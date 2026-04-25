@@ -281,7 +281,8 @@ export type NotificationProviderProfileHealthStatusDto =
   | "ready"
   | "paused"
   | "disabled"
-  | "credentials_unreachable";
+  | "credentials_unreachable"
+  | "target_unreachable";
 
 export type NotificationProviderProfileOperationalRolloutStatusDto =
   | "active_ready"
@@ -291,6 +292,13 @@ export type NotificationProviderProfileOperationalRolloutStatusDto =
   | "canary_ready"
   | "canary_blocked";
 
+export type NotificationProviderProfileProbeStatusDto =
+  | "succeeded"
+  | "skipped_paused"
+  | "skipped_disabled"
+  | "credentials_unreachable"
+  | "target_unreachable";
+
 export interface NotificationProviderProfileOperationalStateDto {
   lastCheckedAt: string;
   lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
@@ -298,6 +306,9 @@ export interface NotificationProviderProfileOperationalStateDto {
   credentialsStatus: NotificationProviderProfileCredentialsStatusDto;
   healthStatus: NotificationProviderProfileHealthStatusDto;
   rolloutStatus: NotificationProviderProfileOperationalRolloutStatusDto;
+  probeStatus: NotificationProviderProfileProbeStatusDto;
+  probeTarget: string | null;
+  probeLatencyMs: number | null;
   lastCheckError: string | null;
 }
 

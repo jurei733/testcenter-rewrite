@@ -458,7 +458,8 @@ const mapNotificationProviderProfileOverrideRecords = (
           operationalStateCandidate.healthStatus === "ready" ||
           operationalStateCandidate.healthStatus === "paused" ||
           operationalStateCandidate.healthStatus === "disabled" ||
-          operationalStateCandidate.healthStatus === "credentials_unreachable"
+          operationalStateCandidate.healthStatus === "credentials_unreachable" ||
+          operationalStateCandidate.healthStatus === "target_unreachable"
         ) &&
         (
           operationalStateCandidate.rolloutStatus === "active_ready" ||
@@ -467,6 +468,25 @@ const mapNotificationProviderProfileOverrideRecords = (
           operationalStateCandidate.rolloutStatus === "disabled" ||
           operationalStateCandidate.rolloutStatus === "canary_ready" ||
           operationalStateCandidate.rolloutStatus === "canary_blocked"
+        ) &&
+        (
+          operationalStateCandidate.probeStatus === "succeeded" ||
+          operationalStateCandidate.probeStatus === "skipped_paused" ||
+          operationalStateCandidate.probeStatus === "skipped_disabled" ||
+          operationalStateCandidate.probeStatus === "credentials_unreachable" ||
+          operationalStateCandidate.probeStatus === "target_unreachable"
+        ) &&
+        (
+          typeof operationalStateCandidate.probeTarget === "string" ||
+          operationalStateCandidate.probeTarget === null
+        ) &&
+        (
+          (
+            typeof operationalStateCandidate.probeLatencyMs === "number" &&
+            Number.isInteger(operationalStateCandidate.probeLatencyMs) &&
+            operationalStateCandidate.probeLatencyMs >= 0
+          ) ||
+          operationalStateCandidate.probeLatencyMs === null
         ) &&
         (
           typeof operationalStateCandidate.lastCheckError === "string" ||
@@ -480,9 +500,13 @@ const mapNotificationProviderProfileOverrideRecords = (
               credentialsStatus: operationalStateCandidate.credentialsStatus as
                 "not_configured" | "reachable" | "unreachable",
               healthStatus: operationalStateCandidate.healthStatus as
-                "ready" | "paused" | "disabled" | "credentials_unreachable",
+                "ready" | "paused" | "disabled" | "credentials_unreachable" | "target_unreachable",
               rolloutStatus: operationalStateCandidate.rolloutStatus as
                 "active_ready" | "active_blocked" | "paused" | "disabled" | "canary_ready" | "canary_blocked",
+              probeStatus: operationalStateCandidate.probeStatus as
+                "succeeded" | "skipped_paused" | "skipped_disabled" | "credentials_unreachable" | "target_unreachable",
+              probeTarget: operationalStateCandidate.probeTarget as string | null,
+              probeLatencyMs: operationalStateCandidate.probeLatencyMs as number | null,
               lastCheckError: operationalStateCandidate.lastCheckError as
                 string | null
             }

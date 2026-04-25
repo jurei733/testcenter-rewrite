@@ -49,6 +49,9 @@ const recordNotificationProviderProfileRefreshAuditEvent = async (input: {
       credentialsStatus: input.profile.operationalState?.credentialsStatus ?? null,
       healthStatus: input.profile.operationalState?.healthStatus ?? null,
       rolloutStatus: input.profile.operationalState?.rolloutStatus ?? null,
+      probeStatus: input.profile.operationalState?.probeStatus ?? null,
+      probeTarget: input.profile.operationalState?.probeTarget ?? null,
+      probeLatencyMs: input.profile.operationalState?.probeLatencyMs ?? null,
       lastCheckError: input.profile.operationalState?.lastCheckError ?? null
     }
   }));
@@ -70,6 +73,9 @@ const didNotificationProviderProfileOperationalStateChange = (
     previousOperationalState.credentialsStatus !== refreshedOperationalState.credentialsStatus ||
     previousOperationalState.healthStatus !== refreshedOperationalState.healthStatus ||
     previousOperationalState.rolloutStatus !== refreshedOperationalState.rolloutStatus ||
+    previousOperationalState.probeStatus !== refreshedOperationalState.probeStatus ||
+    previousOperationalState.probeTarget !== refreshedOperationalState.probeTarget ||
+    previousOperationalState.probeLatencyMs !== refreshedOperationalState.probeLatencyMs ||
     previousOperationalState.lastCheckError !== refreshedOperationalState.lastCheckError;
 };
 

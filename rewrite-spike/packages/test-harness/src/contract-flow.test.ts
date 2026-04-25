@@ -87,7 +87,12 @@ const toExpectedNotificationProviderProfileDto = (input: {
     lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
     lastCheckedByActorId: string;
     credentialsStatus: "not_configured" | "reachable" | "unreachable";
-    healthStatus: "ready" | "paused" | "disabled" | "credentials_unreachable";
+    healthStatus:
+      | "ready"
+      | "paused"
+      | "disabled"
+      | "credentials_unreachable"
+      | "target_unreachable";
     rolloutStatus:
       | "active_ready"
       | "active_blocked"
@@ -95,6 +100,14 @@ const toExpectedNotificationProviderProfileDto = (input: {
       | "disabled"
       | "canary_ready"
       | "canary_blocked";
+    probeStatus:
+      | "succeeded"
+      | "skipped_paused"
+      | "skipped_disabled"
+      | "credentials_unreachable"
+      | "target_unreachable";
+    probeTarget: string | null;
+    probeLatencyMs: number | null;
     lastCheckError: string | null;
   } | null;
 }) => ({
@@ -6675,6 +6688,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
             deliveryChannel: "email_spike",
             target: "retry-once:unreachable-canary@example.test",
             credentialsRef: "vault://unreachable/notifications/canary-email"
+          },
+          {
+            profileKey: "probe-failing-webhook-profile",
+            displayLabel: "Probe Failing Empty Workspace Webhook Profile",
+            rolloutState: "active",
+            deliveryChannel: "webhook_spike",
+            target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-fail",
+            credentialsRef: "vault://notifications/probe-failing-webhook"
           }
         ]
       })
@@ -6700,6 +6721,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         deliveryChannel: "email_spike",
         target: "retry-once:unreachable-canary@example.test",
         credentialsRef: "vault://unreachable/notifications/canary-email"
+      }),
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "probe-failing-webhook-profile",
+        displayLabel: "Probe Failing Empty Workspace Webhook Profile",
+        rolloutState: "active",
+        deliveryChannel: "webhook_spike",
+        target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-fail",
+        credentialsRef: "vault://notifications/probe-failing-webhook"
       })
     ])
   );
@@ -6734,6 +6763,12 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(refreshedTenantAlertsProfile.operationalState.credentialsStatus, "reachable");
   assert.equal(refreshedTenantAlertsProfile.operationalState.healthStatus, "ready");
   assert.equal(refreshedTenantAlertsProfile.operationalState.rolloutStatus, "active_ready");
+  assert.equal(refreshedTenantAlertsProfile.operationalState.probeStatus, "succeeded");
+  assert.equal(
+    refreshedTenantAlertsProfile.operationalState.probeTarget,
+    "tenant-updated-alerts@example.test"
+  );
+  assert.equal(typeof refreshedTenantAlertsProfile.operationalState.probeLatencyMs, "number");
   assert.equal(refreshedTenantAlertsProfile.operationalState.lastCheckError, null);
 
   const refreshedEmptyWorkspaceNotificationProviderProfiles = await retry(
@@ -6765,6 +6800,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   );
   assert.equal(refreshedPausedWorkspaceProfile.operationalState.healthStatus, "paused");
   assert.equal(refreshedPausedWorkspaceProfile.operationalState.rolloutStatus, "paused");
+  assert.equal(refreshedPausedWorkspaceProfile.operationalState.probeStatus, "skipped_paused");
+  assert.equal(refreshedPausedWorkspaceProfile.operationalState.probeTarget, null);
+  assert.equal(refreshedPausedWorkspaceProfile.operationalState.probeLatencyMs, null);
   assert.equal(refreshedPausedWorkspaceProfile.operationalState.lastCheckError, null);
   const refreshedCanaryWorkspaceProfile = refreshedEmptyWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles.find(
     profile => profile.profileKey === "canary-email-profile"
@@ -6781,9 +6819,40 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "credentials_unreachable"
   );
   assert.equal(refreshedCanaryWorkspaceProfile.operationalState.rolloutStatus, "canary_blocked");
+  assert.equal(refreshedCanaryWorkspaceProfile.operationalState.probeStatus, "credentials_unreachable");
+  assert.equal(
+    refreshedCanaryWorkspaceProfile.operationalState.probeTarget,
+    "unreachable-canary@example.test"
+  );
+  assert.equal(refreshedCanaryWorkspaceProfile.operationalState.probeLatencyMs, null);
   assert.equal(
     refreshedCanaryWorkspaceProfile.operationalState.lastCheckError,
     "Credential reference reachability probe failed."
+  );
+  const refreshedProbeFailingWorkspaceProfile = refreshedEmptyWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles.find(
+    profile => profile.profileKey === "probe-failing-webhook-profile"
+  );
+  assert.ok(refreshedProbeFailingWorkspaceProfile?.operationalState);
+  assert.equal(refreshedProbeFailingWorkspaceProfile.operationalState.lastCheckedByActorType, "worker");
+  assert.equal(
+    refreshedProbeFailingWorkspaceProfile.operationalState.lastCheckedByActorId,
+    "provider-operations-service"
+  );
+  assert.equal(refreshedProbeFailingWorkspaceProfile.operationalState.credentialsStatus, "reachable");
+  assert.equal(
+    refreshedProbeFailingWorkspaceProfile.operationalState.healthStatus,
+    "target_unreachable"
+  );
+  assert.equal(refreshedProbeFailingWorkspaceProfile.operationalState.rolloutStatus, "active_blocked");
+  assert.equal(refreshedProbeFailingWorkspaceProfile.operationalState.probeStatus, "target_unreachable");
+  assert.equal(
+    refreshedProbeFailingWorkspaceProfile.operationalState.probeTarget,
+    "https://workspace-webhook.example.test/hooks/probe-fail"
+  );
+  assert.equal(refreshedProbeFailingWorkspaceProfile.operationalState.probeLatencyMs, 250);
+  assert.equal(
+    refreshedProbeFailingWorkspaceProfile.operationalState.lastCheckError,
+    "Active target probe failed."
   );
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(

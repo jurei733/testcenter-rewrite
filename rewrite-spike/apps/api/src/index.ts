@@ -703,7 +703,8 @@ const isNotificationProviderProfileOperationalState = (
     value.healthStatus === "ready" ||
     value.healthStatus === "paused" ||
     value.healthStatus === "disabled" ||
-    value.healthStatus === "credentials_unreachable"
+    value.healthStatus === "credentials_unreachable" ||
+    value.healthStatus === "target_unreachable"
   ) &&
   (
     value.rolloutStatus === "active_ready" ||
@@ -712,6 +713,21 @@ const isNotificationProviderProfileOperationalState = (
     value.rolloutStatus === "disabled" ||
     value.rolloutStatus === "canary_ready" ||
     value.rolloutStatus === "canary_blocked"
+  ) &&
+  (
+    value.probeStatus === "succeeded" ||
+    value.probeStatus === "skipped_paused" ||
+    value.probeStatus === "skipped_disabled" ||
+    value.probeStatus === "credentials_unreachable" ||
+    value.probeStatus === "target_unreachable"
+  ) &&
+  (
+    typeof value.probeTarget === "string" ||
+    value.probeTarget === null
+  ) &&
+  (
+    isNonNegativeInteger(value.probeLatencyMs) ||
+    value.probeLatencyMs === null
   ) &&
   (typeof value.lastCheckError === "string" || value.lastCheckError === null);
 
@@ -740,7 +756,8 @@ const isNotificationProviderProfile = (
     value.healthStatus === "ready" ||
     value.healthStatus === "paused" ||
     value.healthStatus === "disabled" ||
-    value.healthStatus === "credentials_unreachable"
+    value.healthStatus === "credentials_unreachable" ||
+    value.healthStatus === "target_unreachable"
   ) &&
   (
     typeof value.operationalState === "undefined" ||
@@ -1666,13 +1683,16 @@ const toNotificationProviderProfileDto = (
     notificationProviderProfile
   ),
   operationalState: notificationProviderProfile.operationalState
-    ? {
+      ? {
         lastCheckedAt: notificationProviderProfile.operationalState.lastCheckedAt,
         lastCheckedByActorType: notificationProviderProfile.operationalState.lastCheckedByActorType,
         lastCheckedByActorId: notificationProviderProfile.operationalState.lastCheckedByActorId,
         credentialsStatus: notificationProviderProfile.operationalState.credentialsStatus,
         healthStatus: notificationProviderProfile.operationalState.healthStatus,
         rolloutStatus: notificationProviderProfile.operationalState.rolloutStatus,
+        probeStatus: notificationProviderProfile.operationalState.probeStatus,
+        probeTarget: notificationProviderProfile.operationalState.probeTarget,
+        probeLatencyMs: notificationProviderProfile.operationalState.probeLatencyMs,
         lastCheckError: notificationProviderProfile.operationalState.lastCheckError
       }
     : null

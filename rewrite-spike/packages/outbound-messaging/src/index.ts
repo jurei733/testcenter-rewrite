@@ -23,7 +23,8 @@ export type OutboundNotificationProviderProfileHealthStatus =
   | "ready"
   | "paused"
   | "disabled"
-  | "credentials_unreachable";
+  | "credentials_unreachable"
+  | "target_unreachable";
 
 export type OutboundNotificationProviderProfileOperationalRolloutStatus =
   | "active_ready"
@@ -33,6 +34,13 @@ export type OutboundNotificationProviderProfileOperationalRolloutStatus =
   | "canary_ready"
   | "canary_blocked";
 
+export type OutboundNotificationProviderProfileProbeStatus =
+  | "succeeded"
+  | "skipped_paused"
+  | "skipped_disabled"
+  | "credentials_unreachable"
+  | "target_unreachable";
+
 export interface OutboundNotificationProviderProfileOperationalState {
   lastCheckedAt: string;
   lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
@@ -40,6 +48,9 @@ export interface OutboundNotificationProviderProfileOperationalState {
   credentialsStatus: OutboundNotificationProviderProfileCredentialsStatus;
   healthStatus: OutboundNotificationProviderProfileHealthStatus;
   rolloutStatus: OutboundNotificationProviderProfileOperationalRolloutStatus;
+  probeStatus: OutboundNotificationProviderProfileProbeStatus;
+  probeTarget: string | null;
+  probeLatencyMs: number | null;
   lastCheckError: string | null;
 }
 
@@ -93,6 +104,7 @@ interface OutboundNotificationDeliveryAdapter {
 
 const transientFailurePrefix = "retry-once:";
 const terminalFailurePrefix = "fail-permanent:";
+const activeProbeFailurePrefix = "probe-unreachable:";
 const providerProfilePrefix = "profile:";
 const validCredentialsRefPattern = /^vault:\/\/[A-Za-z0-9._/-]+$/;
 const unreachableCredentialsRefPrefix = "vault://unreachable/";
@@ -101,6 +113,7 @@ const normalizeTarget = (target: string): string =>
   target
     .replace(transientFailurePrefix, "")
     .replace(terminalFailurePrefix, "")
+    .replace(activeProbeFailurePrefix, "")
     .trim();
 
 const hasTransientFailurePrefix = (target: string): boolean =>
@@ -108,6 +121,9 @@ const hasTransientFailurePrefix = (target: string): boolean =>
 
 const hasTerminalFailurePrefix = (target: string): boolean =>
   target.startsWith(terminalFailurePrefix);
+
+const hasActiveProbeFailurePrefix = (target: string): boolean =>
+  target.startsWith(activeProbeFailurePrefix);
 
 const createSpikeReceipt = (
   deliveryChannel: OutboundNotificationDeliveryChannel
@@ -198,6 +214,52 @@ const deriveOutboundNotificationProviderProfileHealthStatus = (
   return "ready";
 };
 
+const deriveOutboundNotificationProviderProfileProbeStatus = (
+  profile: OutboundNotificationProviderProfile,
+  credentialsStatus: OutboundNotificationProviderProfileCredentialsStatus
+): OutboundNotificationProviderProfileProbeStatus => {
+  if (!profile.enabled) {
+    return "skipped_disabled";
+  }
+
+  if (profile.rolloutState === "paused") {
+    return "skipped_paused";
+  }
+
+  if (credentialsStatus === "unreachable") {
+    return "credentials_unreachable";
+  }
+
+  if (hasActiveProbeFailurePrefix(profile.target)) {
+    return "target_unreachable";
+  }
+
+  return "succeeded";
+};
+
+const deriveOutboundNotificationProviderProfileHealthStatusFromProbe = (
+  profile: OutboundNotificationProviderProfile,
+  probeStatus: OutboundNotificationProviderProfileProbeStatus
+): OutboundNotificationProviderProfileHealthStatus => {
+  if (!profile.enabled) {
+    return "disabled";
+  }
+
+  if (profile.rolloutState === "paused") {
+    return "paused";
+  }
+
+  if (probeStatus === "credentials_unreachable") {
+    return "credentials_unreachable";
+  }
+
+  if (probeStatus === "target_unreachable") {
+    return "target_unreachable";
+  }
+
+  return "ready";
+};
+
 const deriveOutboundNotificationProviderProfileOperationalRolloutStatus = (
   profile: OutboundNotificationProviderProfile,
   healthStatus: OutboundNotificationProviderProfileHealthStatus
@@ -248,14 +310,31 @@ export const refreshOutboundNotificationProviderProfileOperationalState = (input
   const checkedByActorType = input.checkedByActorType ?? "worker";
   const checkedByActorId = input.checkedByActorId ?? "profile-health-worker";
   const credentialsStatus = deriveOutboundNotificationProviderProfileCredentialsStatus(input.profile);
-  const healthStatus = deriveOutboundNotificationProviderProfileHealthStatus(input.profile);
+  const probeStatus = deriveOutboundNotificationProviderProfileProbeStatus(
+    input.profile,
+    credentialsStatus
+  );
+  const healthStatus = deriveOutboundNotificationProviderProfileHealthStatusFromProbe(
+    input.profile,
+    probeStatus
+  );
   const rolloutStatus = deriveOutboundNotificationProviderProfileOperationalRolloutStatus(
     input.profile,
     healthStatus
   );
-  const lastCheckError = credentialsStatus === "unreachable"
+  const lastCheckError = probeStatus === "credentials_unreachable"
     ? "Credential reference reachability probe failed."
-    : null;
+    : probeStatus === "target_unreachable"
+      ? "Active target probe failed."
+      : null;
+  const probeTarget = probeStatus === "skipped_disabled" || probeStatus === "skipped_paused"
+    ? null
+    : normalizeTarget(input.profile.target);
+  const probeLatencyMs = probeStatus === "succeeded"
+    ? (input.profile.deliveryChannel === "email_spike" ? 45 : 25)
+    : probeStatus === "target_unreachable"
+      ? 250
+      : null;
 
   return {
     ...input.profile,
@@ -266,6 +345,9 @@ export const refreshOutboundNotificationProviderProfileOperationalState = (input
       credentialsStatus,
       healthStatus,
       rolloutStatus,
+      probeStatus,
+      probeTarget,
+      probeLatencyMs,
       lastCheckError
     }
   };
