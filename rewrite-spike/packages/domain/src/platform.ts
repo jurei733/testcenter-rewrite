@@ -1,0 +1,858 @@
+import {
+  defaultContentReleaseActivationPolicy,
+  type ContentReleaseActivationPolicy
+} from "./content.js";
+import type { AuditActorType } from "./audit.js";
+import {
+  defaultOutboundNotificationPolicy,
+  type OutboundNotificationProviderProfile,
+  type OutboundNotificationDeliverySelectionMode,
+  type OutboundNotificationPolicy
+} from "@testcenter-rewrite/outbound-messaging";
+
+export type TenantStatus = "active" | "suspended";
+export type WorkspaceStatus = "active" | "archived";
+
+export interface OperationalPolicy {
+  monitorCommandTtlSeconds: number;
+  monitorCommandLeaseSeconds: number;
+  timedRunMaintenanceGraceSeconds: number;
+}
+
+export interface LaunchApprovalPolicy {
+  systemCheckLaunchApprovalTtlSeconds: number;
+}
+
+export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
+export type NotificationPolicy = OutboundNotificationPolicy;
+export type NotificationProviderProfile = OutboundNotificationProviderProfile;
+export type NotificationProviderProfileOverride = NotificationProviderProfile[];
+export type NotificationProviderProfileOverrideRecords = Record<
+  string,
+  PolicyOverrideRecord<NotificationProviderProfile | null>
+>;
+
+export interface EvidenceRetentionPolicy {
+  systemCheckEvidenceRetentionTtlSeconds: number;
+  systemCheckEvidenceInvestigationRetentionTtlSeconds: number;
+}
+
+export type EvidenceRetentionTtlFieldKey =
+  | "systemCheckEvidenceRetentionTtlSeconds"
+  | "systemCheckEvidenceInvestigationRetentionTtlSeconds";
+
+export type EvidenceRetentionHoldReasonCode = string;
+export type EvidenceRetentionHoldReasonSeverity = "low" | "medium" | "high";
+
+export interface EvidenceRetentionHoldReasonDefinition {
+  holdReasonCode: EvidenceRetentionHoldReasonCode;
+  displayLabel: string;
+  workflowHint: string | null;
+  severity: EvidenceRetentionHoldReasonSeverity;
+  escalationTarget: string | null;
+  uiGroup: string | null;
+  acknowledgementRequired: boolean;
+  defaultAssigneeTarget: string | null;
+  slaSeconds: number | null;
+}
+
+export interface EvidenceRetentionClassTransitionPolicy {
+  holdReasonCode: EvidenceRetentionHoldReasonCode;
+  targetRetentionClass: string;
+}
+
+export interface EvidenceRetentionClassPolicyEntry {
+  retentionClass: string;
+  retentionPolicyKey: string;
+  ttlFieldKey: EvidenceRetentionTtlFieldKey;
+  manualHoldAllowed: boolean;
+  payloadAccessGrantsAllowed: boolean;
+  holdTransitions: EvidenceRetentionClassTransitionPolicy[];
+}
+
+export interface EvidenceRetentionClassPolicy {
+  holdReasons: EvidenceRetentionHoldReasonDefinition[];
+  defaultCaptureRetentionClass: string;
+  classes: EvidenceRetentionClassPolicyEntry[];
+}
+
+export interface EvidenceRetentionClassPolicyOverride {
+  defaultCaptureRetentionClass?: string;
+  classEntries?: EvidenceRetentionClassPolicyEntry[];
+}
+
+export interface EvidenceRetentionClassPolicyOverrideRecords {
+  defaultCaptureRetentionClass?: PolicyOverrideRecord<string>;
+  classEntries?: Record<string, PolicyOverrideRecord<EvidenceRetentionClassPolicyEntry>>;
+}
+
+export interface PolicyOverrideRecord<Value> {
+  value: Value;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+}
+
+export const defaultOperationalPolicy: OperationalPolicy = {
+  monitorCommandTtlSeconds: 30,
+  monitorCommandLeaseSeconds: 15,
+  timedRunMaintenanceGraceSeconds: 0
+};
+
+export const defaultLaunchApprovalPolicy: LaunchApprovalPolicy = {
+  systemCheckLaunchApprovalTtlSeconds: 0
+};
+
+export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
+export const defaultNotificationProviderProfiles: NotificationProviderProfile[] = [];
+
+export const defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy = {
+  systemCheckEvidenceRetentionTtlSeconds: 604800,
+  systemCheckEvidenceInvestigationRetentionTtlSeconds: 2592000
+};
+
+export const defaultEvidenceRetentionClassPolicy: EvidenceRetentionClassPolicy = {
+  holdReasons: [
+    {
+      holdReasonCode: "workspace_review",
+      displayLabel: "Workspace Review",
+      workflowHint: "Keep evidence available while a workspace reviewer inspects the submission.",
+      severity: "low",
+      escalationTarget: null,
+      uiGroup: "review",
+      acknowledgementRequired: false,
+      defaultAssigneeTarget: "workspace-reviewers",
+      slaSeconds: 86400
+    },
+    {
+      holdReasonCode: "operator_investigation",
+      displayLabel: "Operator Investigation",
+      workflowHint: "Escalate evidence into the longer investigation workflow for operator follow-up.",
+      severity: "high",
+      escalationTarget: "ops-investigation",
+      uiGroup: "investigation",
+      acknowledgementRequired: true,
+      defaultAssigneeTarget: "ops-investigation-primary",
+      slaSeconds: 14400
+    }
+  ],
+  defaultCaptureRetentionClass: "workspace_review",
+  classes: [
+    {
+      retentionClass: "workspace_review",
+      retentionPolicyKey: "spike_workspace_review",
+      ttlFieldKey: "systemCheckEvidenceRetentionTtlSeconds",
+      manualHoldAllowed: true,
+      payloadAccessGrantsAllowed: true,
+      holdTransitions: [
+        {
+          holdReasonCode: "workspace_review",
+          targetRetentionClass: "workspace_review"
+        },
+        {
+          holdReasonCode: "operator_investigation",
+          targetRetentionClass: "operator_investigation"
+        }
+      ]
+    },
+    {
+      retentionClass: "operator_investigation",
+      retentionPolicyKey: "spike_operator_investigation",
+      ttlFieldKey: "systemCheckEvidenceInvestigationRetentionTtlSeconds",
+      manualHoldAllowed: true,
+      payloadAccessGrantsAllowed: true,
+      holdTransitions: [
+        {
+          holdReasonCode: "operator_investigation",
+          targetRetentionClass: "operator_investigation"
+        }
+      ]
+    }
+  ]
+};
+
+export interface Tenant {
+  tenantId: string;
+  tenantKey: string;
+  displayName: string;
+  status: TenantStatus;
+  defaultActivationPolicy: ContentReleaseActivationPolicy;
+  defaultOperationalPolicy: OperationalPolicy;
+  defaultLaunchApprovalPolicy: LaunchApprovalPolicy;
+  defaultNotificationPolicy: NotificationPolicy;
+  defaultNotificationProviderProfiles: NotificationProviderProfile[];
+  defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy;
+  defaultEvidenceRetentionClassPolicy: EvidenceRetentionClassPolicy;
+}
+
+export type ContentReleaseActivationPolicyOverride = Partial<ContentReleaseActivationPolicy>;
+export type OperationalPolicyOverride = Partial<OperationalPolicy>;
+export type LaunchApprovalPolicyOverride = Partial<LaunchApprovalPolicy>;
+export type NotificationPolicyOverride = Partial<NotificationPolicy>;
+export type EvidenceRetentionPolicyOverride = Partial<EvidenceRetentionPolicy>;
+
+export interface ActivationPolicyOverrideRecords {
+  blockIncompatibleRoutingChangesWithActiveSessions?: PolicyOverrideRecord<boolean>;
+  warnOnActiveSessions?: PolicyOverrideRecord<boolean>;
+  warnOnHighRiskReleaseChange?: PolicyOverrideRecord<boolean>;
+}
+
+export interface OperationalPolicyOverrideRecords {
+  monitorCommandTtlSeconds?: PolicyOverrideRecord<number>;
+  monitorCommandLeaseSeconds?: PolicyOverrideRecord<number>;
+  timedRunMaintenanceGraceSeconds?: PolicyOverrideRecord<number>;
+}
+
+export interface LaunchApprovalPolicyOverrideRecords {
+  systemCheckLaunchApprovalTtlSeconds?: PolicyOverrideRecord<number>;
+}
+
+export interface NotificationPolicyOverrideRecords {
+  breachNotificationDeliverySelectionMode?: PolicyOverrideRecord<NotificationDeliverySelectionMode>;
+  webhookSpikeRetryDelaySeconds?: PolicyOverrideRecord<number>;
+  webhookSpikeMaxDeliveryAttempts?: PolicyOverrideRecord<number>;
+  emailSpikeRetryDelaySeconds?: PolicyOverrideRecord<number>;
+  emailSpikeMaxDeliveryAttempts?: PolicyOverrideRecord<number>;
+}
+
+export interface EvidenceRetentionPolicyOverrideRecords {
+  systemCheckEvidenceRetentionTtlSeconds?: PolicyOverrideRecord<number>;
+  systemCheckEvidenceInvestigationRetentionTtlSeconds?: PolicyOverrideRecord<number>;
+}
+
+export interface Workspace {
+  workspaceId: string;
+  tenantId: string;
+  workspaceKey: string;
+  displayName: string;
+  status: WorkspaceStatus;
+  activationPolicyOverrideRecords: ActivationPolicyOverrideRecords | null;
+  operationalPolicyOverrideRecords: OperationalPolicyOverrideRecords | null;
+  launchApprovalPolicyOverrideRecords: LaunchApprovalPolicyOverrideRecords | null;
+  notificationPolicyOverrideRecords: NotificationPolicyOverrideRecords | null;
+  notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecords | null;
+  evidenceRetentionPolicyOverrideRecords: EvidenceRetentionPolicyOverrideRecords | null;
+  evidenceRetentionClassPolicyOverrideRecords: EvidenceRetentionClassPolicyOverrideRecords | null;
+}
+
+const createStableId = (prefix: string, businessKey: string): string => `${prefix}-${businessKey}`;
+
+export const createTenant = (input: {
+  tenantKey: string;
+  displayName: string;
+}): Tenant => ({
+  tenantId: createStableId("tenant", input.tenantKey),
+  tenantKey: input.tenantKey,
+  displayName: input.displayName,
+  status: "active",
+  defaultActivationPolicy: defaultContentReleaseActivationPolicy,
+  defaultOperationalPolicy,
+  defaultLaunchApprovalPolicy,
+  defaultNotificationPolicy,
+  defaultNotificationProviderProfiles,
+  defaultEvidenceRetentionPolicy,
+  defaultEvidenceRetentionClassPolicy
+});
+
+export const createWorkspace = (input: {
+  tenantId: string;
+  workspaceKey: string;
+  displayName: string;
+  activationPolicyOverrideRecords?: ActivationPolicyOverrideRecords | null;
+  operationalPolicyOverrideRecords?: OperationalPolicyOverrideRecords | null;
+  launchApprovalPolicyOverrideRecords?: LaunchApprovalPolicyOverrideRecords | null;
+  notificationPolicyOverrideRecords?: NotificationPolicyOverrideRecords | null;
+  notificationProviderProfileOverrideRecords?: NotificationProviderProfileOverrideRecords | null;
+  evidenceRetentionPolicyOverrideRecords?: EvidenceRetentionPolicyOverrideRecords | null;
+  evidenceRetentionClassPolicyOverrideRecords?: EvidenceRetentionClassPolicyOverrideRecords | null;
+}): Workspace => ({
+  workspaceId: createStableId("workspace", `${input.tenantId}-${input.workspaceKey}`),
+  tenantId: input.tenantId,
+  workspaceKey: input.workspaceKey,
+  displayName: input.displayName,
+  status: "active",
+  activationPolicyOverrideRecords: input.activationPolicyOverrideRecords ?? null,
+  operationalPolicyOverrideRecords: input.operationalPolicyOverrideRecords ?? null,
+  launchApprovalPolicyOverrideRecords: input.launchApprovalPolicyOverrideRecords ?? null,
+  notificationPolicyOverrideRecords: input.notificationPolicyOverrideRecords ?? null,
+  notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
+  evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
+  evidenceRetentionClassPolicyOverrideRecords: input.evidenceRetentionClassPolicyOverrideRecords ?? null
+});
+
+const sortNotificationProviderProfiles = (
+  notificationProviderProfiles: NotificationProviderProfile[]
+): NotificationProviderProfile[] =>
+  [...notificationProviderProfiles].sort((left, right) =>
+    left.profileKey.localeCompare(right.profileKey)
+  );
+
+export const resolveWorkspaceActivationPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): ContentReleaseActivationPolicy =>
+  ({
+    ...tenant.defaultActivationPolicy,
+    ...(flattenActivationPolicyOverrideRecords(workspace.activationPolicyOverrideRecords) ?? {})
+  });
+
+export const flattenActivationPolicyOverrideRecords = (
+  records: ActivationPolicyOverrideRecords | null
+): ContentReleaseActivationPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: ContentReleaseActivationPolicyOverride = {};
+
+  if (records.blockIncompatibleRoutingChangesWithActiveSessions) {
+    flattened.blockIncompatibleRoutingChangesWithActiveSessions =
+      records.blockIncompatibleRoutingChangesWithActiveSessions.value;
+  }
+
+  if (records.warnOnActiveSessions) {
+    flattened.warnOnActiveSessions = records.warnOnActiveSessions.value;
+  }
+
+  if (records.warnOnHighRiskReleaseChange) {
+    flattened.warnOnHighRiskReleaseChange = records.warnOnHighRiskReleaseChange.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const createActivationPolicyOverrideRecords = (input: {
+  override: ContentReleaseActivationPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): ActivationPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: ActivationPolicyOverrideRecords = {};
+
+  if (typeof input.override.blockIncompatibleRoutingChangesWithActiveSessions === "boolean") {
+    records.blockIncompatibleRoutingChangesWithActiveSessions = {
+      value: input.override.blockIncompatibleRoutingChangesWithActiveSessions,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.warnOnActiveSessions === "boolean") {
+    records.warnOnActiveSessions = {
+      value: input.override.warnOnActiveSessions,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.warnOnHighRiskReleaseChange === "boolean") {
+    records.warnOnHighRiskReleaseChange = {
+      value: input.override.warnOnHighRiskReleaseChange,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const resolveWorkspaceOperationalPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): OperationalPolicy =>
+  ({
+    ...tenant.defaultOperationalPolicy,
+    ...(flattenOperationalPolicyOverrideRecords(workspace.operationalPolicyOverrideRecords) ?? {})
+  });
+
+export const flattenOperationalPolicyOverrideRecords = (
+  records: OperationalPolicyOverrideRecords | null
+): OperationalPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: OperationalPolicyOverride = {};
+
+  if (records.monitorCommandTtlSeconds) {
+    flattened.monitorCommandTtlSeconds = records.monitorCommandTtlSeconds.value;
+  }
+
+  if (records.monitorCommandLeaseSeconds) {
+    flattened.monitorCommandLeaseSeconds = records.monitorCommandLeaseSeconds.value;
+  }
+
+  if (records.timedRunMaintenanceGraceSeconds) {
+    flattened.timedRunMaintenanceGraceSeconds = records.timedRunMaintenanceGraceSeconds.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const createOperationalPolicyOverrideRecords = (input: {
+  override: OperationalPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): OperationalPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: OperationalPolicyOverrideRecords = {};
+
+  if (typeof input.override.monitorCommandTtlSeconds === "number") {
+    records.monitorCommandTtlSeconds = {
+      value: input.override.monitorCommandTtlSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.monitorCommandLeaseSeconds === "number") {
+    records.monitorCommandLeaseSeconds = {
+      value: input.override.monitorCommandLeaseSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.timedRunMaintenanceGraceSeconds === "number") {
+    records.timedRunMaintenanceGraceSeconds = {
+      value: input.override.timedRunMaintenanceGraceSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const resolveWorkspaceLaunchApprovalPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): LaunchApprovalPolicy =>
+  ({
+    ...tenant.defaultLaunchApprovalPolicy,
+    ...(flattenLaunchApprovalPolicyOverrideRecords(workspace.launchApprovalPolicyOverrideRecords) ?? {})
+  });
+
+export const resolveWorkspaceNotificationPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): NotificationPolicy =>
+  ({
+    ...tenant.defaultNotificationPolicy,
+    ...(flattenNotificationPolicyOverrideRecords(workspace.notificationPolicyOverrideRecords) ?? {})
+  });
+
+export const resolveWorkspaceNotificationProviderProfiles = (
+  workspace: Workspace,
+  tenant: Tenant
+): NotificationProviderProfile[] => {
+  const mergedProfiles = new Map(
+    tenant.defaultNotificationProviderProfiles.map(profile => [profile.profileKey, profile])
+  );
+  if (!workspace.notificationProviderProfileOverrideRecords) {
+    return sortNotificationProviderProfiles(tenant.defaultNotificationProviderProfiles);
+  }
+
+  for (const [profileKey, record] of Object.entries(
+    workspace.notificationProviderProfileOverrideRecords
+  )) {
+    if (record.value === null) {
+      mergedProfiles.delete(profileKey);
+      continue;
+    }
+
+    mergedProfiles.set(profileKey, record.value);
+  }
+
+  return sortNotificationProviderProfiles(Array.from(mergedProfiles.values()));
+};
+
+export const flattenNotificationProviderProfileOverrideRecords = (
+  records: NotificationProviderProfileOverrideRecords | null
+): NotificationProviderProfileOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattenedProfiles = Object.values(records)
+    .map(record => record.value)
+    .filter(
+      (recordValue): recordValue is NotificationProviderProfile => recordValue !== null
+    );
+
+  return flattenedProfiles.length > 0
+    ? sortNotificationProviderProfiles(flattenedProfiles)
+    : null;
+};
+
+export const flattenRemovedNotificationProviderProfileKeys = (
+  records: NotificationProviderProfileOverrideRecords | null
+): string[] | null => {
+  if (!records) {
+    return null;
+  }
+
+  const removedProfileKeys = Object.entries(records)
+    .filter(([, record]) => record.value === null)
+    .map(([profileKey]) => profileKey)
+    .sort((left, right) => left.localeCompare(right));
+
+  return removedProfileKeys.length > 0 ? removedProfileKeys : null;
+};
+
+export const createNotificationProviderProfileOverrideRecords = (input: {
+  override: NotificationProviderProfileOverride;
+  removedProfileKeys?: string[];
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): NotificationProviderProfileOverrideRecords | null => {
+  const removedProfileKeys = [...new Set(input.removedProfileKeys ?? [])].sort((left, right) =>
+    left.localeCompare(right)
+  );
+
+  if (input.override.length === 0 && removedProfileKeys.length === 0) {
+    return null;
+  }
+
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+
+  const overrideEntries = sortNotificationProviderProfiles(input.override).map(profile => [
+    profile.profileKey,
+    {
+      value: profile,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    }
+  ]);
+  const removedEntries = removedProfileKeys.map(profileKey => [
+    profileKey,
+    {
+      value: null,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    }
+  ]);
+
+  return Object.fromEntries(
+    [...overrideEntries, ...removedEntries].map(([profileKey, value]) => [
+      profileKey,
+      value
+    ])
+  );
+};
+
+export const flattenLaunchApprovalPolicyOverrideRecords = (
+  records: LaunchApprovalPolicyOverrideRecords | null
+): LaunchApprovalPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: LaunchApprovalPolicyOverride = {};
+
+  if (records.systemCheckLaunchApprovalTtlSeconds) {
+    flattened.systemCheckLaunchApprovalTtlSeconds = records.systemCheckLaunchApprovalTtlSeconds.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const createLaunchApprovalPolicyOverrideRecords = (input: {
+  override: LaunchApprovalPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): LaunchApprovalPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: LaunchApprovalPolicyOverrideRecords = {};
+
+  if (typeof input.override.systemCheckLaunchApprovalTtlSeconds === "number") {
+    records.systemCheckLaunchApprovalTtlSeconds = {
+      value: input.override.systemCheckLaunchApprovalTtlSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const flattenNotificationPolicyOverrideRecords = (
+  records: NotificationPolicyOverrideRecords | null
+): NotificationPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: NotificationPolicyOverride = {};
+
+  if (records.breachNotificationDeliverySelectionMode) {
+    flattened.breachNotificationDeliverySelectionMode =
+      records.breachNotificationDeliverySelectionMode.value;
+  }
+
+  if (records.webhookSpikeRetryDelaySeconds) {
+    flattened.webhookSpikeRetryDelaySeconds = records.webhookSpikeRetryDelaySeconds.value;
+  }
+
+  if (records.webhookSpikeMaxDeliveryAttempts) {
+    flattened.webhookSpikeMaxDeliveryAttempts = records.webhookSpikeMaxDeliveryAttempts.value;
+  }
+
+  if (records.emailSpikeRetryDelaySeconds) {
+    flattened.emailSpikeRetryDelaySeconds = records.emailSpikeRetryDelaySeconds.value;
+  }
+
+  if (records.emailSpikeMaxDeliveryAttempts) {
+    flattened.emailSpikeMaxDeliveryAttempts = records.emailSpikeMaxDeliveryAttempts.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const createNotificationPolicyOverrideRecords = (input: {
+  override: NotificationPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): NotificationPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: NotificationPolicyOverrideRecords = {};
+
+  if (typeof input.override.breachNotificationDeliverySelectionMode === "string") {
+    records.breachNotificationDeliverySelectionMode = {
+      value: input.override.breachNotificationDeliverySelectionMode,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.webhookSpikeRetryDelaySeconds === "number") {
+    records.webhookSpikeRetryDelaySeconds = {
+      value: input.override.webhookSpikeRetryDelaySeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.webhookSpikeMaxDeliveryAttempts === "number") {
+    records.webhookSpikeMaxDeliveryAttempts = {
+      value: input.override.webhookSpikeMaxDeliveryAttempts,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.emailSpikeRetryDelaySeconds === "number") {
+    records.emailSpikeRetryDelaySeconds = {
+      value: input.override.emailSpikeRetryDelaySeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.emailSpikeMaxDeliveryAttempts === "number") {
+    records.emailSpikeMaxDeliveryAttempts = {
+      value: input.override.emailSpikeMaxDeliveryAttempts,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const resolveWorkspaceEvidenceRetentionPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): EvidenceRetentionPolicy =>
+  ({
+    ...tenant.defaultEvidenceRetentionPolicy,
+    ...(flattenEvidenceRetentionPolicyOverrideRecords(workspace.evidenceRetentionPolicyOverrideRecords) ?? {})
+  });
+
+export const resolveWorkspaceEvidenceRetentionClassPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): EvidenceRetentionClassPolicy => {
+  const override = flattenEvidenceRetentionClassPolicyOverrideRecords(
+    workspace.evidenceRetentionClassPolicyOverrideRecords
+  );
+
+  if (!override) {
+    return tenant.defaultEvidenceRetentionClassPolicy;
+  }
+
+  const overrideClassEntries = new Map(
+    (override.classEntries ?? []).map(entry => [entry.retentionClass, entry])
+  );
+  const effectiveClasses = tenant.defaultEvidenceRetentionClassPolicy.classes.map(
+    classEntry => overrideClassEntries.get(classEntry.retentionClass) ?? classEntry
+  );
+  const defaultCaptureRetentionClass = override.defaultCaptureRetentionClass;
+
+  return {
+    holdReasons: tenant.defaultEvidenceRetentionClassPolicy.holdReasons,
+    defaultCaptureRetentionClass:
+      typeof defaultCaptureRetentionClass === "string" &&
+      effectiveClasses.some(entry => entry.retentionClass === defaultCaptureRetentionClass)
+        ? defaultCaptureRetentionClass
+        : tenant.defaultEvidenceRetentionClassPolicy.defaultCaptureRetentionClass,
+    classes: effectiveClasses
+  };
+};
+
+export const flattenEvidenceRetentionClassPolicyOverrideRecords = (
+  records: EvidenceRetentionClassPolicyOverrideRecords | null
+): EvidenceRetentionClassPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: EvidenceRetentionClassPolicyOverride = {};
+
+  if (records.defaultCaptureRetentionClass) {
+    flattened.defaultCaptureRetentionClass = records.defaultCaptureRetentionClass.value;
+  }
+
+  if (records.classEntries) {
+    const classEntries = Object.values(records.classEntries)
+      .map(record => record.value)
+      .sort((left, right) => left.retentionClass.localeCompare(right.retentionClass));
+
+    if (classEntries.length > 0) {
+      flattened.classEntries = classEntries;
+    }
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const flattenEvidenceRetentionPolicyOverrideRecords = (
+  records: EvidenceRetentionPolicyOverrideRecords | null
+): EvidenceRetentionPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: EvidenceRetentionPolicyOverride = {};
+
+  if (records.systemCheckEvidenceRetentionTtlSeconds) {
+    flattened.systemCheckEvidenceRetentionTtlSeconds = records.systemCheckEvidenceRetentionTtlSeconds.value;
+  }
+
+  if (records.systemCheckEvidenceInvestigationRetentionTtlSeconds) {
+    flattened.systemCheckEvidenceInvestigationRetentionTtlSeconds =
+      records.systemCheckEvidenceInvestigationRetentionTtlSeconds.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
+export const createEvidenceRetentionPolicyOverrideRecords = (input: {
+  override: EvidenceRetentionPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): EvidenceRetentionPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: EvidenceRetentionPolicyOverrideRecords = {};
+
+  if (typeof input.override.systemCheckEvidenceRetentionTtlSeconds === "number") {
+    records.systemCheckEvidenceRetentionTtlSeconds = {
+      value: input.override.systemCheckEvidenceRetentionTtlSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.systemCheckEvidenceInvestigationRetentionTtlSeconds === "number") {
+    records.systemCheckEvidenceInvestigationRetentionTtlSeconds = {
+      value: input.override.systemCheckEvidenceInvestigationRetentionTtlSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const createEvidenceRetentionClassPolicyOverrideRecords = (input: {
+  override: EvidenceRetentionClassPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): EvidenceRetentionClassPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: EvidenceRetentionClassPolicyOverrideRecords = {};
+
+  if (typeof input.override.defaultCaptureRetentionClass === "string") {
+    records.defaultCaptureRetentionClass = {
+      value: input.override.defaultCaptureRetentionClass,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (input.override.classEntries && input.override.classEntries.length > 0) {
+    records.classEntries = Object.fromEntries(
+      input.override.classEntries.map(classEntry => [
+        classEntry.retentionClass,
+        {
+          value: classEntry,
+          updatedAt,
+          updatedByRequestId: input.updatedByRequestId,
+          updatedByActorType: input.updatedByActorType,
+          updatedByActorId: input.updatedByActorId
+        }
+      ])
+    );
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
