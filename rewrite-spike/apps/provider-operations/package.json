@@ -1,0 +1,12 @@
+{
+  "name": "@testcenter-rewrite/provider-operations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/src/index.js",
+  "dependencies": {
+    "@testcenter-rewrite/db": "0.0.0",
+    "@testcenter-rewrite/domain": "0.0.0",
+    "@testcenter-rewrite/outbound-messaging": "0.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@testcenter-rewrite/dispatcher",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/src/index.js",
+  "dependencies": {
+    "@testcenter-rewrite/db": "0.0.0",
+    "@testcenter-rewrite/domain": "0.0.0"
+  }
+}

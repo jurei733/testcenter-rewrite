@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@testcenter-rewrite/contracts": ["packages/contracts/src/index.ts"],
+      "@testcenter-rewrite/outbound-messaging": ["packages/outbound-messaging/src/index.ts"],
+      "@testcenter-rewrite/domain": ["packages/domain/src/index.ts"],
+      "@testcenter-rewrite/db": ["packages/db/src/index.ts"],
+      "@testcenter-rewrite/ui": ["packages/ui/src/index.ts"],
+      "@testcenter-rewrite/test-fixtures": ["packages/test-fixtures/src/index.ts"],
+      "@testcenter-rewrite/test-harness": ["packages/test-harness/src/index.ts"]
+    }
+  }
+}

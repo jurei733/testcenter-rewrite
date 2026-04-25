@@ -1,0 +1,37 @@
+{
+  "name": "testcenter-rewrite-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose -f docker-compose.yml up -d",
+    "db:down": "docker compose -f docker-compose.yml down -v",
+    "db:logs": "docker compose -f docker-compose.yml logs -f postgres",
+    "db:migrate": "npm run build && node packages/db/dist/src/cli.js",
+    "build:projects": "tsc -b packages/contracts packages/outbound-messaging packages/domain packages/db packages/evidence-storage packages/ui packages/test-fixtures apps/api apps/dispatcher apps/notifications apps/provider-operations apps/web apps/worker",
+    "build": "npm run build:projects",
+    "typecheck": "tsc -b --pretty packages/contracts packages/outbound-messaging packages/domain packages/db packages/evidence-storage packages/ui packages/test-fixtures apps/api apps/dispatcher apps/notifications apps/provider-operations apps/web apps/worker",
+    "start:api": "node apps/api/dist/src/index.js",
+    "start:dispatcher": "node apps/dispatcher/dist/src/index.js",
+    "start:dispatcher:once": "node apps/dispatcher/dist/src/index.js --once",
+    "start:notifications": "node apps/notifications/dist/src/index.js",
+    "start:notifications:once": "node apps/notifications/dist/src/index.js --once",
+    "start:provider-operations": "node apps/provider-operations/dist/src/index.js",
+    "start:provider-operations:once": "node apps/provider-operations/dist/src/index.js --once",
+    "start:worker": "node apps/worker/dist/src/index.js",
+    "start:worker:once": "node apps/worker/dist/src/index.js --once",
+    "test:contracts": "npm run build && node --experimental-strip-types --test packages/test-harness/src/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1034.0"
+  }
+}

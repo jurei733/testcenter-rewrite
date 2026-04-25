@@ -1,0 +1,18 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/contracts" },
+    { "path": "./packages/outbound-messaging" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/db" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/test-fixtures" },
+    { "path": "./packages/test-harness" },
+    { "path": "./apps/api" },
+    { "path": "./apps/dispatcher" },
+    { "path": "./apps/notifications" },
+    { "path": "./apps/provider-operations" },
+    { "path": "./apps/web" },
+    { "path": "./apps/worker" }
+  ]
+}

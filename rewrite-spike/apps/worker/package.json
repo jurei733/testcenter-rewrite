@@ -1,0 +1,14 @@
+{
+  "name": "@testcenter-rewrite/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/src/index.js",
+  "dependencies": {
+    "@testcenter-rewrite/contracts": "0.0.0",
+    "@testcenter-rewrite/db": "0.0.0",
+    "@testcenter-rewrite/domain": "0.0.0",
+    "@testcenter-rewrite/evidence-storage": "0.0.0",
+    "@testcenter-rewrite/test-fixtures": "0.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@testcenter-rewrite/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/src/index.js",
+  "dependencies": {
+    "@testcenter-rewrite/ui": "0.0.0"
+  }
+}
