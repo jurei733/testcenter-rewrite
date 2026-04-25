@@ -1,0 +1,6 @@
+.DS_Store
+
+rewrite-spike/node_modules/
+rewrite-spike/.runtime/
+rewrite-spike/**/*.tsbuildinfo
+rewrite-spike/**/dist/
