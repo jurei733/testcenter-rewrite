@@ -20,6 +20,7 @@ import type {
   ImportJob,
   LaunchApprovalPolicyOverrideRecords,
   MonitorCommand,
+  NotificationProviderProfileIncident,
   NotificationProviderPromotionPolicy,
   NotificationProviderPromotionPolicyOverrideRecords,
   NotificationPolicyOverrideRecords,
@@ -1598,6 +1599,29 @@ const mapSystemCheckEvidenceBreachNotification = (
   acknowledgementNote: row.acknowledgement_note ?? null
 });
 
+const mapNotificationProviderProfileIncident = (
+  row: QueryResultRow
+): NotificationProviderProfileIncident => ({
+  incidentId: row.incident_id,
+  tenantId: row.tenant_id,
+  workspaceId: row.workspace_id,
+  profileKey: row.profile_key,
+  incidentType: row.incident_type,
+  status: row.status,
+  openedAt: row.opened_at.toISOString(),
+  openedByActorType: row.opened_by_actor_type,
+  openedByActorId: row.opened_by_actor_id,
+  reasonCode: row.reason_code,
+  deliveryFailedCount: row.delivery_failed_count,
+  suppressionUntil: row.suppression_until ? row.suppression_until.toISOString() : null,
+  sourceRequestId: row.source_request_id ?? null,
+  acknowledgedAt: row.acknowledged_at ? row.acknowledged_at.toISOString() : null,
+  acknowledgedByActorId: row.acknowledged_by_actor_id ?? null,
+  acknowledgementNote: row.acknowledgement_note ?? null,
+  resolvedAt: row.resolved_at ? row.resolved_at.toISOString() : null,
+  resolutionCode: row.resolution_code ?? null
+});
+
 const mapSystemCheckLaunchApproval = (row: QueryResultRow): SystemCheckLaunchApproval => ({
   launchApprovalId: row.launch_approval_id,
   participantSessionId: row.participant_session_id,
@@ -1709,12 +1733,18 @@ export interface PlatformStore {
   saveSystemCheckEvidenceBreachNotification: (
     notification: SystemCheckEvidenceBreachNotification
   ) => Promise<void>;
+  saveNotificationProviderProfileIncident: (
+    incident: NotificationProviderProfileIncident
+  ) => Promise<void>;
   saveSystemCheckLaunchApproval: (launchApproval: SystemCheckLaunchApproval) => Promise<void>;
   saveSystemCheckSubmission: (systemCheckSubmission: SystemCheckSubmission) => Promise<void>;
   updateSystemCheckEvidence: (systemCheckEvidence: SystemCheckEvidence) => Promise<void>;
   updateSystemCheckEvidenceAccessGrant: (accessGrant: SystemCheckEvidenceAccessGrant) => Promise<void>;
   updateSystemCheckEvidenceBreachNotification: (
     notification: SystemCheckEvidenceBreachNotification
+  ) => Promise<void>;
+  updateNotificationProviderProfileIncident: (
+    incident: NotificationProviderProfileIncident
   ) => Promise<void>;
   updateSystemCheckLaunchApproval: (launchApproval: SystemCheckLaunchApproval) => Promise<void>;
   updateSystemCheckSubmissionReview: (systemCheckSubmission: SystemCheckSubmission) => Promise<void>;
@@ -1741,6 +1771,13 @@ export interface PlatformStore {
   getSystemCheckEvidenceBreachNotificationById: (
     notificationId: string
   ) => Promise<SystemCheckEvidenceBreachNotification | undefined>;
+  getNotificationProviderProfileIncidentById: (
+    incidentId: string
+  ) => Promise<NotificationProviderProfileIncident | undefined>;
+  getLatestUnresolvedNotificationProviderProfileIncident: (
+    workspaceId: string,
+    profileKey: string
+  ) => Promise<NotificationProviderProfileIncident | undefined>;
   getSystemCheckLaunchApprovalById: (launchApprovalId: string) => Promise<SystemCheckLaunchApproval | undefined>;
   getSystemCheckSubmissionById: (systemCheckSubmissionId: string) => Promise<SystemCheckSubmission | undefined>;
   getOpenTestRunForSessionAssignment: (
@@ -1797,6 +1834,16 @@ export interface PlatformStore {
       limit?: number;
     }
   ) => Promise<SystemCheckEvidenceBreachNotification[]>;
+  listNotificationProviderProfileIncidentsByWorkspace: (
+    tenantKey: string,
+    workspaceKey: string,
+    options?: {
+      profileKey?: string;
+      incidentType?: NotificationProviderProfileIncident["incidentType"];
+      status?: NotificationProviderProfileIncident["status"];
+      limit?: number;
+    }
+  ) => Promise<NotificationProviderProfileIncident[]>;
   listPendingSystemCheckEvidenceBreachNotificationDeliveries: (
     limit: number
   ) => Promise<SystemCheckEvidenceBreachNotification[]>;
@@ -2209,6 +2256,40 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       client.release();
     }
   },
+  saveNotificationProviderProfileIncident: async incident => {
+    await pool.query(
+      `
+        INSERT INTO notification_provider_profile_incidents (
+          incident_id, tenant_id, workspace_id, profile_key, incident_type, status,
+          opened_at, opened_by_actor_type, opened_by_actor_id, reason_code,
+          delivery_failed_count, suppression_until, source_request_id,
+          acknowledged_at, acknowledged_by_actor_id, acknowledgement_note,
+          resolved_at, resolution_code
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      `,
+      [
+        incident.incidentId,
+        incident.tenantId,
+        incident.workspaceId,
+        incident.profileKey,
+        incident.incidentType,
+        incident.status,
+        incident.openedAt,
+        incident.openedByActorType,
+        incident.openedByActorId,
+        incident.reasonCode,
+        incident.deliveryFailedCount,
+        incident.suppressionUntil,
+        incident.sourceRequestId,
+        incident.acknowledgedAt,
+        incident.acknowledgedByActorId,
+        incident.acknowledgementNote,
+        incident.resolvedAt,
+        incident.resolutionCode
+      ]
+    );
+  },
   saveSystemCheckLaunchApproval: async launchApproval => {
     await pool.query(
       `
@@ -2411,6 +2492,35 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     } finally {
       client.release();
     }
+  },
+  updateNotificationProviderProfileIncident: async incident => {
+    await pool.query(
+      `
+        UPDATE notification_provider_profile_incidents
+        SET status = $2,
+            delivery_failed_count = $3,
+            suppression_until = $4,
+            source_request_id = $5,
+            acknowledged_at = $6,
+            acknowledged_by_actor_id = $7,
+            acknowledgement_note = $8,
+            resolved_at = $9,
+            resolution_code = $10
+        WHERE incident_id = $1
+      `,
+      [
+        incident.incidentId,
+        incident.status,
+        incident.deliveryFailedCount,
+        incident.suppressionUntil,
+        incident.sourceRequestId,
+        incident.acknowledgedAt,
+        incident.acknowledgedByActorId,
+        incident.acknowledgementNote,
+        incident.resolvedAt,
+        incident.resolutionCode
+      ]
+    );
   },
   updateSystemCheckLaunchApproval: async launchApproval => {
     await pool.query(
@@ -2874,6 +2984,44 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
 
     return result.rows[0] ? mapSystemCheckEvidenceBreachNotification(result.rows[0]) : undefined;
   },
+  getNotificationProviderProfileIncidentById: async incidentId => {
+    const result = await pool.query(
+      `
+        SELECT
+          incident_id, tenant_id, workspace_id, profile_key, incident_type, status,
+          opened_at, opened_by_actor_type, opened_by_actor_id, reason_code,
+          delivery_failed_count, suppression_until, source_request_id,
+          acknowledged_at, acknowledged_by_actor_id, acknowledgement_note,
+          resolved_at, resolution_code
+        FROM notification_provider_profile_incidents
+        WHERE incident_id = $1
+      `,
+      [incidentId]
+    );
+
+    return result.rows[0] ? mapNotificationProviderProfileIncident(result.rows[0]) : undefined;
+  },
+  getLatestUnresolvedNotificationProviderProfileIncident: async (workspaceId, profileKey) => {
+    const result = await pool.query(
+      `
+        SELECT
+          incident_id, tenant_id, workspace_id, profile_key, incident_type, status,
+          opened_at, opened_by_actor_type, opened_by_actor_id, reason_code,
+          delivery_failed_count, suppression_until, source_request_id,
+          acknowledged_at, acknowledged_by_actor_id, acknowledgement_note,
+          resolved_at, resolution_code
+        FROM notification_provider_profile_incidents
+        WHERE workspace_id = $1
+          AND profile_key = $2
+          AND status IN ('open', 'acknowledged')
+        ORDER BY opened_at DESC
+        LIMIT 1
+      `,
+      [workspaceId, profileKey]
+    );
+
+    return result.rows[0] ? mapNotificationProviderProfileIncident(result.rows[0]) : undefined;
+  },
   getSystemCheckLaunchApprovalById: async launchApprovalId => {
     const result = await pool.query(
       `
@@ -3200,6 +3348,58 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     );
 
     return result.rows.map(mapSystemCheckEvidenceBreachNotification);
+  },
+  listNotificationProviderProfileIncidentsByWorkspace: async (
+    tenantKey,
+    workspaceKey,
+    options = {}
+  ) => {
+    const workspace = await resolveWorkspace(pool, tenantKey, workspaceKey);
+
+    if (!workspace) {
+      return [];
+    }
+
+    const filters: Array<string | number> = [workspace.tenantId, workspace.workspaceId];
+    const whereClauses = [
+      "tenant_id = $1",
+      "workspace_id = $2"
+    ];
+
+    if (options.profileKey) {
+      filters.push(options.profileKey);
+      whereClauses.push(`profile_key = $${filters.length}`);
+    }
+
+    if (options.incidentType) {
+      filters.push(options.incidentType);
+      whereClauses.push(`incident_type = $${filters.length}`);
+    }
+
+    if (options.status) {
+      filters.push(options.status);
+      whereClauses.push(`status = $${filters.length}`);
+    }
+
+    filters.push(options.limit ?? 50);
+
+    const result = await pool.query(
+      `
+        SELECT
+          incident_id, tenant_id, workspace_id, profile_key, incident_type, status,
+          opened_at, opened_by_actor_type, opened_by_actor_id, reason_code,
+          delivery_failed_count, suppression_until, source_request_id,
+          acknowledged_at, acknowledged_by_actor_id, acknowledgement_note,
+          resolved_at, resolution_code
+        FROM notification_provider_profile_incidents
+        WHERE ${whereClauses.join(" AND ")}
+        ORDER BY opened_at DESC
+        LIMIT $${filters.length}
+      `,
+      filters
+    );
+
+    return result.rows.map(mapNotificationProviderProfileIncident);
   },
   listPendingSystemCheckEvidenceBreachNotificationDeliveries: async limit => {
     const result = await pool.query(

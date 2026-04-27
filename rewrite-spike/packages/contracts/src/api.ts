@@ -39,6 +39,14 @@ export const apiRoutes = {
     profileKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles/${profileKey}:promote`,
+  workspaceNotificationProviderProfileIncidents: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-incidents`,
+  workspaceNotificationProviderProfileIncidentAcknowledge: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-incidents/${incidentId}:acknowledge`,
   workspaceEvidenceRetentionPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/evidence-retention-policy`,
   workspaceEvidenceRetentionClassPolicy: (tenantKey: string, workspaceKey: string): string =>
@@ -338,6 +346,30 @@ export interface NotificationProviderProfileIncidentStateDto {
   reasonCode: "delivery_failures_present";
   deliveryFailedCount: number;
   suppressionUntil: string | null;
+  resolvedAt: string | null;
+  resolutionCode: "auto_promoted" | "manually_promoted" | null;
+}
+
+export type NotificationProviderProfileIncidentStatusDto =
+  | "open"
+  | "acknowledged"
+  | "resolved";
+
+export interface NotificationProviderProfileIncidentDto {
+  incidentId: string;
+  profileKey: string;
+  incidentType: "auto_rollback_failure";
+  status: NotificationProviderProfileIncidentStatusDto;
+  openedAt: string;
+  openedByActorType: "worker" | "notification_service" | "platform_api";
+  openedByActorId: string;
+  reasonCode: "delivery_failures_present";
+  deliveryFailedCount: number;
+  suppressionUntil: string | null;
+  sourceRequestId: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedByActorId: string | null;
+  acknowledgementNote: string | null;
   resolvedAt: string | null;
   resolutionCode: "auto_promoted" | "manually_promoted" | null;
 }
@@ -796,6 +828,24 @@ export interface PromoteWorkspaceNotificationProviderProfileRequest {
 export interface PromoteWorkspaceNotificationProviderProfileResponse {
   profileKey: string;
   workspace: WorkspaceNotificationProviderProfilesResponse;
+}
+
+export interface WorkspaceNotificationProviderProfileIncidentsResponse {
+  items: NotificationProviderProfileIncidentDto[];
+  filters: {
+    profileKey: string | null;
+    incidentType: "auto_rollback_failure" | null;
+    status: NotificationProviderProfileIncidentStatusDto | null;
+  };
+}
+
+export interface AcknowledgeNotificationProviderProfileIncidentRequest {
+  acknowledgedByActorId: string;
+  acknowledgementNote: string;
+}
+
+export interface AcknowledgeNotificationProviderProfileIncidentResponse {
+  incident: NotificationProviderProfileIncidentDto;
 }
 
 export interface WorkspaceEvidenceRetentionPolicyResponse {

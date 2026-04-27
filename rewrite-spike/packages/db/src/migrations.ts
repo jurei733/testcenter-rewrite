@@ -1203,6 +1203,41 @@ SET notification_provider_promotion_policy_override =
 WHERE notification_provider_promotion_policy_override IS NOT NULL
   AND NOT (notification_provider_promotion_policy_override ? 'autoPromotionSuppressionSeconds');
 `
+  },
+  {
+    version: "0041",
+    name: "notification-provider-profile-incidents",
+    sql: `
+CREATE TABLE IF NOT EXISTS notification_provider_profile_incidents (
+  incident_id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+  profile_key TEXT NOT NULL,
+  incident_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  opened_at TIMESTAMPTZ NOT NULL,
+  opened_by_actor_type TEXT NOT NULL,
+  opened_by_actor_id TEXT NOT NULL,
+  reason_code TEXT NOT NULL,
+  delivery_failed_count INTEGER NOT NULL,
+  suppression_until TIMESTAMPTZ NULL,
+  source_request_id TEXT NULL,
+  acknowledged_at TIMESTAMPTZ NULL,
+  acknowledged_by_actor_id TEXT NULL,
+  acknowledgement_note TEXT NULL,
+  resolved_at TIMESTAMPTZ NULL,
+  resolution_code TEXT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_incidents_workspace_opened_at
+  ON notification_provider_profile_incidents(tenant_id, workspace_id, opened_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_incidents_workspace_status
+  ON notification_provider_profile_incidents(workspace_id, status, opened_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_incidents_workspace_profile_status
+  ON notification_provider_profile_incidents(workspace_id, profile_key, status, opened_at DESC);
+`
   }
 ];
 

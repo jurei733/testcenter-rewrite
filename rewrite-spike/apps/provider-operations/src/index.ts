@@ -5,9 +5,11 @@ import {
 } from "@testcenter-rewrite/db";
 import {
   createAuditEvent,
+  createNotificationProviderProfileIncident,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceNotificationProviderPromotionPolicy,
   type NotificationProviderProfile,
+  type NotificationProviderProfileIncident,
   type NotificationProviderPromotionPolicy,
   type SystemCheckEvidenceBreachNotification,
   type Workspace
@@ -428,6 +430,8 @@ const reconcileNotificationProviderProfileRollouts = async (
         metrics: NotificationProviderProfileRolloutMetrics;
         automationAction: "auto_promoted" | "auto_rolled_back";
       }> = [];
+      const incidentsToCreate: NotificationProviderProfileIncident[] = [];
+      const incidentsToUpdate: NotificationProviderProfileIncident[] = [];
 
       for (const profile of effectiveProfiles) {
         const workspaceOverrideRecord =
@@ -481,6 +485,22 @@ const reconcileNotificationProviderProfileRollouts = async (
             requestId,
             updatedAt: checkedAt
           });
+          const unresolvedIncident =
+            await store.getLatestUnresolvedNotificationProviderProfileIncident(
+              workspace.workspaceId,
+              currentProfile.profileKey
+            );
+
+          if (unresolvedIncident) {
+            incidentsToUpdate.push({
+              ...unresolvedIncident,
+              status: "resolved",
+              suppressionUntil: null,
+              resolvedAt: checkedAt,
+              resolutionCode: "auto_promoted",
+              sourceRequestId: requestId
+            });
+          }
           automationAuditEvents.push({
             requestId,
             eventType:
@@ -539,6 +559,29 @@ const reconcileNotificationProviderProfileRollouts = async (
             requestId,
             updatedAt: checkedAt
           });
+          const unresolvedIncident =
+            await store.getLatestUnresolvedNotificationProviderProfileIncident(
+              workspace.workspaceId,
+              currentProfile.profileKey
+            );
+
+          if (!unresolvedIncident) {
+            incidentsToCreate.push(
+              createNotificationProviderProfileIncident({
+                tenantId: workspace.tenantId,
+                workspaceId: workspace.workspaceId,
+                profileKey: currentProfile.profileKey,
+                incidentType: "auto_rollback_failure",
+                openedAt: checkedAt,
+                openedByActorType: "worker",
+                openedByActorId: providerOperationsActorId,
+                reasonCode: "delivery_failures_present",
+                deliveryFailedCount: metrics.deliveryFailedCount,
+                suppressionUntil,
+                sourceRequestId: requestId
+              })
+            );
+          }
           automationAuditEvents.push({
             requestId,
             eventType:
@@ -556,6 +599,14 @@ const reconcileNotificationProviderProfileRollouts = async (
       }
 
       await store.saveWorkspace(updatedWorkspace);
+
+      for (const incident of incidentsToCreate) {
+        await store.saveNotificationProviderProfileIncident(incident);
+      }
+
+      for (const incident of incidentsToUpdate) {
+        await store.updateNotificationProviderProfileIncident(incident);
+      }
 
       for (const auditEvent of automationAuditEvents) {
         await recordNotificationProviderProfileAutomationAuditEvent({

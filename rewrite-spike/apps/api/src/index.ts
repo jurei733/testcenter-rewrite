@@ -30,6 +30,8 @@ import {
   type AcknowledgeSystemCheckEvidenceHoldResponse,
   type AcknowledgeSystemCheckEvidenceBreachNotificationRequest,
   type AcknowledgeSystemCheckEvidenceBreachNotificationResponse,
+  type AcknowledgeNotificationProviderProfileIncidentRequest,
+  type AcknowledgeNotificationProviderProfileIncidentResponse,
   type RedriveSystemCheckEvidenceBreachNotificationRequest,
   type RedriveSystemCheckEvidenceBreachNotificationResponse,
   type HoldSystemCheckEvidenceRequest,
@@ -55,6 +57,8 @@ import {
   type NotificationPolicyOverrideRecordsDto,
   type NotificationProviderProfileInputDto,
   type NotificationProviderProfileDto,
+  type NotificationProviderProfileIncidentDto,
+  type NotificationProviderProfileIncidentStatusDto,
   type NotificationProviderProfileOverrideRecordDto,
   type NotificationProviderProfileRolloutMetricsItemDto,
   type PromoteWorkspaceNotificationProviderProfileRequest,
@@ -165,6 +169,7 @@ import {
   type WorkspaceNotificationPolicyModeDto,
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
+  type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceSystemCheckEvidenceResponse,
@@ -207,6 +212,7 @@ import {
   createLaunchApprovalPolicyOverrideRecords,
   createMonitorCommand,
   createNotificationProviderPromotionPolicyOverrideRecords,
+  createNotificationProviderProfileIncident,
   createNotificationPolicyOverrideRecords,
   createNotificationProviderProfileOverrideRecords,
   createOperationalPolicyOverrideRecords,
@@ -285,6 +291,7 @@ import {
   type NotificationProviderPromotionPolicy,
   type NotificationPolicy,
   type NotificationProviderProfile,
+  type NotificationProviderProfileIncident,
   type StarterAssignment,
   type SourcePackage,
   type SystemCheckEvidence,
@@ -325,6 +332,10 @@ const workspaceNotificationProviderProfileRolloutMetricsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-rollout-metrics$/;
 const workspaceNotificationProviderProfilePromoteRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles\/([^/]+):promote$/;
+const workspaceNotificationProviderProfileIncidentsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents$/;
+const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents\/([^/]+):acknowledge$/;
 const workspaceEvidenceRetentionPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/evidence-retention-policy$/;
 const workspaceEvidenceRetentionClassPolicyRoutePattern =
@@ -879,6 +890,11 @@ const isNotificationProviderProfileInput = (
     (typeof value.credentialsRef === "string" &&
       isValidOutboundNotificationCredentialsRef(value.credentialsRef))
   );
+
+const isNotificationProviderProfileIncidentStatus = (
+  value: unknown
+): value is NotificationProviderProfileIncidentStatusDto =>
+  value === "open" || value === "acknowledged" || value === "resolved";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -1908,6 +1924,27 @@ const toNotificationProviderProfileDto = (
         lastCheckError: notificationProviderProfile.operationalState.lastCheckError
       }
     : null
+});
+
+const toNotificationProviderProfileIncidentDto = (
+  incident: NotificationProviderProfileIncident
+): NotificationProviderProfileIncidentDto => ({
+  incidentId: incident.incidentId,
+  profileKey: incident.profileKey,
+  incidentType: incident.incidentType,
+  status: incident.status,
+  openedAt: incident.openedAt,
+  openedByActorType: incident.openedByActorType,
+  openedByActorId: incident.openedByActorId,
+  reasonCode: incident.reasonCode,
+  deliveryFailedCount: incident.deliveryFailedCount,
+  suppressionUntil: incident.suppressionUntil,
+  sourceRequestId: incident.sourceRequestId,
+  acknowledgedAt: incident.acknowledgedAt,
+  acknowledgedByActorId: incident.acknowledgedByActorId,
+  acknowledgementNote: incident.acknowledgementNote,
+  resolvedAt: incident.resolvedAt,
+  resolutionCode: incident.resolutionCode
 });
 
 const toNotificationProviderProfile = (
@@ -7359,6 +7396,22 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
   };
 
   await store.saveWorkspace(updatedWorkspace);
+  const unresolvedIncident = await store.getLatestUnresolvedNotificationProviderProfileIncident(
+    updatedWorkspace.workspaceId,
+    profileKey
+  );
+
+  if (unresolvedIncident) {
+    await store.updateNotificationProviderProfileIncident({
+      ...unresolvedIncident,
+      status: "resolved",
+      suppressionUntil: null,
+      resolvedAt: updatedAt,
+      resolutionCode: "manually_promoted",
+      sourceRequestId: requestContext.requestId
+    });
+  }
+
   await recordAuditEvent(store, {
     requestId: requestContext.requestId,
     tenantId: updatedWorkspace.tenantId,
@@ -7385,6 +7438,170 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
   sendJson<PromoteWorkspaceNotificationProviderProfileResponse>(response, 200, {
     profileKey,
     workspace: toWorkspaceNotificationProviderProfilesResponse(tenant, updatedWorkspace)
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileIncidentsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawIncidentType = getTrimmedString(url.searchParams.get("incidentType"));
+  const incidentType = rawIncidentType ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+
+  if (incidentType !== null && incidentType !== "auto_rollback_failure") {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_incident_type_filter",
+      "incidentType must be auto_rollback_failure."
+    );
+    return;
+  }
+
+  if (status !== null && !isNotificationProviderProfileIncidentStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_incident_status_filter",
+      "status must be one of open, acknowledged, or resolved."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_incident_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  const incidents = await store.listNotificationProviderProfileIncidentsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: profileKey ?? undefined,
+      incidentType: incidentType ?? undefined,
+      status: status ?? undefined,
+      limit
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileIncidentsResponse>(response, 200, {
+    items: incidents.map(toNotificationProviderProfileIncidentDto),
+    filters: {
+      profileKey,
+      incidentType,
+      status
+    }
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileIncidentAcknowledge = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  if (incident.status === "resolved") {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_incident_already_resolved",
+      `Notification provider profile incident '${incidentId}' is already resolved.`
+    );
+    return;
+  }
+
+  const body = await readBody<AcknowledgeNotificationProviderProfileIncidentRequest>(request);
+  const acknowledgedByActorId = getTrimmedString(body.acknowledgedByActorId);
+  const acknowledgementNote = getTrimmedString(body.acknowledgementNote);
+
+  if (!acknowledgedByActorId || !acknowledgementNote) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_incident_acknowledgement_payload",
+      "acknowledgedByActorId and acknowledgementNote are required."
+    );
+    return;
+  }
+
+  const acknowledgedAt = new Date().toISOString();
+  const acknowledgedIncident: NotificationProviderProfileIncident = {
+    ...incident,
+    status: "acknowledged",
+    acknowledgedAt,
+    acknowledgedByActorId,
+    acknowledgementNote,
+    sourceRequestId: requestContext.requestId
+  };
+
+  await store.updateNotificationProviderProfileIncident(acknowledgedIncident);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: acknowledgedByActorId,
+    eventType: "workspace.notification_provider_profile_incident.acknowledged",
+    payload: {
+      workspaceKey,
+      incident: toNotificationProviderProfileIncidentDto(acknowledgedIncident)
+    }
+  });
+
+  sendJson<AcknowledgeNotificationProviderProfileIncidentResponse>(response, 200, {
+    incident: toNotificationProviderProfileIncidentDto(acknowledgedIncident)
   });
 };
 
@@ -11952,6 +12169,47 @@ const handleRequest = async (
         tenantKey,
         workspaceKey,
         profileKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileIncidentsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileIncidentsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileIncidentsRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceNotificationProviderProfileIncidentsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileIncidentsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileIncidentAcknowledgeRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileIncidentAcknowledgeRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileIncidentAcknowledgeRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileIncidentAcknowledge(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
         requestContext
       );
       return;

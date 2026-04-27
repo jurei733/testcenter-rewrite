@@ -6,6 +6,10 @@ import type { AuditActorType } from "./audit.js";
 import {
   defaultOutboundNotificationPolicy,
   type OutboundNotificationProviderProfile,
+  type OutboundNotificationProviderProfileIncidentReasonCode,
+  type OutboundNotificationProviderProfileIncidentResolutionCode,
+  type OutboundNotificationProviderProfileIncidentState,
+  type OutboundNotificationProviderProfileIncidentType,
   type OutboundNotificationDeliverySelectionMode,
   type OutboundNotificationPolicy
 } from "@testcenter-rewrite/outbound-messaging";
@@ -37,11 +41,44 @@ export interface NotificationProviderPromotionPolicy {
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
 export type NotificationPolicy = OutboundNotificationPolicy;
 export type NotificationProviderProfile = OutboundNotificationProviderProfile;
+export type NotificationProviderProfileIncidentType =
+  OutboundNotificationProviderProfileIncidentType;
+export type NotificationProviderProfileIncidentReasonCode =
+  OutboundNotificationProviderProfileIncidentReasonCode;
+export type NotificationProviderProfileIncidentResolutionCode =
+  OutboundNotificationProviderProfileIncidentResolutionCode;
+export type NotificationProviderProfileIncidentState =
+  OutboundNotificationProviderProfileIncidentState;
 export type NotificationProviderProfileOverride = NotificationProviderProfile[];
 export type NotificationProviderProfileOverrideRecords = Record<
   string,
   PolicyOverrideRecord<NotificationProviderProfile | null>
 >;
+export type NotificationProviderProfileIncidentStatus =
+  | "open"
+  | "acknowledged"
+  | "resolved";
+
+export interface NotificationProviderProfileIncident {
+  incidentId: string;
+  tenantId: string;
+  workspaceId: string;
+  profileKey: string;
+  incidentType: NotificationProviderProfileIncidentType;
+  status: NotificationProviderProfileIncidentStatus;
+  openedAt: string;
+  openedByActorType: "worker" | "notification_service" | "platform_api";
+  openedByActorId: string;
+  reasonCode: NotificationProviderProfileIncidentReasonCode;
+  deliveryFailedCount: number;
+  suppressionUntil: string | null;
+  sourceRequestId: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedByActorId: string | null;
+  acknowledgementNote: string | null;
+  resolvedAt: string | null;
+  resolutionCode: NotificationProviderProfileIncidentResolutionCode | null;
+}
 
 export interface EvidenceRetentionPolicy {
   systemCheckEvidenceRetentionTtlSeconds: number;
@@ -319,6 +356,42 @@ export const createWorkspace = (input: {
   notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
   evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
   evidenceRetentionClassPolicyOverrideRecords: input.evidenceRetentionClassPolicyOverrideRecords ?? null
+});
+
+export const createNotificationProviderProfileIncident = (input: {
+  tenantId: string;
+  workspaceId: string;
+  profileKey: string;
+  incidentType: NotificationProviderProfileIncidentType;
+  openedAt: string;
+  openedByActorType: "worker" | "notification_service" | "platform_api";
+  openedByActorId: string;
+  reasonCode: NotificationProviderProfileIncidentReasonCode;
+  deliveryFailedCount: number;
+  suppressionUntil: string | null;
+  sourceRequestId?: string | null;
+}): NotificationProviderProfileIncident => ({
+  incidentId: createStableId(
+    "notification-provider-profile-incident",
+    `${input.workspaceId}-${input.profileKey}-${input.openedAt}-${input.incidentType}`
+  ),
+  tenantId: input.tenantId,
+  workspaceId: input.workspaceId,
+  profileKey: input.profileKey,
+  incidentType: input.incidentType,
+  status: "open",
+  openedAt: input.openedAt,
+  openedByActorType: input.openedByActorType,
+  openedByActorId: input.openedByActorId,
+  reasonCode: input.reasonCode,
+  deliveryFailedCount: input.deliveryFailedCount,
+  suppressionUntil: input.suppressionUntil,
+  sourceRequestId: input.sourceRequestId ?? null,
+  acknowledgedAt: null,
+  acknowledgedByActorId: null,
+  acknowledgementNote: null,
+  resolvedAt: null,
+  resolutionCode: null
 });
 
 const sortNotificationProviderProfiles = (

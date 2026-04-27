@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import {
   apiRoutes,
+  type AcknowledgeNotificationProviderProfileIncidentResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
   type TenantActivationPolicyResponse,
@@ -22,6 +23,7 @@ import {
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
+  type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceOperationalPolicyResponse
@@ -7568,6 +7570,48 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(autoRollbackAuditEvent.payload.automationAction, "auto_rolled_back");
   assert.equal(autoRollbackAuditEvent.payload.deliveryFailedCount, 1);
 
+  const providerIncidentQueue = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileIncidentsResponse>(
+      apiRoutes.workspaceNotificationProviderProfileIncidents(demoTenantKey, demoWorkspaceKey)
+    );
+    const matchingIncident = response.items.find(
+      item => item.profileKey === "dead-letter-email-profile"
+    );
+
+    assert.ok(matchingIncident, "Expected dead-letter provider incident to be queued.");
+    assert.equal(matchingIncident.status, "open");
+    assert.equal(matchingIncident.reasonCode, "delivery_failures_present");
+    assert.equal(matchingIncident.deliveryFailedCount, 1);
+    assert.equal(matchingIncident.openedByActorId, "provider-operations-service");
+
+    return {
+      response,
+      matchingIncident
+    };
+  }, 20, 250);
+
+  const acknowledgedProviderIncident =
+    await fetchJson<AcknowledgeNotificationProviderProfileIncidentResponse>(
+      apiRoutes.workspaceNotificationProviderProfileIncidentAcknowledge(
+        demoTenantKey,
+        demoWorkspaceKey,
+        providerIncidentQueue.matchingIncident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          acknowledgedByActorId: "ops-governance-1",
+          acknowledgementNote: "Investigating rollout failure before manual recovery."
+        })
+      }
+    );
+  assert.equal(acknowledgedProviderIncident.incident.status, "acknowledged");
+  assert.equal(acknowledgedProviderIncident.incident.acknowledgedByActorId, "ops-governance-1");
+  assert.equal(
+    acknowledgedProviderIncident.incident.acknowledgementNote,
+    "Investigating rollout failure before manual recovery."
+  );
+
   await setSystemCheckEvidenceBreachNotificationCreatedAt({
     evidenceKey: deadLetterEvidenceCaptureResponse.body.evidence.evidenceKey,
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
@@ -7604,6 +7648,52 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     return currentProfile;
   }, 10, 250);
   assert.equal(stillSuppressedDeadLetterWorkspace.profileKey, "dead-letter-email-profile");
+
+  const forcedPromotionAfterIncident = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
+    apiRoutes.workspaceNotificationProviderProfilePromote(
+      demoTenantKey,
+      demoWorkspaceKey,
+      "dead-letter-email-profile"
+    ),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        promotedByActorId: "ops-governance-1",
+        promotionNote: "Manual recovery after incident acknowledgement.",
+        forcePromotion: true,
+        clearRolloutFallbackProfile: false,
+        evaluationWindowHours: 1
+      })
+    }
+  );
+  assert.equal(forcedPromotionAfterIncident.status, 200);
+  assert.equal(
+    forcedPromotionAfterIncident.body.workspace.effectiveNotificationProviderProfiles.find(
+      profile => profile.profileKey === "dead-letter-email-profile"
+    )?.rolloutState,
+    "active"
+  );
+
+  const resolvedProviderIncidentQueue = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileIncidentsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileIncidents(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+    const resolvedIncident = response.items[0];
+
+    assert.ok(resolvedIncident);
+    assert.equal(resolvedIncident.status, "resolved");
+    assert.equal(resolvedIncident.resolutionCode, "manually_promoted");
+    assert.ok(resolvedIncident.resolvedAt);
+
+    return resolvedIncident;
+  }, 20, 250);
+  assert.equal(
+    resolvedProviderIncidentQueue.profileKey,
+    "dead-letter-email-profile"
+  );
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),
