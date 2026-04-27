@@ -280,6 +280,8 @@ export interface NotificationProviderPromotionPolicyDto {
   minimumDirectSelectionCount: number;
   minimumDeliveredCount: number;
   maximumDeliveryFailedCount: number;
+  autoPromoteEnabled: boolean;
+  autoRollbackOnFailureEnabled: boolean;
 }
 
 export interface NotificationProviderPromotionPolicyOverrideDto {
@@ -288,6 +290,8 @@ export interface NotificationProviderPromotionPolicyOverrideDto {
   minimumDirectSelectionCount?: number;
   minimumDeliveredCount?: number;
   maximumDeliveryFailedCount?: number;
+  autoPromoteEnabled?: boolean;
+  autoRollbackOnFailureEnabled?: boolean;
 }
 
 export type NotificationDeliverySelectionModeDto =
@@ -488,6 +492,8 @@ export interface NotificationProviderPromotionPolicyOverrideRecordsDto {
   minimumDirectSelectionCount?: NumericPolicyOverrideRecordDto;
   minimumDeliveredCount?: NumericPolicyOverrideRecordDto;
   maximumDeliveryFailedCount?: NumericPolicyOverrideRecordDto;
+  autoPromoteEnabled?: BooleanPolicyOverrideRecordDto;
+  autoRollbackOnFailureEnabled?: BooleanPolicyOverrideRecordDto;
 }
 
 export interface NotificationPolicyOverrideRecordsDto {

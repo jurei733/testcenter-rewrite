@@ -29,6 +29,8 @@ export interface NotificationProviderPromotionPolicy {
   minimumDirectSelectionCount: number;
   minimumDeliveredCount: number;
   maximumDeliveryFailedCount: number;
+  autoPromoteEnabled: boolean;
+  autoRollbackOnFailureEnabled: boolean;
 }
 
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
@@ -117,7 +119,9 @@ export const defaultNotificationProviderPromotionPolicy: NotificationProviderPro
   minimumRequestedCount: 1,
   minimumDirectSelectionCount: 1,
   minimumDeliveredCount: 1,
-  maximumDeliveryFailedCount: 0
+  maximumDeliveryFailedCount: 0,
+  autoPromoteEnabled: false,
+  autoRollbackOnFailureEnabled: false
 };
 
 export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
@@ -232,6 +236,8 @@ export interface NotificationProviderPromotionPolicyOverrideRecords {
   minimumDirectSelectionCount?: PolicyOverrideRecord<number>;
   minimumDeliveredCount?: PolicyOverrideRecord<number>;
   maximumDeliveryFailedCount?: PolicyOverrideRecord<number>;
+  autoPromoteEnabled?: PolicyOverrideRecord<boolean>;
+  autoRollbackOnFailureEnabled?: PolicyOverrideRecord<boolean>;
 }
 
 export interface NotificationPolicyOverrideRecords {
@@ -651,6 +657,15 @@ export const flattenNotificationProviderPromotionPolicyOverrideRecords = (
     flattened.maximumDeliveryFailedCount = records.maximumDeliveryFailedCount.value;
   }
 
+  if (records.autoPromoteEnabled) {
+    flattened.autoPromoteEnabled = records.autoPromoteEnabled.value;
+  }
+
+  if (records.autoRollbackOnFailureEnabled) {
+    flattened.autoRollbackOnFailureEnabled =
+      records.autoRollbackOnFailureEnabled.value;
+  }
+
   return Object.keys(flattened).length > 0 ? flattened : null;
 };
 
@@ -730,6 +745,26 @@ export const createNotificationProviderPromotionPolicyOverrideRecords = (input: 
   if (typeof input.override.maximumDeliveryFailedCount === "number") {
     records.maximumDeliveryFailedCount = {
       value: input.override.maximumDeliveryFailedCount,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.autoPromoteEnabled === "boolean") {
+    records.autoPromoteEnabled = {
+      value: input.override.autoPromoteEnabled,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.autoRollbackOnFailureEnabled === "boolean") {
+    records.autoRollbackOnFailureEnabled = {
+      value: input.override.autoRollbackOnFailureEnabled,
       updatedAt,
       updatedByRequestId: input.updatedByRequestId,
       updatedByActorType: input.updatedByActorType,

@@ -706,7 +706,9 @@ const isNotificationProviderPromotionPolicy = (
   isNonNegativeInteger(value.minimumRequestedCount) &&
   isNonNegativeInteger(value.minimumDirectSelectionCount) &&
   isNonNegativeInteger(value.minimumDeliveredCount) &&
-  isNonNegativeInteger(value.maximumDeliveryFailedCount);
+  isNonNegativeInteger(value.maximumDeliveryFailedCount) &&
+  typeof value.autoPromoteEnabled === "boolean" &&
+  typeof value.autoRollbackOnFailureEnabled === "boolean";
 
 const isNotificationDeliverySelectionMode = (
   value: unknown
@@ -1047,7 +1049,9 @@ const notificationProviderPromotionPolicyOverrideKeys = [
   "minimumRequestedCount",
   "minimumDirectSelectionCount",
   "minimumDeliveredCount",
-  "maximumDeliveryFailedCount"
+  "maximumDeliveryFailedCount",
+  "autoPromoteEnabled",
+  "autoRollbackOnFailureEnabled"
 ] as const satisfies ReadonlyArray<keyof NotificationProviderPromotionPolicyOverrideDto>;
 
 const notificationPolicyOverrideKeys = [
@@ -1115,7 +1119,9 @@ const isNotificationProviderPromotionPolicyOverride = (
     notificationProviderPromotionPolicyOverrideKeys.includes(
       key as typeof notificationProviderPromotionPolicyOverrideKeys[number]
     ) &&
-    (key === "evaluationWindowHours"
+    (key === "autoPromoteEnabled" || key === "autoRollbackOnFailureEnabled"
+      ? typeof value[key] === "boolean"
+      : key === "evaluationWindowHours"
       ? isPositiveInteger(value[key])
       : isNonNegativeInteger(value[key]))
   );
@@ -1547,7 +1553,12 @@ const isNotificationProviderPromotionPolicyOverrideRecords = (
   return keys.every(key =>
     notificationProviderPromotionPolicyOverrideKeys.includes(
       key as typeof notificationProviderPromotionPolicyOverrideKeys[number]
-    ) && isNumericPolicyOverrideRecord(value[key])
+    ) &&
+    (
+      key === "autoPromoteEnabled" || key === "autoRollbackOnFailureEnabled"
+        ? isBooleanPolicyOverrideRecord(value[key])
+        : isNumericPolicyOverrideRecord(value[key])
+    )
   );
 };
 
@@ -1802,7 +1813,10 @@ const toNotificationProviderPromotionPolicyDto = (
     notificationProviderPromotionPolicy.minimumDirectSelectionCount,
   minimumDeliveredCount: notificationProviderPromotionPolicy.minimumDeliveredCount,
   maximumDeliveryFailedCount:
-    notificationProviderPromotionPolicy.maximumDeliveryFailedCount
+    notificationProviderPromotionPolicy.maximumDeliveryFailedCount,
+  autoPromoteEnabled: notificationProviderPromotionPolicy.autoPromoteEnabled,
+  autoRollbackOnFailureEnabled:
+    notificationProviderPromotionPolicy.autoRollbackOnFailureEnabled
 });
 
 const toNotificationPolicyDto = (
@@ -2172,6 +2186,18 @@ const toNotificationProviderPromotionPolicyOverrideDto = (
         maximumDeliveryFailedCount:
           notificationProviderPromotionPolicyOverride.maximumDeliveryFailedCount
       }
+    : {}),
+  ...(typeof notificationProviderPromotionPolicyOverride.autoPromoteEnabled === "boolean"
+    ? {
+        autoPromoteEnabled:
+          notificationProviderPromotionPolicyOverride.autoPromoteEnabled
+      }
+    : {}),
+  ...(typeof notificationProviderPromotionPolicyOverride.autoRollbackOnFailureEnabled === "boolean"
+    ? {
+        autoRollbackOnFailureEnabled:
+          notificationProviderPromotionPolicyOverride.autoRollbackOnFailureEnabled
+      }
     : {})
 });
 
@@ -2321,6 +2347,20 @@ const toNotificationProviderPromotionPolicyOverrideRecordsDto = (
       ? {
           maximumDeliveryFailedCount: toNumericPolicyOverrideRecordDto(
             notificationProviderPromotionPolicyOverrideRecords.maximumDeliveryFailedCount
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.autoPromoteEnabled
+      ? {
+          autoPromoteEnabled: toBooleanPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.autoPromoteEnabled
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.autoRollbackOnFailureEnabled
+      ? {
+          autoRollbackOnFailureEnabled: toBooleanPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.autoRollbackOnFailureEnabled
           )
         }
       : {})

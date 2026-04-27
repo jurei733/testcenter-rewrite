@@ -3,6 +3,7 @@ import { Pool, type QueryResultRow } from "pg";
 import {
   defaultEvidenceRetentionClassPolicy,
   defaultNotificationPolicy,
+  defaultNotificationProviderPromotionPolicy,
   defaultNotificationProviderProfiles
 } from "@testcenter-rewrite/domain";
 import type {
@@ -390,7 +391,15 @@ const mapNotificationProviderPromotionPolicy = (
     minimumRequestedCount: source.minimumRequestedCount,
     minimumDirectSelectionCount: source.minimumDirectSelectionCount,
     minimumDeliveredCount: source.minimumDeliveredCount,
-    maximumDeliveryFailedCount: source.maximumDeliveryFailedCount
+    maximumDeliveryFailedCount: source.maximumDeliveryFailedCount,
+    autoPromoteEnabled:
+      typeof source.autoPromoteEnabled === "boolean"
+        ? source.autoPromoteEnabled
+        : defaultNotificationProviderPromotionPolicy.autoPromoteEnabled,
+    autoRollbackOnFailureEnabled:
+      typeof source.autoRollbackOnFailureEnabled === "boolean"
+        ? source.autoRollbackOnFailureEnabled
+        : defaultNotificationProviderPromotionPolicy.autoRollbackOnFailureEnabled
   };
 };
 
@@ -451,6 +460,44 @@ const mapNotificationProviderPromotionPolicyOverrideRecords = (
           | "worker"
           | "dispatcher"
           | "notification_service",
+        updatedByActorId: recordValue.updatedByActorId
+      };
+    }
+  }
+
+  for (const fieldKey of [
+    "autoPromoteEnabled",
+    "autoRollbackOnFailureEnabled"
+  ] as const) {
+    const fieldValue = source[fieldKey];
+
+    if (typeof fieldValue === "boolean") {
+      records[fieldKey] = {
+        value: fieldValue,
+        ...legacyNotificationProviderPromotionPolicyOverrideMetadata
+      };
+      continue;
+    }
+
+    if (!fieldValue || typeof fieldValue !== "object") {
+      continue;
+    }
+
+    const recordValue = fieldValue as Record<string, unknown>;
+
+    if (
+      typeof recordValue.value === "boolean" &&
+      typeof recordValue.updatedAt === "string" &&
+      typeof recordValue.updatedByRequestId === "string" &&
+      typeof recordValue.updatedByActorType === "string" &&
+      typeof recordValue.updatedByActorId === "string"
+    ) {
+      records[fieldKey] = {
+        value: recordValue.value,
+        updatedAt: recordValue.updatedAt,
+        updatedByRequestId: recordValue.updatedByRequestId,
+        updatedByActorType: recordValue.updatedByActorType as
+          "platform_api" | "participant" | "monitor" | "worker" | "dispatcher",
         updatedByActorId: recordValue.updatedByActorId
       };
     }
@@ -1172,13 +1219,7 @@ const mapTenant = (row: QueryResultRow): Tenant => ({
   defaultNotificationProviderPromotionPolicy:
     mapNotificationProviderPromotionPolicy(
       row.default_notification_provider_promotion_policy
-    ) ?? {
-      evaluationWindowHours: 24,
-      minimumRequestedCount: 1,
-      minimumDirectSelectionCount: 1,
-      minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
-    },
+    ) ?? defaultNotificationProviderPromotionPolicy,
   defaultNotificationPolicy: row.default_notification_policy
     ? {
         breachNotificationDeliverySelectionMode:

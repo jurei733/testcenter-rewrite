@@ -32,7 +32,11 @@ import {
 } from "@testcenter-rewrite/db";
 import {
   createMonitorCommand,
-  createSystemCheckEvidence
+  createSystemCheckEvidence,
+  createSystemCheckEvidenceBreachNotification,
+  markSystemCheckEvidenceBreachNotificationDeliveryFailed,
+  resolveWorkspaceNotificationPolicy,
+  resolveWorkspaceNotificationProviderProfiles
 } from "@testcenter-rewrite/domain";
 import {
   maskOutboundNotificationCredentialsRef,
@@ -622,6 +626,81 @@ const getPersistedSystemCheckEvidence = async (evidenceKey: string): Promise<{
       purgedAt: systemCheckEvidence.purgedAt,
       purgeReasonCode: systemCheckEvidence.purgeReasonCode
     };
+  } finally {
+    await store.close();
+  }
+};
+
+const seedFailedSystemCheckEvidenceBreachNotification = async (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  evidenceKey: string;
+  escalationTarget: string;
+  createdByActorId: string;
+}): Promise<void> => {
+  const pool = createDatabasePool();
+  const store = createPostgresPlatformStore(pool);
+
+  try {
+    const [tenant, workspace, evidence] = await Promise.all([
+      store.getTenantByKey(input.tenantKey),
+      store.getWorkspaceByKey(input.tenantKey, input.workspaceKey),
+      store.getSystemCheckEvidenceByKey(input.evidenceKey)
+    ]);
+
+    assert.ok(tenant, `Expected tenant '${input.tenantKey}' when seeding failed breach notification.`);
+    assert.ok(
+      workspace,
+      `Expected workspace '${input.workspaceKey}' in tenant '${input.tenantKey}' when seeding failed breach notification.`
+    );
+    assert.ok(evidence, `Expected evidence '${input.evidenceKey}' when seeding failed breach notification.`);
+    assert.ok(evidence.retentionHold, "Expected seeded evidence to still have a retention hold.");
+
+    const seededEvidence = {
+      ...evidence,
+      retentionHold: {
+        ...evidence.retentionHold,
+        escalationTarget: input.escalationTarget
+      }
+    };
+    const notificationPolicy = resolveWorkspaceNotificationPolicy(workspace, tenant);
+    const notificationProviderProfiles = resolveWorkspaceNotificationProviderProfiles(
+      workspace,
+      tenant
+    );
+    const existingNotification = (
+      await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
+        input.tenantKey,
+        input.workspaceKey,
+        {
+          limit: 200
+        }
+      )
+    ).find(notification => notification.evidenceKey === input.evidenceKey);
+    const baseNotification = createSystemCheckEvidenceBreachNotification({
+      systemCheckEvidence: seededEvidence,
+      createdByActorType: "worker",
+      createdByActorId: input.createdByActorId,
+      sourceRequestId: `${input.createdByActorId}-seeded-failed-notification`,
+      notificationPolicy,
+      notificationProviderProfiles
+    });
+    const failedNotification = markSystemCheckEvidenceBreachNotificationDeliveryFailed({
+      notification: existingNotification
+        ? {
+            ...baseNotification,
+            notificationId: existingNotification.notificationId,
+            createdAt: existingNotification.createdAt
+          }
+        : baseNotification,
+      failureReason: "Seeded terminal failure for provider-operations rollback coverage."
+    });
+
+    if (existingNotification) {
+      await store.updateSystemCheckEvidenceBreachNotification(failedNotification);
+    } else {
+      await store.saveSystemCheckEvidenceBreachNotification(failedNotification);
+    }
   } finally {
     await store.close();
   }
@@ -7041,7 +7120,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
           minimumRequestedCount: 2,
           minimumDirectSelectionCount: 1,
           minimumDeliveredCount: 1,
-          maximumDeliveryFailedCount: 0
+          maximumDeliveryFailedCount: 0,
+          autoPromoteEnabled: false,
+          autoRollbackOnFailureEnabled: false
         }
       })
     }
@@ -7051,7 +7132,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     minimumRequestedCount: 2,
     minimumDirectSelectionCount: 1,
     minimumDeliveredCount: 1,
-    maximumDeliveryFailedCount: 0
+    maximumDeliveryFailedCount: 0,
+    autoPromoteEnabled: false,
+    autoRollbackOnFailureEnabled: false
   });
 
   const inheritedEmptyWorkspaceNotificationProviderPromotionPolicy = await fetchJson<WorkspaceNotificationProviderPromotionPolicyResponse>(
@@ -7073,7 +7156,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 2,
       minimumDirectSelectionCount: 1,
       minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
   assert.deepEqual(
@@ -7083,7 +7168,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 2,
       minimumDirectSelectionCount: 1,
       minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
 
@@ -7138,7 +7225,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 2,
       minimumDirectSelectionCount: 1,
       minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
   assert.deepEqual(
@@ -7161,7 +7250,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 0,
       minimumDirectSelectionCount: 0,
       minimumDeliveredCount: 0,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
 
@@ -7218,6 +7309,211 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     promotedRolloutCanaryWorkspaceOverrideRecord.value?.rolloutState,
     "active"
   );
+
+  await fetchJson(
+    apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, emptyWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderProfileOverride: [
+          {
+            profileKey: "rollout-canary-email-profile",
+            displayLabel: "Rollout Canary Email",
+            deliveryChannel: "email_spike",
+            target: "retry-once:workspace-canary@example.test",
+            credentialsRef: "vault://workspace/canary-email",
+            rolloutState: "canary",
+            rolloutPercentage: 0,
+            rolloutFallbackProfileKey: "dead-letter-email-profile"
+          }
+        ]
+      })
+    }
+  );
+
+  await fetchJson(
+    apiRoutes.workspaceNotificationProviderPromotionPolicy(demoTenantKey, emptyWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderPromotionPolicyOverride: {
+          minimumRequestedCount: 0,
+          minimumDirectSelectionCount: 0,
+          minimumDeliveredCount: 0,
+          autoPromoteEnabled: true
+        }
+      })
+    }
+  );
+
+  const autoPromotedRolloutCanaryWorkspace = await retry(async () => {
+    const currentWorkspace = await fetchJson<WorkspaceNotificationProviderProfilesResponse>(
+      apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, emptyWorkspaceKey)
+    );
+    const currentProfile = currentWorkspace.effectiveNotificationProviderProfiles.find(
+      profile => profile.profileKey === "rollout-canary-email-profile"
+    );
+
+    assert.ok(currentProfile, "Expected rollout canary profile to remain visible in empty workspace.");
+    assert.equal(currentProfile.rolloutState, "active");
+    assert.equal(currentProfile.rolloutPercentage, 100);
+    assert.ok(
+      currentProfile.rolloutFallbackProfileKey === null ||
+        currentProfile.rolloutFallbackProfileKey === "dead-letter-email-profile"
+    );
+    if (currentProfile.operationalState !== null) {
+      assert.equal(currentProfile.operationalState.lastCheckedByActorType, "worker");
+      assert.equal(
+        currentProfile.operationalState.lastCheckedByActorId,
+        "provider-operations-service"
+      );
+      assert.equal(currentProfile.operationalState.rolloutStatus, "active_ready");
+    }
+
+    return {
+      currentWorkspace,
+      currentProfile
+    };
+  }, 30, 250);
+  const autoPromotedRolloutCanaryWorkspaceOverrideRecord =
+    autoPromotedRolloutCanaryWorkspace.currentWorkspace.notificationProviderProfileOverrideRecords?.find(
+      record => record.profileKey === "rollout-canary-email-profile"
+    );
+  assert.ok(autoPromotedRolloutCanaryWorkspaceOverrideRecord);
+  assert.equal(autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByActorType, "worker");
+  assert.equal(
+    autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByActorId,
+    "provider-operations-service"
+  );
+  assert.match(
+    autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByRequestId,
+    /^provider-operations-workspace-notification-provider-profile-auto-promote-/
+  );
+
+  const autoPromoteAuditEvents = await retry(async () => {
+    const auditEventsResponse = await fetchJson<{
+      items: Array<{ eventType: string; payload: Record<string, unknown> }>;
+    }>(
+      `${apiRoutes.workspaceAuditEvents(demoTenantKey, emptyWorkspaceKey)}?limit=200`
+    );
+    const matchingEvent = auditEventsResponse.items.find(
+      item =>
+        item.eventType ===
+          "provider_operations.workspace.notification_provider_profile.auto_promoted" &&
+        item.payload.profileKey === "rollout-canary-email-profile"
+    );
+
+    assert.ok(matchingEvent, "Expected provider-operations auto-promote audit event.");
+
+    return matchingEvent;
+  }, 30, 250);
+  assert.equal(autoPromoteAuditEvents.payload.automationAction, "auto_promoted");
+
+  await fetchJson(
+    apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, demoWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderProfileOverride: [
+          {
+            profileKey: "dead-letter-email-profile",
+            displayLabel: "Dead Letter Email",
+            deliveryChannel: "email_spike",
+            target: "dead-letter@example.test",
+            credentialsRef: "vault://tenant/alerts-email",
+            rolloutState: "active",
+            rolloutPercentage: 100,
+            rolloutFallbackProfileKey: "alerts-email-profile"
+          }
+        ]
+      })
+    }
+  );
+
+  await seedFailedSystemCheckEvidenceBreachNotification({
+    tenantKey: demoTenantKey,
+    workspaceKey: demoWorkspaceKey,
+    evidenceKey: deadLetterEvidenceCaptureResponse.body.evidence.evidenceKey,
+    escalationTarget: "profile:dead-letter-email-profile",
+    createdByActorId: "provider-operations-auto-rollback-seed"
+  });
+
+  await fetchJson(
+    apiRoutes.workspaceNotificationProviderPromotionPolicy(demoTenantKey, demoWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderPromotionPolicyOverride: {
+          autoRollbackOnFailureEnabled: true
+        }
+      })
+    }
+  );
+
+  const autoRolledBackDeadLetterWorkspace = await retry(async () => {
+    const currentWorkspace = await fetchJson<WorkspaceNotificationProviderProfilesResponse>(
+      apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, demoWorkspaceKey)
+    );
+    const currentProfile = currentWorkspace.effectiveNotificationProviderProfiles.find(
+      profile => profile.profileKey === "dead-letter-email-profile"
+    );
+
+    assert.ok(currentProfile, "Expected dead-letter profile to remain visible in demo workspace.");
+    assert.equal(currentProfile.rolloutState, "canary");
+    assert.equal(currentProfile.rolloutPercentage, 0);
+    assert.equal(currentProfile.rolloutFallbackProfileKey, "alerts-email-profile");
+    if (currentProfile.operationalState !== null) {
+      assert.equal(currentProfile.operationalState.lastCheckedByActorType, "worker");
+      assert.equal(
+        currentProfile.operationalState.lastCheckedByActorId,
+        "provider-operations-service"
+      );
+      assert.equal(currentProfile.operationalState.rolloutStatus, "canary_ready");
+    }
+
+    return {
+      currentWorkspace,
+      currentProfile
+    };
+  }, 30, 250);
+  const autoRolledBackDeadLetterWorkspaceOverrideRecord =
+    autoRolledBackDeadLetterWorkspace.currentWorkspace.notificationProviderProfileOverrideRecords?.find(
+      record => record.profileKey === "dead-letter-email-profile"
+    );
+  assert.ok(autoRolledBackDeadLetterWorkspaceOverrideRecord);
+  assert.equal(autoRolledBackDeadLetterWorkspaceOverrideRecord.updatedByActorType, "worker");
+  assert.equal(
+    autoRolledBackDeadLetterWorkspaceOverrideRecord.updatedByActorId,
+    "provider-operations-service"
+  );
+  assert.match(
+    autoRolledBackDeadLetterWorkspaceOverrideRecord.updatedByRequestId,
+    /^provider-operations-workspace-notification-provider-profile-auto-rollback-/
+  );
+
+  const autoRollbackAuditEvent = await retry(async () => {
+    const auditEventsResponse = await fetchJson<{
+      items: Array<{ eventType: string; payload: Record<string, unknown> }>;
+    }>(
+      `${apiRoutes.workspaceAuditEvents(demoTenantKey, demoWorkspaceKey)}?limit=200`
+    );
+    const matchingEvent = auditEventsResponse.items.find(
+      item =>
+        item.eventType ===
+          "provider_operations.workspace.notification_provider_profile.auto_rolled_back" &&
+        item.payload.profileKey === "dead-letter-email-profile"
+    );
+
+    assert.ok(matchingEvent, "Expected provider-operations auto-rollback audit event.");
+
+    return matchingEvent;
+  }, 30, 250);
+  assert.equal(autoRollbackAuditEvent.payload.automationAction, "auto_rolled_back");
+  assert.equal(autoRollbackAuditEvent.payload.deliveryFailedCount, 1);
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),
@@ -7829,7 +8125,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "minimumRequestedCount",
     "minimumDirectSelectionCount",
     "minimumDeliveredCount",
-    "maximumDeliveryFailedCount"
+    "maximumDeliveryFailedCount",
+    "autoPromoteEnabled",
+    "autoRollbackOnFailureEnabled"
   ]);
   assert.deepEqual(
     tenantNotificationProviderPromotionPolicyHistoryEntry.defaultNotificationProviderPromotionPolicy,
@@ -7838,7 +8136,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 2,
       minimumDirectSelectionCount: 1,
       minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
 
@@ -8097,7 +8397,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumRequestedCount: 2,
       minimumDirectSelectionCount: 1,
       minimumDeliveredCount: 1,
-      maximumDeliveryFailedCount: 0
+      maximumDeliveryFailedCount: 0,
+      autoPromoteEnabled: false,
+      autoRollbackOnFailureEnabled: false
     }
   );
   assert.deepEqual(

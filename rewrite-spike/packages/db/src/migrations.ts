@@ -1132,6 +1132,48 @@ ADD COLUMN IF NOT EXISTS default_notification_provider_promotion_policy JSONB NO
 ALTER TABLE workspaces
 ADD COLUMN IF NOT EXISTS notification_provider_promotion_policy_override JSONB NULL;
 `
+  },
+  {
+    version: "0039",
+    name: "notification-provider-promotion-policy-automation-flags",
+    sql: `
+UPDATE tenants
+SET default_notification_provider_promotion_policy =
+  COALESCE(default_notification_provider_promotion_policy, '{}'::jsonb)
+  || jsonb_build_object(
+    'autoPromoteEnabled',
+    COALESCE(
+      (default_notification_provider_promotion_policy->>'autoPromoteEnabled')::boolean,
+      false
+    ),
+    'autoRollbackOnFailureEnabled',
+    COALESCE(
+      (default_notification_provider_promotion_policy->>'autoRollbackOnFailureEnabled')::boolean,
+      false
+    )
+  );
+
+UPDATE workspaces
+SET notification_provider_promotion_policy_override =
+  notification_provider_promotion_policy_override
+  || jsonb_build_object(
+    'autoPromoteEnabled',
+    COALESCE(
+      notification_provider_promotion_policy_override->'autoPromoteEnabled',
+      'false'::jsonb
+    ),
+    'autoRollbackOnFailureEnabled',
+    COALESCE(
+      notification_provider_promotion_policy_override->'autoRollbackOnFailureEnabled',
+      'false'::jsonb
+    )
+  )
+WHERE notification_provider_promotion_policy_override IS NOT NULL
+  AND (
+    NOT (notification_provider_promotion_policy_override ? 'autoPromoteEnabled')
+    OR NOT (notification_provider_promotion_policy_override ? 'autoRollbackOnFailureEnabled')
+  );
+`
   }
 ];
 

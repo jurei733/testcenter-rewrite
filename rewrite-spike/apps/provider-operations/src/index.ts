@@ -5,9 +5,17 @@ import {
 } from "@testcenter-rewrite/db";
 import {
   createAuditEvent,
-  type NotificationProviderProfile
+  resolveWorkspaceNotificationProviderProfiles,
+  resolveWorkspaceNotificationProviderPromotionPolicy,
+  type NotificationProviderProfile,
+  type NotificationProviderPromotionPolicy,
+  type SystemCheckEvidenceBreachNotification,
+  type Workspace
 } from "@testcenter-rewrite/domain";
-import { refreshOutboundNotificationProviderProfileOperationalState } from "@testcenter-rewrite/outbound-messaging";
+import {
+  refreshOutboundNotificationProviderProfileOperationalState,
+  resolveOutboundNotificationProviderProfileHealthStatus
+} from "@testcenter-rewrite/outbound-messaging";
 import { setTimeout as delay } from "node:timers/promises";
 
 const maintenanceSweepBatchSize = 200;
@@ -20,6 +28,105 @@ const providerOperationsActorId =
 
 const buildProviderOperationsRequestId = (scope: string, recordId: string): string =>
   `provider-operations-${scope}-${recordId}`;
+
+const tryExtractRequestedNotificationProviderProfileKey = (
+  escalationTarget: string | null
+): string | null => {
+  const trimmedEscalationTarget = escalationTarget?.trim() ?? "";
+
+  if (!trimmedEscalationTarget.startsWith("profile:")) {
+    return null;
+  }
+
+  const requestedProfileKey = trimmedEscalationTarget.slice("profile:".length).trim();
+
+  return requestedProfileKey.length > 0 ? requestedProfileKey : null;
+};
+
+interface NotificationProviderProfileRolloutMetrics {
+  requestedCount: number;
+  directSelectionCount: number;
+  deliveredCount: number;
+  deliveryFailedCount: number;
+  promotionReadiness: "ready" | "blocked";
+  promotionReadinessReasons: string[];
+}
+
+const buildNotificationProviderProfileRolloutMetrics = (input: {
+  profile: NotificationProviderProfile;
+  notifications: SystemCheckEvidenceBreachNotification[];
+  promotionPolicy: NotificationProviderPromotionPolicy;
+  evaluationWindowStart: string;
+}): NotificationProviderProfileRolloutMetrics => {
+  let requestedCount = 0;
+  let directSelectionCount = 0;
+  let deliveredCount = 0;
+  let deliveryFailedCount = 0;
+
+  for (const notification of input.notifications) {
+    if (notification.createdAt < input.evaluationWindowStart) {
+      continue;
+    }
+
+    const requestedProfileKey = tryExtractRequestedNotificationProviderProfileKey(
+      notification.escalationTarget
+    );
+
+    if (requestedProfileKey === input.profile.profileKey) {
+      requestedCount += 1;
+
+      if (notification.deliveryProfileKey === input.profile.profileKey) {
+        directSelectionCount += 1;
+      }
+    }
+
+    if (notification.deliveryProfileKey !== input.profile.profileKey) {
+      continue;
+    }
+
+    if (notification.deliveryStatus === "delivered") {
+      deliveredCount += 1;
+    } else if (notification.deliveryStatus === "delivery_failed") {
+      deliveryFailedCount += 1;
+    }
+  }
+
+  const promotionReadinessReasons: string[] = [];
+
+  if (input.profile.rolloutState !== "canary") {
+    promotionReadinessReasons.push("profile_is_not_canary");
+  }
+
+  if (resolveOutboundNotificationProviderProfileHealthStatus(input.profile) !== "ready") {
+    promotionReadinessReasons.push("profile_is_not_ready");
+  }
+
+  if (requestedCount < input.promotionPolicy.minimumRequestedCount) {
+    promotionReadinessReasons.push("insufficient_requested_volume");
+  }
+
+  if (directSelectionCount < input.promotionPolicy.minimumDirectSelectionCount) {
+    promotionReadinessReasons.push("insufficient_direct_selection_volume");
+  }
+
+  if (deliveredCount < input.promotionPolicy.minimumDeliveredCount) {
+    promotionReadinessReasons.push("insufficient_successful_deliveries");
+  }
+
+  if (deliveryFailedCount > input.promotionPolicy.maximumDeliveryFailedCount) {
+    promotionReadinessReasons.push("delivery_failures_present");
+  }
+
+  return {
+    requestedCount,
+    directSelectionCount,
+    deliveredCount,
+    deliveryFailedCount,
+    promotionReadiness:
+      promotionReadinessReasons.length === 0 ? "ready" : "blocked",
+    promotionReadinessReasons
+  };
+};
 
 const recordNotificationProviderProfileRefreshAuditEvent = async (input: {
   store: PlatformStore;
@@ -80,6 +187,67 @@ const didNotificationProviderProfileOperationalStateChange = (
     previousOperationalState.probeTarget !== refreshedOperationalState.probeTarget ||
     previousOperationalState.probeLatencyMs !== refreshedOperationalState.probeLatencyMs ||
     previousOperationalState.lastCheckError !== refreshedOperationalState.lastCheckError;
+};
+
+const updateWorkspaceNotificationProviderProfileRecord = (input: {
+  workspace: Workspace;
+  profileKey: string;
+  nextProfile: NotificationProviderProfile;
+  requestId: string;
+  updatedAt: string;
+}): Workspace => {
+  const previousRecords = input.workspace.notificationProviderProfileOverrideRecords ?? {};
+  const previousRecord = previousRecords[input.profileKey];
+
+  return {
+    ...input.workspace,
+    notificationProviderProfileOverrideRecords: {
+      ...previousRecords,
+      [input.profileKey]: {
+        value: input.nextProfile,
+        updatedAt: input.updatedAt,
+        updatedByRequestId: input.requestId,
+        updatedByActorType: "worker",
+        updatedByActorId: providerOperationsActorId
+      }
+    }
+  };
+};
+
+const recordNotificationProviderProfileAutomationAuditEvent = async (input: {
+  store: PlatformStore;
+  tenantId: string;
+  workspaceId: string;
+  profile: NotificationProviderProfile;
+  requestId: string;
+  eventType: string;
+  metrics: NotificationProviderProfileRolloutMetrics;
+  promotionPolicy: NotificationProviderPromotionPolicy;
+  automationAction: "auto_promoted" | "auto_rolled_back";
+}): Promise<void> => {
+  await input.store.saveAuditEvent(createAuditEvent({
+    requestId: input.requestId,
+    tenantId: input.tenantId,
+    workspaceId: input.workspaceId,
+    actorType: "worker",
+    actorId: providerOperationsActorId,
+    eventType: input.eventType,
+    payload: {
+      automationAction: input.automationAction,
+      profileKey: input.profile.profileKey,
+      displayLabel: input.profile.displayLabel,
+      rolloutState: input.profile.rolloutState,
+      rolloutPercentage: input.profile.rolloutPercentage,
+      rolloutFallbackProfileKey: input.profile.rolloutFallbackProfileKey,
+      requestedCount: input.metrics.requestedCount,
+      directSelectionCount: input.metrics.directSelectionCount,
+      deliveredCount: input.metrics.deliveredCount,
+      deliveryFailedCount: input.metrics.deliveryFailedCount,
+      promotionReadiness: input.metrics.promotionReadiness,
+      promotionReadinessReasons: input.metrics.promotionReadinessReasons,
+      promotionPolicy: input.promotionPolicy
+    }
+  }));
 };
 
 const synchronizeNotificationProviderProfiles = async (
@@ -205,6 +373,171 @@ const synchronizeNotificationProviderProfiles = async (
   return refreshedProfiles;
 };
 
+const reconcileNotificationProviderProfileRollouts = async (
+  store: PlatformStore,
+  checkedAt: string
+): Promise<number> => {
+  const tenants = await store.listTenants();
+  let automatedChanges = 0;
+
+  for (const tenant of tenants) {
+    const workspaces = await store.listWorkspacesByTenant(tenant.tenantKey);
+
+    for (const workspace of workspaces) {
+      if (!workspace.notificationProviderProfileOverrideRecords) {
+        continue;
+      }
+
+      const effectivePromotionPolicy = resolveWorkspaceNotificationProviderPromotionPolicy(
+        workspace,
+        tenant
+      );
+
+      if (
+        !effectivePromotionPolicy.autoPromoteEnabled &&
+        !effectivePromotionPolicy.autoRollbackOnFailureEnabled
+      ) {
+        continue;
+      }
+
+      const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
+        tenant.tenantKey,
+        workspace.workspaceKey,
+        {
+          limit: 500
+        }
+      );
+      const effectiveProfiles = resolveWorkspaceNotificationProviderProfiles(workspace, tenant);
+      const evaluationWindowStart = new Date(
+        new Date(checkedAt).getTime() -
+          effectivePromotionPolicy.evaluationWindowHours * 60 * 60 * 1000
+      ).toISOString();
+
+      let updatedWorkspace = workspace;
+      const automationAuditEvents: Array<{
+        requestId: string;
+        eventType: string;
+        profile: NotificationProviderProfile;
+        metrics: NotificationProviderProfileRolloutMetrics;
+        automationAction: "auto_promoted" | "auto_rolled_back";
+      }> = [];
+
+      for (const profile of effectiveProfiles) {
+        const workspaceOverrideRecord =
+          updatedWorkspace.notificationProviderProfileOverrideRecords?.[profile.profileKey];
+
+        if (!workspaceOverrideRecord?.value) {
+          continue;
+        }
+
+        const currentProfile = workspaceOverrideRecord.value;
+        const metrics = buildNotificationProviderProfileRolloutMetrics({
+          profile: currentProfile,
+          notifications,
+          promotionPolicy: effectivePromotionPolicy,
+          evaluationWindowStart
+        });
+
+        if (
+          effectivePromotionPolicy.autoPromoteEnabled &&
+          currentProfile.rolloutState === "canary" &&
+          metrics.promotionReadiness === "ready"
+        ) {
+          const promotedProfile: NotificationProviderProfile = {
+            ...currentProfile,
+            rolloutState: "active",
+            rolloutPercentage: 100,
+            operationalState: null
+          };
+          const requestId = buildProviderOperationsRequestId(
+            "workspace-notification-provider-profile-auto-promote",
+            `${workspace.workspaceId}-${currentProfile.profileKey}`
+          );
+
+          updatedWorkspace = updateWorkspaceNotificationProviderProfileRecord({
+            workspace: updatedWorkspace,
+            profileKey: currentProfile.profileKey,
+            nextProfile: promotedProfile,
+            requestId,
+            updatedAt: checkedAt
+          });
+          automationAuditEvents.push({
+            requestId,
+            eventType:
+              "provider_operations.workspace.notification_provider_profile.auto_promoted",
+            profile: promotedProfile,
+            metrics,
+            automationAction: "auto_promoted"
+          });
+          automatedChanges += 1;
+          continue;
+        }
+
+        if (
+          effectivePromotionPolicy.autoRollbackOnFailureEnabled &&
+          currentProfile.rolloutState === "active" &&
+          metrics.deliveryFailedCount >
+            effectivePromotionPolicy.maximumDeliveryFailedCount
+        ) {
+          const rolledBackProfile: NotificationProviderProfile = {
+            ...currentProfile,
+            rolloutState:
+              currentProfile.rolloutFallbackProfileKey === null ? "paused" : "canary",
+            rolloutPercentage:
+              currentProfile.rolloutFallbackProfileKey === null
+                ? currentProfile.rolloutPercentage
+                : 0,
+            operationalState: null
+          };
+          const requestId = buildProviderOperationsRequestId(
+            "workspace-notification-provider-profile-auto-rollback",
+            `${workspace.workspaceId}-${currentProfile.profileKey}`
+          );
+
+          updatedWorkspace = updateWorkspaceNotificationProviderProfileRecord({
+            workspace: updatedWorkspace,
+            profileKey: currentProfile.profileKey,
+            nextProfile: rolledBackProfile,
+            requestId,
+            updatedAt: checkedAt
+          });
+          automationAuditEvents.push({
+            requestId,
+            eventType:
+              "provider_operations.workspace.notification_provider_profile.auto_rolled_back",
+            profile: rolledBackProfile,
+            metrics,
+            automationAction: "auto_rolled_back"
+          });
+          automatedChanges += 1;
+        }
+      }
+
+      if (automationAuditEvents.length === 0) {
+        continue;
+      }
+
+      await store.saveWorkspace(updatedWorkspace);
+
+      for (const auditEvent of automationAuditEvents) {
+        await recordNotificationProviderProfileAutomationAuditEvent({
+          store,
+          tenantId: tenant.tenantId,
+          workspaceId: workspace.workspaceId,
+          profile: auditEvent.profile,
+          requestId: auditEvent.requestId,
+          eventType: auditEvent.eventType,
+          metrics: auditEvent.metrics,
+          promotionPolicy: effectivePromotionPolicy,
+          automationAction: auditEvent.automationAction
+        });
+      }
+    }
+  }
+
+  return automatedChanges;
+};
+
 interface ProviderOperationsConfig {
   mode: "once" | "loop";
   maintenanceIntervalMs: number;
@@ -254,10 +587,14 @@ const main = async (): Promise<void> => {
         store,
         new Date().toISOString()
       );
+      const automatedChanges = await reconcileNotificationProviderProfileRollouts(
+        store,
+        new Date().toISOString()
+      );
 
-      if (config.mode === "once" || refreshedProfiles > 0) {
+      if (config.mode === "once" || refreshedProfiles > 0 || automatedChanges > 0) {
         console.log(
-          `rewrite-spike provider-operations cycle refreshed ${refreshedProfiles} notification provider profile(s)`
+          `rewrite-spike provider-operations cycle refreshed ${refreshedProfiles} notification provider profile(s) and applied ${automatedChanges} rollout automation change(s)`
         );
       }
 
