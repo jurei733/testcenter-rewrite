@@ -7011,6 +7011,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(alertsRolloutMetrics.pendingDeliveryCount, 0);
   assert.equal(alertsRolloutMetrics.deliveryFailedCount, 0);
   assert.ok(alertsRolloutMetrics.lastDeliveredAt);
+  assert.equal(alertsRolloutMetrics.promotionReadiness.status, "blocked");
+  assert.ok(alertsRolloutMetrics.promotionReadiness.reasons.includes("profile_is_not_canary"));
   const deadLetterRolloutMetrics = demoWorkspaceNotificationProviderRolloutMetrics.items.find(
     item => item.profileKey === "dead-letter-email-profile"
   );
@@ -7024,6 +7026,57 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(deadLetterRolloutMetrics.pendingDeliveryCount, 0);
   assert.equal(deadLetterRolloutMetrics.deliveryFailedCount, 0);
   assert.equal(deadLetterRolloutMetrics.lastDeliveryFailedAt, null);
+  assert.equal(deadLetterRolloutMetrics.promotionReadiness.status, "blocked");
+  assert.ok(deadLetterRolloutMetrics.promotionReadiness.reasons.includes("profile_is_not_canary"));
+
+  const emptyWorkspaceNotificationProviderRolloutMetrics = await fetchJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
+    apiRoutes.workspaceNotificationProviderProfileRolloutMetrics(demoTenantKey, emptyWorkspaceKey)
+  );
+  const rolloutCanaryMetrics = emptyWorkspaceNotificationProviderRolloutMetrics.items.find(
+    item => item.profileKey === "rollout-canary-email-profile"
+  );
+  assert.ok(rolloutCanaryMetrics);
+  assert.equal(rolloutCanaryMetrics.rolloutState, "canary");
+  assert.equal(rolloutCanaryMetrics.rolloutPercentage, 0);
+  assert.equal(rolloutCanaryMetrics.requestedCount, 0);
+  assert.equal(rolloutCanaryMetrics.directSelectionCount, 0);
+  assert.equal(rolloutCanaryMetrics.deliveredCount, 0);
+  assert.equal(rolloutCanaryMetrics.deliveryFailedCount, 0);
+  assert.equal(rolloutCanaryMetrics.promotionReadiness.status, "blocked");
+  assert.ok(
+    rolloutCanaryMetrics.promotionReadiness.reasons.includes(
+      "insufficient_requested_volume"
+    )
+  );
+  assert.ok(
+    rolloutCanaryMetrics.promotionReadiness.reasons.includes(
+      "insufficient_successful_deliveries"
+    )
+  );
+
+  const blockedPromotionResponse = await fetchJsonResponse<ErrorResponse>(
+    apiRoutes.workspaceNotificationProviderProfilePromote(
+      demoTenantKey,
+      emptyWorkspaceKey,
+      "rollout-canary-email-profile"
+    ),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        promotedByActorId: "provider-rollout-ops",
+        promotionNote: "Attempt promotion before canary burn-in completes."
+      })
+    },
+    409
+  );
+  assert.equal(
+    blockedPromotionResponse.body.error.code,
+    "notification_provider_profile_promotion_blocked"
+  );
+  assert.match(
+    blockedPromotionResponse.body.error.message,
+    /insufficient_requested_volume/
+  );
 
   const promotedRolloutCanaryWorkspaceResponse = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
@@ -7036,7 +7089,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       body: JSON.stringify({
         promotedByActorId: "provider-rollout-ops",
         promotionNote: "Promote the healthy canary after successful probe checks.",
-        clearRolloutFallbackProfile: true
+        clearRolloutFallbackProfile: true,
+        forcePromotion: true
       })
     }
   );

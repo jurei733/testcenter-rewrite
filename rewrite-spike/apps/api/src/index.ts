@@ -53,6 +53,7 @@ import {
   type NotificationProviderProfileInputDto,
   type NotificationProviderProfileDto,
   type NotificationProviderProfileOverrideRecordDto,
+  type NotificationProviderProfileRolloutMetricsItemDto,
   type PromoteWorkspaceNotificationProviderProfileRequest,
   type PromoteWorkspaceNotificationProviderProfileResponse,
   type NumericPolicyOverrideRecordDto,
@@ -293,6 +294,7 @@ const jsonContentType = {
 };
 const maxSystemCheckEvidenceBytes = 256 * 1024;
 const systemCheckEvidenceAccessGrantTtlSeconds = 300;
+const defaultNotificationProviderProfilePromotionEvaluationWindowHours = 24;
 
 const tenantWorkspaceRoutePattern = /^\/api\/v1\/tenants\/([^/]+)\/workspaces$/;
 const workspaceActivationPolicyRoutePattern =
@@ -892,6 +894,14 @@ const isPromoteWorkspaceNotificationProviderProfileRequest = (
   (
     typeof value.clearRolloutFallbackProfile === "undefined" ||
     typeof value.clearRolloutFallbackProfile === "boolean"
+  ) &&
+  (
+    typeof value.forcePromotion === "undefined" ||
+    typeof value.forcePromotion === "boolean"
+  ) &&
+  (
+    typeof value.evaluationWindowHours === "undefined" ||
+    isPositiveInteger(value.evaluationWindowHours)
   );
 
 const isEvidenceRetentionPolicy = (value: unknown): value is EvidenceRetentionPolicyDto =>
@@ -5573,19 +5583,65 @@ const tryExtractRequestedNotificationProviderProfileKey = (
   return requestedProfileKey.length > 0 ? requestedProfileKey : null;
 };
 
+const toNotificationProviderProfilePromotionReadiness = (input: {
+  profile: NotificationProviderProfile;
+  requestedCount: number;
+  directSelectionCount: number;
+  deliveredCount: number;
+  deliveryFailedCount: number;
+  evaluationWindowHours: number;
+}): NotificationProviderProfileRolloutMetricsItemDto["promotionReadiness"] => {
+  const reasons: string[] = [];
+
+  if (input.profile.rolloutState !== "canary") {
+    reasons.push("profile_is_not_canary");
+  }
+
+  if (resolveOutboundNotificationProviderProfileHealthStatus(input.profile) !== "ready") {
+    reasons.push("profile_is_not_ready");
+  }
+
+  if (input.requestedCount < 1) {
+    reasons.push("insufficient_requested_volume");
+  }
+
+  if (input.directSelectionCount < 1) {
+    reasons.push("insufficient_direct_selection_volume");
+  }
+
+  if (input.deliveredCount < 1) {
+    reasons.push("insufficient_successful_deliveries");
+  }
+
+  if (input.deliveryFailedCount > 0) {
+    reasons.push("delivery_failures_present");
+  }
+
+  return {
+    status: reasons.length === 0 ? "ready" : "blocked",
+    evaluationWindowHours: input.evaluationWindowHours,
+    reasons
+  };
+};
+
 const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
   tenant: Tenant;
   workspace: Workspace;
   notifications: import("@testcenter-rewrite/domain").SystemCheckEvidenceBreachNotification[];
+  evaluationWindowHours: number;
 }): WorkspaceNotificationProviderProfileRolloutMetricsResponse => {
   const effectiveProfiles = resolveWorkspaceNotificationProviderProfiles(
     input.workspace,
     input.tenant
   );
+  const evaluationWindowStart = new Date(
+    Date.now() - input.evaluationWindowHours * 60 * 60 * 1000
+  ).toISOString();
 
   return {
     tenantKey: input.tenant.tenantKey,
     workspaceKey: input.workspace.workspaceKey,
+    evaluationWindowHours: input.evaluationWindowHours,
     items: effectiveProfiles.map(profile => {
       let requestedCount = 0;
       let directSelectionCount = 0;
@@ -5599,6 +5655,10 @@ const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
       let lastDeliveryFailedAt: string | null = null;
 
       for (const notification of input.notifications) {
+        if (notification.createdAt < evaluationWindowStart) {
+          continue;
+        }
+
         const requestedProfileKey = tryExtractRequestedNotificationProviderProfileKey(
           notification.escalationTarget
         );
@@ -5668,7 +5728,15 @@ const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
         pendingDeliveryCount,
         deliveryFailedCount,
         lastDeliveredAt,
-        lastDeliveryFailedAt
+        lastDeliveryFailedAt,
+        promotionReadiness: toNotificationProviderProfilePromotionReadiness({
+          profile,
+          requestedCount,
+          directSelectionCount,
+          deliveredCount,
+          deliveryFailedCount,
+          evaluationWindowHours: input.evaluationWindowHours
+        })
       };
     })
   };
@@ -6293,6 +6361,7 @@ const handleWorkspaceNotificationProviderProfilesGet = async (
 const handleWorkspaceNotificationProviderProfileRolloutMetricsGet = async (
   store: PlatformStore,
   response: ServerResponse,
+  url: URL,
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
@@ -6311,6 +6380,12 @@ const handleWorkspaceNotificationProviderProfileRolloutMetricsGet = async (
     return;
   }
 
+  const requestedWindowHours = url.searchParams.get("windowHours");
+  const evaluationWindowHours =
+    requestedWindowHours && isPositiveInteger(Number(requestedWindowHours))
+      ? Number(requestedWindowHours)
+      : defaultNotificationProviderProfilePromotionEvaluationWindowHours;
+
   const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
     tenantKey,
     workspaceKey,
@@ -6325,7 +6400,8 @@ const handleWorkspaceNotificationProviderProfileRolloutMetricsGet = async (
     toWorkspaceNotificationProviderProfileRolloutMetricsResponse({
       tenant,
       workspace,
-      notifications
+      notifications,
+      evaluationWindowHours
     })
   );
 };
@@ -6545,7 +6621,7 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
       response,
       400,
       "invalid_workspace_notification_provider_profile_promotion_payload",
-      "promotedByActorId is required; promotionNote must be a string when provided; clearRolloutFallbackProfile must be a boolean when provided."
+      "promotedByActorId is required; promotionNote must be a string when provided; clearRolloutFallbackProfile and forcePromotion must be booleans when provided; evaluationWindowHours must be a positive integer when provided."
     );
     return;
   }
@@ -6559,6 +6635,39 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
       404,
       "notification_provider_profile_not_found",
       `Notification provider profile '${profileKey}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const evaluationWindowHours =
+    body.evaluationWindowHours ?? defaultNotificationProviderProfilePromotionEvaluationWindowHours;
+  const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      limit: 500
+    }
+  );
+  const rolloutMetricsResponse = toWorkspaceNotificationProviderProfileRolloutMetricsResponse({
+    tenant,
+    workspace,
+    notifications,
+    evaluationWindowHours
+  });
+  const currentProfileRolloutMetrics = rolloutMetricsResponse.items.find(
+    item => item.profileKey === profileKey
+  );
+
+  if (
+    currentProfileRolloutMetrics &&
+    currentProfileRolloutMetrics.promotionReadiness.status !== "ready" &&
+    !body.forcePromotion
+  ) {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_promotion_blocked",
+      `Notification provider profile '${profileKey}' is not ready for promotion: ${currentProfileRolloutMetrics.promotionReadiness.reasons.join(", ")}.`
     );
     return;
   }
@@ -6601,6 +6710,9 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
       workspaceKey: updatedWorkspace.workspaceKey,
       profileKey,
       promotionNote: body.promotionNote ?? null,
+      forcePromotion: body.forcePromotion ?? false,
+      evaluationWindowHours,
+      promotionReadiness: currentProfileRolloutMetrics?.promotionReadiness ?? null,
       previousProfile: toNotificationProviderProfileDto(currentProfile),
       promotedProfile: toNotificationProviderProfileDto(promotedProfile),
       effectiveNotificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
@@ -11103,6 +11215,7 @@ const handleRequest = async (
       await handleWorkspaceNotificationProviderProfileRolloutMetricsGet(
         store,
         response,
+        url,
         tenantKey,
         workspaceKey
       );

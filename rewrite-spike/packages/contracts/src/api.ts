@@ -696,11 +696,17 @@ export interface NotificationProviderProfileRolloutMetricsItemDto {
   deliveryFailedCount: number;
   lastDeliveredAt: string | null;
   lastDeliveryFailedAt: string | null;
+  promotionReadiness: {
+    status: "ready" | "blocked";
+    evaluationWindowHours: number;
+    reasons: string[];
+  };
 }
 
 export interface WorkspaceNotificationProviderProfileRolloutMetricsResponse {
   tenantKey: string;
   workspaceKey: string;
+  evaluationWindowHours: number;
   items: NotificationProviderProfileRolloutMetricsItemDto[];
 }
 
@@ -708,6 +714,8 @@ export interface PromoteWorkspaceNotificationProviderProfileRequest {
   promotedByActorId: string;
   promotionNote?: string | null;
   clearRolloutFallbackProfile?: boolean;
+  forcePromotion?: boolean;
+  evaluationWindowHours?: number;
 }
 
 export interface PromoteWorkspaceNotificationProviderProfileResponse {
