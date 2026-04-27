@@ -47,6 +47,9 @@ import {
   monitorCommandAckStates,
   type MonitorTestRunCommandResponse,
   type MonitorCommandDto,
+  type NotificationProviderPromotionPolicyDto,
+  type NotificationProviderPromotionPolicyOverrideDto,
+  type NotificationProviderPromotionPolicyOverrideRecordsDto,
   type NotificationPolicyDto,
   type NotificationPolicyOverrideDto,
   type NotificationPolicyOverrideRecordsDto,
@@ -120,6 +123,7 @@ import {
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
+  type TenantNotificationProviderPromotionPolicyResponse,
   type TenantNotificationPolicyResponse,
   type TenantNotificationProviderProfilesResponse,
   type TenantOperationalPolicyResponse,
@@ -128,6 +132,7 @@ import {
   type UpdateTenantEvidenceRetentionClassPolicyRequest,
   type UpdateTenantEvidenceRetentionPolicyRequest,
   type UpdateTenantLaunchApprovalPolicyRequest,
+  type UpdateTenantNotificationProviderPromotionPolicyRequest,
   type UpdateTenantNotificationPolicyRequest,
   type UpdateTenantNotificationProviderProfilesRequest,
   type UpdateTenantOperationalPolicyRequest,
@@ -135,6 +140,7 @@ import {
   type UpdateWorkspaceEvidenceRetentionClassPolicyRequest,
   type UpdateWorkspaceEvidenceRetentionPolicyRequest,
   type UpdateWorkspaceLaunchApprovalPolicyRequest,
+  type UpdateWorkspaceNotificationProviderPromotionPolicyRequest,
   type UpdateWorkspaceNotificationPolicyRequest,
   type UpdateWorkspaceNotificationProviderProfilesRequest,
   type UpdateWorkspaceOperationalPolicyRequest,
@@ -149,6 +155,8 @@ import {
   type WorkspaceEvidenceRetentionClassPolicyResponse,
   type WorkspaceLaunchApprovalPolicyModeDto,
   type WorkspaceLaunchApprovalPolicyResponse,
+  type WorkspaceNotificationProviderPromotionPolicyModeDto,
+  type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceMonitorCommandsResponse,
   type WorkspaceMonitorTestRunDto,
   type WorkspaceMonitorTestRunsResponse,
@@ -197,6 +205,7 @@ import {
   createImportJob,
   createLaunchApprovalPolicyOverrideRecords,
   createMonitorCommand,
+  createNotificationProviderPromotionPolicyOverrideRecords,
   createNotificationPolicyOverrideRecords,
   createNotificationProviderProfileOverrideRecords,
   createOperationalPolicyOverrideRecords,
@@ -226,6 +235,7 @@ import {
   flattenEvidenceRetentionPolicyOverrideRecords,
   flattenActivationPolicyOverrideRecords,
   flattenLaunchApprovalPolicyOverrideRecords,
+  flattenNotificationProviderPromotionPolicyOverrideRecords,
   flattenRemovedNotificationProviderProfileKeys,
   flattenNotificationPolicyOverrideRecords,
   flattenNotificationProviderProfileOverrideRecords,
@@ -260,6 +270,7 @@ import {
   resolveWorkspaceEvidenceRetentionClassPolicy,
   resolveWorkspaceEvidenceRetentionPolicy,
   redriveSystemCheckEvidenceBreachNotification,
+  resolveWorkspaceNotificationProviderPromotionPolicy,
   resolveWorkspaceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceOperationalPolicy,
@@ -270,6 +281,7 @@ import {
   type EvidenceRetentionClassPolicy,
   type EvidenceRetentionPolicy,
   type LaunchApprovalPolicy,
+  type NotificationProviderPromotionPolicy,
   type NotificationPolicy,
   type NotificationProviderProfile,
   type StarterAssignment,
@@ -294,7 +306,6 @@ const jsonContentType = {
 };
 const maxSystemCheckEvidenceBytes = 256 * 1024;
 const systemCheckEvidenceAccessGrantTtlSeconds = 300;
-const defaultNotificationProviderProfilePromotionEvaluationWindowHours = 24;
 
 const tenantWorkspaceRoutePattern = /^\/api\/v1\/tenants\/([^/]+)\/workspaces$/;
 const workspaceActivationPolicyRoutePattern =
@@ -303,6 +314,8 @@ const workspaceOperationalPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/operational-policy$/;
 const workspaceLaunchApprovalPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/launch-approval-policy$/;
+const workspaceNotificationProviderPromotionPolicyRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-promotion-policy$/;
 const workspaceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-policy$/;
 const workspaceNotificationProviderProfilesRoutePattern =
@@ -447,6 +460,8 @@ const tenantActivationPolicyRoutePattern = /^\/api\/v1\/platform\/tenants\/([^/]
 const tenantOperationalPolicyRoutePattern = /^\/api\/v1\/platform\/tenants\/([^/]+)\/operational-policy$/;
 const tenantLaunchApprovalPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/launch-approval-policy$/;
+const tenantNotificationProviderPromotionPolicyRoutePattern =
+  /^\/api\/v1\/platform\/tenants\/([^/]+)\/notification-provider-promotion-policy$/;
 const tenantNotificationPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/notification-policy$/;
 const tenantNotificationProviderProfilesRoutePattern =
@@ -461,6 +476,7 @@ const tenantPolicyAuditEventTypes = [
   "tenant.activation_policy.updated",
   "tenant.operational_policy.updated",
   "tenant.launch_approval_policy.updated",
+  "tenant.notification_provider_promotion_policy.updated",
   "tenant.notification_policy.updated",
   "tenant.notification_provider_profiles.updated",
   "tenant.evidence_retention_policy.updated",
@@ -471,6 +487,7 @@ const workspacePolicyAuditEventTypes = [
   "workspace.activation_policy.updated",
   "workspace.operational_policy.updated",
   "workspace.launch_approval_policy.updated",
+  "workspace.notification_provider_promotion_policy.updated",
   "workspace.notification_policy.updated",
   "workspace.notification_provider_profiles.updated",
   "workspace.evidence_retention_policy.updated",
@@ -680,6 +697,16 @@ const isWorkspaceOperationalPolicyMode = (
 const isLaunchApprovalPolicy = (value: unknown): value is LaunchApprovalPolicyDto =>
   isRecord(value) &&
   isNonNegativeInteger(value.systemCheckLaunchApprovalTtlSeconds);
+
+const isNotificationProviderPromotionPolicy = (
+  value: unknown
+): value is NotificationProviderPromotionPolicyDto =>
+  isRecord(value) &&
+  isPositiveInteger(value.evaluationWindowHours) &&
+  isNonNegativeInteger(value.minimumRequestedCount) &&
+  isNonNegativeInteger(value.minimumDirectSelectionCount) &&
+  isNonNegativeInteger(value.minimumDeliveredCount) &&
+  isNonNegativeInteger(value.maximumDeliveryFailedCount);
 
 const isNotificationDeliverySelectionMode = (
   value: unknown
@@ -1015,6 +1042,14 @@ const launchApprovalPolicyOverrideKeys = [
   "systemCheckLaunchApprovalTtlSeconds"
 ] as const satisfies ReadonlyArray<keyof LaunchApprovalPolicyOverrideDto>;
 
+const notificationProviderPromotionPolicyOverrideKeys = [
+  "evaluationWindowHours",
+  "minimumRequestedCount",
+  "minimumDirectSelectionCount",
+  "minimumDeliveredCount",
+  "maximumDeliveryFailedCount"
+] as const satisfies ReadonlyArray<keyof NotificationProviderPromotionPolicyOverrideDto>;
+
 const notificationPolicyOverrideKeys = [
   "breachNotificationDeliverySelectionMode",
   "webhookSpikeRetryDelaySeconds",
@@ -1061,6 +1096,34 @@ const isLaunchApprovalPolicyOverride = (
 const isWorkspaceLaunchApprovalPolicyMode = (
   value: unknown
 ): value is WorkspaceLaunchApprovalPolicyModeDto =>
+  value === "inherit" || value === "override";
+
+const isNotificationProviderPromotionPolicyOverride = (
+  value: unknown
+): value is NotificationProviderPromotionPolicyOverrideDto => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+
+  if (keys.length === 0) {
+    return false;
+  }
+
+  return keys.every(key =>
+    notificationProviderPromotionPolicyOverrideKeys.includes(
+      key as typeof notificationProviderPromotionPolicyOverrideKeys[number]
+    ) &&
+    (key === "evaluationWindowHours"
+      ? isPositiveInteger(value[key])
+      : isNonNegativeInteger(value[key]))
+  );
+};
+
+const isWorkspaceNotificationProviderPromotionPolicyMode = (
+  value: unknown
+): value is WorkspaceNotificationProviderPromotionPolicyModeDto =>
   value === "inherit" || value === "override";
 
 const isNotificationPolicyOverride = (
@@ -1472,6 +1535,22 @@ const isLaunchApprovalPolicyOverrideRecords = (
   );
 };
 
+const isNotificationProviderPromotionPolicyOverrideRecords = (
+  value: unknown
+): value is NotificationProviderPromotionPolicyOverrideRecordsDto => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+
+  return keys.every(key =>
+    notificationProviderPromotionPolicyOverrideKeys.includes(
+      key as typeof notificationProviderPromotionPolicyOverrideKeys[number]
+    ) && isNumericPolicyOverrideRecord(value[key])
+  );
+};
+
 const isNotificationPolicyOverrideRecords = (
   value: unknown
 ): value is NotificationPolicyOverrideRecordsDto => {
@@ -1712,6 +1791,18 @@ const toLaunchApprovalPolicyDto = (
   launchApprovalPolicy: LaunchApprovalPolicy
 ): LaunchApprovalPolicyDto => ({
   systemCheckLaunchApprovalTtlSeconds: launchApprovalPolicy.systemCheckLaunchApprovalTtlSeconds
+});
+
+const toNotificationProviderPromotionPolicyDto = (
+  notificationProviderPromotionPolicy: NotificationProviderPromotionPolicy
+): NotificationProviderPromotionPolicyDto => ({
+  evaluationWindowHours: notificationProviderPromotionPolicy.evaluationWindowHours,
+  minimumRequestedCount: notificationProviderPromotionPolicy.minimumRequestedCount,
+  minimumDirectSelectionCount:
+    notificationProviderPromotionPolicy.minimumDirectSelectionCount,
+  minimumDeliveredCount: notificationProviderPromotionPolicy.minimumDeliveredCount,
+  maximumDeliveryFailedCount:
+    notificationProviderPromotionPolicy.maximumDeliveryFailedCount
 });
 
 const toNotificationPolicyDto = (
@@ -2045,6 +2136,45 @@ const toLaunchApprovalPolicyOverrideDto = (
     : {})
 });
 
+const toNotificationProviderPromotionPolicyOverrideDto = (
+  notificationProviderPromotionPolicyOverride: NotificationProviderPromotionPolicyOverrideDto
+): NotificationProviderPromotionPolicyOverrideDto => ({
+  ...(isPositiveInteger(notificationProviderPromotionPolicyOverride.evaluationWindowHours)
+    ? {
+        evaluationWindowHours:
+          notificationProviderPromotionPolicyOverride.evaluationWindowHours
+      }
+    : {}),
+  ...(isNonNegativeInteger(notificationProviderPromotionPolicyOverride.minimumRequestedCount)
+    ? {
+        minimumRequestedCount:
+          notificationProviderPromotionPolicyOverride.minimumRequestedCount
+      }
+    : {}),
+  ...(isNonNegativeInteger(
+    notificationProviderPromotionPolicyOverride.minimumDirectSelectionCount
+  )
+    ? {
+        minimumDirectSelectionCount:
+          notificationProviderPromotionPolicyOverride.minimumDirectSelectionCount
+      }
+    : {}),
+  ...(isNonNegativeInteger(notificationProviderPromotionPolicyOverride.minimumDeliveredCount)
+    ? {
+        minimumDeliveredCount:
+          notificationProviderPromotionPolicyOverride.minimumDeliveredCount
+      }
+    : {}),
+  ...(isNonNegativeInteger(
+    notificationProviderPromotionPolicyOverride.maximumDeliveryFailedCount
+  )
+    ? {
+        maximumDeliveryFailedCount:
+          notificationProviderPromotionPolicyOverride.maximumDeliveryFailedCount
+      }
+    : {})
+});
+
 const toNotificationPolicyOverrideDto = (
   notificationPolicyOverride: NotificationPolicyOverrideDto
 ): NotificationPolicyOverrideDto => ({
@@ -2145,6 +2275,52 @@ const toLaunchApprovalPolicyOverrideRecordsDto = (
       ? {
           systemCheckLaunchApprovalTtlSeconds: toNumericPolicyOverrideRecordDto(
             launchApprovalPolicyOverrideRecords.systemCheckLaunchApprovalTtlSeconds
+          )
+        }
+      : {})
+  };
+};
+
+const toNotificationProviderPromotionPolicyOverrideRecordsDto = (
+  notificationProviderPromotionPolicyOverrideRecords: Workspace["notificationProviderPromotionPolicyOverrideRecords"]
+): NotificationProviderPromotionPolicyOverrideRecordsDto | null => {
+  if (!notificationProviderPromotionPolicyOverrideRecords) {
+    return null;
+  }
+
+  return {
+    ...(notificationProviderPromotionPolicyOverrideRecords.evaluationWindowHours
+      ? {
+          evaluationWindowHours: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.evaluationWindowHours
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.minimumRequestedCount
+      ? {
+          minimumRequestedCount: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.minimumRequestedCount
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.minimumDirectSelectionCount
+      ? {
+          minimumDirectSelectionCount: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.minimumDirectSelectionCount
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.minimumDeliveredCount
+      ? {
+          minimumDeliveredCount: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.minimumDeliveredCount
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.maximumDeliveryFailedCount
+      ? {
+          maximumDeliveryFailedCount: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.maximumDeliveryFailedCount
           )
         }
       : {})
@@ -3085,6 +3261,10 @@ const toPolicyHistoryEntryDto = (
     launchApprovalPolicyOverride: null,
     launchApprovalPolicyOverrideRecords: null,
     effectiveLaunchApprovalPolicy: null,
+    defaultNotificationProviderPromotionPolicy: null,
+    notificationProviderPromotionPolicyOverride: null,
+    notificationProviderPromotionPolicyOverrideRecords: null,
+    effectiveNotificationProviderPromotionPolicy: null,
     defaultNotificationPolicy: null,
     notificationPolicyOverride: null,
     notificationPolicyOverrideRecords: null,
@@ -3359,6 +3539,31 @@ const toPolicyHistoryEntryDto = (
     };
   }
 
+  if (auditEvent.eventType === "tenant.notification_provider_promotion_policy.updated") {
+    const defaultNotificationProviderPromotionPolicy = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultNotificationProviderPromotionPolicy"
+    );
+
+    if (!isNotificationProviderPromotionPolicy(defaultNotificationProviderPromotionPolicy)) {
+      return undefined;
+    }
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "notification_provider_promotion",
+      scope: "tenant_default",
+      mode: "default",
+      changedFields: [...notificationProviderPromotionPolicyOverrideKeys],
+      clearedFields: [],
+      defaultNotificationProviderPromotionPolicy,
+      notificationProviderPromotionPolicyOverride: null,
+      notificationProviderPromotionPolicyOverrideRecords: null,
+      effectiveNotificationProviderPromotionPolicy: defaultNotificationProviderPromotionPolicy
+    };
+  }
+
   if (auditEvent.eventType === "tenant.notification_provider_profiles.updated") {
     const defaultNotificationProviderProfilesRecord = getAuditPayloadRecord(
       auditEvent.payload,
@@ -3478,6 +3683,59 @@ const toPolicyHistoryEntryDto = (
           : null,
       effectiveNotificationPolicy: isNotificationPolicy(effectiveNotificationPolicyRecord)
         ? effectiveNotificationPolicyRecord
+        : null
+    };
+  }
+
+  if (auditEvent.eventType === "workspace.notification_provider_promotion_policy.updated") {
+    const defaultNotificationProviderPromotionPolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultNotificationProviderPromotionPolicy"
+    );
+    const notificationProviderPromotionPolicyOverrideRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "notificationProviderPromotionPolicyOverride"
+    );
+    const notificationProviderPromotionPolicyOverrideRecordsRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "notificationProviderPromotionPolicyOverrideRecords"
+    );
+    const effectiveNotificationProviderPromotionPolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "effectiveNotificationProviderPromotionPolicy"
+    );
+    const mode = isWorkspaceNotificationProviderPromotionPolicyMode(auditEvent.payload.mode)
+      ? auditEvent.payload.mode
+      : "override";
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "notification_provider_promotion",
+      scope: "workspace_override",
+      mode,
+      changedFields: getAuditPayloadStringArray(auditEvent.payload, "changedFields") ?? [],
+      clearedFields: getAuditPayloadStringArray(auditEvent.payload, "clearedFields") ?? [],
+      defaultNotificationProviderPromotionPolicy: isNotificationProviderPromotionPolicy(
+        defaultNotificationProviderPromotionPolicyRecord
+      )
+        ? defaultNotificationProviderPromotionPolicyRecord
+        : null,
+      notificationProviderPromotionPolicyOverride: isNotificationProviderPromotionPolicyOverride(
+        notificationProviderPromotionPolicyOverrideRecord
+      )
+        ? notificationProviderPromotionPolicyOverrideRecord
+        : null,
+      notificationProviderPromotionPolicyOverrideRecords:
+        isNotificationProviderPromotionPolicyOverrideRecords(
+          notificationProviderPromotionPolicyOverrideRecordsRecord
+        )
+          ? notificationProviderPromotionPolicyOverrideRecordsRecord
+          : null,
+      effectiveNotificationProviderPromotionPolicy: isNotificationProviderPromotionPolicy(
+        effectiveNotificationProviderPromotionPolicyRecord
+      )
+        ? effectiveNotificationProviderPromotionPolicyRecord
         : null
     };
   }
@@ -4817,6 +5075,15 @@ const toTenantLaunchApprovalPolicyResponse = (
   defaultLaunchApprovalPolicy: toLaunchApprovalPolicyDto(tenant.defaultLaunchApprovalPolicy)
 });
 
+const toTenantNotificationProviderPromotionPolicyResponse = (
+  tenant: Tenant
+): TenantNotificationProviderPromotionPolicyResponse => ({
+  tenantKey: tenant.tenantKey,
+  defaultNotificationProviderPromotionPolicy: toNotificationProviderPromotionPolicyDto(
+    tenant.defaultNotificationProviderPromotionPolicy
+  )
+});
+
 const toTenantNotificationPolicyResponse = (
   tenant: Tenant
 ): TenantNotificationPolicyResponse => ({
@@ -5040,6 +5307,78 @@ const handleTenantLaunchApprovalPolicyPatch = async (
     response,
     200,
     toTenantLaunchApprovalPolicyResponse(updatedTenant)
+  );
+};
+
+const handleTenantNotificationProviderPromotionPolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  sendJson<TenantNotificationProviderPromotionPolicyResponse>(
+    response,
+    200,
+    toTenantNotificationProviderPromotionPolicyResponse(tenant)
+  );
+};
+
+const handleTenantNotificationProviderPromotionPolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  const body = await readBody<UpdateTenantNotificationProviderPromotionPolicyRequest>(request);
+
+  if (!isNotificationProviderPromotionPolicy(body.defaultNotificationProviderPromotionPolicy)) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_notification_provider_promotion_policy_payload",
+      "defaultNotificationProviderPromotionPolicy must provide a valid promotion policy."
+    );
+    return;
+  }
+
+  const updatedTenant: Tenant = {
+    ...tenant,
+    defaultNotificationProviderPromotionPolicy:
+      body.defaultNotificationProviderPromotionPolicy
+  };
+
+  await store.saveTenant(updatedTenant);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedTenant.tenantId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "tenant.notification_provider_promotion_policy.updated",
+    payload: {
+      tenantKey: updatedTenant.tenantKey,
+      defaultNotificationProviderPromotionPolicy:
+        updatedTenant.defaultNotificationProviderPromotionPolicy
+    }
+  });
+
+  sendJson<TenantNotificationProviderPromotionPolicyResponse>(
+    response,
+    200,
+    toTenantNotificationProviderPromotionPolicyResponse(updatedTenant)
   );
 };
 
@@ -5519,6 +5858,34 @@ const toWorkspaceLaunchApprovalPolicyResponse = (
   };
 };
 
+const toWorkspaceNotificationProviderPromotionPolicyResponse = (
+  tenant: Tenant,
+  workspace: Workspace
+): WorkspaceNotificationProviderPromotionPolicyResponse => {
+  const flattenedOverride = flattenNotificationProviderPromotionPolicyOverrideRecords(
+    workspace.notificationProviderPromotionPolicyOverrideRecords
+  );
+
+  return {
+    tenantKey: tenant.tenantKey,
+    workspaceKey: workspace.workspaceKey,
+    mode: workspace.notificationProviderPromotionPolicyOverrideRecords ? "override" : "inherit",
+    defaultNotificationProviderPromotionPolicy: toNotificationProviderPromotionPolicyDto(
+      tenant.defaultNotificationProviderPromotionPolicy
+    ),
+    notificationProviderPromotionPolicyOverride: flattenedOverride
+      ? toNotificationProviderPromotionPolicyOverrideDto(flattenedOverride)
+      : null,
+    notificationProviderPromotionPolicyOverrideRecords:
+      toNotificationProviderPromotionPolicyOverrideRecordsDto(
+        workspace.notificationProviderPromotionPolicyOverrideRecords
+      ),
+    effectiveNotificationProviderPromotionPolicy: toNotificationProviderPromotionPolicyDto(
+      resolveWorkspaceNotificationProviderPromotionPolicy(workspace, tenant)
+    )
+  };
+};
+
 const toWorkspaceNotificationPolicyResponse = (
   tenant: Tenant,
   workspace: Workspace
@@ -5589,7 +5956,7 @@ const toNotificationProviderProfilePromotionReadiness = (input: {
   directSelectionCount: number;
   deliveredCount: number;
   deliveryFailedCount: number;
-  evaluationWindowHours: number;
+  promotionPolicy: NotificationProviderPromotionPolicy;
 }): NotificationProviderProfileRolloutMetricsItemDto["promotionReadiness"] => {
   const reasons: string[] = [];
 
@@ -5601,25 +5968,25 @@ const toNotificationProviderProfilePromotionReadiness = (input: {
     reasons.push("profile_is_not_ready");
   }
 
-  if (input.requestedCount < 1) {
+  if (input.requestedCount < input.promotionPolicy.minimumRequestedCount) {
     reasons.push("insufficient_requested_volume");
   }
 
-  if (input.directSelectionCount < 1) {
+  if (input.directSelectionCount < input.promotionPolicy.minimumDirectSelectionCount) {
     reasons.push("insufficient_direct_selection_volume");
   }
 
-  if (input.deliveredCount < 1) {
+  if (input.deliveredCount < input.promotionPolicy.minimumDeliveredCount) {
     reasons.push("insufficient_successful_deliveries");
   }
 
-  if (input.deliveryFailedCount > 0) {
+  if (input.deliveryFailedCount > input.promotionPolicy.maximumDeliveryFailedCount) {
     reasons.push("delivery_failures_present");
   }
 
   return {
     status: reasons.length === 0 ? "ready" : "blocked",
-    evaluationWindowHours: input.evaluationWindowHours,
+    evaluationWindowHours: input.promotionPolicy.evaluationWindowHours,
     reasons
   };
 };
@@ -5628,20 +5995,26 @@ const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
   tenant: Tenant;
   workspace: Workspace;
   notifications: import("@testcenter-rewrite/domain").SystemCheckEvidenceBreachNotification[];
-  evaluationWindowHours: number;
+  evaluationWindowHours?: number;
 }): WorkspaceNotificationProviderProfileRolloutMetricsResponse => {
   const effectiveProfiles = resolveWorkspaceNotificationProviderProfiles(
     input.workspace,
     input.tenant
   );
+  const effectivePromotionPolicy = resolveWorkspaceNotificationProviderPromotionPolicy(
+    input.workspace,
+    input.tenant
+  );
+  const evaluationWindowHours =
+    input.evaluationWindowHours ?? effectivePromotionPolicy.evaluationWindowHours;
   const evaluationWindowStart = new Date(
-    Date.now() - input.evaluationWindowHours * 60 * 60 * 1000
+    Date.now() - evaluationWindowHours * 60 * 60 * 1000
   ).toISOString();
 
   return {
     tenantKey: input.tenant.tenantKey,
     workspaceKey: input.workspace.workspaceKey,
-    evaluationWindowHours: input.evaluationWindowHours,
+    evaluationWindowHours,
     items: effectiveProfiles.map(profile => {
       let requestedCount = 0;
       let directSelectionCount = 0;
@@ -5735,7 +6108,10 @@ const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
           directSelectionCount,
           deliveredCount,
           deliveryFailedCount,
-          evaluationWindowHours: input.evaluationWindowHours
+          promotionPolicy: {
+            ...effectivePromotionPolicy,
+            evaluationWindowHours
+          }
         })
       };
     })
@@ -6197,6 +6573,151 @@ const handleWorkspaceLaunchApprovalPolicyPatch = async (
   );
 };
 
+const handleWorkspaceNotificationProviderPromotionPolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  sendJson<WorkspaceNotificationProviderPromotionPolicyResponse>(
+    response,
+    200,
+    toWorkspaceNotificationProviderPromotionPolicyResponse(tenant, workspace)
+  );
+};
+
+const handleWorkspaceNotificationProviderPromotionPolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<UpdateWorkspaceNotificationProviderPromotionPolicyRequest>(request);
+
+  if (!isWorkspaceNotificationProviderPromotionPolicyMode(body.mode)) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_notification_provider_promotion_policy_payload",
+      "mode must be either 'inherit' or 'override'."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    !isNotificationProviderPromotionPolicyOverride(
+      body.notificationProviderPromotionPolicyOverride
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_notification_provider_promotion_policy_payload",
+      "notificationProviderPromotionPolicyOverride must provide at least one valid promotion-policy field when mode is 'override'."
+    );
+    return;
+  }
+
+  const notificationProviderPromotionPolicyOverride =
+    body.mode === "override"
+      ? toNotificationProviderPromotionPolicyOverrideDto(
+          body.notificationProviderPromotionPolicyOverride as NotificationProviderPromotionPolicyOverrideDto
+        )
+      : null;
+  const previousNotificationProviderPromotionPolicyOverride =
+    flattenNotificationProviderPromotionPolicyOverrideRecords(
+      workspace.notificationProviderPromotionPolicyOverrideRecords
+    );
+  const changedFields = notificationProviderPromotionPolicyOverride
+    ? Object.keys(notificationProviderPromotionPolicyOverride)
+    : [];
+  const clearedFields = previousNotificationProviderPromotionPolicyOverride
+    ? Object.keys(previousNotificationProviderPromotionPolicyOverride).filter(
+        fieldKey =>
+          !notificationProviderPromotionPolicyOverride ||
+          !(fieldKey in notificationProviderPromotionPolicyOverride)
+      )
+    : [];
+  const notificationProviderPromotionPolicyOverrideRecords =
+    notificationProviderPromotionPolicyOverride
+      ? createNotificationProviderPromotionPolicyOverrideRecords({
+          override: notificationProviderPromotionPolicyOverride,
+          updatedByRequestId: requestContext.requestId,
+          updatedByActorType: "platform_api",
+          updatedByActorId: "platform-api"
+        })
+      : null;
+
+  const updatedWorkspace: Workspace = {
+    ...workspace,
+    notificationProviderPromotionPolicyOverrideRecords
+  };
+
+  await store.saveWorkspace(updatedWorkspace);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedWorkspace.tenantId,
+    workspaceId: updatedWorkspace.workspaceId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "workspace.notification_provider_promotion_policy.updated",
+    payload: {
+      workspaceKey: updatedWorkspace.workspaceKey,
+      mode: body.mode,
+      defaultNotificationProviderPromotionPolicy:
+        tenant.defaultNotificationProviderPromotionPolicy,
+      notificationProviderPromotionPolicyOverride,
+      notificationProviderPromotionPolicyOverrideRecords:
+        toNotificationProviderPromotionPolicyOverrideRecordsDto(
+          updatedWorkspace.notificationProviderPromotionPolicyOverrideRecords
+        ),
+      changedFields,
+      clearedFields,
+      effectiveNotificationProviderPromotionPolicy:
+        resolveWorkspaceNotificationProviderPromotionPolicy(updatedWorkspace, tenant)
+    }
+  });
+
+  sendJson<WorkspaceNotificationProviderPromotionPolicyResponse>(
+    response,
+    200,
+    toWorkspaceNotificationProviderPromotionPolicyResponse(tenant, updatedWorkspace)
+  );
+};
+
 const handleWorkspaceNotificationPolicyGet = async (
   store: PlatformStore,
   response: ServerResponse,
@@ -6381,10 +6902,14 @@ const handleWorkspaceNotificationProviderProfileRolloutMetricsGet = async (
   }
 
   const requestedWindowHours = url.searchParams.get("windowHours");
+  const effectivePromotionPolicy = resolveWorkspaceNotificationProviderPromotionPolicy(
+    workspace,
+    tenant
+  );
   const evaluationWindowHours =
     requestedWindowHours && isPositiveInteger(Number(requestedWindowHours))
       ? Number(requestedWindowHours)
-      : defaultNotificationProviderProfilePromotionEvaluationWindowHours;
+      : effectivePromotionPolicy.evaluationWindowHours;
 
   const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
     tenantKey,
@@ -6639,8 +7164,12 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
     return;
   }
 
+  const effectivePromotionPolicy = resolveWorkspaceNotificationProviderPromotionPolicy(
+    workspace,
+    tenant
+  );
   const evaluationWindowHours =
-    body.evaluationWindowHours ?? defaultNotificationProviderProfilePromotionEvaluationWindowHours;
+    body.evaluationWindowHours ?? effectivePromotionPolicy.evaluationWindowHours;
   const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
     tenantKey,
     workspaceKey,
@@ -10989,6 +11518,30 @@ const handleRequest = async (
     }
   }
 
+  const tenantNotificationProviderPromotionPolicyRouteMatch = pathname.match(
+    tenantNotificationProviderPromotionPolicyRoutePattern
+  );
+
+  if (tenantNotificationProviderPromotionPolicyRouteMatch) {
+    const [, tenantKey] = tenantNotificationProviderPromotionPolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleTenantNotificationProviderPromotionPolicyGet(store, response, tenantKey);
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleTenantNotificationProviderPromotionPolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
   const tenantNotificationPolicyRouteMatch = pathname.match(tenantNotificationPolicyRoutePattern);
 
   if (tenantNotificationPolicyRouteMatch) {
@@ -11140,6 +11693,36 @@ const handleRequest = async (
 
     if (method === "PATCH") {
       await handleWorkspaceLaunchApprovalPolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderPromotionPolicyRouteMatch = pathname.match(
+    workspaceNotificationProviderPromotionPolicyRoutePattern
+  );
+
+  if (workspaceNotificationProviderPromotionPolicyRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceNotificationProviderPromotionPolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderPromotionPolicyGet(
+        store,
+        response,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleWorkspaceNotificationProviderPromotionPolicyPatch(
         store,
         request,
         response,

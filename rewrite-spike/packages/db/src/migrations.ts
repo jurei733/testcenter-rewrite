@@ -1115,6 +1115,23 @@ ADD COLUMN IF NOT EXISTS delivery_profile_key TEXT NULL;
 ALTER TABLE workspaces
 ADD COLUMN IF NOT EXISTS notification_provider_profile_override JSONB NULL;
 `
+  },
+  {
+    version: "0038",
+    name: "notification-provider-promotion-policy-family",
+    sql: `
+ALTER TABLE tenants
+ADD COLUMN IF NOT EXISTS default_notification_provider_promotion_policy JSONB NOT NULL DEFAULT '{
+  "evaluationWindowHours": 24,
+  "minimumRequestedCount": 1,
+  "minimumDirectSelectionCount": 1,
+  "minimumDeliveredCount": 1,
+  "maximumDeliveryFailedCount": 0
+}'::jsonb;
+
+ALTER TABLE workspaces
+ADD COLUMN IF NOT EXISTS notification_provider_promotion_policy_override JSONB NULL;
+`
   }
 ];
 

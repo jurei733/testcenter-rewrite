@@ -23,6 +23,14 @@ export interface LaunchApprovalPolicy {
   systemCheckLaunchApprovalTtlSeconds: number;
 }
 
+export interface NotificationProviderPromotionPolicy {
+  evaluationWindowHours: number;
+  minimumRequestedCount: number;
+  minimumDirectSelectionCount: number;
+  minimumDeliveredCount: number;
+  maximumDeliveryFailedCount: number;
+}
+
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
 export type NotificationPolicy = OutboundNotificationPolicy;
 export type NotificationProviderProfile = OutboundNotificationProviderProfile;
@@ -104,6 +112,14 @@ export const defaultLaunchApprovalPolicy: LaunchApprovalPolicy = {
   systemCheckLaunchApprovalTtlSeconds: 0
 };
 
+export const defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicy = {
+  evaluationWindowHours: 24,
+  minimumRequestedCount: 1,
+  minimumDirectSelectionCount: 1,
+  minimumDeliveredCount: 1,
+  maximumDeliveryFailedCount: 0
+};
+
 export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
 export const defaultNotificationProviderProfiles: NotificationProviderProfile[] = [];
 
@@ -180,6 +196,7 @@ export interface Tenant {
   defaultActivationPolicy: ContentReleaseActivationPolicy;
   defaultOperationalPolicy: OperationalPolicy;
   defaultLaunchApprovalPolicy: LaunchApprovalPolicy;
+  defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicy;
   defaultNotificationPolicy: NotificationPolicy;
   defaultNotificationProviderProfiles: NotificationProviderProfile[];
   defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy;
@@ -189,6 +206,7 @@ export interface Tenant {
 export type ContentReleaseActivationPolicyOverride = Partial<ContentReleaseActivationPolicy>;
 export type OperationalPolicyOverride = Partial<OperationalPolicy>;
 export type LaunchApprovalPolicyOverride = Partial<LaunchApprovalPolicy>;
+export type NotificationProviderPromotionPolicyOverride = Partial<NotificationProviderPromotionPolicy>;
 export type NotificationPolicyOverride = Partial<NotificationPolicy>;
 export type EvidenceRetentionPolicyOverride = Partial<EvidenceRetentionPolicy>;
 
@@ -206,6 +224,14 @@ export interface OperationalPolicyOverrideRecords {
 
 export interface LaunchApprovalPolicyOverrideRecords {
   systemCheckLaunchApprovalTtlSeconds?: PolicyOverrideRecord<number>;
+}
+
+export interface NotificationProviderPromotionPolicyOverrideRecords {
+  evaluationWindowHours?: PolicyOverrideRecord<number>;
+  minimumRequestedCount?: PolicyOverrideRecord<number>;
+  minimumDirectSelectionCount?: PolicyOverrideRecord<number>;
+  minimumDeliveredCount?: PolicyOverrideRecord<number>;
+  maximumDeliveryFailedCount?: PolicyOverrideRecord<number>;
 }
 
 export interface NotificationPolicyOverrideRecords {
@@ -230,6 +256,7 @@ export interface Workspace {
   activationPolicyOverrideRecords: ActivationPolicyOverrideRecords | null;
   operationalPolicyOverrideRecords: OperationalPolicyOverrideRecords | null;
   launchApprovalPolicyOverrideRecords: LaunchApprovalPolicyOverrideRecords | null;
+  notificationProviderPromotionPolicyOverrideRecords: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords: EvidenceRetentionPolicyOverrideRecords | null;
@@ -249,6 +276,7 @@ export const createTenant = (input: {
   defaultActivationPolicy: defaultContentReleaseActivationPolicy,
   defaultOperationalPolicy,
   defaultLaunchApprovalPolicy,
+  defaultNotificationProviderPromotionPolicy,
   defaultNotificationPolicy,
   defaultNotificationProviderProfiles,
   defaultEvidenceRetentionPolicy,
@@ -262,6 +290,7 @@ export const createWorkspace = (input: {
   activationPolicyOverrideRecords?: ActivationPolicyOverrideRecords | null;
   operationalPolicyOverrideRecords?: OperationalPolicyOverrideRecords | null;
   launchApprovalPolicyOverrideRecords?: LaunchApprovalPolicyOverrideRecords | null;
+  notificationProviderPromotionPolicyOverrideRecords?: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords?: NotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords?: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords?: EvidenceRetentionPolicyOverrideRecords | null;
@@ -275,6 +304,8 @@ export const createWorkspace = (input: {
   activationPolicyOverrideRecords: input.activationPolicyOverrideRecords ?? null,
   operationalPolicyOverrideRecords: input.operationalPolicyOverrideRecords ?? null,
   launchApprovalPolicyOverrideRecords: input.launchApprovalPolicyOverrideRecords ?? null,
+  notificationProviderPromotionPolicyOverrideRecords:
+    input.notificationProviderPromotionPolicyOverrideRecords ?? null,
   notificationPolicyOverrideRecords: input.notificationPolicyOverrideRecords ?? null,
   notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
   evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
@@ -450,6 +481,17 @@ export const resolveWorkspaceLaunchApprovalPolicy = (
     ...(flattenLaunchApprovalPolicyOverrideRecords(workspace.launchApprovalPolicyOverrideRecords) ?? {})
   });
 
+export const resolveWorkspaceNotificationProviderPromotionPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): NotificationProviderPromotionPolicy =>
+  ({
+    ...tenant.defaultNotificationProviderPromotionPolicy,
+    ...(flattenNotificationProviderPromotionPolicyOverrideRecords(
+      workspace.notificationProviderPromotionPolicyOverrideRecords
+    ) ?? {})
+  });
+
 export const resolveWorkspaceNotificationPolicy = (
   workspace: Workspace,
   tenant: Tenant
@@ -580,6 +622,38 @@ export const flattenLaunchApprovalPolicyOverrideRecords = (
   return Object.keys(flattened).length > 0 ? flattened : null;
 };
 
+export const flattenNotificationProviderPromotionPolicyOverrideRecords = (
+  records: NotificationProviderPromotionPolicyOverrideRecords | null
+): NotificationProviderPromotionPolicyOverride | null => {
+  if (!records) {
+    return null;
+  }
+
+  const flattened: NotificationProviderPromotionPolicyOverride = {};
+
+  if (records.evaluationWindowHours) {
+    flattened.evaluationWindowHours = records.evaluationWindowHours.value;
+  }
+
+  if (records.minimumRequestedCount) {
+    flattened.minimumRequestedCount = records.minimumRequestedCount.value;
+  }
+
+  if (records.minimumDirectSelectionCount) {
+    flattened.minimumDirectSelectionCount = records.minimumDirectSelectionCount.value;
+  }
+
+  if (records.minimumDeliveredCount) {
+    flattened.minimumDeliveredCount = records.minimumDeliveredCount.value;
+  }
+
+  if (records.maximumDeliveryFailedCount) {
+    flattened.maximumDeliveryFailedCount = records.maximumDeliveryFailedCount.value;
+  }
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
+};
+
 export const createLaunchApprovalPolicyOverrideRecords = (input: {
   override: LaunchApprovalPolicyOverride;
   updatedByRequestId: string;
@@ -593,6 +667,69 @@ export const createLaunchApprovalPolicyOverrideRecords = (input: {
   if (typeof input.override.systemCheckLaunchApprovalTtlSeconds === "number") {
     records.systemCheckLaunchApprovalTtlSeconds = {
       value: input.override.systemCheckLaunchApprovalTtlSeconds,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+export const createNotificationProviderPromotionPolicyOverrideRecords = (input: {
+  override: NotificationProviderPromotionPolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): NotificationProviderPromotionPolicyOverrideRecords | null => {
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const records: NotificationProviderPromotionPolicyOverrideRecords = {};
+
+  if (typeof input.override.evaluationWindowHours === "number") {
+    records.evaluationWindowHours = {
+      value: input.override.evaluationWindowHours,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.minimumRequestedCount === "number") {
+    records.minimumRequestedCount = {
+      value: input.override.minimumRequestedCount,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.minimumDirectSelectionCount === "number") {
+    records.minimumDirectSelectionCount = {
+      value: input.override.minimumDirectSelectionCount,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.minimumDeliveredCount === "number") {
+    records.minimumDeliveredCount = {
+      value: input.override.minimumDeliveredCount,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.maximumDeliveryFailedCount === "number") {
+    records.maximumDeliveryFailedCount = {
+      value: input.override.maximumDeliveryFailedCount,
       updatedAt,
       updatedByRequestId: input.updatedByRequestId,
       updatedByActorType: input.updatedByActorType,

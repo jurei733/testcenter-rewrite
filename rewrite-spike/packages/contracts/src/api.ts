@@ -7,6 +7,8 @@ export const apiRoutes = {
   tenantOperationalPolicy: (tenantKey: string): string => `/api/v1/platform/tenants/${tenantKey}/operational-policy`,
   tenantLaunchApprovalPolicy: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/launch-approval-policy`,
+  tenantNotificationProviderPromotionPolicy: (tenantKey: string): string =>
+    `/api/v1/platform/tenants/${tenantKey}/notification-provider-promotion-policy`,
   tenantNotificationPolicy: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/notification-policy`,
   tenantNotificationProviderProfiles: (tenantKey: string): string =>
@@ -23,6 +25,8 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/operational-policy`,
   workspaceLaunchApprovalPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/launch-approval-policy`,
+  workspaceNotificationProviderPromotionPolicy: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-promotion-policy`,
   workspaceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-policy`,
   workspaceNotificationProviderProfiles: (tenantKey: string, workspaceKey: string): string =>
@@ -270,6 +274,22 @@ export interface LaunchApprovalPolicyOverrideDto {
   systemCheckLaunchApprovalTtlSeconds?: number;
 }
 
+export interface NotificationProviderPromotionPolicyDto {
+  evaluationWindowHours: number;
+  minimumRequestedCount: number;
+  minimumDirectSelectionCount: number;
+  minimumDeliveredCount: number;
+  maximumDeliveryFailedCount: number;
+}
+
+export interface NotificationProviderPromotionPolicyOverrideDto {
+  evaluationWindowHours?: number;
+  minimumRequestedCount?: number;
+  minimumDirectSelectionCount?: number;
+  minimumDeliveredCount?: number;
+  maximumDeliveryFailedCount?: number;
+}
+
 export type NotificationDeliverySelectionModeDto =
   | "infer_from_target"
   | "force_webhook_spike"
@@ -462,6 +482,14 @@ export interface LaunchApprovalPolicyOverrideRecordsDto {
   systemCheckLaunchApprovalTtlSeconds?: NumericPolicyOverrideRecordDto;
 }
 
+export interface NotificationProviderPromotionPolicyOverrideRecordsDto {
+  evaluationWindowHours?: NumericPolicyOverrideRecordDto;
+  minimumRequestedCount?: NumericPolicyOverrideRecordDto;
+  minimumDirectSelectionCount?: NumericPolicyOverrideRecordDto;
+  minimumDeliveredCount?: NumericPolicyOverrideRecordDto;
+  maximumDeliveryFailedCount?: NumericPolicyOverrideRecordDto;
+}
+
 export interface NotificationPolicyOverrideRecordsDto {
   breachNotificationDeliverySelectionMode?: {
     value: NotificationDeliverySelectionModeDto;
@@ -523,6 +551,7 @@ export interface EvidenceRetentionClassPolicyOverrideRecordsDto {
 export type WorkspaceActivationPolicyModeDto = "inherit" | "override";
 export type WorkspaceOperationalPolicyModeDto = "inherit" | "override";
 export type WorkspaceLaunchApprovalPolicyModeDto = "inherit" | "override";
+export type WorkspaceNotificationProviderPromotionPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderProfilesModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionPolicyModeDto = "inherit" | "override";
@@ -553,6 +582,15 @@ export interface UpdateWorkspaceLaunchApprovalPolicyRequest {
 
 export interface UpdateTenantLaunchApprovalPolicyRequest {
   defaultLaunchApprovalPolicy: LaunchApprovalPolicyDto;
+}
+
+export interface UpdateWorkspaceNotificationProviderPromotionPolicyRequest {
+  mode: WorkspaceNotificationProviderPromotionPolicyModeDto;
+  notificationProviderPromotionPolicyOverride?: NotificationProviderPromotionPolicyOverrideDto | null;
+}
+
+export interface UpdateTenantNotificationProviderPromotionPolicyRequest {
+  defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto;
 }
 
 export interface UpdateWorkspaceNotificationPolicyRequest {
@@ -607,6 +645,11 @@ export interface TenantLaunchApprovalPolicyResponse {
   defaultLaunchApprovalPolicy: LaunchApprovalPolicyDto;
 }
 
+export interface TenantNotificationProviderPromotionPolicyResponse {
+  tenantKey: string;
+  defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto;
+}
+
 export interface TenantNotificationPolicyResponse {
   tenantKey: string;
   defaultNotificationPolicy: NotificationPolicyDto;
@@ -655,6 +698,16 @@ export interface WorkspaceLaunchApprovalPolicyResponse {
   launchApprovalPolicyOverride: LaunchApprovalPolicyOverrideDto | null;
   launchApprovalPolicyOverrideRecords: LaunchApprovalPolicyOverrideRecordsDto | null;
   effectiveLaunchApprovalPolicy: LaunchApprovalPolicyDto;
+}
+
+export interface WorkspaceNotificationProviderPromotionPolicyResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  mode: WorkspaceNotificationProviderPromotionPolicyModeDto;
+  defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto;
+  notificationProviderPromotionPolicyOverride: NotificationProviderPromotionPolicyOverrideDto | null;
+  notificationProviderPromotionPolicyOverrideRecords: NotificationProviderPromotionPolicyOverrideRecordsDto | null;
+  effectiveNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto;
 }
 
 export interface WorkspaceNotificationPolicyResponse {
@@ -1597,6 +1650,7 @@ export type PolicyHistoryFamilyDto =
   | "activation"
   | "operational"
   | "launch_approval"
+  | "notification_provider_promotion"
   | "notification"
   | "notification_provider_profiles"
   | "evidence_retention"
@@ -1630,6 +1684,10 @@ export interface PolicyHistoryEntryDto {
   launchApprovalPolicyOverride: LaunchApprovalPolicyOverrideDto | null;
   launchApprovalPolicyOverrideRecords: LaunchApprovalPolicyOverrideRecordsDto | null;
   effectiveLaunchApprovalPolicy: LaunchApprovalPolicyDto | null;
+  defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto | null;
+  notificationProviderPromotionPolicyOverride: NotificationProviderPromotionPolicyOverrideDto | null;
+  notificationProviderPromotionPolicyOverrideRecords: NotificationProviderPromotionPolicyOverrideRecordsDto | null;
+  effectiveNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicyDto | null;
   defaultNotificationPolicy: NotificationPolicyDto | null;
   notificationPolicyOverride: NotificationPolicyOverrideDto | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;

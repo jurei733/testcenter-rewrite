@@ -11,6 +11,7 @@ import {
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
+  type TenantNotificationProviderPromotionPolicyResponse,
   type TenantNotificationPolicyResponse,
   type TenantNotificationProviderProfilesResponse,
   type TenantOperationalPolicyResponse,
@@ -19,6 +20,7 @@ import {
   type WorkspaceEvidenceRetentionClassesResponse,
   type WorkspaceEvidenceRetentionPolicyResponse,
   type WorkspaceLaunchApprovalPolicyResponse,
+  type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -7029,29 +7031,60 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(deadLetterRolloutMetrics.promotionReadiness.status, "blocked");
   assert.ok(deadLetterRolloutMetrics.promotionReadiness.reasons.includes("profile_is_not_canary"));
 
-  const emptyWorkspaceNotificationProviderRolloutMetrics = await fetchJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
-    apiRoutes.workspaceNotificationProviderProfileRolloutMetrics(demoTenantKey, emptyWorkspaceKey)
+  const tenantNotificationProviderPromotionPolicy = await fetchJson<TenantNotificationProviderPromotionPolicyResponse>(
+    apiRoutes.tenantNotificationProviderPromotionPolicy(demoTenantKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        defaultNotificationProviderPromotionPolicy: {
+          evaluationWindowHours: 48,
+          minimumRequestedCount: 2,
+          minimumDirectSelectionCount: 1,
+          minimumDeliveredCount: 1,
+          maximumDeliveryFailedCount: 0
+        }
+      })
+    }
   );
-  const rolloutCanaryMetrics = emptyWorkspaceNotificationProviderRolloutMetrics.items.find(
-    item => item.profileKey === "rollout-canary-email-profile"
+  assert.deepEqual(tenantNotificationProviderPromotionPolicy.defaultNotificationProviderPromotionPolicy, {
+    evaluationWindowHours: 48,
+    minimumRequestedCount: 2,
+    minimumDirectSelectionCount: 1,
+    minimumDeliveredCount: 1,
+    maximumDeliveryFailedCount: 0
+  });
+
+  const inheritedEmptyWorkspaceNotificationProviderPromotionPolicy = await fetchJson<WorkspaceNotificationProviderPromotionPolicyResponse>(
+    apiRoutes.workspaceNotificationProviderPromotionPolicy(demoTenantKey, emptyWorkspaceKey)
   );
-  assert.ok(rolloutCanaryMetrics);
-  assert.equal(rolloutCanaryMetrics.rolloutState, "canary");
-  assert.equal(rolloutCanaryMetrics.rolloutPercentage, 0);
-  assert.equal(rolloutCanaryMetrics.requestedCount, 0);
-  assert.equal(rolloutCanaryMetrics.directSelectionCount, 0);
-  assert.equal(rolloutCanaryMetrics.deliveredCount, 0);
-  assert.equal(rolloutCanaryMetrics.deliveryFailedCount, 0);
-  assert.equal(rolloutCanaryMetrics.promotionReadiness.status, "blocked");
-  assert.ok(
-    rolloutCanaryMetrics.promotionReadiness.reasons.includes(
-      "insufficient_requested_volume"
-    )
+  assert.equal(inheritedEmptyWorkspaceNotificationProviderPromotionPolicy.mode, "inherit");
+  assert.equal(
+    inheritedEmptyWorkspaceNotificationProviderPromotionPolicy.notificationProviderPromotionPolicyOverride,
+    null
   );
-  assert.ok(
-    rolloutCanaryMetrics.promotionReadiness.reasons.includes(
-      "insufficient_successful_deliveries"
-    )
+  assert.equal(
+    inheritedEmptyWorkspaceNotificationProviderPromotionPolicy.notificationProviderPromotionPolicyOverrideRecords,
+    null
+  );
+  assert.deepEqual(
+    inheritedEmptyWorkspaceNotificationProviderPromotionPolicy.defaultNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 2,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    }
+  );
+  assert.deepEqual(
+    inheritedEmptyWorkspaceNotificationProviderPromotionPolicy.effectiveNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 2,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    }
   );
 
   const blockedPromotionResponse = await fetchJsonResponse<ErrorResponse>(
@@ -7078,6 +7111,77 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     /insufficient_requested_volume/
   );
 
+  const emptyWorkspaceNotificationProviderPromotionPolicyResponse = await fetchJsonResponse<WorkspaceNotificationProviderPromotionPolicyResponse>(
+    apiRoutes.workspaceNotificationProviderPromotionPolicy(demoTenantKey, emptyWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderPromotionPolicyOverride: {
+          minimumRequestedCount: 0,
+          minimumDirectSelectionCount: 0,
+          minimumDeliveredCount: 0
+        }
+      })
+    }
+  );
+  const emptyWorkspaceNotificationProviderPromotionPolicy =
+    emptyWorkspaceNotificationProviderPromotionPolicyResponse.body;
+  const emptyWorkspaceNotificationProviderPromotionPolicyRequestId =
+    emptyWorkspaceNotificationProviderPromotionPolicyResponse.headers.get("x-request-id");
+  assert.ok(emptyWorkspaceNotificationProviderPromotionPolicyRequestId);
+  assert.equal(emptyWorkspaceNotificationProviderPromotionPolicy.mode, "override");
+  assert.deepEqual(
+    emptyWorkspaceNotificationProviderPromotionPolicy.defaultNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 2,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    }
+  );
+  assert.deepEqual(
+    emptyWorkspaceNotificationProviderPromotionPolicy.notificationProviderPromotionPolicyOverride,
+    {
+      minimumRequestedCount: 0,
+      minimumDirectSelectionCount: 0,
+      minimumDeliveredCount: 0
+    }
+  );
+  assert.equal(
+    emptyWorkspaceNotificationProviderPromotionPolicy
+      .notificationProviderPromotionPolicyOverrideRecords?.minimumRequestedCount?.updatedByRequestId,
+    emptyWorkspaceNotificationProviderPromotionPolicyRequestId
+  );
+  assert.deepEqual(
+    emptyWorkspaceNotificationProviderPromotionPolicy.effectiveNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 0,
+      minimumDirectSelectionCount: 0,
+      minimumDeliveredCount: 0,
+      maximumDeliveryFailedCount: 0
+    }
+  );
+
+  const emptyWorkspaceNotificationProviderRolloutMetrics = await fetchJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
+    apiRoutes.workspaceNotificationProviderProfileRolloutMetrics(demoTenantKey, emptyWorkspaceKey)
+  );
+  const rolloutCanaryMetrics = emptyWorkspaceNotificationProviderRolloutMetrics.items.find(
+    item => item.profileKey === "rollout-canary-email-profile"
+  );
+  assert.ok(rolloutCanaryMetrics);
+  assert.equal(emptyWorkspaceNotificationProviderRolloutMetrics.evaluationWindowHours, 48);
+  assert.equal(rolloutCanaryMetrics.rolloutState, "canary");
+  assert.equal(rolloutCanaryMetrics.rolloutPercentage, 0);
+  assert.equal(rolloutCanaryMetrics.requestedCount, 0);
+  assert.equal(rolloutCanaryMetrics.directSelectionCount, 0);
+  assert.equal(rolloutCanaryMetrics.deliveredCount, 0);
+  assert.equal(rolloutCanaryMetrics.deliveryFailedCount, 0);
+  assert.equal(rolloutCanaryMetrics.promotionReadiness.status, "ready");
+  assert.deepEqual(rolloutCanaryMetrics.promotionReadiness.reasons, []);
+
   const promotedRolloutCanaryWorkspaceResponse = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
       demoTenantKey,
@@ -7088,9 +7192,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       method: "POST",
       body: JSON.stringify({
         promotedByActorId: "provider-rollout-ops",
-        promotionNote: "Promote the healthy canary after successful probe checks.",
-        clearRolloutFallbackProfile: true,
-        forcePromotion: true
+        promotionNote: "Promote the healthy canary after workspace policy relaxation.",
+        clearRolloutFallbackProfile: true
       })
     }
   );
@@ -7706,6 +7809,39 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     systemCheckLaunchApprovalTtlSeconds: 30
   });
 
+  const tenantNotificationProviderPromotionPolicyHistoryEntry = tenantPolicyHistory.items.find(
+    item =>
+      item.eventType === "tenant.notification_provider_promotion_policy.updated" &&
+      item.defaultNotificationProviderPromotionPolicy?.evaluationWindowHours === 48
+  );
+  assert.ok(tenantNotificationProviderPromotionPolicyHistoryEntry);
+  assert.equal(
+    tenantNotificationProviderPromotionPolicyHistoryEntry.scope,
+    "tenant_default"
+  );
+  assert.equal(
+    tenantNotificationProviderPromotionPolicyHistoryEntry.policyFamily,
+    "notification_provider_promotion"
+  );
+  assert.equal(tenantNotificationProviderPromotionPolicyHistoryEntry.mode, "default");
+  assert.deepEqual(tenantNotificationProviderPromotionPolicyHistoryEntry.changedFields, [
+    "evaluationWindowHours",
+    "minimumRequestedCount",
+    "minimumDirectSelectionCount",
+    "minimumDeliveredCount",
+    "maximumDeliveryFailedCount"
+  ]);
+  assert.deepEqual(
+    tenantNotificationProviderPromotionPolicyHistoryEntry.defaultNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 2,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    }
+  );
+
   const tenantNotificationPolicyHistoryEntry = tenantPolicyHistory.items.find(
     item =>
       item.eventType === "tenant.notification_policy.updated" &&
@@ -7920,6 +8056,64 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     workspaceNotificationPolicyHistoryEntry.notificationPolicyOverrideRecords
       ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
     demoWorkspaceNotificationPolicyRequestId
+  );
+
+  const emptyWorkspacePolicyHistory = await fetchJson<PolicyHistoryResponse>(
+    apiRoutes.workspacePolicyHistory(demoTenantKey, emptyWorkspaceKey)
+  );
+
+  const workspaceNotificationProviderPromotionPolicyHistoryEntry =
+    emptyWorkspacePolicyHistory.items.find(
+      item =>
+        item.eventType ===
+          "workspace.notification_provider_promotion_policy.updated" &&
+        item.requestId ===
+          emptyWorkspaceNotificationProviderPromotionPolicyRequestId
+    );
+  assert.ok(workspaceNotificationProviderPromotionPolicyHistoryEntry);
+  assert.equal(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry.scope,
+    "workspace_override"
+  );
+  assert.equal(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry.policyFamily,
+    "notification_provider_promotion"
+  );
+  assert.equal(workspaceNotificationProviderPromotionPolicyHistoryEntry.mode, "override");
+  assert.deepEqual(workspaceNotificationProviderPromotionPolicyHistoryEntry.changedFields, [
+    "minimumRequestedCount",
+    "minimumDirectSelectionCount",
+    "minimumDeliveredCount"
+  ]);
+  assert.deepEqual(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry.clearedFields,
+    []
+  );
+  assert.deepEqual(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry
+      .defaultNotificationProviderPromotionPolicy,
+    {
+      evaluationWindowHours: 48,
+      minimumRequestedCount: 2,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    }
+  );
+  assert.deepEqual(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry
+      .notificationProviderPromotionPolicyOverride,
+    {
+      minimumRequestedCount: 0,
+      minimumDirectSelectionCount: 0,
+      minimumDeliveredCount: 0
+    }
+  );
+  assert.equal(
+    workspaceNotificationProviderPromotionPolicyHistoryEntry
+      .notificationProviderPromotionPolicyOverrideRecords?.minimumRequestedCount
+      ?.updatedByRequestId,
+    emptyWorkspaceNotificationProviderPromotionPolicyRequestId
   );
 
   const workspaceNotificationProviderProfilesHistoryEntry = workspacePolicyHistory.items.find(

@@ -19,6 +19,8 @@ import type {
   ImportJob,
   LaunchApprovalPolicyOverrideRecords,
   MonitorCommand,
+  NotificationProviderPromotionPolicy,
+  NotificationProviderPromotionPolicyOverrideRecords,
   NotificationPolicyOverrideRecords,
   OperationalPolicyOverrideRecords,
   PolicyOverrideRecord,
@@ -54,6 +56,13 @@ const legacyLaunchApprovalPolicyOverrideMetadata = {
   updatedByRequestId: "legacy-launch-approval-policy-override",
   updatedByActorType: "platform_api" as const,
   updatedByActorId: "legacy-launch-approval-policy-override"
+};
+
+const legacyNotificationProviderPromotionPolicyOverrideMetadata = {
+  updatedAt: new Date(0).toISOString(),
+  updatedByRequestId: "legacy-notification-provider-promotion-policy-override",
+  updatedByActorType: "platform_api" as const,
+  updatedByActorId: "legacy-notification-provider-promotion-policy-override"
 };
 
 const legacyNotificationPolicyOverrideMetadata = {
@@ -339,6 +348,109 @@ const mapNotificationPolicyOverrideRecords = (
         updatedByRequestId: recordValue.updatedByRequestId,
         updatedByActorType: recordValue.updatedByActorType as
           "platform_api" | "participant" | "monitor" | "worker" | "dispatcher",
+        updatedByActorId: recordValue.updatedByActorId
+      };
+    }
+  }
+
+  return Object.keys(records).length > 0 ? records : null;
+};
+
+const mapNotificationProviderPromotionPolicy = (
+  value: unknown
+): NotificationProviderPromotionPolicy | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+
+  if (
+    typeof source.evaluationWindowHours !== "number" ||
+    !Number.isInteger(source.evaluationWindowHours) ||
+    source.evaluationWindowHours <= 0 ||
+    typeof source.minimumRequestedCount !== "number" ||
+    !Number.isInteger(source.minimumRequestedCount) ||
+    source.minimumRequestedCount < 0 ||
+    typeof source.minimumDirectSelectionCount !== "number" ||
+    !Number.isInteger(source.minimumDirectSelectionCount) ||
+    source.minimumDirectSelectionCount < 0 ||
+    typeof source.minimumDeliveredCount !== "number" ||
+    !Number.isInteger(source.minimumDeliveredCount) ||
+    source.minimumDeliveredCount < 0 ||
+    typeof source.maximumDeliveryFailedCount !== "number" ||
+    !Number.isInteger(source.maximumDeliveryFailedCount) ||
+    source.maximumDeliveryFailedCount < 0
+  ) {
+    return null;
+  }
+
+  return {
+    evaluationWindowHours: source.evaluationWindowHours,
+    minimumRequestedCount: source.minimumRequestedCount,
+    minimumDirectSelectionCount: source.minimumDirectSelectionCount,
+    minimumDeliveredCount: source.minimumDeliveredCount,
+    maximumDeliveryFailedCount: source.maximumDeliveryFailedCount
+  };
+};
+
+const mapNotificationProviderPromotionPolicyOverrideRecords = (
+  value: unknown
+): NotificationProviderPromotionPolicyOverrideRecords | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  const records: NotificationProviderPromotionPolicyOverrideRecords = {};
+
+  for (const fieldKey of [
+    "evaluationWindowHours",
+    "minimumRequestedCount",
+    "minimumDirectSelectionCount",
+    "minimumDeliveredCount",
+    "maximumDeliveryFailedCount"
+  ] as const) {
+    const fieldValue = source[fieldKey];
+
+    if (typeof fieldValue === "number" && Number.isInteger(fieldValue)) {
+      if ((fieldKey === "evaluationWindowHours" && fieldValue <= 0) || fieldValue < 0) {
+        continue;
+      }
+
+      records[fieldKey] = {
+        value: fieldValue,
+        ...legacyNotificationProviderPromotionPolicyOverrideMetadata
+      };
+      continue;
+    }
+
+    if (!fieldValue || typeof fieldValue !== "object") {
+      continue;
+    }
+
+    const recordValue = fieldValue as Record<string, unknown>;
+
+    if (
+      typeof recordValue.value === "number" &&
+      Number.isInteger(recordValue.value) &&
+      (fieldKey === "evaluationWindowHours" ? recordValue.value > 0 : recordValue.value >= 0) &&
+      typeof recordValue.updatedAt === "string" &&
+      typeof recordValue.updatedByRequestId === "string" &&
+      typeof recordValue.updatedByActorType === "string" &&
+      typeof recordValue.updatedByActorId === "string"
+    ) {
+      records[fieldKey] = {
+        value: recordValue.value,
+        updatedAt: recordValue.updatedAt,
+        updatedByRequestId: recordValue.updatedByRequestId,
+        updatedByActorType: recordValue.updatedByActorType as
+          | "platform_api"
+          | "participant"
+          | "monitor"
+          | "worker"
+          | "dispatcher"
+          | "notification_service",
         updatedByActorId: recordValue.updatedByActorId
       };
     }
@@ -1057,6 +1169,16 @@ const mapTenant = (row: QueryResultRow): Tenant => ({
     timedRunMaintenanceGraceSeconds: row.default_operational_policy.timedRunMaintenanceGraceSeconds
   },
   defaultLaunchApprovalPolicy: row.default_launch_approval_policy,
+  defaultNotificationProviderPromotionPolicy:
+    mapNotificationProviderPromotionPolicy(
+      row.default_notification_provider_promotion_policy
+    ) ?? {
+      evaluationWindowHours: 24,
+      minimumRequestedCount: 1,
+      minimumDirectSelectionCount: 1,
+      minimumDeliveredCount: 1,
+      maximumDeliveryFailedCount: 0
+    },
   defaultNotificationPolicy: row.default_notification_policy
     ? {
         breachNotificationDeliverySelectionMode:
@@ -1105,6 +1227,10 @@ const mapWorkspace = (row: QueryResultRow): Workspace => ({
   launchApprovalPolicyOverrideRecords: mapLaunchApprovalPolicyOverrideRecords(
     row.launch_approval_policy_override
   ),
+  notificationProviderPromotionPolicyOverrideRecords:
+    mapNotificationProviderPromotionPolicyOverrideRecords(
+      row.notification_provider_promotion_policy_override
+    ),
   notificationPolicyOverrideRecords: mapNotificationPolicyOverrideRecords(row.notification_policy_override),
   notificationProviderProfileOverrideRecords: mapNotificationProviderProfileOverrideRecords(
     row.notification_provider_profile_override
@@ -1459,6 +1585,7 @@ const resolveWorkspace = async (
         w.activation_policy_override,
         w.operational_policy_override,
         w.launch_approval_policy_override,
+        w.notification_provider_promotion_policy_override,
         w.notification_policy_override,
         w.notification_provider_profile_override,
         w.evidence_retention_policy_override,
@@ -1680,17 +1807,19 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       `
         INSERT INTO tenants (
           tenant_id, tenant_key, display_name, status, default_activation_policy,
-          default_operational_policy, default_launch_approval_policy, default_notification_policy,
+          default_operational_policy, default_launch_approval_policy,
+          default_notification_provider_promotion_policy, default_notification_policy,
           default_notification_provider_profiles, default_evidence_retention_policy,
           default_evidence_retention_class_policy
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb)
         ON CONFLICT (tenant_key) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             status = EXCLUDED.status,
             default_activation_policy = EXCLUDED.default_activation_policy,
             default_operational_policy = EXCLUDED.default_operational_policy,
             default_launch_approval_policy = EXCLUDED.default_launch_approval_policy,
+            default_notification_provider_promotion_policy = EXCLUDED.default_notification_provider_promotion_policy,
             default_notification_policy = EXCLUDED.default_notification_policy,
             default_notification_provider_profiles = EXCLUDED.default_notification_provider_profiles,
             default_evidence_retention_policy = EXCLUDED.default_evidence_retention_policy,
@@ -1704,6 +1833,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         JSON.stringify(tenant.defaultActivationPolicy),
         JSON.stringify(tenant.defaultOperationalPolicy),
         JSON.stringify(tenant.defaultLaunchApprovalPolicy),
+        JSON.stringify(tenant.defaultNotificationProviderPromotionPolicy),
         JSON.stringify(tenant.defaultNotificationPolicy),
         JSON.stringify(tenant.defaultNotificationProviderProfiles),
         JSON.stringify(tenant.defaultEvidenceRetentionPolicy),
@@ -1717,16 +1847,18 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         INSERT INTO workspaces (
           workspace_id, tenant_id, workspace_key, display_name, status,
           activation_policy_override, operational_policy_override, launch_approval_policy_override,
-          notification_policy_override, notification_provider_profile_override,
-          evidence_retention_policy_override, evidence_retention_class_policy_override
+          notification_provider_promotion_policy_override, notification_policy_override,
+          notification_provider_profile_override, evidence_retention_policy_override,
+          evidence_retention_class_policy_override
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb)
         ON CONFLICT (tenant_id, workspace_key) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             status = EXCLUDED.status,
             activation_policy_override = EXCLUDED.activation_policy_override,
             operational_policy_override = EXCLUDED.operational_policy_override,
             launch_approval_policy_override = EXCLUDED.launch_approval_policy_override,
+            notification_provider_promotion_policy_override = EXCLUDED.notification_provider_promotion_policy_override,
             notification_policy_override = EXCLUDED.notification_policy_override,
             notification_provider_profile_override = EXCLUDED.notification_provider_profile_override,
             evidence_retention_policy_override = EXCLUDED.evidence_retention_policy_override,
@@ -1742,6 +1874,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         workspace.operationalPolicyOverrideRecords ? JSON.stringify(workspace.operationalPolicyOverrideRecords) : null,
         workspace.launchApprovalPolicyOverrideRecords
           ? JSON.stringify(workspace.launchApprovalPolicyOverrideRecords)
+          : null,
+        workspace.notificationProviderPromotionPolicyOverrideRecords
+          ? JSON.stringify(workspace.notificationProviderPromotionPolicyOverrideRecords)
           : null,
         workspace.notificationPolicyOverrideRecords
           ? JSON.stringify(workspace.notificationPolicyOverrideRecords)
@@ -2449,7 +2584,8 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       `
         SELECT
           tenant_id, tenant_key, display_name, status, default_activation_policy,
-          default_operational_policy, default_launch_approval_policy, default_notification_policy,
+          default_operational_policy, default_launch_approval_policy,
+          default_notification_provider_promotion_policy, default_notification_policy,
           default_notification_provider_profiles, default_evidence_retention_policy,
           default_evidence_retention_class_policy
         FROM tenants
@@ -2465,7 +2601,8 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       `
         SELECT
           tenant_id, tenant_key, display_name, status, default_activation_policy,
-          default_operational_policy, default_launch_approval_policy, default_notification_policy,
+          default_operational_policy, default_launch_approval_policy,
+          default_notification_provider_promotion_policy, default_notification_policy,
           default_notification_provider_profiles, default_evidence_retention_policy,
           default_evidence_retention_class_policy
         FROM tenants
@@ -2482,8 +2619,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         SELECT
           workspace_id, tenant_id, workspace_key, display_name, status,
           activation_policy_override, operational_policy_override, launch_approval_policy_override,
-          notification_policy_override, notification_provider_profile_override,
-          evidence_retention_policy_override, evidence_retention_class_policy_override
+          notification_provider_promotion_policy_override, notification_policy_override,
+          notification_provider_profile_override, evidence_retention_policy_override,
+          evidence_retention_class_policy_override
         FROM workspaces
         WHERE workspace_id = $1
       `,
@@ -3457,7 +3595,8 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       `
         SELECT
           tenant_id, tenant_key, display_name, status, default_activation_policy,
-          default_operational_policy, default_launch_approval_policy, default_notification_policy,
+          default_operational_policy, default_launch_approval_policy,
+          default_notification_provider_promotion_policy, default_notification_policy,
           default_notification_provider_profiles, default_evidence_retention_policy,
           default_evidence_retention_class_policy
         FROM tenants
@@ -3479,6 +3618,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           w.activation_policy_override,
           w.operational_policy_override,
           w.launch_approval_policy_override,
+          w.notification_provider_promotion_policy_override,
           w.notification_policy_override,
           w.notification_provider_profile_override,
           w.evidence_retention_policy_override,
