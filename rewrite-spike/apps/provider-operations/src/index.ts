@@ -14,6 +14,7 @@ import {
 } from "@testcenter-rewrite/domain";
 import {
   refreshOutboundNotificationProviderProfileOperationalState,
+  isOutboundNotificationProviderProfilePromotionSuppressed,
   resolveOutboundNotificationProviderProfileHealthStatus
 } from "@testcenter-rewrite/outbound-messaging";
 import { setTimeout as delay } from "node:timers/promises";
@@ -117,6 +118,10 @@ const buildNotificationProviderProfileRolloutMetrics = (input: {
     promotionReadinessReasons.push("delivery_failures_present");
   }
 
+  if (isOutboundNotificationProviderProfilePromotionSuppressed(input.profile)) {
+    promotionReadinessReasons.push("promotion_suppressed_after_auto_rollback");
+  }
+
   return {
     requestedCount,
     directSelectionCount,
@@ -153,6 +158,7 @@ const recordNotificationProviderProfileRefreshAuditEvent = async (input: {
       targetProbeMode: input.profile.targetProbeMode,
       deliveryChannel: input.profile.deliveryChannel,
       target: input.profile.target,
+      incidentState: input.profile.incidentState ?? null,
       lastCheckedAt: input.profile.operationalState?.lastCheckedAt ?? null,
       lastCheckedByActorType: input.profile.operationalState?.lastCheckedByActorType ?? null,
       lastCheckedByActorId: input.profile.operationalState?.lastCheckedByActorId ?? null,
@@ -245,7 +251,8 @@ const recordNotificationProviderProfileAutomationAuditEvent = async (input: {
       deliveryFailedCount: input.metrics.deliveryFailedCount,
       promotionReadiness: input.metrics.promotionReadiness,
       promotionReadinessReasons: input.metrics.promotionReadinessReasons,
-      promotionPolicy: input.promotionPolicy
+      promotionPolicy: input.promotionPolicy,
+      incidentState: input.profile.incidentState ?? null
     }
   }));
 };
@@ -437,16 +444,29 @@ const reconcileNotificationProviderProfileRollouts = async (
           promotionPolicy: effectivePromotionPolicy,
           evaluationWindowStart
         });
+        const isPromotionSuppressed = isOutboundNotificationProviderProfilePromotionSuppressed(
+          currentProfile,
+          checkedAt
+        );
 
         if (
           effectivePromotionPolicy.autoPromoteEnabled &&
           currentProfile.rolloutState === "canary" &&
-          metrics.promotionReadiness === "ready"
+          metrics.promotionReadiness === "ready" &&
+          !isPromotionSuppressed
         ) {
           const promotedProfile: NotificationProviderProfile = {
             ...currentProfile,
             rolloutState: "active",
             rolloutPercentage: 100,
+            incidentState: currentProfile.incidentState
+              ? {
+                  ...currentProfile.incidentState,
+                  suppressionUntil: null,
+                  resolvedAt: checkedAt,
+                  resolutionCode: "auto_promoted"
+                }
+              : null,
             operationalState: null
           };
           const requestId = buildProviderOperationsRequestId(
@@ -479,6 +499,13 @@ const reconcileNotificationProviderProfileRollouts = async (
           metrics.deliveryFailedCount >
             effectivePromotionPolicy.maximumDeliveryFailedCount
         ) {
+          const suppressionUntil =
+            effectivePromotionPolicy.autoPromotionSuppressionSeconds > 0
+              ? new Date(
+                  new Date(checkedAt).getTime() +
+                    effectivePromotionPolicy.autoPromotionSuppressionSeconds * 1000
+                ).toISOString()
+              : null;
           const rolledBackProfile: NotificationProviderProfile = {
             ...currentProfile,
             rolloutState:
@@ -487,6 +514,17 @@ const reconcileNotificationProviderProfileRollouts = async (
               currentProfile.rolloutFallbackProfileKey === null
                 ? currentProfile.rolloutPercentage
                 : 0,
+            incidentState: {
+              incidentType: "auto_rollback_failure",
+              openedAt: checkedAt,
+              openedByActorType: "worker",
+              openedByActorId: providerOperationsActorId,
+              reasonCode: "delivery_failures_present",
+              deliveryFailedCount: metrics.deliveryFailedCount,
+              suppressionUntil,
+              resolvedAt: null,
+              resolutionCode: null
+            },
             operationalState: null
           };
           const requestId = buildProviderOperationsRequestId(

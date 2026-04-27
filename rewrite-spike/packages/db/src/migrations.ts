@@ -1174,6 +1174,35 @@ WHERE notification_provider_promotion_policy_override IS NOT NULL
     OR NOT (notification_provider_promotion_policy_override ? 'autoRollbackOnFailureEnabled')
   );
 `
+  },
+  {
+    version: "0040",
+    name: "notification-provider-promotion-policy-suppression-seconds",
+    sql: `
+UPDATE tenants
+SET default_notification_provider_promotion_policy =
+  COALESCE(default_notification_provider_promotion_policy, '{}'::jsonb)
+  || jsonb_build_object(
+    'autoPromotionSuppressionSeconds',
+    COALESCE(
+      (default_notification_provider_promotion_policy->>'autoPromotionSuppressionSeconds')::integer,
+      0
+    )
+  );
+
+UPDATE workspaces
+SET notification_provider_promotion_policy_override =
+  notification_provider_promotion_policy_override
+  || jsonb_build_object(
+    'autoPromotionSuppressionSeconds',
+    COALESCE(
+      notification_provider_promotion_policy_override->'autoPromotionSuppressionSeconds',
+      '0'::jsonb
+    )
+  )
+WHERE notification_provider_promotion_policy_override IS NOT NULL
+  AND NOT (notification_provider_promotion_policy_override ? 'autoPromotionSuppressionSeconds');
+`
   }
 ];
 

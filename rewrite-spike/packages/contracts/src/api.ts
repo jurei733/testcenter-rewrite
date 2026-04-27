@@ -282,6 +282,7 @@ export interface NotificationProviderPromotionPolicyDto {
   maximumDeliveryFailedCount: number;
   autoPromoteEnabled: boolean;
   autoRollbackOnFailureEnabled: boolean;
+  autoPromotionSuppressionSeconds: number;
 }
 
 export interface NotificationProviderPromotionPolicyOverrideDto {
@@ -292,6 +293,7 @@ export interface NotificationProviderPromotionPolicyOverrideDto {
   maximumDeliveryFailedCount?: number;
   autoPromoteEnabled?: boolean;
   autoRollbackOnFailureEnabled?: boolean;
+  autoPromotionSuppressionSeconds?: number;
 }
 
 export type NotificationDeliverySelectionModeDto =
@@ -327,6 +329,18 @@ export type NotificationProviderProfileOperationalRolloutStatusDto =
   | "disabled"
   | "canary_ready"
   | "canary_blocked";
+
+export interface NotificationProviderProfileIncidentStateDto {
+  incidentType: "auto_rollback_failure";
+  openedAt: string;
+  openedByActorType: "worker" | "notification_service" | "platform_api";
+  openedByActorId: string;
+  reasonCode: "delivery_failures_present";
+  deliveryFailedCount: number;
+  suppressionUntil: string | null;
+  resolvedAt: string | null;
+  resolutionCode: "auto_promoted" | "manually_promoted" | null;
+}
 
 export type NotificationProviderProfileProbeStatusDto =
   | "succeeded"
@@ -392,6 +406,7 @@ export interface NotificationProviderProfileDto {
   credentialsRefMasked: string | null;
   credentialsStatus: NotificationProviderProfileCredentialsStatusDto;
   healthStatus: NotificationProviderProfileHealthStatusDto;
+  incidentState: NotificationProviderProfileIncidentStateDto | null;
   operationalState: NotificationProviderProfileOperationalStateDto | null;
 }
 
@@ -494,6 +509,7 @@ export interface NotificationProviderPromotionPolicyOverrideRecordsDto {
   maximumDeliveryFailedCount?: NumericPolicyOverrideRecordDto;
   autoPromoteEnabled?: BooleanPolicyOverrideRecordDto;
   autoRollbackOnFailureEnabled?: BooleanPolicyOverrideRecordDto;
+  autoPromotionSuppressionSeconds?: NumericPolicyOverrideRecordDto;
 }
 
 export interface NotificationPolicyOverrideRecordsDto {

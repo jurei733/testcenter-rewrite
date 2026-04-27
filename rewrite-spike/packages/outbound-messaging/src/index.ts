@@ -46,6 +46,28 @@ export type OutboundNotificationProviderProfileProbeStatus =
   | "credentials_unreachable"
   | "target_unreachable";
 
+export type OutboundNotificationProviderProfileIncidentType =
+  | "auto_rollback_failure";
+
+export type OutboundNotificationProviderProfileIncidentReasonCode =
+  | "delivery_failures_present";
+
+export type OutboundNotificationProviderProfileIncidentResolutionCode =
+  | "auto_promoted"
+  | "manually_promoted";
+
+export interface OutboundNotificationProviderProfileIncidentState {
+  incidentType: OutboundNotificationProviderProfileIncidentType;
+  openedAt: string;
+  openedByActorType: "worker" | "notification_service" | "platform_api";
+  openedByActorId: string;
+  reasonCode: OutboundNotificationProviderProfileIncidentReasonCode;
+  deliveryFailedCount: number;
+  suppressionUntil: string | null;
+  resolvedAt: string | null;
+  resolutionCode: OutboundNotificationProviderProfileIncidentResolutionCode | null;
+}
+
 export interface OutboundNotificationProviderProfileOperationalState {
   lastCheckedAt: string;
   lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
@@ -78,6 +100,7 @@ export interface OutboundNotificationProviderProfile {
   deliveryChannel: OutboundNotificationDeliveryChannel;
   target: string;
   credentialsRef: string | null;
+  incidentState?: OutboundNotificationProviderProfileIncidentState | null;
   operationalState?: OutboundNotificationProviderProfileOperationalState | null;
 }
 
@@ -444,6 +467,19 @@ export const isOutboundNotificationProviderProfileDeliverable = (
     profile,
     rolloutSubjectKey
   });
+
+export const isOutboundNotificationProviderProfilePromotionSuppressed = (
+  profile: OutboundNotificationProviderProfile,
+  evaluatedAt: string = new Date().toISOString()
+): boolean => {
+  const incidentState = profile.incidentState;
+
+  if (!incidentState || incidentState.resolvedAt !== null || incidentState.suppressionUntil === null) {
+    return false;
+  }
+
+  return incidentState.suppressionUntil > evaluatedAt;
+};
 
 export const resolveOutboundNotificationDestination = (input: {
   target: string | null;

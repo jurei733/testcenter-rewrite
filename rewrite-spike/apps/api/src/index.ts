@@ -192,6 +192,7 @@ import {
 } from "@testcenter-rewrite/evidence-storage";
 import {
   haveSameOutboundNotificationProviderProfileConfiguration,
+  isOutboundNotificationProviderProfilePromotionSuppressed,
   isValidOutboundNotificationCredentialsRef,
   maskOutboundNotificationCredentialsRef,
   resolveOutboundNotificationProviderProfileCredentialsStatus,
@@ -708,7 +709,8 @@ const isNotificationProviderPromotionPolicy = (
   isNonNegativeInteger(value.minimumDeliveredCount) &&
   isNonNegativeInteger(value.maximumDeliveryFailedCount) &&
   typeof value.autoPromoteEnabled === "boolean" &&
-  typeof value.autoRollbackOnFailureEnabled === "boolean";
+  typeof value.autoRollbackOnFailureEnabled === "boolean" &&
+  isNonNegativeInteger(value.autoPromotionSuppressionSeconds);
 
 const isNotificationDeliverySelectionMode = (
   value: unknown
@@ -810,6 +812,32 @@ const isNotificationProviderProfile = (
     value.healthStatus === "disabled" ||
     value.healthStatus === "credentials_unreachable" ||
     value.healthStatus === "target_unreachable"
+  ) &&
+  (
+    typeof value.incidentState === "undefined" ||
+    value.incidentState === null ||
+    (
+      isRecord(value.incidentState) &&
+      value.incidentState.incidentType === "auto_rollback_failure" &&
+      typeof value.incidentState.openedAt === "string" &&
+      (
+        value.incidentState.openedByActorType === "worker" ||
+        value.incidentState.openedByActorType === "notification_service" ||
+        value.incidentState.openedByActorType === "platform_api"
+      ) &&
+      typeof value.incidentState.openedByActorId === "string" &&
+      value.incidentState.reasonCode === "delivery_failures_present" &&
+      isNonNegativeInteger(value.incidentState.deliveryFailedCount) &&
+      (typeof value.incidentState.suppressionUntil === "string" ||
+        value.incidentState.suppressionUntil === null) &&
+      (typeof value.incidentState.resolvedAt === "string" ||
+        value.incidentState.resolvedAt === null) &&
+      (
+        value.incidentState.resolutionCode === "auto_promoted" ||
+        value.incidentState.resolutionCode === "manually_promoted" ||
+        value.incidentState.resolutionCode === null
+      )
+    )
   ) &&
   (
     typeof value.operationalState === "undefined" ||
@@ -1051,7 +1079,8 @@ const notificationProviderPromotionPolicyOverrideKeys = [
   "minimumDeliveredCount",
   "maximumDeliveryFailedCount",
   "autoPromoteEnabled",
-  "autoRollbackOnFailureEnabled"
+  "autoRollbackOnFailureEnabled",
+  "autoPromotionSuppressionSeconds"
 ] as const satisfies ReadonlyArray<keyof NotificationProviderPromotionPolicyOverrideDto>;
 
 const notificationPolicyOverrideKeys = [
@@ -1816,7 +1845,9 @@ const toNotificationProviderPromotionPolicyDto = (
     notificationProviderPromotionPolicy.maximumDeliveryFailedCount,
   autoPromoteEnabled: notificationProviderPromotionPolicy.autoPromoteEnabled,
   autoRollbackOnFailureEnabled:
-    notificationProviderPromotionPolicy.autoRollbackOnFailureEnabled
+    notificationProviderPromotionPolicy.autoRollbackOnFailureEnabled,
+  autoPromotionSuppressionSeconds:
+    notificationProviderPromotionPolicy.autoPromotionSuppressionSeconds
 });
 
 const toNotificationPolicyDto = (
@@ -1850,6 +1881,19 @@ const toNotificationProviderProfileDto = (
   healthStatus: resolveOutboundNotificationProviderProfileHealthStatus(
     notificationProviderProfile
   ),
+  incidentState: notificationProviderProfile.incidentState
+    ? {
+        incidentType: notificationProviderProfile.incidentState.incidentType,
+        openedAt: notificationProviderProfile.incidentState.openedAt,
+        openedByActorType: notificationProviderProfile.incidentState.openedByActorType,
+        openedByActorId: notificationProviderProfile.incidentState.openedByActorId,
+        reasonCode: notificationProviderProfile.incidentState.reasonCode,
+        deliveryFailedCount: notificationProviderProfile.incidentState.deliveryFailedCount,
+        suppressionUntil: notificationProviderProfile.incidentState.suppressionUntil,
+        resolvedAt: notificationProviderProfile.incidentState.resolvedAt,
+        resolutionCode: notificationProviderProfile.incidentState.resolutionCode
+      }
+    : null,
   operationalState: notificationProviderProfile.operationalState
       ? {
         lastCheckedAt: notificationProviderProfile.operationalState.lastCheckedAt,
@@ -1880,6 +1924,27 @@ const toNotificationProviderProfile = (
   deliveryChannel: notificationProviderProfile.deliveryChannel,
   target: notificationProviderProfile.target,
   credentialsRef: notificationProviderProfile.credentialsRef,
+  incidentState:
+    previousNotificationProviderProfile &&
+    haveSameOutboundNotificationProviderProfileConfiguration(
+      previousNotificationProviderProfile,
+      {
+        profileKey: notificationProviderProfile.profileKey,
+        displayLabel: notificationProviderProfile.displayLabel,
+        enabled: notificationProviderProfile.enabled ?? true,
+        rolloutState: notificationProviderProfile.rolloutState ?? "active",
+        rolloutPercentage: notificationProviderProfile.rolloutPercentage ?? 100,
+        rolloutFallbackProfileKey: notificationProviderProfile.rolloutFallbackProfileKey ?? null,
+        targetProbeMode: notificationProviderProfile.targetProbeMode ?? "active",
+        deliveryChannel: notificationProviderProfile.deliveryChannel,
+        target: notificationProviderProfile.target,
+        credentialsRef: notificationProviderProfile.credentialsRef,
+        incidentState: null,
+        operationalState: null
+      }
+    )
+      ? previousNotificationProviderProfile.incidentState ?? null
+      : null,
   operationalState:
     previousNotificationProviderProfile &&
     haveSameOutboundNotificationProviderProfileConfiguration(
@@ -1895,6 +1960,7 @@ const toNotificationProviderProfile = (
         deliveryChannel: notificationProviderProfile.deliveryChannel,
         target: notificationProviderProfile.target,
         credentialsRef: notificationProviderProfile.credentialsRef,
+        incidentState: null,
         operationalState: null
       }
     )
@@ -2198,6 +2264,12 @@ const toNotificationProviderPromotionPolicyOverrideDto = (
         autoRollbackOnFailureEnabled:
           notificationProviderPromotionPolicyOverride.autoRollbackOnFailureEnabled
       }
+    : {}),
+  ...(isNonNegativeInteger(notificationProviderPromotionPolicyOverride.autoPromotionSuppressionSeconds)
+    ? {
+        autoPromotionSuppressionSeconds:
+          notificationProviderPromotionPolicyOverride.autoPromotionSuppressionSeconds
+      }
     : {})
 });
 
@@ -2361,6 +2433,13 @@ const toNotificationProviderPromotionPolicyOverrideRecordsDto = (
       ? {
           autoRollbackOnFailureEnabled: toBooleanPolicyOverrideRecordDto(
             notificationProviderPromotionPolicyOverrideRecords.autoRollbackOnFailureEnabled
+          )
+        }
+      : {}),
+    ...(notificationProviderPromotionPolicyOverrideRecords.autoPromotionSuppressionSeconds
+      ? {
+          autoPromotionSuppressionSeconds: toNumericPolicyOverrideRecordDto(
+            notificationProviderPromotionPolicyOverrideRecords.autoPromotionSuppressionSeconds
           )
         }
       : {})
@@ -6024,6 +6103,10 @@ const toNotificationProviderProfilePromotionReadiness = (input: {
     reasons.push("delivery_failures_present");
   }
 
+  if (isOutboundNotificationProviderProfilePromotionSuppressed(input.profile)) {
+    reasons.push("promotion_suppressed_after_auto_rollback");
+  }
+
   return {
     status: reasons.length === 0 ? "ready" : "blocked",
     evaluationWindowHours: input.promotionPolicy.evaluationWindowHours,
@@ -7250,6 +7333,14 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
       body.clearRolloutFallbackProfile === false
         ? currentProfile.rolloutFallbackProfileKey
         : null,
+    incidentState: currentProfile.incidentState
+      ? {
+          ...currentProfile.incidentState,
+          suppressionUntil: null,
+          resolvedAt: updatedAt,
+          resolutionCode: "manually_promoted"
+        }
+      : null,
     operationalState: null
   };
   const updatedNotificationProviderProfileOverrideRecords = {

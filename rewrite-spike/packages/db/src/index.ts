@@ -399,7 +399,13 @@ const mapNotificationProviderPromotionPolicy = (
     autoRollbackOnFailureEnabled:
       typeof source.autoRollbackOnFailureEnabled === "boolean"
         ? source.autoRollbackOnFailureEnabled
-        : defaultNotificationProviderPromotionPolicy.autoRollbackOnFailureEnabled
+        : defaultNotificationProviderPromotionPolicy.autoRollbackOnFailureEnabled,
+    autoPromotionSuppressionSeconds:
+      typeof source.autoPromotionSuppressionSeconds === "number" &&
+      Number.isInteger(source.autoPromotionSuppressionSeconds) &&
+      source.autoPromotionSuppressionSeconds >= 0
+        ? source.autoPromotionSuppressionSeconds
+        : defaultNotificationProviderPromotionPolicy.autoPromotionSuppressionSeconds
   };
 };
 
@@ -418,7 +424,8 @@ const mapNotificationProviderPromotionPolicyOverrideRecords = (
     "minimumRequestedCount",
     "minimumDirectSelectionCount",
     "minimumDeliveredCount",
-    "maximumDeliveryFailedCount"
+    "maximumDeliveryFailedCount",
+    "autoPromotionSuppressionSeconds"
   ] as const) {
     const fieldValue = source[fieldKey];
 
@@ -600,6 +607,12 @@ const mapNotificationProviderProfileOverrideRecords = (
       !Array.isArray(candidateProfileValue.operationalState)
         ? (candidateProfileValue.operationalState as Record<string, unknown>)
         : null;
+    const incidentStateCandidate =
+      candidateProfileValue.incidentState &&
+      typeof candidateProfileValue.incidentState === "object" &&
+      !Array.isArray(candidateProfileValue.incidentState)
+        ? (candidateProfileValue.incidentState as Record<string, unknown>)
+        : null;
 
     const normalizedProfile = {
       profileKey: candidateProfileValue.profileKey.trim(),
@@ -633,6 +646,47 @@ const mapNotificationProviderProfileOverrideRecords = (
       credentialsRef:
         typeof candidateProfileValue.credentialsRef === "string"
           ? candidateProfileValue.credentialsRef
+          : null,
+      incidentState:
+        incidentStateCandidate &&
+        incidentStateCandidate.incidentType === "auto_rollback_failure" &&
+        typeof incidentStateCandidate.openedAt === "string" &&
+        (
+          incidentStateCandidate.openedByActorType === "worker" ||
+          incidentStateCandidate.openedByActorType === "notification_service" ||
+          incidentStateCandidate.openedByActorType === "platform_api"
+        ) &&
+        typeof incidentStateCandidate.openedByActorId === "string" &&
+        incidentStateCandidate.reasonCode === "delivery_failures_present" &&
+        typeof incidentStateCandidate.deliveryFailedCount === "number" &&
+        Number.isInteger(incidentStateCandidate.deliveryFailedCount) &&
+        incidentStateCandidate.deliveryFailedCount >= 0 &&
+        (
+          typeof incidentStateCandidate.suppressionUntil === "string" ||
+          incidentStateCandidate.suppressionUntil === null
+        ) &&
+        (
+          typeof incidentStateCandidate.resolvedAt === "string" ||
+          incidentStateCandidate.resolvedAt === null
+        ) &&
+        (
+          incidentStateCandidate.resolutionCode === "auto_promoted" ||
+          incidentStateCandidate.resolutionCode === "manually_promoted" ||
+          incidentStateCandidate.resolutionCode === null
+        )
+          ? {
+              incidentType: "auto_rollback_failure" as const,
+              openedAt: incidentStateCandidate.openedAt as string,
+              openedByActorType: incidentStateCandidate.openedByActorType as
+                "worker" | "notification_service" | "platform_api",
+              openedByActorId: incidentStateCandidate.openedByActorId as string,
+              reasonCode: "delivery_failures_present" as const,
+              deliveryFailedCount: incidentStateCandidate.deliveryFailedCount as number,
+              suppressionUntil: incidentStateCandidate.suppressionUntil as string | null,
+              resolvedAt: incidentStateCandidate.resolvedAt as string | null,
+              resolutionCode: incidentStateCandidate.resolutionCode as
+                "auto_promoted" | "manually_promoted" | null
+            }
           : null,
       operationalState:
         operationalStateCandidate &&

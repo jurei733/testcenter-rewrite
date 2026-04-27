@@ -31,6 +31,7 @@ export interface NotificationProviderPromotionPolicy {
   maximumDeliveryFailedCount: number;
   autoPromoteEnabled: boolean;
   autoRollbackOnFailureEnabled: boolean;
+  autoPromotionSuppressionSeconds: number;
 }
 
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
@@ -121,7 +122,8 @@ export const defaultNotificationProviderPromotionPolicy: NotificationProviderPro
   minimumDeliveredCount: 1,
   maximumDeliveryFailedCount: 0,
   autoPromoteEnabled: false,
-  autoRollbackOnFailureEnabled: false
+  autoRollbackOnFailureEnabled: false,
+  autoPromotionSuppressionSeconds: 0
 };
 
 export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
@@ -238,6 +240,7 @@ export interface NotificationProviderPromotionPolicyOverrideRecords {
   maximumDeliveryFailedCount?: PolicyOverrideRecord<number>;
   autoPromoteEnabled?: PolicyOverrideRecord<boolean>;
   autoRollbackOnFailureEnabled?: PolicyOverrideRecord<boolean>;
+  autoPromotionSuppressionSeconds?: PolicyOverrideRecord<number>;
 }
 
 export interface NotificationPolicyOverrideRecords {
@@ -666,6 +669,11 @@ export const flattenNotificationProviderPromotionPolicyOverrideRecords = (
       records.autoRollbackOnFailureEnabled.value;
   }
 
+  if (records.autoPromotionSuppressionSeconds) {
+    flattened.autoPromotionSuppressionSeconds =
+      records.autoPromotionSuppressionSeconds.value;
+  }
+
   return Object.keys(flattened).length > 0 ? flattened : null;
 };
 
@@ -765,6 +773,16 @@ export const createNotificationProviderPromotionPolicyOverrideRecords = (input: 
   if (typeof input.override.autoRollbackOnFailureEnabled === "boolean") {
     records.autoRollbackOnFailureEnabled = {
       value: input.override.autoRollbackOnFailureEnabled,
+      updatedAt,
+      updatedByRequestId: input.updatedByRequestId,
+      updatedByActorType: input.updatedByActorType,
+      updatedByActorId: input.updatedByActorId
+    };
+  }
+
+  if (typeof input.override.autoPromotionSuppressionSeconds === "number") {
+    records.autoPromotionSuppressionSeconds = {
+      value: input.override.autoPromotionSuppressionSeconds,
       updatedAt,
       updatedByRequestId: input.updatedByRequestId,
       updatedByActorType: input.updatedByActorType,

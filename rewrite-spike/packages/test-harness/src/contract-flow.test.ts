@@ -93,6 +93,17 @@ const toExpectedNotificationProviderProfileDto = (input: {
   rolloutPercentage?: number;
   rolloutFallbackProfileKey?: string | null;
   targetProbeMode?: "active" | "skip";
+  incidentState?: {
+    incidentType: "auto_rollback_failure";
+    openedAt: string;
+    openedByActorType: "worker" | "notification_service" | "platform_api";
+    openedByActorId: string;
+    reasonCode: "delivery_failures_present";
+    deliveryFailedCount: number;
+    suppressionUntil: string | null;
+    resolvedAt: string | null;
+    resolutionCode: "auto_promoted" | "manually_promoted" | null;
+  } | null;
   operationalState?: {
     lastCheckedAt: string;
     lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
@@ -158,6 +169,7 @@ const toExpectedNotificationProviderProfileDto = (input: {
     target: input.target,
     credentialsRef: input.credentialsRef
   }),
+  incidentState: input.incidentState ?? null,
   operationalState: input.operationalState ?? null
 });
 
@@ -572,6 +584,26 @@ const expireSystemCheckEvidenceRetention = async (evidenceKey: string): Promise<
         WHERE evidence_key = $1
       `,
       [evidenceKey, new Date(Date.now() - 2_500).toISOString()]
+    );
+  } finally {
+    await pool.end();
+  }
+};
+
+const setSystemCheckEvidenceBreachNotificationCreatedAt = async (input: {
+  evidenceKey: string;
+  createdAt: string;
+}): Promise<void> => {
+  const pool = createDatabasePool();
+
+  try {
+    await pool.query(
+      `
+        UPDATE system_check_evidence_breach_notifications
+        SET created_at = $2
+        WHERE evidence_key = $1
+      `,
+      [input.evidenceKey, input.createdAt]
     );
   } finally {
     await pool.end();
@@ -7122,7 +7154,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
           minimumDeliveredCount: 1,
           maximumDeliveryFailedCount: 0,
           autoPromoteEnabled: false,
-          autoRollbackOnFailureEnabled: false
+          autoRollbackOnFailureEnabled: false,
+          autoPromotionSuppressionSeconds: 0
         }
       })
     }
@@ -7134,7 +7167,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     minimumDeliveredCount: 1,
     maximumDeliveryFailedCount: 0,
     autoPromoteEnabled: false,
-    autoRollbackOnFailureEnabled: false
+    autoRollbackOnFailureEnabled: false,
+    autoPromotionSuppressionSeconds: 0
   });
 
   const inheritedEmptyWorkspaceNotificationProviderPromotionPolicy = await fetchJson<WorkspaceNotificationProviderPromotionPolicyResponse>(
@@ -7158,7 +7192,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 1,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
   assert.deepEqual(
@@ -7170,7 +7205,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 1,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
 
@@ -7227,7 +7263,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 1,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
   assert.deepEqual(
@@ -7252,7 +7289,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 0,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
 
@@ -7448,7 +7486,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       body: JSON.stringify({
         mode: "override",
         notificationProviderPromotionPolicyOverride: {
-          autoRollbackOnFailureEnabled: true
+          evaluationWindowHours: 1,
+          minimumRequestedCount: 0,
+          minimumDirectSelectionCount: 0,
+          minimumDeliveredCount: 0,
+          maximumDeliveryFailedCount: 0,
+          autoPromoteEnabled: true,
+          autoRollbackOnFailureEnabled: true,
+          autoPromotionSuppressionSeconds: 3600
         }
       })
     }
@@ -7466,6 +7511,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     assert.equal(currentProfile.rolloutState, "canary");
     assert.equal(currentProfile.rolloutPercentage, 0);
     assert.equal(currentProfile.rolloutFallbackProfileKey, "alerts-email-profile");
+    assert.ok(currentProfile.incidentState);
+    assert.equal(currentProfile.incidentState?.incidentType, "auto_rollback_failure");
+    assert.equal(currentProfile.incidentState?.reasonCode, "delivery_failures_present");
+    assert.equal(currentProfile.incidentState?.deliveryFailedCount, 1);
+    assert.equal(currentProfile.incidentState?.openedByActorId, "provider-operations-service");
+    assert.ok(currentProfile.incidentState?.suppressionUntil);
+    assert.equal(currentProfile.incidentState?.resolvedAt, null);
+    assert.equal(currentProfile.incidentState?.resolutionCode, null);
     if (currentProfile.operationalState !== null) {
       assert.equal(currentProfile.operationalState.lastCheckedByActorType, "worker");
       assert.equal(
@@ -7514,6 +7567,43 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   }, 30, 250);
   assert.equal(autoRollbackAuditEvent.payload.automationAction, "auto_rolled_back");
   assert.equal(autoRollbackAuditEvent.payload.deliveryFailedCount, 1);
+
+  await setSystemCheckEvidenceBreachNotificationCreatedAt({
+    evidenceKey: deadLetterEvidenceCaptureResponse.body.evidence.evidenceKey,
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  });
+
+  const suppressedDeadLetterRolloutMetrics = await fetchJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
+    `${apiRoutes.workspaceNotificationProviderProfileRolloutMetrics(demoTenantKey, demoWorkspaceKey)}?windowHours=1`
+  );
+  const suppressedDeadLetterMetrics = suppressedDeadLetterRolloutMetrics.items.find(
+    item => item.profileKey === "dead-letter-email-profile"
+  );
+  assert.ok(suppressedDeadLetterMetrics);
+  assert.equal(suppressedDeadLetterMetrics.deliveryFailedCount, 0);
+  assert.equal(suppressedDeadLetterMetrics.requestedCount, 0);
+  assert.equal(suppressedDeadLetterMetrics.promotionReadiness.status, "blocked");
+  assert.deepEqual(
+    suppressedDeadLetterMetrics.promotionReadiness.reasons,
+    ["promotion_suppressed_after_auto_rollback"]
+  );
+
+  const stillSuppressedDeadLetterWorkspace = await retry(async () => {
+    const currentWorkspace = await fetchJson<WorkspaceNotificationProviderProfilesResponse>(
+      apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, demoWorkspaceKey)
+    );
+    const currentProfile = currentWorkspace.effectiveNotificationProviderProfiles.find(
+      profile => profile.profileKey === "dead-letter-email-profile"
+    );
+
+    assert.ok(currentProfile);
+    assert.equal(currentProfile.rolloutState, "canary");
+    assert.equal(currentProfile.rolloutPercentage, 0);
+    assert.ok(currentProfile.incidentState?.suppressionUntil);
+
+    return currentProfile;
+  }, 10, 250);
+  assert.equal(stillSuppressedDeadLetterWorkspace.profileKey, "dead-letter-email-profile");
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),
@@ -8127,7 +8217,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "minimumDeliveredCount",
     "maximumDeliveryFailedCount",
     "autoPromoteEnabled",
-    "autoRollbackOnFailureEnabled"
+    "autoRollbackOnFailureEnabled",
+    "autoPromotionSuppressionSeconds"
   ]);
   assert.deepEqual(
     tenantNotificationProviderPromotionPolicyHistoryEntry.defaultNotificationProviderPromotionPolicy,
@@ -8138,7 +8229,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 1,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
 
@@ -8399,7 +8491,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       minimumDeliveredCount: 1,
       maximumDeliveryFailedCount: 0,
       autoPromoteEnabled: false,
-      autoRollbackOnFailureEnabled: false
+      autoRollbackOnFailureEnabled: false,
+      autoPromotionSuppressionSeconds: 0
     }
   );
   assert.deepEqual(
