@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   apiRoutes,
   type PolicyHistoryResponse,
+  type PromoteWorkspaceNotificationProviderProfileResponse,
   type TenantActivationPolicyResponse,
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
@@ -19,6 +20,7 @@ import {
   type WorkspaceEvidenceRetentionPolicyResponse,
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
+  type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceOperationalPolicyResponse
 } from "@testcenter-rewrite/contracts";
@@ -6755,6 +6757,16 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
             credentialsRef: "vault://unreachable/notifications/canary-email"
           },
           {
+            profileKey: "rollout-canary-email-profile",
+            displayLabel: "Rollout Canary Empty Workspace Email Profile",
+            rolloutState: "canary",
+            rolloutPercentage: 0,
+            rolloutFallbackProfileKey: "dead-letter-email-profile",
+            deliveryChannel: "email_spike",
+            target: "retry-once:workspace-canary@example.test",
+            credentialsRef: "vault://notifications/workspace-canary-email"
+          },
+          {
             profileKey: "probe-failing-webhook-profile",
             displayLabel: "Probe Failing Empty Workspace Webhook Profile",
             rolloutState: "active",
@@ -6812,6 +6824,16 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         deliveryChannel: "webhook_spike",
         target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-skip",
         credentialsRef: "vault://notifications/probe-skipped-webhook"
+      }),
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "rollout-canary-email-profile",
+        displayLabel: "Rollout Canary Empty Workspace Email Profile",
+        rolloutState: "canary",
+        rolloutPercentage: 0,
+        rolloutFallbackProfileKey: "dead-letter-email-profile",
+        deliveryChannel: "email_spike",
+        target: "retry-once:workspace-canary@example.test",
+        credentialsRef: "vault://notifications/workspace-canary-email"
       })
     ])
   );
@@ -6953,6 +6975,92 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.probeTarget, null);
   assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.probeLatencyMs, null);
   assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.lastCheckError, null);
+  const refreshedRolloutCanaryWorkspaceProfile = refreshedEmptyWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles.find(
+    profile => profile.profileKey === "rollout-canary-email-profile"
+  );
+  assert.ok(refreshedRolloutCanaryWorkspaceProfile?.operationalState);
+  assert.equal(
+    refreshedRolloutCanaryWorkspaceProfile.operationalState.lastCheckedByActorId,
+    "provider-operations-service"
+  );
+  assert.equal(refreshedRolloutCanaryWorkspaceProfile.operationalState.credentialsStatus, "reachable");
+  assert.equal(refreshedRolloutCanaryWorkspaceProfile.operationalState.healthStatus, "ready");
+  assert.equal(refreshedRolloutCanaryWorkspaceProfile.operationalState.rolloutStatus, "canary_ready");
+  assert.equal(refreshedRolloutCanaryWorkspaceProfile.operationalState.probeStatus, "succeeded");
+  assert.equal(
+    refreshedRolloutCanaryWorkspaceProfile.operationalState.probeTarget,
+    "workspace-canary@example.test"
+  );
+  assert.equal(typeof refreshedRolloutCanaryWorkspaceProfile.operationalState.probeLatencyMs, "number");
+  assert.equal(refreshedRolloutCanaryWorkspaceProfile.operationalState.lastCheckError, null);
+
+  const demoWorkspaceNotificationProviderRolloutMetrics = await fetchJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
+    apiRoutes.workspaceNotificationProviderProfileRolloutMetrics(demoTenantKey, demoWorkspaceKey)
+  );
+  const alertsRolloutMetrics = demoWorkspaceNotificationProviderRolloutMetrics.items.find(
+    item => item.profileKey === "alerts-email-profile"
+  );
+  assert.ok(alertsRolloutMetrics);
+  assert.equal(alertsRolloutMetrics.rolloutState, "active");
+  assert.equal(alertsRolloutMetrics.requestedCount, 1);
+  assert.equal(alertsRolloutMetrics.directSelectionCount, 1);
+  assert.equal(alertsRolloutMetrics.fallbackRoutedCount, 0);
+  assert.equal(alertsRolloutMetrics.fallbackRecipientCount, 0);
+  assert.equal(alertsRolloutMetrics.rolloutBlockedCount, 0);
+  assert.equal(alertsRolloutMetrics.deliveredCount, 1);
+  assert.equal(alertsRolloutMetrics.pendingDeliveryCount, 0);
+  assert.equal(alertsRolloutMetrics.deliveryFailedCount, 0);
+  assert.ok(alertsRolloutMetrics.lastDeliveredAt);
+  const deadLetterRolloutMetrics = demoWorkspaceNotificationProviderRolloutMetrics.items.find(
+    item => item.profileKey === "dead-letter-email-profile"
+  );
+  assert.ok(deadLetterRolloutMetrics);
+  assert.equal(deadLetterRolloutMetrics.requestedCount, 1);
+  assert.equal(deadLetterRolloutMetrics.directSelectionCount, 0);
+  assert.equal(deadLetterRolloutMetrics.fallbackRoutedCount, 0);
+  assert.equal(deadLetterRolloutMetrics.fallbackRecipientCount, 0);
+  assert.equal(deadLetterRolloutMetrics.rolloutBlockedCount, 0);
+  assert.equal(deadLetterRolloutMetrics.deliveredCount, 0);
+  assert.equal(deadLetterRolloutMetrics.pendingDeliveryCount, 0);
+  assert.equal(deadLetterRolloutMetrics.deliveryFailedCount, 0);
+  assert.equal(deadLetterRolloutMetrics.lastDeliveryFailedAt, null);
+
+  const promotedRolloutCanaryWorkspaceResponse = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
+    apiRoutes.workspaceNotificationProviderProfilePromote(
+      demoTenantKey,
+      emptyWorkspaceKey,
+      "rollout-canary-email-profile"
+    ),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        promotedByActorId: "provider-rollout-ops",
+        promotionNote: "Promote the healthy canary after successful probe checks.",
+        clearRolloutFallbackProfile: true
+      })
+    }
+  );
+  assert.equal(
+    promotedRolloutCanaryWorkspaceResponse.body.profileKey,
+    "rollout-canary-email-profile"
+  );
+  const promotedRolloutCanaryWorkspaceProfile = promotedRolloutCanaryWorkspaceResponse.body.workspace.effectiveNotificationProviderProfiles.find(
+    profile => profile.profileKey === "rollout-canary-email-profile"
+  );
+  assert.ok(promotedRolloutCanaryWorkspaceProfile);
+  assert.equal(promotedRolloutCanaryWorkspaceProfile.rolloutState, "active");
+  assert.equal(promotedRolloutCanaryWorkspaceProfile.rolloutPercentage, 100);
+  assert.equal(promotedRolloutCanaryWorkspaceProfile.rolloutFallbackProfileKey, null);
+  assert.equal(promotedRolloutCanaryWorkspaceProfile.operationalState, null);
+  const promotedRolloutCanaryWorkspaceOverrideRecord = promotedRolloutCanaryWorkspaceResponse.body.workspace.notificationProviderProfileOverrideRecords?.find(
+    record => record.profileKey === "rollout-canary-email-profile"
+  );
+  assert.ok(promotedRolloutCanaryWorkspaceOverrideRecord);
+  assert.equal(promotedRolloutCanaryWorkspaceOverrideRecord.updatedByActorId, "provider-rollout-ops");
+  assert.equal(
+    promotedRolloutCanaryWorkspaceOverrideRecord.value?.rolloutState,
+    "active"
+  );
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),

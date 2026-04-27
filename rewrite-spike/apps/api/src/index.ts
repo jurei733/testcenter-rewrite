@@ -53,6 +53,8 @@ import {
   type NotificationProviderProfileInputDto,
   type NotificationProviderProfileDto,
   type NotificationProviderProfileOverrideRecordDto,
+  type PromoteWorkspaceNotificationProviderProfileRequest,
+  type PromoteWorkspaceNotificationProviderProfileResponse,
   type NumericPolicyOverrideRecordDto,
   type OperationalPolicyDto,
   type OperationalPolicyOverrideDto,
@@ -153,6 +155,7 @@ import {
   type WorkspaceOperationalPolicyResponse,
   type WorkspaceNotificationPolicyModeDto,
   type WorkspaceNotificationPolicyResponse,
+  type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceSystemCheckEvidenceResponse,
@@ -302,6 +305,10 @@ const workspaceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-policy$/;
 const workspaceNotificationProviderProfilesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles$/;
+const workspaceNotificationProviderProfileRolloutMetricsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-rollout-metrics$/;
+const workspaceNotificationProviderProfilePromoteRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles\/([^/]+):promote$/;
 const workspaceEvidenceRetentionPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/evidence-retention-policy$/;
 const workspaceEvidenceRetentionClassPolicyRoutePattern =
@@ -871,6 +878,21 @@ const isWorkspaceNotificationProviderProfilesMode = (
   value: unknown
 ): value is WorkspaceNotificationProviderProfilesModeDto =>
   value === "inherit" || value === "override";
+
+const isPromoteWorkspaceNotificationProviderProfileRequest = (
+  value: unknown
+): value is PromoteWorkspaceNotificationProviderProfileRequest =>
+  isRecord(value) &&
+  isTrimmedString(value.promotedByActorId) &&
+  (
+    typeof value.promotionNote === "undefined" ||
+    value.promotionNote === null ||
+    typeof value.promotionNote === "string"
+  ) &&
+  (
+    typeof value.clearRolloutFallbackProfile === "undefined" ||
+    typeof value.clearRolloutFallbackProfile === "boolean"
+  );
 
 const isEvidenceRetentionPolicy = (value: unknown): value is EvidenceRetentionPolicyDto =>
   isRecord(value) &&
@@ -5537,6 +5559,121 @@ const toWorkspaceNotificationProviderProfilesResponse = (
   ).map(toNotificationProviderProfileDto)
 });
 
+const tryExtractRequestedNotificationProviderProfileKey = (
+  escalationTarget: string | null
+): string | null => {
+  const trimmedEscalationTarget = escalationTarget?.trim() ?? "";
+
+  if (!trimmedEscalationTarget.startsWith("profile:")) {
+    return null;
+  }
+
+  const requestedProfileKey = trimmedEscalationTarget.slice("profile:".length).trim();
+
+  return requestedProfileKey.length > 0 ? requestedProfileKey : null;
+};
+
+const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
+  tenant: Tenant;
+  workspace: Workspace;
+  notifications: import("@testcenter-rewrite/domain").SystemCheckEvidenceBreachNotification[];
+}): WorkspaceNotificationProviderProfileRolloutMetricsResponse => {
+  const effectiveProfiles = resolveWorkspaceNotificationProviderProfiles(
+    input.workspace,
+    input.tenant
+  );
+
+  return {
+    tenantKey: input.tenant.tenantKey,
+    workspaceKey: input.workspace.workspaceKey,
+    items: effectiveProfiles.map(profile => {
+      let requestedCount = 0;
+      let directSelectionCount = 0;
+      let fallbackRoutedCount = 0;
+      let fallbackRecipientCount = 0;
+      let rolloutBlockedCount = 0;
+      let deliveredCount = 0;
+      let pendingDeliveryCount = 0;
+      let deliveryFailedCount = 0;
+      let lastDeliveredAt: string | null = null;
+      let lastDeliveryFailedAt: string | null = null;
+
+      for (const notification of input.notifications) {
+        const requestedProfileKey = tryExtractRequestedNotificationProviderProfileKey(
+          notification.escalationTarget
+        );
+
+        if (requestedProfileKey === profile.profileKey) {
+          requestedCount += 1;
+
+          if (notification.deliveryProfileKey === profile.profileKey) {
+            directSelectionCount += 1;
+          } else if (notification.deliveryProfileKey) {
+            fallbackRoutedCount += 1;
+          } else if (notification.deliveryTarget === null) {
+            rolloutBlockedCount += 1;
+          }
+        }
+
+        if (
+          notification.deliveryProfileKey === profile.profileKey &&
+          requestedProfileKey !== null &&
+          requestedProfileKey !== profile.profileKey
+        ) {
+          fallbackRecipientCount += 1;
+        }
+
+        if (notification.deliveryProfileKey !== profile.profileKey) {
+          continue;
+        }
+
+        if (notification.deliveryStatus === "delivered") {
+          deliveredCount += 1;
+
+          if (
+            notification.deliveredAt &&
+            (lastDeliveredAt === null || notification.deliveredAt > lastDeliveredAt)
+          ) {
+            lastDeliveredAt = notification.deliveredAt;
+          }
+        } else if (notification.deliveryStatus === "pending_delivery") {
+          pendingDeliveryCount += 1;
+        } else if (notification.deliveryStatus === "delivery_failed") {
+          deliveryFailedCount += 1;
+
+          if (
+            notification.lastDeliveryAttemptAt &&
+            (lastDeliveryFailedAt === null ||
+              notification.lastDeliveryAttemptAt > lastDeliveryFailedAt)
+          ) {
+            lastDeliveryFailedAt = notification.lastDeliveryAttemptAt;
+          }
+        }
+      }
+
+      return {
+        profileKey: profile.profileKey,
+        displayLabel: profile.displayLabel,
+        rolloutState: profile.rolloutState,
+        rolloutPercentage: profile.rolloutPercentage,
+        rolloutFallbackProfileKey: profile.rolloutFallbackProfileKey,
+        targetProbeMode: profile.targetProbeMode,
+        healthStatus: resolveOutboundNotificationProviderProfileHealthStatus(profile),
+        requestedCount,
+        directSelectionCount,
+        fallbackRoutedCount,
+        fallbackRecipientCount,
+        rolloutBlockedCount,
+        deliveredCount,
+        pendingDeliveryCount,
+        deliveryFailedCount,
+        lastDeliveredAt,
+        lastDeliveryFailedAt
+      };
+    })
+  };
+};
+
 const toWorkspaceEvidenceRetentionPolicyResponse = (
   tenant: Tenant,
   workspace: Workspace
@@ -6153,6 +6290,46 @@ const handleWorkspaceNotificationProviderProfilesGet = async (
   );
 };
 
+const handleWorkspaceNotificationProviderProfileRolloutMetricsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const notifications = await store.listSystemCheckEvidenceBreachNotificationsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      limit: 500
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileRolloutMetricsResponse>(
+    response,
+    200,
+    toWorkspaceNotificationProviderProfileRolloutMetricsResponse({
+      tenant,
+      workspace,
+      notifications
+    })
+  );
+};
+
 const handleWorkspaceNotificationProviderProfilesPatch = async (
   store: PlatformStore,
   request: IncomingMessage,
@@ -6335,6 +6512,108 @@ const handleWorkspaceNotificationProviderProfilesPatch = async (
     200,
     toWorkspaceNotificationProviderProfilesResponse(tenant, updatedWorkspace)
   );
+};
+
+const handleWorkspaceNotificationProviderProfilePromote = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  profileKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<PromoteWorkspaceNotificationProviderProfileRequest>(request);
+
+  if (!isPromoteWorkspaceNotificationProviderProfileRequest(body)) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_notification_provider_profile_promotion_payload",
+      "promotedByActorId is required; promotionNote must be a string when provided; clearRolloutFallbackProfile must be a boolean when provided."
+    );
+    return;
+  }
+
+  const effectiveProfiles = resolveWorkspaceNotificationProviderProfiles(workspace, tenant);
+  const currentProfile = effectiveProfiles.find(profile => profile.profileKey === profileKey);
+
+  if (!currentProfile) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_not_found",
+      `Notification provider profile '${profileKey}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const updatedAt = new Date().toISOString();
+  const promotedProfile: NotificationProviderProfile = {
+    ...currentProfile,
+    rolloutState: "active",
+    rolloutPercentage: 100,
+    rolloutFallbackProfileKey:
+      body.clearRolloutFallbackProfile === false
+        ? currentProfile.rolloutFallbackProfileKey
+        : null,
+    operationalState: null
+  };
+  const updatedNotificationProviderProfileOverrideRecords = {
+    ...(workspace.notificationProviderProfileOverrideRecords ?? {}),
+    [profileKey]: {
+      value: promotedProfile,
+      updatedAt,
+      updatedByRequestId: requestContext.requestId,
+      updatedByActorType: "platform_api" as const,
+      updatedByActorId: body.promotedByActorId
+    }
+  };
+  const updatedWorkspace: Workspace = {
+    ...workspace,
+    notificationProviderProfileOverrideRecords: updatedNotificationProviderProfileOverrideRecords
+  };
+
+  await store.saveWorkspace(updatedWorkspace);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedWorkspace.tenantId,
+    workspaceId: updatedWorkspace.workspaceId,
+    actorType: "platform_api",
+    actorId: body.promotedByActorId,
+    eventType: "workspace.notification_provider_profile.promoted",
+    payload: {
+      workspaceKey: updatedWorkspace.workspaceKey,
+      profileKey,
+      promotionNote: body.promotionNote ?? null,
+      previousProfile: toNotificationProviderProfileDto(currentProfile),
+      promotedProfile: toNotificationProviderProfileDto(promotedProfile),
+      effectiveNotificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
+        updatedWorkspace,
+        tenant
+      ).map(toNotificationProviderProfileDto)
+    }
+  });
+
+  sendJson<PromoteWorkspaceNotificationProviderProfileResponse>(response, 200, {
+    profileKey,
+    workspace: toWorkspaceNotificationProviderProfilesResponse(tenant, updatedWorkspace)
+  });
 };
 
 const handleWorkspaceEvidenceRetentionPolicyGet = async (
@@ -10807,6 +11086,45 @@ const handleRequest = async (
         response,
         tenantKey,
         workspaceKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileRolloutMetricsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileRolloutMetricsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileRolloutMetricsRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceNotificationProviderProfileRolloutMetricsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileRolloutMetricsGet(
+        store,
+        response,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfilePromoteRouteMatch = pathname.match(
+    workspaceNotificationProviderProfilePromoteRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfilePromoteRouteMatch) {
+    const [, tenantKey, workspaceKey, profileKey] = workspaceNotificationProviderProfilePromoteRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfilePromote(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        profileKey,
         requestContext
       );
       return;

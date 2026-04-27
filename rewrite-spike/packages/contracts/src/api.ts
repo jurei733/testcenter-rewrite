@@ -27,6 +27,14 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-policy`,
   workspaceNotificationProviderProfiles: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles`,
+  workspaceNotificationProviderProfileRolloutMetrics: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-rollout-metrics`,
+  workspaceNotificationProviderProfilePromote: (
+    tenantKey: string,
+    workspaceKey: string,
+    profileKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles/${profileKey}:promote`,
   workspaceEvidenceRetentionPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/evidence-retention-policy`,
   workspaceEvidenceRetentionClassPolicy: (tenantKey: string, workspaceKey: string): string =>
@@ -668,6 +676,43 @@ export interface WorkspaceNotificationProviderProfilesResponse {
   removedNotificationProviderProfileKeys: string[] | null;
   notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecordDto[] | null;
   effectiveNotificationProviderProfiles: NotificationProviderProfileDto[];
+}
+
+export interface NotificationProviderProfileRolloutMetricsItemDto {
+  profileKey: string;
+  displayLabel: string;
+  rolloutState: NotificationProviderProfileRolloutStateDto;
+  rolloutPercentage: number;
+  rolloutFallbackProfileKey: string | null;
+  targetProbeMode: NotificationProviderProfileTargetProbeModeDto;
+  healthStatus: NotificationProviderProfileHealthStatusDto;
+  requestedCount: number;
+  directSelectionCount: number;
+  fallbackRoutedCount: number;
+  fallbackRecipientCount: number;
+  rolloutBlockedCount: number;
+  deliveredCount: number;
+  pendingDeliveryCount: number;
+  deliveryFailedCount: number;
+  lastDeliveredAt: string | null;
+  lastDeliveryFailedAt: string | null;
+}
+
+export interface WorkspaceNotificationProviderProfileRolloutMetricsResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  items: NotificationProviderProfileRolloutMetricsItemDto[];
+}
+
+export interface PromoteWorkspaceNotificationProviderProfileRequest {
+  promotedByActorId: string;
+  promotionNote?: string | null;
+  clearRolloutFallbackProfile?: boolean;
+}
+
+export interface PromoteWorkspaceNotificationProviderProfileResponse {
+  profileKey: string;
+  workspace: WorkspaceNotificationProviderProfilesResponse;
 }
 
 export interface WorkspaceEvidenceRetentionPolicyResponse {
