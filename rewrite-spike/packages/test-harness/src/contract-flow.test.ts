@@ -24,6 +24,7 @@ import {
   type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceOperationalPolicyResponse
@@ -7590,6 +7591,23 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     };
   }, 20, 250);
 
+  const providerGovernanceQueueBeforeAcknowledgement = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
+    apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
+      demoTenantKey,
+      demoWorkspaceKey
+    )
+  );
+  const governanceItemBeforeAcknowledgement =
+    providerGovernanceQueueBeforeAcknowledgement.items.find(
+      item => item.profileKey === "dead-letter-email-profile"
+    );
+  assert.ok(governanceItemBeforeAcknowledgement);
+  assert.equal(governanceItemBeforeAcknowledgement.governanceStatus, "needs_acknowledgement");
+  assert.deepEqual(governanceItemBeforeAcknowledgement.recommendedActions, [
+    "acknowledge_incident",
+    "investigate_delivery_failures"
+  ]);
+
   const acknowledgedProviderIncident =
     await fetchJson<AcknowledgeNotificationProviderProfileIncidentResponse>(
       apiRoutes.workspaceNotificationProviderProfileIncidentAcknowledge(
@@ -7611,6 +7629,23 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     acknowledgedProviderIncident.incident.acknowledgementNote,
     "Investigating rollout failure before manual recovery."
   );
+
+  const providerGovernanceQueueAfterAcknowledgement = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
+    apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
+      demoTenantKey,
+      demoWorkspaceKey
+    )
+  );
+  const governanceItemAfterAcknowledgement =
+    providerGovernanceQueueAfterAcknowledgement.items.find(
+      item => item.profileKey === "dead-letter-email-profile"
+    );
+  assert.ok(governanceItemAfterAcknowledgement);
+  assert.equal(governanceItemAfterAcknowledgement.governanceStatus, "suppressed");
+  assert.deepEqual(governanceItemAfterAcknowledgement.recommendedActions, [
+    "wait_for_suppression_expiry",
+    "investigate_delivery_failures"
+  ]);
 
   await setSystemCheckEvidenceBreachNotificationCreatedAt({
     evidenceKey: deadLetterEvidenceCaptureResponse.body.evidence.evidenceKey,
@@ -7648,6 +7683,19 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     return currentProfile;
   }, 10, 250);
   assert.equal(stillSuppressedDeadLetterWorkspace.profileKey, "dead-letter-email-profile");
+
+  const stillSuppressedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
+    `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
+      demoTenantKey,
+      demoWorkspaceKey
+    )}?profileKey=dead-letter-email-profile&windowHours=1`
+  );
+  assert.equal(stillSuppressedGovernanceQueue.items.length, 1);
+  assert.equal(stillSuppressedGovernanceQueue.items[0].governanceStatus, "suppressed");
+  assert.deepEqual(stillSuppressedGovernanceQueue.items[0].recommendedActions, [
+    "wait_for_suppression_expiry",
+    "investigate_delivery_failures"
+  ]);
 
   const forcedPromotionAfterIncident = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
@@ -7694,6 +7742,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     resolvedProviderIncidentQueue.profileKey,
     "dead-letter-email-profile"
   );
+
+  const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
+    `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
+      demoTenantKey,
+      demoWorkspaceKey
+    )}?profileKey=dead-letter-email-profile`
+  );
+  assert.equal(resolvedGovernanceQueue.items.length, 0);
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),

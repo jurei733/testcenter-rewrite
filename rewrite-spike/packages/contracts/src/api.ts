@@ -41,6 +41,8 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles/${profileKey}:promote`,
   workspaceNotificationProviderProfileIncidents: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-incidents`,
+  workspaceNotificationProviderProfileGovernanceQueue: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-queue`,
   workspaceNotificationProviderProfileIncidentAcknowledge: (
     tenantKey: string,
     workspaceKey: string,
@@ -836,6 +838,40 @@ export interface WorkspaceNotificationProviderProfileIncidentsResponse {
     profileKey: string | null;
     incidentType: "auto_rollback_failure" | null;
     status: NotificationProviderProfileIncidentStatusDto | null;
+  };
+}
+
+export type NotificationProviderProfileGovernanceStatusDto =
+  | "needs_acknowledgement"
+  | "suppressed"
+  | "ready_for_manual_recovery"
+  | "recovery_blocked";
+
+export type NotificationProviderProfileGovernanceRecommendedActionDto =
+  | "acknowledge_incident"
+  | "investigate_delivery_failures"
+  | "wait_for_suppression_expiry"
+  | "force_promote_if_approved"
+  | "review_promotion_readiness";
+
+export interface NotificationProviderProfileGovernanceQueueItemDto {
+  profileKey: string;
+  governanceStatus: NotificationProviderProfileGovernanceStatusDto;
+  suppressionUntil: string | null;
+  incident: NotificationProviderProfileIncidentDto;
+  rolloutMetrics: NotificationProviderProfileRolloutMetricsItemDto;
+  recommendedActions: NotificationProviderProfileGovernanceRecommendedActionDto[];
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceQueueResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  evaluationWindowHours: number;
+  items: NotificationProviderProfileGovernanceQueueItemDto[];
+  filters: {
+    profileKey: string | null;
+    status: NotificationProviderProfileIncidentStatusDto | null;
+    governanceStatus: NotificationProviderProfileGovernanceStatusDto | null;
   };
 }
 

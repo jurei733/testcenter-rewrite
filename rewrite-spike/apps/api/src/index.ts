@@ -57,6 +57,8 @@ import {
   type NotificationPolicyOverrideRecordsDto,
   type NotificationProviderProfileInputDto,
   type NotificationProviderProfileDto,
+  type NotificationProviderProfileGovernanceQueueItemDto,
+  type NotificationProviderProfileGovernanceStatusDto,
   type NotificationProviderProfileIncidentDto,
   type NotificationProviderProfileIncidentStatusDto,
   type NotificationProviderProfileOverrideRecordDto,
@@ -170,6 +172,7 @@ import {
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceSystemCheckEvidenceResponse,
@@ -334,6 +337,8 @@ const workspaceNotificationProviderProfilePromoteRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles\/([^/]+):promote$/;
 const workspaceNotificationProviderProfileIncidentsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents$/;
+const workspaceNotificationProviderProfileGovernanceQueueRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents\/([^/]+):acknowledge$/;
 const workspaceEvidenceRetentionPolicyRoutePattern =
@@ -895,6 +900,14 @@ const isNotificationProviderProfileIncidentStatus = (
   value: unknown
 ): value is NotificationProviderProfileIncidentStatusDto =>
   value === "open" || value === "acknowledged" || value === "resolved";
+
+const isNotificationProviderProfileGovernanceStatus = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceStatusDto =>
+  value === "needs_acknowledgement" ||
+  value === "suppressed" ||
+  value === "ready_for_manual_recovery" ||
+  value === "recovery_blocked";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -1946,6 +1959,51 @@ const toNotificationProviderProfileIncidentDto = (
   resolvedAt: incident.resolvedAt,
   resolutionCode: incident.resolutionCode
 });
+
+const toNotificationProviderProfileGovernanceQueueItemDto = (input: {
+  incident: NotificationProviderProfileIncident;
+  rolloutMetrics: NotificationProviderProfileRolloutMetricsItemDto;
+  evaluatedAt: string;
+}): NotificationProviderProfileGovernanceQueueItemDto => {
+  const suppressionActive =
+    input.incident.suppressionUntil !== null &&
+    input.incident.suppressionUntil > input.evaluatedAt;
+
+  let governanceStatus: NotificationProviderProfileGovernanceStatusDto;
+  let recommendedActions: NotificationProviderProfileGovernanceQueueItemDto["recommendedActions"];
+
+  if (input.incident.status === "open") {
+    governanceStatus = "needs_acknowledgement";
+    recommendedActions = [
+      "acknowledge_incident",
+      "investigate_delivery_failures"
+    ];
+  } else if (suppressionActive) {
+    governanceStatus = "suppressed";
+    recommendedActions = [
+      "wait_for_suppression_expiry",
+      "investigate_delivery_failures"
+    ];
+  } else if (input.rolloutMetrics.promotionReadiness.status === "ready") {
+    governanceStatus = "ready_for_manual_recovery";
+    recommendedActions = ["force_promote_if_approved"];
+  } else {
+    governanceStatus = "recovery_blocked";
+    recommendedActions = [
+      "investigate_delivery_failures",
+      "review_promotion_readiness"
+    ];
+  }
+
+  return {
+    profileKey: input.incident.profileKey,
+    governanceStatus,
+    suppressionUntil: input.incident.suppressionUntil,
+    incident: toNotificationProviderProfileIncidentDto(input.incident),
+    rolloutMetrics: input.rolloutMetrics,
+    recommendedActions
+  };
+};
 
 const toNotificationProviderProfile = (
   notificationProviderProfile: NotificationProviderProfileInputDto,
@@ -7519,6 +7577,155 @@ const handleWorkspaceNotificationProviderProfileIncidentsGet = async (
   });
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceQueueGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawGovernanceStatus = getTrimmedString(url.searchParams.get("governanceStatus"));
+  const governanceStatus = rawGovernanceStatus ?? null;
+  const requestedWindowHours = url.searchParams.get("windowHours");
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+
+  if (status !== null && !isNotificationProviderProfileIncidentStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_status_filter",
+      "status must be one of open or acknowledged for the governance queue."
+    );
+    return;
+  }
+
+  if (status === "resolved") {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_status_filter",
+      "status must be open or acknowledged for the governance queue."
+    );
+    return;
+  }
+
+  if (
+    governanceStatus !== null &&
+    !isNotificationProviderProfileGovernanceStatus(governanceStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_queue_filter",
+      "governanceStatus must be one of needs_acknowledgement, suppressed, ready_for_manual_recovery, or recovery_blocked."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_queue_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  const effectivePromotionPolicy = resolveWorkspaceNotificationProviderPromotionPolicy(
+    workspace,
+    tenant
+  );
+  const evaluationWindowHours =
+    requestedWindowHours && isPositiveInteger(Number(requestedWindowHours))
+      ? Number(requestedWindowHours)
+      : effectivePromotionPolicy.evaluationWindowHours;
+
+  const [incidents, notifications] = await Promise.all([
+    store.listNotificationProviderProfileIncidentsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      status: status ?? undefined,
+      limit: 200
+    }),
+    store.listSystemCheckEvidenceBreachNotificationsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+
+  const rolloutMetricsByProfileKey = new Map(
+    toWorkspaceNotificationProviderProfileRolloutMetricsResponse({
+      tenant,
+      workspace,
+      notifications,
+      evaluationWindowHours
+    }).items.map(item => [item.profileKey, item] as const)
+  );
+
+  const latestUnresolvedIncidentsByProfileKey = new Map<string, NotificationProviderProfileIncident>();
+  for (const incident of incidents) {
+    if (incident.status === "resolved") {
+      continue;
+    }
+
+    if (!latestUnresolvedIncidentsByProfileKey.has(incident.profileKey)) {
+      latestUnresolvedIncidentsByProfileKey.set(incident.profileKey, incident);
+    }
+  }
+
+  const items = Array.from(latestUnresolvedIncidentsByProfileKey.values())
+    .flatMap(incident => {
+      const rolloutMetrics = rolloutMetricsByProfileKey.get(incident.profileKey);
+
+      if (!rolloutMetrics) {
+        return [];
+      }
+
+      const queueItem = toNotificationProviderProfileGovernanceQueueItemDto({
+        incident,
+        rolloutMetrics,
+        evaluatedAt: new Date().toISOString()
+      });
+
+      if (governanceStatus && queueItem.governanceStatus !== governanceStatus) {
+        return [];
+      }
+
+      return [queueItem];
+    })
+    .slice(0, limit);
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(response, 200, {
+    tenantKey,
+    workspaceKey,
+    evaluationWindowHours,
+    items,
+    filters: {
+      profileKey,
+      status,
+      governanceStatus
+    }
+  });
+};
+
 const handleWorkspaceNotificationProviderProfileIncidentAcknowledge = async (
   store: PlatformStore,
   request: IncomingMessage,
@@ -12184,6 +12391,25 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileIncidentsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceQueueRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceQueueRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceQueueRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceNotificationProviderProfileGovernanceQueueRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceQueueGet(
         store,
         response,
         url,
