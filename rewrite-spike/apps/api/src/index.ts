@@ -565,6 +565,10 @@ const isNonNegativeInteger = (value: unknown): value is number =>
   Number.isInteger(value) &&
   value >= 0;
 
+const isPercentageInteger = (value: unknown): value is number =>
+  isNonNegativeInteger(value) &&
+  value <= 100;
+
 const activationPolicyOverrideKeys = [
   "blockIncompatibleRoutingChangesWithActiveSessions",
   "warnOnActiveSessions",
@@ -718,6 +722,7 @@ const isNotificationProviderProfileOperationalState = (
     value.probeStatus === "succeeded" ||
     value.probeStatus === "skipped_paused" ||
     value.probeStatus === "skipped_disabled" ||
+    value.probeStatus === "skipped_by_policy" ||
     value.probeStatus === "credentials_unreachable" ||
     value.probeStatus === "target_unreachable"
   ) &&
@@ -742,6 +747,15 @@ const isNotificationProviderProfile = (
     value.rolloutState === "active" ||
     value.rolloutState === "paused" ||
     value.rolloutState === "canary"
+  ) &&
+  isPercentageInteger(value.rolloutPercentage) &&
+  (
+    typeof value.rolloutFallbackProfileKey === "string" ||
+    value.rolloutFallbackProfileKey === null
+  ) &&
+  (
+    value.targetProbeMode === "active" ||
+    value.targetProbeMode === "skip"
   ) &&
   isSystemCheckEvidenceBreachNotificationDeliveryChannel(value.deliveryChannel) &&
   isTrimmedString(value.target) &&
@@ -777,6 +791,20 @@ const isNotificationProviderProfileInput = (
     value.rolloutState === "active" ||
     value.rolloutState === "paused" ||
     value.rolloutState === "canary"
+  ) &&
+  (
+    typeof value.rolloutPercentage === "undefined" ||
+    isPercentageInteger(value.rolloutPercentage)
+  ) &&
+  (
+    typeof value.rolloutFallbackProfileKey === "undefined" ||
+    value.rolloutFallbackProfileKey === null ||
+    isTrimmedString(value.rolloutFallbackProfileKey)
+  ) &&
+  (
+    typeof value.targetProbeMode === "undefined" ||
+    value.targetProbeMode === "active" ||
+    value.targetProbeMode === "skip"
   ) &&
   isSystemCheckEvidenceBreachNotificationDeliveryChannel(value.deliveryChannel) &&
   isTrimmedString(value.target) &&
@@ -1672,6 +1700,9 @@ const toNotificationProviderProfileDto = (
   displayLabel: notificationProviderProfile.displayLabel,
   enabled: notificationProviderProfile.enabled,
   rolloutState: notificationProviderProfile.rolloutState,
+  rolloutPercentage: notificationProviderProfile.rolloutPercentage,
+  rolloutFallbackProfileKey: notificationProviderProfile.rolloutFallbackProfileKey,
+  targetProbeMode: notificationProviderProfile.targetProbeMode,
   deliveryChannel: notificationProviderProfile.deliveryChannel,
   target: notificationProviderProfile.target,
   credentialsRefPresent: notificationProviderProfile.credentialsRef !== null,
@@ -1706,6 +1737,9 @@ const toNotificationProviderProfile = (
   displayLabel: notificationProviderProfile.displayLabel,
   enabled: notificationProviderProfile.enabled ?? true,
   rolloutState: notificationProviderProfile.rolloutState ?? "active",
+  rolloutPercentage: notificationProviderProfile.rolloutPercentage ?? 100,
+  rolloutFallbackProfileKey: notificationProviderProfile.rolloutFallbackProfileKey ?? null,
+  targetProbeMode: notificationProviderProfile.targetProbeMode ?? "active",
   deliveryChannel: notificationProviderProfile.deliveryChannel,
   target: notificationProviderProfile.target,
   credentialsRef: notificationProviderProfile.credentialsRef,
@@ -1718,6 +1752,9 @@ const toNotificationProviderProfile = (
         displayLabel: notificationProviderProfile.displayLabel,
         enabled: notificationProviderProfile.enabled ?? true,
         rolloutState: notificationProviderProfile.rolloutState ?? "active",
+        rolloutPercentage: notificationProviderProfile.rolloutPercentage ?? 100,
+        rolloutFallbackProfileKey: notificationProviderProfile.rolloutFallbackProfileKey ?? null,
+        targetProbeMode: notificationProviderProfile.targetProbeMode ?? "active",
         deliveryChannel: notificationProviderProfile.deliveryChannel,
         target: notificationProviderProfile.target,
         credentialsRef: notificationProviderProfile.credentialsRef,
@@ -1742,6 +1779,29 @@ const toNotificationProviderProfileOverrideRecordDto = (
   updatedByActorType: notificationProviderProfileOverrideRecord.updatedByActorType,
   updatedByActorId: notificationProviderProfileOverrideRecord.updatedByActorId
 });
+
+const validateNotificationProviderProfileFallbacks = (input: {
+  profiles: NotificationProviderProfile[];
+  availableProfileKeys: Set<string>;
+}): string | null => {
+  for (const profile of input.profiles) {
+    if (
+      profile.rolloutFallbackProfileKey &&
+      profile.rolloutFallbackProfileKey === profile.profileKey
+    ) {
+      return `Profile '${profile.profileKey}' must not reference itself as rolloutFallbackProfileKey.`;
+    }
+
+    if (
+      profile.rolloutFallbackProfileKey &&
+      !input.availableProfileKeys.has(profile.rolloutFallbackProfileKey)
+    ) {
+      return `Profile '${profile.profileKey}' references unknown rolloutFallbackProfileKey '${profile.rolloutFallbackProfileKey}'.`;
+    }
+  }
+
+  return null;
+};
 
 const toNotificationProviderProfileOverrideRecordDtos = (
   notificationProviderProfileOverrideRecords: Workspace["notificationProviderProfileOverrideRecords"]
@@ -5069,11 +5129,29 @@ const handleTenantNotificationProviderProfilesPatch = async (
   const previousProfilesByKey = new Map(
     tenant.defaultNotificationProviderProfiles.map(profile => [profile.profileKey, profile])
   );
+  const nextTenantNotificationProviderProfiles = body.defaultNotificationProviderProfiles.map(
+    profile => toNotificationProviderProfile(profile, previousProfilesByKey.get(profile.profileKey))
+  );
+  const tenantFallbackValidationError = validateNotificationProviderProfileFallbacks({
+    profiles: nextTenantNotificationProviderProfiles,
+    availableProfileKeys: new Set(
+      nextTenantNotificationProviderProfiles.map(profile => profile.profileKey)
+    )
+  });
+
+  if (tenantFallbackValidationError) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_notification_provider_profiles_payload",
+      tenantFallbackValidationError
+    );
+    return;
+  }
+
   const updatedTenant: Tenant = {
     ...tenant,
-    defaultNotificationProviderProfiles: body.defaultNotificationProviderProfiles.map(
-      profile => toNotificationProviderProfile(profile, previousProfilesByKey.get(profile.profileKey))
-    )
+    defaultNotificationProviderProfiles: nextTenantNotificationProviderProfiles
   };
 
   await store.saveTenant(updatedTenant);
@@ -6155,6 +6233,30 @@ const handleWorkspaceNotificationProviderProfilesPatch = async (
       400,
       "invalid_workspace_notification_provider_profiles_payload",
       "removedNotificationProviderProfileKeys must not overlap notificationProviderProfileOverride profile keys."
+    );
+    return;
+  }
+
+  const workspaceFallbackCandidateKeys = new Set<string>([
+    ...tenant.defaultNotificationProviderProfiles.map(profile => profile.profileKey),
+    ...(notificationProviderProfileOverride?.map(profile => profile.profileKey) ?? [])
+  ]);
+
+  for (const removedProfileKey of removedNotificationProviderProfileKeys ?? []) {
+    workspaceFallbackCandidateKeys.delete(removedProfileKey);
+  }
+
+  const workspaceFallbackValidationError = validateNotificationProviderProfileFallbacks({
+    profiles: notificationProviderProfileOverride ?? [],
+    availableProfileKeys: workspaceFallbackCandidateKeys
+  });
+
+  if (workspaceFallbackValidationError) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_notification_provider_profiles_payload",
+      workspaceFallbackValidationError
     );
     return;
   }

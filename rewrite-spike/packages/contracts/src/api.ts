@@ -272,6 +272,10 @@ export type NotificationProviderProfileRolloutStateDto =
   | "paused"
   | "canary";
 
+export type NotificationProviderProfileTargetProbeModeDto =
+  | "active"
+  | "skip";
+
 export type NotificationProviderProfileCredentialsStatusDto =
   | "not_configured"
   | "reachable"
@@ -296,6 +300,7 @@ export type NotificationProviderProfileProbeStatusDto =
   | "succeeded"
   | "skipped_paused"
   | "skipped_disabled"
+  | "skipped_by_policy"
   | "credentials_unreachable"
   | "target_unreachable";
 
@@ -333,6 +338,9 @@ export interface NotificationProviderProfileInputDto {
   displayLabel: string;
   enabled?: boolean;
   rolloutState?: NotificationProviderProfileRolloutStateDto;
+  rolloutPercentage?: number;
+  rolloutFallbackProfileKey?: string | null;
+  targetProbeMode?: NotificationProviderProfileTargetProbeModeDto;
   deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto;
   target: string;
   credentialsRef: string | null;
@@ -343,6 +351,9 @@ export interface NotificationProviderProfileDto {
   displayLabel: string;
   enabled: boolean;
   rolloutState: NotificationProviderProfileRolloutStateDto;
+  rolloutPercentage: number;
+  rolloutFallbackProfileKey: string | null;
+  targetProbeMode: NotificationProviderProfileTargetProbeModeDto;
   deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto;
   target: string;
   credentialsRefPresent: boolean;

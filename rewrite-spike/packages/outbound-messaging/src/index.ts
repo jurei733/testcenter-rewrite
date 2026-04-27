@@ -14,6 +14,10 @@ export type OutboundNotificationProviderProfileRolloutState =
   | "paused"
   | "canary";
 
+export type OutboundNotificationProviderProfileTargetProbeMode =
+  | "active"
+  | "skip";
+
 export type OutboundNotificationProviderProfileCredentialsStatus =
   | "not_configured"
   | "reachable"
@@ -38,6 +42,7 @@ export type OutboundNotificationProviderProfileProbeStatus =
   | "succeeded"
   | "skipped_paused"
   | "skipped_disabled"
+  | "skipped_by_policy"
   | "credentials_unreachable"
   | "target_unreachable";
 
@@ -67,6 +72,9 @@ export interface OutboundNotificationProviderProfile {
   displayLabel: string;
   enabled: boolean;
   rolloutState: OutboundNotificationProviderProfileRolloutState;
+  rolloutPercentage: number;
+  rolloutFallbackProfileKey: string | null;
+  targetProbeMode: OutboundNotificationProviderProfileTargetProbeMode;
   deliveryChannel: OutboundNotificationDeliveryChannel;
   target: string;
   credentialsRef: string | null;
@@ -153,6 +161,19 @@ export interface ResolvedOutboundNotificationDestination {
   deliveryTarget: string | null;
 }
 
+const normalizeOutboundNotificationProviderProfileRolloutPercentage = (
+  rolloutPercentage: number | undefined
+): number => {
+  if (!Number.isInteger(rolloutPercentage)) {
+    return 100;
+  }
+
+  const normalizedRolloutPercentage =
+    typeof rolloutPercentage === "number" ? rolloutPercentage : 100;
+
+  return Math.max(0, Math.min(100, normalizedRolloutPercentage));
+};
+
 export const isValidOutboundNotificationCredentialsRef = (
   credentialsRef: string | null
 ): boolean =>
@@ -230,6 +251,10 @@ const deriveOutboundNotificationProviderProfileProbeStatus = (
     return "credentials_unreachable";
   }
 
+  if (profile.targetProbeMode === "skip") {
+    return "skipped_by_policy";
+  }
+
   if (hasActiveProbeFailurePrefix(profile.target)) {
     return "target_unreachable";
   }
@@ -291,6 +316,46 @@ export const resolveOutboundNotificationProviderProfileHealthStatus = (
   profile.operationalState?.healthStatus ??
   deriveOutboundNotificationProviderProfileHealthStatus(profile);
 
+const createStableRolloutBucket = (profileKey: string, rolloutSubjectKey: string): number => {
+  const seed = `${profileKey}:${rolloutSubjectKey}`;
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return hash % 100;
+};
+
+export const isOutboundNotificationProviderProfileRolloutAdmitted = (input: {
+  profile: OutboundNotificationProviderProfile;
+  rolloutSubjectKey?: string | null;
+}): boolean => {
+  if (input.profile.rolloutState !== "canary") {
+    return true;
+  }
+
+  const rolloutPercentage = normalizeOutboundNotificationProviderProfileRolloutPercentage(
+    input.profile.rolloutPercentage
+  );
+
+  if (rolloutPercentage >= 100) {
+    return true;
+  }
+
+  if (rolloutPercentage <= 0) {
+    return false;
+  }
+
+  const rolloutSubjectKey = input.rolloutSubjectKey?.trim();
+
+  if (!rolloutSubjectKey) {
+    return false;
+  }
+
+  return createStableRolloutBucket(input.profile.profileKey, rolloutSubjectKey) < rolloutPercentage;
+};
+
 export const resolveOutboundNotificationProviderProfileOperationalRolloutStatus = (
   profile: OutboundNotificationProviderProfile
 ): OutboundNotificationProviderProfileOperationalRolloutStatus =>
@@ -327,7 +392,9 @@ export const refreshOutboundNotificationProviderProfileOperationalState = (input
     : probeStatus === "target_unreachable"
       ? "Active target probe failed."
       : null;
-  const probeTarget = probeStatus === "skipped_disabled" || probeStatus === "skipped_paused"
+  const probeTarget = probeStatus === "skipped_disabled" ||
+    probeStatus === "skipped_paused" ||
+    probeStatus === "skipped_by_policy"
     ? null
     : normalizeTarget(input.profile.target);
   const probeLatencyMs = probeStatus === "succeeded"
@@ -361,45 +428,95 @@ export const haveSameOutboundNotificationProviderProfileConfiguration = (
   left.displayLabel === right.displayLabel &&
   left.enabled === right.enabled &&
   left.rolloutState === right.rolloutState &&
+  left.rolloutPercentage === right.rolloutPercentage &&
+  left.rolloutFallbackProfileKey === right.rolloutFallbackProfileKey &&
+  left.targetProbeMode === right.targetProbeMode &&
   left.deliveryChannel === right.deliveryChannel &&
   left.target === right.target &&
   left.credentialsRef === right.credentialsRef;
 
 export const isOutboundNotificationProviderProfileDeliverable = (
-  profile: OutboundNotificationProviderProfile
+  profile: OutboundNotificationProviderProfile,
+  rolloutSubjectKey?: string | null
 ): boolean =>
-  resolveOutboundNotificationProviderProfileHealthStatus(profile) === "ready";
+  resolveOutboundNotificationProviderProfileHealthStatus(profile) === "ready" &&
+  isOutboundNotificationProviderProfileRolloutAdmitted({
+    profile,
+    rolloutSubjectKey
+  });
 
 export const resolveOutboundNotificationDestination = (input: {
   target: string | null;
   selectionMode?: OutboundNotificationDeliverySelectionMode;
   providerProfiles?: OutboundNotificationProviderProfile[];
+  rolloutSubjectKey?: string | null;
 }): ResolvedOutboundNotificationDestination => {
   const rawTarget = input.target?.trim() ?? "";
   const providerProfiles = input.providerProfiles ?? [];
+  const providerProfilesByKey = new Map(
+    providerProfiles.map(profile => [profile.profileKey, profile])
+  );
 
-  if (rawTarget.startsWith(providerProfilePrefix)) {
-    const profileKey = rawTarget.slice(providerProfilePrefix.length).trim();
-    const profile = providerProfiles.find(candidate => candidate.profileKey === profileKey);
-
-    if (profile) {
+  const resolveProviderProfileDestination = (
+    profileKey: string,
+    visitedProfileKeys: Set<string>
+  ): ResolvedOutboundNotificationDestination => {
+    if (visitedProfileKeys.has(profileKey)) {
       return {
-        deliveryProfileKey: profile.profileKey,
-        deliveryChannel: profile.deliveryChannel,
-        deliveryTarget: isOutboundNotificationProviderProfileDeliverable(profile)
-          ? profile.target
-          : null
+        deliveryProfileKey: profileKey || null,
+        deliveryChannel: resolveOutboundNotificationDeliveryChannel({
+          target: null,
+          selectionMode: input.selectionMode
+        }),
+        deliveryTarget: null
       };
     }
 
+    visitedProfileKeys.add(profileKey);
+
+    const profile = providerProfilesByKey.get(profileKey);
+
+    if (!profile) {
+      return {
+        deliveryProfileKey: profileKey || null,
+        deliveryChannel: resolveOutboundNotificationDeliveryChannel({
+          target: null,
+          selectionMode: input.selectionMode
+        }),
+        deliveryTarget: null
+      };
+    }
+
+    const healthStatus = resolveOutboundNotificationProviderProfileHealthStatus(profile);
+    const rolloutAdmitted = isOutboundNotificationProviderProfileRolloutAdmitted({
+      profile,
+      rolloutSubjectKey: input.rolloutSubjectKey
+    });
+
+    if (
+      healthStatus === "ready" &&
+      !rolloutAdmitted &&
+      profile.rolloutFallbackProfileKey
+    ) {
+      return resolveProviderProfileDestination(
+        profile.rolloutFallbackProfileKey,
+        visitedProfileKeys
+      );
+    }
+
     return {
-      deliveryProfileKey: profileKey || null,
-      deliveryChannel: resolveOutboundNotificationDeliveryChannel({
-        target: null,
-        selectionMode: input.selectionMode
-      }),
-      deliveryTarget: null
+      deliveryProfileKey: profile.profileKey,
+      deliveryChannel: profile.deliveryChannel,
+      deliveryTarget:
+        healthStatus === "ready" && rolloutAdmitted
+          ? profile.target
+          : null
     };
+  };
+
+  if (rawTarget.startsWith(providerProfilePrefix)) {
+    const profileKey = rawTarget.slice(providerProfilePrefix.length).trim();
+    return resolveProviderProfileDestination(profileKey, new Set<string>());
   }
 
   return {

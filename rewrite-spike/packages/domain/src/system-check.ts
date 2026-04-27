@@ -614,6 +614,7 @@ export const createSystemCheckEvidenceBreachNotification = (input: {
 }): SystemCheckEvidenceBreachNotification => {
   const createdAt = input.createdAt ?? new Date().toISOString();
   const retentionHold = input.systemCheckEvidence.retentionHold;
+  const notificationId = `system-check-evidence-breach-notification-${randomUUID()}`;
 
   if (!retentionHold) {
     throw new Error("Cannot create a breach notification for system-check evidence without a retention hold.");
@@ -622,12 +623,13 @@ export const createSystemCheckEvidenceBreachNotification = (input: {
   const resolvedDestination = resolveOutboundNotificationDestination({
     target: retentionHold.escalationTarget,
     selectionMode: input.notificationPolicy?.breachNotificationDeliverySelectionMode,
-    providerProfiles: input.notificationProviderProfiles
+    providerProfiles: input.notificationProviderProfiles,
+    rolloutSubjectKey: notificationId
   });
   const resolvedDeliveryChannel = resolvedDestination.deliveryChannel;
 
   return {
-    notificationId: `system-check-evidence-breach-notification-${randomUUID()}`,
+    notificationId,
     evidenceKey: input.systemCheckEvidence.evidenceKey,
     participantSessionId: input.systemCheckEvidence.participantSessionId,
     tenantId: input.systemCheckEvidence.tenantId,

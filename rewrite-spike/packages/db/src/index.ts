@@ -403,6 +403,25 @@ const mapNotificationProviderProfileOverrideRecords = (
         candidateProfileValue.rolloutState === "canary" ||
         typeof candidateProfileValue.rolloutState === "undefined"
       ) ||
+      !(
+        (
+          typeof candidateProfileValue.rolloutPercentage === "number" &&
+          Number.isInteger(candidateProfileValue.rolloutPercentage) &&
+          candidateProfileValue.rolloutPercentage >= 0 &&
+          candidateProfileValue.rolloutPercentage <= 100
+        ) ||
+        typeof candidateProfileValue.rolloutPercentage === "undefined"
+      ) ||
+      !(
+        typeof candidateProfileValue.rolloutFallbackProfileKey === "string" ||
+        candidateProfileValue.rolloutFallbackProfileKey === null ||
+        typeof candidateProfileValue.rolloutFallbackProfileKey === "undefined"
+      ) ||
+      !(
+        candidateProfileValue.targetProbeMode === "active" ||
+        candidateProfileValue.targetProbeMode === "skip" ||
+        typeof candidateProfileValue.targetProbeMode === "undefined"
+      ) ||
       (candidateProfileValue.deliveryChannel !== "webhook_spike" &&
         candidateProfileValue.deliveryChannel !== "email_spike") ||
       typeof candidateProfileValue.target !== "string" ||
@@ -433,6 +452,22 @@ const mapNotificationProviderProfileOverrideRecords = (
         candidateProfileValue.rolloutState === "paused" ||
         candidateProfileValue.rolloutState === "canary"
           ? candidateProfileValue.rolloutState
+          : "active",
+      rolloutPercentage:
+        typeof candidateProfileValue.rolloutPercentage === "number" &&
+        Number.isInteger(candidateProfileValue.rolloutPercentage) &&
+        candidateProfileValue.rolloutPercentage >= 0 &&
+        candidateProfileValue.rolloutPercentage <= 100
+          ? candidateProfileValue.rolloutPercentage
+          : 100,
+      rolloutFallbackProfileKey:
+        typeof candidateProfileValue.rolloutFallbackProfileKey === "string" &&
+        candidateProfileValue.rolloutFallbackProfileKey.trim().length > 0
+          ? candidateProfileValue.rolloutFallbackProfileKey.trim()
+          : null,
+      targetProbeMode:
+        candidateProfileValue.targetProbeMode === "skip"
+          ? "skip"
           : "active",
       deliveryChannel: candidateProfileValue.deliveryChannel,
       target: candidateProfileValue.target.trim(),
@@ -473,6 +508,7 @@ const mapNotificationProviderProfileOverrideRecords = (
           operationalStateCandidate.probeStatus === "succeeded" ||
           operationalStateCandidate.probeStatus === "skipped_paused" ||
           operationalStateCandidate.probeStatus === "skipped_disabled" ||
+          operationalStateCandidate.probeStatus === "skipped_by_policy" ||
           operationalStateCandidate.probeStatus === "credentials_unreachable" ||
           operationalStateCandidate.probeStatus === "target_unreachable"
         ) &&
@@ -504,7 +540,7 @@ const mapNotificationProviderProfileOverrideRecords = (
               rolloutStatus: operationalStateCandidate.rolloutStatus as
                 "active_ready" | "active_blocked" | "paused" | "disabled" | "canary_ready" | "canary_blocked",
               probeStatus: operationalStateCandidate.probeStatus as
-                "succeeded" | "skipped_paused" | "skipped_disabled" | "credentials_unreachable" | "target_unreachable",
+                "succeeded" | "skipped_paused" | "skipped_disabled" | "skipped_by_policy" | "credentials_unreachable" | "target_unreachable",
               probeTarget: operationalStateCandidate.probeTarget as string | null,
               probeLatencyMs: operationalStateCandidate.probeLatencyMs as number | null,
               lastCheckError: operationalStateCandidate.lastCheckError as

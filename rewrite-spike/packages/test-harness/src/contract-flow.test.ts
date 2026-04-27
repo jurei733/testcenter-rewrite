@@ -82,6 +82,9 @@ const toExpectedNotificationProviderProfileDto = (input: {
   credentialsRef: string | null;
   enabled?: boolean;
   rolloutState?: "active" | "paused" | "canary";
+  rolloutPercentage?: number;
+  rolloutFallbackProfileKey?: string | null;
+  targetProbeMode?: "active" | "skip";
   operationalState?: {
     lastCheckedAt: string;
     lastCheckedByActorType: "worker" | "notification_service" | "platform_api";
@@ -104,6 +107,7 @@ const toExpectedNotificationProviderProfileDto = (input: {
       | "succeeded"
       | "skipped_paused"
       | "skipped_disabled"
+      | "skipped_by_policy"
       | "credentials_unreachable"
       | "target_unreachable";
     probeTarget: string | null;
@@ -115,6 +119,9 @@ const toExpectedNotificationProviderProfileDto = (input: {
   displayLabel: input.displayLabel,
   enabled: input.enabled ?? true,
   rolloutState: input.rolloutState ?? "active",
+  rolloutPercentage: input.rolloutPercentage ?? 100,
+  rolloutFallbackProfileKey: input.rolloutFallbackProfileKey ?? null,
+  targetProbeMode: input.targetProbeMode ?? "active",
   deliveryChannel: input.deliveryChannel,
   target: input.target,
   credentialsRefPresent: input.credentialsRef !== null,
@@ -124,6 +131,9 @@ const toExpectedNotificationProviderProfileDto = (input: {
     displayLabel: input.displayLabel,
     enabled: input.enabled ?? true,
     rolloutState: input.rolloutState ?? "active",
+    rolloutPercentage: input.rolloutPercentage ?? 100,
+    rolloutFallbackProfileKey: input.rolloutFallbackProfileKey ?? null,
+    targetProbeMode: input.targetProbeMode ?? "active",
     deliveryChannel: input.deliveryChannel,
     target: input.target,
     credentialsRef: input.credentialsRef
@@ -133,6 +143,9 @@ const toExpectedNotificationProviderProfileDto = (input: {
     displayLabel: input.displayLabel,
     enabled: input.enabled ?? true,
     rolloutState: input.rolloutState ?? "active",
+    rolloutPercentage: input.rolloutPercentage ?? 100,
+    rolloutFallbackProfileKey: input.rolloutFallbackProfileKey ?? null,
+    targetProbeMode: input.targetProbeMode ?? "active",
     deliveryChannel: input.deliveryChannel,
     target: input.target,
     credentialsRef: input.credentialsRef
@@ -6552,6 +6565,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     displayLabel: "Paused Empty Workspace Alerts Email Profile",
     enabled: true,
     rolloutState: "paused" as const,
+    rolloutPercentage: 100,
+    rolloutFallbackProfileKey: null,
+    targetProbeMode: "active" as const,
     deliveryChannel: "email_spike" as const,
     target: "retry-once:paused-alerts@example.test",
     credentialsRef: "vault://notifications/paused-alerts-email"
@@ -6565,6 +6581,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         displayLabel: "Tenant Updated Dead Letter Email Profile",
         enabled: true,
         rolloutState: "active",
+        rolloutPercentage: 100,
+        rolloutFallbackProfileKey: null,
+        targetProbeMode: "active",
         deliveryChannel: "email_spike",
         target: "fail-permanent:tenant-updated-dead-letter@example.test",
         credentialsRef: null
@@ -6584,6 +6603,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     displayLabel: "Unreachable Canary Profile",
     enabled: true,
     rolloutState: "canary" as const,
+    rolloutPercentage: 100,
+    rolloutFallbackProfileKey: null,
+    targetProbeMode: "active" as const,
     deliveryChannel: "email_spike" as const,
     target: "retry-once:unreachable-canary@example.test",
     credentialsRef: "vault://unreachable/notifications/canary-email"
@@ -6606,6 +6628,49 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       deliveryProfileKey: "unreachable-canary-profile",
       deliveryChannel: "email_spike",
       deliveryTarget: null
+    }
+  );
+  const rolloutFallbackProfile = {
+    profileKey: "rollout-canary-profile",
+    displayLabel: "Rollout Canary Profile",
+    enabled: true,
+    rolloutState: "canary" as const,
+    rolloutPercentage: 0,
+    rolloutFallbackProfileKey: "dead-letter-email-profile",
+    targetProbeMode: "active" as const,
+    deliveryChannel: "email_spike" as const,
+    target: "retry-once:canary-only@example.test",
+    credentialsRef: "vault://notifications/canary-only-email"
+  };
+  const fallbackDeliveryProfile = {
+    profileKey: "dead-letter-email-profile",
+    displayLabel: "Tenant Updated Dead Letter Email Profile",
+    enabled: true,
+    rolloutState: "active" as const,
+    rolloutPercentage: 100,
+    rolloutFallbackProfileKey: null,
+    targetProbeMode: "active" as const,
+    deliveryChannel: "email_spike" as const,
+    target: "fail-permanent:tenant-updated-dead-letter@example.test",
+    credentialsRef: null
+  };
+  assert.equal(
+    isOutboundNotificationProviderProfileDeliverable(
+      rolloutFallbackProfile,
+      "breach-notification-1"
+    ),
+    false
+  );
+  assert.deepEqual(
+    resolveOutboundNotificationDestination({
+      target: "profile:rollout-canary-profile",
+      providerProfiles: [rolloutFallbackProfile, fallbackDeliveryProfile],
+      rolloutSubjectKey: "breach-notification-1"
+    }),
+    {
+      deliveryProfileKey: "dead-letter-email-profile",
+      deliveryChannel: "email_spike",
+      deliveryTarget: "fail-permanent:tenant-updated-dead-letter@example.test"
     }
   );
 
@@ -6696,6 +6761,15 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
             deliveryChannel: "webhook_spike",
             target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-fail",
             credentialsRef: "vault://notifications/probe-failing-webhook"
+          },
+          {
+            profileKey: "probe-skipped-webhook-profile",
+            displayLabel: "Probe Skipped Empty Workspace Webhook Profile",
+            rolloutState: "active",
+            targetProbeMode: "skip",
+            deliveryChannel: "webhook_spike",
+            target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-skip",
+            credentialsRef: "vault://notifications/probe-skipped-webhook"
           }
         ]
       })
@@ -6729,6 +6803,15 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         deliveryChannel: "webhook_spike",
         target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-fail",
         credentialsRef: "vault://notifications/probe-failing-webhook"
+      }),
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "probe-skipped-webhook-profile",
+        displayLabel: "Probe Skipped Empty Workspace Webhook Profile",
+        rolloutState: "active",
+        targetProbeMode: "skip",
+        deliveryChannel: "webhook_spike",
+        target: "probe-unreachable:https://workspace-webhook.example.test/hooks/probe-skip",
+        credentialsRef: "vault://notifications/probe-skipped-webhook"
       })
     ])
   );
@@ -6854,6 +6937,22 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     refreshedProbeFailingWorkspaceProfile.operationalState.lastCheckError,
     "Active target probe failed."
   );
+  const refreshedProbeSkippedWorkspaceProfile = refreshedEmptyWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles.find(
+    profile => profile.profileKey === "probe-skipped-webhook-profile"
+  );
+  assert.ok(refreshedProbeSkippedWorkspaceProfile?.operationalState);
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.lastCheckedByActorType, "worker");
+  assert.equal(
+    refreshedProbeSkippedWorkspaceProfile.operationalState.lastCheckedByActorId,
+    "provider-operations-service"
+  );
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.credentialsStatus, "reachable");
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.healthStatus, "ready");
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.rolloutStatus, "active_ready");
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.probeStatus, "skipped_by_policy");
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.probeTarget, null);
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.probeLatencyMs, null);
+  assert.equal(refreshedProbeSkippedWorkspaceProfile.operationalState.lastCheckError, null);
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),
