@@ -44,6 +44,7 @@ export interface NotificationProviderPromotionPolicy {
 
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
 export type NotificationPolicy = OutboundNotificationPolicy;
+export type GovernanceNotificationPolicy = OutboundNotificationPolicy;
 export type NotificationProviderProfile = OutboundNotificationProviderProfile;
 export type NotificationProviderProfileIncidentType =
   OutboundNotificationProviderProfileIncidentType;
@@ -210,6 +211,8 @@ export const defaultNotificationProviderPromotionPolicy: NotificationProviderPro
 };
 
 export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
+export const defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy =
+  defaultOutboundNotificationPolicy;
 export const defaultNotificationProviderProfiles: NotificationProviderProfile[] = [];
 
 export const defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy = {
@@ -287,6 +290,7 @@ export interface Tenant {
   defaultLaunchApprovalPolicy: LaunchApprovalPolicy;
   defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicy;
   defaultNotificationPolicy: NotificationPolicy;
+  defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy;
   defaultNotificationProviderProfiles: NotificationProviderProfile[];
   defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy;
   defaultEvidenceRetentionClassPolicy: EvidenceRetentionClassPolicy;
@@ -297,6 +301,7 @@ export type OperationalPolicyOverride = Partial<OperationalPolicy>;
 export type LaunchApprovalPolicyOverride = Partial<LaunchApprovalPolicy>;
 export type NotificationProviderPromotionPolicyOverride = Partial<NotificationProviderPromotionPolicy>;
 export type NotificationPolicyOverride = Partial<NotificationPolicy>;
+export type GovernanceNotificationPolicyOverride = Partial<GovernanceNotificationPolicy>;
 export type EvidenceRetentionPolicyOverride = Partial<EvidenceRetentionPolicy>;
 
 export interface ActivationPolicyOverrideRecords {
@@ -334,6 +339,8 @@ export interface NotificationPolicyOverrideRecords {
   emailSpikeMaxDeliveryAttempts?: PolicyOverrideRecord<number>;
 }
 
+export type GovernanceNotificationPolicyOverrideRecords = NotificationPolicyOverrideRecords;
+
 export interface EvidenceRetentionPolicyOverrideRecords {
   systemCheckEvidenceRetentionTtlSeconds?: PolicyOverrideRecord<number>;
   systemCheckEvidenceInvestigationRetentionTtlSeconds?: PolicyOverrideRecord<number>;
@@ -350,6 +357,7 @@ export interface Workspace {
   launchApprovalPolicyOverrideRecords: LaunchApprovalPolicyOverrideRecords | null;
   notificationProviderPromotionPolicyOverrideRecords: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecords | null;
+  governanceNotificationPolicyOverrideRecords: GovernanceNotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -370,6 +378,7 @@ export const createTenant = (input: {
   defaultLaunchApprovalPolicy,
   defaultNotificationProviderPromotionPolicy,
   defaultNotificationPolicy,
+  defaultGovernanceNotificationPolicy,
   defaultNotificationProviderProfiles,
   defaultEvidenceRetentionPolicy,
   defaultEvidenceRetentionClassPolicy
@@ -384,6 +393,7 @@ export const createWorkspace = (input: {
   launchApprovalPolicyOverrideRecords?: LaunchApprovalPolicyOverrideRecords | null;
   notificationProviderPromotionPolicyOverrideRecords?: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords?: NotificationPolicyOverrideRecords | null;
+  governanceNotificationPolicyOverrideRecords?: GovernanceNotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords?: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords?: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords?: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -399,6 +409,8 @@ export const createWorkspace = (input: {
   notificationProviderPromotionPolicyOverrideRecords:
     input.notificationProviderPromotionPolicyOverrideRecords ?? null,
   notificationPolicyOverrideRecords: input.notificationPolicyOverrideRecords ?? null,
+  governanceNotificationPolicyOverrideRecords:
+    input.governanceNotificationPolicyOverrideRecords ?? null,
   notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
   evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
   evidenceRetentionClassPolicyOverrideRecords: input.evidenceRetentionClassPolicyOverrideRecords ?? null
@@ -808,6 +820,15 @@ export const resolveWorkspaceNotificationPolicy = (
   ({
     ...tenant.defaultNotificationPolicy,
     ...(flattenNotificationPolicyOverrideRecords(workspace.notificationPolicyOverrideRecords) ?? {})
+  });
+
+export const resolveWorkspaceGovernanceNotificationPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): GovernanceNotificationPolicy =>
+  ({
+    ...tenant.defaultGovernanceNotificationPolicy,
+    ...(flattenNotificationPolicyOverrideRecords(workspace.governanceNotificationPolicyOverrideRecords) ?? {})
   });
 
 export const resolveWorkspaceNotificationProviderProfiles = (

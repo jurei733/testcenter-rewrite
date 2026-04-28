@@ -10,6 +10,7 @@ import {
   markNotificationProviderProfileGovernanceAlertDeliveryFailed,
   markSystemCheckEvidenceBreachNotificationDelivered,
   markSystemCheckEvidenceBreachNotificationDeliveryFailed,
+  resolveWorkspaceGovernanceNotificationPolicy,
   resolveWorkspaceNotificationPolicy,
   scheduleNotificationProviderProfileGovernanceAlertDeliveryRetry,
   scheduleSystemCheckEvidenceBreachNotificationDeliveryRetry
@@ -235,7 +236,7 @@ const processPendingGovernanceAlertDeliveries = async (store: PlatformStore): Pr
     ]);
     const notificationPolicy =
       tenant && workspace
-        ? resolveWorkspaceNotificationPolicy(workspace, tenant)
+        ? resolveWorkspaceGovernanceNotificationPolicy(workspace, tenant)
         : null;
 
     if (!alert.deliveryTarget) {

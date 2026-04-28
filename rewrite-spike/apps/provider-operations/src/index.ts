@@ -7,9 +7,9 @@ import {
   createAuditEvent,
   createNotificationProviderProfileIncident,
   createNotificationProviderProfileGovernanceAlert,
+  resolveWorkspaceGovernanceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceNotificationProviderPromotionPolicy,
-  resolveWorkspaceNotificationPolicy,
   type NotificationProviderProfile,
   type NotificationProviderProfileGovernanceAlert,
   type NotificationProviderProfileIncident,
@@ -588,7 +588,10 @@ const reconcileNotificationProviderProfileRollouts = async (
               createNotificationProviderProfileGovernanceAlert({
                 incident: createdIncident,
                 profile: rolledBackProfile,
-                notificationPolicy: resolveWorkspaceNotificationPolicy(workspace, tenant),
+                notificationPolicy: resolveWorkspaceGovernanceNotificationPolicy(
+                  workspace,
+                  tenant
+                ),
                 notificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
                   updatedWorkspace,
                   tenant

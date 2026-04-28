@@ -11,6 +11,8 @@ export const apiRoutes = {
     `/api/v1/platform/tenants/${tenantKey}/notification-provider-promotion-policy`,
   tenantNotificationPolicy: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/notification-policy`,
+  tenantGovernanceNotificationPolicy: (tenantKey: string): string =>
+    `/api/v1/platform/tenants/${tenantKey}/governance-notification-policy`,
   tenantNotificationProviderProfiles: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/notification-provider-profiles`,
   tenantEvidenceRetentionPolicy: (tenantKey: string): string =>
@@ -29,6 +31,8 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-promotion-policy`,
   workspaceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-policy`,
+  workspaceGovernanceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/governance-notification-policy`,
   workspaceNotificationProviderProfiles: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles`,
   workspaceNotificationProviderProfileRolloutMetrics: (tenantKey: string, workspaceKey: string): string =>
@@ -628,6 +632,7 @@ export type WorkspaceOperationalPolicyModeDto = "inherit" | "override";
 export type WorkspaceLaunchApprovalPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderPromotionPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationPolicyModeDto = "inherit" | "override";
+export type WorkspaceGovernanceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderProfilesModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionPolicyModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionClassPolicyModeDto = "inherit" | "override";
@@ -675,6 +680,15 @@ export interface UpdateWorkspaceNotificationPolicyRequest {
 
 export interface UpdateTenantNotificationPolicyRequest {
   defaultNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface UpdateWorkspaceGovernanceNotificationPolicyRequest {
+  mode: WorkspaceGovernanceNotificationPolicyModeDto;
+  governanceNotificationPolicyOverride?: NotificationPolicyOverrideDto | null;
+}
+
+export interface UpdateTenantGovernanceNotificationPolicyRequest {
+  defaultGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
 export interface UpdateTenantNotificationProviderProfilesRequest {
@@ -728,6 +742,11 @@ export interface TenantNotificationProviderPromotionPolicyResponse {
 export interface TenantNotificationPolicyResponse {
   tenantKey: string;
   defaultNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface TenantGovernanceNotificationPolicyResponse {
+  tenantKey: string;
+  defaultGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
 export interface TenantNotificationProviderProfilesResponse {
@@ -793,6 +812,16 @@ export interface WorkspaceNotificationPolicyResponse {
   notificationPolicyOverride: NotificationPolicyOverrideDto | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
   effectiveNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface WorkspaceGovernanceNotificationPolicyResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  mode: WorkspaceGovernanceNotificationPolicyModeDto;
+  defaultGovernanceNotificationPolicy: NotificationPolicyDto;
+  governanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
+  governanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
+  effectiveGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
 export interface WorkspaceNotificationProviderProfilesResponse {
@@ -1849,6 +1878,7 @@ export type PolicyHistoryFamilyDto =
   | "launch_approval"
   | "notification_provider_promotion"
   | "notification"
+  | "governance_notification"
   | "notification_provider_profiles"
   | "evidence_retention"
   | "evidence_retention_class";
@@ -1889,6 +1919,10 @@ export interface PolicyHistoryEntryDto {
   notificationPolicyOverride: NotificationPolicyOverrideDto | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
   effectiveNotificationPolicy: NotificationPolicyDto | null;
+  defaultGovernanceNotificationPolicy: NotificationPolicyDto | null;
+  governanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
+  governanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
+  effectiveGovernanceNotificationPolicy: NotificationPolicyDto | null;
   defaultNotificationProviderProfiles: NotificationProviderProfileDto[] | null;
   notificationProviderProfileOverride: NotificationProviderProfileDto[] | null;
   removedNotificationProviderProfileKeys: string[] | null;

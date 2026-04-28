@@ -14,6 +14,7 @@ import {
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
+  type TenantGovernanceNotificationPolicyResponse,
   type TenantNotificationProviderPromotionPolicyResponse,
   type TenantNotificationPolicyResponse,
   type TenantNotificationProviderProfilesResponse,
@@ -23,6 +24,7 @@ import {
   type WorkspaceEvidenceRetentionClassesResponse,
   type WorkspaceEvidenceRetentionPolicyResponse,
   type WorkspaceLaunchApprovalPolicyResponse,
+  type WorkspaceGovernanceNotificationPolicyResponse,
   type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
@@ -7941,6 +7943,99 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     return matchingAlert;
   }, 60, 250);
 
+  const tenantGovernanceNotificationPolicyResponse =
+    await fetchJsonResponse<TenantGovernanceNotificationPolicyResponse>(
+      apiRoutes.tenantGovernanceNotificationPolicy(demoTenantKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          defaultGovernanceNotificationPolicy: {
+            breachNotificationDeliverySelectionMode: "force_email_spike",
+            webhookSpikeRetryDelaySeconds: 13,
+            webhookSpikeMaxDeliveryAttempts: 14,
+            emailSpikeRetryDelaySeconds: 15,
+            emailSpikeMaxDeliveryAttempts: 16
+          }
+        })
+      }
+    );
+  const tenantGovernanceNotificationPolicy = tenantGovernanceNotificationPolicyResponse.body;
+  const tenantGovernanceNotificationPolicyRequestId =
+    tenantGovernanceNotificationPolicyResponse.headers.get("x-request-id");
+  assert.ok(tenantGovernanceNotificationPolicyRequestId);
+  assert.deepEqual(tenantGovernanceNotificationPolicy.defaultGovernanceNotificationPolicy, {
+    breachNotificationDeliverySelectionMode: "force_email_spike",
+    webhookSpikeRetryDelaySeconds: 13,
+    webhookSpikeMaxDeliveryAttempts: 14,
+    emailSpikeRetryDelaySeconds: 15,
+    emailSpikeMaxDeliveryAttempts: 16
+  });
+
+  const inheritedWorkspaceGovernanceNotificationPolicy =
+    await fetchJson<WorkspaceGovernanceNotificationPolicyResponse>(
+      apiRoutes.workspaceGovernanceNotificationPolicy(demoTenantKey, emptyWorkspaceKey)
+    );
+  assert.equal(inheritedWorkspaceGovernanceNotificationPolicy.mode, "inherit");
+  assert.equal(
+    inheritedWorkspaceGovernanceNotificationPolicy.governanceNotificationPolicyOverride,
+    null
+  );
+  assert.deepEqual(
+    inheritedWorkspaceGovernanceNotificationPolicy.effectiveGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 13,
+      webhookSpikeMaxDeliveryAttempts: 14,
+      emailSpikeRetryDelaySeconds: 15,
+      emailSpikeMaxDeliveryAttempts: 16
+    }
+  );
+
+  const workspaceGovernanceNotificationPolicyResponse =
+    await fetchJsonResponse<WorkspaceGovernanceNotificationPolicyResponse>(
+      apiRoutes.workspaceGovernanceNotificationPolicy(demoTenantKey, demoWorkspaceKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "override",
+          governanceNotificationPolicyOverride: {
+            breachNotificationDeliverySelectionMode: "force_webhook_spike",
+            webhookSpikeRetryDelaySeconds: 1,
+            webhookSpikeMaxDeliveryAttempts: 9
+          }
+        })
+      }
+    );
+  const workspaceGovernanceNotificationPolicy = workspaceGovernanceNotificationPolicyResponse.body;
+  const workspaceGovernanceNotificationPolicyRequestId =
+    workspaceGovernanceNotificationPolicyResponse.headers.get("x-request-id");
+  assert.ok(workspaceGovernanceNotificationPolicyRequestId);
+  assert.equal(workspaceGovernanceNotificationPolicy.mode, "override");
+  assert.deepEqual(workspaceGovernanceNotificationPolicy.defaultGovernanceNotificationPolicy, {
+    breachNotificationDeliverySelectionMode: "force_email_spike",
+    webhookSpikeRetryDelaySeconds: 13,
+    webhookSpikeMaxDeliveryAttempts: 14,
+    emailSpikeRetryDelaySeconds: 15,
+    emailSpikeMaxDeliveryAttempts: 16
+  });
+  assert.deepEqual(workspaceGovernanceNotificationPolicy.governanceNotificationPolicyOverride, {
+    breachNotificationDeliverySelectionMode: "force_webhook_spike",
+    webhookSpikeRetryDelaySeconds: 1,
+    webhookSpikeMaxDeliveryAttempts: 9
+  });
+  assert.equal(
+    workspaceGovernanceNotificationPolicy.governanceNotificationPolicyOverrideRecords
+      ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
+    workspaceGovernanceNotificationPolicyRequestId
+  );
+  assert.deepEqual(workspaceGovernanceNotificationPolicy.effectiveGovernanceNotificationPolicy, {
+    breachNotificationDeliverySelectionMode: "force_webhook_spike",
+    webhookSpikeRetryDelaySeconds: 1,
+    webhookSpikeMaxDeliveryAttempts: 9,
+    emailSpikeRetryDelaySeconds: 15,
+    emailSpikeMaxDeliveryAttempts: 16
+  });
+
   const redrivenGovernanceAlert =
     await fetchJson<RedriveNotificationProviderProfileGovernanceAlertResponse>(
       apiRoutes.workspaceNotificationProviderProfileGovernanceAlertRedrive(
@@ -7958,6 +8053,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       }
     );
   assert.equal(redrivenGovernanceAlert.alert.delivery.status, "pending_delivery");
+  assert.equal(redrivenGovernanceAlert.alert.delivery.channel, "webhook_spike");
   assert.equal(redrivenGovernanceAlert.alert.delivery.target, "manual-governance-recovery@example.test");
   assert.equal(redrivenGovernanceAlert.alert.deliveryProfileKey, null);
 
@@ -7973,6 +8069,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     );
 
     assert.ok(matchingAlert, "Expected redriven governance alert to be delivered.");
+    assert.equal(matchingAlert.delivery.channel, "webhook_spike");
     assert.equal(matchingAlert.delivery.status, "delivered");
     assert.equal(matchingAlert.delivery.target, "manual-governance-recovery@example.test");
     assert.equal(matchingAlert.deliveryProfileKey, null);
@@ -8649,6 +8746,33 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     emailSpikeMaxDeliveryAttempts: 7
   });
 
+  const tenantGovernanceNotificationPolicyHistoryEntry = tenantPolicyHistory.items.find(
+    item =>
+      item.eventType === "tenant.governance_notification_policy.updated" &&
+      item.requestId === tenantGovernanceNotificationPolicyRequestId
+  );
+  assert.ok(tenantGovernanceNotificationPolicyHistoryEntry);
+  assert.equal(tenantGovernanceNotificationPolicyHistoryEntry.scope, "tenant_default");
+  assert.equal(tenantGovernanceNotificationPolicyHistoryEntry.policyFamily, "governance_notification");
+  assert.equal(tenantGovernanceNotificationPolicyHistoryEntry.mode, "default");
+  assert.deepEqual(tenantGovernanceNotificationPolicyHistoryEntry.changedFields, [
+    "breachNotificationDeliverySelectionMode",
+    "webhookSpikeRetryDelaySeconds",
+    "webhookSpikeMaxDeliveryAttempts",
+    "emailSpikeRetryDelaySeconds",
+    "emailSpikeMaxDeliveryAttempts"
+  ]);
+  assert.deepEqual(
+    tenantGovernanceNotificationPolicyHistoryEntry.defaultGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 13,
+      webhookSpikeMaxDeliveryAttempts: 14,
+      emailSpikeRetryDelaySeconds: 15,
+      emailSpikeMaxDeliveryAttempts: 16
+    }
+  );
+
   const tenantNotificationProviderProfilesHistoryEntry = tenantPolicyHistory.items.find(
     item =>
       item.eventType === "tenant.notification_provider_profiles.updated" &&
@@ -8839,6 +8963,49 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     workspaceNotificationPolicyHistoryEntry.notificationPolicyOverrideRecords
       ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
     demoWorkspaceNotificationPolicyRequestId
+  );
+
+  const workspaceGovernanceNotificationPolicyHistoryEntry = workspacePolicyHistory.items.find(
+    item => item.eventType === "workspace.governance_notification_policy.updated"
+  );
+  assert.ok(workspaceGovernanceNotificationPolicyHistoryEntry);
+  assert.equal(workspaceGovernanceNotificationPolicyHistoryEntry.scope, "workspace_override");
+  assert.equal(
+    workspaceGovernanceNotificationPolicyHistoryEntry.policyFamily,
+    "governance_notification"
+  );
+  assert.equal(workspaceGovernanceNotificationPolicyHistoryEntry.mode, "override");
+  assert.equal(
+    workspaceGovernanceNotificationPolicyHistoryEntry.requestId,
+    workspaceGovernanceNotificationPolicyRequestId
+  );
+  assert.deepEqual(
+    workspaceGovernanceNotificationPolicyHistoryEntry.defaultGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 13,
+      webhookSpikeMaxDeliveryAttempts: 14,
+      emailSpikeRetryDelaySeconds: 15,
+      emailSpikeMaxDeliveryAttempts: 16
+    }
+  );
+  assert.deepEqual(workspaceGovernanceNotificationPolicyHistoryEntry.changedFields, [
+    "breachNotificationDeliverySelectionMode",
+    "webhookSpikeRetryDelaySeconds",
+    "webhookSpikeMaxDeliveryAttempts"
+  ]);
+  assert.deepEqual(
+    workspaceGovernanceNotificationPolicyHistoryEntry.governanceNotificationPolicyOverride,
+    {
+      breachNotificationDeliverySelectionMode: "force_webhook_spike",
+      webhookSpikeRetryDelaySeconds: 1,
+      webhookSpikeMaxDeliveryAttempts: 9
+    }
+  );
+  assert.equal(
+    workspaceGovernanceNotificationPolicyHistoryEntry.governanceNotificationPolicyOverrideRecords
+      ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
+    workspaceGovernanceNotificationPolicyRequestId
   );
 
   const emptyWorkspacePolicyHistory = await fetchJson<PolicyHistoryResponse>(
