@@ -9,6 +9,7 @@ import {
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
+  type RedriveNotificationProviderProfileGovernanceAlertResponse,
   type TenantActivationPolicyResponse,
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
@@ -27,6 +28,7 @@ import {
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceOperationalPolicyResponse
@@ -36,9 +38,12 @@ import {
   createPostgresPlatformStore
 } from "@testcenter-rewrite/db";
 import {
+  createNotificationProviderProfileGovernanceAlert,
+  createNotificationProviderProfileIncident,
   createMonitorCommand,
   createSystemCheckEvidence,
   createSystemCheckEvidenceBreachNotification,
+  markNotificationProviderProfileGovernanceAlertDeliveryFailed,
   markSystemCheckEvidenceBreachNotificationDeliveryFailed,
   resolveWorkspaceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles
@@ -727,7 +732,7 @@ const seedFailedSystemCheckEvidenceBreachNotification = async (input: {
         ? {
             ...baseNotification,
             notificationId: existingNotification.notificationId,
-            createdAt: existingNotification.createdAt
+            createdAt: new Date().toISOString()
           }
         : baseNotification,
       failureReason: "Seeded terminal failure for provider-operations rollback coverage."
@@ -738,6 +743,71 @@ const seedFailedSystemCheckEvidenceBreachNotification = async (input: {
     } else {
       await store.saveSystemCheckEvidenceBreachNotification(failedNotification);
     }
+  } finally {
+    await store.close();
+  }
+};
+
+const seedFailedNotificationProviderProfileGovernanceAlert = async (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  profileKey: string;
+  createdByActorId: string;
+}): Promise<string> => {
+  const pool = createDatabasePool();
+  const store = createPostgresPlatformStore(pool);
+
+  try {
+    const [tenant, workspace] = await Promise.all([
+      store.getTenantByKey(input.tenantKey),
+      store.getWorkspaceByKey(input.tenantKey, input.workspaceKey)
+    ]);
+
+    assert.ok(tenant, `Expected tenant '${input.tenantKey}' when seeding failed governance alert.`);
+    assert.ok(
+      workspace,
+      `Expected workspace '${input.workspaceKey}' in tenant '${input.tenantKey}' when seeding failed governance alert.`
+    );
+
+    const notificationProviderProfiles = resolveWorkspaceNotificationProviderProfiles(workspace, tenant);
+    const profile = notificationProviderProfiles.find(
+      currentProfile => currentProfile.profileKey === input.profileKey
+    );
+    assert.ok(profile, `Expected provider profile '${input.profileKey}' when seeding failed governance alert.`);
+
+    const incident = createNotificationProviderProfileIncident({
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      profileKey: input.profileKey,
+      incidentType: "auto_rollback_failure",
+      openedAt: new Date().toISOString(),
+      openedByActorType: "worker",
+      openedByActorId: input.createdByActorId,
+      reasonCode: "delivery_failures_present",
+      deliveryFailedCount: 1,
+      suppressionUntil: null,
+      sourceRequestId: `${input.createdByActorId}-seeded-governance-incident`
+    });
+
+    const notificationPolicy = resolveWorkspaceNotificationPolicy(workspace, tenant);
+    const governanceAlert = createNotificationProviderProfileGovernanceAlert({
+      incident,
+      profile,
+      notificationPolicy,
+      notificationProviderProfiles,
+      createdByActorType: "worker",
+      createdByActorId: input.createdByActorId,
+      sourceRequestId: `${input.createdByActorId}-seeded-governance-alert`
+    });
+    const failedGovernanceAlert = markNotificationProviderProfileGovernanceAlertDeliveryFailed({
+      alert: governanceAlert,
+      failureReason: "Seeded terminal failure for governance alert dead-letter coverage."
+    });
+
+    await store.saveNotificationProviderProfileIncident(incident);
+    await store.saveNotificationProviderProfileGovernanceAlert(failedGovernanceAlert);
+
+    return failedGovernanceAlert.alertId;
   } finally {
     await store.close();
   }
@@ -4270,7 +4340,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       currentHoldQueueResponse,
       queueItem
     };
-  }, 60, 250);
+  }, 100, 250);
   const escalatedHoldQueueItem = escalatedHoldQueueResult.queueItem;
   if (!escalatedHoldQueueItem) {
     throw new Error("Escalated hold queue item should exist.");
@@ -7824,6 +7894,107 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     )}?profileKey=dead-letter-email-profile`
   );
   assert.equal(resolvedGovernanceQueue.items.length, 0);
+
+  await fetchJson(
+    apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, demoWorkspaceKey),
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        mode: "override",
+        notificationProviderProfileOverride: [
+          {
+            profileKey: "alerts-email-profile",
+            displayLabel: "Workspace Alerts Email",
+            deliveryChannel: "email_spike",
+            target: "fail-permanent:governance-alert-dead@example.test",
+            credentialsRef: "vault://tenant/alerts-email",
+            rolloutState: "active",
+            rolloutPercentage: 100,
+            rolloutFallbackProfileKey: null
+          }
+        ]
+      })
+    }
+  );
+
+  const seededFailedGovernanceAlertId = await seedFailedNotificationProviderProfileGovernanceAlert({
+    tenantKey: demoTenantKey,
+    workspaceKey: demoWorkspaceKey,
+    profileKey: "dead-letter-email-profile",
+    createdByActorId: "provider-governance-alert-dead-letter-seed"
+  });
+
+  const governanceAlertDeadLetterQueue = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+    const matchingAlert = response.items.find(
+      item => item.alertId === seededFailedGovernanceAlertId
+    );
+
+    assert.ok(matchingAlert, "Expected dead-letter governance alert to enter the dead-letter queue.");
+    assert.equal(matchingAlert.delivery.status, "delivery_failed");
+
+    return matchingAlert;
+  }, 60, 250);
+
+  const redrivenGovernanceAlert =
+    await fetchJson<RedriveNotificationProviderProfileGovernanceAlertResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceAlertRedrive(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterQueue.alertId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          redrivenByActorId: "ops-governance-2",
+          redriveNote: "Corrected governance alert delivery target.",
+          deliveryTarget: "manual-governance-recovery@example.test"
+        })
+      }
+    );
+  assert.equal(redrivenGovernanceAlert.alert.delivery.status, "pending_delivery");
+  assert.equal(redrivenGovernanceAlert.alert.delivery.target, "manual-governance-recovery@example.test");
+  assert.equal(redrivenGovernanceAlert.alert.deliveryProfileKey, null);
+
+  const deliveredRedrivenGovernanceAlert = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlerts(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&deliveryStatus=delivered`
+    );
+    const matchingAlert = response.items.find(
+      item => item.alertId === seededFailedGovernanceAlertId
+    );
+
+    assert.ok(matchingAlert, "Expected redriven governance alert to be delivered.");
+    assert.equal(matchingAlert.delivery.status, "delivered");
+    assert.equal(matchingAlert.delivery.target, "manual-governance-recovery@example.test");
+    assert.equal(matchingAlert.deliveryProfileKey, null);
+    assert.ok(matchingAlert.delivery.receiptId);
+
+    return matchingAlert;
+  }, 30, 250);
+  assert.equal(deliveredRedrivenGovernanceAlert.alertId, seededFailedGovernanceAlertId);
+
+  const emptiedGovernanceAlertDeadLetterQueue =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+  assert.equal(
+    emptiedGovernanceAlertDeadLetterQueue.items.some(
+      item => item.alertId === seededFailedGovernanceAlertId
+    ),
+    false
+  );
 
   const initialTenantEvidenceRetentionPolicy = await fetchJson<TenantEvidenceRetentionPolicyResponse>(
     apiRoutes.tenantEvidenceRetentionPolicy(demoTenantKey),

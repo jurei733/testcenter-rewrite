@@ -5,6 +5,7 @@ import {
 import type { AuditActorType } from "./audit.js";
 import {
   defaultOutboundNotificationPolicy,
+  resolveOutboundNotificationDeliveryChannel,
   resolveOutboundNotificationDestination,
   resolveOutboundNotificationMaxAttempts,
   type OutboundNotificationDeliveryChannel,
@@ -579,6 +580,44 @@ export const acknowledgeNotificationProviderProfileGovernanceAlert = (input: {
     acknowledgedAt,
     acknowledgedByActorId: input.acknowledgedByActorId,
     acknowledgementNote: input.acknowledgementNote
+  };
+};
+
+export const redriveNotificationProviderProfileGovernanceAlert = (input: {
+  alert: NotificationProviderProfileGovernanceAlert;
+  notificationPolicy?: NotificationPolicy;
+  deliveryTarget?: string | null;
+  redrivenAt?: string;
+  sourceRequestId?: string | null;
+}): NotificationProviderProfileGovernanceAlert => {
+  const redrivenAt = input.redrivenAt ?? new Date().toISOString();
+  const explicitDeliveryTarget = input.deliveryTarget?.trim()
+    ? input.deliveryTarget.trim()
+    : null;
+  const resolvedDeliveryTarget = explicitDeliveryTarget ?? input.alert.deliveryTarget;
+  const resolvedDeliveryChannel = resolveOutboundNotificationDeliveryChannel({
+    target: resolvedDeliveryTarget,
+    selectionMode: input.notificationPolicy?.breachNotificationDeliverySelectionMode
+  });
+
+  return {
+    ...input.alert,
+    sourceRequestId: input.sourceRequestId ?? input.alert.sourceRequestId,
+    deliveryProfileKey: explicitDeliveryTarget ? null : input.alert.deliveryProfileKey,
+    deliveryChannel: resolvedDeliveryChannel,
+    deliveryStatus: "pending_delivery",
+    deliveryTarget: resolvedDeliveryTarget ?? null,
+    deliveryAttemptCount: 0,
+    maxDeliveryAttempts: resolveOutboundNotificationMaxAttempts({
+      notificationPolicy: input.notificationPolicy,
+      deliveryChannel: resolvedDeliveryChannel
+    }),
+    nextDeliveryAttemptAt: redrivenAt,
+    lastDeliveryAttemptAt: null,
+    lastDeliveryReceiptId: null,
+    lastDeliveryReceiptIssuedAt: null,
+    deliveredAt: null,
+    lastDeliveryError: null
   };
 };
 

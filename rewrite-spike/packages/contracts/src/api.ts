@@ -45,6 +45,11 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-queue`,
   workspaceNotificationProviderProfileGovernanceAlerts: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts`,
+  workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alert-dead-letter-queue`,
   workspaceNotificationProviderProfileIncidentAcknowledge: (
     tenantKey: string,
     workspaceKey: string,
@@ -57,6 +62,12 @@ export const apiRoutes = {
     alertId: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts/${alertId}:acknowledge`,
+  workspaceNotificationProviderProfileGovernanceAlertRedrive: (
+    tenantKey: string,
+    workspaceKey: string,
+    alertId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts/${alertId}:redrive`,
   workspaceEvidenceRetentionPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/evidence-retention-policy`,
   workspaceEvidenceRetentionClassPolicy: (tenantKey: string, workspaceKey: string): string =>
@@ -925,6 +936,15 @@ export interface WorkspaceNotificationProviderProfileGovernanceAlertsResponse {
   };
 }
 
+export interface WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse {
+  items: NotificationProviderProfileGovernanceAlertDto[];
+  filters: {
+    profileKey: string | null;
+    status: NotificationProviderProfileGovernanceAlertStatusDto | null;
+    deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
+  };
+}
+
 export interface AcknowledgeNotificationProviderProfileIncidentRequest {
   acknowledgedByActorId: string;
   acknowledgementNote: string;
@@ -940,6 +960,16 @@ export interface AcknowledgeNotificationProviderProfileGovernanceAlertRequest {
 }
 
 export interface AcknowledgeNotificationProviderProfileGovernanceAlertResponse {
+  alert: NotificationProviderProfileGovernanceAlertDto;
+}
+
+export interface RedriveNotificationProviderProfileGovernanceAlertRequest {
+  redrivenByActorId: string;
+  redriveNote: string;
+  deliveryTarget?: string | null;
+}
+
+export interface RedriveNotificationProviderProfileGovernanceAlertResponse {
   alert: NotificationProviderProfileGovernanceAlertDto;
 }
 

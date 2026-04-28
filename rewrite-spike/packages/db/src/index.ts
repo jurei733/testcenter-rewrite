@@ -1894,6 +1894,7 @@ export interface PlatformStore {
       profileKey?: string;
       status?: NotificationProviderProfileGovernanceAlert["status"];
       deliveryStatus?: NotificationProviderProfileGovernanceAlert["deliveryStatus"];
+      deliveryChannel?: NotificationProviderProfileGovernanceAlert["deliveryChannel"];
       limit?: number;
     }
   ) => Promise<NotificationProviderProfileGovernanceAlert[]>;
@@ -2635,51 +2636,70 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     );
   },
   updateNotificationProviderProfileGovernanceAlert: async alert => {
-    await pool.query(
-      `
-        UPDATE notification_provider_profile_governance_alerts
-        SET status = $2,
-            governance_status = $3,
-            source_request_id = $4,
-            delivery_profile_key = $5,
-            delivery_channel = $6,
-            delivery_status = $7,
-            delivery_target = $8,
-            delivery_attempt_count = $9,
-            max_delivery_attempts = $10,
-            next_delivery_attempt_at = $11,
-            last_delivery_attempt_at = $12,
-            last_delivery_receipt_id = $13,
-            last_delivery_receipt_issued_at = $14,
-            delivered_at = $15,
-            last_delivery_error = $16,
-            acknowledged_at = $17,
-            acknowledged_by_actor_id = $18,
-            acknowledgement_note = $19
-        WHERE alert_id = $1
-      `,
-      [
-        alert.alertId,
-        alert.status,
-        alert.governanceStatus,
-        alert.sourceRequestId,
-        alert.deliveryProfileKey,
-        alert.deliveryChannel,
-        alert.deliveryStatus,
-        alert.deliveryTarget,
-        alert.deliveryAttemptCount,
-        alert.maxDeliveryAttempts,
-        alert.nextDeliveryAttemptAt,
-        alert.lastDeliveryAttemptAt,
-        alert.lastDeliveryReceiptId,
-        alert.lastDeliveryReceiptIssuedAt,
-        alert.deliveredAt,
-        alert.lastDeliveryError,
-        alert.acknowledgedAt,
-        alert.acknowledgedByActorId,
-        alert.acknowledgementNote
-      ]
-    );
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          UPDATE notification_provider_profile_governance_alerts
+          SET status = $2,
+              governance_status = $3,
+              source_request_id = $4,
+              delivery_profile_key = $5,
+              delivery_channel = $6,
+              delivery_status = $7,
+              delivery_target = $8,
+              delivery_attempt_count = $9,
+              max_delivery_attempts = $10,
+              next_delivery_attempt_at = $11,
+              last_delivery_attempt_at = $12,
+              last_delivery_receipt_id = $13,
+              last_delivery_receipt_issued_at = $14,
+              delivered_at = $15,
+              last_delivery_error = $16,
+              acknowledged_at = $17,
+              acknowledged_by_actor_id = $18,
+              acknowledgement_note = $19
+          WHERE alert_id = $1
+        `,
+        [
+          alert.alertId,
+          alert.status,
+          alert.governanceStatus,
+          alert.sourceRequestId,
+          alert.deliveryProfileKey,
+          alert.deliveryChannel,
+          alert.deliveryStatus,
+          alert.deliveryTarget,
+          alert.deliveryAttemptCount,
+          alert.maxDeliveryAttempts,
+          alert.nextDeliveryAttemptAt,
+          alert.lastDeliveryAttemptAt,
+          alert.lastDeliveryReceiptId,
+          alert.lastDeliveryReceiptIssuedAt,
+          alert.deliveredAt,
+          alert.lastDeliveryError,
+          alert.acknowledgedAt,
+          alert.acknowledgedByActorId,
+          alert.acknowledgementNote
+        ]
+      );
+
+      if (alert.deliveryStatus === "pending_delivery") {
+        await client.query(
+          "SELECT pg_notify($1, $2)",
+          [breachNotificationDispatchQueueChannel, alert.alertId]
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   },
   updateSystemCheckLaunchApproval: async launchApproval => {
     await pool.query(
@@ -3609,6 +3629,11 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     if (options.deliveryStatus) {
       filters.push(options.deliveryStatus);
       whereClauses.push(`delivery_status = $${filters.length}`);
+    }
+
+    if (options.deliveryChannel) {
+      filters.push(options.deliveryChannel);
+      whereClauses.push(`delivery_channel = $${filters.length}`);
     }
 
     filters.push(options.limit ?? 50);

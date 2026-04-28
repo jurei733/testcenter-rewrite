@@ -34,6 +34,8 @@ import {
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type AcknowledgeNotificationProviderProfileGovernanceAlertRequest,
   type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
+  type RedriveNotificationProviderProfileGovernanceAlertRequest,
+  type RedriveNotificationProviderProfileGovernanceAlertResponse,
   type RedriveSystemCheckEvidenceBreachNotificationRequest,
   type RedriveSystemCheckEvidenceBreachNotificationResponse,
   type HoldSystemCheckEvidenceRequest,
@@ -178,6 +180,7 @@ import {
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceSystemCheckEvidenceResponse,
@@ -286,6 +289,7 @@ import {
   resolveWorkspaceEvidenceRetentionClassPolicy,
   resolveWorkspaceEvidenceRetentionPolicy,
   redriveSystemCheckEvidenceBreachNotification,
+  redriveNotificationProviderProfileGovernanceAlert,
   resolveWorkspaceNotificationProviderPromotionPolicy,
   resolveWorkspaceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles,
@@ -348,10 +352,14 @@ const workspaceNotificationProviderProfileGovernanceQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-queue$/;
 const workspaceNotificationProviderProfileGovernanceAlertsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts$/;
+const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents\/([^/]+):acknowledge$/;
 const workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts\/([^/]+):acknowledge$/;
+const workspaceNotificationProviderProfileGovernanceAlertRedriveRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts\/([^/]+):redrive$/;
 const workspaceEvidenceRetentionPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/evidence-retention-policy$/;
 const workspaceEvidenceRetentionClassPolicyRoutePattern =
@@ -7854,6 +7862,88 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertsGet = async (
   });
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawDeliveryChannel = getTrimmedString(url.searchParams.get("deliveryChannel"));
+  const deliveryChannel = rawDeliveryChannel ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+
+  if (status !== null && !isNotificationProviderProfileGovernanceAlertStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_dead_letter_status_filter",
+      "status must be one of pending_acknowledgement or acknowledged."
+    );
+    return;
+  }
+
+  if (
+    deliveryChannel !== null &&
+    !isSystemCheckEvidenceBreachNotificationDeliveryChannel(deliveryChannel)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_dead_letter_delivery_channel_filter",
+      "deliveryChannel must be one of webhook_spike or email_spike."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_dead_letter_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  const alerts = await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: profileKey ?? undefined,
+      status: status ?? undefined,
+      deliveryStatus: "delivery_failed",
+      deliveryChannel: deliveryChannel ?? undefined,
+      limit
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse>(response, 200, {
+    items: alerts.map(toNotificationProviderProfileGovernanceAlertDto),
+    filters: {
+      profileKey,
+      status,
+      deliveryChannel
+    }
+  });
+};
+
 const handleWorkspaceNotificationProviderProfileIncidentAcknowledge = async (
   store: PlatformStore,
   request: IncomingMessage,
@@ -8019,6 +8109,143 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertAcknowledge = asy
 
   sendJson<AcknowledgeNotificationProviderProfileGovernanceAlertResponse>(response, 200, {
     alert: toNotificationProviderProfileGovernanceAlertDto(acknowledgedAlert)
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceAlertRedrive = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  alertId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const alert = await store.getNotificationProviderProfileGovernanceAlertById(alertId);
+
+  if (!alert || alert.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_governance_alert_not_found",
+      `Notification provider profile governance alert '${alertId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  if (alert.deliveryStatus !== "delivery_failed") {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_alert_not_in_dead_letter_queue",
+      `Notification provider profile governance alert '${alertId}' is not currently in the dead-letter queue.`,
+      {
+        deliveryStatus: alert.deliveryStatus
+      }
+    );
+    return;
+  }
+
+  if (alert.status === "acknowledged") {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_alert_already_acknowledged",
+      `Notification provider profile governance alert '${alertId}' has already been acknowledged.`
+    );
+    return;
+  }
+
+  const body = await readBody<RedriveNotificationProviderProfileGovernanceAlertRequest>(request);
+  const redrivenByActorId = getTrimmedString(body.redrivenByActorId);
+  const redriveNote = getTrimmedString(body.redriveNote);
+  const deliveryTarget = getTrimmedString(body.deliveryTarget) ?? null;
+
+  if (!redrivenByActorId || !redriveNote) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_redrive_payload",
+      "redrivenByActorId and redriveNote are required."
+    );
+    return;
+  }
+
+  const effectiveDeliveryTarget = deliveryTarget ?? alert.deliveryTarget;
+
+  if (!effectiveDeliveryTarget) {
+    sendError(
+      response,
+      400,
+      "notification_provider_profile_governance_alert_redrive_target_required",
+      "deliveryTarget is required when the failed governance alert has no existing delivery target."
+    );
+    return;
+  }
+
+  const tenant = await store.getTenantById(workspace.tenantId);
+
+  if (!tenant) {
+    sendError(
+      response,
+      500,
+      "tenant_not_found",
+      `Tenant for workspace '${workspaceKey}' could not be resolved.`
+    );
+    return;
+  }
+
+  const effectiveNotificationPolicy = resolveWorkspaceNotificationPolicy(workspace, tenant);
+  const redrivenAlert = redriveNotificationProviderProfileGovernanceAlert({
+    alert,
+    notificationPolicy: effectiveNotificationPolicy,
+    deliveryTarget: effectiveDeliveryTarget,
+    sourceRequestId: requestContext.requestId
+  });
+
+  await store.updateNotificationProviderProfileGovernanceAlert(redrivenAlert);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: redrivenAlert.tenantId,
+    workspaceId: redrivenAlert.workspaceId,
+    actorType: "platform_api",
+    actorId: redrivenByActorId,
+    eventType: "workspace.notification_provider_profile_governance_alert.redriven",
+    payload: {
+      alertId: redrivenAlert.alertId,
+      incidentId: redrivenAlert.incidentId,
+      profileKey: redrivenAlert.profileKey,
+      governanceStatus: redrivenAlert.governanceStatus,
+      previousSourceRequestId: alert.sourceRequestId,
+      sourceRequestId: redrivenAlert.sourceRequestId,
+      redriveNote,
+      previousDeliveryProfileKey: alert.deliveryProfileKey,
+      previousDeliveryChannel: alert.deliveryChannel,
+      previousDeliveryStatus: alert.deliveryStatus,
+      previousDeliveryAttemptCount: alert.deliveryAttemptCount,
+      previousLastDeliveryError: alert.lastDeliveryError,
+      deliveryProfileKey: redrivenAlert.deliveryProfileKey,
+      deliveryChannel: redrivenAlert.deliveryChannel,
+      deliveryTarget: redrivenAlert.deliveryTarget,
+      maxDeliveryAttempts: redrivenAlert.maxDeliveryAttempts,
+      nextDeliveryAttemptAt: redrivenAlert.nextDeliveryAttemptAt
+    }
+  });
+
+  sendJson<RedriveNotificationProviderProfileGovernanceAlertResponse>(response, 200, {
+    alert: toNotificationProviderProfileGovernanceAlertDto(redrivenAlert)
   });
 };
 
@@ -12649,6 +12876,26 @@ const handleRequest = async (
     }
   }
 
+  const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
   const workspaceNotificationProviderProfileIncidentAcknowledgeRouteMatch = pathname.match(
     workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern
   );
@@ -12681,6 +12928,28 @@ const handleRequest = async (
 
     if (method === "POST") {
       await handleWorkspaceNotificationProviderProfileGovernanceAlertAcknowledge(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        alertId,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceAlertRedriveRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertRedriveRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertRedriveRouteMatch) {
+    const [, tenantKey, workspaceKey, alertId] =
+      workspaceNotificationProviderProfileGovernanceAlertRedriveRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertRedrive(
         store,
         request,
         response,
