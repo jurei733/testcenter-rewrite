@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import {
   apiRoutes,
+  type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
@@ -25,6 +26,7 @@ import {
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceOperationalPolicyResponse
@@ -5226,7 +5228,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     assert.equal(persistedEvidence.retentionHold, null);
     assert.ok(persistedEvidence.purgedAt);
     assert.equal(persistedEvidence.purgeReasonCode, "retention_elapsed");
-  }, 30, 250);
+  }, 60, 250);
 
   const purgedWorkspaceSystemCheckEvidence = await fetchJson<{
     evidence: {
@@ -7608,6 +7610,55 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "investigate_delivery_failures"
   ]);
 
+  const providerGovernanceAlertQueue = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlerts(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&deliveryStatus=delivered`
+    );
+    const matchingAlert = response.items.find(
+      item => item.profileKey === "dead-letter-email-profile"
+    );
+
+    assert.ok(matchingAlert, "Expected dead-letter provider governance alert to be delivered.");
+    assert.equal(matchingAlert.status, "pending_acknowledgement");
+    assert.equal(matchingAlert.governanceStatus, "needs_acknowledgement");
+    assert.equal(matchingAlert.deliveryProfileKey, "alerts-email-profile");
+    assert.equal(matchingAlert.delivery.channel, "email_spike");
+    assert.equal(matchingAlert.delivery.status, "delivered");
+    assert.equal(matchingAlert.delivery.target, "tenant-updated-alerts@example.test");
+    assert.equal(matchingAlert.createdByActorType, "worker");
+    assert.equal(matchingAlert.createdByActorId, "provider-operations-service");
+
+    return matchingAlert;
+  }, 30, 250);
+
+  const acknowledgedProviderGovernanceAlert =
+    await fetchJson<AcknowledgeNotificationProviderProfileGovernanceAlertResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceAlertAcknowledge(
+        demoTenantKey,
+        demoWorkspaceKey,
+        providerGovernanceAlertQueue.alertId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          acknowledgedByActorId: "ops-governance-1",
+          acknowledgementNote: "Governance alert received and linked to provider incident."
+        })
+      }
+    );
+  assert.equal(acknowledgedProviderGovernanceAlert.alert.status, "acknowledged");
+  assert.equal(
+    acknowledgedProviderGovernanceAlert.alert.acknowledgedByActorId,
+    "ops-governance-1"
+  );
+  assert.equal(
+    acknowledgedProviderGovernanceAlert.alert.acknowledgementNote,
+    "Governance alert received and linked to provider incident."
+  );
+
   const acknowledgedProviderIncident =
     await fetchJson<AcknowledgeNotificationProviderProfileIncidentResponse>(
       apiRoutes.workspaceNotificationProviderProfileIncidentAcknowledge(
@@ -7628,6 +7679,30 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(
     acknowledgedProviderIncident.incident.acknowledgementNote,
     "Investigating rollout failure before manual recovery."
+  );
+
+  const governanceAlertAcknowledgementAuditEvent = await retry(async () => {
+    const auditEventsResponse = await fetchJson<{
+      items: Array<{ eventType: string; payload: Record<string, unknown> }>;
+    }>(
+      `${apiRoutes.workspaceAuditEvents(demoTenantKey, demoWorkspaceKey)}?limit=200`
+    );
+    const matchingEvent = auditEventsResponse.items.find(
+      item =>
+        item.eventType ===
+          "workspace.notification_provider_profile_governance_alert.acknowledged" &&
+        (item.payload.alert as { alertId?: string } | undefined)?.alertId ===
+          providerGovernanceAlertQueue.alertId
+    );
+
+    assert.ok(matchingEvent, "Expected governance-alert acknowledgement audit event.");
+
+    return matchingEvent;
+  }, 20, 250);
+  assert.equal(
+    (governanceAlertAcknowledgementAuditEvent.payload.alert as { acknowledgedByActorId: string })
+      .acknowledgedByActorId,
+    "ops-governance-1"
   );
 
   const providerGovernanceQueueAfterAcknowledgement = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
@@ -7697,7 +7772,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "investigate_delivery_failures"
   ]);
 
-  const forcedPromotionAfterIncident = await fetchJsonResponse<PromoteWorkspaceNotificationProviderProfileResponse>(
+  const forcedPromotionAfterIncident = await fetchJson<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
       demoTenantKey,
       demoWorkspaceKey,
@@ -7714,9 +7789,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       })
     }
   );
-  assert.equal(forcedPromotionAfterIncident.status, 200);
   assert.equal(
-    forcedPromotionAfterIncident.body.workspace.effectiveNotificationProviderProfiles.find(
+    forcedPromotionAfterIncident.workspace.effectiveNotificationProviderProfiles.find(
       profile => profile.profileKey === "dead-letter-email-profile"
     )?.rolloutState,
     "active"

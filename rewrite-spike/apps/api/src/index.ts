@@ -32,6 +32,8 @@ import {
   type AcknowledgeSystemCheckEvidenceBreachNotificationResponse,
   type AcknowledgeNotificationProviderProfileIncidentRequest,
   type AcknowledgeNotificationProviderProfileIncidentResponse,
+  type AcknowledgeNotificationProviderProfileGovernanceAlertRequest,
+  type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
   type RedriveSystemCheckEvidenceBreachNotificationRequest,
   type RedriveSystemCheckEvidenceBreachNotificationResponse,
   type HoldSystemCheckEvidenceRequest,
@@ -58,6 +60,8 @@ import {
   type NotificationProviderProfileInputDto,
   type NotificationProviderProfileDto,
   type NotificationProviderProfileGovernanceQueueItemDto,
+  type NotificationProviderProfileGovernanceAlertDto,
+  type NotificationProviderProfileGovernanceAlertStatusDto,
   type NotificationProviderProfileGovernanceStatusDto,
   type NotificationProviderProfileIncidentDto,
   type NotificationProviderProfileIncidentStatusDto,
@@ -173,6 +177,7 @@ import {
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
   type WorkspaceSystemCheckEvidenceResponse,
@@ -269,6 +274,7 @@ import {
   isSystemCheckEvidenceHeld,
   isOpenTestRun,
   markSystemCheckEvidenceAccessGrantAccessed,
+  acknowledgeNotificationProviderProfileGovernanceAlert,
   navigateTestRunToUnit,
   consumeSystemCheckLaunchApproval,
   invalidateSystemCheckLaunchApproval,
@@ -294,6 +300,7 @@ import {
   type NotificationProviderPromotionPolicy,
   type NotificationPolicy,
   type NotificationProviderProfile,
+  type NotificationProviderProfileGovernanceAlert,
   type NotificationProviderProfileIncident,
   type StarterAssignment,
   type SourcePackage,
@@ -339,8 +346,12 @@ const workspaceNotificationProviderProfileIncidentsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents$/;
 const workspaceNotificationProviderProfileGovernanceQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-queue$/;
+const workspaceNotificationProviderProfileGovernanceAlertsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-incidents\/([^/]+):acknowledge$/;
+const workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts\/([^/]+):acknowledge$/;
 const workspaceEvidenceRetentionPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/evidence-retention-policy$/;
 const workspaceEvidenceRetentionClassPolicyRoutePattern =
@@ -900,6 +911,11 @@ const isNotificationProviderProfileIncidentStatus = (
   value: unknown
 ): value is NotificationProviderProfileIncidentStatusDto =>
   value === "open" || value === "acknowledged" || value === "resolved";
+
+const isNotificationProviderProfileGovernanceAlertStatus = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceAlertStatusDto =>
+  value === "pending_acknowledgement" || value === "acknowledged";
 
 const isNotificationProviderProfileGovernanceStatus = (
   value: unknown
@@ -1958,6 +1974,37 @@ const toNotificationProviderProfileIncidentDto = (
   acknowledgementNote: incident.acknowledgementNote,
   resolvedAt: incident.resolvedAt,
   resolutionCode: incident.resolutionCode
+});
+
+const toNotificationProviderProfileGovernanceAlertDto = (
+  alert: NotificationProviderProfileGovernanceAlert
+): NotificationProviderProfileGovernanceAlertDto => ({
+  alertId: alert.alertId,
+  incidentId: alert.incidentId,
+  profileKey: alert.profileKey,
+  status: alert.status,
+  governanceStatus: alert.governanceStatus,
+  createdAt: alert.createdAt,
+  createdByActorType: alert.createdByActorType,
+  createdByActorId: alert.createdByActorId,
+  sourceRequestId: alert.sourceRequestId,
+  deliveryProfileKey: alert.deliveryProfileKey,
+  delivery: {
+    channel: alert.deliveryChannel,
+    status: alert.deliveryStatus,
+    target: alert.deliveryTarget,
+    attemptCount: alert.deliveryAttemptCount,
+    maxAttempts: alert.maxDeliveryAttempts,
+    nextAttemptAt: alert.nextDeliveryAttemptAt,
+    lastAttemptAt: alert.lastDeliveryAttemptAt,
+    receiptId: alert.lastDeliveryReceiptId,
+    receiptIssuedAt: alert.lastDeliveryReceiptIssuedAt,
+    deliveredAt: alert.deliveredAt,
+    lastError: alert.lastDeliveryError
+  },
+  acknowledgedAt: alert.acknowledgedAt,
+  acknowledgedByActorId: alert.acknowledgedByActorId,
+  acknowledgementNote: alert.acknowledgementNote
 });
 
 const toNotificationProviderProfileGovernanceQueueItemDto = (input: {
@@ -7726,6 +7773,87 @@ const handleWorkspaceNotificationProviderProfileGovernanceQueueGet = async (
   });
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceAlertsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawDeliveryStatus = getTrimmedString(url.searchParams.get("deliveryStatus"));
+  const deliveryStatus = rawDeliveryStatus ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+
+  if (status !== null && !isNotificationProviderProfileGovernanceAlertStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_status_filter",
+      "status must be one of pending_acknowledgement or acknowledged."
+    );
+    return;
+  }
+
+  if (
+    deliveryStatus !== null &&
+    !isSystemCheckEvidenceBreachNotificationDeliveryStatus(deliveryStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_delivery_status_filter",
+      "deliveryStatus must be one of pending_delivery, delivered, or delivery_failed."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  const alerts = await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: profileKey ?? undefined,
+      status: status ?? undefined,
+      deliveryStatus: deliveryStatus ?? undefined,
+      limit
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceAlertsResponse>(response, 200, {
+    items: alerts.map(toNotificationProviderProfileGovernanceAlertDto),
+    filters: {
+      profileKey,
+      status,
+      deliveryStatus
+    }
+  });
+};
+
 const handleWorkspaceNotificationProviderProfileIncidentAcknowledge = async (
   store: PlatformStore,
   request: IncomingMessage,
@@ -7809,6 +7937,88 @@ const handleWorkspaceNotificationProviderProfileIncidentAcknowledge = async (
 
   sendJson<AcknowledgeNotificationProviderProfileIncidentResponse>(response, 200, {
     incident: toNotificationProviderProfileIncidentDto(acknowledgedIncident)
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceAlertAcknowledge = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  alertId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const alert = await store.getNotificationProviderProfileGovernanceAlertById(alertId);
+
+  if (!alert || alert.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_governance_alert_not_found",
+      `Notification provider profile governance alert '${alertId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  if (alert.status === "acknowledged") {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_alert_already_acknowledged",
+      `Notification provider profile governance alert '${alertId}' has already been acknowledged.`
+    );
+    return;
+  }
+
+  const body = await readBody<AcknowledgeNotificationProviderProfileGovernanceAlertRequest>(request);
+  const acknowledgedByActorId = getTrimmedString(body.acknowledgedByActorId);
+  const acknowledgementNote = getTrimmedString(body.acknowledgementNote);
+
+  if (!acknowledgedByActorId || !acknowledgementNote) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_acknowledgement_payload",
+      "acknowledgedByActorId and acknowledgementNote are required."
+    );
+    return;
+  }
+
+  const acknowledgedAlert = acknowledgeNotificationProviderProfileGovernanceAlert({
+    alert,
+    acknowledgedByActorId,
+    acknowledgementNote
+  });
+
+  await store.updateNotificationProviderProfileGovernanceAlert(acknowledgedAlert);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: acknowledgedByActorId,
+    eventType: "workspace.notification_provider_profile_governance_alert.acknowledged",
+    payload: {
+      workspaceKey,
+      alert: toNotificationProviderProfileGovernanceAlertDto(acknowledgedAlert)
+    }
+  });
+
+  sendJson<AcknowledgeNotificationProviderProfileGovernanceAlertResponse>(response, 200, {
+    alert: toNotificationProviderProfileGovernanceAlertDto(acknowledgedAlert)
   });
 };
 
@@ -12420,6 +12630,25 @@ const handleRequest = async (
     }
   }
 
+  const workspaceNotificationProviderProfileGovernanceAlertsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertsRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceNotificationProviderProfileGovernanceAlertsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
   const workspaceNotificationProviderProfileIncidentAcknowledgeRouteMatch = pathname.match(
     workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern
   );
@@ -12436,6 +12665,28 @@ const handleRequest = async (
         tenantKey,
         workspaceKey,
         incidentId,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRouteMatch) {
+    const [, tenantKey, workspaceKey, alertId] =
+      workspaceNotificationProviderProfileGovernanceAlertAcknowledgeRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertAcknowledge(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        alertId,
         requestContext
       );
       return;

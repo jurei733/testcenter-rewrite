@@ -21,6 +21,7 @@ import type {
   LaunchApprovalPolicyOverrideRecords,
   MonitorCommand,
   NotificationProviderProfileIncident,
+  NotificationProviderProfileGovernanceAlert,
   NotificationProviderPromotionPolicy,
   NotificationProviderPromotionPolicyOverrideRecords,
   NotificationPolicyOverrideRecords,
@@ -1622,6 +1623,39 @@ const mapNotificationProviderProfileIncident = (
   resolutionCode: row.resolution_code ?? null
 });
 
+const mapNotificationProviderProfileGovernanceAlert = (
+  row: QueryResultRow
+): NotificationProviderProfileGovernanceAlert => ({
+  alertId: row.alert_id,
+  incidentId: row.incident_id,
+  tenantId: row.tenant_id,
+  workspaceId: row.workspace_id,
+  profileKey: row.profile_key,
+  status: row.status,
+  governanceStatus: row.governance_status,
+  createdAt: row.created_at.toISOString(),
+  createdByActorType: row.created_by_actor_type,
+  createdByActorId: row.created_by_actor_id,
+  sourceRequestId: row.source_request_id ?? null,
+  deliveryProfileKey: row.delivery_profile_key ?? null,
+  deliveryChannel: row.delivery_channel,
+  deliveryStatus: row.delivery_status,
+  deliveryTarget: row.delivery_target ?? null,
+  deliveryAttemptCount: row.delivery_attempt_count ?? 0,
+  maxDeliveryAttempts: row.max_delivery_attempts ?? 3,
+  nextDeliveryAttemptAt: row.next_delivery_attempt_at ? row.next_delivery_attempt_at.toISOString() : null,
+  lastDeliveryAttemptAt: row.last_delivery_attempt_at ? row.last_delivery_attempt_at.toISOString() : null,
+  lastDeliveryReceiptId: row.last_delivery_receipt_id ?? null,
+  lastDeliveryReceiptIssuedAt: row.last_delivery_receipt_issued_at
+    ? row.last_delivery_receipt_issued_at.toISOString()
+    : null,
+  deliveredAt: row.delivered_at ? row.delivered_at.toISOString() : null,
+  lastDeliveryError: row.last_delivery_error ?? null,
+  acknowledgedAt: row.acknowledged_at ? row.acknowledged_at.toISOString() : null,
+  acknowledgedByActorId: row.acknowledged_by_actor_id ?? null,
+  acknowledgementNote: row.acknowledgement_note ?? null
+});
+
 const mapSystemCheckLaunchApproval = (row: QueryResultRow): SystemCheckLaunchApproval => ({
   launchApprovalId: row.launch_approval_id,
   participantSessionId: row.participant_session_id,
@@ -1736,6 +1770,9 @@ export interface PlatformStore {
   saveNotificationProviderProfileIncident: (
     incident: NotificationProviderProfileIncident
   ) => Promise<void>;
+  saveNotificationProviderProfileGovernanceAlert: (
+    alert: NotificationProviderProfileGovernanceAlert
+  ) => Promise<void>;
   saveSystemCheckLaunchApproval: (launchApproval: SystemCheckLaunchApproval) => Promise<void>;
   saveSystemCheckSubmission: (systemCheckSubmission: SystemCheckSubmission) => Promise<void>;
   updateSystemCheckEvidence: (systemCheckEvidence: SystemCheckEvidence) => Promise<void>;
@@ -1745,6 +1782,9 @@ export interface PlatformStore {
   ) => Promise<void>;
   updateNotificationProviderProfileIncident: (
     incident: NotificationProviderProfileIncident
+  ) => Promise<void>;
+  updateNotificationProviderProfileGovernanceAlert: (
+    alert: NotificationProviderProfileGovernanceAlert
   ) => Promise<void>;
   updateSystemCheckLaunchApproval: (launchApproval: SystemCheckLaunchApproval) => Promise<void>;
   updateSystemCheckSubmissionReview: (systemCheckSubmission: SystemCheckSubmission) => Promise<void>;
@@ -1774,6 +1814,9 @@ export interface PlatformStore {
   getNotificationProviderProfileIncidentById: (
     incidentId: string
   ) => Promise<NotificationProviderProfileIncident | undefined>;
+  getNotificationProviderProfileGovernanceAlertById: (
+    alertId: string
+  ) => Promise<NotificationProviderProfileGovernanceAlert | undefined>;
   getLatestUnresolvedNotificationProviderProfileIncident: (
     workspaceId: string,
     profileKey: string
@@ -1844,6 +1887,19 @@ export interface PlatformStore {
       limit?: number;
     }
   ) => Promise<NotificationProviderProfileIncident[]>;
+  listNotificationProviderProfileGovernanceAlertsByWorkspace: (
+    tenantKey: string,
+    workspaceKey: string,
+    options?: {
+      profileKey?: string;
+      status?: NotificationProviderProfileGovernanceAlert["status"];
+      deliveryStatus?: NotificationProviderProfileGovernanceAlert["deliveryStatus"];
+      limit?: number;
+    }
+  ) => Promise<NotificationProviderProfileGovernanceAlert[]>;
+  listPendingNotificationProviderProfileGovernanceAlertDeliveries: (
+    limit: number
+  ) => Promise<NotificationProviderProfileGovernanceAlert[]>;
   listPendingSystemCheckEvidenceBreachNotificationDeliveries: (
     limit: number
   ) => Promise<SystemCheckEvidenceBreachNotification[]>;
@@ -2290,6 +2346,62 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       ]
     );
   },
+  saveNotificationProviderProfileGovernanceAlert: async alert => {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          INSERT INTO notification_provider_profile_governance_alerts (
+            alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+            created_at, created_by_actor_type, created_by_actor_id, source_request_id,
+            delivery_profile_key, delivery_channel, delivery_status, delivery_target,
+            delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
+            last_delivery_attempt_at, last_delivery_receipt_id, last_delivery_receipt_issued_at,
+            delivered_at, last_delivery_error, acknowledged_at, acknowledged_by_actor_id,
+            acknowledgement_note
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        `,
+        [
+          alert.alertId,
+          alert.incidentId,
+          alert.tenantId,
+          alert.workspaceId,
+          alert.profileKey,
+          alert.status,
+          alert.governanceStatus,
+          alert.createdAt,
+          alert.createdByActorType,
+          alert.createdByActorId,
+          alert.sourceRequestId,
+          alert.deliveryProfileKey,
+          alert.deliveryChannel,
+          alert.deliveryStatus,
+          alert.deliveryTarget,
+          alert.deliveryAttemptCount,
+          alert.maxDeliveryAttempts,
+          alert.nextDeliveryAttemptAt,
+          alert.lastDeliveryAttemptAt,
+          alert.lastDeliveryReceiptId,
+          alert.lastDeliveryReceiptIssuedAt,
+          alert.deliveredAt,
+          alert.lastDeliveryError,
+          alert.acknowledgedAt,
+          alert.acknowledgedByActorId,
+          alert.acknowledgementNote
+        ]
+      );
+      await client.query(`NOTIFY ${breachNotificationDispatchQueueChannel}`);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
   saveSystemCheckLaunchApproval: async launchApproval => {
     await pool.query(
       `
@@ -2519,6 +2631,53 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         incident.acknowledgementNote,
         incident.resolvedAt,
         incident.resolutionCode
+      ]
+    );
+  },
+  updateNotificationProviderProfileGovernanceAlert: async alert => {
+    await pool.query(
+      `
+        UPDATE notification_provider_profile_governance_alerts
+        SET status = $2,
+            governance_status = $3,
+            source_request_id = $4,
+            delivery_profile_key = $5,
+            delivery_channel = $6,
+            delivery_status = $7,
+            delivery_target = $8,
+            delivery_attempt_count = $9,
+            max_delivery_attempts = $10,
+            next_delivery_attempt_at = $11,
+            last_delivery_attempt_at = $12,
+            last_delivery_receipt_id = $13,
+            last_delivery_receipt_issued_at = $14,
+            delivered_at = $15,
+            last_delivery_error = $16,
+            acknowledged_at = $17,
+            acknowledged_by_actor_id = $18,
+            acknowledgement_note = $19
+        WHERE alert_id = $1
+      `,
+      [
+        alert.alertId,
+        alert.status,
+        alert.governanceStatus,
+        alert.sourceRequestId,
+        alert.deliveryProfileKey,
+        alert.deliveryChannel,
+        alert.deliveryStatus,
+        alert.deliveryTarget,
+        alert.deliveryAttemptCount,
+        alert.maxDeliveryAttempts,
+        alert.nextDeliveryAttemptAt,
+        alert.lastDeliveryAttemptAt,
+        alert.lastDeliveryReceiptId,
+        alert.lastDeliveryReceiptIssuedAt,
+        alert.deliveredAt,
+        alert.lastDeliveryError,
+        alert.acknowledgedAt,
+        alert.acknowledgedByActorId,
+        alert.acknowledgementNote
       ]
     );
   },
@@ -3001,6 +3160,25 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
 
     return result.rows[0] ? mapNotificationProviderProfileIncident(result.rows[0]) : undefined;
   },
+  getNotificationProviderProfileGovernanceAlertById: async alertId => {
+    const result = await pool.query(
+      `
+        SELECT
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          created_at, created_by_actor_type, created_by_actor_id, source_request_id,
+          delivery_profile_key, delivery_channel, delivery_status, delivery_target,
+          delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
+          last_delivery_attempt_at, last_delivery_receipt_id, last_delivery_receipt_issued_at,
+          delivered_at, last_delivery_error, acknowledged_at, acknowledged_by_actor_id,
+          acknowledgement_note
+        FROM notification_provider_profile_governance_alerts
+        WHERE alert_id = $1
+      `,
+      [alertId]
+    );
+
+    return result.rows[0] ? mapNotificationProviderProfileGovernanceAlert(result.rows[0]) : undefined;
+  },
   getLatestUnresolvedNotificationProviderProfileIncident: async (workspaceId, profileKey) => {
     const result = await pool.query(
       `
@@ -3400,6 +3578,82 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     );
 
     return result.rows.map(mapNotificationProviderProfileIncident);
+  },
+  listNotificationProviderProfileGovernanceAlertsByWorkspace: async (
+    tenantKey,
+    workspaceKey,
+    options = {}
+  ) => {
+    const workspace = await resolveWorkspace(pool, tenantKey, workspaceKey);
+
+    if (!workspace) {
+      return [];
+    }
+
+    const filters: Array<string | number> = [workspace.tenantId, workspace.workspaceId];
+    const whereClauses = [
+      "tenant_id = $1",
+      "workspace_id = $2"
+    ];
+
+    if (options.profileKey) {
+      filters.push(options.profileKey);
+      whereClauses.push(`profile_key = $${filters.length}`);
+    }
+
+    if (options.status) {
+      filters.push(options.status);
+      whereClauses.push(`status = $${filters.length}`);
+    }
+
+    if (options.deliveryStatus) {
+      filters.push(options.deliveryStatus);
+      whereClauses.push(`delivery_status = $${filters.length}`);
+    }
+
+    filters.push(options.limit ?? 50);
+
+    const result = await pool.query(
+      `
+        SELECT
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          created_at, created_by_actor_type, created_by_actor_id, source_request_id,
+          delivery_profile_key, delivery_channel, delivery_status, delivery_target,
+          delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
+          last_delivery_attempt_at, last_delivery_receipt_id, last_delivery_receipt_issued_at,
+          delivered_at, last_delivery_error, acknowledged_at, acknowledged_by_actor_id,
+          acknowledgement_note
+        FROM notification_provider_profile_governance_alerts
+        WHERE ${whereClauses.join(" AND ")}
+        ORDER BY created_at DESC
+        LIMIT $${filters.length}
+      `,
+      filters
+    );
+
+    return result.rows.map(mapNotificationProviderProfileGovernanceAlert);
+  },
+  listPendingNotificationProviderProfileGovernanceAlertDeliveries: async limit => {
+    const result = await pool.query(
+      `
+        SELECT
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          created_at, created_by_actor_type, created_by_actor_id, source_request_id,
+          delivery_profile_key, delivery_channel, delivery_status, delivery_target,
+          delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
+          last_delivery_attempt_at, last_delivery_receipt_id, last_delivery_receipt_issued_at,
+          delivered_at, last_delivery_error, acknowledged_at, acknowledged_by_actor_id,
+          acknowledgement_note
+        FROM notification_provider_profile_governance_alerts
+        WHERE delivery_status = 'pending_delivery'
+          AND COALESCE(next_delivery_attempt_at, created_at) <= NOW()
+        ORDER BY COALESCE(next_delivery_attempt_at, created_at) ASC, created_at ASC
+        LIMIT $1
+      `,
+      [limit]
+    );
+
+    return result.rows.map(mapNotificationProviderProfileGovernanceAlert);
   },
   listPendingSystemCheckEvidenceBreachNotificationDeliveries: async limit => {
     const result = await pool.query(

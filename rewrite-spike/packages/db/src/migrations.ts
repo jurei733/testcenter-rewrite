@@ -1238,6 +1238,46 @@ CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_incidents_workspace
 CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_incidents_workspace_profile_status
   ON notification_provider_profile_incidents(workspace_id, profile_key, status, opened_at DESC);
 `
+  },
+  {
+    version: "0042",
+    name: "notification-provider-profile-governance-alerts",
+    sql: `
+CREATE TABLE IF NOT EXISTS notification_provider_profile_governance_alerts (
+  alert_id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES notification_provider_profile_incidents(incident_id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(workspace_id) ON DELETE CASCADE,
+  profile_key TEXT NOT NULL,
+  status TEXT NOT NULL,
+  governance_status TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  created_by_actor_type TEXT NOT NULL,
+  created_by_actor_id TEXT NOT NULL,
+  source_request_id TEXT NULL,
+  delivery_profile_key TEXT NULL,
+  delivery_channel TEXT NOT NULL,
+  delivery_status TEXT NOT NULL,
+  delivery_target TEXT NULL,
+  delivery_attempt_count INTEGER NOT NULL DEFAULT 0,
+  max_delivery_attempts INTEGER NOT NULL DEFAULT 3,
+  next_delivery_attempt_at TIMESTAMPTZ NULL,
+  last_delivery_attempt_at TIMESTAMPTZ NULL,
+  last_delivery_receipt_id TEXT NULL,
+  last_delivery_receipt_issued_at TIMESTAMPTZ NULL,
+  delivered_at TIMESTAMPTZ NULL,
+  last_delivery_error TEXT NULL,
+  acknowledged_at TIMESTAMPTZ NULL,
+  acknowledged_by_actor_id TEXT NULL,
+  acknowledgement_note TEXT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_governance_alerts_workspace_created_at
+  ON notification_provider_profile_governance_alerts(tenant_id, workspace_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notification_provider_profile_governance_alerts_pending_delivery
+  ON notification_provider_profile_governance_alerts(delivery_status, next_delivery_attempt_at ASC, created_at ASC);
+`
   }
 ];
 

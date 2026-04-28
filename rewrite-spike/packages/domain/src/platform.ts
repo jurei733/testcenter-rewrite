@@ -5,6 +5,9 @@ import {
 import type { AuditActorType } from "./audit.js";
 import {
   defaultOutboundNotificationPolicy,
+  resolveOutboundNotificationDestination,
+  resolveOutboundNotificationMaxAttempts,
+  type OutboundNotificationDeliveryChannel,
   type OutboundNotificationProviderProfile,
   type OutboundNotificationProviderProfileIncidentReasonCode,
   type OutboundNotificationProviderProfileIncidentResolutionCode,
@@ -78,6 +81,48 @@ export interface NotificationProviderProfileIncident {
   acknowledgementNote: string | null;
   resolvedAt: string | null;
   resolutionCode: NotificationProviderProfileIncidentResolutionCode | null;
+}
+
+export type NotificationProviderProfileGovernanceAlertStatus =
+  | "pending_acknowledgement"
+  | "acknowledged";
+
+export type NotificationProviderProfileGovernanceAlertDeliveryStatus =
+  | "pending_delivery"
+  | "delivered"
+  | "delivery_failed";
+
+export interface NotificationProviderProfileGovernanceAlert {
+  alertId: string;
+  incidentId: string;
+  tenantId: string;
+  workspaceId: string;
+  profileKey: string;
+  status: NotificationProviderProfileGovernanceAlertStatus;
+  governanceStatus:
+    | "needs_acknowledgement"
+    | "suppressed"
+    | "ready_for_manual_recovery"
+    | "recovery_blocked";
+  createdAt: string;
+  createdByActorType: "worker" | "notification_service" | "platform_api";
+  createdByActorId: string;
+  sourceRequestId: string | null;
+  deliveryProfileKey: string | null;
+  deliveryChannel: OutboundNotificationDeliveryChannel;
+  deliveryStatus: NotificationProviderProfileGovernanceAlertDeliveryStatus;
+  deliveryTarget: string | null;
+  deliveryAttemptCount: number;
+  maxDeliveryAttempts: number;
+  nextDeliveryAttemptAt: string | null;
+  lastDeliveryAttemptAt: string | null;
+  lastDeliveryReceiptId: string | null;
+  lastDeliveryReceiptIssuedAt: string | null;
+  deliveredAt: string | null;
+  lastDeliveryError: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedByActorId: string | null;
+  acknowledgementNote: string | null;
 }
 
 export interface EvidenceRetentionPolicy {
@@ -393,6 +438,149 @@ export const createNotificationProviderProfileIncident = (input: {
   resolvedAt: null,
   resolutionCode: null
 });
+
+export const createNotificationProviderProfileGovernanceAlert = (input: {
+  incident: NotificationProviderProfileIncident;
+  profile: NotificationProviderProfile;
+  notificationPolicy?: NotificationPolicy;
+  notificationProviderProfiles?: NotificationProviderProfile[];
+  createdAt?: string;
+  createdByActorType: "worker" | "notification_service" | "platform_api";
+  createdByActorId: string;
+  sourceRequestId?: string | null;
+}): NotificationProviderProfileGovernanceAlert => {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const governanceStatus = input.incident.status === "open"
+    ? "needs_acknowledgement"
+    : input.incident.suppressionUntil && input.incident.suppressionUntil > createdAt
+      ? "suppressed"
+      : "recovery_blocked";
+  const routingTarget = input.profile.rolloutFallbackProfileKey
+    ? `profile:${input.profile.rolloutFallbackProfileKey}`
+    : null;
+  const resolvedDestination = resolveOutboundNotificationDestination({
+    target: routingTarget,
+    selectionMode: input.notificationPolicy?.breachNotificationDeliverySelectionMode,
+    providerProfiles: input.notificationProviderProfiles ?? [],
+    rolloutSubjectKey: input.incident.incidentId
+  });
+
+  return {
+    alertId: createStableId(
+      "notification-provider-profile-governance-alert",
+      input.incident.incidentId
+    ),
+    incidentId: input.incident.incidentId,
+    tenantId: input.incident.tenantId,
+    workspaceId: input.incident.workspaceId,
+    profileKey: input.incident.profileKey,
+    status: "pending_acknowledgement",
+    governanceStatus,
+    createdAt,
+    createdByActorType: input.createdByActorType,
+    createdByActorId: input.createdByActorId,
+    sourceRequestId: input.sourceRequestId ?? null,
+    deliveryProfileKey: resolvedDestination.deliveryProfileKey,
+    deliveryChannel: resolvedDestination.deliveryChannel,
+    deliveryStatus: "pending_delivery",
+    deliveryTarget: resolvedDestination.deliveryTarget,
+    deliveryAttemptCount: 0,
+    maxDeliveryAttempts: resolveOutboundNotificationMaxAttempts({
+      notificationPolicy: input.notificationPolicy,
+      deliveryChannel: resolvedDestination.deliveryChannel
+    }),
+    nextDeliveryAttemptAt: createdAt,
+    lastDeliveryAttemptAt: null,
+    lastDeliveryReceiptId: null,
+    lastDeliveryReceiptIssuedAt: null,
+    deliveredAt: null,
+    lastDeliveryError: null,
+    acknowledgedAt: null,
+    acknowledgedByActorId: null,
+    acknowledgementNote: null
+  };
+};
+
+export const markNotificationProviderProfileGovernanceAlertDelivered = (input: {
+  alert: NotificationProviderProfileGovernanceAlert;
+  deliveredAt?: string;
+  receiptId?: string | null;
+  receiptIssuedAt?: string | null;
+}): NotificationProviderProfileGovernanceAlert => {
+  const deliveredAt = input.deliveredAt ?? new Date().toISOString();
+
+  return {
+    ...input.alert,
+    deliveryStatus: "delivered",
+    deliveryAttemptCount: input.alert.deliveryAttemptCount + 1,
+    nextDeliveryAttemptAt: null,
+    lastDeliveryAttemptAt: deliveredAt,
+    lastDeliveryReceiptId: input.receiptId ?? null,
+    lastDeliveryReceiptIssuedAt: input.receiptIssuedAt ?? deliveredAt,
+    deliveredAt,
+    lastDeliveryError: null
+  };
+};
+
+export const scheduleNotificationProviderProfileGovernanceAlertDeliveryRetry = (input: {
+  alert: NotificationProviderProfileGovernanceAlert;
+  failureReason: string;
+  attemptedAt?: string;
+  retryAt?: string;
+  receiptId?: string | null;
+  receiptIssuedAt?: string | null;
+}): NotificationProviderProfileGovernanceAlert => {
+  const attemptedAt = input.attemptedAt ?? new Date().toISOString();
+
+  return {
+    ...input.alert,
+    deliveryStatus: "pending_delivery",
+    deliveryAttemptCount: input.alert.deliveryAttemptCount + 1,
+    nextDeliveryAttemptAt: input.retryAt ?? attemptedAt,
+    lastDeliveryAttemptAt: attemptedAt,
+    lastDeliveryReceiptId: input.receiptId ?? null,
+    lastDeliveryReceiptIssuedAt: input.receiptIssuedAt ?? attemptedAt,
+    lastDeliveryError: input.failureReason
+  };
+};
+
+export const markNotificationProviderProfileGovernanceAlertDeliveryFailed = (input: {
+  alert: NotificationProviderProfileGovernanceAlert;
+  failureReason: string;
+  attemptedAt?: string;
+  receiptId?: string | null;
+  receiptIssuedAt?: string | null;
+}): NotificationProviderProfileGovernanceAlert => {
+  const attemptedAt = input.attemptedAt ?? new Date().toISOString();
+
+  return {
+    ...input.alert,
+    deliveryStatus: "delivery_failed",
+    deliveryAttemptCount: input.alert.deliveryAttemptCount + 1,
+    nextDeliveryAttemptAt: null,
+    lastDeliveryAttemptAt: attemptedAt,
+    lastDeliveryReceiptId: input.receiptId ?? null,
+    lastDeliveryReceiptIssuedAt: input.receiptIssuedAt ?? attemptedAt,
+    lastDeliveryError: input.failureReason
+  };
+};
+
+export const acknowledgeNotificationProviderProfileGovernanceAlert = (input: {
+  alert: NotificationProviderProfileGovernanceAlert;
+  acknowledgedByActorId: string;
+  acknowledgementNote: string;
+  acknowledgedAt?: string;
+}): NotificationProviderProfileGovernanceAlert => {
+  const acknowledgedAt = input.acknowledgedAt ?? new Date().toISOString();
+
+  return {
+    ...input.alert,
+    status: "acknowledged",
+    acknowledgedAt,
+    acknowledgedByActorId: input.acknowledgedByActorId,
+    acknowledgementNote: input.acknowledgementNote
+  };
+};
 
 const sortNotificationProviderProfiles = (
   notificationProviderProfiles: NotificationProviderProfile[]

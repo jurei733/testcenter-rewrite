@@ -43,12 +43,20 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-incidents`,
   workspaceNotificationProviderProfileGovernanceQueue: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-queue`,
+  workspaceNotificationProviderProfileGovernanceAlerts: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts`,
   workspaceNotificationProviderProfileIncidentAcknowledge: (
     tenantKey: string,
     workspaceKey: string,
     incidentId: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-incidents/${incidentId}:acknowledge`,
+  workspaceNotificationProviderProfileGovernanceAlertAcknowledge: (
+    tenantKey: string,
+    workspaceKey: string,
+    alertId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts/${alertId}:acknowledge`,
   workspaceEvidenceRetentionPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/evidence-retention-policy`,
   workspaceEvidenceRetentionClassPolicy: (tenantKey: string, workspaceKey: string): string =>
@@ -875,6 +883,48 @@ export interface WorkspaceNotificationProviderProfileGovernanceQueueResponse {
   };
 }
 
+export type NotificationProviderProfileGovernanceAlertStatusDto =
+  | "pending_acknowledgement"
+  | "acknowledged";
+
+export interface NotificationProviderProfileGovernanceAlertDto {
+  alertId: string;
+  incidentId: string;
+  profileKey: string;
+  status: NotificationProviderProfileGovernanceAlertStatusDto;
+  governanceStatus: NotificationProviderProfileGovernanceStatusDto;
+  createdAt: string;
+  createdByActorType: "worker" | "notification_service" | "platform_api";
+  createdByActorId: string;
+  sourceRequestId: string | null;
+  deliveryProfileKey: string | null;
+  delivery: {
+    channel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto;
+    status: SystemCheckEvidenceBreachNotificationDeliveryStatusDto;
+    target: string | null;
+    attemptCount: number;
+    maxAttempts: number;
+    nextAttemptAt: string | null;
+    lastAttemptAt: string | null;
+    receiptId: string | null;
+    receiptIssuedAt: string | null;
+    deliveredAt: string | null;
+    lastError: string | null;
+  };
+  acknowledgedAt: string | null;
+  acknowledgedByActorId: string | null;
+  acknowledgementNote: string | null;
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceAlertsResponse {
+  items: NotificationProviderProfileGovernanceAlertDto[];
+  filters: {
+    profileKey: string | null;
+    status: NotificationProviderProfileGovernanceAlertStatusDto | null;
+    deliveryStatus: SystemCheckEvidenceBreachNotificationDeliveryStatusDto | null;
+  };
+}
+
 export interface AcknowledgeNotificationProviderProfileIncidentRequest {
   acknowledgedByActorId: string;
   acknowledgementNote: string;
@@ -882,6 +932,15 @@ export interface AcknowledgeNotificationProviderProfileIncidentRequest {
 
 export interface AcknowledgeNotificationProviderProfileIncidentResponse {
   incident: NotificationProviderProfileIncidentDto;
+}
+
+export interface AcknowledgeNotificationProviderProfileGovernanceAlertRequest {
+  acknowledgedByActorId: string;
+  acknowledgementNote: string;
+}
+
+export interface AcknowledgeNotificationProviderProfileGovernanceAlertResponse {
+  alert: NotificationProviderProfileGovernanceAlertDto;
 }
 
 export interface WorkspaceEvidenceRetentionPolicyResponse {

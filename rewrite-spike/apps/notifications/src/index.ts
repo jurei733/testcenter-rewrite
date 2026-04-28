@@ -6,9 +6,12 @@ import {
 } from "@testcenter-rewrite/db";
 import {
   createAuditEvent,
+  markNotificationProviderProfileGovernanceAlertDelivered,
+  markNotificationProviderProfileGovernanceAlertDeliveryFailed,
   markSystemCheckEvidenceBreachNotificationDelivered,
   markSystemCheckEvidenceBreachNotificationDeliveryFailed,
   resolveWorkspaceNotificationPolicy,
+  scheduleNotificationProviderProfileGovernanceAlertDeliveryRetry,
   scheduleSystemCheckEvidenceBreachNotificationDeliveryRetry
 } from "@testcenter-rewrite/domain";
 import {
@@ -202,6 +205,186 @@ const processPendingBreachNotificationDeliveries = async (store: PlatformStore):
   return processedNotifications;
 };
 
+const recordGovernanceAlertAuditEvent = async (input: {
+  store: PlatformStore;
+  alert: import("@testcenter-rewrite/domain").NotificationProviderProfileGovernanceAlert;
+  eventType: string;
+  payload?: Record<string, unknown>;
+}): Promise<void> => {
+  await input.store.saveAuditEvent(createAuditEvent({
+    requestId: input.alert.sourceRequestId ?? `notification-service-${input.alert.alertId}`,
+    tenantId: input.alert.tenantId,
+    workspaceId: input.alert.workspaceId,
+    actorType: "notification_service",
+    actorId: notificationServiceId,
+    eventType: input.eventType,
+    payload: input.payload ?? {}
+  }));
+};
+
+const processPendingGovernanceAlertDeliveries = async (store: PlatformStore): Promise<number> => {
+  const pendingAlerts = await store.listPendingNotificationProviderProfileGovernanceAlertDeliveries(
+    maintenanceSweepBatchSize
+  );
+  let processedAlerts = 0;
+
+  for (const alert of pendingAlerts) {
+    const [tenant, workspace] = await Promise.all([
+      store.getTenantById(alert.tenantId),
+      store.getWorkspaceById(alert.workspaceId)
+    ]);
+    const notificationPolicy =
+      tenant && workspace
+        ? resolveWorkspaceNotificationPolicy(workspace, tenant)
+        : null;
+
+    if (!alert.deliveryTarget) {
+      const failedAlert = markNotificationProviderProfileGovernanceAlertDeliveryFailed({
+        alert,
+        failureReason: "No delivery target is configured for this governance alert."
+      });
+      await store.updateNotificationProviderProfileGovernanceAlert(failedAlert);
+      await recordGovernanceAlertAuditEvent({
+        store,
+        alert: failedAlert,
+        eventType: "notification_service.notification_provider_profile.governance_alert.delivery_failed",
+        payload: {
+          alertId: failedAlert.alertId,
+          incidentId: failedAlert.incidentId,
+          profileKey: failedAlert.profileKey,
+          deliveryChannel: failedAlert.deliveryChannel,
+          deliveryStatus: failedAlert.deliveryStatus,
+          deliveryTarget: failedAlert.deliveryTarget,
+          deliveryAttemptCount: failedAlert.deliveryAttemptCount,
+          lastDeliveryReceiptId: failedAlert.lastDeliveryReceiptId,
+          lastDeliveryReceiptIssuedAt: failedAlert.lastDeliveryReceiptIssuedAt,
+          lastDeliveryError: failedAlert.lastDeliveryError
+        }
+      });
+      processedAlerts += 1;
+      continue;
+    }
+
+    const deliveryResult = await deliverSpikeOutboundNotification({
+      deliveryChannel: alert.deliveryChannel,
+      deliveryTarget: alert.deliveryTarget,
+      deliveryAttemptCount: alert.deliveryAttemptCount
+    });
+
+    if (deliveryResult.outcome === "delivered") {
+      const deliveredAlert = markNotificationProviderProfileGovernanceAlertDelivered({
+        alert: {
+          ...alert,
+          deliveryTarget: deliveryResult.normalizedTarget
+        },
+        receiptId: deliveryResult.providerReceiptId,
+        receiptIssuedAt: deliveryResult.providerReceiptIssuedAt
+      });
+      await store.updateNotificationProviderProfileGovernanceAlert(deliveredAlert);
+      await recordGovernanceAlertAuditEvent({
+        store,
+        alert: deliveredAlert,
+        eventType: "notification_service.notification_provider_profile.governance_alert.delivered",
+        payload: {
+          alertId: deliveredAlert.alertId,
+          incidentId: deliveredAlert.incidentId,
+          profileKey: deliveredAlert.profileKey,
+          deliveryChannel: deliveredAlert.deliveryChannel,
+          deliveryStatus: deliveredAlert.deliveryStatus,
+          deliveryTarget: deliveredAlert.deliveryTarget,
+          deliveryAttemptCount: deliveredAlert.deliveryAttemptCount,
+          lastDeliveryReceiptId: deliveredAlert.lastDeliveryReceiptId,
+          lastDeliveryReceiptIssuedAt: deliveredAlert.lastDeliveryReceiptIssuedAt,
+          deliveredAt: deliveredAlert.deliveredAt
+        }
+      });
+      processedAlerts += 1;
+      continue;
+    }
+
+    if (
+      deliveryResult.outcome === "retryable_failure" &&
+      alert.deliveryAttemptCount + 1 < alert.maxDeliveryAttempts
+    ) {
+      const attemptedAt = new Date().toISOString();
+      const retryDelayMs = Math.max(
+        0,
+        resolveOutboundNotificationRetryDelaySeconds({
+          notificationPolicy: notificationPolicy ?? undefined,
+          deliveryChannel: alert.deliveryChannel
+        }) * 1000
+      );
+      const retryAt =
+        retryDelayMs > 0
+          ? new Date(Date.parse(attemptedAt) + retryDelayMs).toISOString()
+          : attemptedAt;
+      const retryScheduledAlert = scheduleNotificationProviderProfileGovernanceAlertDeliveryRetry({
+        alert: {
+          ...alert,
+          deliveryTarget: deliveryResult.normalizedTarget
+        },
+        failureReason: deliveryResult.failureReason ?? "Retryable governance-alert delivery failure.",
+        attemptedAt,
+        retryAt,
+        receiptId: deliveryResult.providerReceiptId,
+        receiptIssuedAt: deliveryResult.providerReceiptIssuedAt
+      });
+      await store.updateNotificationProviderProfileGovernanceAlert(retryScheduledAlert);
+      await recordGovernanceAlertAuditEvent({
+        store,
+        alert: retryScheduledAlert,
+        eventType: "notification_service.notification_provider_profile.governance_alert.retry_scheduled",
+        payload: {
+          alertId: retryScheduledAlert.alertId,
+          incidentId: retryScheduledAlert.incidentId,
+          profileKey: retryScheduledAlert.profileKey,
+          deliveryChannel: retryScheduledAlert.deliveryChannel,
+          deliveryStatus: retryScheduledAlert.deliveryStatus,
+          deliveryTarget: retryScheduledAlert.deliveryTarget,
+          deliveryAttemptCount: retryScheduledAlert.deliveryAttemptCount,
+          nextDeliveryAttemptAt: retryScheduledAlert.nextDeliveryAttemptAt,
+          lastDeliveryReceiptId: retryScheduledAlert.lastDeliveryReceiptId,
+          lastDeliveryReceiptIssuedAt: retryScheduledAlert.lastDeliveryReceiptIssuedAt,
+          lastDeliveryError: retryScheduledAlert.lastDeliveryError
+        }
+      });
+      processedAlerts += 1;
+      continue;
+    }
+
+    const failedAlert = markNotificationProviderProfileGovernanceAlertDeliveryFailed({
+      alert: {
+        ...alert,
+        deliveryTarget: deliveryResult.normalizedTarget
+      },
+      failureReason: deliveryResult.failureReason ?? "Governance alert delivery failed.",
+      receiptId: deliveryResult.providerReceiptId,
+      receiptIssuedAt: deliveryResult.providerReceiptIssuedAt
+    });
+    await store.updateNotificationProviderProfileGovernanceAlert(failedAlert);
+    await recordGovernanceAlertAuditEvent({
+      store,
+      alert: failedAlert,
+      eventType: "notification_service.notification_provider_profile.governance_alert.delivery_failed",
+      payload: {
+        alertId: failedAlert.alertId,
+        incidentId: failedAlert.incidentId,
+        profileKey: failedAlert.profileKey,
+        deliveryChannel: failedAlert.deliveryChannel,
+        deliveryStatus: failedAlert.deliveryStatus,
+        deliveryTarget: failedAlert.deliveryTarget,
+        deliveryAttemptCount: failedAlert.deliveryAttemptCount,
+        lastDeliveryReceiptId: failedAlert.lastDeliveryReceiptId,
+        lastDeliveryReceiptIssuedAt: failedAlert.lastDeliveryReceiptIssuedAt,
+        lastDeliveryError: failedAlert.lastDeliveryError
+      }
+    });
+    processedAlerts += 1;
+  }
+
+  return processedAlerts;
+};
+
 interface NotificationServiceConfig {
   mode: "once" | "loop";
   maintenanceIntervalMs: number;
@@ -293,10 +476,12 @@ const main = async (): Promise<void> => {
   try {
     do {
       const processedNotifications = await processPendingBreachNotificationDeliveries(store);
+      const processedGovernanceAlerts = await processPendingGovernanceAlertDeliveries(store);
+      const processedItems = processedNotifications + processedGovernanceAlerts;
 
-      if (config.mode === "once" || processedNotifications > 0) {
+      if (config.mode === "once" || processedItems > 0) {
         console.log(
-          `rewrite-spike notification service cycle processed ${processedNotifications} breach notification(s)`
+          `rewrite-spike notification service cycle processed ${processedNotifications} breach notification(s) and ${processedGovernanceAlerts} governance alert(s)`
         );
       }
 
@@ -304,7 +489,7 @@ const main = async (): Promise<void> => {
         break;
       }
 
-      if (processedNotifications === 0) {
+      if (processedItems === 0) {
         await dispatchSignalWaiter.wait(config.maintenanceIntervalMs);
       }
     } while (!shouldStop);

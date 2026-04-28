@@ -6,9 +6,12 @@ import {
 import {
   createAuditEvent,
   createNotificationProviderProfileIncident,
+  createNotificationProviderProfileGovernanceAlert,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceNotificationProviderPromotionPolicy,
+  resolveWorkspaceNotificationPolicy,
   type NotificationProviderProfile,
+  type NotificationProviderProfileGovernanceAlert,
   type NotificationProviderProfileIncident,
   type NotificationProviderPromotionPolicy,
   type SystemCheckEvidenceBreachNotification,
@@ -431,6 +434,7 @@ const reconcileNotificationProviderProfileRollouts = async (
         automationAction: "auto_promoted" | "auto_rolled_back";
       }> = [];
       const incidentsToCreate: NotificationProviderProfileIncident[] = [];
+      const governanceAlertsToCreate: NotificationProviderProfileGovernanceAlert[] = [];
       const incidentsToUpdate: NotificationProviderProfileIncident[] = [];
 
       for (const profile of effectiveProfiles) {
@@ -566,8 +570,7 @@ const reconcileNotificationProviderProfileRollouts = async (
             );
 
           if (!unresolvedIncident) {
-            incidentsToCreate.push(
-              createNotificationProviderProfileIncident({
+            const createdIncident = createNotificationProviderProfileIncident({
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
                 profileKey: currentProfile.profileKey,
@@ -578,6 +581,21 @@ const reconcileNotificationProviderProfileRollouts = async (
                 reasonCode: "delivery_failures_present",
                 deliveryFailedCount: metrics.deliveryFailedCount,
                 suppressionUntil,
+                sourceRequestId: requestId
+              });
+            incidentsToCreate.push(createdIncident);
+            governanceAlertsToCreate.push(
+              createNotificationProviderProfileGovernanceAlert({
+                incident: createdIncident,
+                profile: rolledBackProfile,
+                notificationPolicy: resolveWorkspaceNotificationPolicy(workspace, tenant),
+                notificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
+                  updatedWorkspace,
+                  tenant
+                ),
+                createdAt: checkedAt,
+                createdByActorType: "worker",
+                createdByActorId: providerOperationsActorId,
                 sourceRequestId: requestId
               })
             );
@@ -602,6 +620,10 @@ const reconcileNotificationProviderProfileRollouts = async (
 
       for (const incident of incidentsToCreate) {
         await store.saveNotificationProviderProfileIncident(incident);
+      }
+
+      for (const governanceAlert of governanceAlertsToCreate) {
+        await store.saveNotificationProviderProfileGovernanceAlert(governanceAlert);
       }
 
       for (const incident of incidentsToUpdate) {
