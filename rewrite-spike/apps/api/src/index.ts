@@ -190,6 +190,7 @@ import {
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -369,6 +370,8 @@ const workspaceNotificationProviderProfileGovernanceQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-queue$/;
 const workspaceNotificationProviderProfileGovernanceAlertsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts$/;
+const workspaceNotificationProviderProfileGovernanceAlertMetricsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-metrics$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -949,6 +952,11 @@ const isNotificationProviderProfileGovernanceAlertStatus = (
   value: unknown
 ): value is NotificationProviderProfileGovernanceAlertStatusDto =>
   value === "pending_acknowledgement" || value === "acknowledged";
+
+const isNotificationProviderProfileGovernanceAlertClass = (
+  value: unknown
+): value is "incident_open" | "incident_resolved" =>
+  value === "incident_open" || value === "incident_resolved";
 
 const isNotificationProviderProfileGovernanceStatus = (
   value: unknown
@@ -6805,6 +6813,107 @@ const toWorkspaceNotificationProviderProfileRolloutMetricsResponse = (input: {
   };
 };
 
+const toWorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse = (input: {
+  alerts: NotificationProviderProfileGovernanceAlert[];
+  profileKey: string | null;
+  alertClass: "incident_open" | "incident_resolved" | null;
+  deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
+}): WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse => {
+  const buckets = new Map<
+    string,
+    WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse["items"][number]
+  >();
+
+  for (const alert of input.alerts) {
+    if (input.alertClass && alert.alertClass !== input.alertClass) {
+      continue;
+    }
+
+    if (input.deliveryChannel && alert.deliveryChannel !== input.deliveryChannel) {
+      continue;
+    }
+
+    const bucketKey = `${alert.profileKey}:${alert.alertClass}`;
+    const existingBucket = buckets.get(bucketKey);
+
+    if (existingBucket) {
+      existingBucket.totalCount += 1;
+
+      if (alert.status === "pending_acknowledgement") {
+        existingBucket.pendingAcknowledgementCount += 1;
+      } else {
+        existingBucket.acknowledgedCount += 1;
+      }
+
+      if (alert.deliveryStatus === "pending_delivery") {
+        existingBucket.pendingDeliveryCount += 1;
+      } else if (alert.deliveryStatus === "delivered") {
+        existingBucket.deliveredCount += 1;
+      } else {
+        existingBucket.deliveryFailedCount += 1;
+      }
+
+      if (alert.createdAt > existingBucket.latestCreatedAt) {
+        existingBucket.latestCreatedAt = alert.createdAt;
+      }
+
+      if (
+        alert.deliveredAt &&
+        (existingBucket.latestDeliveredAt === null ||
+          alert.deliveredAt > existingBucket.latestDeliveredAt)
+      ) {
+        existingBucket.latestDeliveredAt = alert.deliveredAt;
+      }
+
+      if (
+        alert.acknowledgedAt &&
+        (existingBucket.latestAcknowledgedAt === null ||
+          alert.acknowledgedAt > existingBucket.latestAcknowledgedAt)
+      ) {
+        existingBucket.latestAcknowledgedAt = alert.acknowledgedAt;
+      }
+
+      if (
+        alert.deliveryStatus === "delivery_failed" &&
+        alert.lastDeliveryAttemptAt &&
+        (existingBucket.latestDeliveryFailedAt === null ||
+          alert.lastDeliveryAttemptAt > existingBucket.latestDeliveryFailedAt)
+      ) {
+        existingBucket.latestDeliveryFailedAt = alert.lastDeliveryAttemptAt;
+      }
+
+      continue;
+    }
+
+    buckets.set(bucketKey, {
+      profileKey: alert.profileKey,
+      alertClass: alert.alertClass,
+      totalCount: 1,
+      pendingAcknowledgementCount: alert.status === "pending_acknowledgement" ? 1 : 0,
+      acknowledgedCount: alert.status === "acknowledged" ? 1 : 0,
+      pendingDeliveryCount: alert.deliveryStatus === "pending_delivery" ? 1 : 0,
+      deliveredCount: alert.deliveryStatus === "delivered" ? 1 : 0,
+      deliveryFailedCount: alert.deliveryStatus === "delivery_failed" ? 1 : 0,
+      latestCreatedAt: alert.createdAt,
+      latestDeliveredAt: alert.deliveredAt,
+      latestAcknowledgedAt: alert.acknowledgedAt,
+      latestDeliveryFailedAt:
+        alert.deliveryStatus === "delivery_failed" ? alert.lastDeliveryAttemptAt : null
+    });
+  }
+
+  return {
+    items: Array.from(buckets.values()).sort((left, right) =>
+      right.latestCreatedAt.localeCompare(left.latestCreatedAt)
+    ),
+    filters: {
+      profileKey: input.profileKey,
+      alertClass: input.alertClass,
+      deliveryChannel: input.deliveryChannel
+    }
+  };
+};
+
 const toWorkspaceEvidenceRetentionPolicyResponse = (
   tenant: Tenant,
   workspace: Workspace
@@ -8599,6 +8708,79 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertsGet = async (
       deliveryStatus
     }
   });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceAlertMetricsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawAlertClass = getTrimmedString(url.searchParams.get("alertClass"));
+  const alertClass = rawAlertClass ?? null;
+  const rawDeliveryChannel = getTrimmedString(url.searchParams.get("deliveryChannel"));
+  const deliveryChannel = rawDeliveryChannel ?? null;
+
+  if (
+    alertClass !== null &&
+    !isNotificationProviderProfileGovernanceAlertClass(alertClass)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_metrics_alert_class_filter",
+      "alertClass must be one of incident_open or incident_resolved."
+    );
+    return;
+  }
+
+  if (
+    deliveryChannel !== null &&
+    !isSystemCheckEvidenceBreachNotificationDeliveryChannel(deliveryChannel)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_metrics_delivery_channel_filter",
+      "deliveryChannel must be one of webhook_spike or email_spike."
+    );
+    return;
+  }
+
+  const alerts = await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: profileKey ?? undefined,
+      deliveryChannel: deliveryChannel ?? undefined,
+      limit: 500
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse>(
+    response,
+    200,
+    toWorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse({
+      alerts,
+      profileKey,
+      alertClass,
+      deliveryChannel
+    })
+  );
 };
 
 const handleWorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueGet = async (
@@ -13713,6 +13895,26 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileGovernanceAlertsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceAlertMetricsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertMetricsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertMetricsRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceAlertMetricsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertMetricsGet(
         store,
         response,
         url,

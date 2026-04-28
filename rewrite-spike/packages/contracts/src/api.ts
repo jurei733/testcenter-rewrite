@@ -53,6 +53,11 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-queue`,
   workspaceNotificationProviderProfileGovernanceAlerts: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alerts`,
+  workspaceNotificationProviderProfileGovernanceAlertMetrics: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alert-metrics`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -993,6 +998,30 @@ export interface WorkspaceNotificationProviderProfileGovernanceAlertsResponse {
     profileKey: string | null;
     status: NotificationProviderProfileGovernanceAlertStatusDto | null;
     deliveryStatus: SystemCheckEvidenceBreachNotificationDeliveryStatusDto | null;
+  };
+}
+
+export interface NotificationProviderProfileGovernanceAlertMetricsItemDto {
+  profileKey: string;
+  alertClass: "incident_open" | "incident_resolved";
+  totalCount: number;
+  pendingAcknowledgementCount: number;
+  acknowledgedCount: number;
+  pendingDeliveryCount: number;
+  deliveredCount: number;
+  deliveryFailedCount: number;
+  latestCreatedAt: string;
+  latestDeliveredAt: string | null;
+  latestAcknowledgedAt: string | null;
+  latestDeliveryFailedAt: string | null;
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse {
+  items: NotificationProviderProfileGovernanceAlertMetricsItemDto[];
+  filters: {
+    profileKey: string | null;
+    alertClass: "incident_open" | "incident_resolved" | null;
+    deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
   };
 }
 

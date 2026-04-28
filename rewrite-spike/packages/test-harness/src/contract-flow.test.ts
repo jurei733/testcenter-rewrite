@@ -32,6 +32,7 @@ import {
   type WorkspaceNotificationProviderProfileIncidentsResponse,
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -7974,6 +7975,25 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     return matchingAlert;
   }, 20, 250);
   assert.equal(recoveryGovernanceAlert.profileKey, "dead-letter-email-profile");
+
+  const recoveryGovernanceAlertMetrics = await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse>(
+    `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlertMetrics(
+      demoTenantKey,
+      demoWorkspaceKey
+    )}?profileKey=dead-letter-email-profile&alertClass=incident_resolved`
+  );
+  const recoveryGovernanceAlertMetricsItem =
+    recoveryGovernanceAlertMetrics.items[0];
+  assert.ok(recoveryGovernanceAlertMetricsItem);
+  assert.equal(recoveryGovernanceAlertMetricsItem.profileKey, "dead-letter-email-profile");
+  assert.equal(recoveryGovernanceAlertMetricsItem.alertClass, "incident_resolved");
+  assert.equal(recoveryGovernanceAlertMetricsItem.totalCount, 1);
+  assert.equal(recoveryGovernanceAlertMetricsItem.pendingAcknowledgementCount, 1);
+  assert.equal(recoveryGovernanceAlertMetricsItem.acknowledgedCount, 0);
+  assert.equal(recoveryGovernanceAlertMetricsItem.pendingDeliveryCount, 0);
+  assert.equal(recoveryGovernanceAlertMetricsItem.deliveredCount, 1);
+  assert.equal(recoveryGovernanceAlertMetricsItem.deliveryFailedCount, 0);
+  assert.ok(recoveryGovernanceAlertMetricsItem.latestDeliveredAt);
 
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
