@@ -191,6 +191,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -372,6 +373,8 @@ const workspaceNotificationProviderProfileGovernanceAlertsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alerts$/;
 const workspaceNotificationProviderProfileGovernanceAlertMetricsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-metrics$/;
+const workspaceNotificationProviderProfileGovernanceAlertTrendsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-trends$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -6914,6 +6917,126 @@ const toWorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse = (in
   };
 };
 
+const toWorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse = (input: {
+  alerts: NotificationProviderProfileGovernanceAlert[];
+  profileKey: string | null;
+  alertClass: "incident_open" | "incident_resolved" | null;
+  deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
+  windowHours: number;
+  bucketHours: number;
+}): WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse => {
+  const now = Date.now();
+  const windowStartMs = now - input.windowHours * 60 * 60 * 1000;
+  const bucketMs = input.bucketHours * 60 * 60 * 1000;
+  const itemBuckets = new Map<
+    string,
+    {
+      profileKey: string;
+      alertClass: "incident_open" | "incident_resolved";
+      totalCount: number;
+      buckets: Map<
+        string,
+        {
+          bucketStart: string;
+          bucketEnd: string;
+          totalCount: number;
+          pendingAcknowledgementCount: number;
+          acknowledgedCount: number;
+          pendingDeliveryCount: number;
+          deliveredCount: number;
+          deliveryFailedCount: number;
+        }
+      >;
+    }
+  >();
+
+  for (const alert of input.alerts) {
+    if (input.alertClass && alert.alertClass !== input.alertClass) {
+      continue;
+    }
+
+    if (input.deliveryChannel && alert.deliveryChannel !== input.deliveryChannel) {
+      continue;
+    }
+
+    const createdAtMs = Date.parse(alert.createdAt);
+    if (Number.isNaN(createdAtMs) || createdAtMs < windowStartMs) {
+      continue;
+    }
+
+    const itemKey = `${alert.profileKey}:${alert.alertClass}`;
+    const bucketStartMs =
+      windowStartMs + Math.floor((createdAtMs - windowStartMs) / bucketMs) * bucketMs;
+    const bucketStart = new Date(bucketStartMs).toISOString();
+    const bucketEnd = new Date(bucketStartMs + bucketMs).toISOString();
+    let item = itemBuckets.get(itemKey);
+
+    if (!item) {
+      item = {
+        profileKey: alert.profileKey,
+        alertClass: alert.alertClass,
+        totalCount: 0,
+        buckets: new Map()
+      };
+      itemBuckets.set(itemKey, item);
+    }
+
+    item.totalCount += 1;
+
+    let bucket = item.buckets.get(bucketStart);
+    if (!bucket) {
+      bucket = {
+        bucketStart,
+        bucketEnd,
+        totalCount: 0,
+        pendingAcknowledgementCount: 0,
+        acknowledgedCount: 0,
+        pendingDeliveryCount: 0,
+        deliveredCount: 0,
+        deliveryFailedCount: 0
+      };
+      item.buckets.set(bucketStart, bucket);
+    }
+
+    bucket.totalCount += 1;
+    if (alert.status === "pending_acknowledgement") {
+      bucket.pendingAcknowledgementCount += 1;
+    } else {
+      bucket.acknowledgedCount += 1;
+    }
+
+    if (alert.deliveryStatus === "pending_delivery") {
+      bucket.pendingDeliveryCount += 1;
+    } else if (alert.deliveryStatus === "delivered") {
+      bucket.deliveredCount += 1;
+    } else {
+      bucket.deliveryFailedCount += 1;
+    }
+  }
+
+  return {
+    windowHours: input.windowHours,
+    bucketHours: input.bucketHours,
+    items: Array.from(itemBuckets.values())
+      .map(item => ({
+        profileKey: item.profileKey,
+        alertClass: item.alertClass,
+        totalCount: item.totalCount,
+        buckets: Array.from(item.buckets.values()).sort((left, right) =>
+          left.bucketStart.localeCompare(right.bucketStart)
+        )
+      }))
+      .sort((left, right) =>
+        right.totalCount - left.totalCount || left.profileKey.localeCompare(right.profileKey)
+      ),
+    filters: {
+      profileKey: input.profileKey,
+      alertClass: input.alertClass,
+      deliveryChannel: input.deliveryChannel
+    }
+  };
+};
+
 const toWorkspaceEvidenceRetentionPolicyResponse = (
   tenant: Tenant,
   workspace: Workspace
@@ -8779,6 +8902,109 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertMetricsGet = asyn
       profileKey,
       alertClass,
       deliveryChannel
+    })
+  );
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceAlertTrendsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawAlertClass = getTrimmedString(url.searchParams.get("alertClass"));
+  const alertClass = rawAlertClass ?? null;
+  const rawDeliveryChannel = getTrimmedString(url.searchParams.get("deliveryChannel"));
+  const deliveryChannel = rawDeliveryChannel ?? null;
+  const rawWindowHours = url.searchParams.get("windowHours");
+  const rawBucketHours = url.searchParams.get("bucketHours");
+  const windowHours = rawWindowHours ? Number.parseInt(rawWindowHours, 10) : 24;
+  const bucketHours = rawBucketHours ? Number.parseInt(rawBucketHours, 10) : 24;
+
+  if (
+    alertClass !== null &&
+    !isNotificationProviderProfileGovernanceAlertClass(alertClass)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_trends_alert_class_filter",
+      "alertClass must be one of incident_open or incident_resolved."
+    );
+    return;
+  }
+
+  if (
+    deliveryChannel !== null &&
+    !isSystemCheckEvidenceBreachNotificationDeliveryChannel(deliveryChannel)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_trends_delivery_channel_filter",
+      "deliveryChannel must be one of webhook_spike or email_spike."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(windowHours) || windowHours <= 0 || windowHours > 24 * 30) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_trends_window_hours",
+      "windowHours must be an integer between 1 and 720."
+    );
+    return;
+  }
+
+  if (
+    !Number.isInteger(bucketHours) ||
+    bucketHours <= 0 ||
+    bucketHours > windowHours
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_alert_trends_bucket_hours",
+      "bucketHours must be an integer between 1 and windowHours."
+    );
+    return;
+  }
+
+  const alerts = await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: profileKey ?? undefined,
+      deliveryChannel: deliveryChannel ?? undefined,
+      limit: 500
+    }
+  );
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse>(
+    response,
+    200,
+    toWorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse({
+      alerts,
+      profileKey,
+      alertClass,
+      deliveryChannel,
+      windowHours,
+      bucketHours
     })
   );
 };
@@ -13915,6 +14141,26 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileGovernanceAlertMetricsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceAlertTrendsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceAlertTrendsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceAlertTrendsRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceAlertTrendsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceAlertTrendsGet(
         store,
         response,
         url,

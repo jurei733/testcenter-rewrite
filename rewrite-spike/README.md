@@ -129,6 +129,7 @@ The first scaffold includes:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-queue`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alerts`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alert-metrics`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alert-trends`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alert-dead-letter-queue`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-incidents/{incidentId}:acknowledge`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alerts/{alertId}:acknowledge`

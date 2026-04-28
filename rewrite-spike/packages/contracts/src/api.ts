@@ -58,6 +58,11 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alert-metrics`,
+  workspaceNotificationProviderProfileGovernanceAlertTrends: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alert-trends`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -1018,6 +1023,35 @@ export interface NotificationProviderProfileGovernanceAlertMetricsItemDto {
 
 export interface WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse {
   items: NotificationProviderProfileGovernanceAlertMetricsItemDto[];
+  filters: {
+    profileKey: string | null;
+    alertClass: "incident_open" | "incident_resolved" | null;
+    deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
+  };
+}
+
+export interface NotificationProviderProfileGovernanceAlertTrendBucketDto {
+  bucketStart: string;
+  bucketEnd: string;
+  totalCount: number;
+  pendingAcknowledgementCount: number;
+  acknowledgedCount: number;
+  pendingDeliveryCount: number;
+  deliveredCount: number;
+  deliveryFailedCount: number;
+}
+
+export interface NotificationProviderProfileGovernanceAlertTrendItemDto {
+  profileKey: string;
+  alertClass: "incident_open" | "incident_resolved";
+  totalCount: number;
+  buckets: NotificationProviderProfileGovernanceAlertTrendBucketDto[];
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse {
+  windowHours: number;
+  bucketHours: number;
+  items: NotificationProviderProfileGovernanceAlertTrendItemDto[];
   filters: {
     profileKey: string | null;
     alertClass: "incident_open" | "incident_resolved" | null;

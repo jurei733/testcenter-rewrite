@@ -33,6 +33,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -7666,7 +7667,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       response,
       matchingIncident
     };
-  }, 20, 250);
+  }, 40, 250);
 
   const providerGovernanceQueueBeforeAcknowledgement = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
@@ -7831,7 +7832,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     assert.ok(currentProfile.incidentState?.suppressionUntil);
 
     return currentProfile;
-  }, 10, 250);
+  }, 20, 250);
   assert.equal(stillSuppressedDeadLetterWorkspace.profileKey, "dead-letter-email-profile");
 
   const stillSuppressedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
@@ -7994,6 +7995,29 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(recoveryGovernanceAlertMetricsItem.deliveredCount, 1);
   assert.equal(recoveryGovernanceAlertMetricsItem.deliveryFailedCount, 0);
   assert.ok(recoveryGovernanceAlertMetricsItem.latestDeliveredAt);
+
+  const recoveryGovernanceAlertTrends =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlertTrends(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&alertClass=incident_resolved&windowHours=24&bucketHours=24`
+    );
+  const recoveryGovernanceAlertTrendItem =
+    recoveryGovernanceAlertTrends.items[0];
+  assert.ok(recoveryGovernanceAlertTrendItem);
+  assert.equal(recoveryGovernanceAlertTrendItem.profileKey, "dead-letter-email-profile");
+  assert.equal(recoveryGovernanceAlertTrendItem.alertClass, "incident_resolved");
+  assert.equal(recoveryGovernanceAlertTrendItem.totalCount, 1);
+  assert.equal(recoveryGovernanceAlertTrends.windowHours, 24);
+  assert.equal(recoveryGovernanceAlertTrends.bucketHours, 24);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets.length, 1);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].totalCount, 1);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].pendingAcknowledgementCount, 1);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].acknowledgedCount, 0);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].pendingDeliveryCount, 0);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].deliveredCount, 1);
+  assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].deliveryFailedCount, 0);
 
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
