@@ -1333,6 +1333,64 @@ SET default_governance_notification_policy =
     )
   );
 `
+  },
+  {
+    version: "0044",
+    name: "recovery-governance-notification-policy",
+    sql: `
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS default_recovery_governance_notification_policy JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE workspaces
+  ADD COLUMN IF NOT EXISTS recovery_governance_notification_policy_override JSONB NULL;
+
+ALTER TABLE notification_provider_profile_governance_alerts
+  ADD COLUMN IF NOT EXISTS alert_class TEXT NOT NULL DEFAULT 'incident_open';
+
+UPDATE tenants
+SET default_recovery_governance_notification_policy =
+  COALESCE(default_recovery_governance_notification_policy, '{}'::jsonb)
+  || jsonb_build_object(
+    'breachNotificationDeliverySelectionMode',
+    COALESCE(
+      default_recovery_governance_notification_policy->>'breachNotificationDeliverySelectionMode',
+      default_governance_notification_policy->>'breachNotificationDeliverySelectionMode',
+      'infer_from_target'
+    ),
+    'webhookSpikeRetryDelaySeconds',
+    COALESCE(
+      (default_recovery_governance_notification_policy->>'webhookSpikeRetryDelaySeconds')::integer,
+      (default_recovery_governance_notification_policy->>'breachNotificationRetryDelaySeconds')::integer,
+      (default_governance_notification_policy->>'webhookSpikeRetryDelaySeconds')::integer,
+      (default_governance_notification_policy->>'breachNotificationRetryDelaySeconds')::integer,
+      30
+    ),
+    'webhookSpikeMaxDeliveryAttempts',
+    COALESCE(
+      (default_recovery_governance_notification_policy->>'webhookSpikeMaxDeliveryAttempts')::integer,
+      (default_recovery_governance_notification_policy->>'breachNotificationMaxDeliveryAttempts')::integer,
+      (default_governance_notification_policy->>'webhookSpikeMaxDeliveryAttempts')::integer,
+      (default_governance_notification_policy->>'breachNotificationMaxDeliveryAttempts')::integer,
+      3
+    ),
+    'emailSpikeRetryDelaySeconds',
+    COALESCE(
+      (default_recovery_governance_notification_policy->>'emailSpikeRetryDelaySeconds')::integer,
+      (default_recovery_governance_notification_policy->>'breachNotificationRetryDelaySeconds')::integer,
+      (default_governance_notification_policy->>'emailSpikeRetryDelaySeconds')::integer,
+      (default_governance_notification_policy->>'breachNotificationRetryDelaySeconds')::integer,
+      60
+    ),
+    'emailSpikeMaxDeliveryAttempts',
+    COALESCE(
+      (default_recovery_governance_notification_policy->>'emailSpikeMaxDeliveryAttempts')::integer,
+      (default_recovery_governance_notification_policy->>'breachNotificationMaxDeliveryAttempts')::integer,
+      (default_governance_notification_policy->>'emailSpikeMaxDeliveryAttempts')::integer,
+      (default_governance_notification_policy->>'breachNotificationMaxDeliveryAttempts')::integer,
+      2
+    )
+  );
+`
   }
 ];
 

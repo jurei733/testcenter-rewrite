@@ -45,6 +45,7 @@ export interface NotificationProviderPromotionPolicy {
 export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySelectionMode;
 export type NotificationPolicy = OutboundNotificationPolicy;
 export type GovernanceNotificationPolicy = OutboundNotificationPolicy;
+export type RecoveryGovernanceNotificationPolicy = OutboundNotificationPolicy;
 export type NotificationProviderProfile = OutboundNotificationProviderProfile;
 export type NotificationProviderProfileIncidentType =
   OutboundNotificationProviderProfileIncidentType;
@@ -100,12 +101,14 @@ export interface NotificationProviderProfileGovernanceAlert {
   tenantId: string;
   workspaceId: string;
   profileKey: string;
+  alertClass: "incident_open" | "incident_resolved";
   status: NotificationProviderProfileGovernanceAlertStatus;
   governanceStatus:
     | "needs_acknowledgement"
     | "suppressed"
     | "ready_for_manual_recovery"
-    | "recovery_blocked";
+    | "recovery_blocked"
+    | "resolved_recovery";
   createdAt: string;
   createdByActorType: "worker" | "notification_service" | "platform_api";
   createdByActorId: string;
@@ -213,6 +216,8 @@ export const defaultNotificationProviderPromotionPolicy: NotificationProviderPro
 export const defaultNotificationPolicy: NotificationPolicy = defaultOutboundNotificationPolicy;
 export const defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy =
   defaultOutboundNotificationPolicy;
+export const defaultRecoveryGovernanceNotificationPolicy: RecoveryGovernanceNotificationPolicy =
+  defaultOutboundNotificationPolicy;
 export const defaultNotificationProviderProfiles: NotificationProviderProfile[] = [];
 
 export const defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy = {
@@ -291,6 +296,7 @@ export interface Tenant {
   defaultNotificationProviderPromotionPolicy: NotificationProviderPromotionPolicy;
   defaultNotificationPolicy: NotificationPolicy;
   defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy;
+  defaultRecoveryGovernanceNotificationPolicy: RecoveryGovernanceNotificationPolicy;
   defaultNotificationProviderProfiles: NotificationProviderProfile[];
   defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy;
   defaultEvidenceRetentionClassPolicy: EvidenceRetentionClassPolicy;
@@ -302,6 +308,7 @@ export type LaunchApprovalPolicyOverride = Partial<LaunchApprovalPolicy>;
 export type NotificationProviderPromotionPolicyOverride = Partial<NotificationProviderPromotionPolicy>;
 export type NotificationPolicyOverride = Partial<NotificationPolicy>;
 export type GovernanceNotificationPolicyOverride = Partial<GovernanceNotificationPolicy>;
+export type RecoveryGovernanceNotificationPolicyOverride = Partial<RecoveryGovernanceNotificationPolicy>;
 export type EvidenceRetentionPolicyOverride = Partial<EvidenceRetentionPolicy>;
 
 export interface ActivationPolicyOverrideRecords {
@@ -340,6 +347,7 @@ export interface NotificationPolicyOverrideRecords {
 }
 
 export type GovernanceNotificationPolicyOverrideRecords = NotificationPolicyOverrideRecords;
+export type RecoveryGovernanceNotificationPolicyOverrideRecords = NotificationPolicyOverrideRecords;
 
 export interface EvidenceRetentionPolicyOverrideRecords {
   systemCheckEvidenceRetentionTtlSeconds?: PolicyOverrideRecord<number>;
@@ -358,6 +366,7 @@ export interface Workspace {
   notificationProviderPromotionPolicyOverrideRecords: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecords | null;
   governanceNotificationPolicyOverrideRecords: GovernanceNotificationPolicyOverrideRecords | null;
+  recoveryGovernanceNotificationPolicyOverrideRecords: RecoveryGovernanceNotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -379,6 +388,7 @@ export const createTenant = (input: {
   defaultNotificationProviderPromotionPolicy,
   defaultNotificationPolicy,
   defaultGovernanceNotificationPolicy,
+  defaultRecoveryGovernanceNotificationPolicy,
   defaultNotificationProviderProfiles,
   defaultEvidenceRetentionPolicy,
   defaultEvidenceRetentionClassPolicy
@@ -394,6 +404,7 @@ export const createWorkspace = (input: {
   notificationProviderPromotionPolicyOverrideRecords?: NotificationProviderPromotionPolicyOverrideRecords | null;
   notificationPolicyOverrideRecords?: NotificationPolicyOverrideRecords | null;
   governanceNotificationPolicyOverrideRecords?: GovernanceNotificationPolicyOverrideRecords | null;
+  recoveryGovernanceNotificationPolicyOverrideRecords?: RecoveryGovernanceNotificationPolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords?: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords?: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords?: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -411,6 +422,8 @@ export const createWorkspace = (input: {
   notificationPolicyOverrideRecords: input.notificationPolicyOverrideRecords ?? null,
   governanceNotificationPolicyOverrideRecords:
     input.governanceNotificationPolicyOverrideRecords ?? null,
+  recoveryGovernanceNotificationPolicyOverrideRecords:
+    input.recoveryGovernanceNotificationPolicyOverrideRecords ?? null,
   notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
   evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
   evidenceRetentionClassPolicyOverrideRecords: input.evidenceRetentionClassPolicyOverrideRecords ?? null
@@ -457,20 +470,35 @@ export const createNotificationProviderProfileGovernanceAlert = (input: {
   profile: NotificationProviderProfile;
   notificationPolicy?: NotificationPolicy;
   notificationProviderProfiles?: NotificationProviderProfile[];
+  routingTarget?: string | null;
   createdAt?: string;
   createdByActorType: "worker" | "notification_service" | "platform_api";
   createdByActorId: string;
   sourceRequestId?: string | null;
+  alertClass?: "incident_open" | "incident_resolved";
+  governanceStatus?:
+    | "needs_acknowledgement"
+    | "suppressed"
+    | "ready_for_manual_recovery"
+    | "recovery_blocked"
+    | "resolved_recovery";
 }): NotificationProviderProfileGovernanceAlert => {
   const createdAt = input.createdAt ?? new Date().toISOString();
-  const governanceStatus = input.incident.status === "open"
-    ? "needs_acknowledgement"
-    : input.incident.suppressionUntil && input.incident.suppressionUntil > createdAt
-      ? "suppressed"
-      : "recovery_blocked";
-  const routingTarget = input.profile.rolloutFallbackProfileKey
-    ? `profile:${input.profile.rolloutFallbackProfileKey}`
-    : null;
+  const alertClass = input.alertClass ?? "incident_open";
+  const governanceStatus =
+    input.governanceStatus ??
+    (alertClass === "incident_resolved"
+      ? "resolved_recovery"
+      : input.incident.status === "open"
+        ? "needs_acknowledgement"
+        : input.incident.suppressionUntil && input.incident.suppressionUntil > createdAt
+          ? "suppressed"
+          : "recovery_blocked");
+  const routingTarget =
+    input.routingTarget ??
+    (input.profile.rolloutFallbackProfileKey
+      ? `profile:${input.profile.rolloutFallbackProfileKey}`
+      : null);
   const resolvedDestination = resolveOutboundNotificationDestination({
     target: routingTarget,
     selectionMode: input.notificationPolicy?.breachNotificationDeliverySelectionMode,
@@ -481,12 +509,13 @@ export const createNotificationProviderProfileGovernanceAlert = (input: {
   return {
     alertId: createStableId(
       "notification-provider-profile-governance-alert",
-      input.incident.incidentId
+      `${input.incident.incidentId}-${alertClass}`
     ),
     incidentId: input.incident.incidentId,
     tenantId: input.incident.tenantId,
     workspaceId: input.incident.workspaceId,
     profileKey: input.incident.profileKey,
+    alertClass,
     status: "pending_acknowledgement",
     governanceStatus,
     createdAt,
@@ -513,6 +542,23 @@ export const createNotificationProviderProfileGovernanceAlert = (input: {
     acknowledgementNote: null
   };
 };
+
+export const createNotificationProviderProfileGovernanceRecoveryAlert = (input: {
+  incident: NotificationProviderProfileIncident;
+  profile: NotificationProviderProfile;
+  notificationPolicy?: NotificationPolicy;
+  notificationProviderProfiles?: NotificationProviderProfile[];
+  routingTarget?: string | null;
+  createdAt?: string;
+  createdByActorType: "worker" | "notification_service" | "platform_api";
+  createdByActorId: string;
+  sourceRequestId?: string | null;
+}): NotificationProviderProfileGovernanceAlert =>
+  createNotificationProviderProfileGovernanceAlert({
+    ...input,
+    alertClass: "incident_resolved",
+    governanceStatus: "resolved_recovery"
+  });
 
 export const markNotificationProviderProfileGovernanceAlertDelivered = (input: {
   alert: NotificationProviderProfileGovernanceAlert;
@@ -829,6 +875,17 @@ export const resolveWorkspaceGovernanceNotificationPolicy = (
   ({
     ...tenant.defaultGovernanceNotificationPolicy,
     ...(flattenNotificationPolicyOverrideRecords(workspace.governanceNotificationPolicyOverrideRecords) ?? {})
+  });
+
+export const resolveWorkspaceRecoveryGovernanceNotificationPolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): RecoveryGovernanceNotificationPolicy =>
+  ({
+    ...tenant.defaultRecoveryGovernanceNotificationPolicy,
+    ...(flattenNotificationPolicyOverrideRecords(
+      workspace.recoveryGovernanceNotificationPolicyOverrideRecords
+    ) ?? {})
   });
 
 export const resolveWorkspaceNotificationProviderProfiles = (

@@ -136,6 +136,7 @@ import {
   type TenantEvidenceRetentionPolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
   type TenantGovernanceNotificationPolicyResponse,
+  type TenantRecoveryGovernanceNotificationPolicyResponse,
   type TenantNotificationProviderPromotionPolicyResponse,
   type TenantNotificationPolicyResponse,
   type TenantNotificationProviderProfilesResponse,
@@ -146,6 +147,7 @@ import {
   type UpdateTenantEvidenceRetentionPolicyRequest,
   type UpdateTenantLaunchApprovalPolicyRequest,
   type UpdateTenantGovernanceNotificationPolicyRequest,
+  type UpdateTenantRecoveryGovernanceNotificationPolicyRequest,
   type UpdateTenantNotificationProviderPromotionPolicyRequest,
   type UpdateTenantNotificationPolicyRequest,
   type UpdateTenantNotificationProviderProfilesRequest,
@@ -155,6 +157,7 @@ import {
   type UpdateWorkspaceEvidenceRetentionPolicyRequest,
   type UpdateWorkspaceLaunchApprovalPolicyRequest,
   type UpdateWorkspaceGovernanceNotificationPolicyRequest,
+  type UpdateWorkspaceRecoveryGovernanceNotificationPolicyRequest,
   type UpdateWorkspaceNotificationProviderPromotionPolicyRequest,
   type UpdateWorkspaceNotificationPolicyRequest,
   type UpdateWorkspaceNotificationProviderProfilesRequest,
@@ -172,6 +175,8 @@ import {
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceGovernanceNotificationPolicyModeDto,
   type WorkspaceGovernanceNotificationPolicyResponse,
+  type WorkspaceRecoveryGovernanceNotificationPolicyModeDto,
+  type WorkspaceRecoveryGovernanceNotificationPolicyResponse,
   type WorkspaceNotificationProviderPromotionPolicyModeDto,
   type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceMonitorCommandsResponse,
@@ -229,6 +234,7 @@ import {
   createMonitorCommand,
   createNotificationProviderPromotionPolicyOverrideRecords,
   createNotificationProviderProfileIncident,
+  createNotificationProviderProfileGovernanceRecoveryAlert,
   createNotificationPolicyOverrideRecords,
   createNotificationProviderProfileOverrideRecords,
   createOperationalPolicyOverrideRecords,
@@ -297,6 +303,7 @@ import {
   redriveNotificationProviderProfileGovernanceAlert,
   resolveWorkspaceNotificationProviderPromotionPolicy,
   resolveWorkspaceGovernanceNotificationPolicy,
+  resolveWorkspaceRecoveryGovernanceNotificationPolicy,
   resolveWorkspaceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceOperationalPolicy,
@@ -348,6 +355,8 @@ const workspaceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-policy$/;
 const workspaceGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/governance-notification-policy$/;
+const workspaceRecoveryGovernanceNotificationPolicyRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/recovery-governance-notification-policy$/;
 const workspaceNotificationProviderProfilesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles$/;
 const workspaceNotificationProviderProfileRolloutMetricsRoutePattern =
@@ -510,6 +519,8 @@ const tenantNotificationPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/notification-policy$/;
 const tenantGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/governance-notification-policy$/;
+const tenantRecoveryGovernanceNotificationPolicyRoutePattern =
+  /^\/api\/v1\/platform\/tenants\/([^/]+)\/recovery-governance-notification-policy$/;
 const tenantNotificationProviderProfilesRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/notification-provider-profiles$/;
 const tenantEvidenceRetentionPolicyRoutePattern =
@@ -525,6 +536,7 @@ const tenantPolicyAuditEventTypes = [
   "tenant.notification_provider_promotion_policy.updated",
   "tenant.notification_policy.updated",
   "tenant.governance_notification_policy.updated",
+  "tenant.recovery_governance_notification_policy.updated",
   "tenant.notification_provider_profiles.updated",
   "tenant.evidence_retention_policy.updated",
   "tenant.evidence_retention_class_policy.updated"
@@ -537,6 +549,7 @@ const workspacePolicyAuditEventTypes = [
   "workspace.notification_provider_promotion_policy.updated",
   "workspace.notification_policy.updated",
   "workspace.governance_notification_policy.updated",
+  "workspace.recovery_governance_notification_policy.updated",
   "workspace.notification_provider_profiles.updated",
   "workspace.evidence_retention_policy.updated",
   "workspace.evidence_retention_class_policy.updated"
@@ -943,7 +956,8 @@ const isNotificationProviderProfileGovernanceStatus = (
   value === "needs_acknowledgement" ||
   value === "suppressed" ||
   value === "ready_for_manual_recovery" ||
-  value === "recovery_blocked";
+  value === "recovery_blocked" ||
+  value === "resolved_recovery";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -1262,6 +1276,11 @@ const isWorkspaceNotificationPolicyMode = (
 const isWorkspaceGovernanceNotificationPolicyMode = (
   value: unknown
 ): value is WorkspaceGovernanceNotificationPolicyModeDto =>
+  value === "inherit" || value === "override";
+
+const isWorkspaceRecoveryGovernanceNotificationPolicyMode = (
+  value: unknown
+): value is WorkspaceRecoveryGovernanceNotificationPolicyModeDto =>
   value === "inherit" || value === "override";
 
 const isEvidenceRetentionPolicyOverride = (
@@ -2007,6 +2026,7 @@ const toNotificationProviderProfileGovernanceAlertDto = (
   alertId: alert.alertId,
   incidentId: alert.incidentId,
   profileKey: alert.profileKey,
+  alertClass: alert.alertClass,
   status: alert.status,
   governanceStatus: alert.governanceStatus,
   createdAt: alert.createdAt,
@@ -3559,6 +3579,10 @@ const toPolicyHistoryEntryDto = (
     governanceNotificationPolicyOverride: null,
     governanceNotificationPolicyOverrideRecords: null,
     effectiveGovernanceNotificationPolicy: null,
+    defaultRecoveryGovernanceNotificationPolicy: null,
+    recoveryGovernanceNotificationPolicyOverride: null,
+    recoveryGovernanceNotificationPolicyOverrideRecords: null,
+    effectiveRecoveryGovernanceNotificationPolicy: null,
     defaultNotificationProviderProfiles: null,
     notificationProviderProfileOverride: null,
     removedNotificationProviderProfileKeys: null,
@@ -3854,6 +3878,32 @@ const toPolicyHistoryEntryDto = (
     };
   }
 
+  if (auditEvent.eventType === "tenant.recovery_governance_notification_policy.updated") {
+    const defaultRecoveryGovernanceNotificationPolicy = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultRecoveryGovernanceNotificationPolicy"
+    );
+
+    if (!isNotificationPolicy(defaultRecoveryGovernanceNotificationPolicy)) {
+      return undefined;
+    }
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "recovery_governance_notification",
+      scope: "tenant_default",
+      mode: "default",
+      changedFields: [...notificationPolicyOverrideKeys],
+      clearedFields: [],
+      defaultRecoveryGovernanceNotificationPolicy,
+      recoveryGovernanceNotificationPolicyOverride: null,
+      recoveryGovernanceNotificationPolicyOverrideRecords: null,
+      effectiveRecoveryGovernanceNotificationPolicy:
+        defaultRecoveryGovernanceNotificationPolicy
+    };
+  }
+
   if (auditEvent.eventType === "tenant.notification_provider_promotion_policy.updated") {
     const defaultNotificationProviderPromotionPolicy = getAuditPayloadRecord(
       auditEvent.payload,
@@ -4050,6 +4100,59 @@ const toPolicyHistoryEntryDto = (
         effectiveGovernanceNotificationPolicyRecord
       )
         ? effectiveGovernanceNotificationPolicyRecord
+        : null
+    };
+  }
+
+  if (auditEvent.eventType === "workspace.recovery_governance_notification_policy.updated") {
+    const defaultRecoveryGovernanceNotificationPolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultRecoveryGovernanceNotificationPolicy"
+    );
+    const recoveryGovernanceNotificationPolicyOverrideRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "recoveryGovernanceNotificationPolicyOverride"
+    );
+    const recoveryGovernanceNotificationPolicyOverrideRecordsRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "recoveryGovernanceNotificationPolicyOverrideRecords"
+    );
+    const effectiveRecoveryGovernanceNotificationPolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "effectiveRecoveryGovernanceNotificationPolicy"
+    );
+    const mode = isWorkspaceRecoveryGovernanceNotificationPolicyMode(auditEvent.payload.mode)
+      ? auditEvent.payload.mode
+      : "override";
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "recovery_governance_notification",
+      scope: "workspace_override",
+      mode,
+      changedFields: getAuditPayloadStringArray(auditEvent.payload, "changedFields") ?? [],
+      clearedFields: getAuditPayloadStringArray(auditEvent.payload, "clearedFields") ?? [],
+      defaultRecoveryGovernanceNotificationPolicy: isNotificationPolicy(
+        defaultRecoveryGovernanceNotificationPolicyRecord
+      )
+        ? defaultRecoveryGovernanceNotificationPolicyRecord
+        : null,
+      recoveryGovernanceNotificationPolicyOverride: isNotificationPolicyOverride(
+        recoveryGovernanceNotificationPolicyOverrideRecord
+      )
+        ? recoveryGovernanceNotificationPolicyOverrideRecord
+        : null,
+      recoveryGovernanceNotificationPolicyOverrideRecords:
+        isNotificationPolicyOverrideRecords(
+          recoveryGovernanceNotificationPolicyOverrideRecordsRecord
+        )
+          ? recoveryGovernanceNotificationPolicyOverrideRecordsRecord
+          : null,
+      effectiveRecoveryGovernanceNotificationPolicy: isNotificationPolicy(
+        effectiveRecoveryGovernanceNotificationPolicyRecord
+      )
+        ? effectiveRecoveryGovernanceNotificationPolicyRecord
         : null
     };
   }
@@ -5467,6 +5570,15 @@ const toTenantGovernanceNotificationPolicyResponse = (
   )
 });
 
+const toTenantRecoveryGovernanceNotificationPolicyResponse = (
+  tenant: Tenant
+): TenantRecoveryGovernanceNotificationPolicyResponse => ({
+  tenantKey: tenant.tenantKey,
+  defaultRecoveryGovernanceNotificationPolicy: toNotificationPolicyDto(
+    tenant.defaultRecoveryGovernanceNotificationPolicy
+  )
+});
+
 const toTenantNotificationProviderProfilesResponse = (
   tenant: Tenant
 ): TenantNotificationProviderProfilesResponse => ({
@@ -5895,6 +6007,77 @@ const handleTenantGovernanceNotificationPolicyPatch = async (
     response,
     200,
     toTenantGovernanceNotificationPolicyResponse(updatedTenant)
+  );
+};
+
+const handleTenantRecoveryGovernanceNotificationPolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  sendJson<TenantRecoveryGovernanceNotificationPolicyResponse>(
+    response,
+    200,
+    toTenantRecoveryGovernanceNotificationPolicyResponse(tenant)
+  );
+};
+
+const handleTenantRecoveryGovernanceNotificationPolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  const body = await readBody<UpdateTenantRecoveryGovernanceNotificationPolicyRequest>(request);
+
+  if (!isNotificationPolicy(body.defaultRecoveryGovernanceNotificationPolicy)) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_recovery_governance_notification_policy_payload",
+      "defaultRecoveryGovernanceNotificationPolicy must provide a valid notification policy."
+    );
+    return;
+  }
+
+  const updatedTenant: Tenant = {
+    ...tenant,
+    defaultRecoveryGovernanceNotificationPolicy: body.defaultRecoveryGovernanceNotificationPolicy
+  };
+
+  await store.saveTenant(updatedTenant);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedTenant.tenantId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "tenant.recovery_governance_notification_policy.updated",
+    payload: {
+      tenantKey: updatedTenant.tenantKey,
+      defaultRecoveryGovernanceNotificationPolicy:
+        updatedTenant.defaultRecoveryGovernanceNotificationPolicy
+    }
+  });
+
+  sendJson<TenantRecoveryGovernanceNotificationPolicyResponse>(
+    response,
+    200,
+    toTenantRecoveryGovernanceNotificationPolicyResponse(updatedTenant)
   );
 };
 
@@ -6380,6 +6563,33 @@ const toWorkspaceGovernanceNotificationPolicyResponse = (
     ),
     effectiveGovernanceNotificationPolicy: toNotificationPolicyDto(
       resolveWorkspaceGovernanceNotificationPolicy(workspace, tenant)
+    )
+  };
+};
+
+const toWorkspaceRecoveryGovernanceNotificationPolicyResponse = (
+  tenant: Tenant,
+  workspace: Workspace
+): WorkspaceRecoveryGovernanceNotificationPolicyResponse => {
+  const flattenedOverride = flattenNotificationPolicyOverrideRecords(
+    workspace.recoveryGovernanceNotificationPolicyOverrideRecords
+  );
+
+  return {
+    tenantKey: tenant.tenantKey,
+    workspaceKey: workspace.workspaceKey,
+    mode: workspace.recoveryGovernanceNotificationPolicyOverrideRecords ? "override" : "inherit",
+    defaultRecoveryGovernanceNotificationPolicy: toNotificationPolicyDto(
+      tenant.defaultRecoveryGovernanceNotificationPolicy
+    ),
+    recoveryGovernanceNotificationPolicyOverride: flattenedOverride
+      ? toNotificationPolicyOverrideDto(flattenedOverride)
+      : null,
+    recoveryGovernanceNotificationPolicyOverrideRecords: toNotificationPolicyOverrideRecordsDto(
+      workspace.recoveryGovernanceNotificationPolicyOverrideRecords
+    ),
+    effectiveRecoveryGovernanceNotificationPolicy: toNotificationPolicyDto(
+      resolveWorkspaceRecoveryGovernanceNotificationPolicy(workspace, tenant)
     )
   };
 };
@@ -7470,6 +7680,151 @@ const handleWorkspaceGovernanceNotificationPolicyPatch = async (
   );
 };
 
+const handleWorkspaceRecoveryGovernanceNotificationPolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  sendJson<WorkspaceRecoveryGovernanceNotificationPolicyResponse>(
+    response,
+    200,
+    toWorkspaceRecoveryGovernanceNotificationPolicyResponse(tenant, workspace)
+  );
+};
+
+const handleWorkspaceRecoveryGovernanceNotificationPolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<UpdateWorkspaceRecoveryGovernanceNotificationPolicyRequest>(request);
+
+  if (!isWorkspaceRecoveryGovernanceNotificationPolicyMode(body.mode)) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_recovery_governance_notification_policy_payload",
+      "mode must be either 'inherit' or 'override'."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    !isNotificationPolicyOverride(body.recoveryGovernanceNotificationPolicyOverride)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_recovery_governance_notification_policy_payload",
+      "recoveryGovernanceNotificationPolicyOverride must provide at least one valid notification-policy field when mode is 'override'."
+    );
+    return;
+  }
+
+  const recoveryGovernanceNotificationPolicyOverride =
+    body.mode === "override"
+      ? toNotificationPolicyOverrideDto(
+          body.recoveryGovernanceNotificationPolicyOverride as NotificationPolicyOverrideDto
+        )
+      : null;
+  const previousRecoveryGovernanceNotificationPolicyOverride =
+    flattenNotificationPolicyOverrideRecords(
+      workspace.recoveryGovernanceNotificationPolicyOverrideRecords
+    );
+  const changedRecoveryGovernanceNotificationPolicyFields =
+    recoveryGovernanceNotificationPolicyOverride
+      ? Object.keys(recoveryGovernanceNotificationPolicyOverride)
+      : [];
+  const clearedRecoveryGovernanceNotificationPolicyFields =
+    previousRecoveryGovernanceNotificationPolicyOverride
+      ? Object.keys(previousRecoveryGovernanceNotificationPolicyOverride).filter(
+          fieldKey =>
+            !recoveryGovernanceNotificationPolicyOverride ||
+            !(fieldKey in recoveryGovernanceNotificationPolicyOverride)
+        )
+      : [];
+  const recoveryGovernanceNotificationPolicyOverrideRecords =
+    recoveryGovernanceNotificationPolicyOverride
+      ? createNotificationPolicyOverrideRecords({
+          override: recoveryGovernanceNotificationPolicyOverride,
+          updatedByRequestId: requestContext.requestId,
+          updatedByActorType: "platform_api",
+          updatedByActorId: "platform-api"
+        })
+      : null;
+
+  const updatedWorkspace: Workspace = {
+    ...workspace,
+    recoveryGovernanceNotificationPolicyOverrideRecords
+  };
+
+  await store.saveWorkspace(updatedWorkspace);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedWorkspace.tenantId,
+    workspaceId: updatedWorkspace.workspaceId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "workspace.recovery_governance_notification_policy.updated",
+    payload: {
+      workspaceKey: updatedWorkspace.workspaceKey,
+      mode: body.mode,
+      defaultRecoveryGovernanceNotificationPolicy:
+        tenant.defaultRecoveryGovernanceNotificationPolicy,
+      recoveryGovernanceNotificationPolicyOverride,
+      recoveryGovernanceNotificationPolicyOverrideRecords:
+        toNotificationPolicyOverrideRecordsDto(
+          updatedWorkspace.recoveryGovernanceNotificationPolicyOverrideRecords
+        ),
+      changedFields: changedRecoveryGovernanceNotificationPolicyFields,
+      clearedFields: clearedRecoveryGovernanceNotificationPolicyFields,
+      effectiveRecoveryGovernanceNotificationPolicy:
+        resolveWorkspaceRecoveryGovernanceNotificationPolicy(updatedWorkspace, tenant)
+    }
+  });
+
+  sendJson<WorkspaceRecoveryGovernanceNotificationPolicyResponse>(
+    response,
+    200,
+    toWorkspaceRecoveryGovernanceNotificationPolicyResponse(tenant, updatedWorkspace)
+  );
+};
+
 const handleWorkspaceNotificationProviderProfilesGet = async (
   store: PlatformStore,
   response: ServerResponse,
@@ -7859,16 +8214,53 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
     updatedWorkspace.workspaceId,
     profileKey
   );
+  let recoveryGovernanceAlert: NotificationProviderProfileGovernanceAlert | null = null;
 
   if (unresolvedIncident) {
-    await store.updateNotificationProviderProfileIncident({
+    const priorGovernanceAlerts =
+      await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+        tenantKey,
+        workspaceKey,
+        {
+          profileKey,
+          limit: 50
+        }
+      );
+    const priorIncidentAlert = priorGovernanceAlerts.find(
+      alert =>
+        alert.incidentId === unresolvedIncident.incidentId &&
+        alert.alertClass === "incident_open"
+    );
+    const recoveryRoutingTarget = priorIncidentAlert?.deliveryProfileKey
+      ? `profile:${priorIncidentAlert.deliveryProfileKey}`
+      : (priorIncidentAlert?.deliveryTarget ?? null);
+    const resolvedIncident: NotificationProviderProfileIncident = {
       ...unresolvedIncident,
       status: "resolved",
       suppressionUntil: null,
       resolvedAt: updatedAt,
       resolutionCode: "manually_promoted",
       sourceRequestId: requestContext.requestId
+    };
+    await store.updateNotificationProviderProfileIncident(resolvedIncident);
+    recoveryGovernanceAlert = createNotificationProviderProfileGovernanceRecoveryAlert({
+      incident: resolvedIncident,
+      profile: promotedProfile,
+      notificationPolicy: resolveWorkspaceRecoveryGovernanceNotificationPolicy(
+        updatedWorkspace,
+        tenant
+      ),
+      notificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
+        updatedWorkspace,
+        tenant
+      ),
+      routingTarget: recoveryRoutingTarget,
+      createdAt: updatedAt,
+      createdByActorType: "platform_api",
+      createdByActorId: body.promotedByActorId,
+      sourceRequestId: requestContext.requestId
     });
+    await store.saveNotificationProviderProfileGovernanceAlert(recoveryGovernanceAlert);
   }
 
   await recordAuditEvent(store, {
@@ -7885,6 +8277,7 @@ const handleWorkspaceNotificationProviderProfilePromote = async (
       forcePromotion: body.forcePromotion ?? false,
       evaluationWindowHours,
       promotionReadiness: currentProfileRolloutMetrics?.promotionReadiness ?? null,
+      recoveryGovernanceAlertId: recoveryGovernanceAlert?.alertId ?? null,
       previousProfile: toNotificationProviderProfileDto(currentProfile),
       promotedProfile: toNotificationProviderProfileDto(promotedProfile),
       effectiveNotificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
@@ -8037,7 +8430,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceQueueGet = async (
       response,
       400,
       "invalid_notification_provider_profile_governance_queue_filter",
-      "governanceStatus must be one of needs_acknowledgement, suppressed, ready_for_manual_recovery, or recovery_blocked."
+      "governanceStatus must be one of needs_acknowledgement, suppressed, ready_for_manual_recovery, recovery_blocked, or resolved_recovery."
     );
     return;
   }
@@ -12920,6 +13313,30 @@ const handleRequest = async (
     }
   }
 
+  const tenantRecoveryGovernanceNotificationPolicyRouteMatch = pathname.match(
+    tenantRecoveryGovernanceNotificationPolicyRoutePattern
+  );
+
+  if (tenantRecoveryGovernanceNotificationPolicyRouteMatch) {
+    const [, tenantKey] = tenantRecoveryGovernanceNotificationPolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleTenantRecoveryGovernanceNotificationPolicyGet(store, response, tenantKey);
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleTenantRecoveryGovernanceNotificationPolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
   const tenantNotificationProviderProfilesRouteMatch = pathname.match(
     tenantNotificationProviderProfilesRoutePattern
   );
@@ -13138,6 +13555,36 @@ const handleRequest = async (
 
     if (method === "PATCH") {
       await handleWorkspaceGovernanceNotificationPolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceRecoveryGovernanceNotificationPolicyRouteMatch = pathname.match(
+    workspaceRecoveryGovernanceNotificationPolicyRoutePattern
+  );
+
+  if (workspaceRecoveryGovernanceNotificationPolicyRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceRecoveryGovernanceNotificationPolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceRecoveryGovernanceNotificationPolicyGet(
+        store,
+        response,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleWorkspaceRecoveryGovernanceNotificationPolicyPatch(
         store,
         request,
         response,

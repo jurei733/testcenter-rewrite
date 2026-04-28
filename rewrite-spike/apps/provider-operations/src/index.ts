@@ -7,7 +7,9 @@ import {
   createAuditEvent,
   createNotificationProviderProfileIncident,
   createNotificationProviderProfileGovernanceAlert,
+  createNotificationProviderProfileGovernanceRecoveryAlert,
   resolveWorkspaceGovernanceNotificationPolicy,
+  resolveWorkspaceRecoveryGovernanceNotificationPolicy,
   resolveWorkspaceNotificationProviderProfiles,
   resolveWorkspaceNotificationProviderPromotionPolicy,
   type NotificationProviderProfile,
@@ -496,14 +498,51 @@ const reconcileNotificationProviderProfileRollouts = async (
             );
 
           if (unresolvedIncident) {
-            incidentsToUpdate.push({
+            const priorGovernanceAlerts =
+              await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+                tenant.tenantKey,
+                workspace.workspaceKey,
+                {
+                  profileKey: currentProfile.profileKey,
+                  limit: 50
+                }
+              );
+            const priorIncidentAlert = priorGovernanceAlerts.find(
+              alert =>
+                alert.incidentId === unresolvedIncident.incidentId &&
+                alert.alertClass === "incident_open"
+            );
+            const recoveryRoutingTarget = priorIncidentAlert?.deliveryProfileKey
+              ? `profile:${priorIncidentAlert.deliveryProfileKey}`
+              : (priorIncidentAlert?.deliveryTarget ?? null);
+            const resolvedIncident: NotificationProviderProfileIncident = {
               ...unresolvedIncident,
               status: "resolved",
               suppressionUntil: null,
               resolvedAt: checkedAt,
               resolutionCode: "auto_promoted",
               sourceRequestId: requestId
-            });
+            };
+            incidentsToUpdate.push(resolvedIncident);
+            governanceAlertsToCreate.push(
+              createNotificationProviderProfileGovernanceRecoveryAlert({
+                incident: resolvedIncident,
+                profile: promotedProfile,
+                notificationPolicy: resolveWorkspaceRecoveryGovernanceNotificationPolicy(
+                  updatedWorkspace,
+                  tenant
+                ),
+                notificationProviderProfiles: resolveWorkspaceNotificationProviderProfiles(
+                  updatedWorkspace,
+                  tenant
+                ),
+                routingTarget: recoveryRoutingTarget,
+                createdAt: checkedAt,
+                createdByActorType: "worker",
+                createdByActorId: providerOperationsActorId,
+                sourceRequestId: requestId
+              })
+            );
           }
           automationAuditEvents.push({
             requestId,

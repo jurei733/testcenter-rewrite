@@ -3,6 +3,7 @@ import { Pool, type QueryResultRow } from "pg";
 import {
   defaultEvidenceRetentionClassPolicy,
   defaultGovernanceNotificationPolicy,
+  defaultRecoveryGovernanceNotificationPolicy,
   defaultNotificationPolicy,
   defaultNotificationProviderPromotionPolicy,
   defaultNotificationProviderProfiles
@@ -1323,6 +1324,29 @@ const mapTenant = (row: QueryResultRow): Tenant => ({
           defaultGovernanceNotificationPolicy.emailSpikeMaxDeliveryAttempts
       }
     : defaultGovernanceNotificationPolicy,
+  defaultRecoveryGovernanceNotificationPolicy: row.default_recovery_governance_notification_policy
+    ? {
+        breachNotificationDeliverySelectionMode:
+          row.default_recovery_governance_notification_policy.breachNotificationDeliverySelectionMode ??
+          defaultRecoveryGovernanceNotificationPolicy.breachNotificationDeliverySelectionMode,
+        webhookSpikeRetryDelaySeconds:
+          row.default_recovery_governance_notification_policy.webhookSpikeRetryDelaySeconds ??
+          row.default_recovery_governance_notification_policy.breachNotificationRetryDelaySeconds ??
+          defaultRecoveryGovernanceNotificationPolicy.webhookSpikeRetryDelaySeconds,
+        webhookSpikeMaxDeliveryAttempts:
+          row.default_recovery_governance_notification_policy.webhookSpikeMaxDeliveryAttempts ??
+          row.default_recovery_governance_notification_policy.breachNotificationMaxDeliveryAttempts ??
+          defaultRecoveryGovernanceNotificationPolicy.webhookSpikeMaxDeliveryAttempts,
+        emailSpikeRetryDelaySeconds:
+          row.default_recovery_governance_notification_policy.emailSpikeRetryDelaySeconds ??
+          row.default_recovery_governance_notification_policy.breachNotificationRetryDelaySeconds ??
+          defaultRecoveryGovernanceNotificationPolicy.emailSpikeRetryDelaySeconds,
+        emailSpikeMaxDeliveryAttempts:
+          row.default_recovery_governance_notification_policy.emailSpikeMaxDeliveryAttempts ??
+          row.default_recovery_governance_notification_policy.breachNotificationMaxDeliveryAttempts ??
+          defaultRecoveryGovernanceNotificationPolicy.emailSpikeMaxDeliveryAttempts
+      }
+    : defaultRecoveryGovernanceNotificationPolicy,
   defaultNotificationProviderProfiles: mapNotificationProviderProfiles(
     row.default_notification_provider_profiles
   ),
@@ -1355,6 +1379,8 @@ const mapWorkspace = (row: QueryResultRow): Workspace => ({
   notificationPolicyOverrideRecords: mapNotificationPolicyOverrideRecords(row.notification_policy_override),
   governanceNotificationPolicyOverrideRecords:
     mapNotificationPolicyOverrideRecords(row.governance_notification_policy_override),
+  recoveryGovernanceNotificationPolicyOverrideRecords:
+    mapNotificationPolicyOverrideRecords(row.recovery_governance_notification_policy_override),
   notificationProviderProfileOverrideRecords: mapNotificationProviderProfileOverrideRecords(
     row.notification_provider_profile_override
   ),
@@ -1657,6 +1683,7 @@ const mapNotificationProviderProfileGovernanceAlert = (
   tenantId: row.tenant_id,
   workspaceId: row.workspace_id,
   profileKey: row.profile_key,
+  alertClass: row.alert_class ?? "incident_open",
   status: row.status,
   governanceStatus: row.governance_status,
   createdAt: row.created_at.toISOString(),
@@ -1767,6 +1794,7 @@ const resolveWorkspace = async (
         w.notification_provider_promotion_policy_override,
         w.notification_policy_override,
         w.governance_notification_policy_override,
+        w.recovery_governance_notification_policy_override,
         w.notification_provider_profile_override,
         w.evidence_retention_policy_override,
         w.evidence_retention_class_policy_override
@@ -2035,10 +2063,11 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           tenant_id, tenant_key, display_name, status, default_activation_policy,
           default_operational_policy, default_launch_approval_policy,
           default_notification_provider_promotion_policy, default_notification_policy,
-          default_governance_notification_policy, default_notification_provider_profiles,
-          default_evidence_retention_policy, default_evidence_retention_class_policy
+          default_governance_notification_policy, default_recovery_governance_notification_policy,
+          default_notification_provider_profiles, default_evidence_retention_policy,
+          default_evidence_retention_class_policy
         )
-        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb)
         ON CONFLICT (tenant_key) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             status = EXCLUDED.status,
@@ -2048,6 +2077,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
             default_notification_provider_promotion_policy = EXCLUDED.default_notification_provider_promotion_policy,
             default_notification_policy = EXCLUDED.default_notification_policy,
             default_governance_notification_policy = EXCLUDED.default_governance_notification_policy,
+            default_recovery_governance_notification_policy = EXCLUDED.default_recovery_governance_notification_policy,
             default_notification_provider_profiles = EXCLUDED.default_notification_provider_profiles,
             default_evidence_retention_policy = EXCLUDED.default_evidence_retention_policy,
             default_evidence_retention_class_policy = EXCLUDED.default_evidence_retention_class_policy
@@ -2063,6 +2093,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
         JSON.stringify(tenant.defaultNotificationProviderPromotionPolicy),
         JSON.stringify(tenant.defaultNotificationPolicy),
         JSON.stringify(tenant.defaultGovernanceNotificationPolicy),
+        JSON.stringify(tenant.defaultRecoveryGovernanceNotificationPolicy),
         JSON.stringify(tenant.defaultNotificationProviderProfiles),
         JSON.stringify(tenant.defaultEvidenceRetentionPolicy),
         JSON.stringify(tenant.defaultEvidenceRetentionClassPolicy)
@@ -2076,10 +2107,11 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           workspace_id, tenant_id, workspace_key, display_name, status,
           activation_policy_override, operational_policy_override, launch_approval_policy_override,
           notification_provider_promotion_policy_override, notification_policy_override,
-          governance_notification_policy_override, notification_provider_profile_override,
-          evidence_retention_policy_override, evidence_retention_class_policy_override
+          governance_notification_policy_override, recovery_governance_notification_policy_override,
+          notification_provider_profile_override, evidence_retention_policy_override,
+          evidence_retention_class_policy_override
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb)
         ON CONFLICT (tenant_id, workspace_key) DO UPDATE
         SET display_name = EXCLUDED.display_name,
             status = EXCLUDED.status,
@@ -2089,6 +2121,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
             notification_provider_promotion_policy_override = EXCLUDED.notification_provider_promotion_policy_override,
             notification_policy_override = EXCLUDED.notification_policy_override,
             governance_notification_policy_override = EXCLUDED.governance_notification_policy_override,
+            recovery_governance_notification_policy_override = EXCLUDED.recovery_governance_notification_policy_override,
             notification_provider_profile_override = EXCLUDED.notification_provider_profile_override,
             evidence_retention_policy_override = EXCLUDED.evidence_retention_policy_override,
             evidence_retention_class_policy_override = EXCLUDED.evidence_retention_class_policy_override
@@ -2112,6 +2145,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           : null,
         workspace.governanceNotificationPolicyOverrideRecords
           ? JSON.stringify(workspace.governanceNotificationPolicyOverrideRecords)
+          : null,
+        workspace.recoveryGovernanceNotificationPolicyOverrideRecords
+          ? JSON.stringify(workspace.recoveryGovernanceNotificationPolicyOverrideRecords)
           : null,
         workspace.notificationProviderProfileOverrideRecords
           ? JSON.stringify(workspace.notificationProviderProfileOverrideRecords)
@@ -2388,7 +2424,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       await client.query(
         `
           INSERT INTO notification_provider_profile_governance_alerts (
-            alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+            alert_id, incident_id, tenant_id, workspace_id, profile_key, alert_class, status, governance_status,
             created_at, created_by_actor_type, created_by_actor_id, source_request_id,
             delivery_profile_key, delivery_channel, delivery_status, delivery_target,
             delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
@@ -2396,7 +2432,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
             delivered_at, last_delivery_error, acknowledged_at, acknowledged_by_actor_id,
             acknowledgement_note
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
         `,
         [
           alert.alertId,
@@ -2404,6 +2440,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           alert.tenantId,
           alert.workspaceId,
           alert.profileKey,
+          alert.alertClass,
           alert.status,
           alert.governanceStatus,
           alert.createdAt,
@@ -2676,28 +2713,30 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
       await client.query(
         `
           UPDATE notification_provider_profile_governance_alerts
-          SET status = $2,
-              governance_status = $3,
-              source_request_id = $4,
-              delivery_profile_key = $5,
-              delivery_channel = $6,
-              delivery_status = $7,
-              delivery_target = $8,
-              delivery_attempt_count = $9,
-              max_delivery_attempts = $10,
-              next_delivery_attempt_at = $11,
-              last_delivery_attempt_at = $12,
-              last_delivery_receipt_id = $13,
-              last_delivery_receipt_issued_at = $14,
-              delivered_at = $15,
-              last_delivery_error = $16,
-              acknowledged_at = $17,
-              acknowledged_by_actor_id = $18,
-              acknowledgement_note = $19
+          SET alert_class = $2,
+              status = $3,
+              governance_status = $4,
+              source_request_id = $5,
+              delivery_profile_key = $6,
+              delivery_channel = $7,
+              delivery_status = $8,
+              delivery_target = $9,
+              delivery_attempt_count = $10,
+              max_delivery_attempts = $11,
+              next_delivery_attempt_at = $12,
+              last_delivery_attempt_at = $13,
+              last_delivery_receipt_id = $14,
+              last_delivery_receipt_issued_at = $15,
+              delivered_at = $16,
+              last_delivery_error = $17,
+              acknowledged_at = $18,
+              acknowledged_by_actor_id = $19,
+              acknowledgement_note = $20
           WHERE alert_id = $1
         `,
         [
           alert.alertId,
+          alert.alertClass,
           alert.status,
           alert.governanceStatus,
           alert.sourceRequestId,
@@ -3003,8 +3042,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           tenant_id, tenant_key, display_name, status, default_activation_policy,
           default_operational_policy, default_launch_approval_policy,
           default_notification_provider_promotion_policy, default_notification_policy,
-          default_governance_notification_policy, default_notification_provider_profiles,
-          default_evidence_retention_policy, default_evidence_retention_class_policy
+          default_governance_notification_policy, default_recovery_governance_notification_policy,
+          default_notification_provider_profiles, default_evidence_retention_policy,
+          default_evidence_retention_class_policy
         FROM tenants
         WHERE tenant_id = $1
       `,
@@ -3020,8 +3060,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           tenant_id, tenant_key, display_name, status, default_activation_policy,
           default_operational_policy, default_launch_approval_policy,
           default_notification_provider_promotion_policy, default_notification_policy,
-          default_governance_notification_policy, default_notification_provider_profiles,
-          default_evidence_retention_policy, default_evidence_retention_class_policy
+          default_governance_notification_policy, default_recovery_governance_notification_policy,
+          default_notification_provider_profiles, default_evidence_retention_policy,
+          default_evidence_retention_class_policy
         FROM tenants
         WHERE tenant_key = $1
       `,
@@ -3037,8 +3078,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           workspace_id, tenant_id, workspace_key, display_name, status,
           activation_policy_override, operational_policy_override, launch_approval_policy_override,
           notification_provider_promotion_policy_override, notification_policy_override,
-          governance_notification_policy_override, notification_provider_profile_override,
-          evidence_retention_policy_override, evidence_retention_class_policy_override
+          governance_notification_policy_override, recovery_governance_notification_policy_override,
+          notification_provider_profile_override, evidence_retention_policy_override,
+          evidence_retention_class_policy_override
         FROM workspaces
         WHERE workspace_id = $1
       `,
@@ -3217,7 +3259,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     const result = await pool.query(
       `
         SELECT
-          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, alert_class, status, governance_status,
           created_at, created_by_actor_type, created_by_actor_id, source_request_id,
           delivery_profile_key, delivery_channel, delivery_status, delivery_target,
           delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
@@ -3674,7 +3716,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     const result = await pool.query(
       `
         SELECT
-          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, alert_class, status, governance_status,
           created_at, created_by_actor_type, created_by_actor_id, source_request_id,
           delivery_profile_key, delivery_channel, delivery_status, delivery_target,
           delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
@@ -3695,7 +3737,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
     const result = await pool.query(
       `
         SELECT
-          alert_id, incident_id, tenant_id, workspace_id, profile_key, status, governance_status,
+          alert_id, incident_id, tenant_id, workspace_id, profile_key, alert_class, status, governance_status,
           created_at, created_by_actor_type, created_by_actor_id, source_request_id,
           delivery_profile_key, delivery_channel, delivery_status, delivery_target,
           delivery_attempt_count, max_delivery_attempts, next_delivery_attempt_at,
@@ -4204,8 +4246,9 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           tenant_id, tenant_key, display_name, status, default_activation_policy,
           default_operational_policy, default_launch_approval_policy,
           default_notification_provider_promotion_policy, default_notification_policy,
-          default_governance_notification_policy, default_notification_provider_profiles,
-          default_evidence_retention_policy, default_evidence_retention_class_policy
+          default_governance_notification_policy, default_recovery_governance_notification_policy,
+          default_notification_provider_profiles, default_evidence_retention_policy,
+          default_evidence_retention_class_policy
         FROM tenants
         ORDER BY tenant_key
       `
@@ -4228,6 +4271,7 @@ export const createPostgresPlatformStore = (pool: Pool): PlatformStore => ({
           w.notification_provider_promotion_policy_override,
           w.notification_policy_override,
           w.governance_notification_policy_override,
+          w.recovery_governance_notification_policy_override,
           w.notification_provider_profile_override,
           w.evidence_retention_policy_override,
           w.evidence_retention_class_policy_override

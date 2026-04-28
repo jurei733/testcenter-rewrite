@@ -15,6 +15,7 @@ import {
   type TenantEvidenceRetentionPolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
   type TenantGovernanceNotificationPolicyResponse,
+  type TenantRecoveryGovernanceNotificationPolicyResponse,
   type TenantNotificationProviderPromotionPolicyResponse,
   type TenantNotificationPolicyResponse,
   type TenantNotificationProviderProfilesResponse,
@@ -25,6 +26,7 @@ import {
   type WorkspaceEvidenceRetentionPolicyResponse,
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceGovernanceNotificationPolicyResponse,
+  type WorkspaceRecoveryGovernanceNotificationPolicyResponse,
   type WorkspaceNotificationProviderPromotionPolicyResponse,
   type WorkspaceNotificationPolicyResponse,
   type WorkspaceNotificationProviderProfileIncidentsResponse,
@@ -7844,6 +7846,70 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "investigate_delivery_failures"
   ]);
 
+  const tenantRecoveryGovernanceNotificationPolicyResponse =
+    await fetchJsonResponse<TenantRecoveryGovernanceNotificationPolicyResponse>(
+      apiRoutes.tenantRecoveryGovernanceNotificationPolicy(demoTenantKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          defaultRecoveryGovernanceNotificationPolicy: {
+            breachNotificationDeliverySelectionMode: "force_email_spike",
+            webhookSpikeRetryDelaySeconds: 21,
+            webhookSpikeMaxDeliveryAttempts: 22,
+            emailSpikeRetryDelaySeconds: 23,
+            emailSpikeMaxDeliveryAttempts: 24
+          }
+        })
+      }
+    );
+  const tenantRecoveryGovernanceNotificationPolicy =
+    tenantRecoveryGovernanceNotificationPolicyResponse.body;
+  const tenantRecoveryGovernanceNotificationPolicyRequestId =
+    tenantRecoveryGovernanceNotificationPolicyResponse.headers.get("x-request-id");
+  assert.ok(tenantRecoveryGovernanceNotificationPolicyRequestId);
+  assert.deepEqual(
+    tenantRecoveryGovernanceNotificationPolicy.defaultRecoveryGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 21,
+      webhookSpikeMaxDeliveryAttempts: 22,
+      emailSpikeRetryDelaySeconds: 23,
+      emailSpikeMaxDeliveryAttempts: 24
+    }
+  );
+
+  const workspaceRecoveryGovernanceNotificationPolicyResponse =
+    await fetchJsonResponse<WorkspaceRecoveryGovernanceNotificationPolicyResponse>(
+      apiRoutes.workspaceRecoveryGovernanceNotificationPolicy(demoTenantKey, demoWorkspaceKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "override",
+          recoveryGovernanceNotificationPolicyOverride: {
+            breachNotificationDeliverySelectionMode: "force_email_spike",
+            emailSpikeRetryDelaySeconds: 1,
+            emailSpikeMaxDeliveryAttempts: 6
+          }
+        })
+      }
+    );
+  const workspaceRecoveryGovernanceNotificationPolicy =
+    workspaceRecoveryGovernanceNotificationPolicyResponse.body;
+  const workspaceRecoveryGovernanceNotificationPolicyRequestId =
+    workspaceRecoveryGovernanceNotificationPolicyResponse.headers.get("x-request-id");
+  assert.ok(workspaceRecoveryGovernanceNotificationPolicyRequestId);
+  assert.equal(workspaceRecoveryGovernanceNotificationPolicy.mode, "override");
+  assert.deepEqual(
+    workspaceRecoveryGovernanceNotificationPolicy.effectiveRecoveryGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 21,
+      webhookSpikeMaxDeliveryAttempts: 22,
+      emailSpikeRetryDelaySeconds: 1,
+      emailSpikeMaxDeliveryAttempts: 6
+    }
+  );
+
   const forcedPromotionAfterIncident = await fetchJson<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
       demoTenantKey,
@@ -7888,6 +7954,26 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     resolvedProviderIncidentQueue.profileKey,
     "dead-letter-email-profile"
   );
+
+  const recoveryGovernanceAlert = await retry(async () => {
+    const response = await fetchJson<WorkspaceNotificationProviderProfileGovernanceAlertsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceAlerts(demoTenantKey, demoWorkspaceKey)}?profileKey=dead-letter-email-profile`
+    );
+    const matchingAlert = response.items.find(
+      item =>
+        item.incidentId === resolvedProviderIncidentQueue.incidentId &&
+        item.alertClass === "incident_resolved"
+    );
+
+    assert.ok(matchingAlert, "Expected a recovery governance alert after manual promotion.");
+    assert.equal(matchingAlert.governanceStatus, "resolved_recovery");
+    assert.equal(matchingAlert.delivery.channel, "email_spike");
+    assert.equal(matchingAlert.delivery.maxAttempts, 6);
+    assert.notEqual(matchingAlert.delivery.status, "pending_delivery");
+
+    return matchingAlert;
+  }, 20, 250);
+  assert.equal(recoveryGovernanceAlert.profileKey, "dead-letter-email-profile");
 
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
@@ -8773,6 +8859,39 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     }
   );
 
+  const tenantRecoveryGovernanceNotificationPolicyHistoryEntry = tenantPolicyHistory.items.find(
+    item =>
+      item.eventType === "tenant.recovery_governance_notification_policy.updated" &&
+      item.requestId === tenantRecoveryGovernanceNotificationPolicyRequestId
+  );
+  assert.ok(tenantRecoveryGovernanceNotificationPolicyHistoryEntry);
+  assert.equal(
+    tenantRecoveryGovernanceNotificationPolicyHistoryEntry.scope,
+    "tenant_default"
+  );
+  assert.equal(
+    tenantRecoveryGovernanceNotificationPolicyHistoryEntry.policyFamily,
+    "recovery_governance_notification"
+  );
+  assert.equal(tenantRecoveryGovernanceNotificationPolicyHistoryEntry.mode, "default");
+  assert.deepEqual(tenantRecoveryGovernanceNotificationPolicyHistoryEntry.changedFields, [
+    "breachNotificationDeliverySelectionMode",
+    "webhookSpikeRetryDelaySeconds",
+    "webhookSpikeMaxDeliveryAttempts",
+    "emailSpikeRetryDelaySeconds",
+    "emailSpikeMaxDeliveryAttempts"
+  ]);
+  assert.deepEqual(
+    tenantRecoveryGovernanceNotificationPolicyHistoryEntry.defaultRecoveryGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 21,
+      webhookSpikeMaxDeliveryAttempts: 22,
+      emailSpikeRetryDelaySeconds: 23,
+      emailSpikeMaxDeliveryAttempts: 24
+    }
+  );
+
   const tenantNotificationProviderProfilesHistoryEntry = tenantPolicyHistory.items.find(
     item =>
       item.eventType === "tenant.notification_provider_profiles.updated" &&
@@ -9006,6 +9125,55 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     workspaceGovernanceNotificationPolicyHistoryEntry.governanceNotificationPolicyOverrideRecords
       ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
     workspaceGovernanceNotificationPolicyRequestId
+  );
+
+  const workspaceRecoveryGovernanceNotificationPolicyHistoryEntry =
+    workspacePolicyHistory.items.find(
+      item => item.eventType === "workspace.recovery_governance_notification_policy.updated"
+    );
+  assert.ok(workspaceRecoveryGovernanceNotificationPolicyHistoryEntry);
+  assert.equal(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.scope,
+    "workspace_override"
+  );
+  assert.equal(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.policyFamily,
+    "recovery_governance_notification"
+  );
+  assert.equal(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.mode,
+    "override"
+  );
+  assert.equal(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.requestId,
+    workspaceRecoveryGovernanceNotificationPolicyRequestId
+  );
+  assert.deepEqual(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.defaultRecoveryGovernanceNotificationPolicy,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      webhookSpikeRetryDelaySeconds: 21,
+      webhookSpikeMaxDeliveryAttempts: 22,
+      emailSpikeRetryDelaySeconds: 23,
+      emailSpikeMaxDeliveryAttempts: 24
+    }
+  );
+  assert.deepEqual(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.changedFields,
+    ["breachNotificationDeliverySelectionMode", "emailSpikeRetryDelaySeconds", "emailSpikeMaxDeliveryAttempts"]
+  );
+  assert.deepEqual(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.recoveryGovernanceNotificationPolicyOverride,
+    {
+      breachNotificationDeliverySelectionMode: "force_email_spike",
+      emailSpikeRetryDelaySeconds: 1,
+      emailSpikeMaxDeliveryAttempts: 6
+    }
+  );
+  assert.equal(
+    workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.recoveryGovernanceNotificationPolicyOverrideRecords
+      ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
+    workspaceRecoveryGovernanceNotificationPolicyRequestId
   );
 
   const emptyWorkspacePolicyHistory = await fetchJson<PolicyHistoryResponse>(

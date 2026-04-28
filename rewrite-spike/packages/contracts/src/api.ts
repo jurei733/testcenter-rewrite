@@ -13,6 +13,8 @@ export const apiRoutes = {
     `/api/v1/platform/tenants/${tenantKey}/notification-policy`,
   tenantGovernanceNotificationPolicy: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/governance-notification-policy`,
+  tenantRecoveryGovernanceNotificationPolicy: (tenantKey: string): string =>
+    `/api/v1/platform/tenants/${tenantKey}/recovery-governance-notification-policy`,
   tenantNotificationProviderProfiles: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/notification-provider-profiles`,
   tenantEvidenceRetentionPolicy: (tenantKey: string): string =>
@@ -33,6 +35,8 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-policy`,
   workspaceGovernanceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/governance-notification-policy`,
+  workspaceRecoveryGovernanceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/recovery-governance-notification-policy`,
   workspaceNotificationProviderProfiles: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles`,
   workspaceNotificationProviderProfileRolloutMetrics: (tenantKey: string, workspaceKey: string): string =>
@@ -633,6 +637,7 @@ export type WorkspaceLaunchApprovalPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderPromotionPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceGovernanceNotificationPolicyModeDto = "inherit" | "override";
+export type WorkspaceRecoveryGovernanceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderProfilesModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionPolicyModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionClassPolicyModeDto = "inherit" | "override";
@@ -691,6 +696,15 @@ export interface UpdateTenantGovernanceNotificationPolicyRequest {
   defaultGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
+export interface UpdateWorkspaceRecoveryGovernanceNotificationPolicyRequest {
+  mode: WorkspaceRecoveryGovernanceNotificationPolicyModeDto;
+  recoveryGovernanceNotificationPolicyOverride?: NotificationPolicyOverrideDto | null;
+}
+
+export interface UpdateTenantRecoveryGovernanceNotificationPolicyRequest {
+  defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
 export interface UpdateTenantNotificationProviderProfilesRequest {
   defaultNotificationProviderProfiles: NotificationProviderProfileInputDto[];
 }
@@ -747,6 +761,11 @@ export interface TenantNotificationPolicyResponse {
 export interface TenantGovernanceNotificationPolicyResponse {
   tenantKey: string;
   defaultGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface TenantRecoveryGovernanceNotificationPolicyResponse {
+  tenantKey: string;
+  defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
 export interface TenantNotificationProviderProfilesResponse {
@@ -824,6 +843,16 @@ export interface WorkspaceGovernanceNotificationPolicyResponse {
   effectiveGovernanceNotificationPolicy: NotificationPolicyDto;
 }
 
+export interface WorkspaceRecoveryGovernanceNotificationPolicyResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  mode: WorkspaceRecoveryGovernanceNotificationPolicyModeDto;
+  defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+  recoveryGovernanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
+  recoveryGovernanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
+  effectiveRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
 export interface WorkspaceNotificationProviderProfilesResponse {
   tenantKey: string;
   workspaceKey: string;
@@ -893,7 +922,8 @@ export type NotificationProviderProfileGovernanceStatusDto =
   | "needs_acknowledgement"
   | "suppressed"
   | "ready_for_manual_recovery"
-  | "recovery_blocked";
+  | "recovery_blocked"
+  | "resolved_recovery";
 
 export type NotificationProviderProfileGovernanceRecommendedActionDto =
   | "acknowledge_incident"
@@ -931,6 +961,7 @@ export interface NotificationProviderProfileGovernanceAlertDto {
   alertId: string;
   incidentId: string;
   profileKey: string;
+  alertClass: "incident_open" | "incident_resolved";
   status: NotificationProviderProfileGovernanceAlertStatusDto;
   governanceStatus: NotificationProviderProfileGovernanceStatusDto;
   createdAt: string;
@@ -1879,6 +1910,7 @@ export type PolicyHistoryFamilyDto =
   | "notification_provider_promotion"
   | "notification"
   | "governance_notification"
+  | "recovery_governance_notification"
   | "notification_provider_profiles"
   | "evidence_retention"
   | "evidence_retention_class";
@@ -1923,6 +1955,10 @@ export interface PolicyHistoryEntryDto {
   governanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
   governanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
   effectiveGovernanceNotificationPolicy: NotificationPolicyDto | null;
+  defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto | null;
+  recoveryGovernanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
+  recoveryGovernanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
+  effectiveRecoveryGovernanceNotificationPolicy: NotificationPolicyDto | null;
   defaultNotificationProviderProfiles: NotificationProviderProfileDto[] | null;
   notificationProviderProfileOverride: NotificationProviderProfileDto[] | null;
   removedNotificationProviderProfileKeys: string[] | null;
