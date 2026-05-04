@@ -35,6 +35,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -8057,6 +8058,24 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     )
   );
 
+  const resolvedGovernanceCases =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCases(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&status=resolved`
+    );
+  const resolvedGovernanceCase = resolvedGovernanceCases.items.find(
+    item => item.incident.incidentId === resolvedProviderIncidentQueue.incidentId
+  );
+  assert.ok(resolvedGovernanceCase);
+  assert.equal(resolvedGovernanceCase.caseStatus, "awaiting_alert_acknowledgement");
+  assert.equal(resolvedGovernanceCase.failedAlertCount, 0);
+  assert.equal(resolvedGovernanceCase.pendingAlertAcknowledgementCount, 1);
+  assert.deepEqual(resolvedGovernanceCase.recommendedActions, [
+    "acknowledge_governance_alert"
+  ]);
+
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
       demoTenantKey,
@@ -8110,6 +8129,23 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
 
     return matchingAlert;
   }, 60, 250);
+
+  const governanceAlertDeadLetterCases =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCases(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&caseStatus=awaiting_redrive`
+    );
+  const governanceAlertDeadLetterCase = governanceAlertDeadLetterCases.items.find(
+    item => item.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+  );
+  assert.ok(governanceAlertDeadLetterCase);
+  assert.equal(governanceAlertDeadLetterCase.caseStatus, "awaiting_redrive");
+  assert.equal(governanceAlertDeadLetterCase.failedAlertCount, 1);
+  assert.deepEqual(governanceAlertDeadLetterCase.recommendedActions, [
+    "redrive_governance_alert"
+  ]);
 
   const tenantGovernanceNotificationPolicyResponse =
     await fetchJsonResponse<TenantGovernanceNotificationPolicyResponse>(

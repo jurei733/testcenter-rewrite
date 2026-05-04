@@ -193,6 +193,8 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
+  type NotificationProviderProfileGovernanceCaseStatusDto,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -378,6 +380,8 @@ const workspaceNotificationProviderProfileGovernanceAlertTrendsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-trends$/;
 const workspaceNotificationProviderProfileGovernanceCorrelationsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-correlations$/;
+const workspaceNotificationProviderProfileGovernanceCasesRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -972,6 +976,16 @@ const isNotificationProviderProfileGovernanceStatus = (
   value === "ready_for_manual_recovery" ||
   value === "recovery_blocked" ||
   value === "resolved_recovery";
+
+const isNotificationProviderProfileGovernanceCaseStatus = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseStatusDto =>
+  value === "awaiting_incident_acknowledgement" ||
+  value === "suppressed_monitoring" ||
+  value === "awaiting_redrive" ||
+  value === "awaiting_alert_acknowledgement" ||
+  value === "recovered" ||
+  value === "closed";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -2115,6 +2129,87 @@ const toNotificationProviderProfileGovernanceCorrelationTimelineEventDto = (
   relatedIncidentId: getAuditEventRelatedIncidentId(auditEvent),
   relatedAlertId: getAuditEventRelatedAlertIds(auditEvent)[0] ?? null
 });
+
+const toNotificationProviderProfileGovernanceCaseDto = (input: {
+  profileKey: string;
+  incident: NotificationProviderProfileIncident;
+  alerts: NotificationProviderProfileGovernanceAlert[];
+  timeline: ReturnType<typeof toNotificationProviderProfileGovernanceCorrelationTimelineEventDto>[];
+}): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
+  const nowIso = new Date().toISOString();
+  const openAlertCount = input.alerts.filter(alert => alert.alertClass === "incident_open").length;
+  const failedAlertCount = input.alerts.filter(
+    alert => alert.deliveryStatus === "delivery_failed"
+  ).length;
+  const pendingAlertAcknowledgementCount = input.alerts.filter(
+    alert => alert.status === "pending_acknowledgement"
+  ).length;
+  const suppressionActive =
+    input.incident.suppressionUntil !== null &&
+    input.incident.suppressionUntil > nowIso;
+  const allAlertsAcknowledged =
+    input.alerts.length > 0 &&
+    input.alerts.every(alert => alert.status === "acknowledged");
+  const hasDeliveredRecoveryAlert = input.alerts.some(
+    alert =>
+      alert.alertClass === "incident_resolved" &&
+      alert.deliveryStatus === "delivered"
+  );
+
+  let caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
+  let recommendedActions: WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number]["recommendedActions"];
+
+  if (failedAlertCount > 0) {
+    caseStatus = "awaiting_redrive";
+    recommendedActions = ["redrive_governance_alert"];
+  } else if (input.incident.status === "open") {
+    caseStatus = "awaiting_incident_acknowledgement";
+    recommendedActions = ["acknowledge_incident"];
+  } else if (suppressionActive) {
+    caseStatus = "suppressed_monitoring";
+    recommendedActions = ["wait_for_suppression_expiry"];
+  } else if (pendingAlertAcknowledgementCount > 0) {
+    caseStatus = "awaiting_alert_acknowledgement";
+    recommendedActions = ["acknowledge_governance_alert"];
+  } else if (hasDeliveredRecoveryAlert) {
+    caseStatus = "recovered";
+    recommendedActions = ["review_recovery_state"];
+  } else if (allAlertsAcknowledged || input.incident.status === "resolved") {
+    caseStatus = "closed";
+    recommendedActions = ["no_action_required"];
+  } else {
+    caseStatus = "closed";
+    recommendedActions = ["no_action_required"];
+  }
+
+  const latestActivityAt = [
+    input.incident.openedAt,
+    input.incident.acknowledgedAt,
+    input.incident.resolvedAt,
+    ...input.alerts.flatMap(alert => [
+      alert.createdAt,
+      alert.acknowledgedAt,
+      alert.deliveredAt,
+      alert.lastDeliveryAttemptAt
+    ]),
+    ...input.timeline.map(item => item.occurredAt)
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .sort((left, right) => right.localeCompare(left))[0] ?? input.incident.openedAt;
+
+  return {
+    profileKey: input.profileKey,
+    caseStatus,
+    latestActivityAt,
+    openAlertCount,
+    failedAlertCount,
+    pendingAlertAcknowledgementCount,
+    recommendedActions,
+    incident: toNotificationProviderProfileIncidentDto(input.incident),
+    alerts: input.alerts.map(toNotificationProviderProfileGovernanceAlertDto),
+    timeline: input.timeline
+  };
+};
 
 const toNotificationProviderProfileGovernanceQueueItemDto = (input: {
   incident: NotificationProviderProfileIncident;
@@ -9188,6 +9283,146 @@ const handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet = asyn
   );
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawCaseStatus = getTrimmedString(url.searchParams.get("caseStatus"));
+  const caseStatus = rawCaseStatus ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const rawAuditLimit = url.searchParams.get("auditLimit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+
+  if (status !== null && !isNotificationProviderProfileIncidentStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_status_filter",
+      "status must be open, acknowledged, or resolved."
+    );
+    return;
+  }
+
+  if (
+    caseStatus !== null &&
+    !isNotificationProviderProfileGovernanceCaseStatus(caseStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_case_status_filter",
+      "caseStatus must be one of awaiting_incident_acknowledgement, suppressed_monitoring, awaiting_redrive, awaiting_alert_acknowledgement, recovered, or closed."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_audit_limit",
+      "auditLimit must be an integer between 1 and 1000."
+    );
+    return;
+  }
+
+  const [incidents, alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileIncidentsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      status: status ?? undefined,
+      limit
+    }),
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: auditLimit
+    })
+  ]);
+
+  const items = incidents
+    .map(incident => {
+      const incidentAlerts = alerts
+        .filter(alert => alert.incidentId === incident.incidentId)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      const requestIds = new Set<string>();
+
+      if (incident.sourceRequestId) {
+        requestIds.add(incident.sourceRequestId);
+      }
+      for (const alert of incidentAlerts) {
+        if (alert.sourceRequestId) {
+          requestIds.add(alert.sourceRequestId);
+        }
+      }
+
+      const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+      const timeline = auditEvents
+        .filter(auditEvent => {
+          if (requestIds.has(auditEvent.requestId)) {
+            return true;
+          }
+
+          const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+          if (relatedIncidentId === incident.incidentId) {
+            return true;
+          }
+
+          const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+          return relatedAlertIds.some(alertId => alertIds.has(alertId));
+        })
+        .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+        .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+      return toNotificationProviderProfileGovernanceCaseDto({
+        profileKey: incident.profileKey,
+        incident,
+        alerts: incidentAlerts,
+        timeline
+      });
+    })
+    .filter(item => (caseStatus ? item.caseStatus === caseStatus : true));
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(response, 200, {
+    items,
+    filters: {
+      profileKey,
+      status,
+      caseStatus
+    }
+  });
+};
+
 const handleWorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueGet = async (
   store: PlatformStore,
   response: ServerResponse,
@@ -14360,6 +14595,26 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCasesRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCasesRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCasesRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceCasesRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCasesGet(
         store,
         response,
         url,

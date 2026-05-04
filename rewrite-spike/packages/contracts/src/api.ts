@@ -68,6 +68,11 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-correlations`,
+  workspaceNotificationProviderProfileGovernanceCases: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -1086,6 +1091,44 @@ export interface WorkspaceNotificationProviderProfileGovernanceCorrelationsRespo
   filters: {
     profileKey: string | null;
     status: NotificationProviderProfileIncidentStatusDto | null;
+  };
+}
+
+export type NotificationProviderProfileGovernanceCaseStatusDto =
+  | "awaiting_incident_acknowledgement"
+  | "suppressed_monitoring"
+  | "awaiting_redrive"
+  | "awaiting_alert_acknowledgement"
+  | "recovered"
+  | "closed";
+
+export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
+  | "acknowledge_incident"
+  | "wait_for_suppression_expiry"
+  | "redrive_governance_alert"
+  | "acknowledge_governance_alert"
+  | "review_recovery_state"
+  | "no_action_required";
+
+export interface NotificationProviderProfileGovernanceCaseItemDto {
+  profileKey: string;
+  caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
+  latestActivityAt: string;
+  openAlertCount: number;
+  failedAlertCount: number;
+  pendingAlertAcknowledgementCount: number;
+  recommendedActions: NotificationProviderProfileGovernanceCaseRecommendedActionDto[];
+  incident: NotificationProviderProfileIncidentDto;
+  alerts: NotificationProviderProfileGovernanceAlertDto[];
+  timeline: NotificationProviderProfileGovernanceCorrelationTimelineEventDto[];
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceCasesResponse {
+  items: NotificationProviderProfileGovernanceCaseItemDto[];
+  filters: {
+    profileKey: string | null;
+    status: NotificationProviderProfileIncidentStatusDto | null;
+    caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
   };
 }
 
