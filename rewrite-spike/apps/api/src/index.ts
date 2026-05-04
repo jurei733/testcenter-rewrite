@@ -192,6 +192,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -375,6 +376,8 @@ const workspaceNotificationProviderProfileGovernanceAlertMetricsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-metrics$/;
 const workspaceNotificationProviderProfileGovernanceAlertTrendsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-trends$/;
+const workspaceNotificationProviderProfileGovernanceCorrelationsRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-correlations$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -2061,6 +2064,56 @@ const toNotificationProviderProfileGovernanceAlertDto = (
   acknowledgedAt: alert.acknowledgedAt,
   acknowledgedByActorId: alert.acknowledgedByActorId,
   acknowledgementNote: alert.acknowledgementNote
+});
+
+const getAuditEventRelatedIncidentId = (
+  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
+): string | null => {
+  const directIncidentId = getAuditPayloadString(auditEvent.payload, "incidentId");
+  if (directIncidentId) {
+    return directIncidentId;
+  }
+
+  const incidentRecord = getAuditPayloadRecord(auditEvent.payload, "incident");
+  return incidentRecord ? (getTrimmedString(incidentRecord.incidentId) ?? null) : null;
+};
+
+const getAuditEventRelatedAlertIds = (
+  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
+): string[] => {
+  const relatedAlertIds = new Set<string>();
+  const directAlertId = getAuditPayloadString(auditEvent.payload, "alertId");
+  if (directAlertId) {
+    relatedAlertIds.add(directAlertId);
+  }
+
+  const recoveryGovernanceAlertId = getAuditPayloadString(
+    auditEvent.payload,
+    "recoveryGovernanceAlertId"
+  );
+  if (recoveryGovernanceAlertId) {
+    relatedAlertIds.add(recoveryGovernanceAlertId);
+  }
+
+  const alertRecord = getAuditPayloadRecord(auditEvent.payload, "alert");
+  const nestedAlertId = alertRecord ? getTrimmedString(alertRecord.alertId) : null;
+  if (nestedAlertId) {
+    relatedAlertIds.add(nestedAlertId);
+  }
+
+  return Array.from(relatedAlertIds);
+};
+
+const toNotificationProviderProfileGovernanceCorrelationTimelineEventDto = (
+  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
+) => ({
+  occurredAt: auditEvent.occurredAt,
+  eventType: auditEvent.eventType,
+  requestId: auditEvent.requestId,
+  actorType: auditEvent.actorType,
+  actorId: auditEvent.actorId,
+  relatedIncidentId: getAuditEventRelatedIncidentId(auditEvent),
+  relatedAlertId: getAuditEventRelatedAlertIds(auditEvent)[0] ?? null
 });
 
 const toNotificationProviderProfileGovernanceQueueItemDto = (input: {
@@ -9009,6 +9062,132 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertTrendsGet = async
   );
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawStatus = getTrimmedString(url.searchParams.get("status"));
+  const status = rawStatus ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const rawAuditLimit = url.searchParams.get("auditLimit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+
+  if (status !== null && !isNotificationProviderProfileIncidentStatus(status)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_correlation_status_filter",
+      "status must be open, acknowledged, or resolved."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_correlation_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_correlation_audit_limit",
+      "auditLimit must be an integer between 1 and 1000."
+    );
+    return;
+  }
+
+  const [incidents, alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileIncidentsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      status: status ?? undefined,
+      limit
+    }),
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: auditLimit
+    })
+  ]);
+
+  const items = incidents.map(incident => {
+    const incidentAlerts = alerts
+      .filter(alert => alert.incidentId === incident.incidentId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    const requestIds = new Set<string>();
+
+    if (incident.sourceRequestId) {
+      requestIds.add(incident.sourceRequestId);
+    }
+    for (const alert of incidentAlerts) {
+      if (alert.sourceRequestId) {
+        requestIds.add(alert.sourceRequestId);
+      }
+    }
+
+    const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+    const timeline = auditEvents
+      .filter(auditEvent => {
+        if (requestIds.has(auditEvent.requestId)) {
+          return true;
+        }
+
+        const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+        if (relatedIncidentId === incident.incidentId) {
+          return true;
+        }
+
+        const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+        return relatedAlertIds.some(alertId => alertIds.has(alertId));
+      })
+      .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+      .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+    return {
+      profileKey: incident.profileKey,
+      incident: toNotificationProviderProfileIncidentDto(incident),
+      alerts: incidentAlerts.map(toNotificationProviderProfileGovernanceAlertDto),
+      timeline
+    };
+  });
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse>(
+    response,
+    200,
+    {
+      items,
+      filters: {
+        profileKey,
+        status
+      }
+    }
+  );
+};
+
 const handleWorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueGet = async (
   store: PlatformStore,
   response: ServerResponse,
@@ -14161,6 +14340,26 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileGovernanceAlertTrendsGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCorrelationsRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCorrelationsRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCorrelationsRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceCorrelationsRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet(
         store,
         response,
         url,

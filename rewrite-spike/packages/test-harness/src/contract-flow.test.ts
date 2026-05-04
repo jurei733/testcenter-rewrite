@@ -34,6 +34,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertMetricsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -8018,6 +8019,43 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].pendingDeliveryCount, 0);
   assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].deliveredCount, 1);
   assert.equal(recoveryGovernanceAlertTrendItem.buckets[0].deliveryFailedCount, 0);
+
+  const resolvedGovernanceCorrelations =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCorrelations(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&status=resolved`
+    );
+  const resolvedGovernanceCorrelation = resolvedGovernanceCorrelations.items.find(
+    item => item.incident.incidentId === resolvedProviderIncidentQueue.incidentId
+  );
+  assert.ok(resolvedGovernanceCorrelation);
+  assert.equal(resolvedGovernanceCorrelation.profileKey, "dead-letter-email-profile");
+  assert.equal(resolvedGovernanceCorrelation.incident.status, "resolved");
+  assert.equal(resolvedGovernanceCorrelation.alerts.length, 2);
+  assert.ok(
+    resolvedGovernanceCorrelation.alerts.some(
+      item => item.alertClass === "incident_open"
+    )
+  );
+  assert.ok(
+    resolvedGovernanceCorrelation.alerts.some(
+      item => item.alertClass === "incident_resolved"
+    )
+  );
+  assert.ok(
+    resolvedGovernanceCorrelation.timeline.some(
+      item => item.eventType === "workspace.notification_provider_profile.promoted"
+    )
+  );
+  assert.ok(
+    resolvedGovernanceCorrelation.timeline.some(
+      item =>
+        item.eventType ===
+        "notification_service.notification_provider_profile.governance_alert.delivered"
+    )
+  );
 
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(

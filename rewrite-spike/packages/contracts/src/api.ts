@@ -63,6 +63,11 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-alert-trends`,
+  workspaceNotificationProviderProfileGovernanceCorrelations: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-correlations`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -1056,6 +1061,31 @@ export interface WorkspaceNotificationProviderProfileGovernanceAlertTrendsRespon
     profileKey: string | null;
     alertClass: "incident_open" | "incident_resolved" | null;
     deliveryChannel: SystemCheckEvidenceBreachNotificationDeliveryChannelDto | null;
+  };
+}
+
+export interface NotificationProviderProfileGovernanceCorrelationTimelineEventDto {
+  occurredAt: string;
+  eventType: string;
+  requestId: string;
+  actorType: "platform_api" | "participant" | "monitor" | "worker" | "dispatcher" | "notification_service";
+  actorId: string;
+  relatedIncidentId: string | null;
+  relatedAlertId: string | null;
+}
+
+export interface NotificationProviderProfileGovernanceCorrelationItemDto {
+  profileKey: string;
+  incident: NotificationProviderProfileIncidentDto;
+  alerts: NotificationProviderProfileGovernanceAlertDto[];
+  timeline: NotificationProviderProfileGovernanceCorrelationTimelineEventDto[];
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse {
+  items: NotificationProviderProfileGovernanceCorrelationItemDto[];
+  filters: {
+    profileKey: string | null;
+    status: NotificationProviderProfileIncidentStatusDto | null;
   };
 }
 
