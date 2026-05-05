@@ -1146,6 +1146,7 @@ export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
   | "assign_case"
   | "escalate_case"
   | "reopen_case"
+  | "complete_required_checklist"
   | "acknowledge_incident"
   | "wait_for_suppression_expiry"
   | "redrive_governance_alert"
@@ -1198,6 +1199,13 @@ export interface NotificationProviderProfileGovernanceCaseChecklistItemDto {
   note: string | null;
 }
 
+export interface NotificationProviderProfileGovernanceCaseRequiredChecklistItemDto {
+  itemKey: string;
+  label: string;
+  requiredForTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+  completed: boolean;
+}
+
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
   caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
@@ -1218,6 +1226,8 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   workflowNote: string | null;
   resolutionCode: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
   availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+  closeReadiness: "ready" | "blocked";
+  closeBlockedByChecklistItemKeys: string[];
   latestActivityAt: string;
   openAlertCount: number;
   failedAlertCount: number;
@@ -1225,6 +1235,7 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   recommendedActions: NotificationProviderProfileGovernanceCaseRecommendedActionDto[];
   notes: NotificationProviderProfileGovernanceCaseNoteDto[];
   checklistItems: NotificationProviderProfileGovernanceCaseChecklistItemDto[];
+  requiredChecklistItems: NotificationProviderProfileGovernanceCaseRequiredChecklistItemDto[];
   incident: NotificationProviderProfileIncidentDto;
   alerts: NotificationProviderProfileGovernanceAlertDto[];
   timeline: NotificationProviderProfileGovernanceCorrelationTimelineEventDto[];

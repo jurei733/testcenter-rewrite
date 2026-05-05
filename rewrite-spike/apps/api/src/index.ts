@@ -2378,6 +2378,54 @@ const listNotificationProviderProfileGovernanceCaseChecklistItems = (
   );
 };
 
+const buildNotificationProviderProfileGovernanceCaseRequiredChecklistItems = (input: {
+  caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
+  checklistItems: Array<{
+    itemKey: string;
+    label: string;
+    status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
+    updatedAt: string;
+    updatedByActorId: string;
+    note: string | null;
+  }>;
+}) => {
+  const checklistStatusByKey = new Map(
+    input.checklistItems.map(item => [item.itemKey, item.status] as const)
+  );
+
+  const templateDefinitions =
+    input.caseStatus === "awaiting_redrive"
+      ? [
+          {
+            itemKey: "verify-target",
+            label: "Verify corrected provider target",
+            requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
+          },
+          {
+            itemKey: "document-disposition",
+            label: "Document disposition before closure",
+            requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
+          }
+        ]
+      : input.caseStatus === "awaiting_alert_acknowledgement" ||
+          input.caseStatus === "recovered"
+        ? [
+            {
+              itemKey: "review-recovery-alert",
+              label: "Review recovery alert before closure",
+              requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
+            }
+          ]
+        : [];
+
+  return templateDefinitions.map(template => ({
+    ...template,
+    completed: checklistStatusByKey.get(template.itemKey) === "completed"
+  }));
+};
+
+const defaultGovernanceCaseAuditLimit = 5000;
+
 const toNotificationProviderProfileGovernanceCaseDto = (input: {
   profileKey: string;
   incident: NotificationProviderProfileIncident;
@@ -2481,6 +2529,22 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
   }
 
   const workflowState = input.workflowTransition?.workflowState ?? "open";
+  const requiredChecklistItems =
+    buildNotificationProviderProfileGovernanceCaseRequiredChecklistItems({
+      caseStatus,
+      checklistItems: input.checklistItems
+    });
+  const closeBlockedByChecklistItemKeys =
+    workflowState === "closed"
+      ? []
+      : requiredChecklistItems
+          .filter(
+            item =>
+              item.requiredForTransitions.includes("close_case") && !item.completed
+          )
+          .map(item => item.itemKey);
+  const closeReadiness =
+    closeBlockedByChecklistItemKeys.length === 0 ? "ready" : "blocked";
 
   if (slaStatus === "breached") {
     recommendedActions = ["escalate_case", ...recommendedActions];
@@ -2498,15 +2562,43 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions = ["reopen_case"];
   }
 
+  if (
+    workflowState !== "closed" &&
+    closeBlockedByChecklistItemKeys.length > 0 &&
+    !recommendedActions.includes("complete_required_checklist")
+  ) {
+    if (recommendedActions[0] === "assign_case") {
+      recommendedActions = [
+        "assign_case",
+        "complete_required_checklist",
+        ...recommendedActions.slice(1)
+      ];
+    } else if (recommendedActions[0] !== "no_action_required") {
+      recommendedActions = ["complete_required_checklist", ...recommendedActions];
+    }
+  }
+
   let availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+  const closeCaseTransitionSuffix: NotificationProviderProfileGovernanceCaseTransitionTypeDto[] =
+    closeBlockedByChecklistItemKeys.length === 0 ? ["close_case"] : [];
   if (workflowState === "closed") {
     availableTransitions = ["reopen_case"];
   } else if (workflowState === "in_recovery") {
-    availableTransitions = ["mark_waiting_external", "close_case"];
+    availableTransitions = [
+      "mark_waiting_external",
+      ...closeCaseTransitionSuffix
+    ];
   } else if (workflowState === "waiting_external") {
-    availableTransitions = ["start_recovery", "close_case"];
+    availableTransitions = [
+      "start_recovery",
+      ...closeCaseTransitionSuffix
+    ];
   } else {
-    availableTransitions = ["start_recovery", "mark_waiting_external", "close_case"];
+    availableTransitions = [
+      "start_recovery",
+      "mark_waiting_external",
+      ...closeCaseTransitionSuffix
+    ];
   }
 
   const latestActivityAt = [
@@ -2552,6 +2644,8 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
         ? (input.workflowTransition?.resolutionCode ?? null)
         : null,
     availableTransitions,
+    closeReadiness,
+    closeBlockedByChecklistItemKeys,
     latestActivityAt,
     openAlertCount,
     failedAlertCount,
@@ -2559,10 +2653,74 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions,
     notes: input.notes,
     checklistItems: input.checklistItems,
+    requiredChecklistItems,
     incident: toNotificationProviderProfileIncidentDto(input.incident),
     alerts: input.alerts.map(toNotificationProviderProfileGovernanceAlertDto),
     timeline: input.timeline
   };
+};
+
+const buildNotificationProviderProfileGovernanceCaseItem = (input: {
+  incident: NotificationProviderProfileIncident;
+  alerts: NotificationProviderProfileGovernanceAlert[];
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[];
+}) => {
+  const incidentAlerts = input.alerts
+    .filter(alert => alert.incidentId === input.incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+
+  if (input.incident.sourceRequestId) {
+    requestIds.add(input.incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = input.auditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === input.incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  return toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: input.incident.profileKey,
+    incident: input.incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      input.auditEvents,
+      input.incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      input.auditEvents,
+      input.incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      input.auditEvents,
+      input.incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      input.auditEvents,
+      input.incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+      input.auditEvents,
+      input.incident.incidentId
+    )
+  });
 };
 
 const toNotificationProviderProfileGovernanceCaseQueueItemDto = (
@@ -2606,65 +2764,15 @@ const buildNotificationProviderProfileGovernanceCaseQueueItems = (input: {
   alerts: NotificationProviderProfileGovernanceAlert[];
   auditEvents: import("@testcenter-rewrite/domain").AuditEvent[];
 }) => {
-  return input.incidents.map(incident => {
-    const incidentAlerts = input.alerts
-      .filter(alert => alert.incidentId === incident.incidentId)
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-    const requestIds = new Set<string>();
-
-    if (incident.sourceRequestId) {
-      requestIds.add(incident.sourceRequestId);
-    }
-    for (const alert of incidentAlerts) {
-      if (alert.sourceRequestId) {
-        requestIds.add(alert.sourceRequestId);
-      }
-    }
-
-    const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-    const timeline = input.auditEvents
-      .filter(auditEvent => {
-        if (requestIds.has(auditEvent.requestId)) {
-          return true;
-        }
-        const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-        if (relatedIncidentId === incident.incidentId) {
-          return true;
-        }
-        const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-        return relatedAlertIds.some(alertId => alertIds.has(alertId));
+  return input.incidents.map(incident =>
+    toNotificationProviderProfileGovernanceCaseQueueItemDto(
+      buildNotificationProviderProfileGovernanceCaseItem({
+        incident,
+        alerts: input.alerts,
+        auditEvents: input.auditEvents
       })
-      .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-      .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-    const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-      profileKey: incident.profileKey,
-      incident,
-      alerts: incidentAlerts,
-      timeline,
-      assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-        input.auditEvents,
-        incident.incidentId
-      ),
-      escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-        input.auditEvents,
-        incident.incidentId
-      ),
-      workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-        input.auditEvents,
-        incident.incidentId
-      ),
-      notes: listNotificationProviderProfileGovernanceCaseNotes(
-        input.auditEvents,
-        incident.incidentId
-      ),
-      checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-        input.auditEvents,
-        incident.incidentId
-      )
-    });
-
-    return toNotificationProviderProfileGovernanceCaseQueueItemDto(caseItem);
-  });
+    )
+  );
 };
 
 const toNotificationProviderProfileGovernanceCaseBoardLane = (input: {
@@ -9649,7 +9757,9 @@ const handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet = asyn
   const rawLimit = url.searchParams.get("limit");
   const rawAuditLimit = url.searchParams.get("auditLimit");
   const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
-  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+  const auditLimit = rawAuditLimit
+    ? Number.parseInt(rawAuditLimit, 10)
+    : defaultGovernanceCaseAuditLimit;
 
   if (status !== null && !isNotificationProviderProfileIncidentStatus(status)) {
     sendError(
@@ -9671,12 +9781,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCorrelationsGet = asyn
     return;
   }
 
-  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 5000) {
     sendError(
       response,
       400,
       "invalid_notification_provider_profile_governance_correlation_audit_limit",
-      "auditLimit must be an integer between 1 and 1000."
+      "auditLimit must be an integer between 1 and 5000."
     );
     return;
   }
@@ -9824,12 +9934,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
     return;
   }
 
-  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 5000) {
     sendError(
       response,
       400,
       "invalid_notification_provider_profile_governance_case_audit_limit",
-      "auditLimit must be an integer between 1 and 1000."
+      "auditLimit must be an integer between 1 and 5000."
     );
     return;
   }
@@ -9954,7 +10064,9 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
   const rawLimit = url.searchParams.get("limit");
   const rawAuditLimit = url.searchParams.get("auditLimit");
   const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
-  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+  const auditLimit = rawAuditLimit
+    ? Number.parseInt(rawAuditLimit, 10)
+    : defaultGovernanceCaseAuditLimit;
 
   if (
     caseStatus !== null &&
@@ -10003,12 +10115,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
     return;
   }
 
-  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 5000) {
     sendError(
       response,
       400,
       "invalid_notification_provider_profile_governance_case_queue_audit_limit",
-      "auditLimit must be an integer between 1 and 1000."
+      "auditLimit must be an integer between 1 and 5000."
     );
     return;
   }
@@ -10088,7 +10200,9 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
   const rawAssignmentStatus = getTrimmedString(url.searchParams.get("assignmentStatus"));
   const assignmentStatus = rawAssignmentStatus ?? null;
   const rawAuditLimit = url.searchParams.get("auditLimit");
-  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+  const auditLimit = rawAuditLimit
+    ? Number.parseInt(rawAuditLimit, 10)
+    : defaultGovernanceCaseAuditLimit;
 
   if (
     caseStatus !== null &&
@@ -10127,12 +10241,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
     return;
   }
 
-  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 5000) {
     sendError(
       response,
       400,
       "invalid_notification_provider_profile_governance_case_board_audit_limit",
-      "auditLimit must be an integer between 1 and 1000."
+      "auditLimit must be an integer between 1 and 5000."
     );
     return;
   }
@@ -10313,13 +10427,26 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   }
 
   const auditEvents = await store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-    limit: 500
+    limit: defaultGovernanceCaseAuditLimit
   });
+  const alerts = await store.listNotificationProviderProfileGovernanceAlertsByWorkspace(
+    tenantKey,
+    workspaceKey,
+    {
+      profileKey: incident.profileKey,
+      limit: 500
+    }
+  );
   const currentWorkflowTransition =
     getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
       auditEvents,
       incident.incidentId
     );
+  const currentCaseItem = buildNotificationProviderProfileGovernanceCaseItem({
+    incident,
+    alerts,
+    auditEvents
+  });
   const currentWorkflowState = currentWorkflowTransition?.workflowState ?? "open";
   const allowedTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[] =
     currentWorkflowState === "closed"
@@ -10336,6 +10463,22 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
       409,
       "notification_provider_profile_governance_case_transition_not_allowed",
       `Transition '${transition}' is not allowed from workflow state '${currentWorkflowState}'.`
+    );
+    return;
+  }
+
+  if (
+    transition === "close_case" &&
+    currentCaseItem.closeBlockedByChecklistItemKeys.length > 0
+  ) {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_case_close_checklist_incomplete",
+      "All required checklist items must be completed before close_case.",
+      {
+        blockedChecklistItemKeys: currentCaseItem.closeBlockedByChecklistItemKeys
+      }
     );
     return;
   }
@@ -10360,69 +10503,19 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
     }
   });
 
-  const [alerts, refreshedAuditEvents] = await Promise.all([
+  const [refreshedAlerts, refreshedAuditEvents] = await Promise.all([
     store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
       profileKey: incident.profileKey,
       limit: 500
     }),
     store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-      limit: 500
+      limit: defaultGovernanceCaseAuditLimit
     })
   ]);
-  const incidentAlerts = alerts
-    .filter(alert => alert.incidentId === incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-  if (incident.sourceRequestId) {
-    requestIds.add(incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-  requestIds.add(requestContext.requestId);
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = refreshedAuditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: incident.profileKey,
+  const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      refreshedAuditEvents,
-      incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      refreshedAuditEvents,
-      incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      refreshedAuditEvents,
-      incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      refreshedAuditEvents,
-      incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      refreshedAuditEvents,
-      incident.incidentId
-    )
+    alerts: refreshedAlerts,
+    auditEvents: refreshedAuditEvents
   });
 
   sendJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
@@ -10502,7 +10595,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAddNote = async (
       limit: 500
     }),
     store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-      limit: 500
+      limit: defaultGovernanceCaseAuditLimit
     })
   ]);
   const incidentAlerts = alerts
@@ -10651,7 +10744,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseUpsertChecklistIte
       limit: 500
     }),
     store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-      limit: 500
+      limit: defaultGovernanceCaseAuditLimit
     })
   ]);
   const incidentAlerts = alerts
@@ -10808,7 +10901,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
       limit: 500
     }),
     store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-      limit: 500
+      limit: defaultGovernanceCaseAuditLimit
     })
   ]);
   const incidentAlerts = alerts
@@ -10942,7 +11035,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
       limit: 500
     }),
     store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
-      limit: 500
+      limit: defaultGovernanceCaseAuditLimit
     })
   ]);
   const incidentAlerts = alerts

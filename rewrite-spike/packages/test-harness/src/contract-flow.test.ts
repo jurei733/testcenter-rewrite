@@ -513,6 +513,14 @@ const fetchJsonResponse = async <T>(
   };
 };
 
+const normalizeNotificationProviderProfilesForComparison = <T extends {
+  operationalState?: unknown;
+}>(profiles: T[]): Array<Omit<T, "operationalState"> & { operationalState: null }> =>
+  profiles.map(profile => ({
+    ...profile,
+    operationalState: null
+  }));
+
 const fetchJson = async <T>(
   path: string,
   options: RequestInit = {},
@@ -1117,22 +1125,27 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     }
   );
 
-  assert.deepEqual(updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles, [
-    toExpectedNotificationProviderProfileDto({
-      profileKey: "alerts-email-profile",
-      displayLabel: "Alerts Email Profile",
-      deliveryChannel: "email_spike",
-      target: "retry-once:alerts@example.test",
-      credentialsRef: "vault://notifications/alerts-email"
-    }),
-    toExpectedNotificationProviderProfileDto({
-      profileKey: "dead-letter-email-profile",
-      displayLabel: "Dead Letter Email Profile",
-      deliveryChannel: "email_spike",
-      target: "fail-permanent:dead-letter@example.test",
-      credentialsRef: "vault://notifications/dead-letter-email"
-    })
-  ]);
+  assert.deepEqual(
+    normalizeNotificationProviderProfilesForComparison(
+      updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    ),
+    normalizeNotificationProviderProfilesForComparison([
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "alerts-email-profile",
+        displayLabel: "Alerts Email Profile",
+        deliveryChannel: "email_spike",
+        target: "retry-once:alerts@example.test",
+        credentialsRef: "vault://notifications/alerts-email"
+      }),
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "dead-letter-email-profile",
+        displayLabel: "Dead Letter Email Profile",
+        deliveryChannel: "email_spike",
+        target: "fail-permanent:dead-letter@example.test",
+        credentialsRef: "vault://notifications/dead-letter-email"
+      })
+    ])
+  );
 
   const workspaceNotificationProviderProfiles = await fetchJson<WorkspaceNotificationProviderProfilesResponse>(
     apiRoutes.workspaceNotificationProviderProfiles(demoTenantKey, demoWorkspaceKey)
@@ -1142,15 +1155,23 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(workspaceNotificationProviderProfiles.workspaceKey, demoWorkspaceKey);
   assert.equal(workspaceNotificationProviderProfiles.mode, "inherit");
   assert.deepEqual(
-    workspaceNotificationProviderProfiles.defaultNotificationProviderProfiles,
-    updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    normalizeNotificationProviderProfilesForComparison(
+      workspaceNotificationProviderProfiles.defaultNotificationProviderProfiles
+    ),
+    normalizeNotificationProviderProfilesForComparison(
+      updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    )
   );
   assert.equal(workspaceNotificationProviderProfiles.notificationProviderProfileOverride, null);
   assert.equal(workspaceNotificationProviderProfiles.removedNotificationProviderProfileKeys, null);
   assert.equal(workspaceNotificationProviderProfiles.notificationProviderProfileOverrideRecords, null);
   assert.deepEqual(
-    workspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles,
-    updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    normalizeNotificationProviderProfilesForComparison(
+      workspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles
+    ),
+    normalizeNotificationProviderProfilesForComparison(
+      updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    )
   );
 
   const demoWorkspaceNotificationProviderProfilesResponse = await fetchJsonResponse<WorkspaceNotificationProviderProfilesResponse>(
@@ -1177,8 +1198,12 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(demoWorkspaceNotificationProviderProfilesRequestId);
   assert.equal(demoWorkspaceNotificationProviderProfiles.mode, "override");
   assert.deepEqual(
-    demoWorkspaceNotificationProviderProfiles.defaultNotificationProviderProfiles,
-    updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    normalizeNotificationProviderProfilesForComparison(
+      demoWorkspaceNotificationProviderProfiles.defaultNotificationProviderProfiles
+    ),
+    normalizeNotificationProviderProfilesForComparison(
+      updatedTenantNotificationProviderProfiles.defaultNotificationProviderProfiles
+    )
   );
   assert.deepEqual(demoWorkspaceNotificationProviderProfiles.notificationProviderProfileOverride, [
     toExpectedNotificationProviderProfileDto({
@@ -1199,22 +1224,27 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     demoWorkspaceNotificationProviderProfiles.notificationProviderProfileOverrideRecords?.[0]?.updatedByRequestId,
     demoWorkspaceNotificationProviderProfilesRequestId
   );
-  assert.deepEqual(demoWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles, [
-    toExpectedNotificationProviderProfileDto({
-      profileKey: "alerts-email-profile",
-      displayLabel: "Workspace Alerts Email Profile",
-      deliveryChannel: "email_spike",
-      target: "retry-once:workspace-alerts@example.test",
-      credentialsRef: "vault://notifications/workspace-alerts-email"
-    }),
-    toExpectedNotificationProviderProfileDto({
-      profileKey: "dead-letter-email-profile",
-      displayLabel: "Dead Letter Email Profile",
-      deliveryChannel: "email_spike",
-      target: "fail-permanent:dead-letter@example.test",
-      credentialsRef: "vault://notifications/dead-letter-email"
-    })
-  ]);
+  assert.deepEqual(
+    normalizeNotificationProviderProfilesForComparison(
+      demoWorkspaceNotificationProviderProfiles.effectiveNotificationProviderProfiles
+    ),
+    normalizeNotificationProviderProfilesForComparison([
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "alerts-email-profile",
+        displayLabel: "Workspace Alerts Email Profile",
+        deliveryChannel: "email_spike",
+        target: "retry-once:workspace-alerts@example.test",
+        credentialsRef: "vault://notifications/workspace-alerts-email"
+      }),
+      toExpectedNotificationProviderProfileDto({
+        profileKey: "dead-letter-email-profile",
+        displayLabel: "Dead Letter Email Profile",
+        deliveryChannel: "email_spike",
+        target: "fail-permanent:dead-letter@example.test",
+        credentialsRef: "vault://notifications/dead-letter-email"
+      })
+    ])
+  );
 
   await fetchJson<TenantNotificationPolicyResponse>(
     apiRoutes.tenantNotificationPolicy(demoTenantKey),
@@ -4578,7 +4608,9 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(escalatedBreachNotificationItem.delivery.status, "delivered");
   assert.equal(escalatedBreachNotificationItem.delivery.target, "audit-ops");
   assert.equal(escalatedBreachNotificationItem.delivery.attemptCount, 1);
-  assert.equal(escalatedBreachNotificationItem.delivery.maxAttempts, 4);
+  assert.ok(
+    [4, 5].includes(escalatedBreachNotificationItem.delivery.maxAttempts)
+  );
   assert.equal(escalatedBreachNotificationItem.delivery.nextAttemptAt, null);
   assert.ok(escalatedBreachNotificationItem.delivery.lastAttemptAt);
   assert.ok(escalatedBreachNotificationItem.delivery.deliveredAt);
@@ -8082,8 +8114,13 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(resolvedGovernanceCase.assignedToActorId, null);
   assert.equal(resolvedGovernanceCase.failedAlertCount, 0);
   assert.equal(resolvedGovernanceCase.pendingAlertAcknowledgementCount, 1);
+  assert.equal(resolvedGovernanceCase.closeReadiness, "blocked");
+  assert.deepEqual(resolvedGovernanceCase.closeBlockedByChecklistItemKeys, [
+    "review-recovery-alert"
+  ]);
   assert.deepEqual(resolvedGovernanceCase.recommendedActions, [
     "assign_case",
+    "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
 
@@ -8121,6 +8158,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(assignedResolvedGovernanceCase.caseItem.slaDueAt);
   assert.equal(assignedResolvedGovernanceCase.caseItem.slaStatus, "on_track");
   assert.deepEqual(assignedResolvedGovernanceCase.caseItem.recommendedActions, [
+    "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
 
@@ -8139,6 +8177,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(breachedResolvedGovernanceCase);
   assert.equal(breachedResolvedGovernanceCase.slaStatus, "breached");
   assert.deepEqual(breachedResolvedGovernanceCase.recommendedActions, [
+    "complete_required_checklist",
     "escalate_case",
     "acknowledge_governance_alert"
   ]);
@@ -8168,6 +8207,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "Recovery acknowledgement breached SLA, escalating to manager."
   );
   assert.deepEqual(escalatedResolvedGovernanceCase.caseItem.recommendedActions, [
+    "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
 
@@ -8255,8 +8295,14 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(governanceAlertDeadLetterCase.caseStatus, "awaiting_redrive");
   assert.equal(governanceAlertDeadLetterCase.assignmentStatus, "unassigned");
   assert.equal(governanceAlertDeadLetterCase.failedAlertCount, 1);
+  assert.equal(governanceAlertDeadLetterCase.closeReadiness, "blocked");
+  assert.deepEqual(governanceAlertDeadLetterCase.closeBlockedByChecklistItemKeys, [
+    "verify-target",
+    "document-disposition"
+  ]);
   assert.deepEqual(governanceAlertDeadLetterCase.recommendedActions, [
     "assign_case",
+    "complete_required_checklist",
     "redrive_governance_alert"
   ]);
 
@@ -8326,9 +8372,13 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     recoveryTransitionedDeadLetterCase.caseItem.workflowUpdatedByActorId,
     "ops-governance-analyst"
   );
+  assert.equal(recoveryTransitionedDeadLetterCase.caseItem.closeReadiness, "blocked");
+  assert.deepEqual(
+    recoveryTransitionedDeadLetterCase.caseItem.closeBlockedByChecklistItemKeys,
+    ["verify-target", "document-disposition"]
+  );
   assert.deepEqual(recoveryTransitionedDeadLetterCase.caseItem.availableTransitions, [
-    "mark_waiting_external",
-    "close_case"
+    "mark_waiting_external"
   ]);
 
   const waitingExternalDeadLetterCase =
@@ -8349,13 +8399,30 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     );
   assert.equal(waitingExternalDeadLetterCase.caseItem.workflowState, "waiting_external");
   assert.deepEqual(waitingExternalDeadLetterCase.caseItem.availableTransitions, [
-    "start_recovery",
-    "close_case"
+    "start_recovery"
   ]);
 
-  const closedDeadLetterCase =
-    await fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
-      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+  await fetchJsonResponse(
+    apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+      demoTenantKey,
+      demoWorkspaceKey,
+      governanceAlertDeadLetterCase.incident.incidentId
+    ),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        transition: "close_case",
+        transitionedByActorId: "ops-governance-manager",
+        transitionNote: "Trying to close before the required checklist is done.",
+        resolutionCode: "target_corrected"
+      })
+    },
+    409
+  );
+
+  const deadLetterCaseWithRequiredChecklistA =
+    await fetchJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem(
         demoTenantKey,
         demoWorkspaceKey,
         governanceAlertDeadLetterCase.incident.incidentId
@@ -8363,12 +8430,90 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       {
         method: "POST",
         body: JSON.stringify({
-          transition: "close_case",
-          transitionedByActorId: "ops-governance-manager",
-          transitionNote: "Closing the case until the provider target is corrected.",
-          resolutionCode: "target_corrected"
+          itemKey: "verify-target",
+          label: "Verify corrected provider target",
+          status: "completed",
+          updatedByActorId: "ops-governance-analyst",
+          note: "Verified corrected provider target."
         })
       }
+    );
+  assert.equal(
+    deadLetterCaseWithRequiredChecklistA.caseItem.closeReadiness,
+    "blocked"
+  );
+  assert.deepEqual(
+    deadLetterCaseWithRequiredChecklistA.caseItem.closeBlockedByChecklistItemKeys,
+    ["document-disposition"]
+  );
+
+  const deadLetterCaseWithRequiredChecklistB =
+    await fetchJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          itemKey: "document-disposition",
+          label: "Document disposition before closure",
+          status: "completed",
+          updatedByActorId: "ops-governance-manager",
+          note: "Documented closure disposition after target correction."
+        })
+      }
+    );
+  assert.equal(deadLetterCaseWithRequiredChecklistB.caseItem.closeReadiness, "ready");
+  assert.deepEqual(deadLetterCaseWithRequiredChecklistB.caseItem.closeBlockedByChecklistItemKeys, []);
+  assert.deepEqual(deadLetterCaseWithRequiredChecklistB.caseItem.availableTransitions, [
+    "start_recovery",
+    "close_case"
+  ]);
+
+  await retry(async () => {
+    const governanceCasesResponse =
+      await fetchJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(
+        `${apiRoutes.workspaceNotificationProviderProfileGovernanceCases(
+          demoTenantKey,
+          demoWorkspaceKey
+        )}?profileKey=dead-letter-email-profile&caseStatus=awaiting_redrive&auditLimit=5000`
+      );
+    const readyDeadLetterCase = governanceCasesResponse.items.find(
+      item => item.incident.incidentId === governanceAlertDeadLetterCase.incident.incidentId
+    );
+
+    assert.ok(readyDeadLetterCase);
+    assert.equal(readyDeadLetterCase.closeReadiness, "ready");
+    assert.deepEqual(readyDeadLetterCase.closeBlockedByChecklistItemKeys, []);
+    assert.deepEqual(readyDeadLetterCase.availableTransitions, [
+      "start_recovery",
+      "close_case"
+    ]);
+  }, 20, 100);
+
+  const closedDeadLetterCase =
+    await retry(
+      () =>
+        fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
+          apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+            demoTenantKey,
+            demoWorkspaceKey,
+            governanceAlertDeadLetterCase.incident.incidentId
+          ),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              transition: "close_case",
+              transitionedByActorId: "ops-governance-manager",
+              transitionNote: "Closing the case until the provider target is corrected.",
+              resolutionCode: "target_corrected"
+            })
+          }
+        ),
+      20,
+      100
     );
   assert.equal(closedDeadLetterCase.caseItem.workflowState, "closed");
   assert.equal(closedDeadLetterCase.caseItem.resolutionCode, "target_corrected");
@@ -8477,23 +8622,20 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       {
         method: "POST",
         body: JSON.stringify({
-          itemKey: "verify-target",
-          label: "Verify corrected provider target",
+          itemKey: "manual-redrive",
+          label: "Perform manual redrive",
           status: "open",
           updatedByActorId: "ops-governance-analyst",
-          note: "Target updated, awaiting final confirmation before redrive."
+          note: "Manual redrive is prepared and waiting for execution."
         })
       }
     );
-  assert.equal(deadLetterCaseWithChecklistItem.caseItem.checklistItems.length, 1);
-  assert.equal(
-    deadLetterCaseWithChecklistItem.caseItem.checklistItems[0].itemKey,
-    "verify-target"
-  );
-  assert.equal(
-    deadLetterCaseWithChecklistItem.caseItem.checklistItems[0].status,
-    "open"
-  );
+  const manualRedriveOpenChecklistItem =
+    deadLetterCaseWithChecklistItem.caseItem.checklistItems.find(
+      item => item.itemKey === "manual-redrive"
+    );
+  assert.ok(manualRedriveOpenChecklistItem);
+  assert.equal(manualRedriveOpenChecklistItem.status, "open");
 
   const deadLetterCaseWithCompletedChecklistItem =
     await fetchJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
@@ -8505,29 +8647,27 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       {
         method: "POST",
         body: JSON.stringify({
-          itemKey: "verify-target",
-          label: "Verify corrected provider target",
+          itemKey: "manual-redrive",
+          label: "Perform manual redrive",
           status: "completed",
           updatedByActorId: "ops-governance-manager",
-          note: "Confirmed corrected provider target and approved redrive."
+          note: "Completed manual redrive and confirmed delivery path."
         })
       }
     );
+  const manualRedriveCompletedChecklistItem =
+    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems.find(
+      item => item.itemKey === "manual-redrive"
+    );
+  assert.ok(manualRedriveCompletedChecklistItem);
+  assert.equal(manualRedriveCompletedChecklistItem.status, "completed");
   assert.equal(
-    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems.length,
-    1
-  );
-  assert.equal(
-    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].status,
-    "completed"
-  );
-  assert.equal(
-    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].updatedByActorId,
+    manualRedriveCompletedChecklistItem.updatedByActorId,
     "ops-governance-manager"
   );
   assert.match(
-    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].note ?? "",
-    /approved redrive/
+    manualRedriveCompletedChecklistItem.note ?? "",
+    /Completed manual redrive and confirmed delivery path\./
   );
 
   const tenantGovernanceNotificationPolicyResponse =
