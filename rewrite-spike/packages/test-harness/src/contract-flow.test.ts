@@ -8,6 +8,7 @@ import {
   type AssignNotificationProviderProfileGovernanceCaseResponse,
   type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
   type AcknowledgeNotificationProviderProfileIncidentResponse,
+  type EscalateNotificationProviderProfileGovernanceCaseResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
   type RedriveNotificationProviderProfileGovernanceAlertResponse,
@@ -8092,7 +8093,8 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         body: JSON.stringify({
           assignedByActorId: "ops-governance-lead",
           assignedToActorId: "ops-governance-analyst",
-          assignmentNote: "Handle recovery acknowledgement and confirm rollout state."
+          assignmentNote: "Handle recovery acknowledgement and confirm rollout state.",
+          slaSeconds: 1
         })
       }
     );
@@ -8109,7 +8111,57 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     assignedResolvedGovernanceCase.caseItem.assignmentNote,
     "Handle recovery acknowledgement and confirm rollout state."
   );
+  assert.equal(assignedResolvedGovernanceCase.caseItem.slaSeconds, 1);
+  assert.ok(assignedResolvedGovernanceCase.caseItem.slaDueAt);
+  assert.equal(assignedResolvedGovernanceCase.caseItem.slaStatus, "on_track");
   assert.deepEqual(assignedResolvedGovernanceCase.caseItem.recommendedActions, [
+    "acknowledge_governance_alert"
+  ]);
+
+  await delay(1_200);
+
+  const breachedResolvedGovernanceCases =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCases(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&status=resolved&slaStatus=breached`
+    );
+  const breachedResolvedGovernanceCase = breachedResolvedGovernanceCases.items.find(
+    item => item.incident.incidentId === resolvedProviderIncidentQueue.incidentId
+  );
+  assert.ok(breachedResolvedGovernanceCase);
+  assert.equal(breachedResolvedGovernanceCase.slaStatus, "breached");
+  assert.deepEqual(breachedResolvedGovernanceCase.recommendedActions, [
+    "escalate_case",
+    "acknowledge_governance_alert"
+  ]);
+
+  const escalatedResolvedGovernanceCase =
+    await fetchJson<EscalateNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseEscalate(
+        demoTenantKey,
+        demoWorkspaceKey,
+        resolvedProviderIncidentQueue.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          escalatedByActorId: "ops-governance-manager",
+          escalationNote: "Recovery acknowledgement breached SLA, escalating to manager."
+        })
+      }
+    );
+  assert.equal(escalatedResolvedGovernanceCase.caseItem.slaStatus, "escalated");
+  assert.equal(
+    escalatedResolvedGovernanceCase.caseItem.escalatedByActorId,
+    "ops-governance-manager"
+  );
+  assert.equal(
+    escalatedResolvedGovernanceCase.caseItem.escalationNote,
+    "Recovery acknowledgement breached SLA, escalating to manager."
+  );
+  assert.deepEqual(escalatedResolvedGovernanceCase.caseItem.recommendedActions, [
     "acknowledge_governance_alert"
   ]);
 

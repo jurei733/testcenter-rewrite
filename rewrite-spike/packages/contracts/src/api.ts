@@ -79,6 +79,12 @@ export const apiRoutes = {
     incidentId: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:assign`,
+  workspaceNotificationProviderProfileGovernanceCaseEscalate: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:escalate`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -1110,12 +1116,19 @@ export type NotificationProviderProfileGovernanceCaseStatusDto =
 
 export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
   | "assign_case"
+  | "escalate_case"
   | "acknowledge_incident"
   | "wait_for_suppression_expiry"
   | "redrive_governance_alert"
   | "acknowledge_governance_alert"
   | "review_recovery_state"
   | "no_action_required";
+
+export type NotificationProviderProfileGovernanceCaseSlaStatusDto =
+  | "not_applicable"
+  | "on_track"
+  | "breached"
+  | "escalated";
 
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
@@ -1125,6 +1138,12 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   assignedByActorId: string | null;
   assignedAt: string | null;
   assignmentNote: string | null;
+  slaSeconds: number | null;
+  slaDueAt: string | null;
+  slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto;
+  escalatedAt: string | null;
+  escalatedByActorId: string | null;
+  escalationNote: string | null;
   latestActivityAt: string;
   openAlertCount: number;
   failedAlertCount: number;
@@ -1141,6 +1160,7 @@ export interface WorkspaceNotificationProviderProfileGovernanceCasesResponse {
     profileKey: string | null;
     status: NotificationProviderProfileIncidentStatusDto | null;
     caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
+    slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto | null;
   };
 }
 
@@ -1148,9 +1168,19 @@ export interface AssignNotificationProviderProfileGovernanceCaseRequest {
   assignedByActorId: string;
   assignedToActorId: string;
   assignmentNote: string;
+  slaSeconds?: number | null;
 }
 
 export interface AssignNotificationProviderProfileGovernanceCaseResponse {
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
+}
+
+export interface EscalateNotificationProviderProfileGovernanceCaseRequest {
+  escalatedByActorId: string;
+  escalationNote: string;
+}
+
+export interface EscalateNotificationProviderProfileGovernanceCaseResponse {
   caseItem: NotificationProviderProfileGovernanceCaseItemDto;
 }
 

@@ -195,8 +195,11 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
   type NotificationProviderProfileGovernanceCaseStatusDto,
+  type NotificationProviderProfileGovernanceCaseSlaStatusDto,
   type AssignNotificationProviderProfileGovernanceCaseRequest,
   type AssignNotificationProviderProfileGovernanceCaseResponse,
+  type EscalateNotificationProviderProfileGovernanceCaseRequest,
+  type EscalateNotificationProviderProfileGovernanceCaseResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -386,6 +389,8 @@ const workspaceNotificationProviderProfileGovernanceCasesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases$/;
 const workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):assign$/;
+const workspaceNotificationProviderProfileGovernanceCaseEscalateRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):escalate$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -990,6 +995,14 @@ const isNotificationProviderProfileGovernanceCaseStatus = (
   value === "awaiting_alert_acknowledgement" ||
   value === "recovered" ||
   value === "closed";
+
+const isNotificationProviderProfileGovernanceCaseSlaStatus = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseSlaStatusDto =>
+  value === "not_applicable" ||
+  value === "on_track" ||
+  value === "breached" ||
+  value === "escalated";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -2158,7 +2171,35 @@ const getLatestNotificationProviderProfileGovernanceCaseAssignment = (
       getAuditPayloadString(matchingEvent.payload, "assignedByActorId") ?? null,
     assignedAt: getAuditPayloadString(matchingEvent.payload, "assignedAt") ?? null,
     assignmentNote:
-      getAuditPayloadString(matchingEvent.payload, "assignmentNote") ?? null
+      getAuditPayloadString(matchingEvent.payload, "assignmentNote") ?? null,
+    slaSeconds: getAuditPayloadNumber(matchingEvent.payload, "slaSeconds") ?? null
+  };
+};
+
+const getLatestNotificationProviderProfileGovernanceCaseEscalation = (
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
+  incidentId: string
+) => {
+  const matchingEvent = auditEvents
+    .filter(
+      auditEvent =>
+        auditEvent.eventType ===
+          "workspace.notification_provider_profile_governance_case.escalated" &&
+        getAuditEventRelatedIncidentId(auditEvent) === incidentId
+    )
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
+
+  if (!matchingEvent) {
+    return null;
+  }
+
+  return {
+    escalatedAt:
+      getAuditPayloadString(matchingEvent.payload, "escalatedAt") ?? matchingEvent.occurredAt,
+    escalatedByActorId:
+      getAuditPayloadString(matchingEvent.payload, "escalatedByActorId") ?? null,
+    escalationNote:
+      getAuditPayloadString(matchingEvent.payload, "escalationNote") ?? null
   };
 };
 
@@ -2172,6 +2213,12 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     assignedByActorId: string | null;
     assignedAt: string | null;
     assignmentNote: string | null;
+    slaSeconds: number | null;
+  } | null;
+  escalation: {
+    escalatedAt: string | null;
+    escalatedByActorId: string | null;
+    escalationNote: string | null;
   } | null;
 }): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
   const nowIso = new Date().toISOString();
@@ -2193,6 +2240,22 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
       alert.alertClass === "incident_resolved" &&
       alert.deliveryStatus === "delivered"
   );
+  const slaDueAt =
+    input.assignment?.assignedAt &&
+    typeof input.assignment.slaSeconds === "number" &&
+    input.assignment.slaSeconds > 0
+      ? new Date(
+          Date.parse(input.assignment.assignedAt) + input.assignment.slaSeconds * 1000
+        ).toISOString()
+      : null;
+  const slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto =
+    input.escalation !== null
+      ? "escalated"
+      : slaDueAt === null
+        ? "not_applicable"
+        : slaDueAt < nowIso
+          ? "breached"
+          : "on_track";
 
   let caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
   let recommendedActions: WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number]["recommendedActions"];
@@ -2220,7 +2283,15 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions = ["no_action_required"];
   }
 
-  if (input.assignment === null && recommendedActions[0] !== "no_action_required") {
+  if (slaStatus === "breached") {
+    recommendedActions = ["escalate_case", ...recommendedActions];
+  }
+
+  if (
+    input.assignment === null &&
+    recommendedActions[0] !== "no_action_required" &&
+    recommendedActions[0] !== "assign_case"
+  ) {
     recommendedActions = ["assign_case", ...recommendedActions];
   }
 
@@ -2229,6 +2300,8 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     input.incident.acknowledgedAt,
     input.incident.resolvedAt,
     input.assignment?.assignedAt,
+    slaDueAt,
+    input.escalation?.escalatedAt,
     ...input.alerts.flatMap(alert => [
       alert.createdAt,
       alert.acknowledgedAt,
@@ -2248,6 +2321,12 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     assignedByActorId: input.assignment?.assignedByActorId ?? null,
     assignedAt: input.assignment?.assignedAt ?? null,
     assignmentNote: input.assignment?.assignmentNote ?? null,
+    slaSeconds: input.assignment?.slaSeconds ?? null,
+    slaDueAt,
+    slaStatus,
+    escalatedAt: input.escalation?.escalatedAt ?? null,
+    escalatedByActorId: input.escalation?.escalatedByActorId ?? null,
+    escalationNote: input.escalation?.escalationNote ?? null,
     latestActivityAt,
     openAlertCount,
     failedAlertCount,
@@ -9355,6 +9434,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
   const status = rawStatus ?? null;
   const rawCaseStatus = getTrimmedString(url.searchParams.get("caseStatus"));
   const caseStatus = rawCaseStatus ?? null;
+  const rawSlaStatus = getTrimmedString(url.searchParams.get("slaStatus"));
+  const slaStatus = rawSlaStatus ?? null;
   const rawLimit = url.searchParams.get("limit");
   const rawAuditLimit = url.searchParams.get("auditLimit");
   const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
@@ -9379,6 +9460,16 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
       400,
       "invalid_notification_provider_profile_governance_case_case_status_filter",
       "caseStatus must be one of awaiting_incident_acknowledgement, suppressed_monitoring, awaiting_redrive, awaiting_alert_acknowledgement, recovered, or closed."
+    );
+    return;
+  }
+
+  if (slaStatus !== null && !isNotificationProviderProfileGovernanceCaseSlaStatus(slaStatus)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_sla_status_filter",
+      "slaStatus must be one of not_applicable, on_track, breached, or escalated."
     );
     return;
   }
@@ -9461,17 +9552,23 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
         incident,
         alerts: incidentAlerts,
         timeline,
-        assignment
+        assignment,
+        escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+          auditEvents,
+          incident.incidentId
+        )
       });
     })
-    .filter(item => (caseStatus ? item.caseStatus === caseStatus : true));
+    .filter(item => (caseStatus ? item.caseStatus === caseStatus : true))
+    .filter(item => (slaStatus ? item.slaStatus === slaStatus : true));
 
   sendJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(response, 200, {
     items,
     filters: {
       profileKey,
       status,
-      caseStatus
+      caseStatus,
+      slaStatus
     }
   });
 };
@@ -9512,6 +9609,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
   const assignedByActorId = getTrimmedString(body.assignedByActorId);
   const assignedToActorId = getTrimmedString(body.assignedToActorId);
   const assignmentNote = getTrimmedString(body.assignmentNote);
+  const slaSeconds =
+    typeof body.slaSeconds === "number" && Number.isInteger(body.slaSeconds)
+      ? body.slaSeconds
+      : body.slaSeconds === null || typeof body.slaSeconds === "undefined"
+        ? null
+        : Number.NaN;
 
   if (!assignedByActorId || !assignedToActorId || !assignmentNote) {
     sendError(
@@ -9519,6 +9622,16 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
       400,
       "invalid_notification_provider_profile_governance_case_assignment_payload",
       "assignedByActorId, assignedToActorId, and assignmentNote are required."
+    );
+    return;
+  }
+
+  if (Number.isNaN(slaSeconds) || (typeof slaSeconds === "number" && slaSeconds < 0)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_assignment_sla",
+      "slaSeconds must be a non-negative integer when provided."
     );
     return;
   }
@@ -9538,7 +9651,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
       assignedByActorId,
       assignedToActorId,
       assignedAt,
-      assignmentNote
+      assignmentNote,
+      slaSeconds
     }
   });
 
@@ -9588,10 +9702,136 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
     assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
       auditEvents,
       incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      auditEvents,
+      incident.incidentId
     )
   });
 
   sendJson<AssignNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
+    caseItem
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<EscalateNotificationProviderProfileGovernanceCaseRequest>(request);
+  const escalatedByActorId = getTrimmedString(body.escalatedByActorId);
+  const escalationNote = getTrimmedString(body.escalationNote);
+
+  if (!escalatedByActorId || !escalationNote) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_escalation_payload",
+      "escalatedByActorId and escalationNote are required."
+    );
+    return;
+  }
+
+  const escalatedAt = new Date().toISOString();
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: escalatedByActorId,
+    eventType: "workspace.notification_provider_profile_governance_case.escalated",
+    payload: {
+      workspaceKey,
+      profileKey: incident.profileKey,
+      incidentId: incident.incidentId,
+      escalatedByActorId,
+      escalatedAt,
+      escalationNote
+    }
+  });
+
+  const [alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: incident.profileKey,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+  const incidentAlerts = alerts
+    .filter(alert => alert.incidentId === incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+  if (incident.sourceRequestId) {
+    requestIds.add(incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+  requestIds.add(requestContext.requestId);
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = auditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: incident.profileKey,
+    incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      auditEvents,
+      incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      auditEvents,
+      incident.incidentId
+    )
+  });
+
+  sendJson<EscalateNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
     caseItem
   });
 };
@@ -14808,6 +15048,28 @@ const handleRequest = async (
 
     if (method === "POST") {
       await handleWorkspaceNotificationProviderProfileGovernanceCaseAssign(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseEscalateRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCaseEscalateRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseEscalateRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileGovernanceCaseEscalateRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate(
         store,
         request,
         response,
