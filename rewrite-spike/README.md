@@ -134,6 +134,7 @@ The first scaffold includes:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-cases`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-case-queue`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-case-board`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-cases/{incidentId}:transition`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-cases/{incidentId}:assign`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-cases/{incidentId}:escalate`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/notification-provider-profile-governance-alert-dead-letter-queue`

@@ -9,6 +9,7 @@ import {
   type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type EscalateNotificationProviderProfileGovernanceCaseResponse,
+  type TransitionNotificationProviderProfileGovernanceCaseResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
   type RedriveNotificationProviderProfileGovernanceAlertResponse,
@@ -7497,25 +7498,26 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       assert.equal(currentProfile.operationalState.rolloutStatus, "active_ready");
     }
 
+    const currentOverrideRecord =
+      currentWorkspace.notificationProviderProfileOverrideRecords?.find(
+        record => record.profileKey === "rollout-canary-email-profile"
+      );
+    assert.ok(currentOverrideRecord);
+    assert.equal(currentOverrideRecord.updatedByActorType, "worker");
+    assert.equal(currentOverrideRecord.updatedByActorId, "provider-operations-service");
+    assert.match(
+      currentOverrideRecord.updatedByRequestId,
+      /^provider-operations-workspace-notification-provider-profile-auto-promote-/
+    );
+
     return {
       currentWorkspace,
-      currentProfile
+      currentProfile,
+      currentOverrideRecord
     };
   }, 30, 250);
   const autoPromotedRolloutCanaryWorkspaceOverrideRecord =
-    autoPromotedRolloutCanaryWorkspace.currentWorkspace.notificationProviderProfileOverrideRecords?.find(
-      record => record.profileKey === "rollout-canary-email-profile"
-    );
-  assert.ok(autoPromotedRolloutCanaryWorkspaceOverrideRecord);
-  assert.equal(autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByActorType, "worker");
-  assert.equal(
-    autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByActorId,
-    "provider-operations-service"
-  );
-  assert.match(
-    autoPromotedRolloutCanaryWorkspaceOverrideRecord.updatedByRequestId,
-    /^provider-operations-workspace-notification-provider-profile-auto-promote-/
-  );
+    autoPromotedRolloutCanaryWorkspace.currentOverrideRecord;
 
   const autoPromoteAuditEvents = await retry(async () => {
     const auditEventsResponse = await fetchJson<{
@@ -8300,6 +8302,140 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(boardEscalatedCase);
   assert.equal(boardEscalatedCase.caseItem.slaStatus, "escalated");
   assert.equal(boardEscalatedCase.caseItem.assignmentStatus, "assigned");
+
+  const recoveryTransitionedDeadLetterCase =
+    await fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          transition: "start_recovery",
+          transitionedByActorId: "ops-governance-analyst",
+          transitionNote: "Starting manual recovery workflow for the failed governance alert."
+        })
+      }
+    );
+  assert.equal(recoveryTransitionedDeadLetterCase.caseItem.workflowState, "in_recovery");
+  assert.equal(
+    recoveryTransitionedDeadLetterCase.caseItem.workflowUpdatedByActorId,
+    "ops-governance-analyst"
+  );
+  assert.deepEqual(recoveryTransitionedDeadLetterCase.caseItem.availableTransitions, [
+    "mark_waiting_external",
+    "close_case"
+  ]);
+
+  const waitingExternalDeadLetterCase =
+    await fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          transition: "mark_waiting_external",
+          transitionedByActorId: "ops-governance-analyst",
+          transitionNote: "Waiting for external mail-routing correction before redrive."
+        })
+      }
+    );
+  assert.equal(waitingExternalDeadLetterCase.caseItem.workflowState, "waiting_external");
+  assert.deepEqual(waitingExternalDeadLetterCase.caseItem.availableTransitions, [
+    "start_recovery",
+    "close_case"
+  ]);
+
+  const closedDeadLetterCase =
+    await fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          transition: "close_case",
+          transitionedByActorId: "ops-governance-manager",
+          transitionNote: "Closing the case until the provider target is corrected."
+        })
+      }
+    );
+  assert.equal(closedDeadLetterCase.caseItem.workflowState, "closed");
+  assert.deepEqual(closedDeadLetterCase.caseItem.recommendedActions, ["reopen_case"]);
+  assert.deepEqual(closedDeadLetterCase.caseItem.availableTransitions, ["reopen_case"]);
+
+  const governanceCaseQueueAfterClose =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+  assert.equal(
+    governanceCaseQueueAfterClose.items.some(item =>
+      item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+    ),
+    false
+  );
+
+  const governanceCaseBoardAfterClose =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseBoardResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseBoard(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+  assert.equal(
+    governanceCaseBoardAfterClose.lanes.some(lane =>
+      lane.items.some(item =>
+        item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+      )
+    ),
+    false
+  );
+
+  const reopenedDeadLetterCase =
+    await fetchJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          transition: "reopen_case",
+          transitionedByActorId: "ops-governance-manager",
+          transitionNote: "Reopening after provider target correction is ready for redrive."
+        })
+      }
+    );
+  assert.equal(reopenedDeadLetterCase.caseItem.workflowState, "open");
+  assert.deepEqual(reopenedDeadLetterCase.caseItem.availableTransitions, [
+    "start_recovery",
+    "mark_waiting_external",
+    "close_case"
+  ]);
+
+  const governanceCaseQueueAfterReopen =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&caseStatus=awaiting_redrive`
+    );
+  assert.ok(
+    governanceCaseQueueAfterReopen.items.some(item =>
+      item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+    )
+  );
 
   const tenantGovernanceNotificationPolicyResponse =
     await fetchJsonResponse<TenantGovernanceNotificationPolicyResponse>(

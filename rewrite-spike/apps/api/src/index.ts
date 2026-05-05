@@ -199,10 +199,14 @@ import {
   type NotificationProviderProfileGovernanceCaseBoardLaneDto,
   type NotificationProviderProfileGovernanceCaseStatusDto,
   type NotificationProviderProfileGovernanceCaseSlaStatusDto,
+  type NotificationProviderProfileGovernanceCaseWorkflowStateDto,
+  type NotificationProviderProfileGovernanceCaseTransitionTypeDto,
   type AssignNotificationProviderProfileGovernanceCaseRequest,
   type AssignNotificationProviderProfileGovernanceCaseResponse,
   type EscalateNotificationProviderProfileGovernanceCaseRequest,
   type EscalateNotificationProviderProfileGovernanceCaseResponse,
+  type TransitionNotificationProviderProfileGovernanceCaseRequest,
+  type TransitionNotificationProviderProfileGovernanceCaseResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -394,6 +398,8 @@ const workspaceNotificationProviderProfileGovernanceCaseQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-case-queue$/;
 const workspaceNotificationProviderProfileGovernanceCaseBoardRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-case-board$/;
+const workspaceNotificationProviderProfileGovernanceCaseTransitionRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):transition$/;
 const workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):assign$/;
 const workspaceNotificationProviderProfileGovernanceCaseEscalateRoutePattern =
@@ -1010,6 +1016,14 @@ const isNotificationProviderProfileGovernanceCaseSlaStatus = (
   value === "on_track" ||
   value === "breached" ||
   value === "escalated";
+
+const isNotificationProviderProfileGovernanceCaseTransitionType = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseTransitionTypeDto =>
+  value === "start_recovery" ||
+  value === "mark_waiting_external" ||
+  value === "close_case" ||
+  value === "reopen_case";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -2210,6 +2224,48 @@ const getLatestNotificationProviderProfileGovernanceCaseEscalation = (
   };
 };
 
+const getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition = (
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
+  incidentId: string
+) => {
+  const matchingEvent = auditEvents
+    .filter(
+      auditEvent =>
+        auditEvent.eventType ===
+          "workspace.notification_provider_profile_governance_case.transitioned" &&
+        getAuditEventRelatedIncidentId(auditEvent) === incidentId
+    )
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
+
+  if (!matchingEvent) {
+    return null;
+  }
+
+  const transition = getAuditPayloadString(matchingEvent.payload, "transition");
+  let workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto = "open";
+
+  if (transition === "start_recovery") {
+    workflowState = "in_recovery";
+  } else if (transition === "mark_waiting_external") {
+    workflowState = "waiting_external";
+  } else if (transition === "close_case") {
+    workflowState = "closed";
+  }
+
+  return {
+    transition: isNotificationProviderProfileGovernanceCaseTransitionType(transition)
+      ? transition
+      : null,
+    workflowState,
+    workflowUpdatedAt:
+      getAuditPayloadString(matchingEvent.payload, "transitionedAt") ?? matchingEvent.occurredAt,
+    workflowUpdatedByActorId:
+      getAuditPayloadString(matchingEvent.payload, "transitionedByActorId") ?? null,
+    workflowNote:
+      getAuditPayloadString(matchingEvent.payload, "transitionNote") ?? null
+  };
+};
+
 const toNotificationProviderProfileGovernanceCaseDto = (input: {
   profileKey: string;
   incident: NotificationProviderProfileIncident;
@@ -2226,6 +2282,13 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     escalatedAt: string | null;
     escalatedByActorId: string | null;
     escalationNote: string | null;
+  } | null;
+  workflowTransition: {
+    transition: NotificationProviderProfileGovernanceCaseTransitionTypeDto | null;
+    workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto;
+    workflowUpdatedAt: string | null;
+    workflowUpdatedByActorId: string | null;
+    workflowNote: string | null;
   } | null;
 }): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
   const nowIso = new Date().toISOString();
@@ -2290,6 +2353,8 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions = ["no_action_required"];
   }
 
+  const workflowState = input.workflowTransition?.workflowState ?? "open";
+
   if (slaStatus === "breached") {
     recommendedActions = ["escalate_case", ...recommendedActions];
   }
@@ -2302,6 +2367,21 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions = ["assign_case", ...recommendedActions];
   }
 
+  if (workflowState === "closed") {
+    recommendedActions = ["reopen_case"];
+  }
+
+  let availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+  if (workflowState === "closed") {
+    availableTransitions = ["reopen_case"];
+  } else if (workflowState === "in_recovery") {
+    availableTransitions = ["mark_waiting_external", "close_case"];
+  } else if (workflowState === "waiting_external") {
+    availableTransitions = ["start_recovery", "close_case"];
+  } else {
+    availableTransitions = ["start_recovery", "mark_waiting_external", "close_case"];
+  }
+
   const latestActivityAt = [
     input.incident.openedAt,
     input.incident.acknowledgedAt,
@@ -2309,6 +2389,7 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     input.assignment?.assignedAt,
     slaDueAt,
     input.escalation?.escalatedAt,
+    input.workflowTransition?.workflowUpdatedAt,
     ...input.alerts.flatMap(alert => [
       alert.createdAt,
       alert.acknowledgedAt,
@@ -2334,6 +2415,12 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     escalatedAt: input.escalation?.escalatedAt ?? null,
     escalatedByActorId: input.escalation?.escalatedByActorId ?? null,
     escalationNote: input.escalation?.escalationNote ?? null,
+    workflowState,
+    workflowUpdatedAt: input.workflowTransition?.workflowUpdatedAt ?? null,
+    workflowUpdatedByActorId:
+      input.workflowTransition?.workflowUpdatedByActorId ?? null,
+    workflowNote: input.workflowTransition?.workflowNote ?? null,
+    availableTransitions,
     latestActivityAt,
     openAlertCount,
     failedAlertCount,
@@ -2426,6 +2513,10 @@ const buildNotificationProviderProfileGovernanceCaseQueueItems = (input: {
         incident.incidentId
       ),
       escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+        input.auditEvents,
+        incident.incidentId
+      ),
+      workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
         input.auditEvents,
         incident.incidentId
       )
@@ -9664,6 +9755,10 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
         escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
           auditEvents,
           incident.incidentId
+        ),
+        workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+          auditEvents,
+          incident.incidentId
         )
       });
     })
@@ -9789,7 +9884,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
     auditEvents
   })
     .filter(item => (caseStatus ? item.caseItem.caseStatus === caseStatus : true))
-    .filter(item => (caseStatus === null ? item.caseItem.caseStatus !== "closed" : true))
+    .filter(
+      item =>
+        item.caseItem.caseStatus !== "closed" &&
+        item.caseItem.workflowState !== "closed"
+    )
     .filter(item => (slaStatus ? item.caseItem.slaStatus === slaStatus : true))
     .filter(item =>
       assignmentStatus ? item.caseItem.assignmentStatus === assignmentStatus : true
@@ -9909,7 +10008,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
     auditEvents
   })
     .filter(item => (caseStatus ? item.caseItem.caseStatus === caseStatus : true))
-    .filter(item => (caseStatus === null ? item.caseItem.caseStatus !== "closed" : true))
+    .filter(
+      item =>
+        item.caseItem.caseStatus !== "closed" &&
+        item.caseItem.workflowState !== "closed"
+    )
     .filter(item => (slaStatus ? item.caseItem.slaStatus === slaStatus : true))
     .filter(item =>
       assignmentStatus ? item.caseItem.assignmentStatus === assignmentStatus : true
@@ -9981,6 +10084,168 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
       }
     }
   );
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const body =
+    await readBody<TransitionNotificationProviderProfileGovernanceCaseRequest>(request);
+  const transition = getTrimmedString(body.transition);
+  const transitionedByActorId = getTrimmedString(body.transitionedByActorId);
+  const transitionNote = getTrimmedString(body.transitionNote);
+
+  if (
+    !transition ||
+    !isNotificationProviderProfileGovernanceCaseTransitionType(transition) ||
+    !transitionedByActorId ||
+    !transitionNote
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_transition_payload",
+      "transition, transitionedByActorId, and transitionNote are required."
+    );
+    return;
+  }
+
+  const auditEvents = await store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+    limit: 500
+  });
+  const currentWorkflowTransition =
+    getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      auditEvents,
+      incident.incidentId
+    );
+  const currentWorkflowState = currentWorkflowTransition?.workflowState ?? "open";
+  const allowedTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[] =
+    currentWorkflowState === "closed"
+      ? ["reopen_case"]
+      : currentWorkflowState === "in_recovery"
+        ? ["mark_waiting_external", "close_case"]
+        : currentWorkflowState === "waiting_external"
+          ? ["start_recovery", "close_case"]
+          : ["start_recovery", "mark_waiting_external", "close_case"];
+
+  if (!allowedTransitions.includes(transition)) {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_case_transition_not_allowed",
+      `Transition '${transition}' is not allowed from workflow state '${currentWorkflowState}'.`
+    );
+    return;
+  }
+
+  const transitionedAt = new Date().toISOString();
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: transitionedByActorId,
+    eventType: "workspace.notification_provider_profile_governance_case.transitioned",
+    payload: {
+      workspaceKey,
+      profileKey: incident.profileKey,
+      incidentId: incident.incidentId,
+      transition,
+      transitionedByActorId,
+      transitionedAt,
+      transitionNote
+    }
+  });
+
+  const [alerts, refreshedAuditEvents] = await Promise.all([
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: incident.profileKey,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+  const incidentAlerts = alerts
+    .filter(alert => alert.incidentId === incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+  if (incident.sourceRequestId) {
+    requestIds.add(incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+  requestIds.add(requestContext.requestId);
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = refreshedAuditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: incident.profileKey,
+    incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      refreshedAuditEvents,
+      incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      refreshedAuditEvents,
+      incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      refreshedAuditEvents,
+      incident.incidentId
+    )
+  });
+
+  sendJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
+    caseItem
+  });
 };
 
 const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
@@ -10116,6 +10381,10 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
     escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
       auditEvents,
       incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      auditEvents,
+      incident.incidentId
     )
   });
 
@@ -10236,6 +10505,10 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
       incident.incidentId
     ),
     escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      auditEvents,
+      incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
       auditEvents,
       incident.incidentId
     )
@@ -15483,6 +15756,28 @@ const handleRequest = async (
         url,
         tenantKey,
         workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseTransitionRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCaseTransitionRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseTransitionRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileGovernanceCaseTransitionRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseTransition(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
+        requestContext
       );
       return;
     }

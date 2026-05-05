@@ -83,6 +83,12 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-case-board`,
+  workspaceNotificationProviderProfileGovernanceCaseTransition: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:transition`,
   workspaceNotificationProviderProfileGovernanceCaseAssign: (
     tenantKey: string,
     workspaceKey: string,
@@ -1127,6 +1133,7 @@ export type NotificationProviderProfileGovernanceCaseStatusDto =
 export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
   | "assign_case"
   | "escalate_case"
+  | "reopen_case"
   | "acknowledge_incident"
   | "wait_for_suppression_expiry"
   | "redrive_governance_alert"
@@ -1139,6 +1146,18 @@ export type NotificationProviderProfileGovernanceCaseSlaStatusDto =
   | "on_track"
   | "breached"
   | "escalated";
+
+export type NotificationProviderProfileGovernanceCaseWorkflowStateDto =
+  | "open"
+  | "in_recovery"
+  | "waiting_external"
+  | "closed";
+
+export type NotificationProviderProfileGovernanceCaseTransitionTypeDto =
+  | "start_recovery"
+  | "mark_waiting_external"
+  | "close_case"
+  | "reopen_case";
 
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
@@ -1154,6 +1173,11 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   escalatedAt: string | null;
   escalatedByActorId: string | null;
   escalationNote: string | null;
+  workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto;
+  workflowUpdatedAt: string | null;
+  workflowUpdatedByActorId: string | null;
+  workflowNote: string | null;
+  availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
   latestActivityAt: string;
   openAlertCount: number;
   failedAlertCount: number;
@@ -1231,6 +1255,16 @@ export interface EscalateNotificationProviderProfileGovernanceCaseRequest {
 }
 
 export interface EscalateNotificationProviderProfileGovernanceCaseResponse {
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
+}
+
+export interface TransitionNotificationProviderProfileGovernanceCaseRequest {
+  transition: NotificationProviderProfileGovernanceCaseTransitionTypeDto;
+  transitionedByActorId: string;
+  transitionNote: string;
+}
+
+export interface TransitionNotificationProviderProfileGovernanceCaseResponse {
   caseItem: NotificationProviderProfileGovernanceCaseItemDto;
 }
 
