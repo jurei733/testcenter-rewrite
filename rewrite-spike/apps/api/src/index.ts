@@ -202,12 +202,17 @@ import {
   type NotificationProviderProfileGovernanceCaseWorkflowStateDto,
   type NotificationProviderProfileGovernanceCaseResolutionCodeDto,
   type NotificationProviderProfileGovernanceCaseTransitionTypeDto,
+  type NotificationProviderProfileGovernanceCaseChecklistItemStatusDto,
   type AssignNotificationProviderProfileGovernanceCaseRequest,
   type AssignNotificationProviderProfileGovernanceCaseResponse,
   type EscalateNotificationProviderProfileGovernanceCaseRequest,
   type EscalateNotificationProviderProfileGovernanceCaseResponse,
   type TransitionNotificationProviderProfileGovernanceCaseRequest,
   type TransitionNotificationProviderProfileGovernanceCaseResponse,
+  type AddNotificationProviderProfileGovernanceCaseNoteRequest,
+  type AddNotificationProviderProfileGovernanceCaseNoteResponse,
+  type UpsertNotificationProviderProfileGovernanceCaseChecklistItemRequest,
+  type UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -401,6 +406,10 @@ const workspaceNotificationProviderProfileGovernanceCaseBoardRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-case-board$/;
 const workspaceNotificationProviderProfileGovernanceCaseTransitionRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):transition$/;
+const workspaceNotificationProviderProfileGovernanceCaseAddNoteRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):add-note$/;
+const workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItemRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):upsert-checklist-item$/;
 const workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):assign$/;
 const workspaceNotificationProviderProfileGovernanceCaseEscalateRoutePattern =
@@ -1034,6 +1043,11 @@ const isNotificationProviderProfileGovernanceCaseResolutionCode = (
   value === "external_dependency" ||
   value === "accepted_risk" ||
   value === "false_positive";
+
+const isNotificationProviderProfileGovernanceCaseChecklistItemStatus = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseChecklistItemStatusDto =>
+  value === "open" || value === "completed";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -2286,6 +2300,84 @@ const getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition = (
   };
 };
 
+const listNotificationProviderProfileGovernanceCaseNotes = (
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
+  incidentId: string
+) =>
+  auditEvents
+    .filter(
+      auditEvent =>
+        auditEvent.eventType ===
+          "workspace.notification_provider_profile_governance_case.note_added" &&
+        getAuditEventRelatedIncidentId(auditEvent) === incidentId
+    )
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(auditEvent => ({
+      noteId: getAuditPayloadString(auditEvent.payload, "noteId") ?? auditEvent.requestId,
+      body: getAuditPayloadString(auditEvent.payload, "noteBody") ?? "",
+      createdAt:
+        getAuditPayloadString(auditEvent.payload, "createdAt") ?? auditEvent.occurredAt,
+      createdByActorId: getAuditPayloadString(auditEvent.payload, "createdByActorId") ?? ""
+    }));
+
+const listNotificationProviderProfileGovernanceCaseChecklistItems = (
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
+  incidentId: string
+) => {
+  const latestByItemKey = new Map<
+    string,
+    {
+      itemKey: string;
+      label: string;
+      status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
+      updatedAt: string;
+      updatedByActorId: string;
+      note: string | null;
+    }
+  >();
+
+  for (const auditEvent of auditEvents
+    .filter(
+      currentAuditEvent =>
+        currentAuditEvent.eventType ===
+          "workspace.notification_provider_profile_governance_case.checklist_item_upserted" &&
+        getAuditEventRelatedIncidentId(currentAuditEvent) === incidentId
+    )
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))) {
+    const itemKey = getTrimmedString(
+      getAuditPayloadString(auditEvent.payload, "itemKey")
+    );
+    const label = getTrimmedString(getAuditPayloadString(auditEvent.payload, "label"));
+    const status = getAuditPayloadString(auditEvent.payload, "status");
+    const updatedByActorId = getTrimmedString(
+      getAuditPayloadString(auditEvent.payload, "updatedByActorId")
+    );
+
+    if (
+      !itemKey ||
+      !label ||
+      !updatedByActorId ||
+      !isNotificationProviderProfileGovernanceCaseChecklistItemStatus(status)
+    ) {
+      continue;
+    }
+
+    latestByItemKey.set(itemKey, {
+      itemKey,
+      label,
+      status,
+      updatedAt:
+        getAuditPayloadString(auditEvent.payload, "updatedAt") ?? auditEvent.occurredAt,
+      updatedByActorId,
+      note: getAuditPayloadString(auditEvent.payload, "note") ?? null
+    });
+  }
+
+  return Array.from(latestByItemKey.values()).sort((left, right) =>
+    left.itemKey.localeCompare(right.itemKey)
+  );
+};
+
 const toNotificationProviderProfileGovernanceCaseDto = (input: {
   profileKey: string;
   incident: NotificationProviderProfileIncident;
@@ -2311,6 +2403,20 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     workflowNote: string | null;
     resolutionCode: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
   } | null;
+  notes: Array<{
+    noteId: string;
+    body: string;
+    createdAt: string;
+    createdByActorId: string;
+  }>;
+  checklistItems: Array<{
+    itemKey: string;
+    label: string;
+    status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
+    updatedAt: string;
+    updatedByActorId: string;
+    note: string | null;
+  }>;
 }): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
   const nowIso = new Date().toISOString();
   const openAlertCount = input.alerts.filter(alert => alert.alertClass === "incident_open").length;
@@ -2451,6 +2557,8 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     failedAlertCount,
     pendingAlertAcknowledgementCount,
     recommendedActions,
+    notes: input.notes,
+    checklistItems: input.checklistItems,
     incident: toNotificationProviderProfileIncidentDto(input.incident),
     alerts: input.alerts.map(toNotificationProviderProfileGovernanceAlertDto),
     timeline: input.timeline
@@ -2542,6 +2650,14 @@ const buildNotificationProviderProfileGovernanceCaseQueueItems = (input: {
         incident.incidentId
       ),
       workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+        input.auditEvents,
+        incident.incidentId
+      ),
+      notes: listNotificationProviderProfileGovernanceCaseNotes(
+        input.auditEvents,
+        incident.incidentId
+      ),
+      checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
         input.auditEvents,
         incident.incidentId
       )
@@ -9784,6 +9900,14 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
         workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
           auditEvents,
           incident.incidentId
+        ),
+        notes: listNotificationProviderProfileGovernanceCaseNotes(
+          auditEvents,
+          incident.incidentId
+        ),
+        checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+          auditEvents,
+          incident.incidentId
         )
       });
     })
@@ -10290,12 +10414,309 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
     workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
       refreshedAuditEvents,
       incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      refreshedAuditEvents,
+      incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+      refreshedAuditEvents,
+      incident.incidentId
     )
   });
 
   sendJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
     caseItem
   });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceCaseAddNote = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<AddNotificationProviderProfileGovernanceCaseNoteRequest>(request);
+  const createdByActorId = getTrimmedString(body.createdByActorId);
+  const noteBody = getTrimmedString(body.noteBody);
+
+  if (!createdByActorId || !noteBody) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_note_payload",
+      "createdByActorId and noteBody are required."
+    );
+    return;
+  }
+
+  const createdAt = new Date().toISOString();
+  const noteId = `${incident.incidentId}:note:${createdAt}`;
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: createdByActorId,
+    eventType: "workspace.notification_provider_profile_governance_case.note_added",
+    payload: {
+      workspaceKey,
+      profileKey: incident.profileKey,
+      incidentId: incident.incidentId,
+      noteId,
+      noteBody,
+      createdAt,
+      createdByActorId
+    }
+  });
+
+  const [alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: incident.profileKey,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+  const incidentAlerts = alerts
+    .filter(alert => alert.incidentId === incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+  if (incident.sourceRequestId) {
+    requestIds.add(incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+  requestIds.add(requestContext.requestId);
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = auditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: incident.profileKey,
+    incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      auditEvents,
+      incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      auditEvents,
+      incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      auditEvents,
+      incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      auditEvents,
+      incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+      auditEvents,
+      incident.incidentId
+    )
+  });
+
+  sendJson<AddNotificationProviderProfileGovernanceCaseNoteResponse>(response, 200, {
+    caseItem
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const body =
+    await readBody<UpsertNotificationProviderProfileGovernanceCaseChecklistItemRequest>(
+      request
+    );
+  const itemKey = getTrimmedString(body.itemKey);
+  const label = getTrimmedString(body.label);
+  const status = body.status;
+  const updatedByActorId = getTrimmedString(body.updatedByActorId);
+  const note = getTrimmedString(body.note) ?? null;
+
+  if (
+    !itemKey ||
+    !label ||
+    !updatedByActorId ||
+    !isNotificationProviderProfileGovernanceCaseChecklistItemStatus(status)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_checklist_item_payload",
+      "itemKey, label, status, and updatedByActorId are required."
+    );
+    return;
+  }
+
+  const updatedAt = new Date().toISOString();
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: updatedByActorId,
+    eventType:
+      "workspace.notification_provider_profile_governance_case.checklist_item_upserted",
+    payload: {
+      workspaceKey,
+      profileKey: incident.profileKey,
+      incidentId: incident.incidentId,
+      itemKey,
+      label,
+      status,
+      updatedAt,
+      updatedByActorId,
+      note
+    }
+  });
+
+  const [alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: incident.profileKey,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+  const incidentAlerts = alerts
+    .filter(alert => alert.incidentId === incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+  if (incident.sourceRequestId) {
+    requestIds.add(incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+  requestIds.add(requestContext.requestId);
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = auditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: incident.profileKey,
+    incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      auditEvents,
+      incident.incidentId
+    ),
+    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+      auditEvents,
+      incident.incidentId
+    ),
+    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      auditEvents,
+      incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      auditEvents,
+      incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+      auditEvents,
+      incident.incidentId
+    )
+  });
+
+  sendJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
+    response,
+    200,
+    {
+      caseItem
+    }
+  );
 };
 
 const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
@@ -10435,6 +10856,14 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
     workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
       auditEvents,
       incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      auditEvents,
+      incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
+      auditEvents,
+      incident.incidentId
     )
   });
 
@@ -10559,6 +10988,14 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
       incident.incidentId
     ),
     workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
+      auditEvents,
+      incident.incidentId
+    ),
+    notes: listNotificationProviderProfileGovernanceCaseNotes(
+      auditEvents,
+      incident.incidentId
+    ),
+    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
       auditEvents,
       incident.incidentId
     )
@@ -15821,6 +16258,51 @@ const handleRequest = async (
 
     if (method === "POST") {
       await handleWorkspaceNotificationProviderProfileGovernanceCaseTransition(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseAddNoteRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCaseAddNoteRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseAddNoteRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileGovernanceCaseAddNoteRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseAddNote(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItemRouteMatch =
+    pathname.match(
+      workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItemRoutePattern
+    );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItemRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItemRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem(
         store,
         request,
         response,

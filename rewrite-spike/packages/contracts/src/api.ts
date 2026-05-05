@@ -89,6 +89,18 @@ export const apiRoutes = {
     incidentId: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:transition`,
+  workspaceNotificationProviderProfileGovernanceCaseAddNote: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:add-note`,
+  workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:upsert-checklist-item`,
   workspaceNotificationProviderProfileGovernanceCaseAssign: (
     tenantKey: string,
     workspaceKey: string,
@@ -1166,6 +1178,26 @@ export type NotificationProviderProfileGovernanceCaseTransitionTypeDto =
   | "close_case"
   | "reopen_case";
 
+export type NotificationProviderProfileGovernanceCaseChecklistItemStatusDto =
+  | "open"
+  | "completed";
+
+export interface NotificationProviderProfileGovernanceCaseNoteDto {
+  noteId: string;
+  body: string;
+  createdAt: string;
+  createdByActorId: string;
+}
+
+export interface NotificationProviderProfileGovernanceCaseChecklistItemDto {
+  itemKey: string;
+  label: string;
+  status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
+  updatedAt: string;
+  updatedByActorId: string;
+  note: string | null;
+}
+
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
   caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
@@ -1191,6 +1223,8 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   failedAlertCount: number;
   pendingAlertAcknowledgementCount: number;
   recommendedActions: NotificationProviderProfileGovernanceCaseRecommendedActionDto[];
+  notes: NotificationProviderProfileGovernanceCaseNoteDto[];
+  checklistItems: NotificationProviderProfileGovernanceCaseChecklistItemDto[];
   incident: NotificationProviderProfileIncidentDto;
   alerts: NotificationProviderProfileGovernanceAlertDto[];
   timeline: NotificationProviderProfileGovernanceCorrelationTimelineEventDto[];
@@ -1274,6 +1308,27 @@ export interface TransitionNotificationProviderProfileGovernanceCaseRequest {
 }
 
 export interface TransitionNotificationProviderProfileGovernanceCaseResponse {
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
+}
+
+export interface AddNotificationProviderProfileGovernanceCaseNoteRequest {
+  createdByActorId: string;
+  noteBody: string;
+}
+
+export interface AddNotificationProviderProfileGovernanceCaseNoteResponse {
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
+}
+
+export interface UpsertNotificationProviderProfileGovernanceCaseChecklistItemRequest {
+  itemKey: string;
+  label: string;
+  status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
+  updatedByActorId: string;
+  note?: string | null;
+}
+
+export interface UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse {
   caseItem: NotificationProviderProfileGovernanceCaseItemDto;
 }
 

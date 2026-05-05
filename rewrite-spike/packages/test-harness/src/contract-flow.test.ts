@@ -10,6 +10,8 @@ import {
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type EscalateNotificationProviderProfileGovernanceCaseResponse,
   type TransitionNotificationProviderProfileGovernanceCaseResponse,
+  type AddNotificationProviderProfileGovernanceCaseNoteResponse,
+  type UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse,
   type PolicyHistoryResponse,
   type PromoteWorkspaceNotificationProviderProfileResponse,
   type RedriveNotificationProviderProfileGovernanceAlertResponse,
@@ -8438,6 +8440,94 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     governanceCaseQueueAfterReopen.items.some(item =>
       item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
     )
+  );
+
+  const deadLetterCaseWithNote =
+    await fetchJson<AddNotificationProviderProfileGovernanceCaseNoteResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseAddNote(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          createdByActorId: "ops-governance-analyst",
+          noteBody: "Verified provider target correction and prepared manual redrive."
+        })
+      }
+    );
+  assert.equal(deadLetterCaseWithNote.caseItem.notes.length, 1);
+  assert.equal(
+    deadLetterCaseWithNote.caseItem.notes[0].createdByActorId,
+    "ops-governance-analyst"
+  );
+  assert.match(
+    deadLetterCaseWithNote.caseItem.notes[0].body,
+    /prepared manual redrive/
+  );
+
+  const deadLetterCaseWithChecklistItem =
+    await fetchJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          itemKey: "verify-target",
+          label: "Verify corrected provider target",
+          status: "open",
+          updatedByActorId: "ops-governance-analyst",
+          note: "Target updated, awaiting final confirmation before redrive."
+        })
+      }
+    );
+  assert.equal(deadLetterCaseWithChecklistItem.caseItem.checklistItems.length, 1);
+  assert.equal(
+    deadLetterCaseWithChecklistItem.caseItem.checklistItems[0].itemKey,
+    "verify-target"
+  );
+  assert.equal(
+    deadLetterCaseWithChecklistItem.caseItem.checklistItems[0].status,
+    "open"
+  );
+
+  const deadLetterCaseWithCompletedChecklistItem =
+    await fetchJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseUpsertChecklistItem(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          itemKey: "verify-target",
+          label: "Verify corrected provider target",
+          status: "completed",
+          updatedByActorId: "ops-governance-manager",
+          note: "Confirmed corrected provider target and approved redrive."
+        })
+      }
+    );
+  assert.equal(
+    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems.length,
+    1
+  );
+  assert.equal(
+    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].status,
+    "completed"
+  );
+  assert.equal(
+    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].updatedByActorId,
+    "ops-governance-manager"
+  );
+  assert.match(
+    deadLetterCaseWithCompletedChecklistItem.caseItem.checklistItems[0].note ?? "",
+    /approved redrive/
   );
 
   const tenantGovernanceNotificationPolicyResponse =
