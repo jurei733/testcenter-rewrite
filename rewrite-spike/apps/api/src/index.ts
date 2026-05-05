@@ -200,6 +200,7 @@ import {
   type NotificationProviderProfileGovernanceCaseStatusDto,
   type NotificationProviderProfileGovernanceCaseSlaStatusDto,
   type NotificationProviderProfileGovernanceCaseWorkflowStateDto,
+  type NotificationProviderProfileGovernanceCaseResolutionCodeDto,
   type NotificationProviderProfileGovernanceCaseTransitionTypeDto,
   type AssignNotificationProviderProfileGovernanceCaseRequest,
   type AssignNotificationProviderProfileGovernanceCaseResponse,
@@ -1024,6 +1025,15 @@ const isNotificationProviderProfileGovernanceCaseTransitionType = (
   value === "mark_waiting_external" ||
   value === "close_case" ||
   value === "reopen_case";
+
+const isNotificationProviderProfileGovernanceCaseResolutionCode = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseResolutionCodeDto =>
+  value === "target_corrected" ||
+  value === "manual_recovery_completed" ||
+  value === "external_dependency" ||
+  value === "accepted_risk" ||
+  value === "false_positive";
 
 const isNotificationProviderProfiles = (
   value: unknown
@@ -2242,6 +2252,15 @@ const getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition = (
   }
 
   const transition = getAuditPayloadString(matchingEvent.payload, "transition");
+  const rawResolutionCode = getAuditPayloadString(
+    matchingEvent.payload,
+    "resolutionCode"
+  );
+  const resolutionCode = isNotificationProviderProfileGovernanceCaseResolutionCode(
+    rawResolutionCode
+  )
+    ? rawResolutionCode
+    : null;
   let workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto = "open";
 
   if (transition === "start_recovery") {
@@ -2262,7 +2281,8 @@ const getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition = (
     workflowUpdatedByActorId:
       getAuditPayloadString(matchingEvent.payload, "transitionedByActorId") ?? null,
     workflowNote:
-      getAuditPayloadString(matchingEvent.payload, "transitionNote") ?? null
+      getAuditPayloadString(matchingEvent.payload, "transitionNote") ?? null,
+    resolutionCode
   };
 };
 
@@ -2289,6 +2309,7 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     workflowUpdatedAt: string | null;
     workflowUpdatedByActorId: string | null;
     workflowNote: string | null;
+    resolutionCode: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
   } | null;
 }): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
   const nowIso = new Date().toISOString();
@@ -2420,6 +2441,10 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     workflowUpdatedByActorId:
       input.workflowTransition?.workflowUpdatedByActorId ?? null,
     workflowNote: input.workflowTransition?.workflowNote ?? null,
+    resolutionCode:
+      workflowState === "closed"
+        ? (input.workflowTransition?.resolutionCode ?? null)
+        : null,
     availableTransitions,
     latestActivityAt,
     openAlertCount,
@@ -10123,6 +10148,7 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   const transition = getTrimmedString(body.transition);
   const transitionedByActorId = getTrimmedString(body.transitionedByActorId);
   const transitionNote = getTrimmedString(body.transitionNote);
+  const resolutionCode = getTrimmedString(body.resolutionCode) ?? null;
 
   if (
     !transition ||
@@ -10135,6 +10161,29 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
       400,
       "invalid_notification_provider_profile_governance_case_transition_payload",
       "transition, transitionedByActorId, and transitionNote are required."
+    );
+    return;
+  }
+
+  if (
+    resolutionCode !== null &&
+    !isNotificationProviderProfileGovernanceCaseResolutionCode(resolutionCode)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_resolution_code",
+      "resolutionCode must be one of target_corrected, manual_recovery_completed, external_dependency, accepted_risk, or false_positive."
+    );
+    return;
+  }
+
+  if (transition === "close_case" && resolutionCode === null) {
+    sendError(
+      response,
+      400,
+      "notification_provider_profile_governance_case_resolution_code_required",
+      "resolutionCode is required when transition is close_case."
     );
     return;
   }
@@ -10182,7 +10231,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
       transition,
       transitionedByActorId,
       transitionedAt,
-      transitionNote
+      transitionNote,
+      resolutionCode: transition === "close_case" ? resolutionCode : null
     }
   });
 

@@ -1153,6 +1153,13 @@ export type NotificationProviderProfileGovernanceCaseWorkflowStateDto =
   | "waiting_external"
   | "closed";
 
+export type NotificationProviderProfileGovernanceCaseResolutionCodeDto =
+  | "target_corrected"
+  | "manual_recovery_completed"
+  | "external_dependency"
+  | "accepted_risk"
+  | "false_positive";
+
 export type NotificationProviderProfileGovernanceCaseTransitionTypeDto =
   | "start_recovery"
   | "mark_waiting_external"
@@ -1177,6 +1184,7 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   workflowUpdatedAt: string | null;
   workflowUpdatedByActorId: string | null;
   workflowNote: string | null;
+  resolutionCode: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
   availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
   latestActivityAt: string;
   openAlertCount: number;
@@ -1262,6 +1270,7 @@ export interface TransitionNotificationProviderProfileGovernanceCaseRequest {
   transition: NotificationProviderProfileGovernanceCaseTransitionTypeDto;
   transitionedByActorId: string;
   transitionNote: string;
+  resolutionCode?: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
 }
 
 export interface TransitionNotificationProviderProfileGovernanceCaseResponse {

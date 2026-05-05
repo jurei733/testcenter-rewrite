@@ -8363,11 +8363,13 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         body: JSON.stringify({
           transition: "close_case",
           transitionedByActorId: "ops-governance-manager",
-          transitionNote: "Closing the case until the provider target is corrected."
+          transitionNote: "Closing the case until the provider target is corrected.",
+          resolutionCode: "target_corrected"
         })
       }
     );
   assert.equal(closedDeadLetterCase.caseItem.workflowState, "closed");
+  assert.equal(closedDeadLetterCase.caseItem.resolutionCode, "target_corrected");
   assert.deepEqual(closedDeadLetterCase.caseItem.recommendedActions, ["reopen_case"]);
   assert.deepEqual(closedDeadLetterCase.caseItem.availableTransitions, ["reopen_case"]);
 
@@ -8418,6 +8420,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       }
     );
   assert.equal(reopenedDeadLetterCase.caseItem.workflowState, "open");
+  assert.equal(reopenedDeadLetterCase.caseItem.resolutionCode, null);
   assert.deepEqual(reopenedDeadLetterCase.caseItem.availableTransitions, [
     "start_recovery",
     "mark_waiting_external",
