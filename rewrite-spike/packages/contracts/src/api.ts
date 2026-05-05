@@ -73,6 +73,11 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases`,
+  workspaceNotificationProviderProfileGovernanceCaseQueue: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-case-queue`,
   workspaceNotificationProviderProfileGovernanceCaseAssign: (
     tenantKey: string,
     workspaceKey: string,
@@ -1161,6 +1166,22 @@ export interface WorkspaceNotificationProviderProfileGovernanceCasesResponse {
     status: NotificationProviderProfileIncidentStatusDto | null;
     caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
     slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto | null;
+  };
+}
+
+export interface NotificationProviderProfileGovernanceCaseQueueItemDto {
+  priorityRank: number;
+  priorityReason: string;
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse {
+  items: NotificationProviderProfileGovernanceCaseQueueItemDto[];
+  filters: {
+    profileKey: string | null;
+    caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
+    slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto | null;
+    assignmentStatus: "unassigned" | "assigned" | null;
   };
 }
 

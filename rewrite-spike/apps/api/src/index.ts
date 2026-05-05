@@ -194,6 +194,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse,
   type NotificationProviderProfileGovernanceCaseStatusDto,
   type NotificationProviderProfileGovernanceCaseSlaStatusDto,
   type AssignNotificationProviderProfileGovernanceCaseRequest,
@@ -387,6 +388,8 @@ const workspaceNotificationProviderProfileGovernanceCorrelationsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-correlations$/;
 const workspaceNotificationProviderProfileGovernanceCasesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases$/;
+const workspaceNotificationProviderProfileGovernanceCaseQueueRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-case-queue$/;
 const workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):assign$/;
 const workspaceNotificationProviderProfileGovernanceCaseEscalateRoutePattern =
@@ -2335,6 +2338,42 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     incident: toNotificationProviderProfileIncidentDto(input.incident),
     alerts: input.alerts.map(toNotificationProviderProfileGovernanceAlertDto),
     timeline: input.timeline
+  };
+};
+
+const toNotificationProviderProfileGovernanceCaseQueueItemDto = (
+  caseItem: WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number]
+): WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse["items"][number] => {
+  let priorityRank = 999;
+  let priorityReason = "closed_or_inactive";
+
+  if (caseItem.slaStatus === "escalated") {
+    priorityRank = 10;
+    priorityReason = "case_escalated";
+  } else if (caseItem.slaStatus === "breached") {
+    priorityRank = 20;
+    priorityReason = "sla_breached";
+  } else if (caseItem.caseStatus === "awaiting_redrive") {
+    priorityRank = 30;
+    priorityReason = "delivery_failed";
+  } else if (caseItem.caseStatus === "awaiting_alert_acknowledgement") {
+    priorityRank = 40;
+    priorityReason = "alert_acknowledgement_pending";
+  } else if (caseItem.caseStatus === "awaiting_incident_acknowledgement") {
+    priorityRank = 50;
+    priorityReason = "incident_acknowledgement_pending";
+  } else if (caseItem.caseStatus === "suppressed_monitoring") {
+    priorityRank = 60;
+    priorityReason = "suppression_monitoring";
+  } else if (caseItem.caseStatus === "recovered") {
+    priorityRank = 70;
+    priorityReason = "recovered_review";
+  }
+
+  return {
+    priorityRank,
+    priorityReason,
+    caseItem
   };
 };
 
@@ -9573,6 +9612,179 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
   });
 };
 
+const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  url: URL,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
+  const rawCaseStatus = getTrimmedString(url.searchParams.get("caseStatus"));
+  const caseStatus = rawCaseStatus ?? null;
+  const rawSlaStatus = getTrimmedString(url.searchParams.get("slaStatus"));
+  const slaStatus = rawSlaStatus ?? null;
+  const rawAssignmentStatus = getTrimmedString(url.searchParams.get("assignmentStatus"));
+  const assignmentStatus = rawAssignmentStatus ?? null;
+  const rawLimit = url.searchParams.get("limit");
+  const rawAuditLimit = url.searchParams.get("auditLimit");
+  const limit = rawLimit ? Number.parseInt(rawLimit, 10) : 50;
+  const auditLimit = rawAuditLimit ? Number.parseInt(rawAuditLimit, 10) : 500;
+
+  if (
+    caseStatus !== null &&
+    !isNotificationProviderProfileGovernanceCaseStatus(caseStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_queue_case_status_filter",
+      "caseStatus must be one of awaiting_incident_acknowledgement, suppressed_monitoring, awaiting_redrive, awaiting_alert_acknowledgement, recovered, or closed."
+    );
+    return;
+  }
+
+  if (slaStatus !== null && !isNotificationProviderProfileGovernanceCaseSlaStatus(slaStatus)) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_queue_sla_status_filter",
+      "slaStatus must be one of not_applicable, on_track, breached, or escalated."
+    );
+    return;
+  }
+
+  if (
+    assignmentStatus !== null &&
+    assignmentStatus !== "unassigned" &&
+    assignmentStatus !== "assigned"
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_queue_assignment_status_filter",
+      "assignmentStatus must be one of unassigned or assigned."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(limit) || limit <= 0 || limit > 200) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_queue_limit",
+      "limit must be an integer between 1 and 200."
+    );
+    return;
+  }
+
+  if (!Number.isInteger(auditLimit) || auditLimit <= 0 || auditLimit > 1000) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_queue_audit_limit",
+      "auditLimit must be an integer between 1 and 1000."
+    );
+    return;
+  }
+
+  const [incidents, alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileIncidentsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      limit: 200
+    }),
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: profileKey ?? undefined,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: auditLimit
+    })
+  ]);
+
+  const items = incidents
+    .map(incident => {
+      const incidentAlerts = alerts
+        .filter(alert => alert.incidentId === incident.incidentId)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      const requestIds = new Set<string>();
+      if (incident.sourceRequestId) {
+        requestIds.add(incident.sourceRequestId);
+      }
+      for (const alert of incidentAlerts) {
+        if (alert.sourceRequestId) {
+          requestIds.add(alert.sourceRequestId);
+        }
+      }
+      const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+      const timeline = auditEvents
+        .filter(auditEvent => {
+          if (requestIds.has(auditEvent.requestId)) {
+            return true;
+          }
+          const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+          if (relatedIncidentId === incident.incidentId) {
+            return true;
+          }
+          const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+          return relatedAlertIds.some(alertId => alertIds.has(alertId));
+        })
+        .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+        .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+      const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+        profileKey: incident.profileKey,
+        incident,
+        alerts: incidentAlerts,
+        timeline,
+        assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+          auditEvents,
+          incident.incidentId
+        ),
+        escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
+          auditEvents,
+          incident.incidentId
+        )
+      });
+
+      return toNotificationProviderProfileGovernanceCaseQueueItemDto(caseItem);
+    })
+    .filter(item => (caseStatus ? item.caseItem.caseStatus === caseStatus : true))
+    .filter(item => (caseStatus === null ? item.caseItem.caseStatus !== "closed" : true))
+    .filter(item => (slaStatus ? item.caseItem.slaStatus === slaStatus : true))
+    .filter(item =>
+      assignmentStatus ? item.caseItem.assignmentStatus === assignmentStatus : true
+    )
+    .sort((left, right) =>
+      left.priorityRank - right.priorityRank ||
+      right.caseItem.latestActivityAt.localeCompare(left.caseItem.latestActivityAt) ||
+      left.caseItem.profileKey.localeCompare(right.caseItem.profileKey) ||
+      left.caseItem.incident.incidentId.localeCompare(right.caseItem.incident.incidentId)
+    )
+    .slice(0, limit);
+
+  sendJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(response, 200, {
+    items,
+    filters: {
+      profileKey,
+      caseStatus,
+      slaStatus,
+      assignmentStatus
+    }
+  });
+};
+
 const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
   store: PlatformStore,
   request: IncomingMessage,
@@ -15028,6 +15240,26 @@ const handleRequest = async (
 
     if (method === "GET") {
       await handleWorkspaceNotificationProviderProfileGovernanceCasesGet(
+        store,
+        response,
+        url,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseQueueRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCaseQueueRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseQueueRouteMatch) {
+    const [, tenantKey, workspaceKey] =
+      workspaceNotificationProviderProfileGovernanceCaseQueueRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet(
         store,
         response,
         url,

@@ -38,6 +38,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceAlertTrendsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -8165,6 +8166,22 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "acknowledge_governance_alert"
   ]);
 
+  const escalatedGovernanceCaseQueue =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&slaStatus=escalated`
+    );
+  const escalatedGovernanceCaseQueueItem = escalatedGovernanceCaseQueue.items.find(
+    item => item.caseItem.incident.incidentId === resolvedProviderIncidentQueue.incidentId
+  );
+  assert.ok(escalatedGovernanceCaseQueueItem);
+  assert.equal(escalatedGovernanceCaseQueueItem.priorityRank, 10);
+  assert.equal(escalatedGovernanceCaseQueueItem.priorityReason, "case_escalated");
+  assert.equal(escalatedGovernanceCaseQueueItem.caseItem.slaStatus, "escalated");
+  assert.equal(escalatedGovernanceCaseQueueItem.caseItem.assignmentStatus, "assigned");
+
   const resolvedGovernanceQueue = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     `${apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
       demoTenantKey,
@@ -8237,6 +8254,22 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "assign_case",
     "redrive_governance_alert"
   ]);
+
+  const unassignedGovernanceCaseQueue =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseQueue(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile&caseStatus=awaiting_redrive&assignmentStatus=unassigned`
+    );
+  const deadLetterGovernanceCaseQueueItem = unassignedGovernanceCaseQueue.items.find(
+    item => item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+  );
+  assert.ok(deadLetterGovernanceCaseQueueItem);
+  assert.equal(deadLetterGovernanceCaseQueueItem.priorityRank, 30);
+  assert.equal(deadLetterGovernanceCaseQueueItem.priorityReason, "delivery_failed");
+  assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.caseStatus, "awaiting_redrive");
+  assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.assignmentStatus, "unassigned");
 
   const tenantGovernanceNotificationPolicyResponse =
     await fetchJsonResponse<TenantGovernanceNotificationPolicyResponse>(
