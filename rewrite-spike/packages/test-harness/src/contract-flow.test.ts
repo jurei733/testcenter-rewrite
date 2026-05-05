@@ -39,6 +39,7 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
   type WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse,
+  type WorkspaceNotificationProviderProfileGovernanceCaseBoardResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfileRolloutMetricsResponse,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -8270,6 +8271,35 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(deadLetterGovernanceCaseQueueItem.priorityReason, "delivery_failed");
   assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.caseStatus, "awaiting_redrive");
   assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.assignmentStatus, "unassigned");
+
+  const governanceCaseBoard =
+    await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseBoardResponse>(
+      `${apiRoutes.workspaceNotificationProviderProfileGovernanceCaseBoard(
+        demoTenantKey,
+        demoWorkspaceKey
+      )}?profileKey=dead-letter-email-profile`
+    );
+  const needsAssignmentLane = governanceCaseBoard.lanes.find(
+    lane => lane.laneKey === "needs_assignment"
+  );
+  assert.ok(needsAssignmentLane);
+  const boardDeadLetterCase = needsAssignmentLane.items.find(item =>
+    item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
+  );
+  assert.ok(boardDeadLetterCase);
+  assert.equal(boardDeadLetterCase.caseItem.caseStatus, "awaiting_redrive");
+  assert.equal(boardDeadLetterCase.caseItem.assignmentStatus, "unassigned");
+
+  const breachedOrEscalatedLane = governanceCaseBoard.lanes.find(
+    lane => lane.laneKey === "breached_or_escalated"
+  );
+  assert.ok(breachedOrEscalatedLane);
+  const boardEscalatedCase = breachedOrEscalatedLane.items.find(
+    item => item.caseItem.incident.incidentId === resolvedProviderIncidentQueue.incidentId
+  );
+  assert.ok(boardEscalatedCase);
+  assert.equal(boardEscalatedCase.caseItem.slaStatus, "escalated");
+  assert.equal(boardEscalatedCase.caseItem.assignmentStatus, "assigned");
 
   const tenantGovernanceNotificationPolicyResponse =
     await fetchJsonResponse<TenantGovernanceNotificationPolicyResponse>(

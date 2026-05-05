@@ -78,6 +78,11 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-case-queue`,
+  workspaceNotificationProviderProfileGovernanceCaseBoard: (
+    tenantKey: string,
+    workspaceKey: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-case-board`,
   workspaceNotificationProviderProfileGovernanceCaseAssign: (
     tenantKey: string,
     workspaceKey: string,
@@ -1177,6 +1182,30 @@ export interface NotificationProviderProfileGovernanceCaseQueueItemDto {
 
 export interface WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse {
   items: NotificationProviderProfileGovernanceCaseQueueItemDto[];
+  filters: {
+    profileKey: string | null;
+    caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
+    slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto | null;
+    assignmentStatus: "unassigned" | "assigned" | null;
+  };
+}
+
+export type NotificationProviderProfileGovernanceCaseBoardLaneKeyDto =
+  | "needs_assignment"
+  | "breached_or_escalated"
+  | "awaiting_redrive"
+  | "awaiting_acknowledgement"
+  | "monitoring_or_recovered";
+
+export interface NotificationProviderProfileGovernanceCaseBoardLaneDto {
+  laneKey: NotificationProviderProfileGovernanceCaseBoardLaneKeyDto;
+  displayLabel: string;
+  itemCount: number;
+  items: NotificationProviderProfileGovernanceCaseQueueItemDto[];
+}
+
+export interface WorkspaceNotificationProviderProfileGovernanceCaseBoardResponse {
+  lanes: NotificationProviderProfileGovernanceCaseBoardLaneDto[];
   filters: {
     profileKey: string | null;
     caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
