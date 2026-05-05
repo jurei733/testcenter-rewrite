@@ -73,6 +73,12 @@ export const apiRoutes = {
     workspaceKey: string
   ): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases`,
+  workspaceNotificationProviderProfileGovernanceCaseAssign: (
+    tenantKey: string,
+    workspaceKey: string,
+    incidentId: string
+  ): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profile-governance-cases/${incidentId}:assign`,
   workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueue: (
     tenantKey: string,
     workspaceKey: string
@@ -1103,6 +1109,7 @@ export type NotificationProviderProfileGovernanceCaseStatusDto =
   | "closed";
 
 export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
+  | "assign_case"
   | "acknowledge_incident"
   | "wait_for_suppression_expiry"
   | "redrive_governance_alert"
@@ -1113,6 +1120,11 @@ export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
   caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
+  assignmentStatus: "unassigned" | "assigned";
+  assignedToActorId: string | null;
+  assignedByActorId: string | null;
+  assignedAt: string | null;
+  assignmentNote: string | null;
   latestActivityAt: string;
   openAlertCount: number;
   failedAlertCount: number;
@@ -1130,6 +1142,16 @@ export interface WorkspaceNotificationProviderProfileGovernanceCasesResponse {
     status: NotificationProviderProfileIncidentStatusDto | null;
     caseStatus: NotificationProviderProfileGovernanceCaseStatusDto | null;
   };
+}
+
+export interface AssignNotificationProviderProfileGovernanceCaseRequest {
+  assignedByActorId: string;
+  assignedToActorId: string;
+  assignmentNote: string;
+}
+
+export interface AssignNotificationProviderProfileGovernanceCaseResponse {
+  caseItem: NotificationProviderProfileGovernanceCaseItemDto;
 }
 
 export interface WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse {

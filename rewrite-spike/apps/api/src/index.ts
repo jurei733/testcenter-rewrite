@@ -195,6 +195,8 @@ import {
   type WorkspaceNotificationProviderProfileGovernanceCorrelationsResponse,
   type WorkspaceNotificationProviderProfileGovernanceCasesResponse,
   type NotificationProviderProfileGovernanceCaseStatusDto,
+  type AssignNotificationProviderProfileGovernanceCaseRequest,
+  type AssignNotificationProviderProfileGovernanceCaseResponse,
   type WorkspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueResponse,
   type WorkspaceNotificationProviderProfilesModeDto,
   type WorkspaceNotificationProviderProfilesResponse,
@@ -382,6 +384,8 @@ const workspaceNotificationProviderProfileGovernanceCorrelationsRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-correlations$/;
 const workspaceNotificationProviderProfileGovernanceCasesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases$/;
+const workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-cases\/([^/]+):assign$/;
 const workspaceNotificationProviderProfileGovernanceAlertDeadLetterQueueRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profile-governance-alert-dead-letter-queue$/;
 const workspaceNotificationProviderProfileIncidentAcknowledgeRoutePattern =
@@ -2130,11 +2134,45 @@ const toNotificationProviderProfileGovernanceCorrelationTimelineEventDto = (
   relatedAlertId: getAuditEventRelatedAlertIds(auditEvent)[0] ?? null
 });
 
+const getLatestNotificationProviderProfileGovernanceCaseAssignment = (
+  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
+  incidentId: string
+) => {
+  const matchingEvent = auditEvents
+    .filter(
+      auditEvent =>
+        auditEvent.eventType ===
+          "workspace.notification_provider_profile_governance_case.assigned" &&
+        getAuditEventRelatedIncidentId(auditEvent) === incidentId
+    )
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
+
+  if (!matchingEvent) {
+    return null;
+  }
+
+  return {
+    assignedToActorId:
+      getAuditPayloadString(matchingEvent.payload, "assignedToActorId") ?? null,
+    assignedByActorId:
+      getAuditPayloadString(matchingEvent.payload, "assignedByActorId") ?? null,
+    assignedAt: getAuditPayloadString(matchingEvent.payload, "assignedAt") ?? null,
+    assignmentNote:
+      getAuditPayloadString(matchingEvent.payload, "assignmentNote") ?? null
+  };
+};
+
 const toNotificationProviderProfileGovernanceCaseDto = (input: {
   profileKey: string;
   incident: NotificationProviderProfileIncident;
   alerts: NotificationProviderProfileGovernanceAlert[];
   timeline: ReturnType<typeof toNotificationProviderProfileGovernanceCorrelationTimelineEventDto>[];
+  assignment: {
+    assignedToActorId: string | null;
+    assignedByActorId: string | null;
+    assignedAt: string | null;
+    assignmentNote: string | null;
+  } | null;
 }): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
   const nowIso = new Date().toISOString();
   const openAlertCount = input.alerts.filter(alert => alert.alertClass === "incident_open").length;
@@ -2182,10 +2220,15 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
     recommendedActions = ["no_action_required"];
   }
 
+  if (input.assignment === null && recommendedActions[0] !== "no_action_required") {
+    recommendedActions = ["assign_case", ...recommendedActions];
+  }
+
   const latestActivityAt = [
     input.incident.openedAt,
     input.incident.acknowledgedAt,
     input.incident.resolvedAt,
+    input.assignment?.assignedAt,
     ...input.alerts.flatMap(alert => [
       alert.createdAt,
       alert.acknowledgedAt,
@@ -2200,6 +2243,11 @@ const toNotificationProviderProfileGovernanceCaseDto = (input: {
   return {
     profileKey: input.profileKey,
     caseStatus,
+    assignmentStatus: input.assignment ? "assigned" : "unassigned",
+    assignedToActorId: input.assignment?.assignedToActorId ?? null,
+    assignedByActorId: input.assignment?.assignedByActorId ?? null,
+    assignedAt: input.assignment?.assignedAt ?? null,
+    assignmentNote: input.assignment?.assignmentNote ?? null,
     latestActivityAt,
     openAlertCount,
     failedAlertCount,
@@ -9403,12 +9451,17 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
         })
         .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
         .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+      const assignment = getLatestNotificationProviderProfileGovernanceCaseAssignment(
+        auditEvents,
+        incident.incidentId
+      );
 
       return toNotificationProviderProfileGovernanceCaseDto({
         profileKey: incident.profileKey,
         incident,
         alerts: incidentAlerts,
-        timeline
+        timeline,
+        assignment
       });
     })
     .filter(item => (caseStatus ? item.caseStatus === caseStatus : true));
@@ -9420,6 +9473,126 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
       status,
       caseStatus
     }
+  });
+};
+
+const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  incidentId: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+
+  if (!workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const incident = await store.getNotificationProviderProfileIncidentById(incidentId);
+  if (!incident || incident.workspaceId !== workspace.workspaceId) {
+    sendError(
+      response,
+      404,
+      "notification_provider_profile_incident_not_found",
+      `Notification provider profile incident '${incidentId}' was not found in workspace '${workspaceKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<AssignNotificationProviderProfileGovernanceCaseRequest>(request);
+  const assignedByActorId = getTrimmedString(body.assignedByActorId);
+  const assignedToActorId = getTrimmedString(body.assignedToActorId);
+  const assignmentNote = getTrimmedString(body.assignmentNote);
+
+  if (!assignedByActorId || !assignedToActorId || !assignmentNote) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_assignment_payload",
+      "assignedByActorId, assignedToActorId, and assignmentNote are required."
+    );
+    return;
+  }
+
+  const assignedAt = new Date().toISOString();
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    actorType: "platform_api",
+    actorId: assignedByActorId,
+    eventType: "workspace.notification_provider_profile_governance_case.assigned",
+    payload: {
+      workspaceKey,
+      profileKey: incident.profileKey,
+      incidentId: incident.incidentId,
+      assignedByActorId,
+      assignedToActorId,
+      assignedAt,
+      assignmentNote
+    }
+  });
+
+  const [alerts, auditEvents] = await Promise.all([
+    store.listNotificationProviderProfileGovernanceAlertsByWorkspace(tenantKey, workspaceKey, {
+      profileKey: incident.profileKey,
+      limit: 500
+    }),
+    store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
+      limit: 500
+    })
+  ]);
+  const incidentAlerts = alerts
+    .filter(alert => alert.incidentId === incident.incidentId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const requestIds = new Set<string>();
+  if (incident.sourceRequestId) {
+    requestIds.add(incident.sourceRequestId);
+  }
+  for (const alert of incidentAlerts) {
+    if (alert.sourceRequestId) {
+      requestIds.add(alert.sourceRequestId);
+    }
+  }
+  requestIds.add(requestContext.requestId);
+  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
+  const timeline = auditEvents
+    .filter(auditEvent => {
+      if (requestIds.has(auditEvent.requestId)) {
+        return true;
+      }
+      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
+      if (relatedIncidentId === incident.incidentId) {
+        return true;
+      }
+      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
+      return relatedAlertIds.some(alertId => alertIds.has(alertId));
+    })
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
+    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
+
+  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
+    profileKey: incident.profileKey,
+    incident,
+    alerts: incidentAlerts,
+    timeline,
+    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
+      auditEvents,
+      incident.incidentId
+    )
+  });
+
+  sendJson<AssignNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
+    caseItem
   });
 };
 
@@ -14620,6 +14793,28 @@ const handleRequest = async (
         url,
         tenantKey,
         workspaceKey
+      );
+      return;
+    }
+  }
+
+  const workspaceNotificationProviderProfileGovernanceCaseAssignRouteMatch = pathname.match(
+    workspaceNotificationProviderProfileGovernanceCaseAssignRoutePattern
+  );
+
+  if (workspaceNotificationProviderProfileGovernanceCaseAssignRouteMatch) {
+    const [, tenantKey, workspaceKey, incidentId] =
+      workspaceNotificationProviderProfileGovernanceCaseAssignRouteMatch;
+
+    if (method === "POST") {
+      await handleWorkspaceNotificationProviderProfileGovernanceCaseAssign(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        incidentId,
+        requestContext
       );
       return;
     }

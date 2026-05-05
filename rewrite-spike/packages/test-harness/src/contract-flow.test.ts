@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import {
   apiRoutes,
+  type AssignNotificationProviderProfileGovernanceCaseResponse,
   type AcknowledgeNotificationProviderProfileGovernanceAlertResponse,
   type AcknowledgeNotificationProviderProfileIncidentResponse,
   type PolicyHistoryResponse,
@@ -8070,9 +8071,45 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   );
   assert.ok(resolvedGovernanceCase);
   assert.equal(resolvedGovernanceCase.caseStatus, "awaiting_alert_acknowledgement");
+  assert.equal(resolvedGovernanceCase.assignmentStatus, "unassigned");
+  assert.equal(resolvedGovernanceCase.assignedToActorId, null);
   assert.equal(resolvedGovernanceCase.failedAlertCount, 0);
   assert.equal(resolvedGovernanceCase.pendingAlertAcknowledgementCount, 1);
   assert.deepEqual(resolvedGovernanceCase.recommendedActions, [
+    "assign_case",
+    "acknowledge_governance_alert"
+  ]);
+
+  const assignedResolvedGovernanceCase =
+    await fetchJson<AssignNotificationProviderProfileGovernanceCaseResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseAssign(
+        demoTenantKey,
+        demoWorkspaceKey,
+        resolvedProviderIncidentQueue.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          assignedByActorId: "ops-governance-lead",
+          assignedToActorId: "ops-governance-analyst",
+          assignmentNote: "Handle recovery acknowledgement and confirm rollout state."
+        })
+      }
+    );
+  assert.equal(assignedResolvedGovernanceCase.caseItem.assignmentStatus, "assigned");
+  assert.equal(
+    assignedResolvedGovernanceCase.caseItem.assignedToActorId,
+    "ops-governance-analyst"
+  );
+  assert.equal(
+    assignedResolvedGovernanceCase.caseItem.assignedByActorId,
+    "ops-governance-lead"
+  );
+  assert.equal(
+    assignedResolvedGovernanceCase.caseItem.assignmentNote,
+    "Handle recovery acknowledgement and confirm rollout state."
+  );
+  assert.deepEqual(assignedResolvedGovernanceCase.caseItem.recommendedActions, [
     "acknowledge_governance_alert"
   ]);
 
@@ -8142,8 +8179,10 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   );
   assert.ok(governanceAlertDeadLetterCase);
   assert.equal(governanceAlertDeadLetterCase.caseStatus, "awaiting_redrive");
+  assert.equal(governanceAlertDeadLetterCase.assignmentStatus, "unassigned");
   assert.equal(governanceAlertDeadLetterCase.failedAlertCount, 1);
   assert.deepEqual(governanceAlertDeadLetterCase.recommendedActions, [
+    "assign_case",
     "redrive_governance_alert"
   ]);
 
