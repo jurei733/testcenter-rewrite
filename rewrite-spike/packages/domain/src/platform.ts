@@ -46,6 +46,136 @@ export type NotificationDeliverySelectionMode = OutboundNotificationDeliverySele
 export type NotificationPolicy = OutboundNotificationPolicy;
 export type GovernanceNotificationPolicy = OutboundNotificationPolicy;
 export type RecoveryGovernanceNotificationPolicy = OutboundNotificationPolicy;
+export type GovernanceCasePolicyCaseStatus =
+  | "awaiting_incident_acknowledgement"
+  | "suppressed_monitoring"
+  | "awaiting_redrive"
+  | "awaiting_alert_acknowledgement"
+  | "recovered"
+  | "closed";
+export type GovernanceCasePolicyCaseFamily =
+  | "incident_response"
+  | "delivery_recovery"
+  | "recovery_follow_up";
+export type GovernanceCasePolicySeverity = "low" | "medium" | "high";
+export type GovernanceCasePolicyTransitionType =
+  | "start_recovery"
+  | "mark_waiting_external"
+  | "close_case"
+  | "reopen_case";
+export type GovernanceCasePolicyWorkflowState =
+  | "open"
+  | "in_recovery"
+  | "waiting_external"
+  | "closed";
+export type GovernanceCasePolicyRecommendedAction =
+  | "assign_case"
+  | "escalate_case"
+  | "reopen_case"
+  | "complete_required_checklist"
+  | "provide_resolution_summary"
+  | "acknowledge_incident"
+  | "wait_for_suppression_expiry"
+  | "redrive_governance_alert"
+  | "acknowledge_governance_alert"
+  | "review_recovery_state"
+  | "no_action_required"
+  | "expedite_manual_recovery"
+  | "request_secondary_review";
+
+export interface GovernanceCaseChecklistTemplate {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  caseStatus: GovernanceCasePolicyCaseStatus;
+  caseSeverity?: GovernanceCasePolicySeverity;
+  itemKey: string;
+  label: string;
+  requiredForTransitions: GovernanceCasePolicyTransitionType[];
+}
+
+export interface GovernanceCaseResolutionSummaryRequirement {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  caseSeverity?: GovernanceCasePolicySeverity;
+  prompt: string;
+  minimumLength: number;
+  requiredForTransitions: GovernanceCasePolicyTransitionType[];
+}
+
+export interface GovernanceCaseResolutionSummaryFieldRequirement {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  caseSeverity?: GovernanceCasePolicySeverity;
+  fieldKey: string;
+  label: string;
+  prompt: string;
+  minimumLength: number;
+  requiredForTransitions: GovernanceCasePolicyTransitionType[];
+}
+
+export interface GovernanceCaseQueuePriorityRule {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  caseSeverity: GovernanceCasePolicySeverity;
+  caseStatus?: GovernanceCasePolicyCaseStatus;
+  priorityRank: number;
+  priorityReason: string;
+}
+
+export interface GovernanceCaseRecommendedActionRule {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  caseSeverity: GovernanceCasePolicySeverity;
+  caseStatus?: GovernanceCasePolicyCaseStatus;
+  recommendedAction: GovernanceCasePolicyRecommendedAction;
+}
+
+export interface GovernanceCaseWorkflowTransitionRule {
+  caseFamily: GovernanceCasePolicyCaseFamily;
+  workflowState: GovernanceCasePolicyWorkflowState;
+  caseSeverity?: GovernanceCasePolicySeverity;
+  transition: GovernanceCasePolicyTransitionType;
+  enabled: boolean;
+  reason: string;
+}
+
+export interface GovernanceCasePolicy {
+  closeChecklistTemplates: GovernanceCaseChecklistTemplate[];
+  closeResolutionSummaryRequirements: GovernanceCaseResolutionSummaryRequirement[];
+  closeResolutionSummaryFieldRequirements: GovernanceCaseResolutionSummaryFieldRequirement[];
+  queuePriorityRules: GovernanceCaseQueuePriorityRule[];
+  recommendedActionRules: GovernanceCaseRecommendedActionRule[];
+  workflowTransitionRules: GovernanceCaseWorkflowTransitionRule[];
+}
+
+export interface GovernanceCasePolicyOverride {
+  closeChecklistTemplates?: GovernanceCaseChecklistTemplate[];
+  closeResolutionSummaryRequirements?: GovernanceCaseResolutionSummaryRequirement[];
+  closeResolutionSummaryFieldRequirements?: GovernanceCaseResolutionSummaryFieldRequirement[];
+  queuePriorityRules?: GovernanceCaseQueuePriorityRule[];
+  recommendedActionRules?: GovernanceCaseRecommendedActionRule[];
+  workflowTransitionRules?: GovernanceCaseWorkflowTransitionRule[];
+}
+
+export interface GovernanceCasePolicyOverrideRecords {
+  closeChecklistTemplates?: Record<
+    string,
+    PolicyOverrideRecord<GovernanceCaseChecklistTemplate>
+  >;
+  closeResolutionSummaryRequirements?: Record<
+    string,
+    PolicyOverrideRecord<GovernanceCaseResolutionSummaryRequirement>
+  >;
+  closeResolutionSummaryFieldRequirements?: Record<
+    string,
+    PolicyOverrideRecord<GovernanceCaseResolutionSummaryFieldRequirement>
+  >;
+  queuePriorityRules?: Record<string, PolicyOverrideRecord<GovernanceCaseQueuePriorityRule>>;
+  recommendedActionRules?: Record<
+    string,
+    PolicyOverrideRecord<GovernanceCaseRecommendedActionRule>
+  >;
+  workflowTransitionRules?: Record<
+    string,
+    PolicyOverrideRecord<GovernanceCaseWorkflowTransitionRule>
+  >;
+}
+
 export type NotificationProviderProfile = OutboundNotificationProviderProfile;
 export type NotificationProviderProfileIncidentType =
   OutboundNotificationProviderProfileIncidentType;
@@ -218,7 +348,159 @@ export const defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy =
   defaultOutboundNotificationPolicy;
 export const defaultRecoveryGovernanceNotificationPolicy: RecoveryGovernanceNotificationPolicy =
   defaultOutboundNotificationPolicy;
+export const defaultGovernanceCasePolicy: GovernanceCasePolicy = {
+  closeChecklistTemplates: [
+    {
+      caseFamily: "delivery_recovery",
+      caseStatus: "awaiting_redrive",
+      itemKey: "verify-target",
+      label: "Verify corrected provider target",
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "delivery_recovery",
+      caseStatus: "awaiting_redrive",
+      itemKey: "document-disposition",
+      label: "Document disposition before closure",
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      caseStatus: "awaiting_alert_acknowledgement",
+      itemKey: "review-recovery-alert",
+      label: "Review recovery alert before closure",
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      caseStatus: "recovered",
+      itemKey: "review-recovery-alert",
+      label: "Review recovery alert before closure",
+      requiredForTransitions: ["close_case"]
+    }
+  ],
+  closeResolutionSummaryRequirements: [
+    {
+      caseFamily: "incident_response",
+      prompt: "Summarize the incident acknowledgement and operator disposition before closure.",
+      minimumLength: 20,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "delivery_recovery",
+      prompt: "Summarize the target correction and redrive disposition before closure.",
+      minimumLength: 20,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      prompt: "Summarize the recovery verification and operator disposition before closure.",
+      minimumLength: 20,
+      requiredForTransitions: ["close_case"]
+    }
+  ],
+  closeResolutionSummaryFieldRequirements: [
+    {
+      caseFamily: "incident_response",
+      fieldKey: "acknowledgement_summary",
+      label: "Acknowledgement Summary",
+      prompt: "Describe how the incident was acknowledged and who accepted ownership.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "incident_response",
+      fieldKey: "operator_disposition",
+      label: "Operator Disposition",
+      prompt: "Describe the operator decision that made the incident safe to close.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "delivery_recovery",
+      fieldKey: "corrected_target",
+      label: "Corrected Target",
+      prompt: "Record the corrected provider target or routing destination.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "delivery_recovery",
+      fieldKey: "redrive_disposition",
+      label: "Redrive Disposition",
+      prompt: "Describe the redrive outcome or the final delivery disposition.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      fieldKey: "recovery_verification",
+      label: "Recovery Verification",
+      prompt: "Describe how the recovery state was verified before closure.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      fieldKey: "final_disposition",
+      label: "Final Disposition",
+      prompt: "Describe the final operator disposition after the recovery alert.",
+      minimumLength: 12,
+      requiredForTransitions: ["close_case"]
+    }
+  ],
+  queuePriorityRules: [
+    {
+      caseFamily: "delivery_recovery",
+      caseSeverity: "high",
+      caseStatus: "awaiting_redrive",
+      priorityRank: 25,
+      priorityReason: "severity_high_delivery_recovery"
+    },
+    {
+      caseFamily: "recovery_follow_up",
+      caseSeverity: "medium",
+      caseStatus: "awaiting_alert_acknowledgement",
+      priorityRank: 45,
+      priorityReason: "severity_medium_recovery_follow_up"
+    }
+  ],
+  recommendedActionRules: [
+    {
+      caseFamily: "delivery_recovery",
+      caseSeverity: "high",
+      caseStatus: "awaiting_redrive",
+      recommendedAction: "expedite_manual_recovery"
+    }
+  ],
+  workflowTransitionRules: [
+    {
+      caseFamily: "recovery_follow_up",
+      workflowState: "open",
+      caseSeverity: "medium",
+      transition: "mark_waiting_external",
+      enabled: false,
+      reason: "require_direct_recovery_or_close_for_recovery_follow_up"
+    }
+  ]
+};
 export const defaultNotificationProviderProfiles: NotificationProviderProfile[] = [];
+
+export const resolveGovernanceCasePolicyFamilyFromStatus = (
+  caseStatus: GovernanceCasePolicyCaseStatus
+): GovernanceCasePolicyCaseFamily => {
+  switch (caseStatus) {
+    case "awaiting_incident_acknowledgement":
+    case "suppressed_monitoring":
+      return "incident_response";
+    case "awaiting_redrive":
+      return "delivery_recovery";
+    case "awaiting_alert_acknowledgement":
+    case "recovered":
+    case "closed":
+      return "recovery_follow_up";
+  }
+};
 
 export const defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy = {
   systemCheckEvidenceRetentionTtlSeconds: 604800,
@@ -297,6 +579,7 @@ export interface Tenant {
   defaultNotificationPolicy: NotificationPolicy;
   defaultGovernanceNotificationPolicy: GovernanceNotificationPolicy;
   defaultRecoveryGovernanceNotificationPolicy: RecoveryGovernanceNotificationPolicy;
+  defaultGovernanceCasePolicy: GovernanceCasePolicy;
   defaultNotificationProviderProfiles: NotificationProviderProfile[];
   defaultEvidenceRetentionPolicy: EvidenceRetentionPolicy;
   defaultEvidenceRetentionClassPolicy: EvidenceRetentionClassPolicy;
@@ -367,6 +650,7 @@ export interface Workspace {
   notificationPolicyOverrideRecords: NotificationPolicyOverrideRecords | null;
   governanceNotificationPolicyOverrideRecords: GovernanceNotificationPolicyOverrideRecords | null;
   recoveryGovernanceNotificationPolicyOverrideRecords: RecoveryGovernanceNotificationPolicyOverrideRecords | null;
+  governanceCasePolicyOverrideRecords: GovernanceCasePolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -389,6 +673,7 @@ export const createTenant = (input: {
   defaultNotificationPolicy,
   defaultGovernanceNotificationPolicy,
   defaultRecoveryGovernanceNotificationPolicy,
+  defaultGovernanceCasePolicy,
   defaultNotificationProviderProfiles,
   defaultEvidenceRetentionPolicy,
   defaultEvidenceRetentionClassPolicy
@@ -405,6 +690,7 @@ export const createWorkspace = (input: {
   notificationPolicyOverrideRecords?: NotificationPolicyOverrideRecords | null;
   governanceNotificationPolicyOverrideRecords?: GovernanceNotificationPolicyOverrideRecords | null;
   recoveryGovernanceNotificationPolicyOverrideRecords?: RecoveryGovernanceNotificationPolicyOverrideRecords | null;
+  governanceCasePolicyOverrideRecords?: GovernanceCasePolicyOverrideRecords | null;
   notificationProviderProfileOverrideRecords?: NotificationProviderProfileOverrideRecords | null;
   evidenceRetentionPolicyOverrideRecords?: EvidenceRetentionPolicyOverrideRecords | null;
   evidenceRetentionClassPolicyOverrideRecords?: EvidenceRetentionClassPolicyOverrideRecords | null;
@@ -424,6 +710,7 @@ export const createWorkspace = (input: {
     input.governanceNotificationPolicyOverrideRecords ?? null,
   recoveryGovernanceNotificationPolicyOverrideRecords:
     input.recoveryGovernanceNotificationPolicyOverrideRecords ?? null,
+  governanceCasePolicyOverrideRecords: input.governanceCasePolicyOverrideRecords ?? null,
   notificationProviderProfileOverrideRecords: input.notificationProviderProfileOverrideRecords ?? null,
   evidenceRetentionPolicyOverrideRecords: input.evidenceRetentionPolicyOverrideRecords ?? null,
   evidenceRetentionClassPolicyOverrideRecords: input.evidenceRetentionClassPolicyOverrideRecords ?? null
@@ -887,6 +1174,415 @@ export const resolveWorkspaceRecoveryGovernanceNotificationPolicy = (
       workspace.recoveryGovernanceNotificationPolicyOverrideRecords
     ) ?? {})
   });
+
+const getGovernanceCaseChecklistTemplateKey = (
+  template: GovernanceCaseChecklistTemplate
+): string =>
+  `${template.caseFamily}:${template.caseStatus}:${template.itemKey}${
+    template.caseSeverity ? `:${template.caseSeverity}` : ""
+  }`;
+
+const getGovernanceCaseResolutionSummaryRequirementKey = (
+  requirement: GovernanceCaseResolutionSummaryRequirement
+): string =>
+  `${requirement.caseFamily}${requirement.caseSeverity ? `:${requirement.caseSeverity}` : ""}`;
+
+const getGovernanceCaseResolutionSummaryFieldRequirementKey = (
+  requirement: GovernanceCaseResolutionSummaryFieldRequirement
+): string =>
+  `${requirement.caseFamily}:${requirement.fieldKey}${
+    requirement.caseSeverity ? `:${requirement.caseSeverity}` : ""
+  }`;
+
+const getGovernanceCaseQueuePriorityRuleKey = (
+  rule: GovernanceCaseQueuePriorityRule
+): string =>
+  `${rule.caseFamily}:${rule.caseSeverity}${rule.caseStatus ? `:${rule.caseStatus}` : ""}`;
+
+const getGovernanceCaseRecommendedActionRuleKey = (
+  rule: GovernanceCaseRecommendedActionRule
+): string =>
+  `${rule.caseFamily}:${rule.caseSeverity}${rule.caseStatus ? `:${rule.caseStatus}` : ""}:${
+    rule.recommendedAction
+  }`;
+
+const getGovernanceCaseWorkflowTransitionRuleKey = (
+  rule: GovernanceCaseWorkflowTransitionRule
+): string =>
+  `${rule.caseFamily}:${rule.workflowState}:${rule.transition}${
+    rule.caseSeverity ? `:${rule.caseSeverity}` : ""
+  }`;
+
+const sortGovernanceCaseChecklistTemplates = (
+  templates: GovernanceCaseChecklistTemplate[]
+): GovernanceCaseChecklistTemplate[] =>
+  [...templates].sort((left, right) =>
+    left.caseFamily.localeCompare(right.caseFamily) ||
+    left.caseStatus.localeCompare(right.caseStatus) ||
+    (left.caseSeverity ?? "").localeCompare(right.caseSeverity ?? "") ||
+    left.itemKey.localeCompare(right.itemKey)
+  );
+
+const sortGovernanceCaseResolutionSummaryRequirements = (
+  requirements: GovernanceCaseResolutionSummaryRequirement[]
+): GovernanceCaseResolutionSummaryRequirement[] =>
+  [...requirements].sort(
+    (left, right) =>
+      left.caseFamily.localeCompare(right.caseFamily) ||
+      (left.caseSeverity ?? "").localeCompare(right.caseSeverity ?? "")
+  );
+
+const sortGovernanceCaseResolutionSummaryFieldRequirements = (
+  requirements: GovernanceCaseResolutionSummaryFieldRequirement[]
+): GovernanceCaseResolutionSummaryFieldRequirement[] =>
+  [...requirements].sort(
+    (left, right) =>
+      left.caseFamily.localeCompare(right.caseFamily) ||
+      (left.caseSeverity ?? "").localeCompare(right.caseSeverity ?? "") ||
+      left.fieldKey.localeCompare(right.fieldKey)
+  );
+
+const sortGovernanceCaseQueuePriorityRules = (
+  rules: GovernanceCaseQueuePriorityRule[]
+): GovernanceCaseQueuePriorityRule[] =>
+  [...rules].sort(
+    (left, right) =>
+      left.caseFamily.localeCompare(right.caseFamily) ||
+      left.caseSeverity.localeCompare(right.caseSeverity) ||
+      (left.caseStatus ?? "").localeCompare(right.caseStatus ?? "")
+  );
+
+const sortGovernanceCaseRecommendedActionRules = (
+  rules: GovernanceCaseRecommendedActionRule[]
+): GovernanceCaseRecommendedActionRule[] =>
+  [...rules].sort(
+    (left, right) =>
+      left.caseFamily.localeCompare(right.caseFamily) ||
+      left.caseSeverity.localeCompare(right.caseSeverity) ||
+      (left.caseStatus ?? "").localeCompare(right.caseStatus ?? "") ||
+      left.recommendedAction.localeCompare(right.recommendedAction)
+  );
+
+const sortGovernanceCaseWorkflowTransitionRules = (
+  rules: GovernanceCaseWorkflowTransitionRule[]
+): GovernanceCaseWorkflowTransitionRule[] =>
+  [...rules].sort(
+    (left, right) =>
+      left.caseFamily.localeCompare(right.caseFamily) ||
+      left.workflowState.localeCompare(right.workflowState) ||
+      left.transition.localeCompare(right.transition) ||
+      (left.caseSeverity ?? "").localeCompare(right.caseSeverity ?? "")
+  );
+
+export const resolveWorkspaceGovernanceCasePolicy = (
+  workspace: Workspace,
+  tenant: Tenant
+): GovernanceCasePolicy => {
+  const mergedTemplates = new Map(
+    tenant.defaultGovernanceCasePolicy.closeChecklistTemplates.map(template => [
+      getGovernanceCaseChecklistTemplateKey(template),
+      template
+    ])
+  );
+  const mergedResolutionSummaryRequirements = new Map(
+    tenant.defaultGovernanceCasePolicy.closeResolutionSummaryRequirements.map(requirement => [
+      getGovernanceCaseResolutionSummaryRequirementKey(requirement),
+      requirement
+    ])
+  );
+  const mergedResolutionSummaryFieldRequirements = new Map(
+    tenant.defaultGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.map(
+      requirement => [getGovernanceCaseResolutionSummaryFieldRequirementKey(requirement), requirement]
+    )
+  );
+  const mergedQueuePriorityRules = new Map(
+    tenant.defaultGovernanceCasePolicy.queuePriorityRules.map(rule => [
+      getGovernanceCaseQueuePriorityRuleKey(rule),
+      rule
+    ])
+  );
+  const mergedRecommendedActionRules = new Map(
+    tenant.defaultGovernanceCasePolicy.recommendedActionRules.map(rule => [
+      getGovernanceCaseRecommendedActionRuleKey(rule),
+      rule
+    ])
+  );
+  const mergedWorkflowTransitionRules = new Map(
+    tenant.defaultGovernanceCasePolicy.workflowTransitionRules.map(rule => [
+      getGovernanceCaseWorkflowTransitionRuleKey(rule),
+      rule
+    ])
+  );
+
+  for (const record of Object.values(workspace.governanceCasePolicyOverrideRecords?.closeChecklistTemplates ?? {})) {
+    mergedTemplates.set(getGovernanceCaseChecklistTemplateKey(record.value), record.value);
+  }
+  for (const record of Object.values(
+    workspace.governanceCasePolicyOverrideRecords?.closeResolutionSummaryRequirements ?? {}
+  )) {
+    mergedResolutionSummaryRequirements.set(
+      getGovernanceCaseResolutionSummaryRequirementKey(record.value),
+      record.value
+    );
+  }
+  for (const record of Object.values(
+    workspace.governanceCasePolicyOverrideRecords?.closeResolutionSummaryFieldRequirements ?? {}
+  )) {
+    mergedResolutionSummaryFieldRequirements.set(
+      getGovernanceCaseResolutionSummaryFieldRequirementKey(record.value),
+      record.value
+    );
+  }
+  for (const record of Object.values(
+    workspace.governanceCasePolicyOverrideRecords?.queuePriorityRules ?? {}
+  )) {
+    mergedQueuePriorityRules.set(getGovernanceCaseQueuePriorityRuleKey(record.value), record.value);
+  }
+  for (const record of Object.values(
+    workspace.governanceCasePolicyOverrideRecords?.recommendedActionRules ?? {}
+  )) {
+    mergedRecommendedActionRules.set(
+      getGovernanceCaseRecommendedActionRuleKey(record.value),
+      record.value
+    );
+  }
+  for (const record of Object.values(
+    workspace.governanceCasePolicyOverrideRecords?.workflowTransitionRules ?? {}
+  )) {
+    mergedWorkflowTransitionRules.set(
+      getGovernanceCaseWorkflowTransitionRuleKey(record.value),
+      record.value
+    );
+  }
+
+  return {
+    closeChecklistTemplates: sortGovernanceCaseChecklistTemplates(
+      Array.from(mergedTemplates.values())
+    ),
+    closeResolutionSummaryRequirements: sortGovernanceCaseResolutionSummaryRequirements(
+      Array.from(mergedResolutionSummaryRequirements.values())
+    ),
+    closeResolutionSummaryFieldRequirements: sortGovernanceCaseResolutionSummaryFieldRequirements(
+      Array.from(mergedResolutionSummaryFieldRequirements.values())
+    ),
+    queuePriorityRules: sortGovernanceCaseQueuePriorityRules(
+      Array.from(mergedQueuePriorityRules.values())
+    ),
+    recommendedActionRules: sortGovernanceCaseRecommendedActionRules(
+      Array.from(mergedRecommendedActionRules.values())
+    ),
+    workflowTransitionRules: sortGovernanceCaseWorkflowTransitionRules(
+      Array.from(mergedWorkflowTransitionRules.values())
+    )
+  };
+};
+
+export const flattenGovernanceCasePolicyOverrideRecords = (
+  records: GovernanceCasePolicyOverrideRecords | null
+): GovernanceCasePolicyOverride | null => {
+  if (
+    !records?.closeChecklistTemplates &&
+    !records?.closeResolutionSummaryRequirements &&
+    !records?.closeResolutionSummaryFieldRequirements &&
+    !records?.queuePriorityRules &&
+    !records?.recommendedActionRules &&
+    !records?.workflowTransitionRules
+  ) {
+    return null;
+  }
+
+  const closeChecklistTemplates = sortGovernanceCaseChecklistTemplates(
+    Object.values(records.closeChecklistTemplates ?? {}).map(record => record.value)
+  );
+  const closeResolutionSummaryRequirements = sortGovernanceCaseResolutionSummaryRequirements(
+    Object.values(records.closeResolutionSummaryRequirements ?? {}).map(record => record.value)
+  );
+  const closeResolutionSummaryFieldRequirements =
+    sortGovernanceCaseResolutionSummaryFieldRequirements(
+      Object.values(records.closeResolutionSummaryFieldRequirements ?? {}).map(
+        record => record.value
+      )
+    );
+  const queuePriorityRules = sortGovernanceCaseQueuePriorityRules(
+    Object.values(records.queuePriorityRules ?? {}).map(record => record.value)
+  );
+  const recommendedActionRules = sortGovernanceCaseRecommendedActionRules(
+    Object.values(records.recommendedActionRules ?? {}).map(record => record.value)
+  );
+  const workflowTransitionRules = sortGovernanceCaseWorkflowTransitionRules(
+    Object.values(records.workflowTransitionRules ?? {}).map(record => record.value)
+  );
+
+  if (
+    closeChecklistTemplates.length === 0 &&
+    closeResolutionSummaryRequirements.length === 0 &&
+    closeResolutionSummaryFieldRequirements.length === 0 &&
+    queuePriorityRules.length === 0 &&
+    recommendedActionRules.length === 0 &&
+    workflowTransitionRules.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    ...(closeChecklistTemplates.length > 0 ? { closeChecklistTemplates } : {}),
+    ...(closeResolutionSummaryRequirements.length > 0
+      ? { closeResolutionSummaryRequirements }
+      : {}),
+    ...(closeResolutionSummaryFieldRequirements.length > 0
+      ? { closeResolutionSummaryFieldRequirements }
+      : {}),
+    ...(queuePriorityRules.length > 0
+      ? { queuePriorityRules }
+      : {}),
+    ...(recommendedActionRules.length > 0
+      ? { recommendedActionRules }
+      : {}),
+    ...(workflowTransitionRules.length > 0
+      ? { workflowTransitionRules }
+      : {})
+  };
+};
+
+export const createGovernanceCasePolicyOverrideRecords = (input: {
+  override: GovernanceCasePolicyOverride;
+  updatedByRequestId: string;
+  updatedByActorType: AuditActorType;
+  updatedByActorId: string;
+  updatedAt?: string;
+}): GovernanceCasePolicyOverrideRecords | null => {
+  if (
+    (!input.override.closeChecklistTemplates ||
+      input.override.closeChecklistTemplates.length === 0) &&
+    (!input.override.closeResolutionSummaryRequirements ||
+      input.override.closeResolutionSummaryRequirements.length === 0) &&
+    (!input.override.closeResolutionSummaryFieldRequirements ||
+      input.override.closeResolutionSummaryFieldRequirements.length === 0) &&
+    (!input.override.queuePriorityRules || input.override.queuePriorityRules.length === 0) &&
+    (!input.override.recommendedActionRules ||
+      input.override.recommendedActionRules.length === 0) &&
+    (!input.override.workflowTransitionRules ||
+      input.override.workflowTransitionRules.length === 0)
+  ) {
+    return null;
+  }
+
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+
+  return {
+    ...(input.override.closeChecklistTemplates &&
+    input.override.closeChecklistTemplates.length > 0
+      ? {
+          closeChecklistTemplates: Object.fromEntries(
+            sortGovernanceCaseChecklistTemplates(input.override.closeChecklistTemplates).map(
+              template => [
+                getGovernanceCaseChecklistTemplateKey(template),
+                {
+                  value: template,
+                  updatedAt,
+                  updatedByRequestId: input.updatedByRequestId,
+                  updatedByActorType: input.updatedByActorType,
+                  updatedByActorId: input.updatedByActorId
+                }
+              ]
+            )
+          )
+        }
+      : {}),
+    ...(input.override.closeResolutionSummaryRequirements &&
+    input.override.closeResolutionSummaryRequirements.length > 0
+      ? {
+          closeResolutionSummaryRequirements: Object.fromEntries(
+            sortGovernanceCaseResolutionSummaryRequirements(
+              input.override.closeResolutionSummaryRequirements
+            ).map(requirement => [
+              getGovernanceCaseResolutionSummaryRequirementKey(requirement),
+              {
+                value: requirement,
+                updatedAt,
+                updatedByRequestId: input.updatedByRequestId,
+                updatedByActorType: input.updatedByActorType,
+                updatedByActorId: input.updatedByActorId
+              }
+            ])
+          )
+        }
+      : {}),
+    ...(input.override.closeResolutionSummaryFieldRequirements &&
+    input.override.closeResolutionSummaryFieldRequirements.length > 0
+      ? {
+          closeResolutionSummaryFieldRequirements: Object.fromEntries(
+            sortGovernanceCaseResolutionSummaryFieldRequirements(
+              input.override.closeResolutionSummaryFieldRequirements
+            ).map(requirement => [
+              getGovernanceCaseResolutionSummaryFieldRequirementKey(requirement),
+              {
+                value: requirement,
+                updatedAt,
+                updatedByRequestId: input.updatedByRequestId,
+                updatedByActorType: input.updatedByActorType,
+                updatedByActorId: input.updatedByActorId
+              }
+            ])
+          )
+        }
+      : {}),
+    ...(input.override.queuePriorityRules && input.override.queuePriorityRules.length > 0
+      ? {
+          queuePriorityRules: Object.fromEntries(
+            sortGovernanceCaseQueuePriorityRules(input.override.queuePriorityRules).map(rule => [
+              getGovernanceCaseQueuePriorityRuleKey(rule),
+              {
+                value: rule,
+                updatedAt,
+                updatedByRequestId: input.updatedByRequestId,
+                updatedByActorType: input.updatedByActorType,
+                updatedByActorId: input.updatedByActorId
+              }
+            ])
+          )
+        }
+      : {}),
+    ...(input.override.recommendedActionRules &&
+    input.override.recommendedActionRules.length > 0
+      ? {
+          recommendedActionRules: Object.fromEntries(
+            sortGovernanceCaseRecommendedActionRules(
+              input.override.recommendedActionRules
+            ).map(rule => [
+              getGovernanceCaseRecommendedActionRuleKey(rule),
+              {
+                value: rule,
+                updatedAt,
+                updatedByRequestId: input.updatedByRequestId,
+                updatedByActorType: input.updatedByActorType,
+                updatedByActorId: input.updatedByActorId
+              }
+            ])
+          )
+        }
+      : {}),
+    ...(input.override.workflowTransitionRules &&
+    input.override.workflowTransitionRules.length > 0
+      ? {
+          workflowTransitionRules: Object.fromEntries(
+            sortGovernanceCaseWorkflowTransitionRules(
+              input.override.workflowTransitionRules
+            ).map(rule => [
+              getGovernanceCaseWorkflowTransitionRuleKey(rule),
+              {
+                value: rule,
+                updatedAt,
+                updatedByRequestId: input.updatedByRequestId,
+                updatedByActorType: input.updatedByActorType,
+                updatedByActorId: input.updatedByActorId
+              }
+            ])
+          )
+        }
+      : {})
+  };
+};
 
 export const resolveWorkspaceNotificationProviderProfiles = (
   workspace: Workspace,

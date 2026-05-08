@@ -1391,6 +1391,44 @@ SET default_recovery_governance_notification_policy =
     )
   );
 `
+  },
+  {
+    version: "0045",
+    name: "governance-case-policy",
+    sql: `
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS default_governance_case_policy JSONB NOT NULL DEFAULT '{
+    "closeChecklistTemplates": [
+      {
+        "caseStatus": "awaiting_redrive",
+        "itemKey": "verify-target",
+        "label": "Verify corrected provider target",
+        "requiredForTransitions": ["close_case"]
+      },
+      {
+        "caseStatus": "awaiting_redrive",
+        "itemKey": "document-disposition",
+        "label": "Document disposition before closure",
+        "requiredForTransitions": ["close_case"]
+      },
+      {
+        "caseStatus": "awaiting_alert_acknowledgement",
+        "itemKey": "review-recovery-alert",
+        "label": "Review recovery alert before closure",
+        "requiredForTransitions": ["close_case"]
+      },
+      {
+        "caseStatus": "recovered",
+        "itemKey": "review-recovery-alert",
+        "label": "Review recovery alert before closure",
+        "requiredForTransitions": ["close_case"]
+      }
+    ]
+  }'::jsonb;
+
+ALTER TABLE workspaces
+  ADD COLUMN IF NOT EXISTS governance_case_policy_override JSONB NULL;
+`
   }
 ];
 

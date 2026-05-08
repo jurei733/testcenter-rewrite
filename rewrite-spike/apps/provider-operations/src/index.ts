@@ -289,8 +289,10 @@ const synchronizeNotificationProviderProfiles = async (
       );
 
       if (changedTenantProfiles.length > 0) {
+        const latestTenant = (await store.getTenantById(tenant.tenantId)) ?? tenant;
+
         await store.saveTenant({
-          ...tenant,
+          ...latestTenant,
           defaultNotificationProviderProfiles: refreshedTenantProfiles
         });
 
@@ -360,8 +362,10 @@ const synchronizeNotificationProviderProfiles = async (
       }
 
       if (changedWorkspaceProfiles.length > 0) {
+        const latestWorkspace = (await store.getWorkspaceById(workspace.workspaceId)) ?? workspace;
+
         await store.saveWorkspace({
-          ...workspace,
+          ...latestWorkspace,
           notificationProviderProfileOverrideRecords: Object.fromEntries(refreshedOverrideEntries)
         });
 
@@ -658,7 +662,14 @@ const reconcileNotificationProviderProfileRollouts = async (
         continue;
       }
 
-      await store.saveWorkspace(updatedWorkspace);
+      const latestWorkspace =
+        (await store.getWorkspaceById(updatedWorkspace.workspaceId)) ?? updatedWorkspace;
+
+      await store.saveWorkspace({
+        ...latestWorkspace,
+        notificationProviderProfileOverrideRecords:
+          updatedWorkspace.notificationProviderProfileOverrideRecords
+      });
 
       for (const incident of incidentsToCreate) {
         await store.saveNotificationProviderProfileIncident(incident);

@@ -18,6 +18,7 @@ import {
   type TenantActivationPolicyResponse,
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
+  type TenantGovernanceCasePolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
   type TenantGovernanceNotificationPolicyResponse,
   type TenantRecoveryGovernanceNotificationPolicyResponse,
@@ -29,6 +30,7 @@ import {
   type WorkspaceEvidenceRetentionClassPolicyResponse,
   type WorkspaceEvidenceRetentionClassesResponse,
   type WorkspaceEvidenceRetentionPolicyResponse,
+  type WorkspaceGovernanceCasePolicyResponse,
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceGovernanceNotificationPolicyResponse,
   type WorkspaceRecoveryGovernanceNotificationPolicyResponse,
@@ -7524,7 +7526,10 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         currentProfile.rolloutFallbackProfileKey === "dead-letter-email-profile"
     );
     if (currentProfile.operationalState !== null) {
-      assert.equal(currentProfile.operationalState.lastCheckedByActorType, "worker");
+      assert.ok(
+        currentProfile.operationalState.lastCheckedByActorType === "worker" ||
+          currentProfile.operationalState.lastCheckedByActorType === "platform_api"
+      );
       assert.equal(
         currentProfile.operationalState.lastCheckedByActorId,
         "provider-operations-service"
@@ -7709,7 +7714,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
       response,
       matchingIncident
     };
-  }, 40, 250);
+  }, 80, 250);
 
   const providerGovernanceQueueBeforeAcknowledgement = await fetchJson<WorkspaceNotificationProviderProfileGovernanceQueueResponse>(
     apiRoutes.workspaceNotificationProviderProfileGovernanceQueue(
@@ -7954,6 +7959,404 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     }
   );
 
+  const tenantGovernanceCasePolicyResponse =
+    await fetchJsonResponse<TenantGovernanceCasePolicyResponse>(
+      apiRoutes.tenantGovernanceCasePolicy(demoTenantKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          defaultGovernanceCasePolicy: {
+            closeChecklistTemplates: [
+              {
+                caseFamily: "delivery_recovery",
+                caseStatus: "awaiting_redrive",
+                itemKey: "verify-target",
+                label: "Verify corrected provider target",
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                caseStatus: "awaiting_redrive",
+                itemKey: "document-disposition",
+                label: "Document disposition before closure",
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                caseStatus: "awaiting_alert_acknowledgement",
+                itemKey: "review-recovery-alert",
+                label: "Review recovery alert before closeout",
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                caseStatus: "recovered",
+                itemKey: "review-recovery-alert",
+                label: "Review recovery alert before closeout",
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryRequirements: [
+              {
+                caseFamily: "incident_response",
+                prompt: "Summarize the incident acknowledgement and operator disposition before closure.",
+                minimumLength: 20,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                prompt: "Summarize the target correction and redrive disposition before closure.",
+                minimumLength: 20,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                prompt: "Summarize the recovery verification and operator disposition before closure.",
+                minimumLength: 20,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryFieldRequirements: [
+              {
+                caseFamily: "incident_response",
+                fieldKey: "acknowledgement_summary",
+                label: "Acknowledgement Summary",
+                prompt: "Describe how the incident was acknowledged and who accepted ownership.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "incident_response",
+                fieldKey: "operator_disposition",
+                label: "Operator Disposition",
+                prompt: "Describe the operator decision that made the incident safe to close.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                fieldKey: "corrected_target",
+                label: "Corrected Target",
+                prompt: "Record the corrected provider target or routing destination.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                fieldKey: "redrive_disposition",
+                label: "Redrive Disposition",
+                prompt: "Describe the redrive outcome or the final delivery disposition.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                fieldKey: "recovery_verification",
+                label: "Recovery Verification",
+                prompt: "Describe how the recovery state was verified before closure.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                fieldKey: "final_disposition",
+                label: "Final Disposition",
+                prompt: "Describe the final operator disposition after the recovery alert.",
+                minimumLength: 12,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            queuePriorityRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                priorityRank: 25,
+                priorityReason: "severity_high_delivery_recovery"
+              },
+              {
+                caseFamily: "recovery_follow_up",
+                caseSeverity: "medium",
+                caseStatus: "awaiting_alert_acknowledgement",
+                priorityRank: 45,
+                priorityReason: "severity_medium_recovery_follow_up"
+              }
+            ],
+            recommendedActionRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                recommendedAction: "expedite_manual_recovery"
+              }
+            ],
+            workflowTransitionRules: [
+              {
+                caseFamily: "recovery_follow_up",
+                workflowState: "open",
+                caseSeverity: "medium",
+                transition: "mark_waiting_external",
+                enabled: false,
+                reason: "require_direct_recovery_or_close_for_recovery_follow_up"
+              }
+            ]
+          }
+        })
+      }
+    );
+  const tenantGovernanceCasePolicy = tenantGovernanceCasePolicyResponse.body;
+  const tenantGovernanceCasePolicyRequestId =
+    tenantGovernanceCasePolicyResponse.headers.get("x-request-id");
+  assert.ok(tenantGovernanceCasePolicyRequestId);
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.closeChecklistTemplates.length,
+    4
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.closeResolutionSummaryRequirements.length,
+    3
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.length,
+    6
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.queuePriorityRules.length,
+    2
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.recommendedActionRules.length,
+    1
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.workflowTransitionRules.length,
+    1
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" && item.itemKey === "verify-target"
+    )?.caseFamily,
+    "delivery_recovery"
+  );
+  assert.equal(
+    tenantGovernanceCasePolicy.defaultGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "recovered" && item.itemKey === "review-recovery-alert"
+    )?.label,
+    "Review recovery alert before closeout"
+  );
+
+  const inheritedWorkspaceGovernanceCasePolicy =
+    await fetchJson<WorkspaceGovernanceCasePolicyResponse>(
+      apiRoutes.workspaceGovernanceCasePolicy(
+        demoTenantKey,
+        tenantPolicyWorkspaceKey
+      )
+    );
+  assert.equal(inheritedWorkspaceGovernanceCasePolicy.mode, "inherit");
+  assert.equal(inheritedWorkspaceGovernanceCasePolicy.governanceCasePolicyOverride, null);
+  assert.equal(
+    inheritedWorkspaceGovernanceCasePolicy.governanceCasePolicyOverrideRecords,
+    null
+  );
+  assert.equal(
+    inheritedWorkspaceGovernanceCasePolicy.defaultGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_alert_acknowledgement" &&
+        item.itemKey === "review-recovery-alert"
+    )?.label,
+    "Review recovery alert before closeout"
+  );
+  assert.equal(
+    inheritedWorkspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_alert_acknowledgement" &&
+        item.itemKey === "review-recovery-alert"
+    )?.label,
+    "Review recovery alert before closeout"
+  );
+
+  const workspaceGovernanceCasePolicyResponse =
+    await fetchJsonResponse<WorkspaceGovernanceCasePolicyResponse>(
+      apiRoutes.workspaceGovernanceCasePolicy(demoTenantKey, demoWorkspaceKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "override",
+          governanceCasePolicyOverride: {
+            closeChecklistTemplates: [
+              {
+                caseFamily: "delivery_recovery",
+                caseStatus: "awaiting_redrive",
+                itemKey: "document-disposition",
+                label: "Document closure rationale before closure",
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryRequirements: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                prompt: "Summarize the corrected provider target and redrive disposition before closure.",
+                minimumLength: 60,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryFieldRequirements: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                fieldKey: "redrive_disposition",
+                label: "Document Redrive Disposition",
+                prompt: "Describe the corrected redrive target and the final delivery disposition before closure.",
+                minimumLength: 24,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                fieldKey: "impact_summary",
+                label: "Impact Summary",
+                prompt: "Describe the operator impact and why this failed governance delivery required manual recovery.",
+                minimumLength: 18,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            queuePriorityRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                priorityRank: 15,
+                priorityReason: "workspace_high_delivery_recovery"
+              }
+            ],
+            recommendedActionRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                recommendedAction: "request_secondary_review"
+              }
+            ],
+            workflowTransitionRules: [
+              {
+                caseFamily: "delivery_recovery",
+                workflowState: "open",
+                caseSeverity: "high",
+                transition: "mark_waiting_external",
+                enabled: false,
+                reason: "require_direct_recovery_before_waiting_external"
+              }
+            ]
+          }
+        })
+      }
+    );
+  const workspaceGovernanceCasePolicy = workspaceGovernanceCasePolicyResponse.body;
+  const workspaceGovernanceCasePolicyRequestId =
+    workspaceGovernanceCasePolicyResponse.headers.get("x-request-id");
+  assert.ok(workspaceGovernanceCasePolicyRequestId);
+  assert.equal(workspaceGovernanceCasePolicy.mode, "override");
+  assert.equal(
+    workspaceGovernanceCasePolicy.governanceCasePolicyOverride?.closeChecklistTemplates?.[0]
+      ?.label,
+    "Document closure rationale before closure"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.governanceCasePolicyOverride?.closeChecklistTemplates?.[0]
+      ?.caseFamily,
+    "delivery_recovery"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.governanceCasePolicyOverride
+      ?.closeResolutionSummaryRequirements?.[0]?.minimumLength,
+    60
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.governanceCasePolicyOverride
+      ?.closeResolutionSummaryFieldRequirements?.find(
+        item => item.fieldKey === "redrive_disposition"
+      )?.minimumLength,
+    24
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.governanceCasePolicyOverrideRecords
+      ?.closeChecklistTemplates?.[0]?.updatedByRequestId,
+    workspaceGovernanceCasePolicyRequestId
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" &&
+        item.itemKey === "document-disposition"
+    )?.label,
+    "Document closure rationale before closure"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" && item.itemKey === "verify-target"
+    )?.label,
+    "Verify corrected provider target"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.fieldKey === "redrive_disposition"
+    )?.label,
+    "Document Redrive Disposition"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.fieldKey === "corrected_target"
+    )?.label,
+    "Corrected Target"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.fieldKey === "impact_summary"
+    )?.label,
+    "Impact Summary"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.queuePriorityRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.caseStatus === "awaiting_redrive"
+    )?.priorityRank,
+    15
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.recommendedActionRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.caseStatus === "awaiting_redrive" &&
+        item.recommendedAction === "request_secondary_review"
+    )?.recommendedAction,
+    "request_secondary_review"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicy.effectiveGovernanceCasePolicy.workflowTransitionRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.workflowState === "open" &&
+        item.caseSeverity === "high" &&
+        item.transition === "mark_waiting_external"
+    )?.enabled,
+    false
+  );
+
   const forcedPromotionAfterIncident = await fetchJson<PromoteWorkspaceNotificationProviderProfileResponse>(
     apiRoutes.workspaceNotificationProviderProfilePromote(
       demoTenantKey,
@@ -8109,7 +8512,17 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     item => item.incident.incidentId === resolvedProviderIncidentQueue.incidentId
   );
   assert.ok(resolvedGovernanceCase);
+  assert.equal(resolvedGovernanceCase.caseFamily, "recovery_follow_up");
+  assert.equal(resolvedGovernanceCase.caseSeverity, "medium");
   assert.equal(resolvedGovernanceCase.caseStatus, "awaiting_alert_acknowledgement");
+  assert.equal(
+    resolvedGovernanceCase.closeResolutionSummaryRequirement?.caseFamily,
+    "recovery_follow_up"
+  );
+  assert.deepEqual(
+    resolvedGovernanceCase.closeResolutionSummaryFieldRequirements.map(item => item.fieldKey),
+    ["final_disposition", "recovery_verification"]
+  );
   assert.equal(resolvedGovernanceCase.assignmentStatus, "unassigned");
   assert.equal(resolvedGovernanceCase.assignedToActorId, null);
   assert.equal(resolvedGovernanceCase.failedAlertCount, 0);
@@ -8120,6 +8533,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   ]);
   assert.deepEqual(resolvedGovernanceCase.recommendedActions, [
     "assign_case",
+    "provide_resolution_summary",
     "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
@@ -8158,6 +8572,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(assignedResolvedGovernanceCase.caseItem.slaDueAt);
   assert.equal(assignedResolvedGovernanceCase.caseItem.slaStatus, "on_track");
   assert.deepEqual(assignedResolvedGovernanceCase.caseItem.recommendedActions, [
+    "provide_resolution_summary",
     "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
@@ -8177,6 +8592,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.ok(breachedResolvedGovernanceCase);
   assert.equal(breachedResolvedGovernanceCase.slaStatus, "breached");
   assert.deepEqual(breachedResolvedGovernanceCase.recommendedActions, [
+    "provide_resolution_summary",
     "complete_required_checklist",
     "escalate_case",
     "acknowledge_governance_alert"
@@ -8207,6 +8623,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     "Recovery acknowledgement breached SLA, escalating to manager."
   );
   assert.deepEqual(escalatedResolvedGovernanceCase.caseItem.recommendedActions, [
+    "provide_resolution_summary",
     "complete_required_checklist",
     "acknowledge_governance_alert"
   ]);
@@ -8281,6 +8698,124 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     return matchingAlert;
   }, 60, 250);
 
+  const workspaceGovernanceCasePolicyRefreshResponse =
+    await fetchJsonResponse<WorkspaceGovernanceCasePolicyResponse>(
+      apiRoutes.workspaceGovernanceCasePolicy(demoTenantKey, demoWorkspaceKey),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          mode: "override",
+          governanceCasePolicyOverride: {
+            closeChecklistTemplates: [
+              {
+                caseFamily: "delivery_recovery",
+                caseStatus: "awaiting_redrive",
+                itemKey: "document-disposition",
+                label: "Document closure rationale before closure",
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryRequirements: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                prompt: "Summarize the corrected provider target and redrive disposition before closure.",
+                minimumLength: 60,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            closeResolutionSummaryFieldRequirements: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                fieldKey: "redrive_disposition",
+                label: "Document Redrive Disposition",
+                prompt: "Describe the corrected redrive target and the final delivery disposition before closure.",
+                minimumLength: 24,
+                requiredForTransitions: ["close_case"]
+              },
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                fieldKey: "impact_summary",
+                label: "Impact Summary",
+                prompt: "Describe the operator impact and why this failed governance delivery required manual recovery.",
+                minimumLength: 18,
+                requiredForTransitions: ["close_case"]
+              }
+            ],
+            queuePriorityRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                priorityRank: 15,
+                priorityReason: "workspace_high_delivery_recovery"
+              }
+            ],
+            recommendedActionRules: [
+              {
+                caseFamily: "delivery_recovery",
+                caseSeverity: "high",
+                caseStatus: "awaiting_redrive",
+                recommendedAction: "request_secondary_review"
+              }
+            ],
+            workflowTransitionRules: [
+              {
+                caseFamily: "delivery_recovery",
+                workflowState: "open",
+                caseSeverity: "high",
+                transition: "mark_waiting_external",
+                enabled: false,
+                reason: "require_direct_recovery_before_waiting_external"
+              }
+            ]
+          }
+        })
+      }
+    );
+  const workspaceGovernanceCasePolicyRefreshRequestId =
+    workspaceGovernanceCasePolicyRefreshResponse.headers.get("x-request-id");
+  assert.ok(workspaceGovernanceCasePolicyRefreshRequestId);
+  assert.equal(
+    workspaceGovernanceCasePolicyRefreshResponse.body.effectiveGovernanceCasePolicy.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" &&
+        item.itemKey === "document-disposition"
+    )?.label,
+    "Document closure rationale before closure"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyRefreshResponse.body.effectiveGovernanceCasePolicy.queuePriorityRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.caseStatus === "awaiting_redrive"
+    )?.priorityRank,
+    15
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyRefreshResponse.body.effectiveGovernanceCasePolicy.recommendedActionRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.caseSeverity === "high" &&
+        item.caseStatus === "awaiting_redrive" &&
+        item.recommendedAction === "request_secondary_review"
+    )?.recommendedAction,
+    "request_secondary_review"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyRefreshResponse.body.effectiveGovernanceCasePolicy.workflowTransitionRules.find(
+      item =>
+        item.caseFamily === "delivery_recovery" &&
+        item.workflowState === "open" &&
+        item.caseSeverity === "high" &&
+        item.transition === "mark_waiting_external"
+    )?.enabled,
+    false
+  );
+
   const governanceAlertDeadLetterCases =
     await fetchJson<WorkspaceNotificationProviderProfileGovernanceCasesResponse>(
       `${apiRoutes.workspaceNotificationProviderProfileGovernanceCases(
@@ -8292,16 +8827,43 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     item => item.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
   );
   assert.ok(governanceAlertDeadLetterCase);
+  assert.equal(governanceAlertDeadLetterCase.caseFamily, "delivery_recovery");
+  assert.equal(governanceAlertDeadLetterCase.caseSeverity, "high");
   assert.equal(governanceAlertDeadLetterCase.caseStatus, "awaiting_redrive");
+  assert.equal(
+    governanceAlertDeadLetterCase.closeResolutionSummaryRequirement?.minimumLength,
+    60
+  );
+  assert.deepEqual(
+    governanceAlertDeadLetterCase.closeResolutionSummaryFieldRequirements.map(
+      item => item.fieldKey
+    ),
+    ["corrected_target", "impact_summary", "redrive_disposition"]
+  );
+  assert.equal(
+    governanceAlertDeadLetterCase.closeResolutionSummaryFieldRequirements.find(
+      item => item.fieldKey === "redrive_disposition"
+    )?.minimumLength,
+    24
+  );
+  assert.equal(
+    governanceAlertDeadLetterCase.closeResolutionSummaryFieldRequirements.find(
+      item => item.fieldKey === "impact_summary"
+    )?.minimumLength,
+    18
+  );
   assert.equal(governanceAlertDeadLetterCase.assignmentStatus, "unassigned");
   assert.equal(governanceAlertDeadLetterCase.failedAlertCount, 1);
   assert.equal(governanceAlertDeadLetterCase.closeReadiness, "blocked");
   assert.deepEqual(governanceAlertDeadLetterCase.closeBlockedByChecklistItemKeys, [
-    "verify-target",
-    "document-disposition"
+    "document-disposition",
+    "verify-target"
   ]);
   assert.deepEqual(governanceAlertDeadLetterCase.recommendedActions, [
     "assign_case",
+    "expedite_manual_recovery",
+    "request_secondary_review",
+    "provide_resolution_summary",
     "complete_required_checklist",
     "redrive_governance_alert"
   ]);
@@ -8317,8 +8879,11 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     item => item.caseItem.alerts.some(alert => alert.alertId === seededFailedGovernanceAlertId)
   );
   assert.ok(deadLetterGovernanceCaseQueueItem);
-  assert.equal(deadLetterGovernanceCaseQueueItem.priorityRank, 30);
-  assert.equal(deadLetterGovernanceCaseQueueItem.priorityReason, "delivery_failed");
+  assert.equal(deadLetterGovernanceCaseQueueItem.priorityRank, 15);
+  assert.equal(
+    deadLetterGovernanceCaseQueueItem.priorityReason,
+    "workspace_high_delivery_recovery"
+  );
   assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.caseStatus, "awaiting_redrive");
   assert.equal(deadLetterGovernanceCaseQueueItem.caseItem.assignmentStatus, "unassigned");
 
@@ -8375,7 +8940,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(recoveryTransitionedDeadLetterCase.caseItem.closeReadiness, "blocked");
   assert.deepEqual(
     recoveryTransitionedDeadLetterCase.caseItem.closeBlockedByChecklistItemKeys,
-    ["verify-target", "document-disposition"]
+    ["document-disposition", "verify-target"]
   );
   assert.deepEqual(recoveryTransitionedDeadLetterCase.caseItem.availableTransitions, [
     "mark_waiting_external"
@@ -8458,7 +9023,7 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
         method: "POST",
         body: JSON.stringify({
           itemKey: "document-disposition",
-          label: "Document disposition before closure",
+          label: "Document closure rationale before closure",
           status: "completed",
           updatedByActorId: "ops-governance-manager",
           note: "Documented closure disposition after target correction."
@@ -8467,6 +9032,12 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     );
   assert.equal(deadLetterCaseWithRequiredChecklistB.caseItem.closeReadiness, "ready");
   assert.deepEqual(deadLetterCaseWithRequiredChecklistB.caseItem.closeBlockedByChecklistItemKeys, []);
+  assert.equal(
+    deadLetterCaseWithRequiredChecklistB.caseItem.requiredChecklistItems.find(
+      item => item.itemKey === "document-disposition"
+    )?.label,
+    "Document closure rationale before closure"
+  );
   assert.deepEqual(deadLetterCaseWithRequiredChecklistB.caseItem.availableTransitions, [
     "start_recovery",
     "close_case"
@@ -8487,11 +9058,47 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     assert.ok(readyDeadLetterCase);
     assert.equal(readyDeadLetterCase.closeReadiness, "ready");
     assert.deepEqual(readyDeadLetterCase.closeBlockedByChecklistItemKeys, []);
+    assert.equal(
+      readyDeadLetterCase.requiredChecklistItems.find(
+        item => item.itemKey === "document-disposition"
+      )?.label,
+      "Document closure rationale before closure"
+    );
     assert.deepEqual(readyDeadLetterCase.availableTransitions, [
       "start_recovery",
       "close_case"
     ]);
+    assert.equal(
+      readyDeadLetterCase.closeResolutionSummaryRequirement?.minimumLength,
+      60
+    );
+    assert.deepEqual(
+      readyDeadLetterCase.closeResolutionSummaryFieldRequirements.map(
+        item => item.fieldKey
+      ),
+      ["corrected_target", "impact_summary", "redrive_disposition"]
+    );
+    assert.equal(readyDeadLetterCase.caseSeverity, "high");
   }, 20, 100);
+
+  await fetchJsonResponse(
+    apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+      demoTenantKey,
+      demoWorkspaceKey,
+      governanceAlertDeadLetterCase.incident.incidentId
+    ),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        transition: "close_case",
+        transitionedByActorId: "ops-governance-manager",
+        transitionNote:
+          "Closing note is long enough, but the structured resolution fields are still missing for policy.",
+        resolutionCode: "target_corrected"
+      })
+    },
+    409
+  );
 
   const closedDeadLetterCase =
     await retry(
@@ -8507,8 +9114,26 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
             body: JSON.stringify({
               transition: "close_case",
               transitionedByActorId: "ops-governance-manager",
-              transitionNote: "Closing the case until the provider target is corrected.",
-              resolutionCode: "target_corrected"
+              transitionNote:
+                "Closing the case after validating the corrected provider target and confirming the redrive disposition for follow-up.",
+              resolutionCode: "target_corrected",
+              resolutionSummaryFields: [
+                {
+                  fieldKey: "corrected_target",
+                  value:
+                    "Updated governance alert delivery target to governance-alerts-fixed@example.test."
+                },
+                {
+                  fieldKey: "impact_summary",
+                  value:
+                    "Manual recovery was required because the failed governance alert blocked the expected operator escalation path."
+                },
+                {
+                  fieldKey: "redrive_disposition",
+                  value:
+                    "Redriven governance alert reached the corrected destination and the operator documented the final delivery disposition."
+                }
+              ]
             })
           }
         ),
@@ -8517,6 +9142,27 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     );
   assert.equal(closedDeadLetterCase.caseItem.workflowState, "closed");
   assert.equal(closedDeadLetterCase.caseItem.resolutionCode, "target_corrected");
+  assert.equal(
+    closedDeadLetterCase.caseItem.latestCloseResolutionSummary,
+    "Closing the case after validating the corrected provider target and confirming the redrive disposition for follow-up."
+  );
+  assert.deepEqual(closedDeadLetterCase.caseItem.latestCloseResolutionSummaryFields, [
+    {
+      fieldKey: "corrected_target",
+      value:
+        "Updated governance alert delivery target to governance-alerts-fixed@example.test."
+    },
+    {
+      fieldKey: "impact_summary",
+      value:
+        "Manual recovery was required because the failed governance alert blocked the expected operator escalation path."
+    },
+    {
+      fieldKey: "redrive_disposition",
+      value:
+        "Redriven governance alert reached the corrected destination and the operator documented the final delivery disposition."
+    }
+  ]);
   assert.deepEqual(closedDeadLetterCase.caseItem.recommendedActions, ["reopen_case"]);
   assert.deepEqual(closedDeadLetterCase.caseItem.availableTransitions, ["reopen_case"]);
 
@@ -8570,9 +9216,30 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
   assert.equal(reopenedDeadLetterCase.caseItem.resolutionCode, null);
   assert.deepEqual(reopenedDeadLetterCase.caseItem.availableTransitions, [
     "start_recovery",
-    "mark_waiting_external",
     "close_case"
   ]);
+
+  const blockedWaitingExternalTransitionResponse =
+    await fetchJsonResponse<ErrorResponse>(
+      apiRoutes.workspaceNotificationProviderProfileGovernanceCaseTransition(
+        demoTenantKey,
+        demoWorkspaceKey,
+        governanceAlertDeadLetterCase.incident.incidentId
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          transition: "mark_waiting_external",
+          transitionedByActorId: "ops-governance-manager",
+          transitionNote: "Attempting to pause direct recovery in favor of external wait."
+        })
+      },
+      409
+    );
+  assert.equal(
+    blockedWaitingExternalTransitionResponse.body.error.code,
+    "notification_provider_profile_governance_case_transition_not_allowed"
+  );
 
   const governanceCaseQueueAfterReopen =
     await fetchJson<WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse>(
@@ -9533,6 +10200,45 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     }
   );
 
+  const tenantGovernanceCasePolicyHistoryEntry = tenantPolicyHistory.items.find(
+    item =>
+      item.eventType === "tenant.governance_case_policy.updated" &&
+      item.requestId === tenantGovernanceCasePolicyRequestId
+  );
+  assert.ok(tenantGovernanceCasePolicyHistoryEntry);
+  assert.equal(tenantGovernanceCasePolicyHistoryEntry.scope, "tenant_default");
+  assert.equal(tenantGovernanceCasePolicyHistoryEntry.policyFamily, "governance_case");
+  assert.equal(tenantGovernanceCasePolicyHistoryEntry.mode, "default");
+  assert.deepEqual(
+    [...tenantGovernanceCasePolicyHistoryEntry.changedFields].sort(),
+    [
+      "delivery_recovery:awaiting_redrive:verify-target",
+      "delivery_recovery:awaiting_redrive:document-disposition",
+      "recommended_action:delivery_recovery:high:awaiting_redrive:expedite_manual_recovery",
+      "workflow_transition:recovery_follow_up:open:mark_waiting_external:medium",
+      "recovery_follow_up:awaiting_alert_acknowledgement:review-recovery-alert",
+      "recovery_follow_up:recovered:review-recovery-alert",
+      "queue_priority:delivery_recovery:high:awaiting_redrive",
+      "queue_priority:recovery_follow_up:medium:awaiting_alert_acknowledgement",
+      "resolution_summary:incident_response",
+      "resolution_summary:delivery_recovery",
+      "resolution_summary:recovery_follow_up",
+      "resolution_summary_field:incident_response:acknowledgement_summary",
+      "resolution_summary_field:incident_response:operator_disposition",
+      "resolution_summary_field:delivery_recovery:corrected_target",
+      "resolution_summary_field:delivery_recovery:redrive_disposition",
+      "resolution_summary_field:recovery_follow_up:recovery_verification",
+      "resolution_summary_field:recovery_follow_up:final_disposition"
+    ].sort()
+  );
+  assert.equal(
+    tenantGovernanceCasePolicyHistoryEntry.defaultGovernanceCasePolicy?.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "recovered" && item.itemKey === "review-recovery-alert"
+    )?.label,
+    "Review recovery alert before closeout"
+  );
+
   const tenantNotificationProviderProfilesHistoryEntry = tenantPolicyHistory.items.find(
     item =>
       item.eventType === "tenant.notification_provider_profiles.updated" &&
@@ -9815,6 +10521,58 @@ test("contract flow covers migrations, monitor read models, audit events, runtim
     workspaceRecoveryGovernanceNotificationPolicyHistoryEntry.recoveryGovernanceNotificationPolicyOverrideRecords
       ?.breachNotificationDeliverySelectionMode?.updatedByRequestId,
     workspaceRecoveryGovernanceNotificationPolicyRequestId
+  );
+
+  const workspaceGovernanceCasePolicyHistoryEntry = workspacePolicyHistory.items.find(
+    item =>
+      item.eventType === "workspace.governance_case_policy.updated" &&
+      item.requestId === workspaceGovernanceCasePolicyRefreshRequestId
+  );
+  assert.ok(workspaceGovernanceCasePolicyHistoryEntry);
+  assert.equal(workspaceGovernanceCasePolicyHistoryEntry.scope, "workspace_override");
+  assert.equal(
+    workspaceGovernanceCasePolicyHistoryEntry.policyFamily,
+    "governance_case"
+  );
+  assert.equal(workspaceGovernanceCasePolicyHistoryEntry.mode, "override");
+  assert.deepEqual(
+    [...workspaceGovernanceCasePolicyHistoryEntry.changedFields].sort(),
+    [
+      "delivery_recovery:awaiting_redrive:document-disposition",
+      "queue_priority:delivery_recovery:high:awaiting_redrive",
+      "recommended_action:delivery_recovery:high:awaiting_redrive:request_secondary_review",
+      "workflow_transition:delivery_recovery:open:mark_waiting_external:high",
+      "resolution_summary_field:delivery_recovery:impact_summary:high",
+      "resolution_summary_field:delivery_recovery:redrive_disposition:high",
+      "resolution_summary:delivery_recovery:high"
+    ].sort()
+  );
+  assert.deepEqual(workspaceGovernanceCasePolicyHistoryEntry.clearedFields, []);
+  assert.equal(
+    workspaceGovernanceCasePolicyHistoryEntry.defaultGovernanceCasePolicy?.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" &&
+        item.itemKey === "document-disposition"
+    )?.label,
+    "Document disposition before closure"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyHistoryEntry.governanceCasePolicyOverride
+      ?.closeChecklistTemplates?.[0]?.label,
+    "Document closure rationale before closure"
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyHistoryEntry.governanceCasePolicyOverrideRecords
+      ?.closeChecklistTemplates?.[0]?.updatedByRequestId,
+    workspaceGovernanceCasePolicyRefreshRequestId
+  );
+  assert.equal(
+    workspaceGovernanceCasePolicyHistoryEntry.effectiveGovernanceCasePolicy?.closeChecklistTemplates.find(
+      item =>
+        item.caseStatus === "awaiting_redrive" &&
+        item.itemKey === "document-disposition"
+    )?.label,
+    "Document closure rationale before closure"
   );
 
   const emptyWorkspacePolicyHistory = await fetchJson<PolicyHistoryResponse>(

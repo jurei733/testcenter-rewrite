@@ -47,6 +47,10 @@ import {
   type HealthResponse,
   type ImportJobDetailResponse,
   type ImportJobSummaryDto,
+  type GovernanceCaseChecklistTemplateDto,
+  type GovernanceCasePolicyDto,
+  type GovernanceCasePolicyOverrideDto,
+  type GovernanceCasePolicyOverrideRecordsDto,
   type LaunchApprovalPolicyDto,
   type LaunchApprovalPolicyOverrideDto,
   type LaunchApprovalPolicyOverrideRecordsDto,
@@ -63,6 +67,7 @@ import {
   type NotificationProviderProfileDto,
   type NotificationProviderProfileGovernanceQueueItemDto,
   type NotificationProviderProfileGovernanceAlertDto,
+  type NotificationProviderProfileGovernanceCaseRecommendedActionDto,
   type NotificationProviderProfileGovernanceAlertStatusDto,
   type NotificationProviderProfileGovernanceStatusDto,
   type NotificationProviderProfileIncidentDto,
@@ -134,6 +139,7 @@ import {
   type TenantActivationPolicyResponse,
   type TenantEvidenceRetentionClassPolicyResponse,
   type TenantEvidenceRetentionPolicyResponse,
+  type TenantGovernanceCasePolicyResponse,
   type TenantLaunchApprovalPolicyResponse,
   type TenantGovernanceNotificationPolicyResponse,
   type TenantRecoveryGovernanceNotificationPolicyResponse,
@@ -145,6 +151,7 @@ import {
   type UpdateTenantActivationPolicyRequest,
   type UpdateTenantEvidenceRetentionClassPolicyRequest,
   type UpdateTenantEvidenceRetentionPolicyRequest,
+  type UpdateTenantGovernanceCasePolicyRequest,
   type UpdateTenantLaunchApprovalPolicyRequest,
   type UpdateTenantGovernanceNotificationPolicyRequest,
   type UpdateTenantRecoveryGovernanceNotificationPolicyRequest,
@@ -155,6 +162,7 @@ import {
   type UpdateWorkspaceActivationPolicyRequest,
   type UpdateWorkspaceEvidenceRetentionClassPolicyRequest,
   type UpdateWorkspaceEvidenceRetentionPolicyRequest,
+  type UpdateWorkspaceGovernanceCasePolicyRequest,
   type UpdateWorkspaceLaunchApprovalPolicyRequest,
   type UpdateWorkspaceGovernanceNotificationPolicyRequest,
   type UpdateWorkspaceRecoveryGovernanceNotificationPolicyRequest,
@@ -175,6 +183,8 @@ import {
   type WorkspaceLaunchApprovalPolicyResponse,
   type WorkspaceGovernanceNotificationPolicyModeDto,
   type WorkspaceGovernanceNotificationPolicyResponse,
+  type WorkspaceGovernanceCasePolicyModeDto,
+  type WorkspaceGovernanceCasePolicyResponse,
   type WorkspaceRecoveryGovernanceNotificationPolicyModeDto,
   type WorkspaceRecoveryGovernanceNotificationPolicyResponse,
   type WorkspaceNotificationProviderPromotionPolicyModeDto,
@@ -251,6 +261,7 @@ import {
   createAuditEvent,
   createActivationPolicyOverrideRecords,
   createEvidenceRetentionClassPolicyOverrideRecords,
+  createGovernanceCasePolicyOverrideRecords,
   createEvidenceRetentionPolicyOverrideRecords,
   createImportJob,
   createLaunchApprovalPolicyOverrideRecords,
@@ -285,6 +296,7 @@ import {
   evaluateContentReleaseActivationGuardrail,
   flattenEvidenceRetentionClassPolicyOverrideRecords,
   flattenEvidenceRetentionPolicyOverrideRecords,
+  flattenGovernanceCasePolicyOverrideRecords,
   flattenActivationPolicyOverrideRecords,
   flattenLaunchApprovalPolicyOverrideRecords,
   flattenNotificationProviderPromotionPolicyOverrideRecords,
@@ -322,6 +334,7 @@ import {
   resolveSystemCheckEvidenceHoldTargetRule,
   resolveWorkspaceEvidenceRetentionClassPolicy,
   resolveWorkspaceEvidenceRetentionPolicy,
+  resolveWorkspaceGovernanceCasePolicy,
   redriveSystemCheckEvidenceBreachNotification,
   redriveNotificationProviderProfileGovernanceAlert,
   resolveWorkspaceNotificationProviderPromotionPolicy,
@@ -337,6 +350,8 @@ import {
   type EvidenceRetentionClassPolicy,
   type EvidenceRetentionPolicy,
   type LaunchApprovalPolicy,
+  type GovernanceCaseChecklistTemplate,
+  type GovernanceCasePolicy,
   type NotificationProviderPromotionPolicy,
   type NotificationPolicy,
   type NotificationProviderProfile,
@@ -358,6 +373,51 @@ import {
   type MonitorCommand,
   type Workspace
 } from "@testcenter-rewrite/domain";
+import {
+  buildNotificationProviderProfileGovernanceCaseRequiredChecklistItems,
+  getGovernanceCaseChecklistTemplateKey,
+  getGovernanceCaseQueuePriorityRuleKey,
+  getGovernanceCaseRecommendedActionRuleKey,
+  getGovernanceCaseResolutionSummaryFieldRequirementKey,
+  getGovernanceCaseResolutionSummaryRequirementKey,
+  getGovernanceCaseWorkflowTransitionRuleKey,
+  hasDuplicateGovernanceCaseChecklistTemplates,
+  hasDuplicateGovernanceCaseQueuePriorityRules,
+  hasDuplicateGovernanceCaseRecommendedActionRules,
+  hasDuplicateGovernanceCaseResolutionSummaryFieldRequirements,
+  hasDuplicateGovernanceCaseResolutionSummaryRequirements,
+  hasDuplicateGovernanceCaseWorkflowTransitionRules,
+  isGovernanceCasePolicy,
+  isGovernanceCasePolicyOverride,
+  isGovernanceCasePolicyOverrideRecordsDto,
+  isGovernanceCaseResolutionSummaryFieldValue,
+  resolveGovernanceCaseAvailableTransitions,
+  resolveGovernanceCaseCloseResolutionSummaryFieldRequirements,
+  resolveGovernanceCaseCloseResolutionSummaryRequirement,
+  resolveGovernanceCaseRecommendedActions,
+  toGovernanceCasePolicyDto,
+  toGovernanceCasePolicyOverrideDto,
+  toGovernanceCasePolicyOverrideRecordsDto,
+  toGovernanceCaseResolutionSummaryFieldRequirementDto,
+  toGovernanceCaseResolutionSummaryRequirementDto
+} from "./governance-case-policy.js";
+import {
+  buildNotificationProviderProfileGovernanceCaseItem,
+  buildNotificationProviderProfileGovernanceCaseQueueItems,
+  getAuditEventRelatedAlertIds,
+  getAuditEventRelatedIncidentId,
+  getLatestNotificationProviderProfileGovernanceCaseAssignment,
+  getLatestNotificationProviderProfileGovernanceCaseCloseResolutionSummary,
+  getLatestNotificationProviderProfileGovernanceCaseCloseResolutionSummaryFields,
+  getLatestNotificationProviderProfileGovernanceCaseEscalation,
+  getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition,
+  listNotificationProviderProfileGovernanceCaseChecklistItems,
+  listNotificationProviderProfileGovernanceCaseNotes,
+  toNotificationProviderProfileGovernanceAlertDto,
+  toNotificationProviderProfileGovernanceCaseDto,
+  toNotificationProviderProfileGovernanceCorrelationTimelineEventDto,
+  toNotificationProviderProfileIncidentDto
+} from "./governance-case-read-model.js";
 
 const jsonContentType = {
   "content-type": "application/json; charset=utf-8"
@@ -380,6 +440,8 @@ const workspaceGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/governance-notification-policy$/;
 const workspaceRecoveryGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/recovery-governance-notification-policy$/;
+const workspaceGovernanceCasePolicyRoutePattern =
+  /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/governance-case-policy$/;
 const workspaceNotificationProviderProfilesRoutePattern =
   /^\/api\/v1\/tenants\/([^/]+)\/workspaces\/([^/]+)\/notification-provider-profiles$/;
 const workspaceNotificationProviderProfileRolloutMetricsRoutePattern =
@@ -566,6 +628,8 @@ const tenantGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/governance-notification-policy$/;
 const tenantRecoveryGovernanceNotificationPolicyRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/recovery-governance-notification-policy$/;
+const tenantGovernanceCasePolicyRoutePattern =
+  /^\/api\/v1\/platform\/tenants\/([^/]+)\/governance-case-policy$/;
 const tenantNotificationProviderProfilesRoutePattern =
   /^\/api\/v1\/platform\/tenants\/([^/]+)\/notification-provider-profiles$/;
 const tenantEvidenceRetentionPolicyRoutePattern =
@@ -582,6 +646,7 @@ const tenantPolicyAuditEventTypes = [
   "tenant.notification_policy.updated",
   "tenant.governance_notification_policy.updated",
   "tenant.recovery_governance_notification_policy.updated",
+  "tenant.governance_case_policy.updated",
   "tenant.notification_provider_profiles.updated",
   "tenant.evidence_retention_policy.updated",
   "tenant.evidence_retention_class_policy.updated"
@@ -595,6 +660,7 @@ const workspacePolicyAuditEventTypes = [
   "workspace.notification_policy.updated",
   "workspace.governance_notification_policy.updated",
   "workspace.recovery_governance_notification_policy.updated",
+  "workspace.governance_case_policy.updated",
   "workspace.notification_provider_profiles.updated",
   "workspace.evidence_retention_policy.updated",
   "workspace.evidence_retention_class_policy.updated"
@@ -1019,6 +1085,26 @@ const isNotificationProviderProfileGovernanceCaseStatus = (
   value === "recovered" ||
   value === "closed";
 
+const isNotificationProviderProfileGovernanceCaseFamily = (
+  value: unknown
+): value is "incident_response" | "delivery_recovery" | "recovery_follow_up" =>
+  value === "incident_response" ||
+  value === "delivery_recovery" ||
+  value === "recovery_follow_up";
+
+const isNotificationProviderProfileGovernanceCaseSeverity = (
+  value: unknown
+): value is "low" | "medium" | "high" =>
+  value === "low" || value === "medium" || value === "high";
+
+const isNotificationProviderProfileGovernanceCaseWorkflowState = (
+  value: unknown
+): value is NotificationProviderProfileGovernanceCaseWorkflowStateDto =>
+  value === "open" ||
+  value === "in_recovery" ||
+  value === "waiting_external" ||
+  value === "closed";
+
 const isNotificationProviderProfileGovernanceCaseSlaStatus = (
   value: unknown
 ): value is NotificationProviderProfileGovernanceCaseSlaStatusDto =>
@@ -1371,6 +1457,11 @@ const isWorkspaceGovernanceNotificationPolicyMode = (
 const isWorkspaceRecoveryGovernanceNotificationPolicyMode = (
   value: unknown
 ): value is WorkspaceRecoveryGovernanceNotificationPolicyModeDto =>
+  value === "inherit" || value === "override";
+
+const isWorkspaceGovernanceCasePolicyMode = (
+  value: unknown
+): value is WorkspaceGovernanceCasePolicyModeDto =>
   value === "inherit" || value === "override";
 
 const isEvidenceRetentionPolicyOverride = (
@@ -2089,691 +2180,7 @@ const toNotificationProviderProfileDto = (
     : null
 });
 
-const toNotificationProviderProfileIncidentDto = (
-  incident: NotificationProviderProfileIncident
-): NotificationProviderProfileIncidentDto => ({
-  incidentId: incident.incidentId,
-  profileKey: incident.profileKey,
-  incidentType: incident.incidentType,
-  status: incident.status,
-  openedAt: incident.openedAt,
-  openedByActorType: incident.openedByActorType,
-  openedByActorId: incident.openedByActorId,
-  reasonCode: incident.reasonCode,
-  deliveryFailedCount: incident.deliveryFailedCount,
-  suppressionUntil: incident.suppressionUntil,
-  sourceRequestId: incident.sourceRequestId,
-  acknowledgedAt: incident.acknowledgedAt,
-  acknowledgedByActorId: incident.acknowledgedByActorId,
-  acknowledgementNote: incident.acknowledgementNote,
-  resolvedAt: incident.resolvedAt,
-  resolutionCode: incident.resolutionCode
-});
-
-const toNotificationProviderProfileGovernanceAlertDto = (
-  alert: NotificationProviderProfileGovernanceAlert
-): NotificationProviderProfileGovernanceAlertDto => ({
-  alertId: alert.alertId,
-  incidentId: alert.incidentId,
-  profileKey: alert.profileKey,
-  alertClass: alert.alertClass,
-  status: alert.status,
-  governanceStatus: alert.governanceStatus,
-  createdAt: alert.createdAt,
-  createdByActorType: alert.createdByActorType,
-  createdByActorId: alert.createdByActorId,
-  sourceRequestId: alert.sourceRequestId,
-  deliveryProfileKey: alert.deliveryProfileKey,
-  delivery: {
-    channel: alert.deliveryChannel,
-    status: alert.deliveryStatus,
-    target: alert.deliveryTarget,
-    attemptCount: alert.deliveryAttemptCount,
-    maxAttempts: alert.maxDeliveryAttempts,
-    nextAttemptAt: alert.nextDeliveryAttemptAt,
-    lastAttemptAt: alert.lastDeliveryAttemptAt,
-    receiptId: alert.lastDeliveryReceiptId,
-    receiptIssuedAt: alert.lastDeliveryReceiptIssuedAt,
-    deliveredAt: alert.deliveredAt,
-    lastError: alert.lastDeliveryError
-  },
-  acknowledgedAt: alert.acknowledgedAt,
-  acknowledgedByActorId: alert.acknowledgedByActorId,
-  acknowledgementNote: alert.acknowledgementNote
-});
-
-const getAuditEventRelatedIncidentId = (
-  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
-): string | null => {
-  const directIncidentId = getAuditPayloadString(auditEvent.payload, "incidentId");
-  if (directIncidentId) {
-    return directIncidentId;
-  }
-
-  const incidentRecord = getAuditPayloadRecord(auditEvent.payload, "incident");
-  return incidentRecord ? (getTrimmedString(incidentRecord.incidentId) ?? null) : null;
-};
-
-const getAuditEventRelatedAlertIds = (
-  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
-): string[] => {
-  const relatedAlertIds = new Set<string>();
-  const directAlertId = getAuditPayloadString(auditEvent.payload, "alertId");
-  if (directAlertId) {
-    relatedAlertIds.add(directAlertId);
-  }
-
-  const recoveryGovernanceAlertId = getAuditPayloadString(
-    auditEvent.payload,
-    "recoveryGovernanceAlertId"
-  );
-  if (recoveryGovernanceAlertId) {
-    relatedAlertIds.add(recoveryGovernanceAlertId);
-  }
-
-  const alertRecord = getAuditPayloadRecord(auditEvent.payload, "alert");
-  const nestedAlertId = alertRecord ? getTrimmedString(alertRecord.alertId) : null;
-  if (nestedAlertId) {
-    relatedAlertIds.add(nestedAlertId);
-  }
-
-  return Array.from(relatedAlertIds);
-};
-
-const toNotificationProviderProfileGovernanceCorrelationTimelineEventDto = (
-  auditEvent: import("@testcenter-rewrite/domain").AuditEvent
-) => ({
-  occurredAt: auditEvent.occurredAt,
-  eventType: auditEvent.eventType,
-  requestId: auditEvent.requestId,
-  actorType: auditEvent.actorType,
-  actorId: auditEvent.actorId,
-  relatedIncidentId: getAuditEventRelatedIncidentId(auditEvent),
-  relatedAlertId: getAuditEventRelatedAlertIds(auditEvent)[0] ?? null
-});
-
-const getLatestNotificationProviderProfileGovernanceCaseAssignment = (
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
-  incidentId: string
-) => {
-  const matchingEvent = auditEvents
-    .filter(
-      auditEvent =>
-        auditEvent.eventType ===
-          "workspace.notification_provider_profile_governance_case.assigned" &&
-        getAuditEventRelatedIncidentId(auditEvent) === incidentId
-    )
-    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
-
-  if (!matchingEvent) {
-    return null;
-  }
-
-  return {
-    assignedToActorId:
-      getAuditPayloadString(matchingEvent.payload, "assignedToActorId") ?? null,
-    assignedByActorId:
-      getAuditPayloadString(matchingEvent.payload, "assignedByActorId") ?? null,
-    assignedAt: getAuditPayloadString(matchingEvent.payload, "assignedAt") ?? null,
-    assignmentNote:
-      getAuditPayloadString(matchingEvent.payload, "assignmentNote") ?? null,
-    slaSeconds: getAuditPayloadNumber(matchingEvent.payload, "slaSeconds") ?? null
-  };
-};
-
-const getLatestNotificationProviderProfileGovernanceCaseEscalation = (
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
-  incidentId: string
-) => {
-  const matchingEvent = auditEvents
-    .filter(
-      auditEvent =>
-        auditEvent.eventType ===
-          "workspace.notification_provider_profile_governance_case.escalated" &&
-        getAuditEventRelatedIncidentId(auditEvent) === incidentId
-    )
-    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
-
-  if (!matchingEvent) {
-    return null;
-  }
-
-  return {
-    escalatedAt:
-      getAuditPayloadString(matchingEvent.payload, "escalatedAt") ?? matchingEvent.occurredAt,
-    escalatedByActorId:
-      getAuditPayloadString(matchingEvent.payload, "escalatedByActorId") ?? null,
-    escalationNote:
-      getAuditPayloadString(matchingEvent.payload, "escalationNote") ?? null
-  };
-};
-
-const getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition = (
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
-  incidentId: string
-) => {
-  const matchingEvent = auditEvents
-    .filter(
-      auditEvent =>
-        auditEvent.eventType ===
-          "workspace.notification_provider_profile_governance_case.transitioned" &&
-        getAuditEventRelatedIncidentId(auditEvent) === incidentId
-    )
-    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
-
-  if (!matchingEvent) {
-    return null;
-  }
-
-  const transition = getAuditPayloadString(matchingEvent.payload, "transition");
-  const rawResolutionCode = getAuditPayloadString(
-    matchingEvent.payload,
-    "resolutionCode"
-  );
-  const resolutionCode = isNotificationProviderProfileGovernanceCaseResolutionCode(
-    rawResolutionCode
-  )
-    ? rawResolutionCode
-    : null;
-  let workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto = "open";
-
-  if (transition === "start_recovery") {
-    workflowState = "in_recovery";
-  } else if (transition === "mark_waiting_external") {
-    workflowState = "waiting_external";
-  } else if (transition === "close_case") {
-    workflowState = "closed";
-  }
-
-  return {
-    transition: isNotificationProviderProfileGovernanceCaseTransitionType(transition)
-      ? transition
-      : null,
-    workflowState,
-    workflowUpdatedAt:
-      getAuditPayloadString(matchingEvent.payload, "transitionedAt") ?? matchingEvent.occurredAt,
-    workflowUpdatedByActorId:
-      getAuditPayloadString(matchingEvent.payload, "transitionedByActorId") ?? null,
-    workflowNote:
-      getAuditPayloadString(matchingEvent.payload, "transitionNote") ?? null,
-    resolutionCode
-  };
-};
-
-const listNotificationProviderProfileGovernanceCaseNotes = (
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
-  incidentId: string
-) =>
-  auditEvents
-    .filter(
-      auditEvent =>
-        auditEvent.eventType ===
-          "workspace.notification_provider_profile_governance_case.note_added" &&
-        getAuditEventRelatedIncidentId(auditEvent) === incidentId
-    )
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(auditEvent => ({
-      noteId: getAuditPayloadString(auditEvent.payload, "noteId") ?? auditEvent.requestId,
-      body: getAuditPayloadString(auditEvent.payload, "noteBody") ?? "",
-      createdAt:
-        getAuditPayloadString(auditEvent.payload, "createdAt") ?? auditEvent.occurredAt,
-      createdByActorId: getAuditPayloadString(auditEvent.payload, "createdByActorId") ?? ""
-    }));
-
-const listNotificationProviderProfileGovernanceCaseChecklistItems = (
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[],
-  incidentId: string
-) => {
-  const latestByItemKey = new Map<
-    string,
-    {
-      itemKey: string;
-      label: string;
-      status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
-      updatedAt: string;
-      updatedByActorId: string;
-      note: string | null;
-    }
-  >();
-
-  for (const auditEvent of auditEvents
-    .filter(
-      currentAuditEvent =>
-        currentAuditEvent.eventType ===
-          "workspace.notification_provider_profile_governance_case.checklist_item_upserted" &&
-        getAuditEventRelatedIncidentId(currentAuditEvent) === incidentId
-    )
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))) {
-    const itemKey = getTrimmedString(
-      getAuditPayloadString(auditEvent.payload, "itemKey")
-    );
-    const label = getTrimmedString(getAuditPayloadString(auditEvent.payload, "label"));
-    const status = getAuditPayloadString(auditEvent.payload, "status");
-    const updatedByActorId = getTrimmedString(
-      getAuditPayloadString(auditEvent.payload, "updatedByActorId")
-    );
-
-    if (
-      !itemKey ||
-      !label ||
-      !updatedByActorId ||
-      !isNotificationProviderProfileGovernanceCaseChecklistItemStatus(status)
-    ) {
-      continue;
-    }
-
-    latestByItemKey.set(itemKey, {
-      itemKey,
-      label,
-      status,
-      updatedAt:
-        getAuditPayloadString(auditEvent.payload, "updatedAt") ?? auditEvent.occurredAt,
-      updatedByActorId,
-      note: getAuditPayloadString(auditEvent.payload, "note") ?? null
-    });
-  }
-
-  return Array.from(latestByItemKey.values()).sort((left, right) =>
-    left.itemKey.localeCompare(right.itemKey)
-  );
-};
-
-const buildNotificationProviderProfileGovernanceCaseRequiredChecklistItems = (input: {
-  caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
-  checklistItems: Array<{
-    itemKey: string;
-    label: string;
-    status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
-    updatedAt: string;
-    updatedByActorId: string;
-    note: string | null;
-  }>;
-}) => {
-  const checklistStatusByKey = new Map(
-    input.checklistItems.map(item => [item.itemKey, item.status] as const)
-  );
-
-  const templateDefinitions =
-    input.caseStatus === "awaiting_redrive"
-      ? [
-          {
-            itemKey: "verify-target",
-            label: "Verify corrected provider target",
-            requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
-          },
-          {
-            itemKey: "document-disposition",
-            label: "Document disposition before closure",
-            requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
-          }
-        ]
-      : input.caseStatus === "awaiting_alert_acknowledgement" ||
-          input.caseStatus === "recovered"
-        ? [
-            {
-              itemKey: "review-recovery-alert",
-              label: "Review recovery alert before closure",
-              requiredForTransitions: ["close_case"] as NotificationProviderProfileGovernanceCaseTransitionTypeDto[]
-            }
-          ]
-        : [];
-
-  return templateDefinitions.map(template => ({
-    ...template,
-    completed: checklistStatusByKey.get(template.itemKey) === "completed"
-  }));
-};
-
 const defaultGovernanceCaseAuditLimit = 5000;
-
-const toNotificationProviderProfileGovernanceCaseDto = (input: {
-  profileKey: string;
-  incident: NotificationProviderProfileIncident;
-  alerts: NotificationProviderProfileGovernanceAlert[];
-  timeline: ReturnType<typeof toNotificationProviderProfileGovernanceCorrelationTimelineEventDto>[];
-  assignment: {
-    assignedToActorId: string | null;
-    assignedByActorId: string | null;
-    assignedAt: string | null;
-    assignmentNote: string | null;
-    slaSeconds: number | null;
-  } | null;
-  escalation: {
-    escalatedAt: string | null;
-    escalatedByActorId: string | null;
-    escalationNote: string | null;
-  } | null;
-  workflowTransition: {
-    transition: NotificationProviderProfileGovernanceCaseTransitionTypeDto | null;
-    workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto;
-    workflowUpdatedAt: string | null;
-    workflowUpdatedByActorId: string | null;
-    workflowNote: string | null;
-    resolutionCode: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
-  } | null;
-  notes: Array<{
-    noteId: string;
-    body: string;
-    createdAt: string;
-    createdByActorId: string;
-  }>;
-  checklistItems: Array<{
-    itemKey: string;
-    label: string;
-    status: NotificationProviderProfileGovernanceCaseChecklistItemStatusDto;
-    updatedAt: string;
-    updatedByActorId: string;
-    note: string | null;
-  }>;
-}): WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number] => {
-  const nowIso = new Date().toISOString();
-  const openAlertCount = input.alerts.filter(alert => alert.alertClass === "incident_open").length;
-  const failedAlertCount = input.alerts.filter(
-    alert => alert.deliveryStatus === "delivery_failed"
-  ).length;
-  const pendingAlertAcknowledgementCount = input.alerts.filter(
-    alert => alert.status === "pending_acknowledgement"
-  ).length;
-  const suppressionActive =
-    input.incident.suppressionUntil !== null &&
-    input.incident.suppressionUntil > nowIso;
-  const allAlertsAcknowledged =
-    input.alerts.length > 0 &&
-    input.alerts.every(alert => alert.status === "acknowledged");
-  const hasDeliveredRecoveryAlert = input.alerts.some(
-    alert =>
-      alert.alertClass === "incident_resolved" &&
-      alert.deliveryStatus === "delivered"
-  );
-  const slaDueAt =
-    input.assignment?.assignedAt &&
-    typeof input.assignment.slaSeconds === "number" &&
-    input.assignment.slaSeconds > 0
-      ? new Date(
-          Date.parse(input.assignment.assignedAt) + input.assignment.slaSeconds * 1000
-        ).toISOString()
-      : null;
-  const slaStatus: NotificationProviderProfileGovernanceCaseSlaStatusDto =
-    input.escalation !== null
-      ? "escalated"
-      : slaDueAt === null
-        ? "not_applicable"
-        : slaDueAt < nowIso
-          ? "breached"
-          : "on_track";
-
-  let caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
-  let recommendedActions: WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number]["recommendedActions"];
-
-  if (failedAlertCount > 0) {
-    caseStatus = "awaiting_redrive";
-    recommendedActions = ["redrive_governance_alert"];
-  } else if (input.incident.status === "open") {
-    caseStatus = "awaiting_incident_acknowledgement";
-    recommendedActions = ["acknowledge_incident"];
-  } else if (suppressionActive) {
-    caseStatus = "suppressed_monitoring";
-    recommendedActions = ["wait_for_suppression_expiry"];
-  } else if (pendingAlertAcknowledgementCount > 0) {
-    caseStatus = "awaiting_alert_acknowledgement";
-    recommendedActions = ["acknowledge_governance_alert"];
-  } else if (hasDeliveredRecoveryAlert) {
-    caseStatus = "recovered";
-    recommendedActions = ["review_recovery_state"];
-  } else if (allAlertsAcknowledged || input.incident.status === "resolved") {
-    caseStatus = "closed";
-    recommendedActions = ["no_action_required"];
-  } else {
-    caseStatus = "closed";
-    recommendedActions = ["no_action_required"];
-  }
-
-  const workflowState = input.workflowTransition?.workflowState ?? "open";
-  const requiredChecklistItems =
-    buildNotificationProviderProfileGovernanceCaseRequiredChecklistItems({
-      caseStatus,
-      checklistItems: input.checklistItems
-    });
-  const closeBlockedByChecklistItemKeys =
-    workflowState === "closed"
-      ? []
-      : requiredChecklistItems
-          .filter(
-            item =>
-              item.requiredForTransitions.includes("close_case") && !item.completed
-          )
-          .map(item => item.itemKey);
-  const closeReadiness =
-    closeBlockedByChecklistItemKeys.length === 0 ? "ready" : "blocked";
-
-  if (slaStatus === "breached") {
-    recommendedActions = ["escalate_case", ...recommendedActions];
-  }
-
-  if (
-    input.assignment === null &&
-    recommendedActions[0] !== "no_action_required" &&
-    recommendedActions[0] !== "assign_case"
-  ) {
-    recommendedActions = ["assign_case", ...recommendedActions];
-  }
-
-  if (workflowState === "closed") {
-    recommendedActions = ["reopen_case"];
-  }
-
-  if (
-    workflowState !== "closed" &&
-    closeBlockedByChecklistItemKeys.length > 0 &&
-    !recommendedActions.includes("complete_required_checklist")
-  ) {
-    if (recommendedActions[0] === "assign_case") {
-      recommendedActions = [
-        "assign_case",
-        "complete_required_checklist",
-        ...recommendedActions.slice(1)
-      ];
-    } else if (recommendedActions[0] !== "no_action_required") {
-      recommendedActions = ["complete_required_checklist", ...recommendedActions];
-    }
-  }
-
-  let availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
-  const closeCaseTransitionSuffix: NotificationProviderProfileGovernanceCaseTransitionTypeDto[] =
-    closeBlockedByChecklistItemKeys.length === 0 ? ["close_case"] : [];
-  if (workflowState === "closed") {
-    availableTransitions = ["reopen_case"];
-  } else if (workflowState === "in_recovery") {
-    availableTransitions = [
-      "mark_waiting_external",
-      ...closeCaseTransitionSuffix
-    ];
-  } else if (workflowState === "waiting_external") {
-    availableTransitions = [
-      "start_recovery",
-      ...closeCaseTransitionSuffix
-    ];
-  } else {
-    availableTransitions = [
-      "start_recovery",
-      "mark_waiting_external",
-      ...closeCaseTransitionSuffix
-    ];
-  }
-
-  const latestActivityAt = [
-    input.incident.openedAt,
-    input.incident.acknowledgedAt,
-    input.incident.resolvedAt,
-    input.assignment?.assignedAt,
-    slaDueAt,
-    input.escalation?.escalatedAt,
-    input.workflowTransition?.workflowUpdatedAt,
-    ...input.alerts.flatMap(alert => [
-      alert.createdAt,
-      alert.acknowledgedAt,
-      alert.deliveredAt,
-      alert.lastDeliveryAttemptAt
-    ]),
-    ...input.timeline.map(item => item.occurredAt)
-  ]
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
-    .sort((left, right) => right.localeCompare(left))[0] ?? input.incident.openedAt;
-
-  return {
-    profileKey: input.profileKey,
-    caseStatus,
-    assignmentStatus: input.assignment ? "assigned" : "unassigned",
-    assignedToActorId: input.assignment?.assignedToActorId ?? null,
-    assignedByActorId: input.assignment?.assignedByActorId ?? null,
-    assignedAt: input.assignment?.assignedAt ?? null,
-    assignmentNote: input.assignment?.assignmentNote ?? null,
-    slaSeconds: input.assignment?.slaSeconds ?? null,
-    slaDueAt,
-    slaStatus,
-    escalatedAt: input.escalation?.escalatedAt ?? null,
-    escalatedByActorId: input.escalation?.escalatedByActorId ?? null,
-    escalationNote: input.escalation?.escalationNote ?? null,
-    workflowState,
-    workflowUpdatedAt: input.workflowTransition?.workflowUpdatedAt ?? null,
-    workflowUpdatedByActorId:
-      input.workflowTransition?.workflowUpdatedByActorId ?? null,
-    workflowNote: input.workflowTransition?.workflowNote ?? null,
-    resolutionCode:
-      workflowState === "closed"
-        ? (input.workflowTransition?.resolutionCode ?? null)
-        : null,
-    availableTransitions,
-    closeReadiness,
-    closeBlockedByChecklistItemKeys,
-    latestActivityAt,
-    openAlertCount,
-    failedAlertCount,
-    pendingAlertAcknowledgementCount,
-    recommendedActions,
-    notes: input.notes,
-    checklistItems: input.checklistItems,
-    requiredChecklistItems,
-    incident: toNotificationProviderProfileIncidentDto(input.incident),
-    alerts: input.alerts.map(toNotificationProviderProfileGovernanceAlertDto),
-    timeline: input.timeline
-  };
-};
-
-const buildNotificationProviderProfileGovernanceCaseItem = (input: {
-  incident: NotificationProviderProfileIncident;
-  alerts: NotificationProviderProfileGovernanceAlert[];
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[];
-}) => {
-  const incidentAlerts = input.alerts
-    .filter(alert => alert.incidentId === input.incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-
-  if (input.incident.sourceRequestId) {
-    requestIds.add(input.incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = input.auditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === input.incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  return toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: input.incident.profileKey,
-    incident: input.incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      input.auditEvents,
-      input.incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      input.auditEvents,
-      input.incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      input.auditEvents,
-      input.incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      input.auditEvents,
-      input.incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      input.auditEvents,
-      input.incident.incidentId
-    )
-  });
-};
-
-const toNotificationProviderProfileGovernanceCaseQueueItemDto = (
-  caseItem: WorkspaceNotificationProviderProfileGovernanceCasesResponse["items"][number]
-): WorkspaceNotificationProviderProfileGovernanceCaseQueueResponse["items"][number] => {
-  let priorityRank = 999;
-  let priorityReason = "closed_or_inactive";
-
-  if (caseItem.slaStatus === "escalated") {
-    priorityRank = 10;
-    priorityReason = "case_escalated";
-  } else if (caseItem.slaStatus === "breached") {
-    priorityRank = 20;
-    priorityReason = "sla_breached";
-  } else if (caseItem.caseStatus === "awaiting_redrive") {
-    priorityRank = 30;
-    priorityReason = "delivery_failed";
-  } else if (caseItem.caseStatus === "awaiting_alert_acknowledgement") {
-    priorityRank = 40;
-    priorityReason = "alert_acknowledgement_pending";
-  } else if (caseItem.caseStatus === "awaiting_incident_acknowledgement") {
-    priorityRank = 50;
-    priorityReason = "incident_acknowledgement_pending";
-  } else if (caseItem.caseStatus === "suppressed_monitoring") {
-    priorityRank = 60;
-    priorityReason = "suppression_monitoring";
-  } else if (caseItem.caseStatus === "recovered") {
-    priorityRank = 70;
-    priorityReason = "recovered_review";
-  }
-
-  return {
-    priorityRank,
-    priorityReason,
-    caseItem
-  };
-};
-
-const buildNotificationProviderProfileGovernanceCaseQueueItems = (input: {
-  incidents: NotificationProviderProfileIncident[];
-  alerts: NotificationProviderProfileGovernanceAlert[];
-  auditEvents: import("@testcenter-rewrite/domain").AuditEvent[];
-}) => {
-  return input.incidents.map(incident =>
-    toNotificationProviderProfileGovernanceCaseQueueItemDto(
-      buildNotificationProviderProfileGovernanceCaseItem({
-        incident,
-        alerts: input.alerts,
-        auditEvents: input.auditEvents
-      })
-    )
-  );
-};
 
 const toNotificationProviderProfileGovernanceCaseBoardLane = (input: {
   laneKey: NotificationProviderProfileGovernanceCaseBoardLaneDto["laneKey"];
@@ -4317,6 +3724,10 @@ const toPolicyHistoryEntryDto = (
     recoveryGovernanceNotificationPolicyOverride: null,
     recoveryGovernanceNotificationPolicyOverrideRecords: null,
     effectiveRecoveryGovernanceNotificationPolicy: null,
+    defaultGovernanceCasePolicy: null,
+    governanceCasePolicyOverride: null,
+    governanceCasePolicyOverrideRecords: null,
+    effectiveGovernanceCasePolicy: null,
     defaultNotificationProviderProfiles: null,
     notificationProviderProfileOverride: null,
     removedNotificationProviderProfileKeys: null,
@@ -4663,6 +4074,50 @@ const toPolicyHistoryEntryDto = (
     };
   }
 
+  if (auditEvent.eventType === "tenant.governance_case_policy.updated") {
+    const defaultGovernanceCasePolicy = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultGovernanceCasePolicy"
+    );
+
+    if (!isGovernanceCasePolicy(defaultGovernanceCasePolicy)) {
+      return undefined;
+    }
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "governance_case",
+      scope: "tenant_default",
+      mode: "default",
+      changedFields: [
+        ...defaultGovernanceCasePolicy.closeChecklistTemplates.map(
+          getGovernanceCaseChecklistTemplateKey
+        ),
+        ...defaultGovernanceCasePolicy.closeResolutionSummaryRequirements.map(
+          getGovernanceCaseResolutionSummaryRequirementKey
+        ),
+        ...defaultGovernanceCasePolicy.closeResolutionSummaryFieldRequirements.map(
+          getGovernanceCaseResolutionSummaryFieldRequirementKey
+        ),
+        ...defaultGovernanceCasePolicy.queuePriorityRules.map(
+          getGovernanceCaseQueuePriorityRuleKey
+        ),
+        ...defaultGovernanceCasePolicy.recommendedActionRules.map(
+          getGovernanceCaseRecommendedActionRuleKey
+        ),
+        ...defaultGovernanceCasePolicy.workflowTransitionRules.map(
+          getGovernanceCaseWorkflowTransitionRuleKey
+        )
+      ],
+      clearedFields: [],
+      defaultGovernanceCasePolicy,
+      governanceCasePolicyOverride: null,
+      governanceCasePolicyOverrideRecords: null,
+      effectiveGovernanceCasePolicy: defaultGovernanceCasePolicy
+    };
+  }
+
   if (auditEvent.eventType === "tenant.notification_provider_profiles.updated") {
     const defaultNotificationProviderProfilesRecord = getAuditPayloadRecord(
       auditEvent.payload,
@@ -4686,6 +4141,56 @@ const toPolicyHistoryEntryDto = (
       removedNotificationProviderProfileKeys: null,
       notificationProviderProfileOverrideRecords: null,
       effectiveNotificationProviderProfiles: defaultNotificationProviderProfilesRecord
+    };
+  }
+
+  if (auditEvent.eventType === "workspace.governance_case_policy.updated") {
+    const defaultGovernanceCasePolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "defaultGovernanceCasePolicy"
+    );
+    const governanceCasePolicyOverrideRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "governanceCasePolicyOverride"
+    );
+    const governanceCasePolicyOverrideRecordsRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "governanceCasePolicyOverrideRecords"
+    );
+    const effectiveGovernanceCasePolicyRecord = getAuditPayloadRecord(
+      auditEvent.payload,
+      "effectiveGovernanceCasePolicy"
+    );
+    const mode = isWorkspaceGovernanceCasePolicyMode(auditEvent.payload.mode)
+      ? auditEvent.payload.mode
+      : "override";
+
+    return {
+      ...baseEntry,
+      ...emptyPolicyState,
+      policyFamily: "governance_case",
+      scope: "workspace_override",
+      mode,
+      changedFields: getAuditPayloadStringArray(auditEvent.payload, "changedFields") ?? [],
+      clearedFields: getAuditPayloadStringArray(auditEvent.payload, "clearedFields") ?? [],
+      defaultGovernanceCasePolicy: isGovernanceCasePolicy(defaultGovernanceCasePolicyRecord)
+        ? defaultGovernanceCasePolicyRecord
+        : null,
+      governanceCasePolicyOverride: isGovernanceCasePolicyOverride(
+        governanceCasePolicyOverrideRecord
+      )
+        ? governanceCasePolicyOverrideRecord
+        : null,
+      governanceCasePolicyOverrideRecords: isGovernanceCasePolicyOverrideRecordsDto(
+        governanceCasePolicyOverrideRecordsRecord
+      )
+        ? governanceCasePolicyOverrideRecordsRecord
+        : null,
+      effectiveGovernanceCasePolicy: isGovernanceCasePolicy(
+        effectiveGovernanceCasePolicyRecord
+      )
+        ? effectiveGovernanceCasePolicyRecord
+        : null
     };
   }
 
@@ -6313,6 +5818,15 @@ const toTenantRecoveryGovernanceNotificationPolicyResponse = (
   )
 });
 
+const toTenantGovernanceCasePolicyResponse = (
+  tenant: Tenant
+): TenantGovernanceCasePolicyResponse => ({
+  tenantKey: tenant.tenantKey,
+  defaultGovernanceCasePolicy: toGovernanceCasePolicyDto(
+    tenant.defaultGovernanceCasePolicy
+  )
+});
+
 const toTenantNotificationProviderProfilesResponse = (
   tenant: Tenant
 ): TenantNotificationProviderProfilesResponse => ({
@@ -6812,6 +6326,160 @@ const handleTenantRecoveryGovernanceNotificationPolicyPatch = async (
     response,
     200,
     toTenantRecoveryGovernanceNotificationPolicyResponse(updatedTenant)
+  );
+};
+
+const handleTenantGovernanceCasePolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  sendJson<TenantGovernanceCasePolicyResponse>(
+    response,
+    200,
+    toTenantGovernanceCasePolicyResponse(tenant)
+  );
+};
+
+const handleTenantGovernanceCasePolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const tenant = await store.getTenantByKey(tenantKey);
+
+  if (!tenant) {
+    sendError(response, 404, "tenant_not_found", `Tenant '${tenantKey}' was not found.`);
+    return;
+  }
+
+  const body = await readBody<UpdateTenantGovernanceCasePolicyRequest>(request);
+
+  if (!isGovernanceCasePolicy(body.defaultGovernanceCasePolicy)) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy must provide a valid governance-case policy."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseChecklistTemplates(
+      body.defaultGovernanceCasePolicy.closeChecklistTemplates
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.closeChecklistTemplates must not contain duplicate caseFamily/caseStatus/itemKey triples."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseResolutionSummaryRequirements(
+      body.defaultGovernanceCasePolicy.closeResolutionSummaryRequirements
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.closeResolutionSummaryRequirements must not contain duplicate caseFamily entries."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseResolutionSummaryFieldRequirements(
+      body.defaultGovernanceCasePolicy.closeResolutionSummaryFieldRequirements
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.closeResolutionSummaryFieldRequirements must not contain duplicate caseFamily/fieldKey pairs."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseQueuePriorityRules(
+      body.defaultGovernanceCasePolicy.queuePriorityRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.queuePriorityRules must not contain duplicate caseFamily/caseSeverity/caseStatus combinations."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseRecommendedActionRules(
+      body.defaultGovernanceCasePolicy.recommendedActionRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.recommendedActionRules must not contain duplicate caseFamily/caseSeverity/caseStatus/recommendedAction combinations."
+    );
+    return;
+  }
+
+  if (
+    hasDuplicateGovernanceCaseWorkflowTransitionRules(
+      body.defaultGovernanceCasePolicy.workflowTransitionRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_tenant_governance_case_policy_payload",
+      "defaultGovernanceCasePolicy.workflowTransitionRules must not contain duplicate caseFamily/workflowState/transition/caseSeverity combinations."
+    );
+    return;
+  }
+
+  const updatedTenant: Tenant = {
+    ...tenant,
+    defaultGovernanceCasePolicy: body.defaultGovernanceCasePolicy
+  };
+
+  await store.saveTenant(updatedTenant);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedTenant.tenantId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "tenant.governance_case_policy.updated",
+    payload: {
+      tenantKey: updatedTenant.tenantKey,
+      defaultGovernanceCasePolicy: updatedTenant.defaultGovernanceCasePolicy
+    }
+  });
+
+  sendJson<TenantGovernanceCasePolicyResponse>(
+    response,
+    200,
+    toTenantGovernanceCasePolicyResponse(updatedTenant)
   );
 };
 
@@ -7324,6 +6992,33 @@ const toWorkspaceRecoveryGovernanceNotificationPolicyResponse = (
     ),
     effectiveRecoveryGovernanceNotificationPolicy: toNotificationPolicyDto(
       resolveWorkspaceRecoveryGovernanceNotificationPolicy(workspace, tenant)
+    )
+  };
+};
+
+const toWorkspaceGovernanceCasePolicyResponse = (
+  tenant: Tenant,
+  workspace: Workspace
+): WorkspaceGovernanceCasePolicyResponse => {
+  const flattenedOverride = flattenGovernanceCasePolicyOverrideRecords(
+    workspace.governanceCasePolicyOverrideRecords
+  );
+
+  return {
+    tenantKey: tenant.tenantKey,
+    workspaceKey: workspace.workspaceKey,
+    mode: workspace.governanceCasePolicyOverrideRecords ? "override" : "inherit",
+    defaultGovernanceCasePolicy: toGovernanceCasePolicyDto(
+      tenant.defaultGovernanceCasePolicy
+    ),
+    governanceCasePolicyOverride: flattenedOverride
+      ? toGovernanceCasePolicyOverrideDto(flattenedOverride)
+      : null,
+    governanceCasePolicyOverrideRecords: toGovernanceCasePolicyOverrideRecordsDto(
+      workspace.governanceCasePolicyOverrideRecords
+    ),
+    effectiveGovernanceCasePolicy: toGovernanceCasePolicyDto(
+      resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
     )
   };
 };
@@ -8780,6 +8475,326 @@ const handleWorkspaceRecoveryGovernanceNotificationPolicyPatch = async (
   );
 };
 
+const handleWorkspaceGovernanceCasePolicyGet = async (
+  store: PlatformStore,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  sendJson<WorkspaceGovernanceCasePolicyResponse>(
+    response,
+    200,
+    toWorkspaceGovernanceCasePolicyResponse(tenant, workspace)
+  );
+};
+
+const handleWorkspaceGovernanceCasePolicyPatch = async (
+  store: PlatformStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  tenantKey: string,
+  workspaceKey: string,
+  requestContext: RequestContext
+): Promise<void> => {
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
+
+  if (!tenant || !workspace) {
+    sendError(
+      response,
+      404,
+      "workspace_not_found",
+      `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+    );
+    return;
+  }
+
+  const body = await readBody<UpdateWorkspaceGovernanceCasePolicyRequest>(request);
+
+  if (!isWorkspaceGovernanceCasePolicyMode(body.mode)) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "mode must be either 'inherit' or 'override'."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    !isGovernanceCasePolicyOverride(body.governanceCasePolicyOverride)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride must provide at least one governance-case checklist template or close-resolution-summary requirement when mode is 'override'."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.closeChecklistTemplates) &&
+    hasDuplicateGovernanceCaseChecklistTemplates(
+      body.governanceCasePolicyOverride.closeChecklistTemplates
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.closeChecklistTemplates must not contain duplicate caseFamily/caseStatus/itemKey triples."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.closeResolutionSummaryRequirements) &&
+    hasDuplicateGovernanceCaseResolutionSummaryRequirements(
+      body.governanceCasePolicyOverride.closeResolutionSummaryRequirements
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.closeResolutionSummaryRequirements must not contain duplicate caseFamily entries."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.closeResolutionSummaryFieldRequirements) &&
+    hasDuplicateGovernanceCaseResolutionSummaryFieldRequirements(
+      body.governanceCasePolicyOverride.closeResolutionSummaryFieldRequirements
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.closeResolutionSummaryFieldRequirements must not contain duplicate caseFamily/fieldKey pairs."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.queuePriorityRules) &&
+    hasDuplicateGovernanceCaseQueuePriorityRules(
+      body.governanceCasePolicyOverride.queuePriorityRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.queuePriorityRules must not contain duplicate caseFamily/caseSeverity/caseStatus combinations."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.recommendedActionRules) &&
+    hasDuplicateGovernanceCaseRecommendedActionRules(
+      body.governanceCasePolicyOverride.recommendedActionRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.recommendedActionRules must not contain duplicate caseFamily/caseSeverity/caseStatus/recommendedAction combinations."
+    );
+    return;
+  }
+
+  if (
+    body.mode === "override" &&
+    Array.isArray(body.governanceCasePolicyOverride?.workflowTransitionRules) &&
+    hasDuplicateGovernanceCaseWorkflowTransitionRules(
+      body.governanceCasePolicyOverride.workflowTransitionRules
+    )
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_workspace_governance_case_policy_payload",
+      "governanceCasePolicyOverride.workflowTransitionRules must not contain duplicate caseFamily/workflowState/transition/caseSeverity combinations."
+    );
+    return;
+  }
+
+  const governanceCasePolicyOverride =
+    body.mode === "override"
+      ? toGovernanceCasePolicyOverrideDto(
+          body.governanceCasePolicyOverride as GovernanceCasePolicyOverrideDto
+        )
+      : null;
+  const previousGovernanceCasePolicyOverride =
+    flattenGovernanceCasePolicyOverrideRecords(
+      workspace.governanceCasePolicyOverrideRecords
+    );
+  const previousTemplateKeys = new Set(
+    previousGovernanceCasePolicyOverride?.closeChecklistTemplates?.map(
+      getGovernanceCaseChecklistTemplateKey
+    ) ?? []
+  );
+  const previousResolutionSummaryRequirementKeys = new Set(
+    previousGovernanceCasePolicyOverride?.closeResolutionSummaryRequirements?.map(
+      getGovernanceCaseResolutionSummaryRequirementKey
+    ) ?? []
+  );
+  const previousResolutionSummaryFieldRequirementKeys = new Set(
+    previousGovernanceCasePolicyOverride?.closeResolutionSummaryFieldRequirements?.map(
+      getGovernanceCaseResolutionSummaryFieldRequirementKey
+    ) ?? []
+  );
+  const previousQueuePriorityRuleKeys = new Set(
+    previousGovernanceCasePolicyOverride?.queuePriorityRules?.map(
+      getGovernanceCaseQueuePriorityRuleKey
+    ) ?? []
+  );
+  const previousRecommendedActionRuleKeys = new Set(
+    previousGovernanceCasePolicyOverride?.recommendedActionRules?.map(
+      getGovernanceCaseRecommendedActionRuleKey
+    ) ?? []
+  );
+  const previousWorkflowTransitionRuleKeys = new Set(
+    previousGovernanceCasePolicyOverride?.workflowTransitionRules?.map(
+      getGovernanceCaseWorkflowTransitionRuleKey
+    ) ?? []
+  );
+  const nextTemplateKeys = new Set(
+    governanceCasePolicyOverride?.closeChecklistTemplates?.map(
+      getGovernanceCaseChecklistTemplateKey
+    ) ?? []
+  );
+  const nextResolutionSummaryRequirementKeys = new Set(
+    governanceCasePolicyOverride?.closeResolutionSummaryRequirements?.map(
+      getGovernanceCaseResolutionSummaryRequirementKey
+    ) ?? []
+  );
+  const nextResolutionSummaryFieldRequirementKeys = new Set(
+    governanceCasePolicyOverride?.closeResolutionSummaryFieldRequirements?.map(
+      getGovernanceCaseResolutionSummaryFieldRequirementKey
+    ) ?? []
+  );
+  const nextQueuePriorityRuleKeys = new Set(
+    governanceCasePolicyOverride?.queuePriorityRules?.map(
+      getGovernanceCaseQueuePriorityRuleKey
+    ) ?? []
+  );
+  const nextRecommendedActionRuleKeys = new Set(
+    governanceCasePolicyOverride?.recommendedActionRules?.map(
+      getGovernanceCaseRecommendedActionRuleKey
+    ) ?? []
+  );
+  const nextWorkflowTransitionRuleKeys = new Set(
+    governanceCasePolicyOverride?.workflowTransitionRules?.map(
+      getGovernanceCaseWorkflowTransitionRuleKey
+    ) ?? []
+  );
+  const changedGovernanceCasePolicyFields = Array.from(
+    new Set([
+      ...nextTemplateKeys,
+      ...nextResolutionSummaryRequirementKeys,
+      ...nextResolutionSummaryFieldRequirementKeys,
+      ...nextQueuePriorityRuleKeys,
+      ...nextRecommendedActionRuleKeys,
+      ...nextWorkflowTransitionRuleKeys
+    ])
+  ).sort(
+    (left, right) => left.localeCompare(right)
+  );
+  const clearedGovernanceCasePolicyFields = Array.from(
+    new Set([
+      ...previousTemplateKeys,
+      ...previousResolutionSummaryRequirementKeys,
+      ...previousResolutionSummaryFieldRequirementKeys,
+      ...previousQueuePriorityRuleKeys,
+      ...previousRecommendedActionRuleKeys,
+      ...previousWorkflowTransitionRuleKeys
+    ])
+  )
+    .filter(
+      templateKey =>
+        !nextTemplateKeys.has(templateKey) &&
+        !nextResolutionSummaryRequirementKeys.has(templateKey) &&
+        !nextResolutionSummaryFieldRequirementKeys.has(templateKey) &&
+        !nextQueuePriorityRuleKeys.has(templateKey) &&
+        !nextRecommendedActionRuleKeys.has(templateKey) &&
+        !nextWorkflowTransitionRuleKeys.has(templateKey)
+    )
+    .sort((left, right) => left.localeCompare(right));
+  const governanceCasePolicyOverrideRecords = governanceCasePolicyOverride
+    ? createGovernanceCasePolicyOverrideRecords({
+        override: governanceCasePolicyOverride,
+        updatedByRequestId: requestContext.requestId,
+        updatedByActorType: "platform_api",
+        updatedByActorId: "platform-api"
+      })
+    : null;
+
+  const updatedWorkspace: Workspace = {
+    ...workspace,
+    governanceCasePolicyOverrideRecords
+  };
+
+  await store.saveWorkspace(updatedWorkspace);
+  await recordAuditEvent(store, {
+    requestId: requestContext.requestId,
+    tenantId: updatedWorkspace.tenantId,
+    workspaceId: updatedWorkspace.workspaceId,
+    actorType: "platform_api",
+    actorId: "platform-api",
+    eventType: "workspace.governance_case_policy.updated",
+    payload: {
+      workspaceKey: updatedWorkspace.workspaceKey,
+      mode: body.mode,
+      defaultGovernanceCasePolicy: tenant.defaultGovernanceCasePolicy,
+      governanceCasePolicyOverride,
+      governanceCasePolicyOverrideRecords: toGovernanceCasePolicyOverrideRecordsDto(
+        updatedWorkspace.governanceCasePolicyOverrideRecords
+      ),
+      changedFields: changedGovernanceCasePolicyFields,
+      clearedFields: clearedGovernanceCasePolicyFields,
+      effectiveGovernanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(
+        updatedWorkspace,
+        tenant
+      )
+    }
+  });
+
+  sendJson<WorkspaceGovernanceCasePolicyResponse>(
+    response,
+    200,
+    toWorkspaceGovernanceCasePolicyResponse(tenant, updatedWorkspace)
+  );
+};
+
 const handleWorkspaceNotificationProviderProfilesGet = async (
   store: PlatformStore,
   response: ServerResponse,
@@ -9255,9 +9270,12 @@ const handleWorkspaceNotificationProviderProfileIncidentsGet = async (
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -9266,6 +9284,8 @@ const handleWorkspaceNotificationProviderProfileIncidentsGet = async (
     );
     return;
   }
+
+  const governanceCasePolicy = resolveWorkspaceGovernanceCasePolicy(workspace, tenant);
 
   const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
   const rawIncidentType = getTrimmedString(url.searchParams.get("incidentType"));
@@ -9482,9 +9502,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceAlertsGet = async (
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -9867,9 +9890,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -9878,6 +9904,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
     );
     return;
   }
+
+  const governanceCasePolicy = resolveWorkspaceGovernanceCasePolicy(workspace, tenant);
 
   const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
   const rawStatus = getTrimmedString(url.searchParams.get("status"));
@@ -9960,67 +9988,14 @@ const handleWorkspaceNotificationProviderProfileGovernanceCasesGet = async (
   ]);
 
   const items = incidents
-    .map(incident => {
-      const incidentAlerts = alerts
-        .filter(alert => alert.incidentId === incident.incidentId)
-        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-      const requestIds = new Set<string>();
-
-      if (incident.sourceRequestId) {
-        requestIds.add(incident.sourceRequestId);
-      }
-      for (const alert of incidentAlerts) {
-        if (alert.sourceRequestId) {
-          requestIds.add(alert.sourceRequestId);
-        }
-      }
-
-      const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-      const timeline = auditEvents
-        .filter(auditEvent => {
-          if (requestIds.has(auditEvent.requestId)) {
-            return true;
-          }
-
-          const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-          if (relatedIncidentId === incident.incidentId) {
-            return true;
-          }
-
-          const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-          return relatedAlertIds.some(alertId => alertIds.has(alertId));
-        })
-        .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-        .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-      const assignment = getLatestNotificationProviderProfileGovernanceCaseAssignment(
-        auditEvents,
-        incident.incidentId
-      );
-
-      return toNotificationProviderProfileGovernanceCaseDto({
-        profileKey: incident.profileKey,
+    .map(incident =>
+      buildNotificationProviderProfileGovernanceCaseItem({
         incident,
-        alerts: incidentAlerts,
-        timeline,
-        assignment,
-        escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-          auditEvents,
-          incident.incidentId
-        ),
-        workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-          auditEvents,
-          incident.incidentId
-        ),
-        notes: listNotificationProviderProfileGovernanceCaseNotes(
-          auditEvents,
-          incident.incidentId
-        ),
-        checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-          auditEvents,
-          incident.incidentId
-        )
-      });
-    })
+        alerts,
+        auditEvents,
+        governanceCasePolicy
+      })
+    )
     .filter(item => (caseStatus ? item.caseStatus === caseStatus : true))
     .filter(item => (slaStatus ? item.slaStatus === slaStatus : true));
 
@@ -10042,9 +10017,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10053,6 +10031,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
     );
     return;
   }
+
+  const governanceCasePolicy = resolveWorkspaceGovernanceCasePolicy(workspace, tenant);
 
   const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
   const rawCaseStatus = getTrimmedString(url.searchParams.get("caseStatus"));
@@ -10142,7 +10122,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseQueueGet = async (
   const items = buildNotificationProviderProfileGovernanceCaseQueueItems({
     incidents,
     alerts,
-    auditEvents
+    auditEvents,
+    governanceCasePolicy
   })
     .filter(item => (caseStatus ? item.caseItem.caseStatus === caseStatus : true))
     .filter(
@@ -10180,9 +10161,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
   tenantKey: string,
   workspaceKey: string
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10191,6 +10175,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
     );
     return;
   }
+
+  const governanceCasePolicy = resolveWorkspaceGovernanceCasePolicy(workspace, tenant);
 
   const profileKey = getTrimmedString(url.searchParams.get("profileKey")) ?? null;
   const rawCaseStatus = getTrimmedString(url.searchParams.get("caseStatus"));
@@ -10268,7 +10254,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseBoardGet = async (
   const queueItems = buildNotificationProviderProfileGovernanceCaseQueueItems({
     incidents,
     alerts,
-    auditEvents
+    auditEvents,
+    governanceCasePolicy
   })
     .filter(item => (caseStatus ? item.caseItem.caseStatus === caseStatus : true))
     .filter(
@@ -10358,9 +10345,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   incidentId: string,
   requestContext: RequestContext
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10387,6 +10377,14 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   const transitionedByActorId = getTrimmedString(body.transitionedByActorId);
   const transitionNote = getTrimmedString(body.transitionNote);
   const resolutionCode = getTrimmedString(body.resolutionCode) ?? null;
+  const resolutionSummaryFields = Array.isArray(body.resolutionSummaryFields)
+    ? body.resolutionSummaryFields
+        .filter(isGovernanceCaseResolutionSummaryFieldValue)
+        .map(field => ({
+          fieldKey: field.fieldKey.trim(),
+          value: field.value.trim()
+        }))
+    : [];
 
   if (
     !transition ||
@@ -10426,6 +10424,33 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
     return;
   }
 
+  if (
+    Array.isArray(body.resolutionSummaryFields) &&
+    resolutionSummaryFields.length !== body.resolutionSummaryFields.length
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_notification_provider_profile_governance_case_resolution_summary_fields",
+      "resolutionSummaryFields entries must provide fieldKey and value."
+    );
+    return;
+  }
+
+  if (
+    Array.isArray(body.resolutionSummaryFields) &&
+    new Set(resolutionSummaryFields.map(field => field.fieldKey)).size !==
+      resolutionSummaryFields.length
+  ) {
+    sendError(
+      response,
+      400,
+      "duplicate_notification_provider_profile_governance_case_resolution_summary_fields",
+      "resolutionSummaryFields must not contain duplicate fieldKey values."
+    );
+    return;
+  }
+
   const auditEvents = await store.listAuditEventsByWorkspace(tenantKey, workspaceKey, {
     limit: defaultGovernanceCaseAuditLimit
   });
@@ -10445,17 +10470,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   const currentCaseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
     alerts,
-    auditEvents
+    auditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
   const currentWorkflowState = currentWorkflowTransition?.workflowState ?? "open";
-  const allowedTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[] =
-    currentWorkflowState === "closed"
-      ? ["reopen_case"]
-      : currentWorkflowState === "in_recovery"
-        ? ["mark_waiting_external", "close_case"]
-        : currentWorkflowState === "waiting_external"
-          ? ["start_recovery", "close_case"]
-          : ["start_recovery", "mark_waiting_external", "close_case"];
+  const allowedTransitions = currentCaseItem.availableTransitions;
 
   if (!allowedTransitions.includes(transition)) {
     sendError(
@@ -10483,6 +10502,70 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
     return;
   }
 
+  if (
+    transition === "close_case" &&
+    currentCaseItem.closeResolutionSummaryRequirement &&
+    currentCaseItem.closeResolutionSummaryRequirement.requiredForTransitions.includes(
+      "close_case"
+    ) &&
+    transitionNote.length <
+      currentCaseItem.closeResolutionSummaryRequirement.minimumLength
+  ) {
+    sendError(
+      response,
+      409,
+      "notification_provider_profile_governance_case_resolution_summary_incomplete",
+      `transitionNote must be at least ${currentCaseItem.closeResolutionSummaryRequirement.minimumLength} characters for close_case.`,
+      {
+        requiredMinimumLength:
+          currentCaseItem.closeResolutionSummaryRequirement.minimumLength,
+        resolutionSummaryPrompt:
+          currentCaseItem.closeResolutionSummaryRequirement.prompt
+      }
+    );
+    return;
+  }
+
+  if (transition === "close_case") {
+    const requiredResolutionSummaryFields =
+      currentCaseItem.closeResolutionSummaryFieldRequirements.filter(requirement =>
+        requirement.requiredForTransitions.includes("close_case")
+      );
+    const resolutionSummaryFieldValueByKey = new Map(
+      resolutionSummaryFields.map(field => [field.fieldKey, field.value] as const)
+    );
+    const incompleteFieldRequirements = requiredResolutionSummaryFields.filter(
+      requirement => {
+        const fieldValue = resolutionSummaryFieldValueByKey.get(requirement.fieldKey);
+        return (
+          typeof fieldValue !== "string" ||
+          fieldValue.trim().length < requirement.minimumLength
+        );
+      }
+    );
+
+    if (incompleteFieldRequirements.length > 0) {
+      sendError(
+        response,
+        409,
+        "notification_provider_profile_governance_case_resolution_summary_fields_incomplete",
+        "resolutionSummaryFields must satisfy all required close_case field requirements.",
+        {
+          missingOrIncompleteFieldKeys: incompleteFieldRequirements.map(
+            requirement => requirement.fieldKey
+          ),
+          requiredFields: incompleteFieldRequirements.map(requirement => ({
+            fieldKey: requirement.fieldKey,
+            label: requirement.label,
+            prompt: requirement.prompt,
+            minimumLength: requirement.minimumLength
+          }))
+        }
+      );
+      return;
+    }
+  }
+
   const transitionedAt = new Date().toISOString();
   await recordAuditEvent(store, {
     requestId: requestContext.requestId,
@@ -10499,6 +10582,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
       transitionedByActorId,
       transitionedAt,
       transitionNote,
+      resolutionSummaryFields:
+        transition === "close_case" ? resolutionSummaryFields : [],
       resolutionCode: transition === "close_case" ? resolutionCode : null
     }
   });
@@ -10515,7 +10600,8 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseTransition = async
   const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
     alerts: refreshedAlerts,
-    auditEvents: refreshedAuditEvents
+    auditEvents: refreshedAuditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
 
   sendJson<TransitionNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
@@ -10532,9 +10618,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAddNote = async (
   incidentId: string,
   requestContext: RequestContext
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10598,60 +10687,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAddNote = async (
       limit: defaultGovernanceCaseAuditLimit
     })
   ]);
-  const incidentAlerts = alerts
-    .filter(alert => alert.incidentId === incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-  if (incident.sourceRequestId) {
-    requestIds.add(incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-  requestIds.add(requestContext.requestId);
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = auditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: incident.profileKey,
+  const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      auditEvents,
-      incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      auditEvents,
-      incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      auditEvents,
-      incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      auditEvents,
-      incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      auditEvents,
-      incident.incidentId
-    )
+    alerts,
+    auditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
 
   sendJson<AddNotificationProviderProfileGovernanceCaseNoteResponse>(response, 200, {
@@ -10668,9 +10708,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseUpsertChecklistIte
   incidentId: string,
   requestContext: RequestContext
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10747,60 +10790,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseUpsertChecklistIte
       limit: defaultGovernanceCaseAuditLimit
     })
   ]);
-  const incidentAlerts = alerts
-    .filter(alert => alert.incidentId === incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-  if (incident.sourceRequestId) {
-    requestIds.add(incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-  requestIds.add(requestContext.requestId);
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = auditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: incident.profileKey,
+  const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      auditEvents,
-      incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      auditEvents,
-      incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      auditEvents,
-      incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      auditEvents,
-      incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      auditEvents,
-      incident.incidentId
-    )
+    alerts,
+    auditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
 
   sendJson<UpsertNotificationProviderProfileGovernanceCaseChecklistItemResponse>(
@@ -10821,9 +10815,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
   incidentId: string,
   requestContext: RequestContext
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -10904,60 +10901,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseAssign = async (
       limit: defaultGovernanceCaseAuditLimit
     })
   ]);
-  const incidentAlerts = alerts
-    .filter(alert => alert.incidentId === incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-  if (incident.sourceRequestId) {
-    requestIds.add(incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-  requestIds.add(requestContext.requestId);
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = auditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: incident.profileKey,
+  const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      auditEvents,
-      incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      auditEvents,
-      incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      auditEvents,
-      incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      auditEvents,
-      incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      auditEvents,
-      incident.incidentId
-    )
+    alerts,
+    auditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
 
   sendJson<AssignNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
@@ -10974,9 +10922,12 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
   incidentId: string,
   requestContext: RequestContext
 ): Promise<void> => {
-  const workspace = await store.getWorkspaceByKey(tenantKey, workspaceKey);
+  const [tenant, workspace] = await Promise.all([
+    store.getTenantByKey(tenantKey),
+    store.getWorkspaceByKey(tenantKey, workspaceKey)
+  ]);
 
-  if (!workspace) {
+  if (!tenant || !workspace) {
     sendError(
       response,
       404,
@@ -11038,60 +10989,11 @@ const handleWorkspaceNotificationProviderProfileGovernanceCaseEscalate = async (
       limit: defaultGovernanceCaseAuditLimit
     })
   ]);
-  const incidentAlerts = alerts
-    .filter(alert => alert.incidentId === incident.incidentId)
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  const requestIds = new Set<string>();
-  if (incident.sourceRequestId) {
-    requestIds.add(incident.sourceRequestId);
-  }
-  for (const alert of incidentAlerts) {
-    if (alert.sourceRequestId) {
-      requestIds.add(alert.sourceRequestId);
-    }
-  }
-  requestIds.add(requestContext.requestId);
-  const alertIds = new Set(incidentAlerts.map(alert => alert.alertId));
-  const timeline = auditEvents
-    .filter(auditEvent => {
-      if (requestIds.has(auditEvent.requestId)) {
-        return true;
-      }
-      const relatedIncidentId = getAuditEventRelatedIncidentId(auditEvent);
-      if (relatedIncidentId === incident.incidentId) {
-        return true;
-      }
-      const relatedAlertIds = getAuditEventRelatedAlertIds(auditEvent);
-      return relatedAlertIds.some(alertId => alertIds.has(alertId));
-    })
-    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
-    .map(toNotificationProviderProfileGovernanceCorrelationTimelineEventDto);
-
-  const caseItem = toNotificationProviderProfileGovernanceCaseDto({
-    profileKey: incident.profileKey,
+  const caseItem = buildNotificationProviderProfileGovernanceCaseItem({
     incident,
-    alerts: incidentAlerts,
-    timeline,
-    assignment: getLatestNotificationProviderProfileGovernanceCaseAssignment(
-      auditEvents,
-      incident.incidentId
-    ),
-    escalation: getLatestNotificationProviderProfileGovernanceCaseEscalation(
-      auditEvents,
-      incident.incidentId
-    ),
-    workflowTransition: getLatestNotificationProviderProfileGovernanceCaseWorkflowTransition(
-      auditEvents,
-      incident.incidentId
-    ),
-    notes: listNotificationProviderProfileGovernanceCaseNotes(
-      auditEvents,
-      incident.incidentId
-    ),
-    checklistItems: listNotificationProviderProfileGovernanceCaseChecklistItems(
-      auditEvents,
-      incident.incidentId
-    )
+    alerts,
+    auditEvents,
+    governanceCasePolicy: resolveWorkspaceGovernanceCasePolicy(workspace, tenant)
   });
 
   sendJson<EscalateNotificationProviderProfileGovernanceCaseResponse>(response, 200, {
@@ -15835,6 +15737,30 @@ const handleRequest = async (
     }
   }
 
+  const tenantGovernanceCasePolicyRouteMatch = pathname.match(
+    tenantGovernanceCasePolicyRoutePattern
+  );
+
+  if (tenantGovernanceCasePolicyRouteMatch) {
+    const [, tenantKey] = tenantGovernanceCasePolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleTenantGovernanceCasePolicyGet(store, response, tenantKey);
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleTenantGovernanceCasePolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
   const tenantNotificationProviderProfilesRouteMatch = pathname.match(
     tenantNotificationProviderProfilesRoutePattern
   );
@@ -16083,6 +16009,36 @@ const handleRequest = async (
 
     if (method === "PATCH") {
       await handleWorkspaceRecoveryGovernanceNotificationPolicyPatch(
+        store,
+        request,
+        response,
+        tenantKey,
+        workspaceKey,
+        requestContext
+      );
+      return;
+    }
+  }
+
+  const workspaceGovernanceCasePolicyRouteMatch = pathname.match(
+    workspaceGovernanceCasePolicyRoutePattern
+  );
+
+  if (workspaceGovernanceCasePolicyRouteMatch) {
+    const [, tenantKey, workspaceKey] = workspaceGovernanceCasePolicyRouteMatch;
+
+    if (method === "GET") {
+      await handleWorkspaceGovernanceCasePolicyGet(
+        store,
+        response,
+        tenantKey,
+        workspaceKey
+      );
+      return;
+    }
+
+    if (method === "PATCH") {
+      await handleWorkspaceGovernanceCasePolicyPatch(
         store,
         request,
         response,

@@ -15,6 +15,8 @@ export const apiRoutes = {
     `/api/v1/platform/tenants/${tenantKey}/governance-notification-policy`,
   tenantRecoveryGovernanceNotificationPolicy: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/recovery-governance-notification-policy`,
+  tenantGovernanceCasePolicy: (tenantKey: string): string =>
+    `/api/v1/platform/tenants/${tenantKey}/governance-case-policy`,
   tenantNotificationProviderProfiles: (tenantKey: string): string =>
     `/api/v1/platform/tenants/${tenantKey}/notification-provider-profiles`,
   tenantEvidenceRetentionPolicy: (tenantKey: string): string =>
@@ -37,6 +39,8 @@ export const apiRoutes = {
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/governance-notification-policy`,
   workspaceRecoveryGovernanceNotificationPolicy: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/recovery-governance-notification-policy`,
+  workspaceGovernanceCasePolicy: (tenantKey: string, workspaceKey: string): string =>
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/governance-case-policy`,
   workspaceNotificationProviderProfiles: (tenantKey: string, workspaceKey: string): string =>
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/notification-provider-profiles`,
   workspaceNotificationProviderProfileRolloutMetrics: (tenantKey: string, workspaceKey: string): string =>
@@ -500,6 +504,83 @@ export interface NotificationPolicyOverrideDto {
   emailSpikeMaxDeliveryAttempts?: number;
 }
 
+export interface GovernanceCaseChecklistTemplateDto {
+  caseFamily:
+    | "incident_response"
+    | "delivery_recovery"
+    | "recovery_follow_up";
+  caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
+  caseSeverity?: NotificationProviderProfileGovernanceCaseSeverityDto;
+  itemKey: string;
+  label: string;
+  requiredForTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+}
+
+export interface GovernanceCaseResolutionSummaryRequirementDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  caseSeverity?: NotificationProviderProfileGovernanceCaseSeverityDto;
+  prompt: string;
+  minimumLength: number;
+  requiredForTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+}
+
+export interface GovernanceCaseResolutionSummaryFieldRequirementDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  caseSeverity?: NotificationProviderProfileGovernanceCaseSeverityDto;
+  fieldKey: string;
+  label: string;
+  prompt: string;
+  minimumLength: number;
+  requiredForTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
+}
+
+export interface GovernanceCaseResolutionSummaryFieldValueDto {
+  fieldKey: string;
+  value: string;
+}
+
+export interface GovernanceCaseQueuePriorityRuleDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  caseSeverity: NotificationProviderProfileGovernanceCaseSeverityDto;
+  caseStatus?: NotificationProviderProfileGovernanceCaseStatusDto;
+  priorityRank: number;
+  priorityReason: string;
+}
+
+export interface GovernanceCaseRecommendedActionRuleDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  caseSeverity: NotificationProviderProfileGovernanceCaseSeverityDto;
+  caseStatus?: NotificationProviderProfileGovernanceCaseStatusDto;
+  recommendedAction: NotificationProviderProfileGovernanceCaseRecommendedActionDto;
+}
+
+export interface GovernanceCaseWorkflowTransitionRuleDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  workflowState: NotificationProviderProfileGovernanceCaseWorkflowStateDto;
+  caseSeverity?: NotificationProviderProfileGovernanceCaseSeverityDto;
+  transition: NotificationProviderProfileGovernanceCaseTransitionTypeDto;
+  enabled: boolean;
+  reason: string;
+}
+
+export interface GovernanceCasePolicyDto {
+  closeChecklistTemplates: GovernanceCaseChecklistTemplateDto[];
+  closeResolutionSummaryRequirements: GovernanceCaseResolutionSummaryRequirementDto[];
+  closeResolutionSummaryFieldRequirements: GovernanceCaseResolutionSummaryFieldRequirementDto[];
+  queuePriorityRules: GovernanceCaseQueuePriorityRuleDto[];
+  recommendedActionRules: GovernanceCaseRecommendedActionRuleDto[];
+  workflowTransitionRules: GovernanceCaseWorkflowTransitionRuleDto[];
+}
+
+export interface GovernanceCasePolicyOverrideDto {
+  closeChecklistTemplates?: GovernanceCaseChecklistTemplateDto[];
+  closeResolutionSummaryRequirements?: GovernanceCaseResolutionSummaryRequirementDto[];
+  closeResolutionSummaryFieldRequirements?: GovernanceCaseResolutionSummaryFieldRequirementDto[];
+  queuePriorityRules?: GovernanceCaseQueuePriorityRuleDto[];
+  recommendedActionRules?: GovernanceCaseRecommendedActionRuleDto[];
+  workflowTransitionRules?: GovernanceCaseWorkflowTransitionRuleDto[];
+}
+
 export interface NotificationProviderProfileInputDto {
   profileKey: string;
   displayLabel: string;
@@ -534,6 +615,90 @@ export interface NotificationProviderProfileDto {
 export interface NotificationProviderProfileOverrideRecordDto {
   profileKey: string;
   value: NotificationProviderProfileDto | null;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyTemplateOverrideRecordDto {
+  value: GovernanceCaseChecklistTemplateDto;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyResolutionSummaryRequirementOverrideRecordDto {
+  value: GovernanceCaseResolutionSummaryRequirementDto;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyResolutionSummaryFieldRequirementOverrideRecordDto {
+  value: GovernanceCaseResolutionSummaryFieldRequirementDto;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyQueuePriorityRuleOverrideRecordDto {
+  value: GovernanceCaseQueuePriorityRuleDto;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyRecommendedActionRuleOverrideRecordDto {
+  value: GovernanceCaseRecommendedActionRuleDto;
+  updatedAt: string;
+  updatedByRequestId: string;
+  updatedByActorType:
+    | "platform_api"
+    | "participant"
+    | "monitor"
+    | "worker"
+    | "dispatcher"
+    | "notification_service";
+  updatedByActorId: string;
+}
+
+export interface GovernanceCasePolicyWorkflowTransitionRuleOverrideRecordDto {
+  value: GovernanceCaseWorkflowTransitionRuleDto;
   updatedAt: string;
   updatedByRequestId: string;
   updatedByActorType:
@@ -653,6 +818,15 @@ export interface NotificationPolicyOverrideRecordsDto {
   emailSpikeMaxDeliveryAttempts?: NumericPolicyOverrideRecordDto;
 }
 
+export interface GovernanceCasePolicyOverrideRecordsDto {
+  closeChecklistTemplates?: GovernanceCasePolicyTemplateOverrideRecordDto[];
+  closeResolutionSummaryRequirements?: GovernanceCasePolicyResolutionSummaryRequirementOverrideRecordDto[];
+  closeResolutionSummaryFieldRequirements?: GovernanceCasePolicyResolutionSummaryFieldRequirementOverrideRecordDto[];
+  queuePriorityRules?: GovernanceCasePolicyQueuePriorityRuleOverrideRecordDto[];
+  recommendedActionRules?: GovernanceCasePolicyRecommendedActionRuleOverrideRecordDto[];
+  workflowTransitionRules?: GovernanceCasePolicyWorkflowTransitionRuleOverrideRecordDto[];
+}
+
 export interface EvidenceRetentionPolicyOverrideRecordsDto {
   systemCheckEvidenceRetentionTtlSeconds?: NumericPolicyOverrideRecordDto;
   systemCheckEvidenceInvestigationRetentionTtlSeconds?: NumericPolicyOverrideRecordDto;
@@ -698,6 +872,7 @@ export type WorkspaceNotificationProviderPromotionPolicyModeDto = "inherit" | "o
 export type WorkspaceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceGovernanceNotificationPolicyModeDto = "inherit" | "override";
 export type WorkspaceRecoveryGovernanceNotificationPolicyModeDto = "inherit" | "override";
+export type WorkspaceGovernanceCasePolicyModeDto = "inherit" | "override";
 export type WorkspaceNotificationProviderProfilesModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionPolicyModeDto = "inherit" | "override";
 export type WorkspaceEvidenceRetentionClassPolicyModeDto = "inherit" | "override";
@@ -761,8 +936,17 @@ export interface UpdateWorkspaceRecoveryGovernanceNotificationPolicyRequest {
   recoveryGovernanceNotificationPolicyOverride?: NotificationPolicyOverrideDto | null;
 }
 
+export interface UpdateWorkspaceGovernanceCasePolicyRequest {
+  mode: WorkspaceGovernanceCasePolicyModeDto;
+  governanceCasePolicyOverride?: GovernanceCasePolicyOverrideDto | null;
+}
+
 export interface UpdateTenantRecoveryGovernanceNotificationPolicyRequest {
   defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface UpdateTenantGovernanceCasePolicyRequest {
+  defaultGovernanceCasePolicy: GovernanceCasePolicyDto;
 }
 
 export interface UpdateTenantNotificationProviderProfilesRequest {
@@ -826,6 +1010,11 @@ export interface TenantGovernanceNotificationPolicyResponse {
 export interface TenantRecoveryGovernanceNotificationPolicyResponse {
   tenantKey: string;
   defaultRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface TenantGovernanceCasePolicyResponse {
+  tenantKey: string;
+  defaultGovernanceCasePolicy: GovernanceCasePolicyDto;
 }
 
 export interface TenantNotificationProviderProfilesResponse {
@@ -911,6 +1100,16 @@ export interface WorkspaceRecoveryGovernanceNotificationPolicyResponse {
   recoveryGovernanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
   recoveryGovernanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
   effectiveRecoveryGovernanceNotificationPolicy: NotificationPolicyDto;
+}
+
+export interface WorkspaceGovernanceCasePolicyResponse {
+  tenantKey: string;
+  workspaceKey: string;
+  mode: WorkspaceGovernanceCasePolicyModeDto;
+  defaultGovernanceCasePolicy: GovernanceCasePolicyDto;
+  governanceCasePolicyOverride: GovernanceCasePolicyOverrideDto | null;
+  governanceCasePolicyOverrideRecords: GovernanceCasePolicyOverrideRecordsDto | null;
+  effectiveGovernanceCasePolicy: GovernanceCasePolicyDto;
 }
 
 export interface WorkspaceNotificationProviderProfilesResponse {
@@ -1141,17 +1340,28 @@ export type NotificationProviderProfileGovernanceCaseStatusDto =
   | "awaiting_alert_acknowledgement"
   | "recovered"
   | "closed";
+export type NotificationProviderProfileGovernanceCaseFamilyDto =
+  | "incident_response"
+  | "delivery_recovery"
+  | "recovery_follow_up";
+export type NotificationProviderProfileGovernanceCaseSeverityDto =
+  | "low"
+  | "medium"
+  | "high";
 
 export type NotificationProviderProfileGovernanceCaseRecommendedActionDto =
   | "assign_case"
   | "escalate_case"
   | "reopen_case"
   | "complete_required_checklist"
+  | "provide_resolution_summary"
   | "acknowledge_incident"
   | "wait_for_suppression_expiry"
   | "redrive_governance_alert"
   | "acknowledge_governance_alert"
   | "review_recovery_state"
+  | "expedite_manual_recovery"
+  | "request_secondary_review"
   | "no_action_required";
 
 export type NotificationProviderProfileGovernanceCaseSlaStatusDto =
@@ -1200,6 +1410,7 @@ export interface NotificationProviderProfileGovernanceCaseChecklistItemDto {
 }
 
 export interface NotificationProviderProfileGovernanceCaseRequiredChecklistItemDto {
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
   itemKey: string;
   label: string;
   requiredForTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
@@ -1208,6 +1419,8 @@ export interface NotificationProviderProfileGovernanceCaseRequiredChecklistItemD
 
 export interface NotificationProviderProfileGovernanceCaseItemDto {
   profileKey: string;
+  caseFamily: NotificationProviderProfileGovernanceCaseFamilyDto;
+  caseSeverity: NotificationProviderProfileGovernanceCaseSeverityDto;
   caseStatus: NotificationProviderProfileGovernanceCaseStatusDto;
   assignmentStatus: "unassigned" | "assigned";
   assignedToActorId: string | null;
@@ -1228,6 +1441,10 @@ export interface NotificationProviderProfileGovernanceCaseItemDto {
   availableTransitions: NotificationProviderProfileGovernanceCaseTransitionTypeDto[];
   closeReadiness: "ready" | "blocked";
   closeBlockedByChecklistItemKeys: string[];
+  closeResolutionSummaryRequirement: GovernanceCaseResolutionSummaryRequirementDto | null;
+  closeResolutionSummaryFieldRequirements: GovernanceCaseResolutionSummaryFieldRequirementDto[];
+  latestCloseResolutionSummary: string | null;
+  latestCloseResolutionSummaryFields: GovernanceCaseResolutionSummaryFieldValueDto[];
   latestActivityAt: string;
   openAlertCount: number;
   failedAlertCount: number;
@@ -1316,6 +1533,7 @@ export interface TransitionNotificationProviderProfileGovernanceCaseRequest {
   transitionedByActorId: string;
   transitionNote: string;
   resolutionCode?: NotificationProviderProfileGovernanceCaseResolutionCodeDto | null;
+  resolutionSummaryFields?: GovernanceCaseResolutionSummaryFieldValueDto[];
 }
 
 export interface TransitionNotificationProviderProfileGovernanceCaseResponse {
@@ -2258,6 +2476,7 @@ export type PolicyHistoryFamilyDto =
   | "notification"
   | "governance_notification"
   | "recovery_governance_notification"
+  | "governance_case"
   | "notification_provider_profiles"
   | "evidence_retention"
   | "evidence_retention_class";
@@ -2306,6 +2525,10 @@ export interface PolicyHistoryEntryDto {
   recoveryGovernanceNotificationPolicyOverride: NotificationPolicyOverrideDto | null;
   recoveryGovernanceNotificationPolicyOverrideRecords: NotificationPolicyOverrideRecordsDto | null;
   effectiveRecoveryGovernanceNotificationPolicy: NotificationPolicyDto | null;
+  defaultGovernanceCasePolicy: GovernanceCasePolicyDto | null;
+  governanceCasePolicyOverride: GovernanceCasePolicyOverrideDto | null;
+  governanceCasePolicyOverrideRecords: GovernanceCasePolicyOverrideRecordsDto | null;
+  effectiveGovernanceCasePolicy: GovernanceCasePolicyDto | null;
   defaultNotificationProviderProfiles: NotificationProviderProfileDto[] | null;
   notificationProviderProfileOverride: NotificationProviderProfileDto[] | null;
   removedNotificationProviderProfileKeys: string[] | null;
