@@ -1,0 +1,18 @@
+{
+  "name": "testcenter-rewrite-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/domain packages/contracts packages/application apps/api apps/web",
+    "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application apps/api apps/web"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3"
+  }
+}

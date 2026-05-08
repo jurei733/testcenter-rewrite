@@ -1,0 +1,11 @@
+{
+  "name": "@testcenter-rewrite-app/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/packages/contracts/src/index.js",
+  "types": "dist/packages/contracts/src/index.d.ts",
+  "dependencies": {
+    "@testcenter-rewrite-app/domain": "0.0.0"
+  }
+}

@@ -4,3 +4,7 @@ rewrite-spike/node_modules/
 rewrite-spike/.runtime/
 rewrite-spike/**/*.tsbuildinfo
 rewrite-spike/**/dist/
+
+rewrite-app/node_modules/
+rewrite-app/**/*.tsbuildinfo
+rewrite-app/**/dist/
