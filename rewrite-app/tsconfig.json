@@ -4,7 +4,10 @@
     { "path": "./packages/domain" },
     { "path": "./packages/contracts" },
     { "path": "./packages/application" },
-    { "path": "./apps/api" },
-    { "path": "./apps/web" }
+    { "path": "./packages/memory-store" },
+    { "path": "./packages/file-store" },
+    { "path": "./packages/sqlite-store" },
+    { "path": "./packages/postgres-store" },
+    { "path": "./apps/api" }
   ]
 }

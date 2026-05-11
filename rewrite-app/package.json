@@ -8,11 +8,50 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b packages/domain packages/contracts packages/application apps/api apps/web",
-    "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application apps/api apps/web"
+    "build": "npm run build:core && npm run build:web",
+    "build:core": "tsc -b packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
+    "build:web": "ng build rewrite-app-web",
+    "ci": "npm run typecheck && npm run build && npm run test:integration && npm run smoke:startup:sqlite && npm run smoke:shutdown:sqlite",
+    "db:doctor": "npm run build && node ./scripts/storage-admin.mjs doctor",
+    "db:doctor:built": "node ./scripts/storage-admin.mjs doctor",
+    "db:doctor:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs doctor",
+    "db:doctor:postgres:built": "FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs doctor",
+    "db:doctor:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite node ./scripts/storage-admin.mjs doctor",
+    "db:doctor:sqlite:built": "FIRST_SLICE_STORE=sqlite node ./scripts/storage-admin.mjs doctor",
+    "db:migrate": "npm run build && node ./scripts/storage-admin.mjs migrate",
+    "db:migrate:built": "node ./scripts/storage-admin.mjs migrate",
+    "db:migrate:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs migrate",
+    "db:migrate:postgres:built": "FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs migrate",
+    "db:migrate:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite node ./scripts/storage-admin.mjs migrate",
+    "db:migrate:sqlite:built": "FIRST_SLICE_STORE=sqlite node ./scripts/storage-admin.mjs migrate",
+    "smoke:startup": "npm run build && node ./scripts/smoke-startup.mjs",
+    "smoke:compose:postgres": "npm run build && node ./scripts/smoke-compose-postgres.mjs",
+    "smoke:shutdown": "npm run build && node ./scripts/smoke-shutdown.mjs",
+    "smoke:shutdown:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
+    "smoke:startup:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs",
+    "smoke:startup:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/smoke-startup.mjs",
+    "test:integration": "npm run test:integration:memory && npm run test:integration:sqlite",
+    "test:integration:memory": "npm run build && node --test apps/api/dist/apps/api/src/integration.test.js",
+    "test:integration:sqlite": "rm -f ./.data/integration-sqlite.sqlite && npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js",
+    "test:integration:postgres": "npm run build && node ./scripts/run-postgres-integration.mjs",
+    "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api && ng build rewrite-app-web --configuration development",
+    "start:api": "node apps/api/dist/apps/api/src/index.js"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@angular-devkit/build-angular": "^21.2.10",
+    "@angular/cli": "^21.2.10",
+    "@angular/common": "^21.2.12",
+    "@angular/compiler": "^21.2.12",
+    "@angular/compiler-cli": "^21.2.12",
+    "@angular/core": "^21.2.12",
+    "@angular/forms": "^21.2.12",
+    "@angular/platform-browser": "^21.2.12",
+    "rxjs": "^7.8.2",
+    "zone.js": "^0.16.2"
   }
 }

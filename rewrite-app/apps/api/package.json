@@ -8,6 +8,10 @@
   "dependencies": {
     "@testcenter-rewrite-app/application": "0.0.0",
     "@testcenter-rewrite-app/contracts": "0.0.0",
-    "@testcenter-rewrite-app/domain": "0.0.0"
+    "@testcenter-rewrite-app/domain": "0.0.0",
+    "@testcenter-rewrite-app/file-store": "0.0.0",
+    "@testcenter-rewrite-app/memory-store": "0.0.0",
+    "@testcenter-rewrite-app/postgres-store": "0.0.0",
+    "@testcenter-rewrite-app/sqlite-store": "0.0.0"
   }
 }

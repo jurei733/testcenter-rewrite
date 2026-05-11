@@ -1,0 +1,61 @@
+services:
+  rewrite-app-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_BUILD_SHA: ${APP_BUILD_SHA:-local-compose}
+        APP_BUILD_TIMESTAMP: ${APP_BUILD_TIMESTAMP:-unknown}
+    restart: "no"
+    command: ["npm", "run", "db:migrate:postgres:built"]
+    environment:
+      FIRST_SLICE_STORE: postgres
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@rewrite-app-postgres:5432/rewrite_app
+    depends_on:
+      rewrite-app-postgres:
+        condition: service_healthy
+
+  rewrite-app-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_BUILD_SHA: ${APP_BUILD_SHA:-local-compose}
+        APP_BUILD_TIMESTAMP: ${APP_BUILD_TIMESTAMP:-unknown}
+    restart: unless-stopped
+    ports:
+      - "4310:4310"
+    environment:
+      PORT: "4310"
+      FIRST_SLICE_STORE: postgres
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@rewrite-app-postgres:5432/rewrite_app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4310/readyz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      rewrite-app-postgres:
+        condition: service_healthy
+      rewrite-app-migrate:
+        condition: service_completed_successfully
+
+  rewrite-app-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rewrite_app
+      POSTGRES_USER: rewrite
+      POSTGRES_PASSWORD: rewrite
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rewrite -d rewrite_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - rewrite-app-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  rewrite-app-postgres-data:

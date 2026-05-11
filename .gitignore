@@ -6,5 +6,11 @@ rewrite-spike/**/*.tsbuildinfo
 rewrite-spike/**/dist/
 
 rewrite-app/node_modules/
+rewrite-app/.angular/
+rewrite-app/.data/
+rewrite-app/.env
+rewrite-app/.env.local
+rewrite-app/.npm-cache/
+rewrite-app/.tmp-angular-sample/
 rewrite-app/**/*.tsbuildinfo
 rewrite-app/**/dist/

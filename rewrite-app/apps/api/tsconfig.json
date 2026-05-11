@@ -6,7 +6,11 @@
   "references": [
     { "path": "../../packages/domain" },
     { "path": "../../packages/contracts" },
-    { "path": "../../packages/application" }
+    { "path": "../../packages/application" },
+    { "path": "../../packages/file-store" },
+    { "path": "../../packages/memory-store" },
+    { "path": "../../packages/postgres-store" },
+    { "path": "../../packages/sqlite-store" }
   ],
   "include": ["src/**/*.ts"]
 }

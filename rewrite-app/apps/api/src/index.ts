@@ -1,23 +1,1815 @@
-import { firstSliceUseCases } from "@testcenter-rewrite-app/application";
-import { productionApiRoutes } from "@testcenter-rewrite-app/contracts";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { extname, relative, resolve } from "node:path";
+import { fileURLToPath, URL } from "node:url";
+
+import {
+  createFirstSliceServices,
+  type FirstSliceError,
+  firstSliceUseCases
+} from "@testcenter-rewrite-app/application";
+import {
+  type ApiErrorResponse,
+  type ActivateContentReleaseRequest,
+  type ActivateContentReleaseResponse,
+  type CompleteTestRunResponse,
+  type CreateImportJobRequest,
+  type CreateImportJobResponse,
+  type CreateSourcePackageRequest,
+  type CreateSourcePackageResponse,
+  type CreateTenantRequest,
+  type CreateTenantResponse,
+  type CreateWorkspaceRequest,
+  type CreateWorkspaceResponse,
+  type GetContentReleaseActivationReadinessResponse,
+  type GetContentReleaseResponse,
+  type GetImportJobResponse,
+  type GetParticipantSessionResponse,
+  type GetRuntimeConfigResponse,
+  type GetRuntimeDiagnosticsResponse,
+  type GetSourcePackageResponse,
+  type GetWorkspaceOverviewResponse,
+  type ListWorkspaceActivityEventsResponse,
+  type ListImportJobsResponse,
+  type ListParticipantSessionsResponse,
+  type ListContentReleasesResponse,
+  type ListSourcePackagesResponse,
+  type MonitorOpenRunsResponse,
+  type ParticipantCurrentRunStateResponse,
+  type ParticipantLaunchRequest,
+  type ParticipantLaunchResponse,
+  type ParticipantRuntimeStateResponse,
+  type ResumeTestRunResponse,
+  type ResumeParticipantSessionResponse,
+  type RetrySourcePackageImportRequest,
+  type RetrySourcePackageImportResponse,
+  type RuntimeOperationalEvent,
+  type SaveTestRunProgressRequest,
+  type SaveTestRunProgressResponse,
+  type ParticipantSignInRequest,
+  type ParticipantSignInResponse,
+  productionApiRoutes,
+  resolveRoutePath
+} from "@testcenter-rewrite-app/contracts";
 import { firstProductionSliceCapabilities } from "@testcenter-rewrite-app/domain";
+import {
+  checkFileFirstSliceReadiness,
+  createFileFirstSliceRepository
+} from "@testcenter-rewrite-app/file-store";
+import { createInMemoryFirstSliceRepository } from "@testcenter-rewrite-app/memory-store";
+import {
+  createPostgresFirstSliceStorage,
+  POSTGRES_FIRST_SLICE_SCHEMA_VERSION
+} from "@testcenter-rewrite-app/postgres-store";
+import {
+  checkSqliteFirstSliceReadiness,
+  createSqliteFirstSliceRepository,
+  SQLITE_FIRST_SLICE_SCHEMA_VERSION
+} from "@testcenter-rewrite-app/sqlite-store";
 
-export const productionApiManifest = {
-  workspace: "rewrite-app/api",
-  phase: "production-baseline",
-  routes: productionApiRoutes,
-  useCases: firstSliceUseCases,
-  capabilities: firstProductionSliceCapabilities
-} as const;
+type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 
-export const describeProductionApi = (): string =>
+const parseIntegerEnvironmentValue = (
+  envKey: string,
+  fallbackValue: number
+): number => {
+  const rawValue = process.env[envKey];
+  if (rawValue == null || rawValue === "") {
+    return fallbackValue;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+    throw new Error(`${envKey} must be a non-negative integer.`);
+  }
+
+  return parsedValue;
+};
+
+const resolveStoreKind = (): RuntimeStoreKind => {
+  const store = process.env.FIRST_SLICE_STORE ?? "memory";
+  if (store === "memory" || store === "file" || store === "sqlite" || store === "postgres") {
+    return store;
+  }
+  throw new Error(
+    `Unsupported FIRST_SLICE_STORE '${store}'. Supported values are memory, file, sqlite, postgres.`
+  );
+};
+
+const createRepositoryFromEnvironment = async () => {
+  const store = resolveStoreKind();
+
+  if (store === "file") {
+    const filePath =
+      process.env.FIRST_SLICE_FILE ??
+      fileURLToPath(new URL("../../../../.data/first-slice.json", import.meta.url));
+    return {
+      kind: "file" as const,
+      repository: createFileFirstSliceRepository(filePath),
+      location: filePath,
+      schemaVersion: null,
+      readinessCheck: () => checkFileFirstSliceReadiness(filePath),
+      shutdown: async () => undefined
+    };
+  }
+
+  if (store === "sqlite") {
+    const filePath =
+      process.env.FIRST_SLICE_SQLITE_FILE ??
+      fileURLToPath(
+        new URL("../../../../.data/first-slice.sqlite", import.meta.url)
+      );
+    return {
+      kind: "sqlite" as const,
+      repository: createSqliteFirstSliceRepository(filePath),
+      location: filePath,
+      schemaVersion: SQLITE_FIRST_SLICE_SCHEMA_VERSION,
+      readinessCheck: () => checkSqliteFirstSliceReadiness(filePath),
+      shutdown: async () => undefined
+    };
+  }
+
+  if (store === "postgres") {
+    const connectionString = process.env.FIRST_SLICE_POSTGRES_URL;
+    if (!connectionString) {
+      throw new Error(
+        "FIRST_SLICE_POSTGRES_URL is required when FIRST_SLICE_STORE=postgres."
+      );
+    }
+    const storage = await createPostgresFirstSliceStorage(connectionString);
+    return {
+      kind: "postgres" as const,
+      repository: storage.repository,
+      location: connectionString,
+      schemaVersion: POSTGRES_FIRST_SLICE_SCHEMA_VERSION,
+      readinessCheck: storage.readinessCheck,
+      shutdown: storage.shutdown
+    };
+  }
+
+  return {
+    kind: "memory" as const,
+    repository: createInMemoryFirstSliceRepository(),
+    location: null,
+    schemaVersion: null,
+    readinessCheck: async () => undefined,
+    shutdown: async () => undefined
+  };
+};
+
+const createApiRuntime = async () => {
+  const store = resolveStoreKind();
+  const configuredPort = parseIntegerEnvironmentValue("PORT", 4310);
+  const shutdownDrainDelayMs = parseIntegerEnvironmentValue(
+    "SHUTDOWN_DRAIN_DELAY_MS",
+    DEFAULT_SHUTDOWN_DRAIN_DELAY_MS
+  );
+  const repositoryConfig = await createRepositoryFromEnvironment();
+  const repository = repositoryConfig.repository;
+  return {
+    config: {
+      port: configuredPort,
+      shutdownDrainDelayMs,
+      environment: {
+        firstSliceStore: store,
+        firstSliceFilePresent: Boolean(process.env.FIRST_SLICE_FILE),
+        firstSliceSqliteFilePresent: Boolean(process.env.FIRST_SLICE_SQLITE_FILE),
+        firstSlicePostgresUrlPresent: Boolean(process.env.FIRST_SLICE_POSTGRES_URL),
+        appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
+        appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP)
+      }
+    },
+    repositoryConfig,
+    repository,
+    services: createFirstSliceServices({ repository }),
+    metrics: createRuntimeMetrics(),
+    recentOperationalEvents: [] as RuntimeOperationalEvent[],
+    lifecycle: {
+      phase: "running" as "running" | "draining",
+      shutdownRequestedAt: null as string | null
+    },
+    build: {
+      commitSha: process.env.APP_BUILD_SHA ?? null,
+      builtAt: process.env.APP_BUILD_TIMESTAMP ?? null
+    },
+    shutdown: repositoryConfig.shutdown
+  };
+};
+
+const redactStorageLocation = (input: string | null): string | null => {
+  if (!input) {
+    return input;
+  }
+
+  if (!/^postgres(?:ql)?:\/\//.test(input)) {
+    return input;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.username) {
+      url.username = "REDACTED";
+    }
+    if (url.password) {
+      url.password = "REDACTED";
+    }
+    return url.toString();
+  } catch {
+    return input.replace(/\/\/([^:@/]+)(?::[^@/]+)?@/, "//REDACTED:REDACTED@");
+  }
+};
+
+const describeProductionApi = (input: {
+  storageKind: string;
+  storageSchemaVersion: string | number | null;
+  buildCommitSha: string | null;
+  buildTimestamp: string | null;
+}): string =>
   [
     "Testcenter Rewrite Production API Baseline",
-    `workspace=${productionApiManifest.workspace}`,
-    `phase=${productionApiManifest.phase}`,
-    `routes=${Object.keys(productionApiManifest.routes).join(",")}`
+    "workspace=rewrite-app/api",
+    "phase=production-baseline",
+    `storage=${input.storageKind}`,
+    `storageSchemaVersion=${input.storageSchemaVersion ?? "n/a"}`,
+    `buildCommitSha=${input.buildCommitSha ?? "n/a"}`,
+    `buildTimestamp=${input.buildTimestamp ?? "n/a"}`,
+    `routes=${Object.keys(productionApiRoutes).join(",")}`
   ].join("\n");
 
+const jsonHeaders = {
+  "content-type": "application/json; charset=utf-8"
+};
+
+const htmlHeaders = {
+  "content-type": "text/html; charset=utf-8"
+};
+
+const textHeaders = {
+  "content-type": "text/plain; version=0.0.4; charset=utf-8"
+};
+
+const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
+const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
+
+type RuntimeMetrics = {
+  startedAt: string;
+  activeRequests: number;
+  totalRequests: number;
+  completedRequests: number;
+  requestCountsByMethod: Record<string, number>;
+  requestCountsByRoute: Record<string, number>;
+  responseCountsByStatusCode: Record<string, number>;
+  requestLatencyByRoute: Record<string, RouteLatencySummary>;
+  errorCounts: {
+    firstSlice: number;
+    invalidJson: number;
+    routeNotFound: number;
+    storageNotReady: number;
+    internal: number;
+  };
+};
+
+type RouteLatencySummary = {
+  count: number;
+  totalMs: number;
+  maxMs: number;
+  bucketCounts: Record<string, number>;
+};
+
+const REQUEST_LATENCY_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000];
+
+const createRuntimeMetrics = (): RuntimeMetrics => ({
+  startedAt: new Date().toISOString(),
+  activeRequests: 0,
+  totalRequests: 0,
+  completedRequests: 0,
+  requestCountsByMethod: {},
+  requestCountsByRoute: {},
+  responseCountsByStatusCode: {},
+  requestLatencyByRoute: {},
+  errorCounts: {
+    firstSlice: 0,
+    invalidJson: 0,
+    routeNotFound: 0,
+    storageNotReady: 0,
+    internal: 0
+  }
+});
+
+const appendRuntimeOperationalEvent = (
+  target: RuntimeOperationalEvent[],
+  event: RuntimeOperationalEvent
+): void => {
+  target.push(event);
+  if (target.length > MAX_RUNTIME_OPERATIONAL_EVENTS) {
+    target.splice(0, target.length - MAX_RUNTIME_OPERATIONAL_EVENTS);
+  }
+};
+
+const incrementCounter = (
+  counters: Record<string, number>,
+  key: string | number
+): void => {
+  const normalizedKey = String(key);
+  counters[normalizedKey] = (counters[normalizedKey] ?? 0) + 1;
+};
+
+const createRouteLatencySummary = (): RouteLatencySummary => ({
+  count: 0,
+  totalMs: 0,
+  maxMs: 0,
+  bucketCounts: {}
+});
+
+const recordRouteLatency = (
+  metrics: RuntimeMetrics,
+  route: string,
+  durationMs: number
+): void => {
+  const summary =
+    metrics.requestLatencyByRoute[route] ??
+    (metrics.requestLatencyByRoute[route] = createRouteLatencySummary());
+  summary.count += 1;
+  summary.totalMs += durationMs;
+  summary.maxMs = Math.max(summary.maxMs, durationMs);
+
+  for (const bucket of REQUEST_LATENCY_BUCKETS_MS) {
+    if (durationMs <= bucket) {
+      incrementCounter(summary.bucketCounts, bucket);
+    }
+  }
+
+  incrementCounter(summary.bucketCounts, "+Inf");
+};
+
+const getProcessMemorySnapshot = () => {
+  const usage = process.memoryUsage();
+  return {
+    rssBytes: usage.rss,
+    heapTotalBytes: usage.heapTotal,
+    heapUsedBytes: usage.heapUsed,
+    externalBytes: usage.external,
+    arrayBuffersBytes: usage.arrayBuffers
+  };
+};
+
+const escapePrometheusLabelValue = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+
+const logStructured = (
+  level: "info" | "error",
+  event: string,
+  details: Record<string, unknown>
+): void => {
+  const line = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level,
+    event,
+    ...details
+  });
+
+  if (level === "error") {
+    process.stderr.write(`${line}\n`);
+    return;
+  }
+
+  process.stdout.write(`${line}\n`);
+};
+
+const recordRuntimeOperationalEvent = (
+  runtime: Awaited<ReturnType<typeof createApiRuntime>>,
+  level: "info" | "error",
+  event: string,
+  details: Record<string, unknown>
+): void => {
+  appendRuntimeOperationalEvent(runtime.recentOperationalEvents, {
+    occurredAt: new Date().toISOString(),
+    level,
+    event,
+    details
+  });
+  logStructured(level, event, details);
+};
+
+const renderPrometheusMetrics = (
+  runtime: Awaited<ReturnType<typeof createApiRuntime>>
+): string => {
+  const metrics = runtime.metrics;
+  const memory = getProcessMemorySnapshot();
+  const lines: string[] = [
+    "# HELP rewrite_app_uptime_seconds Process uptime in seconds.",
+    "# TYPE rewrite_app_uptime_seconds gauge",
+    `rewrite_app_uptime_seconds ${((Date.now() - Date.parse(metrics.startedAt)) / 1000).toFixed(3)}`,
+    "# HELP rewrite_app_active_requests Active in-flight HTTP requests.",
+    "# TYPE rewrite_app_active_requests gauge",
+    `rewrite_app_active_requests ${metrics.activeRequests}`,
+    "# HELP rewrite_app_total_requests Total HTTP requests seen by the process.",
+    "# TYPE rewrite_app_total_requests counter",
+    `rewrite_app_total_requests ${metrics.totalRequests}`,
+    "# HELP rewrite_app_completed_requests Total completed HTTP requests.",
+    "# TYPE rewrite_app_completed_requests counter",
+    `rewrite_app_completed_requests ${metrics.completedRequests}`,
+    "# HELP rewrite_app_process_resident_memory_bytes Resident process memory in bytes.",
+    "# TYPE rewrite_app_process_resident_memory_bytes gauge",
+    `rewrite_app_process_resident_memory_bytes ${memory.rssBytes}`,
+    "# HELP rewrite_app_process_heap_total_bytes Total V8 heap allocation in bytes.",
+    "# TYPE rewrite_app_process_heap_total_bytes gauge",
+    `rewrite_app_process_heap_total_bytes ${memory.heapTotalBytes}`,
+    "# HELP rewrite_app_process_heap_used_bytes Used V8 heap in bytes.",
+    "# TYPE rewrite_app_process_heap_used_bytes gauge",
+    `rewrite_app_process_heap_used_bytes ${memory.heapUsedBytes}`,
+    "# HELP rewrite_app_process_external_memory_bytes External process memory in bytes.",
+    "# TYPE rewrite_app_process_external_memory_bytes gauge",
+    `rewrite_app_process_external_memory_bytes ${memory.externalBytes}`,
+    "# HELP rewrite_app_build_info Build metadata for the running process.",
+    "# TYPE rewrite_app_build_info gauge",
+    `rewrite_app_build_info{storage_kind="${escapePrometheusLabelValue(runtime.repositoryConfig.kind)}",build_sha="${escapePrometheusLabelValue(runtime.build.commitSha ?? "unknown")}",build_timestamp="${escapePrometheusLabelValue(runtime.build.builtAt ?? "unknown")}"} 1`
+  ];
+
+  for (const [method, count] of Object.entries(metrics.requestCountsByMethod)) {
+    lines.push(
+      `rewrite_app_request_count_by_method{method="${escapePrometheusLabelValue(method)}"} ${count}`
+    );
+  }
+
+  for (const [route, count] of Object.entries(metrics.requestCountsByRoute)) {
+    lines.push(
+      `rewrite_app_request_count_by_route{route="${escapePrometheusLabelValue(route)}"} ${count}`
+    );
+  }
+
+  for (const [statusCode, count] of Object.entries(metrics.responseCountsByStatusCode)) {
+    lines.push(
+      `rewrite_app_response_count_by_status{status_code="${escapePrometheusLabelValue(statusCode)}"} ${count}`
+    );
+  }
+
+  for (const [errorType, count] of Object.entries(metrics.errorCounts)) {
+    lines.push(
+      `rewrite_app_error_count{error_type="${escapePrometheusLabelValue(errorType)}"} ${count}`
+    );
+  }
+
+  for (const [route, summary] of Object.entries(metrics.requestLatencyByRoute)) {
+    const escapedRoute = escapePrometheusLabelValue(route);
+    lines.push(
+      `rewrite_app_request_duration_ms_count{route="${escapedRoute}"} ${summary.count}`
+    );
+    lines.push(
+      `rewrite_app_request_duration_ms_sum{route="${escapedRoute}"} ${summary.totalMs.toFixed(3)}`
+    );
+    lines.push(
+      `rewrite_app_request_duration_ms_max{route="${escapedRoute}"} ${summary.maxMs.toFixed(3)}`
+    );
+
+    for (const bucket of REQUEST_LATENCY_BUCKETS_MS) {
+      lines.push(
+        `rewrite_app_request_duration_ms_bucket{route="${escapedRoute}",le="${bucket}"} ${summary.bucketCounts[String(bucket)] ?? 0}`
+      );
+    }
+
+    lines.push(
+      `rewrite_app_request_duration_ms_bucket{route="${escapedRoute}",le="+Inf"} ${summary.bucketCounts["+Inf"] ?? 0}`
+    );
+  }
+
+  return `${lines.join("\n")}\n`;
+};
+
+const sendJson = <T>(
+  response: ServerResponse,
+  statusCode: number,
+  body: T
+): void => {
+  response.writeHead(statusCode, jsonHeaders);
+  response.end(JSON.stringify(body, null, 2));
+};
+
+const sendHtml = (
+  response: ServerResponse,
+  statusCode: number,
+  html: string
+): void => {
+  response.writeHead(statusCode, htmlHeaders);
+  response.end(html);
+};
+
+const sendText = (
+  response: ServerResponse,
+  statusCode: number,
+  text: string
+): void => {
+  response.writeHead(statusCode, textHeaders);
+  response.end(text);
+};
+
+const sendAsset = (
+  response: ServerResponse,
+  statusCode: number,
+  contentType: string,
+  body: Buffer
+): void => {
+  response.writeHead(statusCode, {
+    "content-type": contentType,
+    "cache-control": "no-cache"
+  });
+  response.end(body);
+};
+
+const sendError = (
+  response: ServerResponse,
+  statusCode: number,
+  error: string,
+  message: string,
+  details?: unknown
+): void => {
+  sendJson<ApiErrorResponse>(response, statusCode, { error, message, details });
+};
+
+const readJsonBody = async <T>(request: IncomingMessage): Promise<T> => {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of request) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+
+  const payload = Buffer.concat(chunks).toString("utf8");
+  return JSON.parse(payload) as T;
+};
+
+const isFirstSliceError = (value: unknown): value is FirstSliceError =>
+  value instanceof Error &&
+  "statusCode" in value &&
+  "errorCode" in value;
+
+const createRoutePattern = (template: string): RegExp =>
+  new RegExp(
+    `^${template
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/:([A-Za-z0-9_]+)/g, "(?<$1>[^/]+)")}$`
+  );
+
+const workspaceCreatePattern = createRoutePattern(
+  productionApiRoutes.workspace.createWorkspace
+);
+const workspaceOverviewPattern = createRoutePattern(
+  productionApiRoutes.workspace.getWorkspaceOverview
+);
+const workspaceActivityEventListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listWorkspaceActivityEvents
+);
+const sourcePackageCreatePattern = createRoutePattern(
+  productionApiRoutes.workspace.createSourcePackage
+);
+const sourcePackageListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listSourcePackages
+);
+const sourcePackageDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getSourcePackage
+);
+const sourcePackageRetryImportPattern = createRoutePattern(
+  productionApiRoutes.workspace.retrySourcePackageImport
+);
+const importJobCreatePattern = createRoutePattern(
+  productionApiRoutes.workspace.createImportJob
+);
+const importJobListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listImportJobs
+);
+const participantSessionListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listParticipantSessions
+);
+const participantSessionDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getParticipantSession
+);
+const importJobDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getImportJob
+);
+const contentReleaseListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listContentReleases
+);
+const contentReleaseDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getContentRelease
+);
+const contentReleaseActivationReadinessPattern = createRoutePattern(
+  productionApiRoutes.workspace.getContentReleaseActivationReadiness
+);
+const contentReleaseActivatePattern = createRoutePattern(
+  productionApiRoutes.workspace.activateContentRelease
+);
+const runtimeStatePattern = createRoutePattern(
+  productionApiRoutes.participant.getRuntimeState
+);
+const currentRunStatePattern = createRoutePattern(
+  productionApiRoutes.participant.getCurrentRunState
+);
+const saveProgressPattern = createRoutePattern(
+  productionApiRoutes.participant.saveProgress
+);
+const resumeSessionPattern = createRoutePattern(
+  productionApiRoutes.participant.resumeSession
+);
+const resumeRunPattern = createRoutePattern(
+  productionApiRoutes.participant.resumeRun
+);
+const completeRunPattern = createRoutePattern(
+  productionApiRoutes.participant.completeRun
+);
+const monitorOpenRunsPattern = createRoutePattern(
+  productionApiRoutes.monitor.openRuns
+);
+
+const frontendBuildDirectoryCandidates = [
+  resolve(process.cwd(), "dist/apps/web/browser"),
+  fileURLToPath(
+    new URL("../../../../../../dist/apps/web/browser", import.meta.url)
+  )
+];
+
+const resolveFrontendBuildDirectory = (): string => {
+  const existingCandidate = frontendBuildDirectoryCandidates.find(candidate =>
+    existsSync(candidate)
+  );
+  return existingCandidate ?? frontendBuildDirectoryCandidates[0];
+};
+
+const frontendBuildDirectory = resolveFrontendBuildDirectory();
+const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
+
+const resolveFrontendContentType = (pathname: string): string => {
+  switch (extname(pathname)) {
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".map":
+      return "application/json; charset=utf-8";
+    case ".ico":
+      return "image/x-icon";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".woff2":
+      return "font/woff2";
+    default:
+      return "application/octet-stream";
+  }
+};
+
+const serveFrontendRequest = async (
+  response: ServerResponse,
+  pathname: string
+): Promise<boolean> => {
+  if (!(pathname === "/" || pathname === "/app" || pathname.startsWith("/app/"))) {
+    return false;
+  }
+
+  if (!existsSync(frontendBuildDirectory) || !existsSync(frontendIndexPath)) {
+    sendError(
+      response,
+      503,
+      "frontend_not_built",
+      "Angular frontend assets are not available. Run the frontend build first.",
+      {
+        expectedDirectory: frontendBuildDirectory
+      }
+    );
+    return true;
+  }
+
+  const relativePath =
+    pathname === "/" || pathname === "/app"
+      ? ""
+      : pathname.replace(/^\/app\/?/, "");
+
+  if (relativePath === "" || !relativePath.includes(".")) {
+    const html = await readFile(frontendIndexPath, "utf8");
+    sendHtml(response, 200, html);
+    return true;
+  }
+
+  const candidatePath = resolve(frontendBuildDirectory, relativePath);
+  const candidateRelativePath = relative(frontendBuildDirectory, candidatePath);
+  if (candidateRelativePath.startsWith("..")) {
+    sendError(response, 404, "not_found", "Frontend asset not found.");
+    return true;
+  }
+
+  try {
+    const assetStat = await stat(candidatePath);
+    if (!assetStat.isFile()) {
+      throw new Error("Not a file");
+    }
+    const body = await readFile(candidatePath);
+    sendAsset(response, 200, resolveFrontendContentType(candidatePath), body);
+  } catch {
+    sendError(response, 404, "not_found", "Frontend asset not found.", {
+      assetPath: relativePath
+    });
+  }
+
+  return true;
+};
+
+const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
+  if (method === "GET" && (pathname === "/" || pathname === "/app")) {
+    return "GET /app";
+  }
+
+  if (method === "GET" && pathname.startsWith("/app/")) {
+    return "GET /app/*";
+  }
+
+  if (method === "GET" && pathname === "/healthz") {
+    return "GET /healthz";
+  }
+
+  if (method === "GET" && pathname === "/readyz") {
+    return "GET /readyz";
+  }
+
+  if (method === "GET" && pathname === "/metrics") {
+    return "GET /metrics";
+  }
+
+  if (method === "GET" && pathname === "/metrics/prometheus") {
+    return "GET /metrics/prometheus";
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.system.getRuntimeDiagnostics) {
+    return `GET ${productionApiRoutes.system.getRuntimeDiagnostics}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.system.getRuntimeConfig) {
+    return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
+  }
+
+  if (method === "GET" && pathname === "/manifest") {
+    return "GET /manifest";
+  }
+
+  const routeChecks: Array<[string, RegExp, string]> = [
+    ["POST", workspaceCreatePattern, productionApiRoutes.workspace.createWorkspace],
+    ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
+    [
+      "GET",
+      workspaceActivityEventListPattern,
+      productionApiRoutes.workspace.listWorkspaceActivityEvents
+    ],
+    ["POST", sourcePackageCreatePattern, productionApiRoutes.workspace.createSourcePackage],
+    ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
+    ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
+    [
+      "POST",
+      sourcePackageRetryImportPattern,
+      productionApiRoutes.workspace.retrySourcePackageImport
+    ],
+    ["POST", importJobCreatePattern, productionApiRoutes.workspace.createImportJob],
+    ["GET", importJobListPattern, productionApiRoutes.workspace.listImportJobs],
+    ["GET", importJobDetailPattern, productionApiRoutes.workspace.getImportJob],
+    [
+      "GET",
+      participantSessionListPattern,
+      productionApiRoutes.workspace.listParticipantSessions
+    ],
+    [
+      "GET",
+      participantSessionDetailPattern,
+      productionApiRoutes.workspace.getParticipantSession
+    ],
+    [
+      "GET",
+      contentReleaseListPattern,
+      productionApiRoutes.workspace.listContentReleases
+    ],
+    [
+      "GET",
+      contentReleaseDetailPattern,
+      productionApiRoutes.workspace.getContentRelease
+    ],
+    [
+      "GET",
+      contentReleaseActivationReadinessPattern,
+      productionApiRoutes.workspace.getContentReleaseActivationReadiness
+    ],
+    [
+      "POST",
+      contentReleaseActivatePattern,
+      productionApiRoutes.workspace.activateContentRelease
+    ],
+    ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
+    ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
+    ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
+    ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
+    ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
+    ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns]
+  ];
+
+  for (const [expectedMethod, pattern, template] of routeChecks) {
+    if (method === expectedMethod && pattern.test(pathname)) {
+      return `${method} ${template}`;
+    }
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.platform.createTenant) {
+    return `POST ${productionApiRoutes.platform.createTenant}`;
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.participant.signIn) {
+    return `POST ${productionApiRoutes.participant.signIn}`;
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.participant.launch) {
+    return `POST ${productionApiRoutes.participant.launch}`;
+  }
+
+  return `${method} <unmatched>`;
+};
+
+const decodeRouteGroup = (value: string | undefined): string | null =>
+  value ? decodeURIComponent(value) : null;
+
+const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
+  async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+    const services = runtime.services;
+    const requestId = randomUUID();
+    const requestStartedAt = process.hrtime.bigint();
+    const method = request.method ?? "UNKNOWN";
+    const metrics = runtime.metrics;
+    const routeLabel = resolveMetricsRouteLabel(method, new URL(request.url ?? "/", "http://127.0.0.1").pathname);
+
+    response.setHeader("x-request-id", requestId);
+    metrics.activeRequests += 1;
+    metrics.totalRequests += 1;
+    incrementCounter(metrics.requestCountsByMethod, method);
+    incrementCounter(metrics.requestCountsByRoute, routeLabel);
+
+    response.once("finish", () => {
+      const durationMs = Number(process.hrtime.bigint() - requestStartedAt) / 1_000_000;
+      metrics.activeRequests -= 1;
+      metrics.completedRequests += 1;
+      incrementCounter(metrics.responseCountsByStatusCode, response.statusCode);
+      recordRouteLatency(metrics, routeLabel, durationMs);
+      recordRuntimeOperationalEvent(runtime, "info", "http_request_completed", {
+        requestId,
+        method,
+        route: routeLabel,
+        path: request.url ?? null,
+        statusCode: response.statusCode,
+        durationMs: Number(durationMs.toFixed(3)),
+        storageKind: runtime.repositoryConfig.kind
+      });
+    });
+
+    if (!request.url || !request.method) {
+      sendError(response, 400, "invalid_request", "Missing request URL or method.");
+      return;
+    }
+
+    const url = new URL(request.url, "http://127.0.0.1");
+    const pathname = url.pathname;
+
+    try {
+      if (request.method === "GET" && (pathname === "/" || pathname.startsWith("/app"))) {
+        await serveFrontendRequest(response, pathname);
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/healthz") {
+        sendJson(response, 200, {
+          status: "ok",
+          phase: "production-baseline"
+        });
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/readyz") {
+        if (runtime.lifecycle.phase === "draining") {
+          sendError(
+            response,
+            503,
+            "service_draining",
+            "Service is draining and not accepting new work.",
+            {
+              storageKind: runtime.repositoryConfig.kind,
+              shutdownRequestedAt: runtime.lifecycle.shutdownRequestedAt
+            }
+          );
+          return;
+        }
+
+        try {
+          await runtime.repositoryConfig.readinessCheck();
+          sendJson(response, 200, {
+            status: "ready",
+            phase: "production-baseline",
+            storage: {
+              kind: runtime.repositoryConfig.kind,
+              schemaVersion: runtime.repositoryConfig.schemaVersion
+            }
+          });
+        } catch (error) {
+          metrics.errorCounts.storageNotReady += 1;
+          recordRuntimeOperationalEvent(runtime, "error", "storage_readiness_failed", {
+            requestId,
+            method,
+            route: routeLabel,
+            path: request.url ?? null,
+            storageKind: runtime.repositoryConfig.kind,
+            cause: error instanceof Error ? error.message : String(error)
+          });
+          sendError(
+            response,
+            503,
+            "storage_not_ready",
+            "Storage readiness check failed.",
+            {
+              storageKind: runtime.repositoryConfig.kind,
+              cause: error instanceof Error ? error.message : String(error)
+            }
+          );
+        }
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/metrics") {
+        const memory = getProcessMemorySnapshot();
+        sendJson(response, 200, {
+          phase: "production-baseline",
+          build: runtime.build,
+          runtime: {
+            startedAt: metrics.startedAt,
+            uptimeSeconds: Number(
+              ((Date.now() - Date.parse(metrics.startedAt)) / 1000).toFixed(3)
+            ),
+            lifecycle: runtime.lifecycle,
+            activeRequests: metrics.activeRequests,
+            totalRequests: metrics.totalRequests,
+            completedRequests: metrics.completedRequests
+          },
+          memory,
+          storage: {
+            kind: runtime.repositoryConfig.kind,
+            schemaVersion: runtime.repositoryConfig.schemaVersion
+          },
+          requestCountsByMethod: metrics.requestCountsByMethod,
+          requestCountsByRoute: metrics.requestCountsByRoute,
+          responseCountsByStatusCode: metrics.responseCountsByStatusCode,
+          requestLatencyByRoute: metrics.requestLatencyByRoute,
+          errorCounts: metrics.errorCounts
+        });
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/metrics/prometheus") {
+        sendText(response, 200, renderPrometheusMetrics(runtime));
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.system.getRuntimeDiagnostics
+      ) {
+        const memory = getProcessMemorySnapshot();
+        sendJson<GetRuntimeDiagnosticsResponse>(response, 200, {
+          phase: "production-baseline",
+          build: runtime.build,
+          runtime: {
+            startedAt: metrics.startedAt,
+            uptimeSeconds: Number(
+              ((Date.now() - Date.parse(metrics.startedAt)) / 1000).toFixed(3)
+            ),
+            lifecycle: runtime.lifecycle,
+            activeRequests: metrics.activeRequests,
+            totalRequests: metrics.totalRequests,
+            completedRequests: metrics.completedRequests
+          },
+          memory,
+          storage: {
+            kind: runtime.repositoryConfig.kind,
+            schemaVersion: runtime.repositoryConfig.schemaVersion,
+            location: redactStorageLocation(runtime.repositoryConfig.location)
+          },
+          recentEvents: runtime.recentOperationalEvents
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.system.getRuntimeConfig
+      ) {
+        sendJson<GetRuntimeConfigResponse>(response, 200, {
+          phase: "production-baseline",
+          build: runtime.build,
+          runtimeConfig: {
+            port: runtime.config.port,
+            shutdownDrainDelayMs: runtime.config.shutdownDrainDelayMs,
+            storage: {
+              kind: runtime.repositoryConfig.kind,
+              location: redactStorageLocation(runtime.repositoryConfig.location),
+              schemaVersion: runtime.repositoryConfig.schemaVersion
+            },
+            environment: runtime.config.environment
+          }
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.platform.createTenant
+      ) {
+        const body = await readJsonBody<CreateTenantRequest>(request);
+        const tenant = await services.platform.createTenant(body);
+        sendJson<CreateTenantResponse>(response, 201, { tenant });
+        return;
+      }
+
+      const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
+      if (request.method === "POST" && workspaceCreateMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
+        if (!tenantKey) {
+          sendError(response, 400, "invalid_tenant_key", "tenantKey is required.");
+          return;
+        }
+
+        const body = await readJsonBody<CreateWorkspaceRequest>(request);
+        const workspace = await services.platform.createWorkspace({
+          tenantKey,
+          workspaceKey: body.workspaceKey,
+          displayName: body.displayName
+        });
+        sendJson<CreateWorkspaceResponse>(response, 201, { workspace });
+        return;
+      }
+
+      const workspaceOverviewMatch = workspaceOverviewPattern.exec(pathname);
+      if (request.method === "GET" && workspaceOverviewMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          workspaceOverviewMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const workspaceOverview =
+          await services.workspaceAdminRead.getWorkspaceOverview({
+            tenantKey,
+            workspaceKey
+          });
+        sendJson<GetWorkspaceOverviewResponse>(response, 200, {
+          workspaceOverview
+        });
+        return;
+      }
+
+      const workspaceActivityEventListMatch =
+        workspaceActivityEventListPattern.exec(pathname);
+      if (request.method === "GET" && workspaceActivityEventListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          workspaceActivityEventListMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          workspaceActivityEventListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const eventType = url.searchParams.get("eventType") ?? undefined;
+        const items = await services.workspaceAdminRead.listWorkspaceActivityEvents({
+          tenantKey,
+          workspaceKey,
+          eventType: eventType as never
+        });
+        sendJson<ListWorkspaceActivityEventsResponse>(response, 200, { items });
+        return;
+      }
+
+      const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
+      const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
+      const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
+      const sourcePackageRetryImportMatch =
+        sourcePackageRetryImportPattern.exec(pathname);
+      if (request.method === "GET" && sourcePackageListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listSourcePackages({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListSourcePackagesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && sourcePackageDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageDetailMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageDetailMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const sourcePackageDetail =
+          await services.workspaceAdminRead.getSourcePackageDetail({
+            tenantKey,
+            workspaceKey,
+            sourcePackageId
+          });
+        sendJson<GetSourcePackageResponse>(response, 200, { sourcePackageDetail });
+        return;
+      }
+
+      if (request.method === "POST" && sourcePackageRetryImportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageRetryImportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageRetryImportMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageRetryImportMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<RetrySourcePackageImportRequest>(request);
+        const result = await services.contentIntake.retrySourcePackageImport({
+          tenantKey,
+          workspaceKey,
+          sourcePackageId,
+          fileName: body.fileName,
+          mediaType: body.mediaType,
+          contentStructure: body.contentStructure,
+          sourceDocument: body.sourceDocument
+        });
+        sendJson<RetrySourcePackageImportResponse>(response, 200, result);
+        return;
+      }
+
+      if (request.method === "POST" && sourcePackageCreateMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageCreateMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageCreateMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<CreateSourcePackageRequest>(request);
+        const sourcePackage = await services.contentIntake.createSourcePackage({
+          tenantKey,
+          workspaceKey,
+          fileName: body.fileName,
+          mediaType: body.mediaType,
+          contentStructure: body.contentStructure,
+          sourceDocument: body.sourceDocument
+        });
+        sendJson<CreateSourcePackageResponse>(response, 201, { sourcePackage });
+        return;
+      }
+
+      const importJobCreateMatch = importJobCreatePattern.exec(pathname);
+      const importJobListMatch = importJobListPattern.exec(pathname);
+      const importJobDetailMatch = importJobDetailPattern.exec(pathname);
+      const participantSessionListMatch = participantSessionListPattern.exec(pathname);
+      const participantSessionDetailMatch =
+        participantSessionDetailPattern.exec(pathname);
+      if (request.method === "GET" && importJobListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(importJobListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(importJobListMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listImportJobs({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListImportJobsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && importJobDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(importJobDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(importJobDetailMatch.groups.workspaceKey);
+        const importJobId = decodeRouteGroup(importJobDetailMatch.groups.importJobId);
+        if (!tenantKey || !workspaceKey || !importJobId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and importJobId are required."
+          );
+          return;
+        }
+
+        const importJobDetail = await services.workspaceAdminRead.getImportJobDetail({
+          tenantKey,
+          workspaceKey,
+          importJobId
+        });
+        sendJson<GetImportJobResponse>(response, 200, { importJobDetail });
+        return;
+      }
+
+      if (request.method === "GET" && participantSessionListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(participantSessionListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          participantSessionListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listParticipantSessions({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListParticipantSessionsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && participantSessionDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          participantSessionDetailMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          participantSessionDetailMatch.groups.workspaceKey
+        );
+        const participantSessionId = decodeRouteGroup(
+          participantSessionDetailMatch.groups.participantSessionId
+        );
+        if (!tenantKey || !workspaceKey || !participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and participantSessionId are required."
+          );
+          return;
+        }
+
+        const participantSessionDetail =
+          await services.workspaceAdminRead.getParticipantSessionDetail({
+            tenantKey,
+            workspaceKey,
+            participantSessionId
+          });
+        sendJson<GetParticipantSessionResponse>(response, 200, {
+          participantSessionDetail
+        });
+        return;
+      }
+
+      if (request.method === "POST" && importJobCreateMatch?.groups) {
+        const tenantKey = decodeRouteGroup(importJobCreateMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(importJobCreateMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<CreateImportJobRequest>(request);
+        const result = await services.createImportJobWithRelease({
+          tenantKey,
+          workspaceKey,
+          sourcePackageId: body.sourcePackageId
+        });
+        sendJson<CreateImportJobResponse>(response, 201, result);
+        return;
+      }
+
+      const contentReleaseListMatch = contentReleaseListPattern.exec(pathname);
+      if (request.method === "GET" && contentReleaseListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(contentReleaseListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          contentReleaseListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listContentReleases({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListContentReleasesResponse>(response, 200, { items });
+        return;
+      }
+
+      const contentReleaseDetailMatch = contentReleaseDetailPattern.exec(pathname);
+      if (request.method === "GET" && contentReleaseDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(contentReleaseDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          contentReleaseDetailMatch.groups.workspaceKey
+        );
+        const contentReleaseId = decodeRouteGroup(
+          contentReleaseDetailMatch.groups.contentReleaseId
+        );
+        if (!tenantKey || !workspaceKey || !contentReleaseId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and contentReleaseId are required."
+          );
+          return;
+        }
+
+        const contentReleaseDetail =
+          await services.workspaceAdminRead.getContentReleaseDetail({
+            tenantKey,
+            workspaceKey,
+            contentReleaseId
+          });
+        sendJson<GetContentReleaseResponse>(response, 200, {
+          contentReleaseDetail
+        });
+        return;
+      }
+
+      const contentReleaseActivationReadinessMatch =
+        contentReleaseActivationReadinessPattern.exec(pathname);
+      if (
+        request.method === "GET" &&
+        contentReleaseActivationReadinessMatch?.groups
+      ) {
+        const tenantKey = decodeRouteGroup(
+          contentReleaseActivationReadinessMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          contentReleaseActivationReadinessMatch.groups.workspaceKey
+        );
+        const contentReleaseId = decodeRouteGroup(
+          contentReleaseActivationReadinessMatch.groups.contentReleaseId
+        );
+        if (!tenantKey || !workspaceKey || !contentReleaseId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and contentReleaseId are required."
+          );
+          return;
+        }
+
+        const activationReadiness =
+          await services.workspaceAdminRead.getContentReleaseActivationReadiness({
+            tenantKey,
+            workspaceKey,
+            contentReleaseId
+          });
+        sendJson<GetContentReleaseActivationReadinessResponse>(response, 200, {
+          activationReadiness
+        });
+        return;
+      }
+
+      const contentReleaseActivateMatch = contentReleaseActivatePattern.exec(pathname);
+      if (request.method === "POST" && contentReleaseActivateMatch?.groups) {
+        const tenantKey = decodeRouteGroup(contentReleaseActivateMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          contentReleaseActivateMatch.groups.workspaceKey
+        );
+        const contentReleaseId = decodeRouteGroup(
+          contentReleaseActivateMatch.groups.contentReleaseId
+        );
+        if (!tenantKey || !workspaceKey || !contentReleaseId) {
+          sendError(
+            response,
+            400,
+            "invalid_content_release_scope",
+            "tenantKey, workspaceKey, and contentReleaseId are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<ActivateContentReleaseRequest>(request);
+        const contentRelease = await services.contentIntake.activateContentRelease({
+          tenantKey,
+          workspaceKey,
+          contentReleaseId,
+          activatedByActorId: body.activatedByActorId
+          ,
+          forceActivation: body.forceActivation
+        });
+        sendJson<ActivateContentReleaseResponse>(response, 200, { contentRelease });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.participant.signIn
+      ) {
+        const body = await readJsonBody<ParticipantSignInRequest>(request);
+        const participantSession = await services.participantRuntime.signIn(body);
+        sendJson<ParticipantSignInResponse>(response, 200, { participantSession });
+        return;
+      }
+
+      const runtimeStateMatch = runtimeStatePattern.exec(pathname);
+      if (request.method === "GET" && runtimeStateMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(
+          runtimeStateMatch.groups.participantSessionId
+        );
+        if (!participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_session_id",
+            "participantSessionId is required."
+          );
+          return;
+        }
+
+        const runtimeState = await services.participantRuntime.getRuntimeState({
+          participantSessionId
+        });
+        sendJson<ParticipantRuntimeStateResponse>(response, 200, {
+          runtimeState
+        });
+        return;
+      }
+
+      const currentRunStateMatch = currentRunStatePattern.exec(pathname);
+      if (request.method === "GET" && currentRunStateMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(
+          currentRunStateMatch.groups.participantSessionId
+        );
+        if (!participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_session_id",
+            "participantSessionId is required."
+          );
+          return;
+        }
+
+        const currentRunState = await services.participantRuntime.getCurrentRunState({
+          participantSessionId
+        });
+        sendJson<ParticipantCurrentRunStateResponse>(response, 200, {
+          currentRunState
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.participant.launch
+      ) {
+        const body = await readJsonBody<ParticipantLaunchRequest>(request);
+        const testRun = await services.participantRuntime.launch(body);
+        sendJson<ParticipantLaunchResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const resumeSessionMatch = resumeSessionPattern.exec(pathname);
+      if (request.method === "POST" && resumeSessionMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(
+          resumeSessionMatch.groups.participantSessionId
+        );
+        if (!participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_session_id",
+            "participantSessionId is required."
+          );
+          return;
+        }
+
+        const testRun = await services.participantRuntime.resumeSession({
+          participantSessionId
+        });
+        sendJson<ResumeParticipantSessionResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const saveProgressMatch = saveProgressPattern.exec(pathname);
+      if (request.method === "POST" && saveProgressMatch?.groups) {
+        const testRunId = decodeRouteGroup(saveProgressMatch.groups.testRunId);
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+
+        const body = await readJsonBody<SaveTestRunProgressRequest>(request);
+        const testRun = await services.participantRuntime.saveProgress({
+          testRunId,
+          currentUnitKey: body.currentUnitKey,
+          status: body.status
+        });
+        sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const resumeRunMatch = resumeRunPattern.exec(pathname);
+      if (request.method === "POST" && resumeRunMatch?.groups) {
+        const testRunId = decodeRouteGroup(resumeRunMatch.groups.testRunId);
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+
+        const testRun = await services.participantRuntime.resumeRun({
+          testRunId
+        });
+        sendJson<ResumeTestRunResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const completeRunMatch = completeRunPattern.exec(pathname);
+      if (request.method === "POST" && completeRunMatch?.groups) {
+        const testRunId = decodeRouteGroup(completeRunMatch.groups.testRunId);
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+
+        const testRun = await services.participantRuntime.completeRun({
+          testRunId
+        });
+        sendJson<CompleteTestRunResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const monitorOpenRunsMatch = monitorOpenRunsPattern.exec(pathname);
+      if (request.method === "GET" && monitorOpenRunsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(monitorOpenRunsMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(monitorOpenRunsMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_monitor_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.monitorRead.listOpenRuns({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<MonitorOpenRunsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && pathname === "/manifest") {
+        const workspaceCreateExample = resolveRoutePath(
+          productionApiRoutes.workspace.createWorkspace,
+          { tenantKey: "demo-tenant" }
+        );
+        const workspaceOverviewExample = resolveRoutePath(
+          productionApiRoutes.workspace.getWorkspaceOverview,
+          {
+            tenantKey: "demo-tenant",
+            workspaceKey: "demo-workspace"
+          }
+        );
+        sendJson(response, 200, {
+          workspace: "rewrite-app/api",
+          phase: "production-baseline",
+          build: runtime.build,
+          storage: {
+            kind: runtime.repositoryConfig.kind,
+            location: redactStorageLocation(runtime.repositoryConfig.location),
+            schemaVersion: runtime.repositoryConfig.schemaVersion
+          },
+          routes: productionApiRoutes,
+          useCases: firstSliceUseCases,
+          capabilities: firstProductionSliceCapabilities,
+          examples: {
+            workspaceCreate: workspaceCreateExample,
+            workspaceOverview: workspaceOverviewExample
+          }
+        });
+        return;
+      }
+
+      metrics.errorCounts.routeNotFound += 1;
+      sendError(response, 404, "route_not_found", `No route matches '${pathname}'.`);
+    } catch (error) {
+      if (isFirstSliceError(error)) {
+        metrics.errorCounts.firstSlice += 1;
+        sendError(
+          response,
+          error.statusCode,
+          error.errorCode,
+          error.message,
+          error.details
+        );
+        return;
+      }
+
+      if (error instanceof SyntaxError) {
+        metrics.errorCounts.invalidJson += 1;
+        sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
+        return;
+      }
+
+      metrics.errorCounts.internal += 1;
+      recordRuntimeOperationalEvent(runtime, "error", "http_request_failed", {
+        requestId,
+        method,
+        route: routeLabel,
+        path: request.url ?? null,
+        storageKind: runtime.repositoryConfig.kind,
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message
+              }
+            : { message: String(error) }
+      });
+      sendError(
+        response,
+        500,
+        "internal_server_error",
+        "An unexpected server error occurred.",
+        { requestId }
+      );
+    }
+  };
+
+export const createProductionApiServer = async () =>
+  {
+    const runtime = await createApiRuntime();
+    const server = createServer(createRequestHandler(runtime));
+    server.once("close", () => {
+      void runtime.shutdown();
+    });
+    return server;
+  };
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  process.stdout.write(`${describeProductionApi()}\n`);
+  const runtime = await createApiRuntime();
+  const port = runtime.config.port;
+  const shutdownDrainDelayMs = runtime.config.shutdownDrainDelayMs;
+  const server = createServer(createRequestHandler(runtime));
+  let shuttingDown = false;
+
+  const closeServer = () => {
+    server.close(async error => {
+      try {
+        await runtime.shutdown();
+      } finally {
+        if (error) {
+          process.stderr.write(`${String(error)}\n`);
+          process.exit(1);
+          return;
+        }
+        process.exit(0);
+      }
+    });
+  };
+
+  const shutdown = (signal: string) => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    runtime.lifecycle.phase = "draining";
+    runtime.lifecycle.shutdownRequestedAt = new Date().toISOString();
+    recordRuntimeOperationalEvent(runtime, "info", "process_shutdown_requested", {
+      signal,
+      storageKind: runtime.repositoryConfig.kind,
+      shutdownDrainDelayMs
+    });
+    process.stdout.write(`shutdown_signal=${signal}\n`);
+    setTimeout(closeServer, Math.max(0, shutdownDrainDelayMs)).unref();
+
+    setTimeout(() => {
+      process.stderr.write("shutdown_timeout_exceeded\n");
+      process.exit(1);
+    }, shutdownDrainDelayMs + 5_000).unref();
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("uncaughtException", error => {
+    recordRuntimeOperationalEvent(runtime, "error", "process_uncaught_exception", {
+      storageKind: runtime.repositoryConfig.kind,
+      error: {
+        name: error.name,
+        message: error.message
+      }
+    });
+    shutdown("uncaughtException");
+  });
+  process.on("unhandledRejection", reason => {
+    recordRuntimeOperationalEvent(runtime, "error", "process_unhandled_rejection", {
+      storageKind: runtime.repositoryConfig.kind,
+      reason:
+        reason instanceof Error
+          ? {
+              name: reason.name,
+              message: reason.message
+            }
+          : { message: String(reason) }
+    });
+    shutdown("unhandledRejection");
+  });
+
+  server.listen(port, () => {
+    recordRuntimeOperationalEvent(runtime, "info", "process_started", {
+      storageKind: runtime.repositoryConfig.kind,
+      storageSchemaVersion: runtime.repositoryConfig.schemaVersion,
+      buildCommitSha: runtime.build.commitSha,
+      buildTimestamp: runtime.build.builtAt,
+      port
+    });
+    process.stdout.write(
+      `${describeProductionApi({
+        storageKind: runtime.repositoryConfig.kind,
+        storageSchemaVersion: runtime.repositoryConfig.schemaVersion,
+        buildCommitSha: runtime.build.commitSha,
+        buildTimestamp: runtime.build.builtAt
+      })}\n`
+    );
+    process.stdout.write(`listening=http://127.0.0.1:${port}\n`);
+  });
 }

@@ -1,0 +1,83 @@
+name: rewrite-app-ci
+
+on:
+  push:
+    paths:
+      - ".github/workflows/rewrite-app-ci.yml"
+      - "rewrite-app/**"
+  pull_request:
+    paths:
+      - ".github/workflows/rewrite-app-ci.yml"
+      - "rewrite-app/**"
+
+jobs:
+  verify-memory-sqlite:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rewrite-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rewrite-app/package-lock.json
+      - run: npm ci
+      - run: npm run ci
+
+  verify-postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rewrite-app
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rewrite_app
+          POSTGRES_USER: rewrite
+          POSTGRES_PASSWORD: rewrite
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rewrite -d rewrite_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rewrite-app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:integration:postgres
+      - run: FIRST_SLICE_STORE=postgres npm run smoke:startup
+
+  docker-compose-release-smoke:
+    runs-on: ubuntu-latest
+    env:
+      APP_BUILD_SHA: ${{ github.sha }}
+      APP_BUILD_TIMESTAMP: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f rewrite-app/docker-compose.postgres.yml up -d --build
+      - run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4310/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "rewrite-app compose stack did not become healthy in time" >&2
+          docker compose -f rewrite-app/docker-compose.postgres.yml logs >&2 || true
+          exit 1
+      - run: curl -fsS http://127.0.0.1:4310/manifest
+      - if: always()
+        run: docker compose -f rewrite-app/docker-compose.postgres.yml down -v
