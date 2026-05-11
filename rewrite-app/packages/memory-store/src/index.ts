@@ -1,0 +1,157 @@
+import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import type {
+  ContentRelease,
+  ImportJob,
+  ParticipantSession,
+  SourcePackage,
+  Tenant,
+  TestRun,
+  WorkspaceActivityEvent,
+  Workspace
+} from "@testcenter-rewrite-app/domain";
+
+type InMemoryFirstSliceState = {
+  tenants: Map<string, Tenant>;
+  workspacesByScope: Map<string, Workspace>;
+  workspacesByKey: Map<string, Workspace>;
+  workspaceActivityEvents: Map<string, WorkspaceActivityEvent>;
+  sourcePackages: Map<string, SourcePackage>;
+  importJobs: Map<string, ImportJob>;
+  contentReleases: Map<string, ContentRelease>;
+  participantSessions: Map<string, ParticipantSession>;
+  testRuns: Map<string, TestRun>;
+};
+
+const createInitialState = (): InMemoryFirstSliceState => ({
+  tenants: new Map(),
+  workspacesByScope: new Map(),
+  workspacesByKey: new Map(),
+  workspaceActivityEvents: new Map(),
+  sourcePackages: new Map(),
+  importJobs: new Map(),
+  contentReleases: new Map(),
+  participantSessions: new Map(),
+  testRuns: new Map()
+});
+
+const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
+  `${tenantKey}::${workspaceKey}`;
+
+export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
+  const state = createInitialState();
+
+  return {
+    async getTenantByKey(tenantKey) {
+      return state.tenants.get(tenantKey) ?? null;
+    },
+    async saveTenant(tenant) {
+      state.tenants.set(tenant.tenantKey, tenant);
+    },
+    async getWorkspaceByScope(tenantKey, workspaceKey) {
+      return (
+        state.workspacesByScope.get(workspaceScopeKey(tenantKey, workspaceKey)) ?? null
+      );
+    },
+    async getWorkspaceByWorkspaceKey(workspaceKey) {
+      return state.workspacesByKey.get(workspaceKey) ?? null;
+    },
+    async saveWorkspace(scope) {
+      state.workspacesByScope.set(
+        workspaceScopeKey(scope.tenantKey, scope.workspaceKey),
+        scope.workspace
+      );
+      state.workspacesByKey.set(scope.workspace.workspaceKey, scope.workspace);
+    },
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.workspaceActivityEvents.values()).filter(
+        activityEvent =>
+          activityEvent.tenantId === tenantId &&
+          activityEvent.workspaceId === workspaceId
+      );
+    },
+    async saveWorkspaceActivityEvent(activityEvent) {
+      state.workspaceActivityEvents.set(
+        activityEvent.activityEventId,
+        activityEvent
+      );
+    },
+    async getSourcePackageById(sourcePackageId) {
+      return state.sourcePackages.get(sourcePackageId) ?? null;
+    },
+    async listSourcePackagesByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.sourcePackages.values()).filter(
+        sourcePackage =>
+          sourcePackage.tenantId === tenantId &&
+          sourcePackage.workspaceId === workspaceId
+      );
+    },
+    async saveSourcePackage(sourcePackage) {
+      state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
+    },
+    async getImportJobById(importJobId) {
+      return state.importJobs.get(importJobId) ?? null;
+    },
+    async listImportJobsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.importJobs.values()).filter(
+        importJob => importJob.tenantId === tenantId && importJob.workspaceId === workspaceId
+      );
+    },
+    async saveImportJob(importJob) {
+      state.importJobs.set(importJob.importJobId, importJob);
+    },
+    async getContentReleaseById(contentReleaseId) {
+      return state.contentReleases.get(contentReleaseId) ?? null;
+    },
+    async listContentReleasesByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.contentReleases.values()).filter(
+        contentRelease =>
+          contentRelease.tenantId === tenantId &&
+          contentRelease.workspaceId === workspaceId
+      );
+    },
+    async saveContentRelease(contentRelease) {
+      state.contentReleases.set(contentRelease.contentReleaseId, contentRelease);
+    },
+    async getParticipantSessionById(participantSessionId) {
+      return state.participantSessions.get(participantSessionId) ?? null;
+    },
+    async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.participantSessions.values()).filter(
+        participantSession =>
+          participantSession.tenantId === tenantId &&
+          participantSession.workspaceId === workspaceId
+      );
+    },
+    async saveParticipantSession(participantSession) {
+      state.participantSessions.set(
+        participantSession.participantSessionId,
+        participantSession
+      );
+    },
+    async getTestRunById(testRunId) {
+      return state.testRuns.get(testRunId) ?? null;
+    },
+    async listTestRunsByParticipantSessionId(participantSessionId) {
+      return Array.from(state.testRuns.values()).filter(
+        testRun => testRun.participantSessionId === participantSessionId
+      );
+    },
+    async getOpenTestRunByParticipantSessionId(participantSessionId) {
+      return (
+        Array.from(state.testRuns.values()).find(
+          testRun =>
+            testRun.participantSessionId === participantSessionId &&
+            testRun.status !== "completed"
+        ) ?? null
+      );
+    },
+    async listTestRunsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.testRuns.values()).filter(
+        testRun => testRun.tenantId === tenantId && testRun.workspaceId === workspaceId
+      );
+    },
+    async saveTestRun(testRun) {
+      state.testRuns.set(testRun.testRunId, testRun);
+    }
+  };
+};

@@ -1,0 +1,12 @@
+{
+  "name": "@testcenter-rewrite-app/file-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/packages/file-store/src/index.js",
+  "types": "dist/packages/file-store/src/index.d.ts",
+  "dependencies": {
+    "@testcenter-rewrite-app/application": "0.0.0",
+    "@testcenter-rewrite-app/domain": "0.0.0"
+  }
+}

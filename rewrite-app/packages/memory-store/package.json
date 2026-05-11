@@ -1,0 +1,12 @@
+{
+  "name": "@testcenter-rewrite-app/memory-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/packages/memory-store/src/index.js",
+  "types": "dist/packages/memory-store/src/index.d.ts",
+  "dependencies": {
+    "@testcenter-rewrite-app/application": "0.0.0",
+    "@testcenter-rewrite-app/domain": "0.0.0"
+  }
+}

@@ -1,0 +1,863 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+
+import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import type {
+  ContentRelease,
+  ContentReleaseRuntimeSnapshot,
+  ImportJob,
+  ImportJobDiagnostic,
+  ParticipantSession,
+  SourcePackage,
+  SourcePackageContentStructure,
+  Tenant,
+  TestRun,
+  WorkspaceActivityEvent,
+  Workspace
+} from "@testcenter-rewrite-app/domain";
+
+type SqliteMigration = {
+  version: number;
+  name: string;
+  sql: string;
+};
+
+type WorkspaceRow = Workspace & {
+  tenant_key: string;
+};
+
+const mapTenant = (row: Record<string, unknown> | undefined): Tenant | null =>
+  row
+    ? {
+        tenantId: String(row.tenant_id),
+        tenantKey: String(row.tenant_key),
+        displayName: String(row.display_name),
+        status: row.status as Tenant["status"],
+        createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapWorkspace = (
+  row: Record<string, unknown> | undefined
+): WorkspaceRow | null =>
+  row
+    ? {
+        workspaceId: String(row.workspace_id),
+        tenantId: String(row.tenant_id),
+        workspaceKey: String(row.workspace_key),
+        displayName: String(row.display_name),
+        status: row.status as Workspace["status"],
+        createdAt: String(row.created_at),
+        tenant_key: String(row.tenant_key)
+      }
+    : null;
+
+const mapSourcePackage = (
+  row: Record<string, unknown> | undefined
+): SourcePackage | null =>
+  row
+    ? {
+        sourcePackageId: String(row.source_package_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        fileName: String(row.file_name),
+        mediaType: String(row.media_type),
+        contentStructure:
+          row.content_structure_json === null || row.content_structure_json === undefined
+            ? null
+            : (JSON.parse(
+                String(row.content_structure_json)
+              ) as SourcePackageContentStructure),
+        sourceDocument:
+          row.source_document_text === null || row.source_document_text === undefined
+            ? null
+            : String(row.source_document_text),
+        status: row.status as SourcePackage["status"],
+        uploadedAt: String(row.uploaded_at)
+      }
+    : null;
+
+const mapImportJob = (row: Record<string, unknown> | undefined): ImportJob | null =>
+  row
+    ? {
+        importJobId: String(row.import_job_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        sourcePackageId: String(row.source_package_id),
+        status: row.status as ImportJob["status"],
+        createdAt: String(row.created_at),
+        finishedAt:
+          row.finished_at === null || row.finished_at === undefined
+            ? null
+            : String(row.finished_at),
+        diagnostics: JSON.parse(
+          String(row.diagnostics_json ?? "[]")
+        ) as ImportJobDiagnostic[]
+      }
+    : null;
+
+const mapContentRelease = (
+  row: Record<string, unknown> | undefined
+): ContentRelease | null =>
+  row
+    ? {
+        contentReleaseId: String(row.content_release_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        importJobId: String(row.import_job_id),
+        releaseLabel: String(row.release_label),
+        runtimeSnapshot: JSON.parse(
+          String(row.runtime_snapshot_json ?? "{\"bookletEntries\":[]}")
+        ) as ContentReleaseRuntimeSnapshot,
+        status: row.status as ContentRelease["status"],
+        createdAt: String(row.created_at),
+        activatedAt:
+          row.activated_at === null || row.activated_at === undefined
+            ? null
+            : String(row.activated_at)
+      }
+    : null;
+
+const mapParticipantSession = (
+  row: Record<string, unknown> | undefined
+): ParticipantSession | null =>
+  row
+    ? {
+        participantSessionId: String(row.participant_session_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        contentReleaseId: String(row.content_release_id),
+        loginKey: String(row.login_key),
+        groupKey: String(row.group_key),
+        status: row.status as ParticipantSession["status"],
+        createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
+  row
+    ? {
+        testRunId: String(row.test_run_id),
+        participantSessionId: String(row.participant_session_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        contentReleaseId: String(row.content_release_id),
+        bookletKey: String(row.booklet_key),
+        status: row.status as TestRun["status"],
+        currentUnitKey:
+          row.current_unit_key === null || row.current_unit_key === undefined
+            ? null
+            : String(row.current_unit_key),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at),
+        completedAt:
+          row.completed_at === null || row.completed_at === undefined
+            ? null
+            : String(row.completed_at)
+      }
+    : null;
+
+const mapWorkspaceActivityEvent = (
+  row: Record<string, unknown> | undefined
+): WorkspaceActivityEvent | null =>
+  row
+    ? {
+        activityEventId: String(row.activity_event_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        eventType: row.event_type as WorkspaceActivityEvent["eventType"],
+        actorId:
+          row.actor_id === null || row.actor_id === undefined
+            ? null
+            : String(row.actor_id),
+        subjectType: row.subject_type as WorkspaceActivityEvent["subjectType"],
+        subjectId: String(row.subject_id),
+        occurredAt: String(row.occurred_at),
+        summary: String(row.summary),
+        details: JSON.parse(String(row.details_json ?? "{}")) as Record<string, unknown>
+      }
+    : null;
+
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 7;
+
+const sqliteMigrations: SqliteMigration[] = [
+  {
+    version: 1,
+    name: "initial_first_slice_schema",
+    sql: `
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS tenants (
+        tenant_id TEXT PRIMARY KEY,
+        tenant_key TEXT NOT NULL UNIQUE,
+        display_name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS workspaces (
+        workspace_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        tenant_key TEXT NOT NULL,
+        workspace_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (tenant_key, workspace_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS source_packages (
+        source_package_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS import_jobs (
+        import_job_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        source_package_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS content_releases (
+        content_release_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        import_job_id TEXT NOT NULL,
+        release_label TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        activated_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS participant_sessions (
+        participant_session_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        content_release_id TEXT NOT NULL,
+        login_key TEXT NOT NULL,
+        group_key TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS test_runs (
+        test_run_id TEXT PRIMARY KEY,
+        participant_session_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        content_release_id TEXT NOT NULL,
+        booklet_key TEXT NOT NULL,
+        status TEXT NOT NULL,
+        current_unit_key TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspaces_workspace_key
+        ON workspaces (workspace_key);
+      CREATE INDEX IF NOT EXISTS idx_source_packages_workspace
+        ON source_packages (tenant_id, workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_import_jobs_workspace
+        ON import_jobs (tenant_id, workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_content_releases_workspace
+        ON content_releases (tenant_id, workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_participant_sessions_workspace
+        ON participant_sessions (tenant_id, workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_test_runs_workspace
+        ON test_runs (tenant_id, workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_test_runs_participant_session
+        ON test_runs (participant_session_id);
+    `
+  },
+  {
+    version: 2,
+    name: "add_test_run_completed_at",
+    sql: `
+      ALTER TABLE test_runs
+      ADD COLUMN completed_at TEXT;
+    `
+  },
+  {
+    version: 3,
+    name: "add_content_release_runtime_snapshot",
+    sql: `
+      ALTER TABLE content_releases
+      ADD COLUMN runtime_snapshot_json TEXT NOT NULL DEFAULT '{"bookletEntries":[]}';
+    `
+  },
+  {
+    version: 4,
+    name: "add_source_package_content_structure",
+    sql: `
+      ALTER TABLE source_packages
+      ADD COLUMN content_structure_json TEXT;
+    `
+  },
+  {
+    version: 5,
+    name: "add_source_package_source_document",
+    sql: `
+      ALTER TABLE source_packages
+      ADD COLUMN source_document_text TEXT;
+    `
+  },
+  {
+    version: 6,
+    name: "add_import_job_diagnostics",
+    sql: `
+      ALTER TABLE import_jobs
+      ADD COLUMN finished_at TEXT;
+
+      ALTER TABLE import_jobs
+      ADD COLUMN diagnostics_json TEXT NOT NULL DEFAULT '[]';
+    `
+  },
+  {
+    version: 7,
+    name: "add_workspace_activity_events",
+    sql: `
+      CREATE TABLE IF NOT EXISTS workspace_activity_events (
+        activity_event_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_id TEXT,
+        subject_type TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        details_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_activity_events_workspace
+        ON workspace_activity_events (tenant_id, workspace_id, occurred_at);
+    `
+  }
+];
+
+const getCurrentSchemaVersion = (database: DatabaseSync): number => {
+  const migrationTable = database
+    .prepare(
+      `SELECT name
+       FROM sqlite_master
+       WHERE type = 'table' AND name = 'schema_migrations'`
+    )
+    .get() as Record<string, unknown> | undefined;
+
+  if (!migrationTable) {
+    return 0;
+  }
+
+  const row = database
+    .prepare(`SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations`)
+    .get() as Record<string, unknown> | undefined;
+
+  return row ? Number(row.version) : 0;
+};
+
+const applyMigrations = (database: DatabaseSync): void => {
+  database.exec("PRAGMA foreign_keys = ON;");
+
+  const currentVersion = getCurrentSchemaVersion(database);
+  const pendingMigrations = sqliteMigrations.filter(
+    migration => migration.version > currentVersion
+  );
+
+  for (const migration of pendingMigrations) {
+    database.exec("BEGIN");
+
+    try {
+      database.exec(migration.sql);
+      database
+        .prepare(
+          `INSERT INTO schema_migrations (version, name, applied_at)
+           VALUES (?, ?, ?)`
+        )
+        .run(migration.version, migration.name, new Date().toISOString());
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+};
+
+export type SqliteFirstSliceStorageDiagnostics = {
+  currentSchemaVersion: number;
+  targetSchemaVersion: number;
+};
+
+export const inspectSqliteFirstSliceStorage = async (
+  filePath: string
+): Promise<SqliteFirstSliceStorageDiagnostics> => {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const database = new DatabaseSync(filePath);
+
+  try {
+    return {
+      currentSchemaVersion: getCurrentSchemaVersion(database),
+      targetSchemaVersion: SQLITE_FIRST_SLICE_SCHEMA_VERSION
+    };
+  } finally {
+    database.close();
+  }
+};
+
+export const migrateSqliteFirstSliceStorage = async (
+  filePath: string
+): Promise<SqliteFirstSliceStorageDiagnostics> => {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const database = new DatabaseSync(filePath);
+
+  try {
+    applyMigrations(database);
+    return {
+      currentSchemaVersion: getCurrentSchemaVersion(database),
+      targetSchemaVersion: SQLITE_FIRST_SLICE_SCHEMA_VERSION
+    };
+  } finally {
+    database.close();
+  }
+};
+
+export const checkSqliteFirstSliceReadiness = async (
+  filePath: string
+): Promise<void> => {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const database = new DatabaseSync(filePath);
+
+  try {
+    database.prepare("SELECT 1").get();
+  } finally {
+    database.close();
+  }
+};
+
+export const createSqliteFirstSliceRepository = (
+  filePath: string
+): FirstSliceRepository => {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const database = new DatabaseSync(filePath);
+  applyMigrations(database);
+
+  return {
+    async getTenantByKey(tenantKey) {
+      const row = database
+        .prepare(
+          `SELECT tenant_id, tenant_key, display_name, status, created_at
+           FROM tenants
+           WHERE tenant_key = ?`
+        )
+        .get(tenantKey) as Record<string, unknown> | undefined;
+      return mapTenant(row);
+    },
+    async saveTenant(tenant) {
+      database
+        .prepare(
+          `INSERT INTO tenants (
+            tenant_id, tenant_key, display_name, status, created_at
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(tenant_id) DO UPDATE SET
+            tenant_key = excluded.tenant_key,
+            display_name = excluded.display_name,
+            status = excluded.status,
+            created_at = excluded.created_at`
+        )
+        .run(
+          tenant.tenantId,
+          tenant.tenantKey,
+          tenant.displayName,
+          tenant.status,
+          tenant.createdAt
+        );
+    },
+    async getWorkspaceByScope(tenantKey, workspaceKey) {
+      const row = database
+        .prepare(
+          `SELECT workspace_id, tenant_id, tenant_key, workspace_key, display_name, status, created_at
+           FROM workspaces
+           WHERE tenant_key = ? AND workspace_key = ?`
+        )
+        .get(tenantKey, workspaceKey) as Record<string, unknown> | undefined;
+      const workspace = mapWorkspace(row);
+      return workspace
+        ? {
+            workspaceId: workspace.workspaceId,
+            tenantId: workspace.tenantId,
+            workspaceKey: workspace.workspaceKey,
+            displayName: workspace.displayName,
+            status: workspace.status,
+            createdAt: workspace.createdAt
+          }
+        : null;
+    },
+    async getWorkspaceByWorkspaceKey(workspaceKey) {
+      const row = database
+        .prepare(
+          `SELECT workspace_id, tenant_id, tenant_key, workspace_key, display_name, status, created_at
+           FROM workspaces
+           WHERE workspace_key = ?
+           ORDER BY created_at ASC
+           LIMIT 1`
+        )
+        .get(workspaceKey) as Record<string, unknown> | undefined;
+      const workspace = mapWorkspace(row);
+      return workspace
+        ? {
+            workspaceId: workspace.workspaceId,
+            tenantId: workspace.tenantId,
+            workspaceKey: workspace.workspaceKey,
+            displayName: workspace.displayName,
+            status: workspace.status,
+            createdAt: workspace.createdAt
+          }
+        : null;
+    },
+    async saveWorkspace(scope) {
+      database
+        .prepare(
+          `INSERT INTO workspaces (
+            workspace_id, tenant_id, tenant_key, workspace_key, display_name, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(workspace_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            tenant_key = excluded.tenant_key,
+            workspace_key = excluded.workspace_key,
+            display_name = excluded.display_name,
+            status = excluded.status,
+            created_at = excluded.created_at`
+        )
+        .run(
+          scope.workspace.workspaceId,
+          scope.workspace.tenantId,
+          scope.tenantKey,
+          scope.workspace.workspaceKey,
+          scope.workspace.displayName,
+          scope.workspace.status,
+          scope.workspace.createdAt
+        );
+    },
+    async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+           FROM workspace_activity_events
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapWorkspaceActivityEvent(row))
+        .filter(Boolean) as WorkspaceActivityEvent[];
+    },
+    async saveWorkspaceActivityEvent(activityEvent) {
+      database
+        .prepare(
+          `INSERT INTO workspace_activity_events (
+            activity_event_id, tenant_id, workspace_id, event_type, actor_id, subject_type, subject_id, occurred_at, summary, details_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(activity_event_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            event_type = excluded.event_type,
+            actor_id = excluded.actor_id,
+            subject_type = excluded.subject_type,
+            subject_id = excluded.subject_id,
+            occurred_at = excluded.occurred_at,
+            summary = excluded.summary,
+            details_json = excluded.details_json`
+        )
+        .run(
+          activityEvent.activityEventId,
+          activityEvent.tenantId,
+          activityEvent.workspaceId,
+          activityEvent.eventType,
+          activityEvent.actorId,
+          activityEvent.subjectType,
+          activityEvent.subjectId,
+          activityEvent.occurredAt,
+          activityEvent.summary,
+          JSON.stringify(activityEvent.details)
+        );
+    },
+    async getSourcePackageById(sourcePackageId) {
+      const row = database
+        .prepare(
+          `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+           FROM source_packages
+           WHERE source_package_id = ?`
+        )
+        .get(sourcePackageId) as Record<string, unknown> | undefined;
+      return mapSourcePackage(row);
+    },
+    async listSourcePackagesByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+           FROM source_packages
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows.map(row => mapSourcePackage(row)).filter(Boolean) as SourcePackage[];
+    },
+    async saveSourcePackage(sourcePackage) {
+      database
+        .prepare(
+          `INSERT INTO source_packages (
+            source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(source_package_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            file_name = excluded.file_name,
+            media_type = excluded.media_type,
+            content_structure_json = excluded.content_structure_json,
+            source_document_text = excluded.source_document_text,
+            status = excluded.status,
+            uploaded_at = excluded.uploaded_at`
+        )
+        .run(
+          sourcePackage.sourcePackageId,
+          sourcePackage.tenantId,
+          sourcePackage.workspaceId,
+          sourcePackage.fileName,
+          sourcePackage.mediaType,
+          sourcePackage.contentStructure
+            ? JSON.stringify(sourcePackage.contentStructure)
+            : null,
+          sourcePackage.sourceDocument,
+          sourcePackage.status,
+          sourcePackage.uploadedAt
+        );
+    },
+    async getImportJobById(importJobId) {
+      const row = database
+        .prepare(
+          `SELECT import_job_id, tenant_id, workspace_id, source_package_id, status, created_at, finished_at, diagnostics_json
+           FROM import_jobs
+           WHERE import_job_id = ?`
+        )
+        .get(importJobId) as Record<string, unknown> | undefined;
+      return mapImportJob(row);
+    },
+    async listImportJobsByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT import_job_id, tenant_id, workspace_id, source_package_id, status, created_at, finished_at, diagnostics_json
+           FROM import_jobs
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows.map(row => mapImportJob(row)).filter(Boolean) as ImportJob[];
+    },
+    async saveImportJob(importJob) {
+      database
+        .prepare(
+          `INSERT INTO import_jobs (
+            import_job_id, tenant_id, workspace_id, source_package_id, status, created_at, finished_at, diagnostics_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(import_job_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            source_package_id = excluded.source_package_id,
+            status = excluded.status,
+            created_at = excluded.created_at,
+            finished_at = excluded.finished_at,
+            diagnostics_json = excluded.diagnostics_json`
+        )
+        .run(
+          importJob.importJobId,
+          importJob.tenantId,
+          importJob.workspaceId,
+          importJob.sourcePackageId,
+          importJob.status,
+          importJob.createdAt,
+          importJob.finishedAt,
+          JSON.stringify(importJob.diagnostics)
+        );
+    },
+    async getContentReleaseById(contentReleaseId) {
+      const row = database
+        .prepare(
+          `SELECT content_release_id, tenant_id, workspace_id, import_job_id, release_label, runtime_snapshot_json, status, created_at, activated_at
+           FROM content_releases
+           WHERE content_release_id = ?`
+        )
+        .get(contentReleaseId) as Record<string, unknown> | undefined;
+      return mapContentRelease(row);
+    },
+    async listContentReleasesByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT content_release_id, tenant_id, workspace_id, import_job_id, release_label, runtime_snapshot_json, status, created_at, activated_at
+           FROM content_releases
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapContentRelease(row))
+        .filter(Boolean) as ContentRelease[];
+    },
+    async saveContentRelease(contentRelease) {
+      database
+        .prepare(
+          `INSERT INTO content_releases (
+            content_release_id, tenant_id, workspace_id, import_job_id, release_label, runtime_snapshot_json, status, created_at, activated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(content_release_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            import_job_id = excluded.import_job_id,
+            release_label = excluded.release_label,
+            runtime_snapshot_json = excluded.runtime_snapshot_json,
+            status = excluded.status,
+            created_at = excluded.created_at,
+            activated_at = excluded.activated_at`
+        )
+        .run(
+          contentRelease.contentReleaseId,
+          contentRelease.tenantId,
+          contentRelease.workspaceId,
+          contentRelease.importJobId,
+          contentRelease.releaseLabel,
+          JSON.stringify(contentRelease.runtimeSnapshot),
+          contentRelease.status,
+          contentRelease.createdAt,
+          contentRelease.activatedAt
+        );
+    },
+    async getParticipantSessionById(participantSessionId) {
+      const row = database
+        .prepare(
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+           FROM participant_sessions
+           WHERE participant_session_id = ?`
+        )
+        .get(participantSessionId) as Record<string, unknown> | undefined;
+      return mapParticipantSession(row);
+    },
+    async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+           FROM participant_sessions
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapParticipantSession(row))
+        .filter(Boolean) as ParticipantSession[];
+    },
+    async saveParticipantSession(participantSession) {
+      database
+        .prepare(
+          `INSERT INTO participant_sessions (
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(participant_session_id) DO UPDATE SET
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            content_release_id = excluded.content_release_id,
+            login_key = excluded.login_key,
+            group_key = excluded.group_key,
+            status = excluded.status,
+            created_at = excluded.created_at`
+        )
+        .run(
+          participantSession.participantSessionId,
+          participantSession.tenantId,
+          participantSession.workspaceId,
+          participantSession.contentReleaseId,
+          participantSession.loginKey,
+          participantSession.groupKey,
+          participantSession.status,
+          participantSession.createdAt
+        );
+    },
+    async getTestRunById(testRunId) {
+      const row = database
+        .prepare(
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+           FROM test_runs
+           WHERE test_run_id = ?`
+        )
+        .get(testRunId) as Record<string, unknown> | undefined;
+      return mapTestRun(row);
+    },
+    async listTestRunsByParticipantSessionId(participantSessionId) {
+      const rows = database
+        .prepare(
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+           FROM test_runs
+           WHERE participant_session_id = ?`
+        )
+        .all(participantSessionId) as Record<string, unknown>[];
+      return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
+    },
+    async getOpenTestRunByParticipantSessionId(participantSessionId) {
+      const row = database
+        .prepare(
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+           FROM test_runs
+           WHERE participant_session_id = ? AND status != 'completed'
+           ORDER BY updated_at ASC
+           LIMIT 1`
+        )
+        .get(participantSessionId) as Record<string, unknown> | undefined;
+      return mapTestRun(row);
+    },
+    async listTestRunsByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+           FROM test_runs
+           WHERE tenant_id = ? AND workspace_id = ?`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows.map(row => mapTestRun(row)).filter(Boolean) as TestRun[];
+    },
+    async saveTestRun(testRun) {
+      database
+        .prepare(
+          `INSERT INTO test_runs (
+            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(test_run_id) DO UPDATE SET
+            participant_session_id = excluded.participant_session_id,
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            content_release_id = excluded.content_release_id,
+            booklet_key = excluded.booklet_key,
+            status = excluded.status,
+            current_unit_key = excluded.current_unit_key,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at,
+            completed_at = excluded.completed_at`
+        )
+        .run(
+          testRun.testRunId,
+          testRun.participantSessionId,
+          testRun.tenantId,
+          testRun.workspaceId,
+          testRun.contentReleaseId,
+          testRun.bookletKey,
+          testRun.status,
+          testRun.currentUnitKey,
+          testRun.createdAt,
+          testRun.updatedAt,
+          testRun.completedAt
+        );
+    }
+  };
+};
