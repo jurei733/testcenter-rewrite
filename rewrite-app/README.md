@@ -31,6 +31,9 @@ rewrite-app/
     application/
     contracts/
     domain/
+    file-store/
+    memory-store/
+    sqlite-store/
 ```
 
 ## Design Rules
@@ -39,6 +42,7 @@ rewrite-app/
 - preserve domain semantics from the spike before preserving spike file shapes
 - prefer explicit ports and use-case boundaries over direct infrastructure coupling
 - do not copy spike megafiles into this workspace
+- keep infrastructure adapters outside the application package
 
 ## Verification
 
@@ -48,4 +52,246 @@ Run inside `rewrite-app/`:
 npm install
 npm run typecheck
 npm run build
+npm run start:api
 ```
+
+For the local production-like verification path, run:
+
+```bash
+npm run ci
+```
+
+That executes:
+
+- typecheck
+- build
+- memory + sqlite integration tests
+- a built-server startup smoke test against SQLite
+- a built-server graceful shutdown/drain smoke test against SQLite
+
+For explicit storage administration, run:
+
+```bash
+npm run db:doctor
+npm run db:migrate
+FIRST_SLICE_STORE=sqlite npm run db:doctor:sqlite
+FIRST_SLICE_STORE=sqlite npm run db:migrate:sqlite
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:doctor:postgres
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:migrate:postgres
+```
+
+These commands use the built storage adapters directly and do not require the API process to be running.
+
+The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
+
+```bash
+npm run db:doctor:sqlite:built
+npm run db:migrate:sqlite:built
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:doctor:postgres:built
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:migrate:postgres:built
+```
+
+For durable local storage, run the API with:
+
+```bash
+FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/first-slice.json npm run start:api
+```
+
+For relational local persistence, run:
+
+```bash
+FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/first-slice.sqlite npm run start:api
+```
+
+For Postgres-backed persistence, run:
+
+```bash
+FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run start:api
+```
+
+For a local containerized API + Postgres stack, run:
+
+```bash
+docker compose -f docker-compose.postgres.yml up --build
+```
+
+That stack now runs in two explicit application roles:
+
+- `rewrite-app-migrate`: one-shot schema migration role
+- `rewrite-app-api`: long-running HTTP service role
+
+The API waits for both Postgres health and successful migration completion before it starts.
+
+The workspace also ships a checked-in environment example:
+
+```bash
+cp .env.example .env
+```
+
+Then adjust the storage variables for your local mode.
+
+`APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` are optional and surface through the API manifest, metrics, and startup banner for release identification.
+
+When you build the production image, you can also pass them as Docker build args:
+
+```bash
+docker build \
+  --build-arg APP_BUILD_SHA=$(git rev-parse --short HEAD) \
+  --build-arg APP_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  -f Dockerfile .
+```
+
+## Current Live Flow
+
+The first production workspace now serves a small in-memory HTTP baseline with:
+
+- `POST /api/v1/platform/tenants`
+- `POST /api/v1/tenants/{tenantKey}/workspaces`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/retry-import`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs/{importJobId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions/{participantSessionId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/content-releases`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/content-releases/{contentReleaseId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/content-releases/{contentReleaseId}/activation-readiness`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/content-releases/{contentReleaseId}/activate`
+- `POST /api/v1/participant/auth/sign-in`
+- `GET /api/v1/participant/sessions/{participantSessionId}/runtime-state`
+- `GET /api/v1/participant/sessions/{participantSessionId}/current-state`
+- `POST /api/v1/participant/starter:launch`
+- `POST /api/v1/participant/test-runs/{testRunId}/save-progress`
+- `POST /api/v1/participant/sessions/{participantSessionId}/resume`
+- `POST /api/v1/participant/test-runs/{testRunId}/resume`
+- `POST /api/v1/participant/test-runs/{testRunId}/complete`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/monitor/open-runs`
+
+The added read side now makes the first slice inspectable:
+
+- workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
+- source-package listing shows uploaded packages together with their latest import attempt
+- source-package detail now shows the full retry/import history and any releases that were produced from that package
+- import-job listing shows completed and failed imports together with persisted diagnostics and source-package context
+- import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
+- participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release
+- participant-session detail now resolves one session together with its content release and full run history
+- content-release detail now resolves a single release together with its import/source-package lineage, attached sessions/runs, and neighboring activation history within the workspace release line
+- content-release activation readiness now previews whether a staged release can be switched in immediately or is currently blocked by open runs on the active release
+- workspace activity events now provide a persisted operator timeline for setup, import, activation, and runtime actions
+- failed source packages can now be retried in place with corrected manifest data, producing a fresh import job on the same package identity
+- content-release listing returns staged/active/superseded releases together with their import/source-package lineage
+- participant runtime can now be re-entered through session context, not only through `testRunId`
+- participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
+- source-package intake can now optionally carry a small structured `contentStructure`, which the import step turns into the release runtime snapshot
+- source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
+- imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
+- guarded activation now returns explicit blocking details for open runs on the currently active release, so operators and the shell can see why a release switch was rejected
+- runtime now supports `running -> paused -> running -> completed` on test-runs
+- completed test-runs now leave the monitor queue and persist their completion timestamp
+
+## Frontend Shell
+
+- `GET /` and `GET /app` now serve a production-facing operator shell from [apps/web/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/index.ts)
+- the shell now persists form context locally, exposes guided flows for bootstrap/import/runtime, surfaces operational summaries plus an activity feed, and supports view-level navigation/deep-links for `#workspace`, `#content`, `#runtime`, and `#ops`
+
+## Current Persistence Boundary
+
+- [packages/application/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/application/src/index.ts) now owns use-case logic and repository ports
+- [packages/memory-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/memory-store/src/index.ts) provides the current runnable in-memory adapter
+- [packages/file-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/file-store/src/index.ts) provides a durable JSON-file adapter for local development
+- [packages/sqlite-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/sqlite-store/src/index.ts) provides the first relational adapter on top of `node:sqlite`, including tracked schema migrations and content-release runtime snapshots
+- [packages/postgres-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/postgres-store/src/index.ts) provides a networked Postgres adapter with its own schema migration bootstrap and the same repository contract as the local stores
+- the SQLite adapter now also persists raw source-package content used for import-time structure derivation
+- import-job persistence now also stores `finishedAt` and structured diagnostics for failed imports
+- [apps/api/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/api/src/index.ts) wires `repository -> services -> HTTP`
+
+## Integration Test Matrix
+
+The production slice now has a small store matrix:
+
+```bash
+npm run test:integration
+```
+
+That runs:
+
+- `memory`
+- `sqlite`
+
+And there is an optional Postgres-backed run:
+
+```bash
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run test:integration:postgres
+```
+
+If `FIRST_SLICE_POSTGRES_URL` is not set, the optional Postgres test runner skips cleanly.
+
+There are also built-process startup smoke checks:
+
+```bash
+npm run smoke:startup
+npm run smoke:startup:sqlite
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:startup:postgres
+```
+
+Those boot the built API process, poll `/healthz`, `/readyz`, and `/manifest`, then stop the process again.
+
+For graceful rollout verification, run:
+
+```bash
+npm run smoke:shutdown:sqlite
+```
+
+That boots the built API process, waits for readiness, sends `SIGTERM`, verifies `/readyz` switches to `503 service_draining`, and then checks that the process exits cleanly.
+
+For the full containerized release path, run:
+
+```bash
+APP_BUILD_SHA=$(git rev-parse --short HEAD) npm run smoke:compose:postgres
+```
+
+That verifies:
+
+- compose build
+- Postgres health
+- one-shot migration role
+- API readiness
+- build metadata propagation into the running API manifest
+
+For runtime probes:
+
+- `/healthz` is a liveness check
+- `/readyz` is a storage-aware readiness check
+- `/metrics` returns JSON runtime metrics including request counts by route, route latency summaries, and process memory
+- `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
+- `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, and drain timing
+- `/readyz` is a storage-aware readiness check
+- `/metrics` exposes lightweight runtime request/error counters for the current API process
+- `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
+- `/manifest` exposes the active storage mode, schema version, routes, and use-case surface
+- `db:doctor` reports storage reachability plus current vs. target schema version where applicable
+- `db:migrate` applies the adapter-managed schema migrations without going through the HTTP server boot path
+
+## CI / Deployability
+
+- [../.github/workflows/rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) now verifies:
+  - memory + sqlite CI path
+  - Postgres integration + startup smoke
+  - Docker compose release smoke with explicit migrate + api roles
+- [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build plus an image-level `/readyz` healthcheck
+- [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate and api services, restart policies, and service healthchecks
+- [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
+
+It is still intentionally lightweight:
+
+- persistence can be in-memory, JSON-file-backed, or SQLite-backed
+- importer behavior is still small, but can now derive runtime structure from either source-package metadata or a simple manifest-like source document instead of only hardcoded defaults
+- participant launch is simplified
+- monitor reads prove the shape, not full operational parity
