@@ -68,6 +68,7 @@ That executes:
 - memory + sqlite integration tests
 - a built-server startup smoke test against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
+- a browser-driven Angular UI smoke against SQLite
 
 For explicit storage administration, run:
 
@@ -197,8 +198,9 @@ The added read side now makes the first slice inspectable:
 
 ## Frontend Shell
 
-- `GET /` and `GET /app` now serve a production-facing operator shell from [apps/web/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/index.ts)
-- the shell now persists form context locally, exposes guided flows for bootstrap/import/runtime, surfaces operational summaries plus an activity feed, and supports view-level navigation/deep-links for `#workspace`, `#content`, `#runtime`, and `#ops`
+- `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
+- the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
+- the shell persists form context locally, exposes guided flows for bootstrap/import/runtime, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, and failed-import retry flow
 
 ## Current Persistence Boundary
 
@@ -249,6 +251,22 @@ npm run smoke:shutdown:sqlite
 ```
 
 That boots the built API process, waits for readiness, sends `SIGTERM`, verifies `/readyz` switches to `503 service_draining`, and then checks that the process exits cleanly.
+
+For browser-level frontend verification, run:
+
+```bash
+npm run install:browsers
+npm run smoke:ui
+```
+
+That builds the Angular frontend, boots the built API process on SQLite, and drives a real browser through:
+
+- workspace bootstrap
+- source-package import and release activation
+- participant sign-in and session resume
+- failed import diagnostics on a broken package
+- retrying that failed import on the same package identity
+- diagnostics and config reads
 
 For the full containerized release path, run:
 

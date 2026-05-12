@@ -1733,7 +1733,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let shuttingDown = false;
 
   const closeServer = () => {
+    server.closeIdleConnections?.();
+    const forceCloseHandle = setTimeout(() => {
+      server.closeAllConnections?.();
+    }, 1_000);
+    forceCloseHandle.unref();
+
     server.close(async error => {
+      clearTimeout(forceCloseHandle);
       try {
         await runtime.shutdown();
       } finally {
