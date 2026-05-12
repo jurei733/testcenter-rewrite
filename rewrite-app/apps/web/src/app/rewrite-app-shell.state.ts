@@ -1,0 +1,139 @@
+import type { ActivityFeedItem, SummaryCard } from "./rewrite-app-shell.types";
+
+export interface ShellOpsState {
+  storageKind: string;
+  storageSchemaVersion: string;
+  readinessBadge: string;
+  runtimeHealthView: string;
+  runtimeMetricsView: string;
+  runtimeDiagnosticsView: string;
+  runtimeConfigView: string;
+  diagnosticsLoaded: boolean;
+}
+
+export interface ShellRuntimeState {
+  loginKey: string;
+  participantSessionId: string;
+  testRunId: string;
+  currentUnitKey: string;
+  participantSessionsView: string;
+  participantSessionDetailView: string;
+  runtimeStateView: string;
+  currentRunStateView: string;
+  openRunsView: string;
+  runtimeMonitorView: string;
+  runtimeLoaded: boolean;
+}
+
+export interface ShellContentState {
+  sourceFileName: string;
+  sourceMediaType: string;
+  sourceDocument: string;
+  sourcePackageId: string;
+  importJobId: string;
+  contentReleaseId: string;
+  forceActivation: boolean;
+  sourcePackagesView: string;
+  importJobsView: string;
+  contentReleasesView: string;
+  sourcePackageDetailView: string;
+  importJobDetailView: string;
+  contentReleaseActivationReadinessView: string;
+  contentReleaseDetailView: string;
+  activationGuardView: string;
+  contentLoaded: boolean;
+}
+
+export interface ShellWorkspaceState {
+  tenantKey: string;
+  workspaceKey: string;
+  autoRefreshEnabled: boolean;
+  autoRefreshSeconds: number;
+  workspaceOverviewView: string;
+  workspaceActivityView: string;
+  workspaceLoaded: boolean;
+}
+
+export interface ShellFeedbackState {
+  summaryCards: SummaryCard[];
+  activityFeed: ActivityFeedItem[];
+}
+
+export function createInitialShellOpsState(): ShellOpsState {
+  return {
+    storageKind: "unknown",
+    storageSchemaVersion: "n/a",
+    readinessBadge: "unknown",
+    runtimeHealthView: 'Use "Refresh Diagnostics".',
+    runtimeMetricsView: 'Use "Refresh Diagnostics".',
+    runtimeDiagnosticsView: 'Use "Refresh Diagnostics".',
+    runtimeConfigView: 'Use "Refresh Diagnostics".',
+    diagnosticsLoaded: false
+  };
+}
+
+export function createInitialShellRuntimeState(): ShellRuntimeState {
+  return {
+    loginKey: "student-ui",
+    participantSessionId: "",
+    testRunId: "",
+    currentUnitKey: "unit-1",
+    participantSessionsView: 'Use "Refresh Runtime Reads".',
+    participantSessionDetailView: 'Use "Participant Session Detail".',
+    runtimeStateView: 'Use "Refresh Runtime Reads".',
+    currentRunStateView: 'Use "Refresh Runtime Reads".',
+    openRunsView: 'Use "Refresh Runtime Reads".',
+    runtimeMonitorView: "Use runtime actions to populate the latest action result.",
+    runtimeLoaded: false
+  };
+}
+
+export function createInitialShellContentState(
+  defaultSourceDocument: string
+): ShellContentState {
+  return {
+    sourceFileName: "frontend-starter.xml",
+    sourceMediaType: "application/xml",
+    sourceDocument: defaultSourceDocument,
+    sourcePackageId: "",
+    importJobId: "",
+    contentReleaseId: "",
+    forceActivation: false,
+    sourcePackagesView: 'Use "Refresh Content Reads".',
+    importJobsView: 'Use "Refresh Content Reads".',
+    contentReleasesView: 'Use "Refresh Content Reads".',
+    sourcePackageDetailView: 'Use "Source Package Detail".',
+    importJobDetailView: 'Use "Import Job Detail".',
+    contentReleaseActivationReadinessView: 'Use "Release Readiness".',
+    contentReleaseDetailView: 'Use "Release Detail".',
+    activationGuardView:
+      "Activation guard details appear here when readiness or activation reports open-run blockers.",
+    contentLoaded: false
+  };
+}
+
+export function createInitialShellWorkspaceState(): ShellWorkspaceState {
+  return {
+    tenantKey: "demo-tenant",
+    workspaceKey: "demo-workspace",
+    autoRefreshEnabled: true,
+    autoRefreshSeconds: 8,
+    workspaceOverviewView: 'Use "Refresh Workspace Overview".',
+    workspaceActivityView: 'Use "Refresh Content Reads".',
+    workspaceLoaded: false
+  };
+}
+
+export function createInitialShellFeedbackState(
+  createSummaryCards: () => SummaryCard[]
+): ShellFeedbackState {
+  return {
+    summaryCards: createSummaryCards(),
+    activityFeed: [
+      {
+        title: "Ready",
+        detail: "The Angular shell is waiting for the first API action."
+      }
+    ]
+  };
+}

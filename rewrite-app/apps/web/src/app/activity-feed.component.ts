@@ -1,10 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input } from "@angular/core";
-
-type ActivityFeedItem = {
-  title: string;
-  detail: string;
-};
+import type { ActivityFeedItem } from "./rewrite-app-shell.types";
 
 @Component({
   selector: "app-activity-feed",

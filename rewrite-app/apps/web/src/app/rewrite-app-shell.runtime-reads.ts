@@ -1,0 +1,98 @@
+import type {
+  GetParticipantSessionResponse,
+  MonitorOpenRunsResponse,
+  ParticipantCurrentRunStateResponse,
+  ParticipantRuntimeStateResponse
+} from "@testcenter-rewrite-app/contracts";
+
+import {
+  applyRuntimeReadsCurrentRunMissing,
+  applyRuntimeReadsWithSession,
+  applyRuntimeReadsWithoutSession,
+  type RuntimePresentationHost
+} from "./rewrite-app-shell.runtime";
+
+export interface ShellRuntimeReadsHost {
+  request<T>(
+    label: string,
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: { quiet?: boolean }
+  ): Promise<T>;
+  isCurrentRunMissingError(error: unknown): boolean;
+  getOpenRunsPath(): string;
+  getRuntimeStatePath(): string;
+  getParticipantSessionDetailPath(): string;
+  getCurrentRunStatePath(): string;
+  createRuntimePresentationHost(): RuntimePresentationHost;
+}
+
+export async function refreshRuntimeReadsAction(
+  host: ShellRuntimeReadsHost,
+  participantSessionId: string,
+  quiet = false
+): Promise<void> {
+  const openRuns = await host.request<MonitorOpenRunsResponse>(
+    "Monitor Open Runs",
+    "GET",
+    host.getOpenRunsPath(),
+    undefined,
+    { quiet }
+  );
+
+  if (!participantSessionId.trim()) {
+    applyRuntimeReadsWithoutSession(
+      host.createRuntimePresentationHost(),
+      openRuns,
+      quiet
+    );
+    return;
+  }
+
+  const [runtimeStatePayload, sessionDetailPayload] = await Promise.all([
+    host.request<ParticipantRuntimeStateResponse>(
+      "Runtime State",
+      "GET",
+      host.getRuntimeStatePath(),
+      undefined,
+      { quiet }
+    ),
+    host.request<GetParticipantSessionResponse>(
+      "Participant Session Detail",
+      "GET",
+      host.getParticipantSessionDetailPath(),
+      undefined,
+      { quiet }
+    )
+  ]);
+
+  let currentRunStatePayload: ParticipantCurrentRunStateResponse | null = null;
+  try {
+    currentRunStatePayload = await host.request<ParticipantCurrentRunStateResponse>(
+      "Current State",
+      "GET",
+      host.getCurrentRunStatePath(),
+      undefined,
+      { quiet }
+    );
+  } catch (error) {
+    if (host.isCurrentRunMissingError(error)) {
+      applyRuntimeReadsCurrentRunMissing(
+        host.createRuntimePresentationHost(),
+        runtimeStatePayload.runtimeState.availableAction
+      );
+    } else {
+      throw error;
+    }
+  }
+
+  applyRuntimeReadsWithSession(
+    host.createRuntimePresentationHost(),
+    openRuns,
+    runtimeStatePayload,
+    sessionDetailPayload,
+    currentRunStatePayload,
+    quiet
+  );
+}

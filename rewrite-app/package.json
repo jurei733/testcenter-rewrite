@@ -11,7 +11,8 @@
     "build": "npm run build:core && npm run build:web",
     "build:core": "tsc -b packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
     "build:web": "ng build rewrite-app-web",
-    "ci": "npm run typecheck && npm run build && npm run test:integration && npm run smoke:startup:sqlite && npm run smoke:shutdown:sqlite",
+    "ci": "npm run typecheck && npm run build && npm run test:integration && npm run smoke:startup:sqlite && npm run smoke:shutdown:sqlite && npm run smoke:ui",
+    "install:browsers": "playwright install chromium",
     "db:doctor": "npm run build && node ./scripts/storage-admin.mjs doctor",
     "db:doctor:built": "node ./scripts/storage-admin.mjs doctor",
     "db:doctor:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs doctor",
@@ -30,6 +31,7 @@
     "smoke:shutdown:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
     "smoke:startup:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs",
     "smoke:startup:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/smoke-startup.mjs",
+    "smoke:ui": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke.sqlite node ./scripts/smoke-ui.mjs",
     "test:integration": "npm run test:integration:memory && npm run test:integration:sqlite",
     "test:integration:memory": "npm run build && node --test apps/api/dist/apps/api/src/integration.test.js",
     "test:integration:sqlite": "rm -f ./.data/integration-sqlite.sqlite && npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js",
@@ -40,6 +42,7 @@
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/pg": "^8.15.2",
+    "playwright": "^1.54.1",
     "typescript": "^5.8.3"
   },
   "dependencies": {
@@ -51,6 +54,7 @@
     "@angular/core": "^21.2.12",
     "@angular/forms": "^21.2.12",
     "@angular/platform-browser": "^21.2.12",
+    "@angular/router": "^21.2.12",
     "rxjs": "^7.8.2",
     "zone.js": "^0.16.2"
   }

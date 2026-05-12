@@ -1,11 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input } from "@angular/core";
-
-type SummaryCard = {
-  label: string;
-  headline: string;
-  detail: string;
-};
+import type { SummaryCard } from "./rewrite-app-shell.types";
 
 @Component({
   selector: "app-summary-cards",

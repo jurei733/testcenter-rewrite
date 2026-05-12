@@ -1,0 +1,106 @@
+import type {
+  ParticipantSignInRequest,
+  ParticipantSignInResponse,
+  ResumeParticipantSessionResponse,
+  ResumeTestRunResponse,
+  SaveTestRunProgressRequest,
+  SaveTestRunProgressResponse
+} from "@testcenter-rewrite-app/contracts";
+
+import {
+  applyCompleteRunResult,
+  applyParticipantSignInResult,
+  applyResumeParticipantSessionResult,
+  applyResumeRunResult,
+  applySaveProgressResult,
+  type RuntimePresentationHost
+} from "./rewrite-app-shell.runtime";
+
+export interface ShellRuntimeActionsHost {
+  request<T>(
+    label: string,
+    method: string,
+    path: string,
+    body?: unknown
+  ): Promise<T>;
+  getParticipantSignInPath(): string;
+  getResumeParticipantSessionPath(): string;
+  getSaveProgressPath(): string;
+  getResumeRunPath(): string;
+  getCompleteRunPath(): string;
+  getWorkspaceKey(): string;
+  getLoginKey(): string;
+  getCurrentUnitKey(): string;
+  createRuntimePresentationHost(): RuntimePresentationHost;
+  refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
+}
+
+export async function participantSignInAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<ParticipantSignInResponse>(
+    "Participant Sign In",
+    "POST",
+    host.getParticipantSignInPath(),
+    {
+      workspaceKey: host.getWorkspaceKey().trim(),
+      loginKey: host.getLoginKey().trim()
+    } satisfies ParticipantSignInRequest
+  );
+  applyParticipantSignInResult(host.createRuntimePresentationHost(), payload);
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function resumeParticipantSessionAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<ResumeParticipantSessionResponse>(
+    "Resume Session",
+    "POST",
+    host.getResumeParticipantSessionPath()
+  );
+  applyResumeParticipantSessionResult(
+    host.createRuntimePresentationHost(),
+    payload
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function saveProgressAction(
+  host: ShellRuntimeActionsHost,
+  status: "paused" | "running"
+): Promise<void> {
+  const payload = await host.request<SaveTestRunProgressResponse>(
+    status === "paused" ? "Save Progress Paused" : "Save Progress Running",
+    "POST",
+    host.getSaveProgressPath(),
+    {
+      currentUnitKey: host.getCurrentUnitKey().trim() || null,
+      status
+    } satisfies SaveTestRunProgressRequest
+  );
+  applySaveProgressResult(host.createRuntimePresentationHost(), payload, status);
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function resumeRunAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<ResumeTestRunResponse>(
+    "Resume Run",
+    "POST",
+    host.getResumeRunPath()
+  );
+  applyResumeRunResult(host.createRuntimePresentationHost(), payload);
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function completeRunAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<{
+    testRun: { testRunId: string; status: string; completedAt?: string | null };
+  }>("Complete Run", "POST", host.getCompleteRunPath());
+  applyCompleteRunResult(host.createRuntimePresentationHost(), payload);
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
