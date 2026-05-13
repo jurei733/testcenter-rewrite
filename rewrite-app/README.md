@@ -110,6 +110,12 @@ For Postgres-backed persistence, run:
 FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run start:api
 ```
 
+For a production-like operator surface, require an admin bearer session on platform/workspace/content/monitor API routes. Platform admins can access all operator routes, tenant admins can access their tenant, and workspace admins can access their workspace:
+
+```bash
+FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true npm run start:api
+```
+
 For a local containerized API + Postgres stack, run:
 
 ```bash
@@ -146,7 +152,19 @@ docker build \
 
 The first production workspace now serves a small in-memory HTTP baseline with:
 
+- `POST /api/v1/admin/auth/bootstrap`
+- `POST /api/v1/admin/auth/sign-in`
+- `GET /api/v1/admin/auth/current-session`
+- `POST /api/v1/admin/auth/sign-out`
+- `GET /api/v1/admin/users`
+- `POST /api/v1/admin/users`
+- `PATCH /api/v1/admin/users/{adminUserId}`
+- `POST /api/v1/admin/users/{adminUserId}/password`
+- `POST /api/v1/admin/users/{adminUserId}/role-assignments`
+- `DELETE /api/v1/admin/users/{adminUserId}/role-assignments/{roleAssignmentId}`
+- `GET /api/v1/platform/tenants`
 - `POST /api/v1/platform/tenants`
+- `GET /api/v1/tenants/{tenantKey}/workspaces`
 - `POST /api/v1/tenants/{tenantKey}/workspaces`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
@@ -175,6 +193,9 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 
 The added read side now makes the first slice inspectable:
 
+- admin bootstrap creates the first platform admin, bearer sessions can be checked/revoked, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and prevent self-disable or self platform-role revoke lockouts
+- `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
+- tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
 - source-package listing shows uploaded packages together with their latest import attempt
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
@@ -200,7 +221,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for bootstrap/import/runtime, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, and failed-import retry flow
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management, tenant/workspace directory selection, workspace bootstrap, import, and runtime, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, and protected admin directory
 
 ## Current Persistence Boundary
 
@@ -257,16 +278,20 @@ For browser-level frontend verification, run:
 ```bash
 npm run install:browsers
 npm run smoke:ui
+npm run smoke:ui:operator-auth
 ```
 
 That builds the Angular frontend, boots the built API process on SQLite, and drives a real browser through:
 
+- admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user read models, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
+
+The `smoke:ui:operator-auth` variant repeats the browser flow with `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, verifying that the shell can carry the admin bearer session into protected operator routes.
 
 For the full containerized release path, run:
 
@@ -289,7 +314,7 @@ For runtime probes:
 - `/metrics` returns JSON runtime metrics including request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
-- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, and drain timing
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, and whether operator auth is required
 - `/readyz` is a storage-aware readiness check
 - `/metrics` exposes lightweight runtime request/error counters for the current API process
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
@@ -301,6 +326,7 @@ For runtime probes:
 
 - [../.github/workflows/rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) now verifies:
   - memory + sqlite CI path
+  - browser smoke with optional operator auth enabled
   - Postgres integration + startup smoke
   - Docker compose release smoke with explicit migrate + api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build plus an image-level `/readyz` healthcheck
