@@ -124,6 +124,16 @@ h1 {
   letter-spacing: -0.03em;
 }
 
+.status-pill.action-pill {
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+}
+
+.status-pill.action-pill button {
+  justify-self: start;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
@@ -219,18 +229,26 @@ label {
 
 input,
 textarea,
+select,
 button {
   font: inherit;
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid rgba(27, 36, 48, 0.16);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--ink);
+}
+
+input:disabled,
+select:disabled {
+  color: rgba(27, 36, 48, 0.46);
+  background: rgba(255, 255, 255, 0.46);
 }
 
 textarea {
@@ -300,6 +318,47 @@ button:disabled {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.json-panel-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(27, 36, 48, 0.03);
+}
+
+.json-panel-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.json-panel-preview {
+  padding: 14px 16px;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
+  border-top: 1px solid rgba(27, 36, 48, 0.03);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.response-preview {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
 pre {
@@ -400,9 +459,203 @@ pre {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
+.live-context-card {
+  display: grid;
+  gap: 16px;
+}
+
+.live-context-header {
+  display: grid;
+  gap: 10px;
+}
+
+.live-context-header h2 {
+  margin: 10px 0 0;
+}
+
+.live-context-header p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.live-context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.live-context-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 241, 232, 0.82));
+  text-decoration: none;
+  color: inherit;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.live-context-section:hover {
+  transform: translateY(-1px);
+  border-color: rgba(196, 82, 47, 0.28);
+}
+
+.live-context-section strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.live-context-items {
+  display: grid;
+  gap: 10px;
+}
+
+.live-context-item {
+  display: grid;
+  gap: 4px;
+}
+
+.live-context-item span {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.live-context-item code {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.record-collection-empty {
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.66);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.record-collection-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.record-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.record-card.is-selected {
+  border-color: rgba(196, 82, 47, 0.42);
+  background: linear-gradient(180deg, rgba(241, 216, 195, 0.55), rgba(255, 255, 255, 0.92));
+  box-shadow: inset 0 0 0 1px rgba(196, 82, 47, 0.16);
+}
+
+.record-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.record-card-header h4 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.record-card-header p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.record-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: end;
+}
+
+.record-card-badges span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  font-size: 11px;
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.record-card-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.record-card-rows div {
+  display: grid;
+  gap: 4px;
+}
+
+.record-card-rows dt {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.record-card-rows dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.record-card-selection {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(196, 82, 47, 0.14);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.record-card-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1080px) {
   .hero,
-  .workspace {
+  .workspace,
+  .live-context-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -414,5 +667,18 @@ pre {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .record-card-header,
+  .record-card-rows {
+    grid-template-columns: 1fr;
+  }
+
+  .record-card-header {
+    display: grid;
+  }
+
+  .record-card-badges {
+    justify-content: start;
   }
 }

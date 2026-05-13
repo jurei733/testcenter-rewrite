@@ -34,6 +34,18 @@
         <strong>Readiness</strong>
         <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
       </div>
+      <div class="status-pill action-pill">
+        <strong>Raw Debug</strong>
+        <button
+          id="rawDebugToggle"
+          class="ghost"
+          type="button"
+          [attr.aria-pressed]="app.showRawDebug"
+          (click)="app.toggleRawDebug()"
+        >
+          {{ app.showRawDebug ? "Hide" : "Show" }}
+        </button>
+      </div>
     </div>
   </section>
 
@@ -63,25 +75,26 @@
 
   <section class="workspace app-layout">
     <div class="stack">
+      <app-live-context [sections]="app.liveContextSections"></app-live-context>
+
       <router-outlet></router-outlet>
     </div>
 
     <div class="stack">
       <article class="card result">
         <header>
-          <span>Last Response</span>
+          <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
           <span id="responseMeta">{{ app.responseMeta() }}</span>
         </header>
-        <pre id="lastResponse">{{ app.lastResponse() }}</pre>
+        <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
+        <ng-template #lastResponsePreview>
+          <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
+        </ng-template>
       </article>
 
       <article class="card view-grid">
         <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
         <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
-        <p class="note">
-          Tip: use the ids returned in the response pane to drive import, activation,
-          and release detail flows while the Angular frontend is still intentionally lean.
-        </p>
       </article>
     </div>
   </section>

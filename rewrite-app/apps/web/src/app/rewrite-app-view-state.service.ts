@@ -1,0 +1,112 @@
+import { ApplicationRef, Injectable, inject } from "@angular/core";
+
+import { RewriteAppContentService } from "./rewrite-app-content.service";
+import { RewriteAppOpsService } from "./rewrite-app-ops.service";
+import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
+import { RewriteAppShellLifecycleService } from "./rewrite-app-shell-lifecycle.service";
+import type { AppView } from "./rewrite-app-shell.types";
+import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
+
+@Injectable({ providedIn: "root" })
+export class RewriteAppViewStateService {
+  private readonly uiState = inject(RewriteAppUiStateService);
+  private readonly applicationRef = inject(ApplicationRef);
+  private readonly lifecycle = inject(RewriteAppShellLifecycleService);
+  private readonly workspaceService = inject(RewriteAppWorkspaceService);
+  private readonly contentService = inject(RewriteAppContentService);
+  private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly opsService = inject(RewriteAppOpsService);
+
+  private readonly workspaceState = this.uiState.workspace;
+  private readonly refreshWorkspaceOverview = (quiet?: boolean) =>
+    this.workspaceService.refreshWorkspaceOverview(quiet);
+  private readonly refreshContentReads = (quiet?: boolean) =>
+    this.contentService.refreshContentReads(quiet);
+  private readonly refreshRuntimeReads = (quiet?: boolean) =>
+    this.runtimeService.refreshRuntimeReads(quiet);
+  private readonly refreshOperationalDiagnostics = (quiet?: boolean) =>
+    this.opsService.refreshOperationalDiagnostics(quiet);
+
+  get activeView(): AppView {
+    return this.uiState.activeView;
+  }
+
+  private set activeView(nextValue: AppView) {
+    this.uiState.activeView = nextValue;
+  }
+
+  init(): void {
+    this.lifecycle.hydrateShellState();
+    this.lifecycle.scheduleAutoRefresh(
+      this.refreshWorkspaceOverview,
+      this.refreshContentReads,
+      this.refreshRuntimeReads,
+      this.refreshOperationalDiagnostics
+    );
+    void this.opsService.refreshOperationalDiagnostics(true);
+  }
+
+  destroy(): void {
+    this.lifecycle.clearAutoRefresh(
+      this.refreshWorkspaceOverview,
+      this.refreshContentReads,
+      this.refreshRuntimeReads,
+      this.refreshOperationalDiagnostics
+    );
+  }
+
+  setActiveView(view: AppView): void {
+    if (this.activeView === view) {
+      void this.lifecycle.ensureDataForView(
+        view,
+        this.refreshWorkspaceOverview,
+        this.refreshContentReads,
+        this.refreshRuntimeReads,
+        this.refreshOperationalDiagnostics
+      );
+      return;
+    }
+
+    this.activeView = view;
+    this.persistShellState();
+    void this.lifecycle.ensureDataForView(
+      view,
+      this.refreshWorkspaceOverview,
+      this.refreshContentReads,
+      this.refreshRuntimeReads,
+      this.refreshOperationalDiagnostics
+    );
+  }
+
+  onAutoRefreshSettingsChanged(): void {
+    this.workspaceState.autoRefreshSeconds = Math.max(
+      3,
+      Number(this.workspaceState.autoRefreshSeconds) || 8
+    );
+    this.persistShellState();
+    this.lifecycle.scheduleAutoRefresh(
+      this.refreshWorkspaceOverview,
+      this.refreshContentReads,
+      this.refreshRuntimeReads,
+      this.refreshOperationalDiagnostics
+    );
+  }
+
+  onActionAsync(action: () => Promise<unknown>): void {
+    void action()
+      .catch(() => undefined)
+      .finally(() => {
+        this.uiState.renderVersion.update(version => version + 1);
+        this.applicationRef.tick();
+      });
+  }
+
+  persistShellState(): void {
+    this.lifecycle.persistShellState();
+  }
+
+  getPersistedView(): AppView {
+    return this.activeView;
+  }
+}

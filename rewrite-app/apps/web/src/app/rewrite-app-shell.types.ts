@@ -1,3 +1,5 @@
+import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+
 export type AppView = "workspace" | "content" | "runtime" | "ops";
 
 export type SummaryCard = {
@@ -27,6 +29,24 @@ export type PersistedShellState = {
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   forceActivation: boolean;
+  adminUsername: string;
+  adminDisplayName: string;
+  adminSessionToken: string;
+  adminCreateUsername: string;
+  adminCreateDisplayName: string;
+  adminCreateRole: AdminRole;
+  adminCreateTenantKey: string;
+  adminCreateWorkspaceKey: string;
+  adminRoleTargetUserId: string;
+  adminRoleRole: AdminRole;
+  adminRoleTenantKey: string;
+  adminRoleWorkspaceKey: string;
+  adminRevokeTargetUserId: string;
+  adminRevokeRoleAssignmentId: string;
+  adminStatusTargetUserId: string;
+  adminStatusValue: AdminUserStatus;
+  adminResetTargetUserId: string;
+  showRawDebug: boolean;
   activeView: AppView;
 };
 

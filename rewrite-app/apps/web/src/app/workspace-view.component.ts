@@ -4,12 +4,20 @@ import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { JsonPanelComponent } from "./json-panel.component";
+import { RecordCollectionComponent } from "./record-collection.component";
+import { SummaryCardsComponent } from "./summary-cards.component";
 import { WorkspaceViewFacade } from "./workspace-view.facade";
 
 @Component({
   selector: "app-workspace-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, JsonPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    JsonPanelComponent,
+    SummaryCardsComponent,
+    RecordCollectionComponent
+  ],
   template: `
     <div class="stack">
       <article class="card">
@@ -58,8 +66,77 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button class="primary" type="button" (click)="view.createTenant()">Create Tenant</button>
           <button class="secondary" type="button" (click)="view.createWorkspace()">Create Workspace</button>
           <button class="ghost" type="button" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
+          <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
+          <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
         </div>
       </article>
+
+      <article class="card">
+        <h2>Workspace Snapshot</h2>
+        <p>Keep the current scope, active release line, participant load, and refresh state visible while you operate the slice.</p>
+        <app-summary-cards [cards]="view.workspaceCards"></app-summary-cards>
+      </article>
+
+      <app-record-collection
+        title="Workspace Action Queue"
+        subtitle="The next useful operator move for this scope, derived from the current overview."
+        [items]="view.workspaceActionItems"
+        (itemAction)="view.runWorkspaceSuggestion($event)"
+        emptyState="Refresh or bootstrap the workspace to derive the next action."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Tenant Directory"
+        subtitle="Platform-level tenant list for choosing the current operating scope."
+        [items]="view.tenantDirectoryItems"
+        (itemAction)="view.selectTenant($event)"
+        emptyState="Refresh the tenant directory after signing in as an operator."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Directory"
+        subtitle="Tenant-scoped workspace list for choosing the active workspace."
+        [items]="view.workspaceDirectoryItems"
+        (itemAction)="view.selectWorkspace($event)"
+        emptyState="Refresh the workspace directory for the selected tenant."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Scope Detail"
+        subtitle="Pinned tenant, workspace, and refresh settings without dropping into raw state."
+        [items]="view.workspaceScopeItems"
+        emptyState="Workspace scope is not configured yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Overview Detail"
+        subtitle="The current scope with release, import, and participant pressure in one card."
+        [items]="view.workspaceOverviewItems"
+        emptyState="Refresh the workspace overview to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Pressure"
+        subtitle="Current release line, participant pressure, and import activity at a glance."
+        [items]="view.workspacePressureItems"
+        emptyState="Refresh the workspace overview to inspect workspace pressure."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Activity"
+        subtitle="Latest operator and system events for this scope."
+        [items]="view.workspaceActivityItems"
+        (itemAction)="view.openActivitySubject($event)"
+        emptyState="No workspace activity yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Activity Detail"
+        subtitle="Recent event payloads without dropping into the raw activity timeline JSON."
+        [items]="view.workspaceActivityDetailItems"
+        (itemAction)="view.openActivitySubject($event)"
+        emptyState="No detailed workspace activity is loaded yet."
+      ></app-record-collection>
 
       <app-json-panel
         title="Workspace Overview"

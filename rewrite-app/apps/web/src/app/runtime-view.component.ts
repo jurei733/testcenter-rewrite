@@ -4,12 +4,20 @@ import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { JsonPanelComponent } from "./json-panel.component";
+import { RecordCollectionComponent } from "./record-collection.component";
 import { RuntimeViewFacade } from "./runtime-view.facade";
+import { SummaryCardsComponent } from "./summary-cards.component";
 
 @Component({
   selector: "app-runtime-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, JsonPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    JsonPanelComponent,
+    SummaryCardsComponent,
+    RecordCollectionComponent
+  ],
   template: `
     <div class="stack">
       <article class="card">
@@ -45,6 +53,20 @@ import { RuntimeViewFacade } from "./runtime-view.facade";
       </article>
 
       <article class="card">
+        <h2>Runtime Snapshot</h2>
+        <p>See the current participant state at a glance before diving into the detailed runtime payloads.</p>
+        <app-summary-cards [cards]="view.runtimeCards"></app-summary-cards>
+      </article>
+
+      <app-record-collection
+        title="Runtime Action Queue"
+        subtitle="Suggested next actions derived from the selected session, current run, and monitor blockers."
+        [items]="view.runtimeActionItems"
+        (itemAction)="view.runRuntimeSuggestion($event)"
+        emptyState="Refresh runtime reads to derive the next action."
+      ></app-record-collection>
+
+      <article class="card">
         <h2>Guided Flow</h2>
         <p>Drive the participant happy path end to end from sign-in to live runtime state.</p>
         <div class="actions">
@@ -52,6 +74,54 @@ import { RuntimeViewFacade } from "./runtime-view.facade";
           <button class="ghost" type="button" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
         </div>
       </article>
+
+      <app-record-collection
+        title="Participant Sessions"
+        subtitle="Known sessions, their latest run state, and release context."
+        [items]="view.participantSessionItems"
+        (itemAction)="view.selectParticipantSession($event)"
+        emptyState="No participant sessions loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Selected Participant Session"
+        subtitle="The active session with its release and group context."
+        [items]="view.participantSessionDetailItems"
+        (itemAction)="view.selectParticipantSession($event)"
+        emptyState="Load a participant session detail to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Participant Run History"
+        subtitle="Runs that belong to the selected participant session."
+        [items]="view.participantRunHistoryItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="No session run history loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Runtime State Detail"
+        subtitle="The current session-level runtime status and next action."
+        [items]="view.runtimeStateItems"
+        (itemAction)="view.selectParticipantSession($event)"
+        emptyState="Refresh runtime reads to inspect the current runtime state."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Current Run Detail"
+        subtitle="The active booklet and unit for the selected test run."
+        [items]="view.currentRunStateItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="No current run state loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Open Monitor Runs"
+        subtitle="Runs that currently keep the activation guard active."
+        [items]="view.openRunItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="No open runs are currently loaded."
+      ></app-record-collection>
 
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>

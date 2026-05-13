@@ -28,6 +28,7 @@ export class RewriteAppUiStateService {
   readonly runtime = createInitialShellRuntimeState();
 
   activeView: AppView = "workspace";
+  showRawDebug = false;
   autoRefreshHandle: number | null = null;
   foregroundRequestDepth = 0;
 }

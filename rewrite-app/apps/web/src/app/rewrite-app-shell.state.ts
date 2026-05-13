@@ -1,3 +1,5 @@
+import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+
 import type { ActivityFeedItem, SummaryCard } from "./rewrite-app-shell.types";
 
 export interface ShellOpsState {
@@ -9,6 +11,28 @@ export interface ShellOpsState {
   runtimeDiagnosticsView: string;
   runtimeConfigView: string;
   diagnosticsLoaded: boolean;
+  adminUsername: string;
+  adminDisplayName: string;
+  adminPassword: string;
+  adminSessionToken: string;
+  adminSessionView: string;
+  adminUsersView: string;
+  adminCreateUsername: string;
+  adminCreateDisplayName: string;
+  adminCreatePassword: string;
+  adminCreateRole: AdminRole;
+  adminCreateTenantKey: string;
+  adminCreateWorkspaceKey: string;
+  adminRoleTargetUserId: string;
+  adminRoleRole: AdminRole;
+  adminRoleTenantKey: string;
+  adminRoleWorkspaceKey: string;
+  adminRevokeTargetUserId: string;
+  adminRevokeRoleAssignmentId: string;
+  adminStatusTargetUserId: string;
+  adminStatusValue: AdminUserStatus;
+  adminResetTargetUserId: string;
+  adminResetPassword: string;
 }
 
 export interface ShellRuntimeState {
@@ -49,6 +73,8 @@ export interface ShellWorkspaceState {
   workspaceKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
+  tenantsView: string;
+  workspacesView: string;
   workspaceOverviewView: string;
   workspaceActivityView: string;
   workspaceLoaded: boolean;
@@ -68,7 +94,29 @@ export function createInitialShellOpsState(): ShellOpsState {
     runtimeMetricsView: 'Use "Refresh Diagnostics".',
     runtimeDiagnosticsView: 'Use "Refresh Diagnostics".',
     runtimeConfigView: 'Use "Refresh Diagnostics".',
-    diagnosticsLoaded: false
+    diagnosticsLoaded: false,
+    adminUsername: "admin",
+    adminDisplayName: "Platform Admin",
+    adminPassword: "",
+    adminSessionToken: "",
+    adminSessionView: "Use admin bootstrap or sign-in.",
+    adminUsersView: 'Use "Admin Users".',
+    adminCreateUsername: "workspace-admin",
+    adminCreateDisplayName: "Workspace Admin",
+    adminCreatePassword: "",
+    adminCreateRole: "workspace_admin",
+    adminCreateTenantKey: "demo-tenant",
+    adminCreateWorkspaceKey: "demo-workspace",
+    adminRoleTargetUserId: "",
+    adminRoleRole: "workspace_admin",
+    adminRoleTenantKey: "demo-tenant",
+    adminRoleWorkspaceKey: "demo-workspace",
+    adminRevokeTargetUserId: "",
+    adminRevokeRoleAssignmentId: "",
+    adminStatusTargetUserId: "",
+    adminStatusValue: "active",
+    adminResetTargetUserId: "",
+    adminResetPassword: ""
   };
 }
 
@@ -118,6 +166,8 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceKey: "demo-workspace",
     autoRefreshEnabled: true,
     autoRefreshSeconds: 8,
+    tenantsView: 'Use "Refresh Tenant Directory".',
+    workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
     workspaceLoaded: false

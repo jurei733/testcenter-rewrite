@@ -11,10 +11,12 @@ export class RewriteAppApiService {
   async send<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    extraHeaders: Record<string, string> = {}
   ): Promise<{ statusCode: number; payload: T }> {
     const headers: Record<string, string> = {
-      Accept: "application/json"
+      Accept: "application/json",
+      ...extraHeaders
     };
     const init: RequestInit = {
       method,

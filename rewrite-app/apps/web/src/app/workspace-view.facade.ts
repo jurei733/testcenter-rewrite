@@ -1,12 +1,34 @@
 import { Injectable, inject } from "@angular/core";
+import { Router } from "@angular/router";
 
-import { RewriteAppShellService } from "./rewrite-app-shell.service";
+import type {
+  GetWorkspaceOverviewResponse,
+  ListParticipantSessionsResponse,
+  ListTenantsResponse,
+  ListWorkspacesResponse,
+  ListWorkspaceActivityEventsResponse
+} from "@testcenter-rewrite-app/contracts";
+import type { SummaryCard } from "./rewrite-app-shell.types";
+import {
+  parseJsonDocument,
+  readNumberValue,
+  readStringValue
+} from "./rewrite-app-shell.readers";
+import type { RecordCollectionItem } from "./record-collection.component";
+import { RewriteAppContentService } from "./rewrite-app-content.service";
+import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
 @Injectable({ providedIn: "root" })
 export class WorkspaceViewFacade {
-  private readonly shell = inject(RewriteAppShellService);
+  private readonly contentService = inject(RewriteAppContentService);
+  private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly router = inject(Router);
   private readonly uiState = inject(RewriteAppUiStateService);
+  private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly workspaceService = inject(RewriteAppWorkspaceService);
 
   readonly workspace = this.uiState.workspace;
 
@@ -14,27 +36,681 @@ export class WorkspaceViewFacade {
     return this.uiState.workspace.workspaceActivityView;
   }
 
+  get workspaceActionItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetWorkspaceOverviewResponse>(
+      this.workspace.workspaceOverviewView
+    );
+    const detail = payload?.workspaceOverview;
+    const items: RecordCollectionItem[] = [];
+    const tenantKey = this.workspace.tenantKey.trim();
+    const workspaceKey = this.workspace.workspaceKey.trim();
+
+    if (!detail) {
+      items.push({
+        headline: "Bootstrap workspace scope",
+        subline: workspaceKey || "workspace key missing",
+        badges: ["setup", tenantKey ? "tenant ready" : "tenant missing"],
+        rows: [
+          {
+            label: "Tenant",
+            value: tenantKey || "enter a tenant key first"
+          },
+          {
+            label: "Workspace",
+            value: workspaceKey || "enter a workspace key first"
+          },
+          {
+            label: "Expected Result",
+            value: "Create or reuse the tenant and workspace, then load the overview"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { workspaceCommand: "bootstrapWorkspace" }
+      });
+      return items;
+    }
+
+    if (detail.sourcePackageCount === 0) {
+      items.push({
+        headline: "Start content intake",
+        subline: "No packages have been imported yet",
+        badges: ["content", "empty"],
+        rows: [
+          {
+            label: "Active Release",
+            value: detail.activeContentReleaseId ?? "none"
+          },
+          {
+            label: "Expected Result",
+            value: "Open Content with the current scope and load its read models"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { workspaceCommand: "openContent" }
+      });
+    } else if (!detail.activeContentReleaseId) {
+      items.push({
+        headline: "Finish release activation",
+        subline: `${detail.sourcePackageCount} package(s), ${detail.contentReleaseCount} release(s)`,
+        badges: ["content", "activation"],
+        rows: [
+          {
+            label: "Imports",
+            value: String(detail.importJobCount)
+          },
+          {
+            label: "Expected Result",
+            value: "Open Content to check readiness or activate a staged release"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { workspaceCommand: "openContent" }
+      });
+    }
+
+    if (detail.activeContentReleaseId && detail.participantSessionCount === 0) {
+      items.push({
+        headline: "Start participant runtime",
+        subline: detail.activeContentReleaseId,
+        badges: ["runtime", "no sessions"],
+        rows: [
+          {
+            label: "Participant Sessions",
+            value: "0"
+          },
+          {
+            label: "Expected Result",
+            value: "Open Runtime so a participant can sign in against the active release"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { workspaceCommand: "openRuntime" }
+      });
+    }
+
+    if (detail.openTestRunCount > 0) {
+      items.push({
+        headline: "Review open runtime blockers",
+        subline: `${detail.openTestRunCount} open run(s)`,
+        badges: ["runtime", "activation guard"],
+        rows: [
+          {
+            label: "Active Release",
+            value: detail.activeContentReleaseId ?? "none"
+          },
+          {
+            label: "Expected Result",
+            value: "Open Runtime and refresh monitor state for active runs"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { workspaceCommand: "openRuntime" }
+      });
+    }
+
+    items.push({
+      headline: "Refresh workspace overview",
+      subline: `${detail.sourcePackageCount} package(s), ${detail.participantSessionCount} participant session(s)`,
+      badges: ["read model"],
+      rows: [
+        {
+          label: "Latest Import",
+          value: detail.latestImportJobAt
+            ? this.formatDateTime(detail.latestImportJobAt)
+            : "none"
+        },
+        {
+          label: "Expected Result",
+          value: "Reload release, import, participant, and open-run counters"
+        }
+      ],
+      actionLabel: "Apply Suggestion",
+      actionPayload: { workspaceCommand: "refreshWorkspaceOverview" }
+    });
+
+    return items;
+  }
+
+  get workspaceOverviewItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetWorkspaceOverviewResponse>(
+      this.workspace.workspaceOverviewView
+    );
+    const detail = payload?.workspaceOverview;
+    if (!detail) {
+      return [];
+    }
+
+    return [
+      {
+        headline: detail.workspace.displayName,
+        subline: detail.workspace.workspaceKey,
+        badges: [
+          detail.activeContentReleaseId ?? "no active release",
+          `${detail.openTestRunCount} open run(s)`
+        ],
+        rows: [
+          {
+            label: "Tenant",
+            value: detail.tenant.tenantKey
+          },
+          {
+            label: "Packages / Imports",
+            value: `${detail.sourcePackageCount} / ${detail.importJobCount}`
+          },
+          {
+            label: "Releases / Sessions",
+            value: `${detail.contentReleaseCount} / ${detail.participantSessionCount}`
+          },
+          {
+            label: "Latest Import",
+            value: detail.latestImportJobAt
+              ? this.formatDateTime(detail.latestImportJobAt)
+              : "none"
+          }
+        ]
+      }
+    ];
+  }
+
+  get workspaceScopeItems(): RecordCollectionItem[] {
+    return [
+      {
+        headline: this.workspace.workspaceKey || "workspace not set",
+        subline: this.workspace.tenantKey || "tenant not set",
+        badges: [
+          this.workspace.autoRefreshEnabled ? "auto refresh on" : "auto refresh off",
+          `${this.workspace.autoRefreshSeconds}s`
+        ],
+        rows: [
+          {
+            label: "Tenant Key",
+            value: this.workspace.tenantKey || "n/a"
+          },
+          {
+            label: "Workspace Key",
+            value: this.workspace.workspaceKey || "n/a"
+          },
+          {
+            label: "Refresh Mode",
+            value: this.workspace.autoRefreshEnabled ? "automatic" : "manual"
+          },
+          {
+            label: "Refresh Interval",
+            value: `${this.workspace.autoRefreshSeconds}s`
+          }
+        ]
+      }
+    ];
+  }
+
+  get tenantDirectoryItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListTenantsResponse>(
+      this.workspace.tenantsView
+    );
+    return (payload?.items ?? []).map(tenant => ({
+      headline: tenant.displayName,
+      subline: tenant.tenantKey,
+      badges: [tenant.status],
+      rows: [
+        { label: "Tenant ID", value: tenant.tenantId },
+        { label: "Created", value: this.formatDateTime(tenant.createdAt) }
+      ],
+      selected: tenant.tenantKey === this.workspace.tenantKey,
+      actionLabel: "Use Tenant",
+      actionPayload: { tenantKey: tenant.tenantKey }
+    }));
+  }
+
+  get workspaceDirectoryItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListWorkspacesResponse>(
+      this.workspace.workspacesView
+    );
+    return (payload?.items ?? []).map(workspace => ({
+      headline: workspace.displayName,
+      subline: workspace.workspaceKey,
+      badges: [workspace.status],
+      rows: [
+        { label: "Workspace ID", value: workspace.workspaceId },
+        { label: "Tenant ID", value: workspace.tenantId },
+        { label: "Created", value: this.formatDateTime(workspace.createdAt) }
+      ],
+      selected: workspace.workspaceKey === this.workspace.workspaceKey,
+      actionLabel: "Use Workspace",
+      actionPayload: {
+        tenantKey: this.workspace.tenantKey,
+        workspaceKey: workspace.workspaceKey
+      }
+    }));
+  }
+
+  get workspacePressureItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetWorkspaceOverviewResponse>(
+      this.workspace.workspaceOverviewView
+    );
+    const detail = payload?.workspaceOverview;
+    if (!detail) {
+      return [];
+    }
+
+    return [
+      {
+        headline: detail.activeContentReleaseId ?? "no active release",
+        subline: `${detail.openTestRunCount} open run(s)`,
+        badges: [
+          `${detail.sourcePackageCount} package(s)`,
+          `${detail.importJobCount} import(s)`,
+          `${detail.contentReleaseCount} release(s)`
+        ],
+        rows: [
+          {
+            label: "Participant Sessions",
+            value: String(detail.participantSessionCount)
+          },
+          {
+            label: "Latest Import",
+            value: detail.latestImportJobAt
+              ? this.formatDateTime(detail.latestImportJobAt)
+              : "none"
+          },
+          {
+            label: "Workspace Status",
+            value: detail.workspace.status
+          },
+          {
+            label: "Tenant Status",
+            value: detail.tenant.status
+          }
+        ]
+      }
+    ];
+  }
+
+  get workspaceCards(): SummaryCard[] {
+    const payload = parseJsonDocument<GetWorkspaceOverviewResponse>(
+      this.workspace.workspaceOverviewView
+    );
+    const activeReleaseId =
+      readStringValue(payload, ["workspaceOverview", "activeContentReleaseId"]) ?? "none";
+    const sourcePackageCount =
+      readNumberValue(payload, ["workspaceOverview", "sourcePackageCount"]) ?? 0;
+    const importJobCount =
+      readNumberValue(payload, ["workspaceOverview", "importJobCount"]) ?? 0;
+    const participantSessionCount =
+      readNumberValue(payload, ["workspaceOverview", "participantSessionCount"]) ?? 0;
+    const openTestRunCount =
+      readNumberValue(payload, ["workspaceOverview", "openTestRunCount"]) ?? 0;
+
+    return [
+      {
+        label: "Workspace",
+        headline: this.workspace.workspaceKey,
+        detail: this.workspace.tenantKey
+      },
+      {
+        label: "Active Release",
+        headline: activeReleaseId,
+        detail: `${sourcePackageCount} package(s) · ${importJobCount} import(s)`
+      },
+      {
+        label: "Participants",
+        headline: String(participantSessionCount),
+        detail: `${openTestRunCount} open run(s)`
+      },
+      {
+        label: "Auto Refresh",
+        headline: this.workspace.autoRefreshEnabled ? "enabled" : "paused",
+        detail: `Every ${this.workspace.autoRefreshSeconds}s`
+      }
+    ];
+  }
+
+  get workspaceActivityItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
+      this.workspace.workspaceActivityView
+    );
+    return payload?.items.slice(0, 8).map(item => ({
+      headline: item.activityEvent.summary,
+      subline: `${item.activityEvent.eventType} · ${this.formatDateTime(item.activityEvent.occurredAt)}`,
+      badges: [
+        item.activityEvent.subjectType,
+        item.activityEvent.actorId ?? "system"
+      ],
+      rows: [
+        { label: "Subject", value: item.activityEvent.subjectId },
+        { label: "Event Id", value: item.activityEvent.activityEventId }
+      ],
+      selected: this.isActivitySubjectSelected(
+        item.activityEvent.subjectType,
+        item.activityEvent.subjectId
+      ),
+      actionLabel: this.getActivitySubjectActionLabel(item.activityEvent.subjectType),
+      actionPayload: {
+        subjectType: item.activityEvent.subjectType,
+        subjectId: item.activityEvent.subjectId,
+        participantSessionId:
+          readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
+        loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
+        currentUnitKey:
+          readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
+      }
+    })) ?? [];
+  }
+
+  get workspaceActivityDetailItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
+      this.workspace.workspaceActivityView
+    );
+    return (
+      payload?.items.slice(0, 5).map(item => {
+        const detailRows = Object.entries(item.activityEvent.details)
+          .slice(0, 4)
+          .map(([key, value]) => ({
+            label: this.humanizeKey(key),
+            value: this.stringifyValue(value)
+          }));
+
+        return {
+          headline: item.activityEvent.eventType,
+          subline: this.formatDateTime(item.activityEvent.occurredAt),
+          badges: [
+            item.activityEvent.subjectType,
+            item.activityEvent.actorId ?? "system"
+          ],
+          rows: [
+            { label: "Summary", value: item.activityEvent.summary },
+            { label: "Subject Id", value: item.activityEvent.subjectId },
+            ...detailRows
+          ],
+          selected: this.isActivitySubjectSelected(
+            item.activityEvent.subjectType,
+            item.activityEvent.subjectId
+          ),
+          actionLabel: this.getActivitySubjectActionLabel(item.activityEvent.subjectType),
+          actionPayload: {
+            subjectType: item.activityEvent.subjectType,
+            subjectId: item.activityEvent.subjectId,
+            participantSessionId:
+              readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
+            loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
+            currentUnitKey:
+              readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
+          }
+        } satisfies RecordCollectionItem;
+      }) ?? []
+    );
+  }
+
   init(): void {
-    this.shell.setActiveView("workspace");
+    this.viewState.setActiveView("workspace");
   }
 
   persistState(): void {
-    this.shell.persistShellState();
+    this.viewState.persistShellState();
   }
 
   onAutoRefreshSettingsChanged(): void {
-    this.shell.onAutoRefreshSettingsChanged();
+    this.viewState.onAutoRefreshSettingsChanged();
   }
 
   createTenant(): void {
-    this.shell.onActionAsync(() => this.shell.createTenant());
+    this.viewState.onActionAsync(() => this.workspaceService.createTenant());
   }
 
   createWorkspace(): void {
-    this.shell.onActionAsync(() => this.shell.createWorkspace());
+    this.viewState.onActionAsync(() => this.workspaceService.createWorkspace());
   }
 
   refreshWorkspaceOverview(): void {
-    this.shell.onActionAsync(() => this.shell.refreshWorkspaceOverview());
+    this.viewState.onActionAsync(() => this.workspaceService.refreshWorkspaceOverview());
+  }
+
+  refreshTenantDirectory(): void {
+    this.viewState.onActionAsync(() => this.workspaceService.refreshTenantDirectory());
+  }
+
+  refreshWorkspaceDirectory(): void {
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.refreshWorkspaceDirectory()
+    );
+  }
+
+  selectTenant(item: RecordCollectionItem): void {
+    const tenantKey = item.actionPayload?.tenantKey?.trim();
+    if (!tenantKey) {
+      return;
+    }
+
+    this.workspace.tenantKey = tenantKey;
+    this.workspace.workspaceKey = "";
+    this.persistState();
+    this.refreshWorkspaceDirectory();
+  }
+
+  selectWorkspace(item: RecordCollectionItem): void {
+    const tenantKey = item.actionPayload?.tenantKey?.trim();
+    const workspaceKey = item.actionPayload?.workspaceKey?.trim();
+    if (!workspaceKey) {
+      return;
+    }
+
+    if (tenantKey) {
+      this.workspace.tenantKey = tenantKey;
+    }
+    this.workspace.workspaceKey = workspaceKey;
+    this.persistState();
+    this.refreshWorkspaceOverview();
+  }
+
+  runWorkspaceSuggestion(item: RecordCollectionItem): void {
+    switch (item.actionPayload?.workspaceCommand) {
+      case "bootstrapWorkspace":
+        this.viewState.onActionAsync(() => this.workspaceService.bootstrapWorkspaceFlow());
+        break;
+      case "openContent":
+        void this.router.navigateByUrl("/content");
+        this.viewState.onActionAsync(() => this.contentService.refreshContentReads(true));
+        break;
+      case "openRuntime":
+        void this.router.navigateByUrl("/runtime");
+        this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads(true));
+        break;
+      case "refreshWorkspaceOverview":
+      default:
+        this.refreshWorkspaceOverview();
+        break;
+    }
+  }
+
+  openActivitySubject(item: RecordCollectionItem): void {
+    const subjectType = item.actionPayload?.subjectType?.trim();
+    const subjectId = item.actionPayload?.subjectId?.trim();
+    if (!subjectType || !subjectId) {
+      return;
+    }
+
+    switch (subjectType) {
+      case "workspace":
+        void this.router.navigateByUrl("/workspace");
+        this.viewState.onActionAsync(() => this.workspaceService.refreshWorkspaceOverview());
+        return;
+      case "source_package":
+        this.openSourcePackageInContent(subjectId);
+        return;
+      case "import_job":
+        this.openImportJobInContent(subjectId);
+        return;
+      case "content_release":
+        this.openContentReleaseInContent(subjectId);
+        return;
+      case "participant_session":
+        this.openParticipantSessionInRuntime(
+          subjectId,
+          item.actionPayload?.loginKey?.trim() ?? ""
+        );
+        return;
+      case "test_run":
+        this.openTestRunInRuntime(
+          subjectId,
+          item.actionPayload?.participantSessionId?.trim() ?? "",
+          item.actionPayload?.loginKey?.trim() ?? "",
+          item.actionPayload?.currentUnitKey ?? ""
+        );
+        return;
+      default:
+        return;
+    }
+  }
+
+  private openSourcePackageInContent(sourcePackageId: string): void {
+    const content = this.uiState.content;
+    content.sourcePackageId = sourcePackageId;
+    this.persistState();
+    void this.router.navigateByUrl("/content");
+    this.viewState.onActionAsync(() => this.contentService.loadSourcePackageDetail());
+  }
+
+  private openImportJobInContent(importJobId: string): void {
+    const content = this.uiState.content;
+    content.importJobId = importJobId;
+    this.persistState();
+    void this.router.navigateByUrl("/content");
+    this.viewState.onActionAsync(() => this.contentService.loadImportJobDetail());
+  }
+
+  private openContentReleaseInContent(contentReleaseId: string): void {
+    const content = this.uiState.content;
+    content.contentReleaseId = contentReleaseId;
+    this.persistState();
+    void this.router.navigateByUrl("/content");
+    this.viewState.onActionAsync(async () => {
+      await this.contentService.loadContentReleaseActivationReadiness();
+      await this.contentService.loadContentReleaseDetail();
+    });
+  }
+
+  private openParticipantSessionInRuntime(
+    participantSessionId: string,
+    loginKey: string
+  ): void {
+    const runtime = this.uiState.runtime;
+    runtime.participantSessionId = participantSessionId;
+    runtime.testRunId = "";
+    runtime.currentUnitKey = "";
+    if (loginKey) {
+      runtime.loginKey = loginKey;
+    }
+
+    this.persistState();
+    void this.router.navigateByUrl("/runtime");
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.loadParticipantSessionDetail();
+      await this.runtimeService.refreshRuntimeReads(true);
+    });
+  }
+
+  private openTestRunInRuntime(
+    testRunId: string,
+    participantSessionId: string,
+    loginKey: string,
+    currentUnitKey: string
+  ): void {
+    const runtime = this.uiState.runtime;
+    const matchingParticipantSession = this.findParticipantSessionByTestRunId(testRunId);
+    const resolvedSession =
+      participantSessionId || matchingParticipantSession?.participantSessionId || "";
+    const resolvedLoginKey = loginKey || matchingParticipantSession?.loginKey || "";
+
+    runtime.testRunId = testRunId;
+    runtime.currentUnitKey = currentUnitKey;
+    if (resolvedSession) {
+      runtime.participantSessionId = resolvedSession;
+    }
+    if (resolvedLoginKey) {
+      runtime.loginKey = resolvedLoginKey;
+    }
+
+    this.persistState();
+    void this.router.navigateByUrl("/runtime");
+    if (!runtime.participantSessionId.trim()) {
+      return;
+    }
+
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.loadParticipantSessionDetail();
+      await this.runtimeService.refreshRuntimeReads(true);
+    });
+  }
+
+  private getActivitySubjectActionLabel(
+    subjectType: ListWorkspaceActivityEventsResponse["items"][number]["activityEvent"]["subjectType"]
+  ): string {
+    if (subjectType === "workspace") {
+      return "Refresh Scope";
+    }
+    return "Open Subject";
+  }
+
+  private isActivitySubjectSelected(subjectType: string, subjectId: string): boolean {
+    switch (subjectType) {
+      case "workspace":
+        return false;
+      case "source_package":
+        return this.uiState.content.sourcePackageId.trim() === subjectId;
+      case "import_job":
+        return this.uiState.content.importJobId.trim() === subjectId;
+      case "content_release":
+        return this.uiState.content.contentReleaseId.trim() === subjectId;
+      case "participant_session":
+        return this.uiState.runtime.participantSessionId.trim() === subjectId;
+      case "test_run":
+        return this.uiState.runtime.testRunId.trim() === subjectId;
+      default:
+        return false;
+    }
+  }
+
+  private findParticipantSessionByTestRunId(
+    testRunId: string
+  ): { participantSessionId: string; loginKey: string } | null {
+    const payload = parseJsonDocument<ListParticipantSessionsResponse>(
+      this.uiState.runtime.participantSessionsView
+    );
+    const matchingItem = payload?.items.find(
+      item => item.latestTestRun?.testRunId === testRunId
+    );
+    if (!matchingItem) {
+      return null;
+    }
+
+    return {
+      participantSessionId: matchingItem.participantSession.participantSessionId,
+      loginKey: matchingItem.participantSession.loginKey
+    };
+  }
+
+  private formatDateTime(value: string): string {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  private humanizeKey(value: string): string {
+    return value
+      .replace(/([A-Z])/g, " $1")
+      .replace(/[_-]/g, " ")
+      .replace(/^\w/, firstCharacter => firstCharacter.toUpperCase());
+  }
+
+  private stringifyValue(value: unknown): string {
+    if (value == null) {
+      return "null";
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[unserializable]";
+    }
   }
 }

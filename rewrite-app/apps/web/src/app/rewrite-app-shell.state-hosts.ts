@@ -85,8 +85,11 @@ export function createShellPersistenceStateHost(args: {
   workspaceState: ShellWorkspaceState;
   contentState: ShellContentState;
   runtimeState: ShellRuntimeState;
+  opsState: ShellOpsState;
   getActiveView(): AppView;
   setActiveView(nextValue: AppView): void;
+  getShowRawDebug(): boolean;
+  setShowRawDebug(nextValue: boolean): void;
 }): ShellPersistenceTarget {
   return {
     get tenantKey() {
@@ -178,6 +181,114 @@ export function createShellPersistenceStateHost(args: {
     },
     set forceActivation(nextValue) {
       args.contentState.forceActivation = nextValue;
+    },
+    get adminUsername() {
+      return args.opsState.adminUsername;
+    },
+    set adminUsername(nextValue) {
+      args.opsState.adminUsername = nextValue;
+    },
+    get adminDisplayName() {
+      return args.opsState.adminDisplayName;
+    },
+    set adminDisplayName(nextValue) {
+      args.opsState.adminDisplayName = nextValue;
+    },
+    get adminSessionToken() {
+      return args.opsState.adminSessionToken;
+    },
+    set adminSessionToken(nextValue) {
+      args.opsState.adminSessionToken = nextValue;
+    },
+    get adminCreateUsername() {
+      return args.opsState.adminCreateUsername;
+    },
+    set adminCreateUsername(nextValue) {
+      args.opsState.adminCreateUsername = nextValue;
+    },
+    get adminCreateDisplayName() {
+      return args.opsState.adminCreateDisplayName;
+    },
+    set adminCreateDisplayName(nextValue) {
+      args.opsState.adminCreateDisplayName = nextValue;
+    },
+    get adminCreateRole() {
+      return args.opsState.adminCreateRole;
+    },
+    set adminCreateRole(nextValue) {
+      args.opsState.adminCreateRole = nextValue;
+    },
+    get adminCreateTenantKey() {
+      return args.opsState.adminCreateTenantKey;
+    },
+    set adminCreateTenantKey(nextValue) {
+      args.opsState.adminCreateTenantKey = nextValue;
+    },
+    get adminCreateWorkspaceKey() {
+      return args.opsState.adminCreateWorkspaceKey;
+    },
+    set adminCreateWorkspaceKey(nextValue) {
+      args.opsState.adminCreateWorkspaceKey = nextValue;
+    },
+    get adminRoleTargetUserId() {
+      return args.opsState.adminRoleTargetUserId;
+    },
+    set adminRoleTargetUserId(nextValue) {
+      args.opsState.adminRoleTargetUserId = nextValue;
+    },
+    get adminRoleRole() {
+      return args.opsState.adminRoleRole;
+    },
+    set adminRoleRole(nextValue) {
+      args.opsState.adminRoleRole = nextValue;
+    },
+    get adminRoleTenantKey() {
+      return args.opsState.adminRoleTenantKey;
+    },
+    set adminRoleTenantKey(nextValue) {
+      args.opsState.adminRoleTenantKey = nextValue;
+    },
+    get adminRoleWorkspaceKey() {
+      return args.opsState.adminRoleWorkspaceKey;
+    },
+    set adminRoleWorkspaceKey(nextValue) {
+      args.opsState.adminRoleWorkspaceKey = nextValue;
+    },
+    get adminRevokeTargetUserId() {
+      return args.opsState.adminRevokeTargetUserId;
+    },
+    set adminRevokeTargetUserId(nextValue) {
+      args.opsState.adminRevokeTargetUserId = nextValue;
+    },
+    get adminRevokeRoleAssignmentId() {
+      return args.opsState.adminRevokeRoleAssignmentId;
+    },
+    set adminRevokeRoleAssignmentId(nextValue) {
+      args.opsState.adminRevokeRoleAssignmentId = nextValue;
+    },
+    get adminStatusTargetUserId() {
+      return args.opsState.adminStatusTargetUserId;
+    },
+    set adminStatusTargetUserId(nextValue) {
+      args.opsState.adminStatusTargetUserId = nextValue;
+    },
+    get adminStatusValue() {
+      return args.opsState.adminStatusValue;
+    },
+    set adminStatusValue(nextValue) {
+      args.opsState.adminStatusValue = nextValue;
+    },
+    get adminResetTargetUserId() {
+      return args.opsState.adminResetTargetUserId;
+    },
+    set adminResetTargetUserId(nextValue) {
+      args.opsState.adminResetTargetUserId = nextValue;
+    },
+    get showRawDebug() {
+      return args.getShowRawDebug();
+    },
+    set showRawDebug(nextValue) {
+      args.setShowRawDebug(nextValue);
     },
     get activeView() {
       return args.getActiveView();

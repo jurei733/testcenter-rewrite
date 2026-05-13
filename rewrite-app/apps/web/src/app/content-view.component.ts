@@ -5,11 +5,19 @@ import { FormsModule } from "@angular/forms";
 
 import { ContentViewFacade } from "./content-view.facade";
 import { JsonPanelComponent } from "./json-panel.component";
+import { RecordCollectionComponent } from "./record-collection.component";
+import { SummaryCardsComponent } from "./summary-cards.component";
 
 @Component({
   selector: "app-content-view",
   standalone: true,
-  imports: [CommonModule, FormsModule, JsonPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    JsonPanelComponent,
+    SummaryCardsComponent,
+    RecordCollectionComponent
+  ],
   template: `
     <div class="stack">
       <article class="card">
@@ -56,6 +64,44 @@ import { JsonPanelComponent } from "./json-panel.component";
       </article>
 
       <article class="card">
+        <h2>Content Snapshot</h2>
+        <p>Keep the latest package, import, release, and activation-guard state visible while you work through intake and rollout.</p>
+        <app-summary-cards [cards]="view.contentCards"></app-summary-cards>
+      </article>
+
+      <app-record-collection
+        title="Content Action Queue"
+        subtitle="Suggested next actions for intake, import diagnostics, retry, and release activation."
+        [items]="view.contentActionItems"
+        (itemAction)="view.runContentSuggestion($event)"
+        emptyState="Refresh content reads to derive the next action."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Packages"
+        subtitle="Recent uploads and their latest import state."
+        [items]="view.sourcePackageItems"
+        (itemAction)="view.selectSourcePackage($event)"
+        emptyState="No source packages yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Import Jobs"
+        subtitle="Recent import attempts, diagnostics, and current selection."
+        [items]="view.importJobItems"
+        (itemAction)="view.selectImportJob($event)"
+        emptyState="No import jobs yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Content Releases"
+        subtitle="Release lifecycle, activation status, and open-run pressure."
+        [items]="view.contentReleaseItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="No releases yet."
+      ></app-record-collection>
+
+      <article class="card">
         <h2>Detail Reads And Retry</h2>
         <p>Inspect individual package, import, and release history, or retry a failed import with corrected content.</p>
         <div class="actions">
@@ -67,6 +113,130 @@ import { JsonPanelComponent } from "./json-panel.component";
           <button class="ghost" type="button" (click)="view.retrySourcePackageImport()">Retry Failed Import</button>
         </div>
       </article>
+
+      <app-record-collection
+        title="Selected Source Package Detail"
+        subtitle="The currently selected package with its import and release footprint."
+        [items]="view.sourcePackageDetailItems"
+        (itemAction)="view.selectSourcePackage($event)"
+        emptyState="Load a source package detail to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Package Structure"
+        subtitle="Booklets and units declared directly on the selected source package."
+        [items]="view.sourcePackageStructureItems"
+        emptyState="No structured package layout is loaded for this source package."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Document Preview"
+        subtitle="A compact preview of the selected package payload without dropping to raw text."
+        [items]="view.sourceDocumentPreviewItems"
+        emptyState="No source document is loaded for this source package."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Package Import History"
+        subtitle="Every import attempt for the selected package."
+        [items]="view.sourcePackageImportHistoryItems"
+        (itemAction)="view.selectImportJob($event)"
+        emptyState="No import history loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Package Release History"
+        subtitle="Releases produced from the selected package."
+        [items]="view.sourcePackageReleaseHistoryItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="No release history loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Selected Import Job Detail"
+        subtitle="The chosen import with source and release linkage."
+        [items]="view.importJobDetailItems"
+        (itemAction)="view.selectImportJob($event)"
+        emptyState="Load an import job detail to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Import Diagnostics"
+        subtitle="Structured diagnostics for the selected import attempt."
+        [items]="view.importJobDiagnosticItems"
+        emptyState="No diagnostics are loaded for the selected import."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Import Linkage"
+        subtitle="Jump directly from the selected import to its source package or produced release."
+        [items]="view.importJobLinkageItems"
+        (itemAction)="view.openLinkedDetail($event)"
+        emptyState="No linked package or release is loaded for this import."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Release Activation Readiness"
+        subtitle="The selected release and its current guard result."
+        [items]="view.activationReadinessItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="Load release readiness to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Activation Blocking Runs"
+        subtitle="Runs that currently block superseding the active release."
+        [items]="view.activationBlockingRunItems"
+        (itemAction)="view.openBlockingRunInRuntime($event)"
+        emptyState="No blocking open runs are currently loaded."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Selected Release Detail"
+        subtitle="The chosen release with participant and lifecycle context."
+        [items]="view.contentReleaseDetailItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="Load a release detail to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Release Lineage"
+        subtitle="Follow the selected release back to its import, source package, or neighboring activated releases."
+        [items]="view.contentReleaseLineageItems"
+        (itemAction)="view.openLinkedDetail($event)"
+        emptyState="No linked lineage is loaded for this release."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Release Runtime Snapshot"
+        subtitle="Booklets and units that the selected release exposes to runtime."
+        [items]="view.contentReleaseRuntimeSnapshotItems"
+        emptyState="No runtime snapshot is loaded for this release."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Release Participant Sessions"
+        subtitle="Sessions currently attached to the selected release."
+        [items]="view.contentReleaseParticipantSessionItems"
+        (itemAction)="view.openParticipantSessionInRuntime($event)"
+        emptyState="No participant sessions are loaded for this release."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Release Test Runs"
+        subtitle="Runs created on the selected release, ready to jump into runtime."
+        [items]="view.contentReleaseTestRunItems"
+        (itemAction)="view.openTestRunInRuntime($event)"
+        emptyState="No test runs are loaded for this release."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Workspace Release History"
+        subtitle="The activation line around the selected release."
+        [items]="view.contentReleaseHistoryItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="No release history loaded yet."
+      ></app-record-collection>
 
       <article class="card">
         <h2>Guided Flows</h2>

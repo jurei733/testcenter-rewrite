@@ -5,6 +5,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/rou
 
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { AppShellFacade } from "./app-shell.facade";
+import { LiveContextComponent } from "./live-context.component";
 import { SummaryCardsComponent } from "./summary-cards.component";
 
 @Component({
@@ -16,7 +17,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
     RouterLink,
     RouterLinkActive,
     SummaryCardsComponent,
-    ActivityFeedComponent
+    ActivityFeedComponent,
+    LiveContextComponent
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.css"
