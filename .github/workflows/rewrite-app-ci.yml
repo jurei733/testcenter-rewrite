@@ -26,7 +26,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run ci
-      - run: npm run smoke:ui
+      - run: npm run smoke:ui:operator-auth
 
   verify-postgres:
     runs-on: ubuntu-latest

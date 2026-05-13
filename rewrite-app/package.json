@@ -32,6 +32,7 @@
     "smoke:startup:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs",
     "smoke:startup:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/smoke-startup.mjs",
     "smoke:ui": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke.sqlite node ./scripts/smoke-ui.mjs",
+    "smoke:ui:operator-auth": "npm run build && FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-auth.sqlite node ./scripts/smoke-ui.mjs",
     "test:integration": "npm run test:integration:memory && npm run test:integration:sqlite",
     "test:integration:memory": "npm run build && node --test apps/api/dist/apps/api/src/integration.test.js",
     "test:integration:sqlite": "rm -f ./.data/integration-sqlite.sqlite && npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js",

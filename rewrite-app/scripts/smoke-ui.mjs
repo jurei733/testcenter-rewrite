@@ -12,6 +12,16 @@ const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
+let smokeAdminSessionToken = "";
+
+const createSmokeFetchInit = () =>
+  smokeAdminSessionToken
+    ? {
+        headers: {
+          authorization: `Bearer ${smokeAdminSessionToken}`
+        }
+      }
+    : undefined;
 
 const allocatePort = () =>
   new Promise((resolvePromise, reject) => {
@@ -77,7 +87,7 @@ const pollJsonWithPredicate = async (url, predicate, timeoutMs = 20_000) => {
   let lastPayload = null;
 
   while (Date.now() < deadline) {
-    const response = await fetch(url);
+    const response = await fetch(url, createSmokeFetchInit());
     if (response.ok) {
       const payload = await response.json();
       lastPayload = payload;
@@ -140,8 +150,64 @@ try {
   const baseUrl = `http://127.0.0.1:${port}`;
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
+  const adminUsername = `ui-admin-${Date.now()}`;
+  const adminPassword = "ui-smoke-admin-secret";
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
+  };
+  const fillAndCommit = async (selector, value) => {
+    const locator = page.locator(selector);
+    await locator.click({ force: true });
+    await locator.evaluate((element, nextValue) => {
+      const value = String(nextValue);
+      if (element instanceof HTMLInputElement) {
+        const valueSetter = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value"
+        )?.set;
+        valueSetter?.call(element, value);
+      } else if (element instanceof HTMLTextAreaElement) {
+        const valueSetter = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value"
+        )?.set;
+        valueSetter?.call(element, value);
+      }
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }, String(value));
+    await locator.blur();
+    await page.waitForTimeout(50);
+  };
+  const selectAndCommit = async (selector, value) => {
+    const locator = page.locator(selector);
+    await locator.selectOption(String(value));
+    await locator.dispatchEvent("change");
+    await locator.blur();
+    await page.waitForTimeout(50);
+  };
+  const expectInputValue = async (selector, expectedValue) => {
+    await page.waitForFunction(
+      ([targetSelector, targetValue]) => {
+        const input = document.querySelector(targetSelector);
+        return input instanceof HTMLInputElement && input.value === targetValue;
+      },
+      [selector, expectedValue],
+      { timeout: 15_000 }
+    );
+  };
+  const waitForInputMinLength = async (selector, minLength) => {
+    await page.waitForFunction(
+      ([targetSelector, targetMinLength]) => {
+        const input = document.querySelector(targetSelector);
+        return (
+          input instanceof HTMLInputElement &&
+          input.value.length >= Number(targetMinLength)
+        );
+      },
+      [selector, minLength],
+      { timeout: 15_000 }
+    );
   };
   const waitForBusy = async stepLabel => {
     try {
@@ -150,6 +216,7 @@ try {
           const root = document.querySelector(".page");
           return root != null && root.classList.contains("is-busy");
         },
+        undefined,
         { timeout: 5_000 }
       );
       return true;
@@ -171,6 +238,7 @@ try {
           const root = document.querySelector(".page");
           return root != null && !root.classList.contains("is-busy");
         },
+        undefined,
         { timeout: 15_000 }
       );
       return true;
@@ -186,30 +254,173 @@ try {
     }
   };
   const clickAction = async name => {
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
     await waitForNotBusy(`${name}-before-click`);
-    await page.getByRole("button", { name }).click({ force: true });
+    const button = page.getByRole("button", { name, exact: true });
+    await button.scrollIntoViewIfNeeded();
+    await button.click({ force: true });
     const startedBusy = await waitForBusy(`${name}-after-click`);
     if (!startedBusy) {
       await page.waitForTimeout(150);
     }
     await waitForNotBusy(`${name}-after-click`);
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
+  };
+  const clickCardAction = async (cardTitle, buttonName, itemHeadline = null) => {
+    const stepName = [cardTitle, itemHeadline ?? buttonName]
+      .join("-")
+      .replaceAll(" ", "-")
+      .toLowerCase();
+    logStep(`action-${stepName}-start`);
+    await waitForNotBusy(`${stepName}-before-click`);
+    const card = page.locator("article.card").filter({
+      has: page.getByRole("heading", { name: cardTitle, exact: true })
+    });
+    const actionScope = itemHeadline
+      ? card.locator(".record-card").filter({
+          has: page.getByRole("heading", { name: itemHeadline, exact: true })
+        })
+      : card;
+    const button = actionScope
+      .getByRole("button", { name: buttonName, exact: true })
+      .first();
+    await button.scrollIntoViewIfNeeded();
+    await button.click({ force: true });
+    const startedBusy = await waitForBusy(`${stepName}-after-click`);
+    if (!startedBusy) {
+      await page.waitForTimeout(150);
+    }
+    await waitForNotBusy(`${stepName}-after-click`);
+    logStep(`action-${stepName}-done`);
   };
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/workspace$/);
   await page.waitForSelector("h1");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Action Queue" })
+    })
+    .waitFor();
   await waitForNotBusy("initial-load");
+  logStep("raw-debug-toggle");
+  assert.equal(
+    await page.locator(".raw-debug-panel").count(),
+    0,
+    "Raw debug panels should be hidden by default."
+  );
+  assert.equal(
+    await page.locator("#lastResponse").count(),
+    0,
+    "The full raw last response should be hidden by default."
+  );
+  await page.locator("#lastResponsePreview").waitFor();
+  await page.locator("#rawDebugToggle").click();
+  await page.locator(".raw-debug-panel").first().waitFor();
+  await page.locator("#lastResponse").waitFor();
+  await page.locator("#rawDebugToggle").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(".raw-debug-panel").length === 0 &&
+      document.querySelector("#lastResponse") == null,
+    undefined,
+    { timeout: 10_000 }
+  );
   if (await page.locator("#autoRefreshEnabled").isChecked()) {
     logStep("disable-auto-refresh");
     await page.locator("#autoRefreshEnabled").uncheck();
     await page.waitForTimeout(150);
   }
 
+  logStep("nav-ops");
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Ops Action Queue" })
+    })
+    .waitFor();
+  logStep("admin-bootstrap-sign-in");
+  await fillAndCommit("#adminUsername", adminUsername);
+  await fillAndCommit("#adminDisplayName", "UI Smoke Admin");
+  await fillAndCommit("#adminPassword", adminPassword);
+  await clickAction("Bootstrap / Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  const adminCurrentSessionResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/current-session`,
+    {
+      headers: {
+        authorization: `Bearer ${smokeAdminSessionToken}`
+      }
+    }
+  );
+  assert.equal(adminCurrentSessionResponse.status, 200);
+  const adminCurrentSessionPayload = await adminCurrentSessionResponse.json();
+  assert.equal(adminCurrentSessionPayload.adminUser.username, adminUsername);
+  assert.equal(
+    adminCurrentSessionPayload.roleAssignments.some(
+      assignment => assignment.role === "platform_admin"
+    ),
+    true
+  );
+  logStep("admin-current-session");
+  await clickAction("Current Session");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Session", exact: true })
+    })
+    .filter({ hasText: "platform_admin" })
+    .waitFor();
+  logStep("admin-users");
+  await clickAction("Admin Users");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: adminUsername })
+    .filter({ hasText: "platform_admin" })
+    .waitFor();
+  logStep("admin-sign-out");
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  smokeAdminSessionToken = "";
+  logStep("admin-sign-in");
+  await fillAndCommit("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  assert.notEqual(smokeAdminSessionToken.length, 0);
+  logStep("refresh-diagnostics");
+  await clickAction("Refresh Diagnostics");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Process Metrics", exact: true })
+    })
+    .waitFor();
+
+  logStep("nav-workspace-bootstrap");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Action Queue" })
+    })
+    .waitFor();
   logStep("fill-workspace-scope");
-  await page.locator("#tenantKey").fill(tenantKey);
-  await page.locator("#workspaceKey").fill(workspaceKey);
+  await fillAndCommit("#tenantKey", tenantKey);
+  await fillAndCommit("#workspaceKey", workspaceKey);
   logStep("bootstrap-workspace-flow");
-  await clickAction("Create Tenant");
-  await clickAction("Create Workspace");
+  await clickCardAction(
+    "Workspace Action Queue",
+    "Apply Suggestion",
+    "Bootstrap workspace scope"
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
     payload =>
@@ -221,12 +432,208 @@ try {
       payload.workspaceOverview.workspace != null &&
       payload.workspaceOverview.workspace.workspaceKey === workspaceKey
   );
+  logStep("workspace-directory-reads");
+  await clickAction("Refresh Tenant Directory");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Tenant Directory", exact: true })
+    })
+    .filter({ hasText: tenantKey })
+    .waitFor();
+  await clickAction("Refresh Workspace Directory");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
 
-  await page.getByRole("link", { name: "Content" }).click();
+  logStep("nav-ops-admin-management");
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
+  await page.locator("#adminCreateUsername").waitFor();
+  const generatedWorkspaceAdminUsername = `ui-workspace-admin-${Date.now()}`;
+  const workspaceAdminPassword = "ui-workspace-admin-secret";
+  const workspaceAdminResetPassword = "ui-workspace-admin-reset-secret";
+  await fillAndCommit("#adminCreateUsername", generatedWorkspaceAdminUsername);
+  await fillAndCommit("#adminCreateDisplayName", "UI Workspace Admin");
+  await fillAndCommit("#adminCreatePassword", workspaceAdminPassword);
+  await selectAndCommit("#adminCreateRole", "workspace_admin");
+  await fillAndCommit("#adminCreateTenantKey", tenantKey);
+  await fillAndCommit("#adminCreateWorkspaceKey", workspaceKey);
+  const workspaceAdminUsername = (
+    await page.locator("#adminCreateUsername").inputValue()
+  ).trim();
+  assert.ok(
+    workspaceAdminUsername.length > 0,
+    "UI smoke expected a non-empty admin username before creating a workspace admin."
+  );
+  logStep("create-workspace-admin");
+  await clickAction("Create Admin User");
+  const adminUsersAfterCreate = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === workspaceAdminUsername &&
+          item?.adminUser?.status === "active" &&
+          Array.isArray(item?.roleAssignments) &&
+          item.roleAssignments.some(
+            roleAssignment => roleAssignment?.role === "workspace_admin"
+          )
+      )
+  );
+  const workspaceAdminUserId = adminUsersAfterCreate.items.find(
+    item => item?.adminUser?.username === workspaceAdminUsername
+  )?.adminUser?.adminUserId;
+  assert.ok(
+    workspaceAdminUserId,
+    "UI smoke expected an adminUserId for the created workspace admin."
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: "workspace_admin" })
+    .waitFor();
+
+  await fillAndCommit("#adminRoleTargetUserId", workspaceAdminUserId);
+  await selectAndCommit("#adminRoleRole", "tenant_admin");
+  await fillAndCommit("#adminRoleTenantKey", tenantKey);
+  logStep("assign-tenant-admin-role");
+  await clickAction("Assign Role");
+  const adminUsersAfterRoleAssign = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          Array.isArray(item?.roleAssignments) &&
+          item.roleAssignments.some(
+            roleAssignment => roleAssignment?.role === "workspace_admin"
+          ) &&
+          item.roleAssignments.some(
+            roleAssignment => roleAssignment?.role === "tenant_admin"
+          )
+      )
+  );
+  const tenantRoleAssignmentId = adminUsersAfterRoleAssign.items
+    .find(item => item?.adminUser?.adminUserId === workspaceAdminUserId)
+    ?.roleAssignments.find(
+      roleAssignment => roleAssignment?.role === "tenant_admin"
+    )?.roleAssignmentId;
+  assert.ok(
+    tenantRoleAssignmentId,
+    "UI smoke expected a tenant admin role assignment id after assigning the role."
+  );
+
+  await fillAndCommit("#adminRevokeTargetUserId", workspaceAdminUserId);
+  await fillAndCommit("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
+  logStep("revoke-tenant-admin-role");
+  await clickAction("Revoke Role");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          Array.isArray(item?.roleAssignments) &&
+          item.roleAssignments.some(
+            roleAssignment => roleAssignment?.role === "workspace_admin"
+          ) &&
+          !item.roleAssignments.some(
+            roleAssignment => roleAssignment?.role === "tenant_admin"
+          )
+      )
+  );
+
+  await fillAndCommit("#adminResetTargetUserId", workspaceAdminUserId);
+  await fillAndCommit("#adminResetPassword", workspaceAdminResetPassword);
+  logStep("reset-workspace-admin-password");
+  await clickAction("Reset Password");
+  const oldWorkspaceAdminPasswordSignIn = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: workspaceAdminUsername,
+        password: workspaceAdminPassword
+      })
+    }
+  );
+  assert.equal(oldWorkspaceAdminPasswordSignIn.status, 401);
+  const resetWorkspaceAdminPasswordSignIn = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: workspaceAdminUsername,
+        password: workspaceAdminResetPassword
+      })
+    }
+  );
+  assert.equal(resetWorkspaceAdminPasswordSignIn.status, 200);
+
+  await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
+  await selectAndCommit("#adminStatusValue", "disabled");
+  logStep("disable-workspace-admin");
+  await clickAction("Update Status");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item?.adminUser?.status === "disabled"
+      )
+  );
+  const disabledWorkspaceAdminSignIn = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: workspaceAdminUsername,
+        password: workspaceAdminResetPassword
+      })
+    }
+  );
+  assert.equal(disabledWorkspaceAdminSignIn.status, 401);
+
+  logStep("nav-content");
+  await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);
   await page.locator("#sourceFileName").waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Content Action Queue" })
+    })
+    .waitFor();
   logStep("import-and-activate-flow");
-  await clickAction("Create Source Package");
+  await clickCardAction(
+    "Content Action Queue",
+    "Apply Suggestion",
+    "Create source package"
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
     payload =>
@@ -254,13 +661,19 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "active")
   );
 
-  await page.getByRole("link", { name: "Runtime" }).click();
+  logStep("nav-runtime");
+  await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
-  await waitForNotBusy("runtime-before-sign-in");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Runtime Action Queue" })
+    })
+    .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
-  await page.locator("#loginKey").fill(participantLoginKey);
+  await fillAndCommit("#loginKey", participantLoginKey);
   await clickAction("Sign In");
   const participantSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const hasParticipantSession = payload =>
@@ -284,6 +697,7 @@ try {
     );
   } catch {
     process.stdout.write("ui_smoke_step=participant-sign-in-retry\n");
+    await fillAndCommit("#loginKey", participantLoginKey);
     await clickAction("Sign In");
     participantSessionsPayload = await pollJsonWithPredicate(
       participantSessionsUrl,
@@ -298,8 +712,7 @@ try {
     participantSessionId,
     "UI smoke expected participantSessionId to be populated after the runtime happy path."
   );
-  await page.locator("#participantSessionId").fill(participantSessionId);
-  await waitForNotBusy("runtime-before-resume");
+  await fillAndCommit("#participantSessionId", participantSessionId);
   logStep("resume-session");
   await clickAction("Resume Session");
   const pausedCurrentState = await pollJsonWithPredicate(
@@ -313,7 +726,8 @@ try {
       "currentUnit" in payload.currentRunState &&
       payload.currentRunState.currentUnit?.unitKey != null
   );
-  await page.locator("#currentUnitKey").fill("unit-paused");
+  await fillAndCommit("#currentUnitKey", "unit-paused");
+  await expectInputValue("#currentUnitKey", "unit-paused");
   await clickAction("Save Paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
@@ -330,7 +744,7 @@ try {
   );
   const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
   assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
-  await page.locator("#testRunId").fill(pausedTestRunId);
+  await fillAndCommit("#testRunId", pausedTestRunId);
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(
@@ -354,12 +768,13 @@ try {
       payload.items.length > 0
   );
 
-  await page.getByRole("link", { name: "Content" }).click();
+  logStep("nav-content-blocked-activation");
+  await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);
   logStep("blocked-activation-flow");
-  await page.locator("#sourceFileName").fill("blocked-activation.xml");
-  await page.locator("#sourceMediaType").fill("application/xml");
-  await page.locator("#sourceDocument").fill(repairedImportSourceDocument);
+  await fillAndCommit("#sourceFileName", "blocked-activation.xml");
+  await fillAndCommit("#sourceMediaType", "application/xml");
+  await fillAndCommit("#sourceDocument", repairedImportSourceDocument);
   await clickAction("Create Source Package");
   await clickAction("Create Import Job");
   await clickAction("Activate Release");
@@ -373,10 +788,73 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "staged")
   );
 
+  logStep("open-blocking-run-in-runtime");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Activation Blocking Runs" })
+    })
+    .getByRole("button", { name: "Open In Runtime" })
+    .first()
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.testRunId === pausedTestRunId
+  );
+
+  logStep("nav-content-after-blocking-run");
+  await page.locator('[data-view-nav="content"]').click();
+  await page.waitForURL(/\/app\/content$/);
+
+  logStep("nav-workspace-activity");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  logStep("open-activity-subject");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Activity" })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "participant_session_resumed" })
+    .first()
+    .getByRole("button", { name: "Open Subject" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.testRunId === pausedTestRunId
+  );
+
+  logStep("nav-content-after-activity-subject");
+  await page.locator('[data-view-nav="content"]').click();
+  await page.waitForURL(/\/app\/content$/);
+
   await page.locator("#sourceFileName").waitFor();
-  await page.locator("#sourceFileName").fill("broken.json");
-  await page.locator("#sourceMediaType").fill("application/json");
-  await page.locator("#sourceDocument").fill(failedImportSourceDocument);
+  await fillAndCommit("#sourceFileName", "broken.json");
+  await fillAndCommit("#sourceMediaType", "application/json");
+  await expectInputValue("#sourceMediaType", "application/json");
+  await fillAndCommit("#sourceDocument", failedImportSourceDocument);
   await clickAction("Create Source Package");
 
   const failedSourcePackagesPayload = await pollJsonWithPredicate(
@@ -386,18 +864,22 @@ try {
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.some(
-        item => item?.sourcePackage?.fileName === "broken.json"
+        item =>
+          item?.sourcePackage?.mediaType === "application/json" &&
+          item?.sourcePackage?.sourceDocument === failedImportSourceDocument
       )
   );
   const failedSourcePackageId = failedSourcePackagesPayload.items.find(
-    item => item?.sourcePackage?.fileName === "broken.json"
+    item =>
+      item?.sourcePackage?.mediaType === "application/json" &&
+      item?.sourcePackage?.sourceDocument === failedImportSourceDocument
   )?.sourcePackage?.sourcePackageId;
   assert.ok(
     failedSourcePackageId,
     "UI smoke expected a source package id for the failed import scenario."
   );
 
-  await page.locator("#sourcePackageId").fill(failedSourcePackageId);
+  await fillAndCommit("#sourcePackageId", failedSourcePackageId);
   logStep("create-failed-import-job");
   await clickAction("Create Import Job");
   await pollJsonWithPredicate(
@@ -420,9 +902,10 @@ try {
       )
   );
 
-  await page.locator("#sourceFileName").fill("fixed.xml");
-  await page.locator("#sourceMediaType").fill("application/xml");
-  await page.locator("#sourceDocument").fill(repairedImportSourceDocument);
+  await fillAndCommit("#sourceFileName", "fixed.xml");
+  await fillAndCommit("#sourceMediaType", "application/xml");
+  await expectInputValue("#sourceMediaType", "application/xml");
+  await fillAndCommit("#sourceDocument", repairedImportSourceDocument);
   logStep("retry-failed-import");
   await clickAction("Retry Failed Import");
   await pollJsonWithPredicate(
@@ -444,9 +927,9 @@ try {
       payload.sourcePackageDetail.contentReleases.length > 0
   );
 
-  await page.getByRole("link", { name: "Runtime" }).click();
+  logStep("nav-runtime-before-complete");
+  await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
-  await waitForNotBusy("runtime-before-complete");
   logStep("refresh-runtime-before-complete");
   await clickAction("Refresh Runtime Reads");
   await pollJsonWithPredicate(
@@ -462,7 +945,7 @@ try {
       payload.currentRunState.testRun.testRunId === pausedTestRunId &&
       payload.currentRunState.testRun.status === "running"
   );
-  await page.locator("#testRunId").fill(pausedTestRunId);
+  await fillAndCommit("#testRunId", pausedTestRunId);
   logStep("complete-run");
   await clickAction("Complete Run");
   await pollJsonWithPredicate(
@@ -493,6 +976,9 @@ try {
     `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
   );
 } finally {
+  process.stdout.write("ui_smoke_step=teardown-browser\n");
   await browser?.close().catch(() => undefined);
+  process.stdout.write("ui_smoke_step=teardown-server\n");
   await stopChild(child);
+  process.stdout.write("ui_smoke_step=teardown-complete\n");
 }
