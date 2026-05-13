@@ -13,17 +13,20 @@ type JsonResponse<T> = {
   body: T;
 };
 
-const requestJson = async <T>(
+const requestJsonAt = async <T>(
+  rootUrl: string,
   path: string,
   init?: {
     method?: string;
+    headers?: Record<string, string>;
     body?: unknown;
   }
 ): Promise<JsonResponse<T>> => {
-  const response = await fetch(baseUrl + path, {
+  const response = await fetch(rootUrl + path, {
     method: init?.method ?? "GET",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(init?.headers ?? {})
     },
     body:
       init?.body === undefined ? undefined : JSON.stringify(init.body)
@@ -33,6 +36,15 @@ const requestJson = async <T>(
     body: (await response.json()) as T
   };
 };
+
+const requestJson = async <T>(
+  path: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: unknown;
+  }
+): Promise<JsonResponse<T>> => requestJsonAt<T>(baseUrl, path, init);
 
 const requestText = async (
   path: string,
@@ -50,6 +62,54 @@ const requestText = async (
   };
 };
 
+const closeServer = async (
+  targetServer: Awaited<ReturnType<typeof createProductionApiServer>>
+): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    targetServer.close(error => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+};
+
+const createIsolatedServer = async (
+  environment: Record<string, string>
+): Promise<{
+  server: Awaited<ReturnType<typeof createProductionApiServer>>;
+  baseUrl: string;
+}> => {
+  const previousEnvironment = new Map(
+    Object.keys(environment).map(key => [key, process.env[key]])
+  );
+
+  try {
+    for (const [key, value] of Object.entries(environment)) {
+      process.env[key] = value;
+    }
+    const isolatedServer = await createProductionApiServer();
+    await new Promise<void>(resolve => {
+      isolatedServer.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = isolatedServer.address() as AddressInfo;
+    return {
+      server: isolatedServer,
+      baseUrl: `http://127.0.0.1:${address.port}`
+    };
+  } finally {
+    for (const [key, value] of previousEnvironment) {
+      if (value == null) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+};
+
 before(async () => {
   server = await createProductionApiServer();
   await new Promise<void>(resolve => {
@@ -60,15 +120,790 @@ before(async () => {
 });
 
 after(async () => {
-  await new Promise<void>((resolve, reject) => {
-    server.close(error => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
+  await closeServer(server);
+});
+
+test("admin bootstrap and bearer session lifecycle", async () => {
+  const bootstrap = await requestJson<{
+    adminUser: {
+      adminUserId: string;
+      username: string;
+      displayName: string;
+      status: string;
+      passwordHash?: string;
+    };
+    roleAssignments: Array<{
+      roleAssignmentId: string;
+      adminUserId: string;
+      role: string;
+      tenantId: string | null;
+      workspaceId: string | null;
+    }>;
+  }>("/api/v1/admin/auth/bootstrap", {
+    method: "POST",
+    body: {
+      username: "Integration.Admin",
+      displayName: "Integration Admin",
+      password: "integration-secret"
+    }
   });
+
+  assert.equal(bootstrap.status, 201);
+  assert.equal(bootstrap.body.adminUser.username, "integration.admin");
+  assert.equal(bootstrap.body.adminUser.displayName, "Integration Admin");
+  assert.equal(bootstrap.body.adminUser.status, "active");
+  assert.equal(bootstrap.body.adminUser.passwordHash, undefined);
+  assert.equal(bootstrap.body.roleAssignments.length, 1);
+  assert.equal(bootstrap.body.roleAssignments[0]?.role, "platform_admin");
+  assert.equal(
+    bootstrap.body.roleAssignments[0]?.adminUserId,
+    bootstrap.body.adminUser.adminUserId
+  );
+  assert.equal(bootstrap.body.roleAssignments[0]?.tenantId, null);
+  assert.equal(bootstrap.body.roleAssignments[0]?.workspaceId, null);
+
+  const duplicateBootstrap = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/bootstrap",
+    {
+      method: "POST",
+      body: {
+        username: "Second.Admin",
+        password: "integration-secret"
+      }
+    }
+  );
+
+  assert.equal(duplicateBootstrap.status, 409);
+  assert.equal(duplicateBootstrap.body.error, "admin_bootstrap_already_completed");
+
+  const rejectedSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "wrong-secret"
+      }
+    }
+  );
+
+  assert.equal(rejectedSignIn.status, 401);
+  assert.equal(rejectedSignIn.body.error, "admin_credentials_invalid");
+
+  const signIn = await requestJson<{
+    adminUser: { adminUserId: string; username: string };
+    adminSession: { adminSessionId: string; token?: string; revokedAt: string | null };
+    roleAssignments: Array<{ role: string }>;
+    sessionToken: string;
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.adminUser.adminUserId, bootstrap.body.adminUser.adminUserId);
+  assert.equal(typeof signIn.body.sessionToken, "string");
+  assert.ok(signIn.body.sessionToken.length > 20);
+  assert.equal(signIn.body.adminSession.token, undefined);
+  assert.equal(signIn.body.adminSession.revokedAt, null);
+  assert.equal(signIn.body.roleAssignments[0]?.role, "platform_admin");
+
+  const missingSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session"
+  );
+
+  assert.equal(missingSession.status, 401);
+  assert.equal(missingSession.body.error, "admin_session_missing");
+
+  const currentSession = await requestJson<{
+    adminUser: { adminUserId: string; username: string };
+    adminSession: { adminSessionId: string; token?: string; revokedAt: string | null };
+    roleAssignments: Array<{ role: string }>;
+  }>("/api/v1/admin/auth/current-session", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(currentSession.status, 200);
+  assert.equal(
+    currentSession.body.adminSession.adminSessionId,
+    signIn.body.adminSession.adminSessionId
+  );
+  assert.equal(currentSession.body.adminSession.token, undefined);
+  assert.equal(currentSession.body.adminSession.revokedAt, null);
+  assert.equal(currentSession.body.roleAssignments[0]?.role, "platform_admin");
+
+  const missingDirectorySession = await requestJson<{ error: string }>(
+    "/api/v1/admin/users"
+  );
+
+  assert.equal(missingDirectorySession.status, 401);
+  assert.equal(missingDirectorySession.body.error, "admin_session_missing");
+
+  const adminUsers = await requestJson<{
+    items: Array<{
+      adminUser: { adminUserId: string; username: string; passwordHash?: string };
+      roleAssignments: Array<{ roleAssignmentId: string; role: string }>;
+    }>;
+  }>("/api/v1/admin/users", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(adminUsers.status, 200);
+  assert.equal(adminUsers.body.items.length, 1);
+  assert.equal(
+    adminUsers.body.items[0]?.adminUser.adminUserId,
+    bootstrap.body.adminUser.adminUserId
+  );
+  assert.equal(adminUsers.body.items[0]?.adminUser.username, "integration.admin");
+  assert.equal(adminUsers.body.items[0]?.adminUser.passwordHash, undefined);
+  assert.equal(
+    adminUsers.body.items[0]?.roleAssignments[0]?.role,
+    "platform_admin"
+  );
+
+  const selfRevokePlatformRole = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${bootstrap.body.adminUser.adminUserId}/role-assignments/${adminUsers.body.items[0]?.roleAssignments[0]?.roleAssignmentId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(selfRevokePlatformRole.status, 409);
+  assert.equal(
+    selfRevokePlatformRole.body.error,
+    "admin_self_revoke_platform_role_forbidden"
+  );
+
+  const adminTenantKey = "admin-directory-tenant";
+  const adminWorkspaceKey = "admin-directory-workspace";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey: adminTenantKey, displayName: "Admin Directory Tenant" }
+  });
+  await requestJson(`/api/v1/tenants/${adminTenantKey}/workspaces`, {
+    method: "POST",
+    body: {
+      workspaceKey: adminWorkspaceKey,
+      displayName: "Admin Directory Workspace"
+    }
+  });
+
+  const listedTenants = await requestJson<{
+    items: Array<{ tenantKey: string; displayName: string }>;
+  }>("/api/v1/platform/tenants");
+
+  assert.equal(listedTenants.status, 200);
+  assert.equal(
+    listedTenants.body.items.some(
+      tenant =>
+        tenant.tenantKey === adminTenantKey &&
+        tenant.displayName === "Admin Directory Tenant"
+    ),
+    true
+  );
+
+  const listedWorkspaces = await requestJson<{
+    items: Array<{ workspaceKey: string; displayName: string }>;
+  }>(`/api/v1/tenants/${adminTenantKey}/workspaces`);
+
+  assert.equal(listedWorkspaces.status, 200);
+  assert.equal(listedWorkspaces.body.items.length, 1);
+  assert.equal(listedWorkspaces.body.items[0]?.workspaceKey, adminWorkspaceKey);
+  assert.equal(
+    listedWorkspaces.body.items[0]?.displayName,
+    "Admin Directory Workspace"
+  );
+
+  const createdAdminUser = await requestJson<{
+    adminUser: {
+      adminUserId: string;
+      username: string;
+      displayName: string;
+      status: string;
+      passwordHash?: string;
+    };
+    roleAssignments: Array<{
+      roleAssignmentId: string;
+      role: string;
+      tenantId: string | null;
+      workspaceId: string | null;
+    }>;
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      username: "Workspace.Admin",
+      displayName: "Workspace Admin",
+      password: "workspace-secret",
+      roleAssignments: [
+        {
+          role: "workspace_admin",
+          tenantKey: adminTenantKey,
+          workspaceKey: adminWorkspaceKey
+        }
+      ]
+    }
+  });
+
+  assert.equal(createdAdminUser.status, 201);
+  assert.equal(createdAdminUser.body.adminUser.username, "workspace.admin");
+  assert.equal(createdAdminUser.body.adminUser.displayName, "Workspace Admin");
+  assert.equal(createdAdminUser.body.adminUser.status, "active");
+  assert.equal(createdAdminUser.body.adminUser.passwordHash, undefined);
+  assert.equal(createdAdminUser.body.roleAssignments.length, 1);
+  assert.equal(createdAdminUser.body.roleAssignments[0]?.role, "workspace_admin");
+  assert.equal(typeof createdAdminUser.body.roleAssignments[0]?.tenantId, "string");
+  assert.equal(
+    typeof createdAdminUser.body.roleAssignments[0]?.workspaceId,
+    "string"
+  );
+
+  const duplicateRoleAssignment = await requestJson<{
+    roleAssignments: Array<{ role: string }>;
+  }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        role: "workspace_admin",
+        tenantKey: adminTenantKey,
+        workspaceKey: adminWorkspaceKey
+      }
+    }
+  );
+
+  assert.equal(duplicateRoleAssignment.status, 200);
+  assert.equal(
+    duplicateRoleAssignment.body.roleAssignments.filter(
+      roleAssignment => roleAssignment.role === "workspace_admin"
+    ).length,
+    1
+  );
+
+  const assignedTenantRole = await requestJson<{
+    roleAssignments: Array<{ roleAssignmentId: string; role: string }>;
+  }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        role: "tenant_admin",
+        tenantKey: adminTenantKey
+      }
+    }
+  );
+
+  assert.equal(assignedTenantRole.status, 200);
+  const tenantRoleAssignmentId = assignedTenantRole.body.roleAssignments.find(
+    roleAssignment => roleAssignment.role === "tenant_admin"
+  )?.roleAssignmentId;
+  assert.ok(
+    tenantRoleAssignmentId,
+    "Expected tenant admin role assignment to be created."
+  );
+  assert.equal(
+    assignedTenantRole.body.roleAssignments.filter(
+      roleAssignment => roleAssignment.role === "tenant_admin"
+    ).length,
+    1
+  );
+
+  const revokedTenantRole = await requestJson<{
+    roleAssignments: Array<{ roleAssignmentId: string; role: string }>;
+  }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments/${tenantRoleAssignmentId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(revokedTenantRole.status, 200);
+  assert.equal(
+    revokedTenantRole.body.roleAssignments.some(
+      roleAssignment => roleAssignment.role === "tenant_admin"
+    ),
+    false
+  );
+  assert.equal(
+    revokedTenantRole.body.roleAssignments.some(
+      roleAssignment => roleAssignment.role === "workspace_admin"
+    ),
+    true
+  );
+
+  const missingTenantRoleRevoke = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments/${tenantRoleAssignmentId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(missingTenantRoleRevoke.status, 404);
+  assert.equal(
+    missingTenantRoleRevoke.body.error,
+    "admin_role_assignment_not_found"
+  );
+
+  const resetPassword = await requestJson<{
+    adminUser: { adminUserId: string; username: string; passwordHash?: string };
+  }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/password`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: { password: "workspace-secret-reset" }
+  });
+
+  assert.equal(resetPassword.status, 200);
+  assert.equal(
+    resetPassword.body.adminUser.adminUserId,
+    createdAdminUser.body.adminUser.adminUserId
+  );
+  assert.equal(resetPassword.body.adminUser.passwordHash, undefined);
+
+  const oldPasswordSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "workspace.admin",
+        password: "workspace-secret"
+      }
+    }
+  );
+
+  assert.equal(oldPasswordSignIn.status, 401);
+  assert.equal(oldPasswordSignIn.body.error, "admin_credentials_invalid");
+
+  const resetPasswordSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "workspace.admin",
+        password: "workspace-secret-reset"
+      }
+    }
+  );
+
+  assert.equal(resetPasswordSignIn.status, 200);
+  assert.ok(resetPasswordSignIn.body.sessionToken.length > 20);
+
+  const selfDisable = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${bootstrap.body.adminUser.adminUserId}`,
+    {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: { status: "disabled" }
+    }
+  );
+
+  assert.equal(selfDisable.status, 409);
+  assert.equal(selfDisable.body.error, "admin_self_disable_forbidden");
+
+  const disabledAdminUser = await requestJson<{
+    adminUser: { displayName: string; status: string };
+  }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`, {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      displayName: "Disabled Workspace Admin",
+      status: "disabled"
+    }
+  });
+
+  assert.equal(disabledAdminUser.status, 200);
+  assert.equal(
+    disabledAdminUser.body.adminUser.displayName,
+    "Disabled Workspace Admin"
+  );
+  assert.equal(disabledAdminUser.body.adminUser.status, "disabled");
+
+  const disabledSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "workspace.admin",
+        password: "workspace-secret-reset"
+      }
+    }
+  );
+
+  assert.equal(disabledSignIn.status, 401);
+  assert.equal(disabledSignIn.body.error, "admin_credentials_invalid");
+
+  const signOut = await requestJson<{
+    adminSession: { adminSessionId: string; revokedAt: string | null };
+  }>("/api/v1/admin/auth/sign-out", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(signOut.status, 200);
+  assert.equal(signOut.body.adminSession.adminSessionId, signIn.body.adminSession.adminSessionId);
+  assert.equal(typeof signOut.body.adminSession.revokedAt, "string");
+
+  const revokedSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(revokedSession.status, 401);
+  assert.equal(revokedSession.body.error, "admin_session_invalid");
+});
+
+test("operator API can require a platform-admin bearer session", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        operatorAuthRequired: boolean;
+        environment: { firstSliceOperatorAuthRequired: boolean };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.operatorAuthRequired, true);
+    assert.equal(
+      config.body.runtimeConfig.environment.firstSliceOperatorAuthRequired,
+      true
+    );
+
+    const rejectedTenantCreate = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants",
+      {
+        method: "POST",
+        body: { tenantKey: "auth-required-tenant", displayName: "Auth Required" }
+      }
+    );
+
+    assert.equal(rejectedTenantCreate.status, 401);
+    assert.equal(rejectedTenantCreate.body.error, "admin_session_missing");
+
+    const rejectedTenantList = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants"
+    );
+
+    assert.equal(rejectedTenantList.status, 401);
+    assert.equal(rejectedTenantList.body.error, "admin_session_missing");
+
+    await requestJsonAt(isolated.baseUrl, "/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "Required.Admin",
+        displayName: "Required Admin",
+        password: "required-secret"
+      }
+    });
+    const signIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "required.admin",
+          password: "required-secret"
+        }
+      }
+    );
+    const adminHeaders = {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    };
+
+    const tenantCreate = await requestJsonAt<{ tenant: { tenantKey: string } }>(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: { tenantKey: "auth-required-tenant", displayName: "Auth Required" }
+      }
+    );
+
+    assert.equal(tenantCreate.status, 201);
+    assert.equal(tenantCreate.body.tenant.tenantKey, "auth-required-tenant");
+
+    const tenantList = await requestJsonAt<{
+      items: Array<{ tenantKey: string }>;
+    }>(isolated.baseUrl, "/api/v1/platform/tenants", { headers: adminHeaders });
+
+    assert.equal(tenantList.status, 200);
+    assert.equal(
+      tenantList.body.items.some(
+        tenant => tenant.tenantKey === "auth-required-tenant"
+      ),
+      true
+    );
+
+    await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          workspaceKey: "auth-required-workspace",
+          displayName: "Auth Required Workspace"
+        }
+      }
+    );
+
+    const workspaceList = await requestJsonAt<{
+      items: Array<{ workspaceKey: string }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      { headers: adminHeaders }
+    );
+
+    assert.equal(workspaceList.status, 200);
+    assert.equal(
+      workspaceList.body.items.some(
+        workspace => workspace.workspaceKey === "auth-required-workspace"
+      ),
+      true
+    );
+
+    const rejectedOverview = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace"
+    );
+
+    assert.equal(rejectedOverview.status, 401);
+    assert.equal(rejectedOverview.body.error, "admin_session_missing");
+
+    const overview = await requestJsonAt<{
+      workspaceOverview: { workspace: { workspaceKey: string } };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      { headers: adminHeaders }
+    );
+
+    assert.equal(overview.status, 200);
+    assert.equal(
+      overview.body.workspaceOverview.workspace.workspaceKey,
+      "auth-required-workspace"
+    );
+
+    const workspaceAdmin = await requestJsonAt<{
+      adminUser: { adminUserId: string; username: string };
+      roleAssignments: Array<{ role: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Workspace.Required.Admin",
+        displayName: "Workspace Required Admin",
+        password: "workspace-required-secret",
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace"
+          }
+        ]
+      }
+    });
+
+    assert.equal(workspaceAdmin.status, 201);
+    assert.equal(workspaceAdmin.body.adminUser.username, "workspace.required.admin");
+    assert.equal(workspaceAdmin.body.roleAssignments[0]?.role, "workspace_admin");
+
+    const workspaceAdminSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "workspace.required.admin",
+          password: "workspace-required-secret"
+        }
+      }
+    );
+    const workspaceAdminHeaders = {
+      authorization: `Bearer ${workspaceAdminSignIn.body.sessionToken}`
+    };
+
+    const scopedOverview = await requestJsonAt<{
+      workspaceOverview: { workspace: { workspaceKey: string } };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      { headers: workspaceAdminHeaders }
+    );
+
+    assert.equal(scopedOverview.status, 200);
+    assert.equal(
+      scopedOverview.body.workspaceOverview.workspace.workspaceKey,
+      "auth-required-workspace"
+    );
+
+    const rejectedWorkspaceListByWorkspaceAdmin = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      { headers: workspaceAdminHeaders }
+    );
+
+    assert.equal(rejectedWorkspaceListByWorkspaceAdmin.status, 403);
+    assert.equal(
+      rejectedWorkspaceListByWorkspaceAdmin.body.error,
+      "admin_role_required"
+    );
+
+    const rejectedWorkspaceCreateByWorkspaceAdmin = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/tenants/auth-required-tenant/workspaces", {
+      method: "POST",
+      headers: workspaceAdminHeaders,
+      body: {
+        workspaceKey: "workspace-admin-created",
+        displayName: "Workspace Admin Created"
+      }
+    });
+
+    assert.equal(rejectedWorkspaceCreateByWorkspaceAdmin.status, 403);
+    assert.equal(
+      rejectedWorkspaceCreateByWorkspaceAdmin.body.error,
+      "admin_role_required"
+    );
+
+    const rejectedTenantCreateByWorkspaceAdmin = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/platform/tenants", {
+      method: "POST",
+      headers: workspaceAdminHeaders,
+      body: {
+        tenantKey: "workspace-admin-tenant",
+        displayName: "Workspace Admin Tenant"
+      }
+    });
+
+    assert.equal(rejectedTenantCreateByWorkspaceAdmin.status, 403);
+    assert.equal(
+      rejectedTenantCreateByWorkspaceAdmin.body.error,
+      "admin_role_required"
+    );
+
+    const tenantAdmin = await requestJsonAt<{
+      adminUser: { username: string };
+      roleAssignments: Array<{ role: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Tenant.Required.Admin",
+        displayName: "Tenant Required Admin",
+        password: "tenant-required-secret",
+        roleAssignments: [
+          {
+            role: "tenant_admin",
+            tenantKey: "auth-required-tenant"
+          }
+        ]
+      }
+    });
+
+    assert.equal(tenantAdmin.status, 201);
+    assert.equal(tenantAdmin.body.adminUser.username, "tenant.required.admin");
+    assert.equal(tenantAdmin.body.roleAssignments[0]?.role, "tenant_admin");
+
+    const tenantAdminSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "tenant.required.admin",
+          password: "tenant-required-secret"
+        }
+      }
+    );
+
+    const tenantCreatedWorkspace = await requestJsonAt<{
+      workspace: { workspaceKey: string };
+    }>(isolated.baseUrl, "/api/v1/tenants/auth-required-tenant/workspaces", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+      },
+      body: {
+        workspaceKey: "tenant-admin-created",
+        displayName: "Tenant Admin Created"
+      }
+    });
+
+    assert.equal(tenantCreatedWorkspace.status, 201);
+    assert.equal(
+      tenantCreatedWorkspace.body.workspace.workspaceKey,
+      "tenant-admin-created"
+    );
+
+    const tenantAdminWorkspaceList = await requestJsonAt<{
+      items: Array<{ workspaceKey: string }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      {
+        headers: {
+          authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(tenantAdminWorkspaceList.status, 200);
+    assert.equal(
+      tenantAdminWorkspaceList.body.items.some(
+        workspace => workspace.workspaceKey === "tenant-admin-created"
+      ),
+      true
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
 });
 
 test("failed import can be retried on the same source package", async () => {

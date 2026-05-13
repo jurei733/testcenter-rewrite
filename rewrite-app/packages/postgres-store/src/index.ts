@@ -2,6 +2,9 @@ import { Pool, type QueryResultRow } from "pg";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -42,6 +45,51 @@ const mapWorkspace = (row: Row | undefined): Workspace | null =>
         workspaceKey: String(row.workspace_key),
         displayName: String(row.display_name),
         status: row.status as Workspace["status"],
+        createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapAdminUser = (row: Row | undefined): AdminUser | null =>
+  row
+    ? {
+        adminUserId: String(row.admin_user_id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        passwordHash: String(row.password_hash),
+        status: row.status as AdminUser["status"],
+        createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapAdminSession = (row: Row | undefined): AdminSession | null =>
+  row
+    ? {
+        adminSessionId: String(row.admin_session_id),
+        adminUserId: String(row.admin_user_id),
+        token: String(row.session_token),
+        createdAt: String(row.created_at),
+        expiresAt: String(row.expires_at),
+        revokedAt:
+          row.revoked_at === null || row.revoked_at === undefined
+            ? null
+            : String(row.revoked_at)
+      }
+    : null;
+
+const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | null =>
+  row
+    ? {
+        roleAssignmentId: String(row.role_assignment_id),
+        adminUserId: String(row.admin_user_id),
+        role: row.role as AdminRoleAssignment["role"],
+        tenantId:
+          row.tenant_id === null || row.tenant_id === undefined
+            ? null
+            : String(row.tenant_id),
+        workspaceId:
+          row.workspace_id === null || row.workspace_id === undefined
+            ? null
+            : String(row.workspace_id),
         createdAt: String(row.created_at)
       }
     : null;
@@ -166,7 +214,7 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 1;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 3;
 
 const migrations: PostgresMigration[] = [
   {
@@ -288,6 +336,49 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_test_runs_participant_session
         ON test_runs (participant_session_id);
     `
+  },
+  {
+    version: 2,
+    name: "add_admin_auth",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_users (
+        admin_user_id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        display_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        admin_session_id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL,
+        session_token TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        revoked_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_sessions_user
+        ON admin_sessions (admin_user_id);
+    `
+  },
+  {
+    version: 3,
+    name: "add_admin_role_assignments",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_role_assignments (
+        role_assignment_id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tenant_id TEXT,
+        workspace_id TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_role_assignments_user
+        ON admin_role_assignments (admin_user_id);
+    `
   }
 ];
 
@@ -405,12 +496,134 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   };
 
   return {
+    async listAdminUsers() {
+      return many(
+        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+         FROM admin_users
+         ORDER BY created_at ASC`,
+        [],
+        mapAdminUser
+      );
+    },
+    async getAdminUserById(adminUserId) {
+      return one(
+        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+         FROM admin_users
+         WHERE admin_user_id = $1`,
+        [adminUserId],
+        mapAdminUser
+      );
+    },
+    async getAdminUserByUsername(username) {
+      return one(
+        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+         FROM admin_users
+         WHERE username = $1`,
+        [username],
+        mapAdminUser
+      );
+    },
+    async saveAdminUser(adminUser) {
+      await pool.query(
+        `INSERT INTO admin_users (
+          admin_user_id, username, display_name, password_hash, status, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT(admin_user_id) DO UPDATE SET
+          username = EXCLUDED.username,
+          display_name = EXCLUDED.display_name,
+          password_hash = EXCLUDED.password_hash,
+          status = EXCLUDED.status,
+          created_at = EXCLUDED.created_at`,
+        [
+          adminUser.adminUserId,
+          adminUser.username,
+          adminUser.displayName,
+          adminUser.passwordHash,
+          adminUser.status,
+          adminUser.createdAt
+        ]
+      );
+    },
+    async listAdminRoleAssignmentsByUserId(adminUserId) {
+      return many(
+        `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+         FROM admin_role_assignments
+         WHERE admin_user_id = $1`,
+        [adminUserId],
+        mapAdminRoleAssignment
+      );
+    },
+    async saveAdminRoleAssignment(roleAssignment) {
+      await pool.query(
+        `INSERT INTO admin_role_assignments (
+          role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT(role_assignment_id) DO UPDATE SET
+          admin_user_id = EXCLUDED.admin_user_id,
+          role = EXCLUDED.role,
+          tenant_id = EXCLUDED.tenant_id,
+          workspace_id = EXCLUDED.workspace_id,
+          created_at = EXCLUDED.created_at`,
+        [
+          roleAssignment.roleAssignmentId,
+          roleAssignment.adminUserId,
+          roleAssignment.role,
+          roleAssignment.tenantId,
+          roleAssignment.workspaceId,
+          roleAssignment.createdAt
+        ]
+      );
+    },
+    async deleteAdminRoleAssignment(roleAssignmentId) {
+      await pool.query(
+        `DELETE FROM admin_role_assignments WHERE role_assignment_id = $1`,
+        [roleAssignmentId]
+      );
+    },
+    async getAdminSessionByToken(token) {
+      return one(
+        `SELECT admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+         FROM admin_sessions
+         WHERE session_token = $1`,
+        [token],
+        mapAdminSession
+      );
+    },
+    async saveAdminSession(adminSession) {
+      await pool.query(
+        `INSERT INTO admin_sessions (
+          admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT(admin_session_id) DO UPDATE SET
+          admin_user_id = EXCLUDED.admin_user_id,
+          session_token = EXCLUDED.session_token,
+          created_at = EXCLUDED.created_at,
+          expires_at = EXCLUDED.expires_at,
+          revoked_at = EXCLUDED.revoked_at`,
+        [
+          adminSession.adminSessionId,
+          adminSession.adminUserId,
+          adminSession.token,
+          adminSession.createdAt,
+          adminSession.expiresAt,
+          adminSession.revokedAt
+        ]
+      );
+    },
     async getTenantByKey(tenantKey) {
       return one(
         `SELECT tenant_id, tenant_key, display_name, status, created_at
          FROM tenants
          WHERE tenant_key = $1`,
         [tenantKey],
+        mapTenant
+      );
+    },
+    async listTenants() {
+      return many(
+        `SELECT tenant_id, tenant_key, display_name, status, created_at
+         FROM tenants`,
+        [],
         mapTenant
       );
     },
@@ -450,6 +663,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
          ORDER BY created_at ASC
          LIMIT 1`,
         [workspaceKey],
+        mapWorkspace
+      );
+    },
+    async listWorkspacesByTenantId(tenantId) {
+      return many(
+        `SELECT workspace_id, tenant_id, workspace_key, display_name, status, created_at
+         FROM workspaces
+         WHERE tenant_id = $1`,
+        [tenantId],
         mapWorkspace
       );
     },

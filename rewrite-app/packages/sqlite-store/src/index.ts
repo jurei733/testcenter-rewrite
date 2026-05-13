@@ -4,6 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -50,6 +53,55 @@ const mapWorkspace = (
         status: row.status as Workspace["status"],
         createdAt: String(row.created_at),
         tenant_key: String(row.tenant_key)
+      }
+    : null;
+
+const mapAdminUser = (row: Record<string, unknown> | undefined): AdminUser | null =>
+  row
+    ? {
+        adminUserId: String(row.admin_user_id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        passwordHash: String(row.password_hash),
+        status: row.status as AdminUser["status"],
+        createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapAdminSession = (
+  row: Record<string, unknown> | undefined
+): AdminSession | null =>
+  row
+    ? {
+        adminSessionId: String(row.admin_session_id),
+        adminUserId: String(row.admin_user_id),
+        token: String(row.session_token),
+        createdAt: String(row.created_at),
+        expiresAt: String(row.expires_at),
+        revokedAt:
+          row.revoked_at === null || row.revoked_at === undefined
+            ? null
+            : String(row.revoked_at)
+      }
+    : null;
+
+const mapAdminRoleAssignment = (
+  row: Record<string, unknown> | undefined
+): AdminRoleAssignment | null =>
+  row
+    ? {
+        roleAssignmentId: String(row.role_assignment_id),
+        adminUserId: String(row.admin_user_id),
+        role: row.role as AdminRoleAssignment["role"],
+        tenantId:
+          row.tenant_id === null || row.tenant_id === undefined
+            ? null
+            : String(row.tenant_id),
+        workspaceId:
+          row.workspace_id === null || row.workspace_id === undefined
+            ? null
+            : String(row.workspace_id),
+        createdAt: String(row.created_at)
       }
     : null;
 
@@ -179,7 +231,7 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 7;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 9;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -344,6 +396,49 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_workspace_activity_events_workspace
         ON workspace_activity_events (tenant_id, workspace_id, occurred_at);
     `
+  },
+  {
+    version: 8,
+    name: "add_admin_auth",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_users (
+        admin_user_id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        display_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS admin_sessions (
+        admin_session_id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL,
+        session_token TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        revoked_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_sessions_user
+        ON admin_sessions (admin_user_id);
+    `
+  },
+  {
+    version: 9,
+    name: "add_admin_role_assignments",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_role_assignments (
+        role_assignment_id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tenant_id TEXT,
+        workspace_id TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_role_assignments_user
+        ON admin_role_assignments (admin_user_id);
+    `
   }
 ];
 
@@ -453,6 +548,129 @@ export const createSqliteFirstSliceRepository = (
   applyMigrations(database);
 
   return {
+    async listAdminUsers() {
+      const rows = database
+        .prepare(
+          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+           FROM admin_users
+           ORDER BY created_at ASC`
+        )
+        .all() as Record<string, unknown>[];
+      return rows.map(row => mapAdminUser(row)).filter(Boolean) as AdminUser[];
+    },
+    async getAdminUserById(adminUserId) {
+      const row = database
+        .prepare(
+          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+           FROM admin_users
+           WHERE admin_user_id = ?`
+        )
+        .get(adminUserId) as Record<string, unknown> | undefined;
+      return mapAdminUser(row);
+    },
+    async getAdminUserByUsername(username) {
+      const row = database
+        .prepare(
+          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+           FROM admin_users
+           WHERE username = ?`
+        )
+        .get(username) as Record<string, unknown> | undefined;
+      return mapAdminUser(row);
+    },
+    async saveAdminUser(adminUser) {
+      database
+        .prepare(
+          `INSERT INTO admin_users (
+            admin_user_id, username, display_name, password_hash, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(admin_user_id) DO UPDATE SET
+            username = excluded.username,
+            display_name = excluded.display_name,
+            password_hash = excluded.password_hash,
+            status = excluded.status,
+            created_at = excluded.created_at`
+        )
+        .run(
+          adminUser.adminUserId,
+          adminUser.username,
+          adminUser.displayName,
+          adminUser.passwordHash,
+          adminUser.status,
+          adminUser.createdAt
+        );
+    },
+    async listAdminRoleAssignmentsByUserId(adminUserId) {
+      const rows = database
+        .prepare(
+          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+           FROM admin_role_assignments
+           WHERE admin_user_id = ?`
+        )
+        .all(adminUserId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapAdminRoleAssignment(row))
+        .filter(Boolean) as AdminRoleAssignment[];
+    },
+    async saveAdminRoleAssignment(roleAssignment) {
+      database
+        .prepare(
+          `INSERT INTO admin_role_assignments (
+            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(role_assignment_id) DO UPDATE SET
+            admin_user_id = excluded.admin_user_id,
+            role = excluded.role,
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            created_at = excluded.created_at`
+        )
+        .run(
+          roleAssignment.roleAssignmentId,
+          roleAssignment.adminUserId,
+          roleAssignment.role,
+          roleAssignment.tenantId,
+          roleAssignment.workspaceId,
+          roleAssignment.createdAt
+        );
+    },
+    async deleteAdminRoleAssignment(roleAssignmentId) {
+      database
+        .prepare(`DELETE FROM admin_role_assignments WHERE role_assignment_id = ?`)
+        .run(roleAssignmentId);
+    },
+    async getAdminSessionByToken(token) {
+      const row = database
+        .prepare(
+          `SELECT admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+           FROM admin_sessions
+           WHERE session_token = ?`
+        )
+        .get(token) as Record<string, unknown> | undefined;
+      return mapAdminSession(row);
+    },
+    async saveAdminSession(adminSession) {
+      database
+        .prepare(
+          `INSERT INTO admin_sessions (
+            admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(admin_session_id) DO UPDATE SET
+            admin_user_id = excluded.admin_user_id,
+            session_token = excluded.session_token,
+            created_at = excluded.created_at,
+            expires_at = excluded.expires_at,
+            revoked_at = excluded.revoked_at`
+        )
+        .run(
+          adminSession.adminSessionId,
+          adminSession.adminUserId,
+          adminSession.token,
+          adminSession.createdAt,
+          adminSession.expiresAt,
+          adminSession.revokedAt
+        );
+    },
     async getTenantByKey(tenantKey) {
       const row = database
         .prepare(
@@ -462,6 +680,17 @@ export const createSqliteFirstSliceRepository = (
         )
         .get(tenantKey) as Record<string, unknown> | undefined;
       return mapTenant(row);
+    },
+    async listTenants() {
+      const rows = database
+        .prepare(
+          `SELECT tenant_id, tenant_key, display_name, status, created_at
+           FROM tenants`
+        )
+        .all() as Record<string, unknown>[];
+      return rows
+        .map(row => mapTenant(row))
+        .filter((tenant): tenant is Tenant => tenant !== null);
     },
     async saveTenant(tenant) {
       database
@@ -524,6 +753,26 @@ export const createSqliteFirstSliceRepository = (
             createdAt: workspace.createdAt
           }
         : null;
+    },
+    async listWorkspacesByTenantId(tenantId) {
+      const rows = database
+        .prepare(
+          `SELECT workspace_id, tenant_id, tenant_key, workspace_key, display_name, status, created_at
+           FROM workspaces
+           WHERE tenant_id = ?`
+        )
+        .all(tenantId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapWorkspace(row))
+        .filter((workspace): workspace is WorkspaceRow => workspace !== null)
+        .map(workspace => ({
+          workspaceId: workspace.workspaceId,
+          tenantId: workspace.tenantId,
+          workspaceKey: workspace.workspaceKey,
+          displayName: workspace.displayName,
+          status: workspace.status,
+          createdAt: workspace.createdAt
+        }));
     },
     async saveWorkspace(scope) {
       database

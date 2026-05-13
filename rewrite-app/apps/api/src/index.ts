@@ -8,13 +8,23 @@ import { fileURLToPath, URL } from "node:url";
 import {
   createFirstSliceServices,
   type FirstSliceError,
+  type FirstSliceRepository,
   firstSliceUseCases
 } from "@testcenter-rewrite-app/application";
 import {
+  type AdminSignInRequest,
+  type AdminSignInResponse,
+  type AdminSignOutResponse,
   type ApiErrorResponse,
   type ActivateContentReleaseRequest,
   type ActivateContentReleaseResponse,
+  type AssignAdminRoleRequest,
+  type AssignAdminRoleResponse,
+  type BootstrapAdminUserRequest,
+  type BootstrapAdminUserResponse,
   type CompleteTestRunResponse,
+  type CreateAdminUserRequest,
+  type CreateAdminUserResponse,
   type CreateImportJobRequest,
   type CreateImportJobResponse,
   type CreateSourcePackageRequest,
@@ -25,6 +35,7 @@ import {
   type CreateWorkspaceResponse,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
+  type GetAdminCurrentSessionResponse,
   type GetImportJobResponse,
   type GetParticipantSessionResponse,
   type GetRuntimeConfigResponse,
@@ -33,6 +44,9 @@ import {
   type GetWorkspaceOverviewResponse,
   type ListWorkspaceActivityEventsResponse,
   type ListImportJobsResponse,
+  type ListAdminUsersResponse,
+  type ListTenantsResponse,
+  type ListWorkspacesResponse,
   type ListParticipantSessionsResponse,
   type ListContentReleasesResponse,
   type ListSourcePackagesResponse,
@@ -46,14 +60,27 @@ import {
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
   type RuntimeOperationalEvent,
+  type ResetAdminUserPasswordRequest,
+  type ResetAdminUserPasswordResponse,
+  type RevokeAdminRoleResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
   type ParticipantSignInRequest,
   type ParticipantSignInResponse,
+  type UpdateAdminUserRequest,
+  type UpdateAdminUserResponse,
   productionApiRoutes,
+  type PublicAdminSession,
+  type PublicAdminUser,
+  type AdminUserDirectoryItem,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
-import { firstProductionSliceCapabilities } from "@testcenter-rewrite-app/domain";
+import {
+  type AdminRoleAssignment,
+  type AdminSession,
+  type AdminUser,
+  firstProductionSliceCapabilities
+} from "@testcenter-rewrite-app/domain";
 import {
   checkFileFirstSliceReadiness,
   createFileFirstSliceRepository
@@ -86,6 +113,28 @@ const parseIntegerEnvironmentValue = (
   }
 
   return parsedValue;
+};
+
+const parseBooleanEnvironmentFlag = (
+  envKey: string,
+  fallbackValue = false
+): boolean => {
+  const rawValue = process.env[envKey];
+  if (rawValue == null || rawValue === "") {
+    return fallbackValue;
+  }
+
+  const normalizedValue = rawValue.trim().toLowerCase();
+  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "optional"].includes(normalizedValue)) {
+    return false;
+  }
+
+  throw new Error(
+    `${envKey} must be a boolean flag like true/false, yes/no, on/off, or required/optional.`
+  );
 };
 
 const resolveStoreKind = (): RuntimeStoreKind => {
@@ -166,17 +215,23 @@ const createApiRuntime = async () => {
     "SHUTDOWN_DRAIN_DELAY_MS",
     DEFAULT_SHUTDOWN_DRAIN_DELAY_MS
   );
+  const operatorAuthRequired = parseBooleanEnvironmentFlag(
+    "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
+    false
+  );
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
   return {
     config: {
       port: configuredPort,
       shutdownDrainDelayMs,
+      operatorAuthRequired,
       environment: {
         firstSliceStore: store,
         firstSliceFilePresent: Boolean(process.env.FIRST_SLICE_FILE),
         firstSliceSqliteFilePresent: Boolean(process.env.FIRST_SLICE_SQLITE_FILE),
         firstSlicePostgresUrlPresent: Boolean(process.env.FIRST_SLICE_POSTGRES_URL),
+        firstSliceOperatorAuthRequired: operatorAuthRequired,
         appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
         appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP)
       }
@@ -528,6 +583,68 @@ const sendError = (
   sendJson<ApiErrorResponse>(response, statusCode, { error, message, details });
 };
 
+const toPublicAdminUser = (adminUser: AdminUser): PublicAdminUser => {
+  return {
+    adminUserId: adminUser.adminUserId,
+    username: adminUser.username,
+    displayName: adminUser.displayName,
+    status: adminUser.status,
+    createdAt: adminUser.createdAt
+  };
+};
+
+const toPublicAdminSession = (
+  adminSession: AdminSession
+): PublicAdminSession => {
+  return {
+    adminSessionId: adminSession.adminSessionId,
+    adminUserId: adminSession.adminUserId,
+    createdAt: adminSession.createdAt,
+    expiresAt: adminSession.expiresAt,
+    revokedAt: adminSession.revokedAt
+  };
+};
+
+const toAdminUserDirectoryItem = (item: {
+  adminUser: AdminUser;
+  roleAssignments: AdminUserDirectoryItem["roleAssignments"];
+}): AdminUserDirectoryItem => ({
+  adminUser: toPublicAdminUser(item.adminUser),
+  roleAssignments: item.roleAssignments
+});
+
+const readBearerToken = (request: IncomingMessage): string | null => {
+  const authorization = request.headers.authorization;
+  if (!authorization) {
+    return null;
+  }
+
+  const [scheme, token] = authorization.trim().split(/\s+/);
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token;
+};
+
+const requireBearerToken = (
+  request: IncomingMessage,
+  response: ServerResponse
+): string | null => {
+  const token = readBearerToken(request);
+  if (!token) {
+    sendError(
+      response,
+      401,
+      "admin_session_missing",
+      "Admin bearer session is required."
+    );
+    return null;
+  }
+
+  return token;
+};
+
 const readJsonBody = async <T>(request: IncomingMessage): Promise<T> => {
   const chunks: Buffer[] = [];
 
@@ -551,6 +668,18 @@ const createRoutePattern = (template: string): RegExp =>
       .replace(/:([A-Za-z0-9_]+)/g, "(?<$1>[^/]+)")}$`
   );
 
+const adminUserUpdatePattern = createRoutePattern(
+  productionApiRoutes.admin.updateUser
+);
+const adminUserResetPasswordPattern = createRoutePattern(
+  productionApiRoutes.admin.resetPassword
+);
+const adminUserAssignRolePattern = createRoutePattern(
+  productionApiRoutes.admin.assignRole
+);
+const adminUserRevokeRolePattern = createRoutePattern(
+  productionApiRoutes.admin.revokeRole
+);
 const workspaceCreatePattern = createRoutePattern(
   productionApiRoutes.workspace.createWorkspace
 );
@@ -620,6 +749,129 @@ const completeRunPattern = createRoutePattern(
 const monitorOpenRunsPattern = createRoutePattern(
   productionApiRoutes.monitor.openRuns
 );
+
+type OperatorAccessScope =
+  | { kind: "platform" }
+  | { kind: "tenant"; tenantKey: string }
+  | { kind: "workspace"; tenantKey: string; workspaceKey: string };
+
+const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
+  ["GET", workspaceOverviewPattern],
+  ["GET", workspaceActivityEventListPattern],
+  ["POST", sourcePackageCreatePattern],
+  ["GET", sourcePackageListPattern],
+  ["GET", sourcePackageDetailPattern],
+  ["POST", sourcePackageRetryImportPattern],
+  ["POST", importJobCreatePattern],
+  ["GET", importJobListPattern],
+  ["GET", importJobDetailPattern],
+  ["GET", participantSessionListPattern],
+  ["GET", participantSessionDetailPattern],
+  ["GET", contentReleaseListPattern],
+  ["GET", contentReleaseDetailPattern],
+  ["GET", contentReleaseActivationReadinessPattern],
+  ["POST", contentReleaseActivatePattern],
+  ["GET", monitorOpenRunsPattern]
+];
+
+const isOperatorApiRequest = (method: string, pathname: string): boolean => {
+  return resolveOperatorAccessScope(method, pathname) !== null;
+};
+
+const resolveOperatorAccessScope = (
+  method: string,
+  pathname: string
+): OperatorAccessScope | null => {
+  if (method === "POST" && pathname === productionApiRoutes.platform.createTenant) {
+    return { kind: "platform" };
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
+    return { kind: "platform" };
+  }
+
+  const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
+  if ((method === "POST" || method === "GET") && workspaceCreateMatch?.groups) {
+    const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
+    return tenantKey ? { kind: "tenant", tenantKey } : null;
+  }
+
+  for (const [expectedMethod, pattern] of workspaceScopedOperatorRouteChecks) {
+    const match = pattern.exec(pathname);
+    if (method !== expectedMethod || !match?.groups) {
+      continue;
+    }
+
+    const tenantKey = decodeRouteGroup(match.groups.tenantKey);
+    const workspaceKey = decodeRouteGroup(match.groups.workspaceKey);
+    if (!tenantKey || !workspaceKey) {
+      return null;
+    }
+
+    return { kind: "workspace", tenantKey, workspaceKey };
+  }
+
+  return null;
+};
+
+const hasOperatorAccess = async (
+  repository: FirstSliceRepository,
+  roleAssignments: AdminRoleAssignment[],
+  scope: OperatorAccessScope
+): Promise<boolean> => {
+  if (roleAssignments.some(roleAssignment => roleAssignment.role === "platform_admin")) {
+    return true;
+  }
+
+  if (scope.kind === "platform") {
+    return false;
+  }
+
+  const tenant = await repository.getTenantByKey(scope.tenantKey);
+  if (!tenant) {
+    return false;
+  }
+
+  if (
+    roleAssignments.some(
+      roleAssignment =>
+        roleAssignment.role === "tenant_admin" &&
+        roleAssignment.tenantId === tenant.tenantId
+    )
+  ) {
+    return true;
+  }
+
+  if (scope.kind === "tenant") {
+    return false;
+  }
+
+  const workspace = await repository.getWorkspaceByScope(
+    scope.tenantKey,
+    scope.workspaceKey
+  );
+  if (!workspace) {
+    return false;
+  }
+
+  return roleAssignments.some(
+    roleAssignment =>
+      roleAssignment.role === "workspace_admin" &&
+      roleAssignment.workspaceId === workspace.workspaceId
+  );
+};
+
+const describeOperatorAccessScope = (scope: OperatorAccessScope): string => {
+  if (scope.kind === "platform") {
+    return "platform";
+  }
+
+  if (scope.kind === "tenant") {
+    return `tenant:${scope.tenantKey}`;
+  }
+
+  return `workspace:${scope.tenantKey}/${scope.workspaceKey}`;
+};
 
 const frontendBuildDirectoryCandidates = [
   resolve(process.cwd(), "dist/apps/web/browser"),
@@ -756,8 +1008,53 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return "GET /manifest";
   }
 
+  if (method === "POST" && pathname === productionApiRoutes.admin.bootstrap) {
+    return `POST ${productionApiRoutes.admin.bootstrap}`;
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.admin.signIn) {
+    return `POST ${productionApiRoutes.admin.signIn}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.admin.currentSession) {
+    return `GET ${productionApiRoutes.admin.currentSession}`;
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.admin.signOut) {
+    return `POST ${productionApiRoutes.admin.signOut}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
+    return `GET ${productionApiRoutes.platform.listTenants}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.admin.listUsers) {
+    return `GET ${productionApiRoutes.admin.listUsers}`;
+  }
+
+  if (method === "POST" && pathname === productionApiRoutes.admin.createUser) {
+    return `POST ${productionApiRoutes.admin.createUser}`;
+  }
+
+  if (method === "PATCH" && adminUserUpdatePattern.test(pathname)) {
+    return `PATCH ${productionApiRoutes.admin.updateUser}`;
+  }
+
+  if (method === "POST" && adminUserResetPasswordPattern.test(pathname)) {
+    return `POST ${productionApiRoutes.admin.resetPassword}`;
+  }
+
+  if (method === "POST" && adminUserAssignRolePattern.test(pathname)) {
+    return `POST ${productionApiRoutes.admin.assignRole}`;
+  }
+
+  if (method === "DELETE" && adminUserRevokeRolePattern.test(pathname)) {
+    return `DELETE ${productionApiRoutes.admin.revokeRole}`;
+  }
+
   const routeChecks: Array<[string, RegExp, string]> = [
     ["POST", workspaceCreatePattern, productionApiRoutes.workspace.createWorkspace],
+    ["GET", workspaceCreatePattern, productionApiRoutes.workspace.listWorkspaces],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
     [
       "GET",
@@ -1014,6 +1311,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           runtimeConfig: {
             port: runtime.config.port,
             shutdownDrainDelayMs: runtime.config.shutdownDrainDelayMs,
+            operatorAuthRequired: runtime.config.operatorAuthRequired,
             storage: {
               kind: runtime.repositoryConfig.kind,
               location: redactStorageLocation(runtime.repositoryConfig.location),
@@ -1022,6 +1320,298 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             environment: runtime.config.environment
           }
         });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.bootstrap
+      ) {
+        const body = await readJsonBody<BootstrapAdminUserRequest>(request);
+        const { adminUser, roleAssignments } =
+          await services.adminAuth.bootstrapAdminUser(body);
+        sendJson<BootstrapAdminUserResponse>(response, 201, {
+          adminUser: toPublicAdminUser(adminUser),
+          roleAssignments
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.signIn
+      ) {
+        const body = await readJsonBody<AdminSignInRequest>(request);
+        const { adminUser, adminSession, roleAssignments } =
+          await services.adminAuth.signIn(body);
+        sendJson<AdminSignInResponse>(response, 200, {
+          adminUser: toPublicAdminUser(adminUser),
+          adminSession: toPublicAdminSession(adminSession),
+          roleAssignments,
+          sessionToken: adminSession.token
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.currentSession
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const { adminUser, adminSession, roleAssignments } =
+          await services.adminAuth.getCurrentSession({ sessionToken });
+        sendJson<GetAdminCurrentSessionResponse>(response, 200, {
+          adminUser: toPublicAdminUser(adminUser),
+          adminSession: toPublicAdminSession(adminSession),
+          roleAssignments
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.signOut
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const adminSession = await services.adminAuth.signOut({ sessionToken });
+        sendJson<AdminSignOutResponse>(response, 200, {
+          adminSession: toPublicAdminSession(adminSession)
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.listUsers
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const items = await services.adminDirectory.listAdminUsers({
+          sessionToken
+        });
+        sendJson<ListAdminUsersResponse>(response, 200, {
+          items: items.map(toAdminUserDirectoryItem)
+        });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.createUser
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const body = await readJsonBody<CreateAdminUserRequest>(request);
+        const item = await services.adminDirectory.createAdminUser({
+          sessionToken,
+          username: body.username,
+          displayName: body.displayName,
+          password: body.password,
+          roleAssignments: body.roleAssignments
+        });
+        sendJson<CreateAdminUserResponse>(
+          response,
+          201,
+          toAdminUserDirectoryItem(item)
+        );
+        return;
+      }
+
+      const adminUserUpdateMatch = adminUserUpdatePattern.exec(pathname);
+      if (request.method === "PATCH" && adminUserUpdateMatch?.groups) {
+        const adminUserId = decodeRouteGroup(
+          adminUserUpdateMatch.groups.adminUserId
+        );
+        if (!adminUserId) {
+          sendError(response, 400, "invalid_admin_user_id", "adminUserId is required.");
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const body = await readJsonBody<UpdateAdminUserRequest>(request);
+        const item = await services.adminDirectory.updateAdminUser({
+          sessionToken,
+          adminUserId,
+          displayName: body.displayName,
+          status: body.status
+        });
+        sendJson<UpdateAdminUserResponse>(
+          response,
+          200,
+          toAdminUserDirectoryItem(item)
+        );
+        return;
+      }
+
+      const adminUserResetPasswordMatch =
+        adminUserResetPasswordPattern.exec(pathname);
+      if (request.method === "POST" && adminUserResetPasswordMatch?.groups) {
+        const adminUserId = decodeRouteGroup(
+          adminUserResetPasswordMatch.groups.adminUserId
+        );
+        if (!adminUserId) {
+          sendError(response, 400, "invalid_admin_user_id", "adminUserId is required.");
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const body = await readJsonBody<ResetAdminUserPasswordRequest>(request);
+        const item = await services.adminDirectory.resetAdminUserPassword({
+          sessionToken,
+          adminUserId,
+          password: body.password
+        });
+        sendJson<ResetAdminUserPasswordResponse>(
+          response,
+          200,
+          toAdminUserDirectoryItem(item)
+        );
+        return;
+      }
+
+      const adminUserAssignRoleMatch = adminUserAssignRolePattern.exec(pathname);
+      if (request.method === "POST" && adminUserAssignRoleMatch?.groups) {
+        const adminUserId = decodeRouteGroup(
+          adminUserAssignRoleMatch.groups.adminUserId
+        );
+        if (!adminUserId) {
+          sendError(response, 400, "invalid_admin_user_id", "adminUserId is required.");
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const body = await readJsonBody<AssignAdminRoleRequest>(request);
+        const item = await services.adminDirectory.assignAdminRole({
+          sessionToken,
+          adminUserId,
+          role: body.role,
+          tenantKey: body.tenantKey,
+          workspaceKey: body.workspaceKey
+        });
+        sendJson<AssignAdminRoleResponse>(
+          response,
+          200,
+          toAdminUserDirectoryItem(item)
+        );
+        return;
+      }
+
+      const adminUserRevokeRoleMatch = adminUserRevokeRolePattern.exec(pathname);
+      if (request.method === "DELETE" && adminUserRevokeRoleMatch?.groups) {
+        const adminUserId = decodeRouteGroup(
+          adminUserRevokeRoleMatch.groups.adminUserId
+        );
+        const roleAssignmentId = decodeRouteGroup(
+          adminUserRevokeRoleMatch.groups.roleAssignmentId
+        );
+        if (!adminUserId) {
+          sendError(response, 400, "invalid_admin_user_id", "adminUserId is required.");
+          return;
+        }
+        if (!roleAssignmentId) {
+          sendError(
+            response,
+            400,
+            "invalid_role_assignment_id",
+            "roleAssignmentId is required."
+          );
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const item = await services.adminDirectory.revokeAdminRole({
+          sessionToken,
+          adminUserId,
+          roleAssignmentId
+        });
+        sendJson<RevokeAdminRoleResponse>(
+          response,
+          200,
+          toAdminUserDirectoryItem(item)
+        );
+        return;
+      }
+
+      if (
+        runtime.config.operatorAuthRequired &&
+        isOperatorApiRequest(request.method, pathname)
+      ) {
+        const operatorAccessScope = resolveOperatorAccessScope(
+          request.method,
+          pathname
+        );
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const { roleAssignments } = await services.adminAuth.getCurrentSession({
+          sessionToken
+        });
+        if (
+          !operatorAccessScope ||
+          !(await hasOperatorAccess(
+            runtime.repository,
+            roleAssignments,
+            operatorAccessScope
+          ))
+        ) {
+          sendError(
+            response,
+            403,
+            "admin_role_required",
+            "The admin session does not have the required role.",
+            {
+              requiredRoles: [
+                "platform_admin",
+                "tenant_admin",
+                "workspace_admin"
+              ],
+              scope: operatorAccessScope
+                ? describeOperatorAccessScope(operatorAccessScope)
+                : "unknown"
+            }
+          );
+          return;
+        }
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.platform.listTenants
+      ) {
+        const items = await services.platform.listTenants();
+        sendJson<ListTenantsResponse>(response, 200, { items });
         return;
       }
 
@@ -1036,6 +1626,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
+      if (request.method === "GET" && workspaceCreateMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
+        if (!tenantKey) {
+          sendError(response, 400, "invalid_tenant_key", "tenantKey is required.");
+          return;
+        }
+
+        const items = await services.platform.listWorkspaces({ tenantKey });
+        sendJson<ListWorkspacesResponse>(response, 200, { items });
+        return;
+      }
+
       if (request.method === "POST" && workspaceCreateMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
         if (!tenantKey) {

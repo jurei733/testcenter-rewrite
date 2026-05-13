@@ -1,5 +1,8 @@
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
   ContentRelease,
   ImportJob,
   ParticipantSession,
@@ -11,6 +14,10 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 type InMemoryFirstSliceState = {
+  adminUsers: Map<string, AdminUser>;
+  adminUsersByUsername: Map<string, AdminUser>;
+  adminRoleAssignments: Map<string, AdminRoleAssignment>;
+  adminSessionsByToken: Map<string, AdminSession>;
   tenants: Map<string, Tenant>;
   workspacesByScope: Map<string, Workspace>;
   workspacesByKey: Map<string, Workspace>;
@@ -23,6 +30,10 @@ type InMemoryFirstSliceState = {
 };
 
 const createInitialState = (): InMemoryFirstSliceState => ({
+  adminUsers: new Map(),
+  adminUsersByUsername: new Map(),
+  adminRoleAssignments: new Map(),
+  adminSessionsByToken: new Map(),
   tenants: new Map(),
   workspacesByScope: new Map(),
   workspacesByKey: new Map(),
@@ -41,8 +52,41 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
 
   return {
+    async listAdminUsers() {
+      return Array.from(state.adminUsers.values());
+    },
+    async getAdminUserById(adminUserId) {
+      return state.adminUsers.get(adminUserId) ?? null;
+    },
+    async getAdminUserByUsername(username) {
+      return state.adminUsersByUsername.get(username) ?? null;
+    },
+    async saveAdminUser(adminUser) {
+      state.adminUsers.set(adminUser.adminUserId, adminUser);
+      state.adminUsersByUsername.set(adminUser.username, adminUser);
+    },
+    async listAdminRoleAssignmentsByUserId(adminUserId) {
+      return Array.from(state.adminRoleAssignments.values()).filter(
+        roleAssignment => roleAssignment.adminUserId === adminUserId
+      );
+    },
+    async saveAdminRoleAssignment(roleAssignment) {
+      state.adminRoleAssignments.set(roleAssignment.roleAssignmentId, roleAssignment);
+    },
+    async deleteAdminRoleAssignment(roleAssignmentId) {
+      state.adminRoleAssignments.delete(roleAssignmentId);
+    },
+    async getAdminSessionByToken(token) {
+      return state.adminSessionsByToken.get(token) ?? null;
+    },
+    async saveAdminSession(adminSession) {
+      state.adminSessionsByToken.set(adminSession.token, adminSession);
+    },
     async getTenantByKey(tenantKey) {
       return state.tenants.get(tenantKey) ?? null;
+    },
+    async listTenants() {
+      return Array.from(state.tenants.values());
     },
     async saveTenant(tenant) {
       state.tenants.set(tenant.tenantKey, tenant);
@@ -54,6 +98,11 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getWorkspaceByWorkspaceKey(workspaceKey) {
       return state.workspacesByKey.get(workspaceKey) ?? null;
+    },
+    async listWorkspacesByTenantId(tenantId) {
+      return Array.from(state.workspacesByScope.values()).filter(
+        workspace => workspace.tenantId === tenantId
+      );
     },
     async saveWorkspace(scope) {
       state.workspacesByScope.set(

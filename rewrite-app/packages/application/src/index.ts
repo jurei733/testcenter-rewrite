@@ -1,6 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import type {
+  AdminRole,
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
+  AdminUserStatus,
   ContentReleaseActivationReadiness,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
@@ -29,7 +34,9 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 export type PlatformPort = {
+  listTenants(): Promise<Tenant[]>;
   createTenant(input: { tenantKey: string; displayName: string }): Promise<Tenant>;
+  listWorkspaces(input: { tenantKey: string }): Promise<Workspace[]>;
   createWorkspace(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -151,7 +158,78 @@ export type MonitorReadPort = {
   }): Promise<OpenMonitorRun[]>;
 };
 
+export type AdminAuthPort = {
+  bootstrapAdminUser(input: {
+    username: string;
+    displayName?: string;
+    password: string;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  signIn(input: {
+    username: string;
+    password: string;
+  }): Promise<{
+    adminUser: AdminUser;
+    adminSession: AdminSession;
+    roleAssignments: AdminRoleAssignment[];
+  }>;
+  getCurrentSession(input: {
+    sessionToken: string;
+  }): Promise<{
+    adminUser: AdminUser;
+    adminSession: AdminSession;
+    roleAssignments: AdminRoleAssignment[];
+  }>;
+  signOut(input: { sessionToken: string }): Promise<AdminSession>;
+};
+
+export type AdminDirectoryPort = {
+  listAdminUsers(input: {
+    sessionToken: string;
+  }): Promise<
+    Array<{
+      adminUser: AdminUser;
+      roleAssignments: AdminRoleAssignment[];
+    }>
+  >;
+  createAdminUser(input: {
+    sessionToken: string;
+    username: string;
+    displayName?: string;
+    password: string;
+    roleAssignments?: Array<{
+      role: AdminRole;
+      tenantKey?: string | null;
+      workspaceKey?: string | null;
+    }>;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  updateAdminUser(input: {
+    sessionToken: string;
+    adminUserId: string;
+    displayName?: string;
+    status?: AdminUserStatus;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  resetAdminUserPassword(input: {
+    sessionToken: string;
+    adminUserId: string;
+    password: string;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  assignAdminRole(input: {
+    sessionToken: string;
+    adminUserId: string;
+    role: AdminRole;
+    tenantKey?: string | null;
+    workspaceKey?: string | null;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  revokeAdminRole(input: {
+    sessionToken: string;
+    adminUserId: string;
+    roleAssignmentId: string;
+  }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+};
+
 export type FirstSlicePorts = {
+  adminAuth: AdminAuthPort;
+  adminDirectory: AdminDirectoryPort;
   platform: PlatformPort;
   contentIntake: ContentIntakePort;
   workspaceAdminRead: WorkspaceAdminReadPort;
@@ -178,7 +256,19 @@ export class FirstSliceError extends Error {
 }
 
 export const firstSliceUseCases = {
+  bootstrapAdminUser: "BootstrapAdminUser",
+  adminSignIn: "AdminSignIn",
+  getAdminCurrentSession: "GetAdminCurrentSession",
+  adminSignOut: "AdminSignOut",
+  listAdminUsers: "ListAdminUsers",
+  createAdminUser: "CreateAdminUser",
+  updateAdminUser: "UpdateAdminUser",
+  resetAdminUserPassword: "ResetAdminUserPassword",
+  assignAdminRole: "AssignAdminRole",
+  revokeAdminRole: "RevokeAdminRole",
+  listTenants: "ListTenants",
   createTenant: "CreateTenant",
+  listWorkspaces: "ListWorkspaces",
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
@@ -225,13 +315,26 @@ export type FirstSliceServices = FirstSlicePorts & {
 };
 
 export type FirstSliceRepository = {
+  listAdminUsers(): Promise<AdminUser[]>;
+  getAdminUserById(adminUserId: string): Promise<AdminUser | null>;
+  getAdminUserByUsername(username: string): Promise<AdminUser | null>;
+  saveAdminUser(adminUser: AdminUser): Promise<void>;
+  listAdminRoleAssignmentsByUserId(
+    adminUserId: string
+  ): Promise<AdminRoleAssignment[]>;
+  saveAdminRoleAssignment(roleAssignment: AdminRoleAssignment): Promise<void>;
+  deleteAdminRoleAssignment(roleAssignmentId: string): Promise<void>;
+  getAdminSessionByToken(token: string): Promise<AdminSession | null>;
+  saveAdminSession(adminSession: AdminSession): Promise<void>;
   getTenantByKey(tenantKey: string): Promise<Tenant | null>;
+  listTenants(): Promise<Tenant[]>;
   saveTenant(tenant: Tenant): Promise<void>;
   getWorkspaceByScope(
     tenantKey: string,
     workspaceKey: string
   ): Promise<Workspace | null>;
   getWorkspaceByWorkspaceKey(workspaceKey: string): Promise<Workspace | null>;
+  listWorkspacesByTenantId(tenantId: string): Promise<Workspace[]>;
   saveWorkspace(scope: {
     tenantKey: string;
     workspaceKey: string;
@@ -285,6 +388,257 @@ export type FirstSliceDependencies = {
   repository: FirstSliceRepository;
   idGenerator?: () => string;
   now?: () => string;
+  adminSessionTtlMs?: number;
+};
+
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
+const PASSWORD_HASH_KEY_LENGTH = 64;
+const ADMIN_ROLES: AdminRole[] = [
+  "platform_admin",
+  "tenant_admin",
+  "workspace_admin"
+];
+const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
+
+type AdminRoleAssignmentInput = {
+  role: AdminRole;
+  tenantKey?: string | null;
+  workspaceKey?: string | null;
+};
+
+type ResolvedAdminRoleScope = {
+  role: AdminRole;
+  tenantId: string | null;
+  workspaceId: string | null;
+};
+
+const normalizeAdminUsername = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(
+      400,
+      "admin_username_required",
+      "Admin username is required."
+    );
+  }
+
+  return value.trim().toLowerCase();
+};
+
+const requireAdminPassword = (value: unknown): string => {
+  if (typeof value !== "string" || value.length < 8) {
+    throw new FirstSliceError(
+      400,
+      "admin_password_policy_violation",
+      "Admin password must be at least 8 characters long."
+    );
+  }
+
+  return value;
+};
+
+const normalizeAdminDisplayName = (
+  value: unknown,
+  fallbackDisplayName: string
+): string => {
+  if (value === undefined || value === null) {
+    return fallbackDisplayName;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "admin_display_name_invalid",
+      "Admin display name must be a string."
+    );
+  }
+
+  return value.trim() || fallbackDisplayName;
+};
+
+const normalizeAdminUserStatus = (value: unknown): AdminUserStatus => {
+  if (
+    typeof value !== "string" ||
+    !ADMIN_USER_STATUSES.includes(value as AdminUserStatus)
+  ) {
+    throw new FirstSliceError(
+      400,
+      "admin_user_status_invalid",
+      "Admin user status must be 'active' or 'disabled'."
+    );
+  }
+
+  return value as AdminUserStatus;
+};
+
+const normalizeAdminRole = (value: unknown): AdminRole => {
+  if (typeof value !== "string" || !ADMIN_ROLES.includes(value as AdminRole)) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_invalid",
+      "Admin role must be a supported role."
+    );
+  }
+
+  return value as AdminRole;
+};
+
+const normalizeOptionalScopeKey = (value: unknown, fieldName: string): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "admin_role_scope_invalid",
+      `${fieldName} must be a string when provided.`
+    );
+  }
+
+  return value.trim() || null;
+};
+
+const normalizeAdminRoleAssignmentInputs = (
+  value: AdminRoleAssignmentInput[] | undefined
+): AdminRoleAssignmentInput[] => {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_assignments_invalid",
+      "Admin role assignments must be an array."
+    );
+  }
+
+  return value;
+};
+
+const requireAdminCredentialsPassword = (value: unknown): string => {
+  if (typeof value !== "string" || value === "") {
+    throw new FirstSliceError(
+      401,
+      "admin_credentials_invalid",
+      "Admin credentials are invalid."
+    );
+  }
+
+  return value;
+};
+
+const hashAdminPassword = (password: string): string => {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, PASSWORD_HASH_KEY_LENGTH);
+  return `scrypt$${salt}$${derivedKey.toString("hex")}`;
+};
+
+const verifyAdminPassword = (password: string, passwordHash: string): boolean => {
+  const [scheme, salt, expectedHash] = passwordHash.split("$");
+  if (scheme !== "scrypt" || !salt || !expectedHash) {
+    return false;
+  }
+
+  const expected = Buffer.from(expectedHash, "hex");
+  const actual = scryptSync(password, salt, expected.length);
+  if (actual.length !== expected.length) {
+    return false;
+  }
+
+  return timingSafeEqual(actual, expected);
+};
+
+const createAdminSessionToken = (): string => randomBytes(32).toString("base64url");
+
+const calculateAdminSessionExpiry = (
+  createdAt: string,
+  sessionTtlMs: number
+): string => new Date(Date.parse(createdAt) + sessionTtlMs).toISOString();
+
+const listAdminRoleAssignmentsForUser = async (
+  repository: FirstSliceRepository,
+  adminUserId: string
+): Promise<AdminRoleAssignment[]> =>
+  (await repository.listAdminRoleAssignmentsByUserId(adminUserId)).sort(
+    (left, right) => left.createdAt.localeCompare(right.createdAt)
+  );
+
+const requireActiveAdminSession = async (
+  repository: FirstSliceRepository,
+  sessionToken: string,
+  nowIso: string
+): Promise<{
+  adminUser: AdminUser;
+  adminSession: AdminSession;
+  roleAssignments: AdminRoleAssignment[];
+}> => {
+  if (!sessionToken.trim()) {
+    throw new FirstSliceError(
+      401,
+      "admin_session_missing",
+      "Admin bearer session is required."
+    );
+  }
+
+  const adminSession = await repository.getAdminSessionByToken(sessionToken);
+  if (
+    !adminSession ||
+    adminSession.revokedAt !== null ||
+    Date.parse(adminSession.expiresAt) <= Date.parse(nowIso)
+  ) {
+    throw new FirstSliceError(
+      401,
+      "admin_session_invalid",
+      "Admin session is invalid or expired."
+    );
+  }
+
+  const adminUser = await repository.getAdminUserById(adminSession.adminUserId);
+  if (!adminUser || adminUser.status !== "active") {
+    throw new FirstSliceError(
+      401,
+      "admin_session_invalid",
+      "Admin session is invalid or expired."
+    );
+  }
+
+  const roleAssignments = await listAdminRoleAssignmentsForUser(
+    repository,
+    adminUser.adminUserId
+  );
+
+  return { adminUser, adminSession, roleAssignments };
+};
+
+const requireAdminRole = (
+  roleAssignments: AdminRoleAssignment[],
+  requiredRoles: AdminRole[]
+): void => {
+  if (!roleAssignments.some(roleAssignment => requiredRoles.includes(roleAssignment.role))) {
+    throw new FirstSliceError(
+      403,
+      "admin_role_required",
+      "The admin session does not have the required role.",
+      { requiredRoles }
+    );
+  }
+};
+
+const requireAdminUser = async (
+  repository: FirstSliceRepository,
+  adminUserId: string
+): Promise<AdminUser> => {
+  const adminUser = await repository.getAdminUserById(adminUserId);
+  if (!adminUser) {
+    throw new FirstSliceError(
+      404,
+      "admin_user_not_found",
+      `Admin user '${adminUserId}' was not found.`
+    );
+  }
+
+  return adminUser;
 };
 
 const requireTenant = async (
@@ -322,6 +676,78 @@ const requireWorkspace = async (
 
   return workspace;
 };
+
+const resolveAdminRoleScope = async (
+  repository: FirstSliceRepository,
+  input: AdminRoleAssignmentInput
+): Promise<ResolvedAdminRoleScope> => {
+  const role = normalizeAdminRole(input.role);
+  const tenantKey = normalizeOptionalScopeKey(input.tenantKey, "tenantKey");
+  const workspaceKey = normalizeOptionalScopeKey(input.workspaceKey, "workspaceKey");
+
+  if (role === "platform_admin") {
+    if (tenantKey || workspaceKey) {
+      throw new FirstSliceError(
+        400,
+        "admin_role_scope_invalid",
+        "Platform admin role assignments must not include tenant or workspace scope."
+      );
+    }
+
+    return { role, tenantId: null, workspaceId: null };
+  }
+
+  if (!tenantKey) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_scope_invalid",
+      "Tenant-scoped admin roles require tenantKey."
+    );
+  }
+
+  if (role === "tenant_admin") {
+    if (workspaceKey) {
+      throw new FirstSliceError(
+        400,
+        "admin_role_scope_invalid",
+        "Tenant admin role assignments must not include workspaceKey."
+      );
+    }
+
+    const tenant = await requireTenant(repository, tenantKey);
+    return { role, tenantId: tenant.tenantId, workspaceId: null };
+  }
+
+  if (!workspaceKey) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_scope_invalid",
+      "Workspace admin role assignments require tenantKey and workspaceKey."
+    );
+  }
+
+  const workspace = await requireWorkspace(repository, tenantKey, workspaceKey);
+  return { role, tenantId: workspace.tenantId, workspaceId: workspace.workspaceId };
+};
+
+const isSameAdminRoleScope = (
+  roleAssignment: AdminRoleAssignment,
+  scope: ResolvedAdminRoleScope
+): boolean =>
+  roleAssignment.role === scope.role &&
+  roleAssignment.tenantId === scope.tenantId &&
+  roleAssignment.workspaceId === scope.workspaceId;
+
+const createAdminUserDirectoryItem = async (
+  repository: FirstSliceRepository,
+  adminUser: AdminUser
+): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }> => ({
+  adminUser,
+  roleAssignments: await listAdminRoleAssignmentsForUser(
+    repository,
+    adminUser.adminUserId
+  )
+});
 
 const requireSourcePackage = async (
   repository: FirstSliceRepository,
@@ -864,6 +1290,7 @@ export const createFirstSliceServices = (
   const repository = dependencies.repository;
   const idGenerator = dependencies.idGenerator ?? randomUUID;
   const now = dependencies.now ?? (() => new Date().toISOString());
+  const adminSessionTtlMs = dependencies.adminSessionTtlMs ?? ADMIN_SESSION_TTL_MS;
 
   const recordWorkspaceActivity = async (input: {
     tenantId: string;
@@ -999,7 +1426,319 @@ export const createFirstSliceServices = (
   };
 
   return {
+    adminAuth: {
+      async bootstrapAdminUser(input) {
+        const existingAdminUsers = await repository.listAdminUsers();
+        if (existingAdminUsers.length > 0) {
+          throw new FirstSliceError(
+            409,
+            "admin_bootstrap_already_completed",
+            "Admin bootstrap can only be completed before the first admin user exists."
+          );
+        }
+
+        const username = normalizeAdminUsername(input.username);
+        const password = requireAdminPassword(input.password);
+        const displayName = input.displayName?.trim() || username;
+        const timestamp = now();
+        const adminUser: AdminUser = {
+          adminUserId: idGenerator(),
+          username,
+          displayName,
+          passwordHash: hashAdminPassword(password),
+          status: "active",
+          createdAt: timestamp
+        };
+        const platformAdminRoleAssignment: AdminRoleAssignment = {
+          roleAssignmentId: idGenerator(),
+          adminUserId: adminUser.adminUserId,
+          role: "platform_admin",
+          tenantId: null,
+          workspaceId: null,
+          createdAt: timestamp
+        };
+
+        await repository.saveAdminUser(adminUser);
+        await repository.saveAdminRoleAssignment(platformAdminRoleAssignment);
+        return {
+          adminUser,
+          roleAssignments: [platformAdminRoleAssignment]
+        };
+      },
+      async signIn(input) {
+        const username = normalizeAdminUsername(input.username);
+        const password = requireAdminCredentialsPassword(input.password);
+        const adminUser = await repository.getAdminUserByUsername(username);
+        if (
+          !adminUser ||
+          adminUser.status !== "active" ||
+          !verifyAdminPassword(password, adminUser.passwordHash)
+        ) {
+          throw new FirstSliceError(
+            401,
+            "admin_credentials_invalid",
+            "Admin credentials are invalid."
+          );
+        }
+
+        const timestamp = now();
+        const adminSession: AdminSession = {
+          adminSessionId: idGenerator(),
+          adminUserId: adminUser.adminUserId,
+          token: createAdminSessionToken(),
+          createdAt: timestamp,
+          expiresAt: calculateAdminSessionExpiry(timestamp, adminSessionTtlMs),
+          revokedAt: null
+        };
+
+        await repository.saveAdminSession(adminSession);
+        return {
+          adminUser,
+          adminSession,
+          roleAssignments: await listAdminRoleAssignmentsForUser(
+            repository,
+            adminUser.adminUserId
+          )
+        };
+      },
+      async getCurrentSession(input) {
+        return requireActiveAdminSession(repository, input.sessionToken, now());
+      },
+      async signOut(input) {
+        const { adminSession } = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        const revokedSession: AdminSession = {
+          ...adminSession,
+          revokedAt: now()
+        };
+
+        await repository.saveAdminSession(revokedSession);
+        return revokedSession;
+      }
+    },
+    adminDirectory: {
+      async listAdminUsers(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminUsers = (await repository.listAdminUsers()).sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.username.localeCompare(right.username)
+        );
+
+        return Promise.all(
+          adminUsers.map(async adminUser => ({
+            adminUser,
+            roleAssignments: await listAdminRoleAssignmentsForUser(
+              repository,
+              adminUser.adminUserId
+            )
+          }))
+        );
+      },
+      async createAdminUser(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const username = normalizeAdminUsername(input.username);
+        const existingAdminUser = await repository.getAdminUserByUsername(username);
+        if (existingAdminUser) {
+          throw new FirstSliceError(
+            409,
+            "admin_username_conflict",
+            `Admin username '${username}' already exists.`
+          );
+        }
+
+        const password = requireAdminPassword(input.password);
+        const timestamp = now();
+        const adminUser: AdminUser = {
+          adminUserId: idGenerator(),
+          username,
+          displayName: normalizeAdminDisplayName(input.displayName, username),
+          passwordHash: hashAdminPassword(password),
+          status: "active",
+          createdAt: timestamp
+        };
+        const requestedRoleAssignments = normalizeAdminRoleAssignmentInputs(
+          input.roleAssignments
+        );
+
+        await repository.saveAdminUser(adminUser);
+
+        const savedRoleAssignments: AdminRoleAssignment[] = [];
+        for (const requestedRoleAssignment of requestedRoleAssignments) {
+          const scope = await resolveAdminRoleScope(repository, requestedRoleAssignment);
+          if (
+            savedRoleAssignments.some(roleAssignment =>
+              isSameAdminRoleScope(roleAssignment, scope)
+            )
+          ) {
+            continue;
+          }
+
+          const roleAssignment: AdminRoleAssignment = {
+            roleAssignmentId: idGenerator(),
+            adminUserId: adminUser.adminUserId,
+            role: scope.role,
+            tenantId: scope.tenantId,
+            workspaceId: scope.workspaceId,
+            createdAt: timestamp
+          };
+          await repository.saveAdminRoleAssignment(roleAssignment);
+          savedRoleAssignments.push(roleAssignment);
+        }
+
+        return createAdminUserDirectoryItem(repository, adminUser);
+      },
+      async updateAdminUser(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const nextStatus =
+          input.status === undefined
+            ? adminUser.status
+            : normalizeAdminUserStatus(input.status);
+        if (
+          nextStatus === "disabled" &&
+          adminUser.adminUserId === currentSession.adminUser.adminUserId
+        ) {
+          throw new FirstSliceError(
+            409,
+            "admin_self_disable_forbidden",
+            "The active admin user cannot disable their own account."
+          );
+        }
+
+        const updatedAdminUser: AdminUser = {
+          ...adminUser,
+          displayName:
+            input.displayName === undefined
+              ? adminUser.displayName
+              : normalizeAdminDisplayName(input.displayName, adminUser.username),
+          status: nextStatus
+        };
+        await repository.saveAdminUser(updatedAdminUser);
+
+        return createAdminUserDirectoryItem(repository, updatedAdminUser);
+      },
+      async resetAdminUserPassword(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const password = requireAdminPassword(input.password);
+        const updatedAdminUser: AdminUser = {
+          ...adminUser,
+          passwordHash: hashAdminPassword(password)
+        };
+        await repository.saveAdminUser(updatedAdminUser);
+
+        return createAdminUserDirectoryItem(repository, updatedAdminUser);
+      },
+      async assignAdminRole(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const scope = await resolveAdminRoleScope(repository, input);
+        const existingRoleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        if (
+          existingRoleAssignments.some(roleAssignment =>
+            isSameAdminRoleScope(roleAssignment, scope)
+          )
+        ) {
+          return { adminUser, roleAssignments: existingRoleAssignments };
+        }
+
+        const roleAssignment: AdminRoleAssignment = {
+          roleAssignmentId: idGenerator(),
+          adminUserId: adminUser.adminUserId,
+          role: scope.role,
+          tenantId: scope.tenantId,
+          workspaceId: scope.workspaceId,
+          createdAt: now()
+        };
+        await repository.saveAdminRoleAssignment(roleAssignment);
+
+        return createAdminUserDirectoryItem(repository, adminUser);
+      },
+      async revokeAdminRole(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const existingRoleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        const roleAssignment = existingRoleAssignments.find(
+          candidate => candidate.roleAssignmentId === input.roleAssignmentId
+        );
+        if (!roleAssignment) {
+          throw new FirstSliceError(
+            404,
+            "admin_role_assignment_not_found",
+            `Role assignment '${input.roleAssignmentId}' was not found for admin user '${adminUser.adminUserId}'.`
+          );
+        }
+
+        if (
+          adminUser.adminUserId === currentSession.adminUser.adminUserId &&
+          roleAssignment.role === "platform_admin"
+        ) {
+          throw new FirstSliceError(
+            409,
+            "admin_self_revoke_platform_role_forbidden",
+            "The active admin user cannot revoke their own platform admin role."
+          );
+        }
+
+        await repository.deleteAdminRoleAssignment(roleAssignment.roleAssignmentId);
+
+        return createAdminUserDirectoryItem(repository, adminUser);
+      }
+    },
     platform: {
+      async listTenants() {
+        return (await repository.listTenants()).sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.tenantKey.localeCompare(right.tenantKey)
+        );
+      },
       async createTenant(input) {
         const existingTenant = await repository.getTenantByKey(input.tenantKey);
         if (existingTenant) {
@@ -1019,6 +1758,14 @@ export const createFirstSliceServices = (
         };
         await repository.saveTenant(tenant);
         return tenant;
+      },
+      async listWorkspaces(input) {
+        const tenant = await requireTenant(repository, input.tenantKey);
+        return (await repository.listWorkspacesByTenantId(tenant.tenantId)).sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.workspaceKey.localeCompare(right.workspaceKey)
+        );
       },
       async createWorkspace(input) {
         const tenant = await requireTenant(repository, input.tenantKey);

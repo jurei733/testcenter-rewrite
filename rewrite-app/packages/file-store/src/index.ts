@@ -3,6 +3,9 @@ import { dirname } from "node:path";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
   ContentRelease,
   ImportJob,
   ParticipantSession,
@@ -14,6 +17,9 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 type PersistedFirstSliceState = {
+  adminUsers: Record<string, AdminUser>;
+  adminRoleAssignments: Record<string, AdminRoleAssignment>;
+  adminSessions: Record<string, AdminSession>;
   tenants: Record<string, Tenant>;
   workspacesByScope: Record<string, Workspace>;
   workspacesByKey: Record<string, Workspace>;
@@ -26,6 +32,9 @@ type PersistedFirstSliceState = {
 };
 
 const createInitialState = (): PersistedFirstSliceState => ({
+  adminUsers: {},
+  adminRoleAssignments: {},
+  adminSessions: {},
   tenants: {},
   workspacesByScope: {},
   workspacesByKey: {},
@@ -110,9 +119,63 @@ export const createFileFirstSliceRepository = (
   };
 
   return {
+    async listAdminUsers() {
+      const state = await getState();
+      return Object.values(state.adminUsers);
+    },
+    async getAdminUserById(adminUserId) {
+      const state = await getState();
+      return state.adminUsers[adminUserId] ?? null;
+    },
+    async getAdminUserByUsername(username) {
+      const state = await getState();
+      return (
+        Object.values(state.adminUsers).find(
+          adminUser => adminUser.username === username
+        ) ?? null
+      );
+    },
+    async saveAdminUser(adminUser) {
+      await mutate(state => {
+        state.adminUsers[adminUser.adminUserId] = adminUser;
+      });
+    },
+    async listAdminRoleAssignmentsByUserId(adminUserId) {
+      const state = await getState();
+      return Object.values(state.adminRoleAssignments).filter(
+        roleAssignment => roleAssignment.adminUserId === adminUserId
+      );
+    },
+    async saveAdminRoleAssignment(roleAssignment) {
+      await mutate(state => {
+        state.adminRoleAssignments[roleAssignment.roleAssignmentId] = roleAssignment;
+      });
+    },
+    async deleteAdminRoleAssignment(roleAssignmentId) {
+      await mutate(state => {
+        delete state.adminRoleAssignments[roleAssignmentId];
+      });
+    },
+    async getAdminSessionByToken(token) {
+      const state = await getState();
+      return (
+        Object.values(state.adminSessions).find(
+          adminSession => adminSession.token === token
+        ) ?? null
+      );
+    },
+    async saveAdminSession(adminSession) {
+      await mutate(state => {
+        state.adminSessions[adminSession.adminSessionId] = adminSession;
+      });
+    },
     async getTenantByKey(tenantKey) {
       const state = await getState();
       return state.tenants[tenantKey] ?? null;
+    },
+    async listTenants() {
+      const state = await getState();
+      return Object.values(state.tenants);
     },
     async saveTenant(tenant) {
       await mutate(state => {
@@ -126,6 +189,12 @@ export const createFileFirstSliceRepository = (
     async getWorkspaceByWorkspaceKey(workspaceKey) {
       const state = await getState();
       return state.workspacesByKey[workspaceKey] ?? null;
+    },
+    async listWorkspacesByTenantId(tenantId) {
+      const state = await getState();
+      return Object.values(state.workspacesByScope).filter(
+        workspace => workspace.tenantId === tenantId
+      );
     },
     async saveWorkspace(scope) {
       await mutate(state => {

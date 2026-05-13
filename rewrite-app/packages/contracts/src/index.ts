@@ -1,4 +1,9 @@
 import type {
+  AdminRole,
+  AdminRoleAssignment,
+  AdminSession,
+  AdminUser,
+  AdminUserStatus,
   ContentReleaseActivationReadiness,
   ContentRelease,
   ImportJob,
@@ -25,11 +30,26 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 export const productionApiRoutes = {
+  admin: {
+    bootstrap: "/api/v1/admin/auth/bootstrap",
+    signIn: "/api/v1/admin/auth/sign-in",
+    signOut: "/api/v1/admin/auth/sign-out",
+    currentSession: "/api/v1/admin/auth/current-session",
+    listUsers: "/api/v1/admin/users",
+    createUser: "/api/v1/admin/users",
+    updateUser: "/api/v1/admin/users/:adminUserId",
+    resetPassword: "/api/v1/admin/users/:adminUserId/password",
+    assignRole: "/api/v1/admin/users/:adminUserId/role-assignments",
+    revokeRole:
+      "/api/v1/admin/users/:adminUserId/role-assignments/:roleAssignmentId"
+  },
   platform: {
+    listTenants: "/api/v1/platform/tenants",
     createTenant: "/api/v1/platform/tenants"
   },
   workspace: {
     createWorkspace: "/api/v1/tenants/:tenantKey/workspaces",
+    listWorkspaces: "/api/v1/tenants/:tenantKey/workspaces",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
@@ -129,6 +149,47 @@ export type ParticipantSignInRequest = {
   loginKey: string;
 };
 
+export type PublicAdminUser = Omit<AdminUser, "passwordHash">;
+
+export type PublicAdminSession = Omit<AdminSession, "token">;
+
+export type PublicAdminRoleAssignment = AdminRoleAssignment;
+
+export type BootstrapAdminUserRequest = {
+  username: string;
+  displayName?: string;
+  password: string;
+};
+
+export type AdminSignInRequest = {
+  username: string;
+  password: string;
+};
+
+export type AdminRoleAssignmentRequest = {
+  role: AdminRole;
+  tenantKey?: string | null;
+  workspaceKey?: string | null;
+};
+
+export type CreateAdminUserRequest = {
+  username: string;
+  displayName?: string;
+  password: string;
+  roleAssignments?: AdminRoleAssignmentRequest[];
+};
+
+export type UpdateAdminUserRequest = {
+  displayName?: string;
+  status?: AdminUserStatus;
+};
+
+export type ResetAdminUserPasswordRequest = {
+  password: string;
+};
+
+export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
+
 export type ParticipantLaunchRequest = {
   participantSessionId: string;
 };
@@ -142,9 +203,58 @@ export type CreateTenantResponse = {
   tenant: Tenant;
 };
 
+export type ListTenantsResponse = {
+  items: Tenant[];
+};
+
 export type CreateWorkspaceResponse = {
   workspace: Workspace;
 };
+
+export type ListWorkspacesResponse = {
+  items: Workspace[];
+};
+
+export type BootstrapAdminUserResponse = {
+  adminUser: PublicAdminUser;
+  roleAssignments: PublicAdminRoleAssignment[];
+};
+
+export type AdminSignInResponse = {
+  adminUser: PublicAdminUser;
+  adminSession: PublicAdminSession;
+  roleAssignments: PublicAdminRoleAssignment[];
+  sessionToken: string;
+};
+
+export type GetAdminCurrentSessionResponse = {
+  adminUser: PublicAdminUser;
+  adminSession: PublicAdminSession;
+  roleAssignments: PublicAdminRoleAssignment[];
+};
+
+export type AdminSignOutResponse = {
+  adminSession: PublicAdminSession;
+};
+
+export type AdminUserDirectoryItem = {
+  adminUser: PublicAdminUser;
+  roleAssignments: PublicAdminRoleAssignment[];
+};
+
+export type ListAdminUsersResponse = {
+  items: AdminUserDirectoryItem[];
+};
+
+export type CreateAdminUserResponse = AdminUserDirectoryItem;
+
+export type UpdateAdminUserResponse = AdminUserDirectoryItem;
+
+export type ResetAdminUserPasswordResponse = AdminUserDirectoryItem;
+
+export type AssignAdminRoleResponse = AdminUserDirectoryItem;
+
+export type RevokeAdminRoleResponse = AdminUserDirectoryItem;
 
 export type GetWorkspaceOverviewResponse = {
   workspaceOverview: WorkspaceOverview;
@@ -293,6 +403,7 @@ export type GetRuntimeConfigResponse = {
   runtimeConfig: {
     port: number;
     shutdownDrainDelayMs: number;
+    operatorAuthRequired: boolean;
     storage: {
       kind: "memory" | "file" | "sqlite" | "postgres";
       location: string | null;
@@ -303,6 +414,7 @@ export type GetRuntimeConfigResponse = {
       firstSliceFilePresent: boolean;
       firstSliceSqliteFilePresent: boolean;
       firstSlicePostgresUrlPresent: boolean;
+      firstSliceOperatorAuthRequired: boolean;
       appBuildShaPresent: boolean;
       appBuildTimestampPresent: boolean;
     };

@@ -1,5 +1,7 @@
 export type TenantStatus = "active" | "suspended";
 export type WorkspaceStatus = "active" | "archived";
+export type AdminUserStatus = "active" | "disabled";
+export type AdminRole = "platform_admin" | "tenant_admin" | "workspace_admin";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export type ImportJobStatus = "queued" | "running" | "failed" | "completed";
 export type ContentReleaseStatus = "staged" | "active" | "superseded";
@@ -40,6 +42,33 @@ export type Workspace = {
   workspaceKey: string;
   displayName: string;
   status: WorkspaceStatus;
+  createdAt: string;
+};
+
+export type AdminUser = {
+  adminUserId: string;
+  username: string;
+  displayName: string;
+  passwordHash: string;
+  status: AdminUserStatus;
+  createdAt: string;
+};
+
+export type AdminSession = {
+  adminSessionId: string;
+  adminUserId: string;
+  token: string;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+};
+
+export type AdminRoleAssignment = {
+  roleAssignmentId: string;
+  adminUserId: string;
+  role: AdminRole;
+  tenantId: string | null;
+  workspaceId: string | null;
   createdAt: string;
 };
 
@@ -265,6 +294,10 @@ export type WorkspaceSourcePackageDetail = {
 };
 
 export type FirstSliceCapability =
+  | "admin_bootstrap"
+  | "admin_authentication"
+  | "admin_session_lifecycle"
+  | "admin_role_assignment"
   | "tenant_lifecycle"
   | "workspace_lifecycle"
   | "workspace_admin_read"
@@ -281,6 +314,10 @@ export type FirstSliceCapability =
   | "monitor_open_runs";
 
 export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
+  "admin_bootstrap",
+  "admin_authentication",
+  "admin_session_lifecycle",
+  "admin_role_assignment",
   "tenant_lifecycle",
   "workspace_lifecycle",
   "workspace_admin_read",
