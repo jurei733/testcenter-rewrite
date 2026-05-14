@@ -44,12 +44,6 @@
     "start:api": "node apps/api/dist/apps/api/src/index.js"
   },
   "devDependencies": {
-    "@types/node": "^22.15.21",
-    "@types/pg": "^8.15.2",
-    "playwright": "^1.54.1",
-    "typescript": "^5.8.3"
-  },
-  "dependencies": {
     "@angular-devkit/build-angular": "^21.2.10",
     "@angular/cli": "^21.2.10",
     "@angular/common": "^21.2.12",
@@ -59,6 +53,10 @@
     "@angular/forms": "^21.2.12",
     "@angular/platform-browser": "^21.2.12",
     "@angular/router": "^21.2.12",
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
+    "playwright": "^1.54.1",
+    "typescript": "^5.8.3",
     "rxjs": "^7.8.2",
     "zone.js": "^0.16.2"
   }
