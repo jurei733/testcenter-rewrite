@@ -1,4 +1,12 @@
-node_modules
-dist
+*.tsbuildinfo
+.DS_Store
+.angular
+.env
+.env.local
+.npm-cache
+.tmp-angular-sample
 .data
+coverage
+dist
+node_modules
 npm-debug.log

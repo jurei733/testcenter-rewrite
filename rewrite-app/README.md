@@ -122,6 +122,8 @@ For a local containerized API + Postgres stack, run:
 docker compose -f docker-compose.postgres.yml up --build
 ```
 
+The container image and compose stack default `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, so the operator surface starts in a production-like protected mode. Set `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=false` only for an intentionally open local sandbox.
+
 That stack now runs in two explicit application roles:
 
 - `rewrite-app-migrate`: one-shot schema migration role
@@ -136,6 +138,8 @@ cp .env.example .env
 ```
 
 Then adjust the storage variables for your local mode.
+
+The Docker build context excludes local `.env`, `.env.local`, data, cache, and build-output files so local secrets or generated state are not sent to the Docker daemon.
 
 `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` are optional and surface through the API manifest, metrics, and startup banner for release identification.
 
