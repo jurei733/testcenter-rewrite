@@ -587,6 +587,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     adminAuditEvents.body.items.map(item => item.eventType)
   );
   assert.equal(adminAuditEventTypes.has("admin_user_bootstrapped"), true);
+  assert.equal(adminAuditEventTypes.has("admin_sign_in_failed"), true);
   assert.equal(adminAuditEventTypes.has("admin_sign_in_succeeded"), true);
   assert.equal(adminAuditEventTypes.has("admin_user_created"), true);
   assert.equal(adminAuditEventTypes.has("admin_role_assigned"), true);
@@ -599,6 +600,16 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         item.eventType === "admin_user_updated" &&
         item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
         item.summary.includes("workspace.admin")
+    ),
+    true
+  );
+  assert.equal(
+    adminAuditEvents.body.items.some(
+      item =>
+        item.eventType === "admin_sign_in_failed" &&
+        item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
+        item.details["username"] === "workspace.admin" &&
+        item.details["reason"] === "admin_user_not_active"
     ),
     true
   );

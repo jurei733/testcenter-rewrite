@@ -4,6 +4,7 @@ export type AdminUserStatus = "active" | "disabled";
 export type AdminRole = "platform_admin" | "tenant_admin" | "workspace_admin";
 export type AdminAuditEventType =
   | "admin_user_bootstrapped"
+  | "admin_sign_in_failed"
   | "admin_sign_in_succeeded"
   | "admin_sign_out"
   | "admin_user_created"
@@ -18,6 +19,7 @@ export type ParticipantSessionStatus = "signed_in" | "launched" | "closed";
 export type TestRunStatus = "created" | "running" | "paused" | "completed";
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
+  "admin_sign_in_failed",
   "admin_sign_in_succeeded",
   "admin_sign_out",
   "admin_user_created",

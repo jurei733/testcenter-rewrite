@@ -1517,11 +1517,28 @@ export const createFirstSliceServices = (
         const username = normalizeAdminUsername(input.username);
         const password = requireAdminCredentialsPassword(input.password);
         const adminUser = await repository.getAdminUserByUsername(username);
+        const signInFailureReason = !adminUser
+          ? "admin_user_not_found"
+          : adminUser.status !== "active"
+            ? "admin_user_not_active"
+            : !verifyAdminPassword(password, adminUser.passwordHash)
+              ? "password_mismatch"
+              : null;
         if (
           !adminUser ||
           adminUser.status !== "active" ||
-          !verifyAdminPassword(password, adminUser.passwordHash)
+          signInFailureReason !== null
         ) {
+          await recordAdminAuditEvent({
+            eventType: "admin_sign_in_failed",
+            subjectAdminUserId: adminUser?.adminUserId ?? null,
+            summary: `Admin sign-in failed for '${username}'.`,
+            details: {
+              username,
+              reason: signInFailureReason,
+              adminUserStatus: adminUser?.status ?? null
+            }
+          });
           throw new FirstSliceError(
             401,
             "admin_credentials_invalid",

@@ -199,7 +199,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/revoked, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and prevent self-disable or self platform-role revoke lockouts
-- admin audit events persist a protected platform-admin trail for bootstrap, sign-in/sign-out, user management, password reset, and role assignment/revocation
+- admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, user management, password reset, and role assignment/revocation
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
