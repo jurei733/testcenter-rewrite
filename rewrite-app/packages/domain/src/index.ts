@@ -2,11 +2,30 @@ export type TenantStatus = "active" | "suspended";
 export type WorkspaceStatus = "active" | "archived";
 export type AdminUserStatus = "active" | "disabled";
 export type AdminRole = "platform_admin" | "tenant_admin" | "workspace_admin";
+export type AdminAuditEventType =
+  | "admin_user_bootstrapped"
+  | "admin_sign_in_succeeded"
+  | "admin_sign_out"
+  | "admin_user_created"
+  | "admin_user_updated"
+  | "admin_password_reset"
+  | "admin_role_assigned"
+  | "admin_role_revoked";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export type ImportJobStatus = "queued" | "running" | "failed" | "completed";
 export type ContentReleaseStatus = "staged" | "active" | "superseded";
 export type ParticipantSessionStatus = "signed_in" | "launched" | "closed";
 export type TestRunStatus = "created" | "running" | "paused" | "completed";
+export const adminAuditEventTypes = [
+  "admin_user_bootstrapped",
+  "admin_sign_in_succeeded",
+  "admin_sign_out",
+  "admin_user_created",
+  "admin_user_updated",
+  "admin_password_reset",
+  "admin_role_assigned",
+  "admin_role_revoked"
+] as const satisfies readonly AdminAuditEventType[];
 export type WorkspaceActivityEventType =
   | "workspace_created"
   | "source_package_created"
@@ -70,6 +89,16 @@ export type AdminRoleAssignment = {
   tenantId: string | null;
   workspaceId: string | null;
   createdAt: string;
+};
+
+export type AdminAuditEvent = {
+  adminAuditEventId: string;
+  eventType: AdminAuditEventType;
+  actorAdminUserId: string | null;
+  subjectAdminUserId: string | null;
+  occurredAt: string;
+  summary: string;
+  details: Record<string, unknown>;
 };
 
 export type SourcePackage = {

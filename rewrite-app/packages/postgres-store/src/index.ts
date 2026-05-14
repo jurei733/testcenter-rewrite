@@ -2,6 +2,7 @@ import { Pool, type QueryResultRow } from "pg";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
@@ -91,6 +92,26 @@ const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | nul
             ? null
             : String(row.workspace_id),
         createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapAdminAuditEvent = (row: Row | undefined): AdminAuditEvent | null =>
+  row
+    ? {
+        adminAuditEventId: String(row.admin_audit_event_id),
+        eventType: row.event_type as AdminAuditEvent["eventType"],
+        actorAdminUserId:
+          row.actor_admin_user_id === null || row.actor_admin_user_id === undefined
+            ? null
+            : String(row.actor_admin_user_id),
+        subjectAdminUserId:
+          row.subject_admin_user_id === null ||
+          row.subject_admin_user_id === undefined
+            ? null
+            : String(row.subject_admin_user_id),
+        occurredAt: String(row.occurred_at),
+        summary: String(row.summary),
+        details: JSON.parse(String(row.details_json ?? "{}")) as Record<string, unknown>
       }
     : null;
 
@@ -214,7 +235,7 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 3;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 4;
 
 const migrations: PostgresMigration[] = [
   {
@@ -378,6 +399,28 @@ const migrations: PostgresMigration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_admin_role_assignments_user
         ON admin_role_assignments (admin_user_id);
+    `
+  },
+  {
+    version: 4,
+    name: "add_admin_audit_events",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_audit_events (
+        admin_audit_event_id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        actor_admin_user_id TEXT,
+        subject_admin_user_id TEXT,
+        occurred_at TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        details_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_occurred_at
+        ON admin_audit_events (occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_subject
+        ON admin_audit_events (subject_admin_user_id, occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_actor
+        ON admin_audit_events (actor_admin_user_id, occurred_at);
     `
   }
 ];
@@ -578,6 +621,37 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       await pool.query(
         `DELETE FROM admin_role_assignments WHERE role_assignment_id = $1`,
         [roleAssignmentId]
+      );
+    },
+    async listAdminAuditEvents() {
+      return many(
+        `SELECT admin_audit_event_id, event_type, actor_admin_user_id, subject_admin_user_id, occurred_at, summary, details_json
+         FROM admin_audit_events`,
+        [],
+        mapAdminAuditEvent
+      );
+    },
+    async saveAdminAuditEvent(auditEvent) {
+      await pool.query(
+        `INSERT INTO admin_audit_events (
+          admin_audit_event_id, event_type, actor_admin_user_id, subject_admin_user_id, occurred_at, summary, details_json
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT(admin_audit_event_id) DO UPDATE SET
+          event_type = EXCLUDED.event_type,
+          actor_admin_user_id = EXCLUDED.actor_admin_user_id,
+          subject_admin_user_id = EXCLUDED.subject_admin_user_id,
+          occurred_at = EXCLUDED.occurred_at,
+          summary = EXCLUDED.summary,
+          details_json = EXCLUDED.details_json`,
+        [
+          auditEvent.adminAuditEventId,
+          auditEvent.eventType,
+          auditEvent.actorAdminUserId,
+          auditEvent.subjectAdminUserId,
+          auditEvent.occurredAt,
+          auditEvent.summary,
+          JSON.stringify(auditEvent.details)
+        ]
       );
     },
     async getAdminSessionByToken(token) {

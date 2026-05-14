@@ -162,6 +162,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `POST /api/v1/admin/users/{adminUserId}/password`
 - `POST /api/v1/admin/users/{adminUserId}/role-assignments`
 - `DELETE /api/v1/admin/users/{adminUserId}/role-assignments/{roleAssignmentId}`
+- `GET /api/v1/admin/audit-events`
 - `GET /api/v1/platform/tenants`
 - `POST /api/v1/platform/tenants`
 - `GET /api/v1/tenants/{tenantKey}/workspaces`
@@ -194,6 +195,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/revoked, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and prevent self-disable or self platform-role revoke lockouts
+- admin audit events persist a protected platform-admin trail for bootstrap, sign-in/sign-out, user management, password reset, and role assignment/revocation
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
@@ -221,7 +223,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management, tenant/workspace directory selection, workspace bootstrap, import, and runtime, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, and protected admin directory
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards, tenant/workspace directory selection, workspace bootstrap, import, and runtime, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, and protected admin directory
 
 ## Current Persistence Boundary
 
@@ -283,7 +285,7 @@ npm run smoke:ui:operator-auth
 
 That builds the Angular frontend, boots the built API process on SQLite, and drives a real browser through:
 
-- admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user read models, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
+- admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume

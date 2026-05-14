@@ -17,6 +17,7 @@ export interface ShellOpsState {
   adminSessionToken: string;
   adminSessionView: string;
   adminUsersView: string;
+  adminAuditView: string;
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreatePassword: string;
@@ -101,6 +102,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminSessionToken: "",
     adminSessionView: "Use admin bootstrap or sign-in.",
     adminUsersView: 'Use "Admin Users".',
+    adminAuditView: 'Use "Admin Audit Events".',
     adminCreateUsername: "workspace-admin",
     adminCreateDisplayName: "Workspace Admin",
     adminCreatePassword: "",

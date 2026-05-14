@@ -537,8 +537,17 @@ try {
     "UI smoke expected a tenant admin role assignment id after assigning the role."
   );
 
-  await fillAndCommit("#adminRevokeTargetUserId", workspaceAdminUserId);
-  await fillAndCommit("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Role Assignments", exact: true })
+    })
+    .filter({ hasText: "tenant_admin" })
+    .filter({ hasText: tenantRoleAssignmentId })
+    .waitFor();
+  await clickCardAction("Admin Role Assignments", "Use For Revoke", "tenant_admin");
+  await expectInputValue("#adminRevokeTargetUserId", workspaceAdminUserId);
+  await expectInputValue("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
   logStep("revoke-tenant-admin-role");
   await clickAction("Revoke Role");
   await pollJsonWithPredicate(
@@ -617,6 +626,30 @@ try {
     }
   );
   assert.equal(disabledWorkspaceAdminSignIn.status, 401);
+
+  logStep("admin-audit-events");
+  await clickAction("Admin Audit Events");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/audit-events`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.eventType === "admin_user_updated" &&
+          item?.subjectAdminUserId === workspaceAdminUserId
+      ) &&
+      payload.items.some(item => item?.eventType === "admin_role_revoked")
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Audit Events", exact: true })
+    })
+    .filter({ hasText: "admin_user_updated" })
+    .filter({ hasText: workspaceAdminUserId })
+    .waitFor();
 
   logStep("nav-content");
   await page.locator('[data-view-nav="content"]').click();

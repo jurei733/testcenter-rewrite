@@ -1,4 +1,6 @@
 import type {
+  AdminAuditEvent,
+  AdminAuditEventType,
   AdminRole,
   AdminRoleAssignment,
   AdminSession,
@@ -41,7 +43,8 @@ export const productionApiRoutes = {
     resetPassword: "/api/v1/admin/users/:adminUserId/password",
     assignRole: "/api/v1/admin/users/:adminUserId/role-assignments",
     revokeRole:
-      "/api/v1/admin/users/:adminUserId/role-assignments/:roleAssignmentId"
+      "/api/v1/admin/users/:adminUserId/role-assignments/:roleAssignmentId",
+    listAuditEvents: "/api/v1/admin/audit-events"
   },
   platform: {
     listTenants: "/api/v1/platform/tenants",
@@ -142,6 +145,13 @@ export type ActivateContentReleaseBlockedErrorDetails = {
 
 export type WorkspaceActivityEventListQuery = {
   eventType?: WorkspaceActivityEventType;
+};
+
+export type AdminAuditEventListQuery = {
+  eventType?: AdminAuditEventType;
+  actorAdminUserId?: string;
+  subjectAdminUserId?: string;
+  limit?: number;
 };
 
 export type ParticipantSignInRequest = {
@@ -255,6 +265,10 @@ export type ResetAdminUserPasswordResponse = AdminUserDirectoryItem;
 export type AssignAdminRoleResponse = AdminUserDirectoryItem;
 
 export type RevokeAdminRoleResponse = AdminUserDirectoryItem;
+
+export type ListAdminAuditEventsResponse = {
+  items: AdminAuditEvent[];
+};
 
 export type GetWorkspaceOverviewResponse = {
   workspaceOverview: WorkspaceOverview;

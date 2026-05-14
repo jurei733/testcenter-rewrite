@@ -5,6 +5,7 @@ import type {
   AdminSignOutResponse,
   BootstrapAdminUserResponse,
   GetAdminCurrentSessionResponse,
+  ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
   GetRuntimeConfigResponse,
   GetRuntimeDiagnosticsResponse
@@ -117,6 +118,10 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminUsers());
   }
 
+  refreshAdminAuditEvents(): void {
+    this.viewState.onActionAsync(() => this.opsService.refreshAdminAuditEvents());
+  }
+
   createAdminUser(): void {
     this.viewState.onActionAsync(() => this.opsService.createAdminUser());
   }
@@ -150,6 +155,25 @@ export class OpsViewFacade {
     this.ops.adminRevokeRoleAssignmentId =
       item.actionPayload?.roleAssignmentId ??
       this.ops.adminRevokeRoleAssignmentId;
+    const status = item.actionPayload?.adminUserStatus;
+    if (status === "active" || status === "disabled") {
+      this.ops.adminStatusValue = status;
+    }
+    this.persistState();
+  }
+
+  selectAdminRoleAssignment(item: RecordCollectionItem): void {
+    const adminUserId = item.actionPayload?.adminUserId;
+    const roleAssignmentId = item.actionPayload?.roleAssignmentId;
+    if (!adminUserId || !roleAssignmentId) {
+      return;
+    }
+
+    this.ops.adminRoleTargetUserId = adminUserId;
+    this.ops.adminRevokeTargetUserId = adminUserId;
+    this.ops.adminRevokeRoleAssignmentId = roleAssignmentId;
+    this.ops.adminStatusTargetUserId = adminUserId;
+    this.ops.adminResetTargetUserId = adminUserId;
     const status = item.actionPayload?.adminUserStatus;
     if (status === "active" || status === "disabled") {
       this.ops.adminStatusValue = status;
@@ -250,6 +274,92 @@ export class OpsViewFacade {
         roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
         adminUserStatus: item.adminUser.status
       }
+    }));
+  }
+
+  get adminRoleAssignmentItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    return (payload?.items ?? []).flatMap(item =>
+      item.roleAssignments.map(roleAssignment => ({
+        headline: roleAssignment.role,
+        subline: item.adminUser.username,
+        badges: [
+          item.adminUser.status,
+          roleAssignment.workspaceId
+            ? "workspace-scope"
+            : roleAssignment.tenantId
+              ? "tenant-scope"
+              : "platform-scope"
+        ],
+        rows: [
+          {
+            label: "Admin User ID",
+            value: item.adminUser.adminUserId
+          },
+          {
+            label: "Role Assignment ID",
+            value: roleAssignment.roleAssignmentId
+          },
+          {
+            label: "Tenant ID",
+            value: roleAssignment.tenantId ?? "platform"
+          },
+          {
+            label: "Workspace ID",
+            value: roleAssignment.workspaceId ?? "all-workspaces"
+          },
+          {
+            label: "Created",
+            value: this.formatDateTime(roleAssignment.createdAt)
+          }
+        ],
+        selected:
+          roleAssignment.roleAssignmentId === this.ops.adminRevokeRoleAssignmentId,
+        actionLabel: "Use For Revoke",
+        actionPayload: {
+          adminUserId: item.adminUser.adminUserId,
+          roleAssignmentId: roleAssignment.roleAssignmentId,
+          adminUserStatus: item.adminUser.status
+        }
+      }))
+    );
+  }
+
+  get adminAuditItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListAdminAuditEventsResponse>(
+      this.ops.adminAuditView
+    );
+    return (payload?.items ?? []).map(auditEvent => ({
+      headline: auditEvent.eventType,
+      subline: this.formatDateTime(auditEvent.occurredAt),
+      badges: [
+        auditEvent.actorAdminUserId ? "actor" : "system",
+        auditEvent.subjectAdminUserId ? "subject" : "no-subject"
+      ],
+      rows: [
+        {
+          label: "Summary",
+          value: auditEvent.summary
+        },
+        {
+          label: "Audit Event ID",
+          value: auditEvent.adminAuditEventId
+        },
+        {
+          label: "Actor Admin User ID",
+          value: auditEvent.actorAdminUserId ?? "system"
+        },
+        {
+          label: "Subject Admin User ID",
+          value: auditEvent.subjectAdminUserId ?? "n/a"
+        },
+        {
+          label: "Details",
+          value: this.stringifyValue(auditEvent.details)
+        }
+      ]
     }));
   }
 

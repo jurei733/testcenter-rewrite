@@ -1,5 +1,6 @@
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
@@ -17,6 +18,7 @@ type InMemoryFirstSliceState = {
   adminUsers: Map<string, AdminUser>;
   adminUsersByUsername: Map<string, AdminUser>;
   adminRoleAssignments: Map<string, AdminRoleAssignment>;
+  adminAuditEvents: Map<string, AdminAuditEvent>;
   adminSessionsByToken: Map<string, AdminSession>;
   tenants: Map<string, Tenant>;
   workspacesByScope: Map<string, Workspace>;
@@ -33,6 +35,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   adminUsers: new Map(),
   adminUsersByUsername: new Map(),
   adminRoleAssignments: new Map(),
+  adminAuditEvents: new Map(),
   adminSessionsByToken: new Map(),
   tenants: new Map(),
   workspacesByScope: new Map(),
@@ -75,6 +78,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async deleteAdminRoleAssignment(roleAssignmentId) {
       state.adminRoleAssignments.delete(roleAssignmentId);
+    },
+    async listAdminAuditEvents() {
+      return Array.from(state.adminAuditEvents.values());
+    },
+    async saveAdminAuditEvent(auditEvent) {
+      state.adminAuditEvents.set(auditEvent.adminAuditEventId, auditEvent);
     },
     async getAdminSessionByToken(token) {
       return state.adminSessionsByToken.get(token) ?? null;

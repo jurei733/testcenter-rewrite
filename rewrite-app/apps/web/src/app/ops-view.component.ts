@@ -56,6 +56,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="adminSignInButton" class="ghost" type="button" (click)="view.signInAdmin()">Sign In</button>
           <button id="adminCurrentSessionButton" class="ghost" type="button" (click)="view.refreshAdminSession()">Current Session</button>
           <button id="adminUsersButton" class="ghost" type="button" (click)="view.refreshAdminUsers()">Admin Users</button>
+          <button id="adminAuditEventsButton" class="ghost" type="button" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
           <button id="adminSignOutButton" class="ghost" type="button" (click)="view.signOutAdmin()">Sign Out</button>
         </div>
       </article>
@@ -177,6 +178,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         [items]="view.adminUserItems"
         (itemAction)="view.selectAdminUser($event)"
         emptyState="Sign in as platform admin, then refresh admin users."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Admin Role Assignments"
+        subtitle="Concrete role assignments that can be selected for safe revocation."
+        [items]="view.adminRoleAssignmentItems"
+        (itemAction)="view.selectAdminRoleAssignment($event)"
+        emptyState="Refresh admin users to inspect role assignments."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Admin Audit Events"
+        subtitle="Persistent platform-admin trail for admin sign-ins, user management, and role changes."
+        [items]="view.adminAuditItems"
+        emptyState="Sign in as platform admin, then refresh admin audit events."
       ></app-record-collection>
 
       <article class="card">

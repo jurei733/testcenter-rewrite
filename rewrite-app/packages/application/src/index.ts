@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import type {
+  AdminAuditEvent,
+  AdminAuditEventType,
   AdminRole,
   AdminRoleAssignment,
   AdminSession,
@@ -225,6 +227,13 @@ export type AdminDirectoryPort = {
     adminUserId: string;
     roleAssignmentId: string;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  listAdminAuditEvents(input: {
+    sessionToken: string;
+    eventType?: AdminAuditEventType;
+    actorAdminUserId?: string;
+    subjectAdminUserId?: string;
+    limit?: number;
+  }): Promise<AdminAuditEvent[]>;
 };
 
 export type FirstSlicePorts = {
@@ -266,6 +275,7 @@ export const firstSliceUseCases = {
   resetAdminUserPassword: "ResetAdminUserPassword",
   assignAdminRole: "AssignAdminRole",
   revokeAdminRole: "RevokeAdminRole",
+  listAdminAuditEvents: "ListAdminAuditEvents",
   listTenants: "ListTenants",
   createTenant: "CreateTenant",
   listWorkspaces: "ListWorkspaces",
@@ -324,6 +334,8 @@ export type FirstSliceRepository = {
   ): Promise<AdminRoleAssignment[]>;
   saveAdminRoleAssignment(roleAssignment: AdminRoleAssignment): Promise<void>;
   deleteAdminRoleAssignment(roleAssignmentId: string): Promise<void>;
+  listAdminAuditEvents(): Promise<AdminAuditEvent[]>;
+  saveAdminAuditEvent(auditEvent: AdminAuditEvent): Promise<void>;
   getAdminSessionByToken(token: string): Promise<AdminSession | null>;
   saveAdminSession(adminSession: AdminSession): Promise<void>;
   getTenantByKey(tenantKey: string): Promise<Tenant | null>;
@@ -737,6 +749,15 @@ const isSameAdminRoleScope = (
   roleAssignment.role === scope.role &&
   roleAssignment.tenantId === scope.tenantId &&
   roleAssignment.workspaceId === scope.workspaceId;
+
+const summarizeAdminRoleAssignment = (
+  roleAssignment: AdminRoleAssignment
+): Record<string, string | null> => ({
+  roleAssignmentId: roleAssignment.roleAssignmentId,
+  role: roleAssignment.role,
+  tenantId: roleAssignment.tenantId,
+  workspaceId: roleAssignment.workspaceId
+});
 
 const createAdminUserDirectoryItem = async (
   repository: FirstSliceRepository,
@@ -1316,6 +1337,24 @@ export const createFirstSliceServices = (
     });
   };
 
+  const recordAdminAuditEvent = async (input: {
+    eventType: AdminAuditEvent["eventType"];
+    actorAdminUserId?: string | null;
+    subjectAdminUserId?: string | null;
+    summary: string;
+    details?: Record<string, unknown>;
+  }): Promise<void> => {
+    await repository.saveAdminAuditEvent({
+      adminAuditEventId: idGenerator(),
+      eventType: input.eventType,
+      actorAdminUserId: input.actorAdminUserId ?? null,
+      subjectAdminUserId: input.subjectAdminUserId ?? null,
+      occurredAt: now(),
+      summary: input.summary,
+      details: input.details ?? {}
+    });
+  };
+
   const createImportJobWithRelease = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1460,6 +1499,15 @@ export const createFirstSliceServices = (
 
         await repository.saveAdminUser(adminUser);
         await repository.saveAdminRoleAssignment(platformAdminRoleAssignment);
+        await recordAdminAuditEvent({
+          eventType: "admin_user_bootstrapped",
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Bootstrapped platform admin '${adminUser.username}'.`,
+          details: {
+            username: adminUser.username,
+            roleAssignment: summarizeAdminRoleAssignment(platformAdminRoleAssignment)
+          }
+        });
         return {
           adminUser,
           roleAssignments: [platformAdminRoleAssignment]
@@ -1492,20 +1540,31 @@ export const createFirstSliceServices = (
         };
 
         await repository.saveAdminSession(adminSession);
+        const roleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        await recordAdminAuditEvent({
+          eventType: "admin_sign_in_succeeded",
+          actorAdminUserId: adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${adminUser.username}' signed in.`,
+          details: {
+            username: adminUser.username,
+            adminSessionId: adminSession.adminSessionId
+          }
+        });
         return {
           adminUser,
           adminSession,
-          roleAssignments: await listAdminRoleAssignmentsForUser(
-            repository,
-            adminUser.adminUserId
-          )
+          roleAssignments
         };
       },
       async getCurrentSession(input) {
         return requireActiveAdminSession(repository, input.sessionToken, now());
       },
       async signOut(input) {
-        const { adminSession } = await requireActiveAdminSession(
+        const { adminUser, adminSession } = await requireActiveAdminSession(
           repository,
           input.sessionToken,
           now()
@@ -1516,6 +1575,16 @@ export const createFirstSliceServices = (
         };
 
         await repository.saveAdminSession(revokedSession);
+        await recordAdminAuditEvent({
+          eventType: "admin_sign_out",
+          actorAdminUserId: adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${adminUser.username}' signed out.`,
+          details: {
+            username: adminUser.username,
+            adminSessionId: adminSession.adminSessionId
+          }
+        });
         return revokedSession;
       }
     },
@@ -1601,7 +1670,21 @@ export const createFirstSliceServices = (
           savedRoleAssignments.push(roleAssignment);
         }
 
-        return createAdminUserDirectoryItem(repository, adminUser);
+        const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
+        await recordAdminAuditEvent({
+          eventType: "admin_user_created",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' created user '${adminUser.username}'.`,
+          details: {
+            username: adminUser.username,
+            displayName: adminUser.displayName,
+            status: adminUser.status,
+            roleAssignments: savedRoleAssignments.map(summarizeAdminRoleAssignment)
+          }
+        });
+
+        return directoryItem;
       },
       async updateAdminUser(input) {
         const currentSession = await requireActiveAdminSession(
@@ -1637,7 +1720,25 @@ export const createFirstSliceServices = (
         };
         await repository.saveAdminUser(updatedAdminUser);
 
-        return createAdminUserDirectoryItem(repository, updatedAdminUser);
+        const directoryItem = await createAdminUserDirectoryItem(
+          repository,
+          updatedAdminUser
+        );
+        await recordAdminAuditEvent({
+          eventType: "admin_user_updated",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: updatedAdminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' updated user '${updatedAdminUser.username}'.`,
+          details: {
+            username: updatedAdminUser.username,
+            previousDisplayName: adminUser.displayName,
+            nextDisplayName: updatedAdminUser.displayName,
+            previousStatus: adminUser.status,
+            nextStatus: updatedAdminUser.status
+          }
+        });
+
+        return directoryItem;
       },
       async resetAdminUserPassword(input) {
         const currentSession = await requireActiveAdminSession(
@@ -1655,7 +1756,21 @@ export const createFirstSliceServices = (
         };
         await repository.saveAdminUser(updatedAdminUser);
 
-        return createAdminUserDirectoryItem(repository, updatedAdminUser);
+        const directoryItem = await createAdminUserDirectoryItem(
+          repository,
+          updatedAdminUser
+        );
+        await recordAdminAuditEvent({
+          eventType: "admin_password_reset",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: updatedAdminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' reset password for '${updatedAdminUser.username}'.`,
+          details: {
+            username: updatedAdminUser.username
+          }
+        });
+
+        return directoryItem;
       },
       async assignAdminRole(input) {
         const currentSession = await requireActiveAdminSession(
@@ -1689,7 +1804,19 @@ export const createFirstSliceServices = (
         };
         await repository.saveAdminRoleAssignment(roleAssignment);
 
-        return createAdminUserDirectoryItem(repository, adminUser);
+        const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
+        await recordAdminAuditEvent({
+          eventType: "admin_role_assigned",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' assigned '${roleAssignment.role}' to '${adminUser.username}'.`,
+          details: {
+            username: adminUser.username,
+            roleAssignment: summarizeAdminRoleAssignment(roleAssignment)
+          }
+        });
+
+        return directoryItem;
       },
       async revokeAdminRole(input) {
         const currentSession = await requireActiveAdminSession(
@@ -1728,7 +1855,44 @@ export const createFirstSliceServices = (
 
         await repository.deleteAdminRoleAssignment(roleAssignment.roleAssignmentId);
 
-        return createAdminUserDirectoryItem(repository, adminUser);
+        const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
+        await recordAdminAuditEvent({
+          eventType: "admin_role_revoked",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' revoked '${roleAssignment.role}' from '${adminUser.username}'.`,
+          details: {
+            username: adminUser.username,
+            roleAssignment: summarizeAdminRoleAssignment(roleAssignment)
+          }
+        });
+
+        return directoryItem;
+      },
+      async listAdminAuditEvents(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+
+        return (await repository.listAdminAuditEvents())
+          .filter(
+            auditEvent =>
+              (!input.eventType || auditEvent.eventType === input.eventType) &&
+              (!input.actorAdminUserId ||
+                auditEvent.actorAdminUserId === input.actorAdminUserId) &&
+              (!input.subjectAdminUserId ||
+                auditEvent.subjectAdminUserId === input.subjectAdminUserId)
+          )
+          .sort(
+            (left, right) =>
+              right.occurredAt.localeCompare(left.occurredAt) ||
+              right.adminAuditEventId.localeCompare(left.adminAuditEventId)
+          )
+          .slice(0, limit);
       }
     },
     platform: {

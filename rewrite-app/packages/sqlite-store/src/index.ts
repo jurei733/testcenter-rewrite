@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
@@ -102,6 +103,28 @@ const mapAdminRoleAssignment = (
             ? null
             : String(row.workspace_id),
         createdAt: String(row.created_at)
+      }
+    : null;
+
+const mapAdminAuditEvent = (
+  row: Record<string, unknown> | undefined
+): AdminAuditEvent | null =>
+  row
+    ? {
+        adminAuditEventId: String(row.admin_audit_event_id),
+        eventType: row.event_type as AdminAuditEvent["eventType"],
+        actorAdminUserId:
+          row.actor_admin_user_id === null || row.actor_admin_user_id === undefined
+            ? null
+            : String(row.actor_admin_user_id),
+        subjectAdminUserId:
+          row.subject_admin_user_id === null ||
+          row.subject_admin_user_id === undefined
+            ? null
+            : String(row.subject_admin_user_id),
+        occurredAt: String(row.occurred_at),
+        summary: String(row.summary),
+        details: JSON.parse(String(row.details_json ?? "{}")) as Record<string, unknown>
       }
     : null;
 
@@ -231,7 +254,7 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 9;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 10;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -439,6 +462,28 @@ const sqliteMigrations: SqliteMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_admin_role_assignments_user
         ON admin_role_assignments (admin_user_id);
     `
+  },
+  {
+    version: 10,
+    name: "add_admin_audit_events",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_audit_events (
+        admin_audit_event_id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        actor_admin_user_id TEXT,
+        subject_admin_user_id TEXT,
+        occurred_at TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        details_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_occurred_at
+        ON admin_audit_events (occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_subject
+        ON admin_audit_events (subject_admin_user_id, occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_admin_audit_events_actor
+        ON admin_audit_events (actor_admin_user_id, occurred_at);
+    `
   }
 ];
 
@@ -638,6 +683,41 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(`DELETE FROM admin_role_assignments WHERE role_assignment_id = ?`)
         .run(roleAssignmentId);
+    },
+    async listAdminAuditEvents() {
+      const rows = database
+        .prepare(
+          `SELECT admin_audit_event_id, event_type, actor_admin_user_id, subject_admin_user_id, occurred_at, summary, details_json
+           FROM admin_audit_events`
+        )
+        .all() as Record<string, unknown>[];
+      return rows
+        .map(row => mapAdminAuditEvent(row))
+        .filter(Boolean) as AdminAuditEvent[];
+    },
+    async saveAdminAuditEvent(auditEvent) {
+      database
+        .prepare(
+          `INSERT INTO admin_audit_events (
+            admin_audit_event_id, event_type, actor_admin_user_id, subject_admin_user_id, occurred_at, summary, details_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(admin_audit_event_id) DO UPDATE SET
+            event_type = excluded.event_type,
+            actor_admin_user_id = excluded.actor_admin_user_id,
+            subject_admin_user_id = excluded.subject_admin_user_id,
+            occurred_at = excluded.occurred_at,
+            summary = excluded.summary,
+            details_json = excluded.details_json`
+        )
+        .run(
+          auditEvent.adminAuditEventId,
+          auditEvent.eventType,
+          auditEvent.actorAdminUserId,
+          auditEvent.subjectAdminUserId,
+          auditEvent.occurredAt,
+          auditEvent.summary,
+          JSON.stringify(auditEvent.details)
+        );
     },
     async getAdminSessionByToken(token) {
       const row = database

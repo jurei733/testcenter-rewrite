@@ -11,6 +11,7 @@ import type {
   CreateAdminUserRequest,
   CreateAdminUserResponse,
   GetAdminCurrentSessionResponse,
+  ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
   ResetAdminUserPasswordRequest,
   ResetAdminUserPasswordResponse,
@@ -152,6 +153,25 @@ export class RewriteAppOpsService {
     this.feedback.rememberActivity(
       "Admin Users Refreshed",
       `${payload.items.length} admin user(s) loaded from the protected directory.`
+    );
+  }
+
+  async refreshAdminAuditEvents(): Promise<void> {
+    const payload = await this.requestState.request<ListAdminAuditEventsResponse>(
+      "Admin Audit Events",
+      "GET",
+      productionApiRoutes.admin.listAuditEvents,
+      undefined,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.opsState.adminAuditView = prettyPrintJson(
+      payload,
+      this.opsState.adminAuditView
+    );
+    this.feedback.rememberActivity(
+      "Admin Audit Events Refreshed",
+      `${payload.items.length} admin audit event(s) loaded from persistent storage.`
     );
   }
 

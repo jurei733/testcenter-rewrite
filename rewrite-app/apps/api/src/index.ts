@@ -15,6 +15,7 @@ import {
   type AdminSignInRequest,
   type AdminSignInResponse,
   type AdminSignOutResponse,
+  type AdminAuditEventListQuery,
   type ApiErrorResponse,
   type ActivateContentReleaseRequest,
   type ActivateContentReleaseResponse,
@@ -42,6 +43,7 @@ import {
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
   type GetWorkspaceOverviewResponse,
+  type ListAdminAuditEventsResponse,
   type ListWorkspaceActivityEventsResponse,
   type ListImportJobsResponse,
   type ListAdminUsersResponse,
@@ -79,6 +81,8 @@ import {
   type AdminRoleAssignment,
   type AdminSession,
   type AdminUser,
+  type AdminAuditEventType,
+  adminAuditEventTypes,
   firstProductionSliceCapabilities
 } from "@testcenter-rewrite-app/domain";
 import {
@@ -1024,6 +1028,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `POST ${productionApiRoutes.admin.signOut}`;
   }
 
+  if (method === "GET" && pathname === productionApiRoutes.admin.listAuditEvents) {
+    return `GET ${productionApiRoutes.admin.listAuditEvents}`;
+  }
+
   if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
     return `GET ${productionApiRoutes.platform.listTenants}`;
   }
@@ -1385,6 +1393,62 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<AdminSignOutResponse>(response, 200, {
           adminSession: toPublicAdminSession(adminSession)
         });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.listAuditEvents
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const eventType = url.searchParams.get("eventType")?.trim() || undefined;
+        if (
+          eventType &&
+          !adminAuditEventTypes.includes(eventType as AdminAuditEventType)
+        ) {
+          sendError(
+            response,
+            400,
+            "admin_audit_event_type_invalid",
+            `Admin audit event type '${eventType}' is not supported.`
+          );
+          return;
+        }
+
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "admin_audit_limit_invalid",
+            "Admin audit limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
+        const query: AdminAuditEventListQuery = {
+          eventType: eventType as AdminAuditEventType | undefined,
+          actorAdminUserId:
+            url.searchParams.get("actorAdminUserId")?.trim() || undefined,
+          subjectAdminUserId:
+            url.searchParams.get("subjectAdminUserId")?.trim() || undefined,
+          limit
+        };
+        const items = await services.adminDirectory.listAdminAuditEvents({
+          sessionToken,
+          ...query
+        });
+        sendJson<ListAdminAuditEventsResponse>(response, 200, { items });
         return;
       }
 

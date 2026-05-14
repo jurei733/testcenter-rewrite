@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
@@ -19,6 +20,7 @@ import type {
 type PersistedFirstSliceState = {
   adminUsers: Record<string, AdminUser>;
   adminRoleAssignments: Record<string, AdminRoleAssignment>;
+  adminAuditEvents: Record<string, AdminAuditEvent>;
   adminSessions: Record<string, AdminSession>;
   tenants: Record<string, Tenant>;
   workspacesByScope: Record<string, Workspace>;
@@ -34,6 +36,7 @@ type PersistedFirstSliceState = {
 const createInitialState = (): PersistedFirstSliceState => ({
   adminUsers: {},
   adminRoleAssignments: {},
+  adminAuditEvents: {},
   adminSessions: {},
   tenants: {},
   workspacesByScope: {},
@@ -154,6 +157,15 @@ export const createFileFirstSliceRepository = (
     async deleteAdminRoleAssignment(roleAssignmentId) {
       await mutate(state => {
         delete state.adminRoleAssignments[roleAssignmentId];
+      });
+    },
+    async listAdminAuditEvents() {
+      const state = await getState();
+      return Object.values(state.adminAuditEvents);
+    },
+    async saveAdminAuditEvent(auditEvent) {
+      await mutate(state => {
+        state.adminAuditEvents[auditEvent.adminAuditEventId] = auditEvent;
       });
     },
     async getAdminSessionByToken(token) {

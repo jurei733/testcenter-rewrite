@@ -244,6 +244,13 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(missingDirectorySession.status, 401);
   assert.equal(missingDirectorySession.body.error, "admin_session_missing");
 
+  const missingAuditSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/audit-events"
+  );
+
+  assert.equal(missingAuditSession.status, 401);
+  assert.equal(missingAuditSession.body.error, "admin_session_missing");
+
   const adminUsers = await requestJson<{
     items: Array<{
       adminUser: { adminUserId: string; username: string; passwordHash?: string };
@@ -560,6 +567,101 @@ test("admin bootstrap and bearer session lifecycle", async () => {
 
   assert.equal(disabledSignIn.status, 401);
   assert.equal(disabledSignIn.body.error, "admin_credentials_invalid");
+
+  const adminAuditEvents = await requestJson<{
+    items: Array<{
+      eventType: string;
+      actorAdminUserId: string | null;
+      subjectAdminUserId: string | null;
+      summary: string;
+      details: Record<string, unknown>;
+    }>;
+  }>("/api/v1/admin/audit-events", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(adminAuditEvents.status, 200);
+  const adminAuditEventTypes = new Set(
+    adminAuditEvents.body.items.map(item => item.eventType)
+  );
+  assert.equal(adminAuditEventTypes.has("admin_user_bootstrapped"), true);
+  assert.equal(adminAuditEventTypes.has("admin_sign_in_succeeded"), true);
+  assert.equal(adminAuditEventTypes.has("admin_user_created"), true);
+  assert.equal(adminAuditEventTypes.has("admin_role_assigned"), true);
+  assert.equal(adminAuditEventTypes.has("admin_role_revoked"), true);
+  assert.equal(adminAuditEventTypes.has("admin_password_reset"), true);
+  assert.equal(adminAuditEventTypes.has("admin_user_updated"), true);
+  assert.equal(
+    adminAuditEvents.body.items.some(
+      item =>
+        item.eventType === "admin_user_updated" &&
+        item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
+        item.summary.includes("workspace.admin")
+    ),
+    true
+  );
+  assert.equal(JSON.stringify(adminAuditEvents.body).includes("workspace-secret"), false);
+
+  const subjectAuditEvents = await requestJson<{
+    items: Array<{ subjectAdminUserId: string | null }>;
+  }>(
+    `/api/v1/admin/audit-events?subjectAdminUserId=${createdAdminUser.body.adminUser.adminUserId}`,
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(subjectAuditEvents.status, 200);
+  assert.equal(subjectAuditEvents.body.items.length > 0, true);
+  assert.equal(
+    subjectAuditEvents.body.items.every(
+      item => item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId
+    ),
+    true
+  );
+
+  const limitedAuditEvents = await requestJson<{ items: unknown[] }>(
+    "/api/v1/admin/audit-events?limit=1",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(limitedAuditEvents.status, 200);
+  assert.equal(limitedAuditEvents.body.items.length, 1);
+
+  const invalidAuditEventType = await requestJson<{ error: string }>(
+    "/api/v1/admin/audit-events?eventType=unsupported",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAuditEventType.status, 400);
+  assert.equal(
+    invalidAuditEventType.body.error,
+    "admin_audit_event_type_invalid"
+  );
+
+  const invalidAuditLimit = await requestJson<{ error: string }>(
+    "/api/v1/admin/audit-events?limit=0",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAuditLimit.status, 400);
+  assert.equal(invalidAuditLimit.body.error, "admin_audit_limit_invalid");
 
   const signOut = await requestJson<{
     adminSession: { adminSessionId: string; revokedAt: string | null };
