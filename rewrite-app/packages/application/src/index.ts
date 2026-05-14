@@ -1008,14 +1008,50 @@ const normalizeParsedJsonContentStructure = (
   return normalizeContentStructure(contentStructure);
 };
 
+const decodeXmlAttributeValue = (value: string): string =>
+  value
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+
 const parseXmlAttributes = (rawAttributes: string): Record<string, string> => {
   const attributes: Record<string, string> = {};
 
-  for (const match of rawAttributes.matchAll(/([a-zA-Z_:][\w:.-]*)="([^"]*)"/g)) {
-    attributes[match[1]] = match[2];
+  for (const match of rawAttributes.matchAll(
+    /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  )) {
+    attributes[match[1]] = decodeXmlAttributeValue(match[2] ?? match[3] ?? "");
   }
 
   return attributes;
+};
+
+const readXmlAttribute = (
+  attributes: Record<string, string>,
+  ...candidateNames: string[]
+): string | undefined => {
+  for (const candidateName of candidateNames) {
+    const exactValue = attributes[candidateName];
+    if (exactValue !== undefined) {
+      return exactValue;
+    }
+  }
+
+  const normalizedEntries = Object.entries(attributes).map(([key, value]) => [
+    key.toLowerCase(),
+    value
+  ]);
+  for (const candidateName of candidateNames) {
+    const normalizedName = candidateName.toLowerCase();
+    const match = normalizedEntries.find(([key]) => key === normalizedName);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return undefined;
 };
 
 const normalizeParsedXmlContentStructure = (
@@ -1024,21 +1060,19 @@ const normalizeParsedXmlContentStructure = (
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
   for (const bookletMatch of sourceDocument.matchAll(
-    /<booklet\b([^>]*)>([\s\S]*?)<\/booklet>/g
+    /<booklet\b([^>]*)>([\s\S]*?)<\/booklet>/gi
   )) {
     const bookletAttributes = parseXmlAttributes(bookletMatch[1] ?? "");
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
-    for (const unitMatch of (bookletMatch[2] ?? "").matchAll(/<unit\b([^>]*?)(?:\/>|>([\s\S]*?)<\/unit>)/g)) {
+    for (const unitMatch of (bookletMatch[2] ?? "").matchAll(/<unit\b([^>]*?)(?:\/>|>([\s\S]*?)<\/unit>)/gi)) {
       const unitAttributes = parseXmlAttributes(unitMatch[1] ?? "");
       unitEntries.push({
         unitKey: String(
-          unitAttributes.unitKey ?? unitAttributes.key ?? unitAttributes.id ?? ""
+          readXmlAttribute(unitAttributes, "unitKey", "key", "id") ?? ""
         ).trim(),
         displayLabel: String(
-          unitAttributes.displayLabel ??
-            unitAttributes.label ??
-            unitAttributes.title ??
+          readXmlAttribute(unitAttributes, "displayLabel", "label", "title") ??
             ""
         ).trim()
       });
@@ -1046,15 +1080,11 @@ const normalizeParsedXmlContentStructure = (
 
     bookletEntries.push({
       bookletKey: String(
-        bookletAttributes.bookletKey ??
-          bookletAttributes.key ??
-          bookletAttributes.id ??
+        readXmlAttribute(bookletAttributes, "bookletKey", "key", "id") ??
           ""
       ).trim(),
       displayLabel: String(
-        bookletAttributes.displayLabel ??
-          bookletAttributes.label ??
-          bookletAttributes.title ??
+        readXmlAttribute(bookletAttributes, "displayLabel", "label", "title") ??
           ""
       ).trim(),
       unitEntries

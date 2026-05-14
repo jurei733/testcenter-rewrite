@@ -1070,10 +1070,10 @@ test("failed import can be retried on the same source package", async () => {
     {
       method: "POST",
       body: {
-        fileName: "fixed.xml",
-        mediaType: "application/xml",
-        sourceDocument:
-          "<assessment><booklet key=\"booklet:fixed\" label=\"Fixed\"><unit key=\"unit-fixed\" label=\"Fixed Unit\" /></booklet></assessment>"
+      fileName: "fixed.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+          "<Assessment><Booklet Key='booklet:fixed' Label='Fixed'><Unit Key='unit-fixed' Label='Fixed Unit' /></Booklet></Assessment>"
       }
     }
   );
