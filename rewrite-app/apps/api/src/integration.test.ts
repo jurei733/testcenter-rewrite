@@ -1479,7 +1479,7 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.equal(appResponse.status, 200);
   assert.match(appResponse.contentType ?? "", /text\/html/);
   assert.match(appResponse.body, /<app-root><\/app-root>/);
-  assert.match(appResponse.body, /<base href="\/app\/">/);
+  assert.match(appResponse.body, /<base href="\/app\/"\s*\/?>/);
   assert.match(appResponse.body, /<title>Testcenter Rewrite App<\/title>/);
 
   const scriptMatch = appResponse.body.match(

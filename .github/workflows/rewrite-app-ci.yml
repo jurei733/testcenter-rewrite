@@ -59,8 +59,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - run: npm run test:integration:postgres
-      - run: FIRST_SLICE_STORE=postgres npm run smoke:startup
+      - run: npm run db:migrate:postgres:built
+      - run: npm run db:doctor:postgres:built
+      - run: npm run test:integration:postgres:built
+      - run: npm run smoke:startup:postgres:built
 
   docker-compose-release-smoke:
     runs-on: ubuntu-latest
