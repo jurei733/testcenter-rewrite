@@ -25,6 +25,36 @@ const run = (command, args, options = {}) =>
     });
   });
 
+const capture = (command, args, options = {}) =>
+  new Promise((resolvePromise, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: options.env ?? process.env
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", chunk => {
+      stderr += chunk;
+    });
+    child.once("error", reject);
+    child.once("exit", code => {
+      if (code === 0) {
+        resolvePromise(stdout.trim());
+        return;
+      }
+      reject(
+        new Error(
+          `${command} ${args.join(" ")} exited with code ${code ?? 1}: ${stderr.trim()}`
+        )
+      );
+    });
+  });
+
 const readExpectedPostgresSchemaVersion = async () => {
   const source = await readFile(
     new URL("../packages/postgres-store/src/index.ts", import.meta.url),
@@ -102,6 +132,21 @@ try {
   const readiness = await pollJson("http://127.0.0.1:4310/readyz");
   const manifest = await pollJson("http://127.0.0.1:4310/manifest");
   const config = await pollJson("http://127.0.0.1:4310/diagnostics/config");
+  const apiContainerId = await capture("docker", [
+    ...composeArgs,
+    "ps",
+    "-q",
+    "rewrite-app-api"
+  ]);
+  if (!apiContainerId) {
+    throw new Error("Could not resolve rewrite-app-api container id.");
+  }
+  const apiContainerUser = await capture("docker", [
+    "inspect",
+    apiContainerId,
+    "--format",
+    "{{.Config.User}}"
+  ]);
 
   expectEqual("readiness.storage.kind", readiness.storage?.kind, "postgres");
   expectEqual(
@@ -137,6 +182,7 @@ try {
     config.runtimeConfig?.environment?.firstSlicePostgresUrlPresent,
     true
   );
+  expectEqual("apiContainer.user", apiContainerUser, "node");
 
   process.stdout.write(
     `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired}\n`

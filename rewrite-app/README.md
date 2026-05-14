@@ -311,6 +311,7 @@ That verifies:
 - Postgres health
 - one-shot migration role
 - API readiness
+- non-root API container user
 - Postgres schema-version propagation through readiness, manifest, and config
 - build metadata propagation into the running API manifest
 - production-like operator auth configuration in the composed API service
