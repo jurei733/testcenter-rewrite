@@ -46,7 +46,9 @@ COPY --from=build /app/packages/file-store/dist ./packages/file-store/dist
 COPY --from=build /app/packages/sqlite-store/dist ./packages/sqlite-store/dist
 COPY --from=build /app/packages/postgres-store/dist ./packages/postgres-store/dist
 
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && chown -R node:node /app
+
+USER node
 
 EXPOSE 4310
 
