@@ -6,6 +6,7 @@ ARG APP_BUILD_SHA=unknown
 ARG APP_BUILD_TIMESTAMP=unknown
 
 COPY package.json package-lock.json ./
+COPY angular.json ./
 COPY tsconfig.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages

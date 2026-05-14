@@ -64,22 +64,15 @@ jobs:
 
   docker-compose-release-smoke:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rewrite-app
     env:
       APP_BUILD_SHA: ${{ github.sha }}
       APP_BUILD_TIMESTAMP: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose -f rewrite-app/docker-compose.postgres.yml up -d --build
-      - run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:4310/readyz >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "rewrite-app compose stack did not become healthy in time" >&2
-          docker compose -f rewrite-app/docker-compose.postgres.yml logs >&2 || true
-          exit 1
-      - run: curl -fsS http://127.0.0.1:4310/manifest
-      - if: always()
-        run: docker compose -f rewrite-app/docker-compose.postgres.yml down -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ./scripts/smoke-compose-postgres.mjs
