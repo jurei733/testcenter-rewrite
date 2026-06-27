@@ -41,6 +41,7 @@ export class RewriteAppShellContentHostsService {
         options: { quiet?: boolean } = {}
       ) => this.requestState.request<T>(label, method, path, body, options),
       workspaceState: this.workspaceState,
+      contentState: this.contentState,
       createWorkspaceContentPresentationHost: () =>
         this.presentationHosts.createWorkspaceContentPresentationHost()
     });

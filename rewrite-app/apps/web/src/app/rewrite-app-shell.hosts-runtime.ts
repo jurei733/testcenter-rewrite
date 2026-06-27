@@ -82,18 +82,21 @@ export function createRuntimeReadsStateHost(args: {
   runtimeState: ShellRuntimeState;
   createRuntimePresentationHost(): RuntimePresentationHost;
 }): ShellRuntimeReadsHost {
+  const readQueryValue = (value: unknown): string =>
+    typeof value === "string" ? value.trim() : String(value ?? "").trim();
+
   const buildParticipantSessionsPath = (): string => {
     const path = resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
       tenantKey: args.workspaceState.tenantKey.trim(),
       workspaceKey: args.workspaceState.workspaceKey.trim()
     });
     const query = new URLSearchParams();
-    const status = args.runtimeState.participantSessionStatusFilter.trim();
-    const groupKey = args.runtimeState.participantSessionGroupFilter.trim();
-    const loginKey = args.runtimeState.participantSessionLoginFilter.trim();
+    const status = readQueryValue(args.runtimeState.participantSessionStatusFilter);
+    const groupKey = readQueryValue(args.runtimeState.participantSessionGroupFilter);
+    const loginKey = readQueryValue(args.runtimeState.participantSessionLoginFilter);
     const contentReleaseId =
-      args.runtimeState.participantSessionReleaseFilter.trim();
-    const limit = args.runtimeState.participantSessionLimit.trim();
+      readQueryValue(args.runtimeState.participantSessionReleaseFilter);
+    const limit = readQueryValue(args.runtimeState.participantSessionLimit);
 
     if (status) {
       query.set("status", status);

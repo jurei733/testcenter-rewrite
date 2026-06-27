@@ -10,6 +10,18 @@ export type ShellPersistenceTarget = {
   sourcePackageId: string;
   importJobId: string;
   contentReleaseId: string;
+  sourcePackageStatusFilter: string;
+  sourcePackageMediaTypeFilter: string;
+  sourcePackageFileNameFilter: string;
+  sourcePackageLatestImportStatusFilter: string;
+  sourcePackageLimit: string;
+  importJobStatusFilter: string;
+  importJobSourcePackageFilter: string;
+  importJobLimit: string;
+  contentReleaseStatusFilter: string;
+  contentReleaseImportJobFilter: string;
+  contentReleaseSourcePackageFilter: string;
+  contentReleaseLimit: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -59,6 +71,19 @@ export const createPersistedShellState = (
   sourcePackageId: target.sourcePackageId,
   importJobId: target.importJobId,
   contentReleaseId: target.contentReleaseId,
+  sourcePackageStatusFilter: target.sourcePackageStatusFilter,
+  sourcePackageMediaTypeFilter: target.sourcePackageMediaTypeFilter,
+  sourcePackageFileNameFilter: target.sourcePackageFileNameFilter,
+  sourcePackageLatestImportStatusFilter:
+    target.sourcePackageLatestImportStatusFilter,
+  sourcePackageLimit: target.sourcePackageLimit,
+  importJobStatusFilter: target.importJobStatusFilter,
+  importJobSourcePackageFilter: target.importJobSourcePackageFilter,
+  importJobLimit: target.importJobLimit,
+  contentReleaseStatusFilter: target.contentReleaseStatusFilter,
+  contentReleaseImportJobFilter: target.contentReleaseImportJobFilter,
+  contentReleaseSourcePackageFilter: target.contentReleaseSourcePackageFilter,
+  contentReleaseLimit: target.contentReleaseLimit,
   participantSessionId: target.participantSessionId,
   testRunId: target.testRunId,
   currentUnitKey: target.currentUnitKey,
@@ -109,6 +134,31 @@ export const applyHydratedShellState = (
   target.sourcePackageId = snapshot.sourcePackageId ?? target.sourcePackageId;
   target.importJobId = snapshot.importJobId ?? target.importJobId;
   target.contentReleaseId = snapshot.contentReleaseId ?? target.contentReleaseId;
+  target.sourcePackageStatusFilter =
+    snapshot.sourcePackageStatusFilter ?? target.sourcePackageStatusFilter;
+  target.sourcePackageMediaTypeFilter =
+    snapshot.sourcePackageMediaTypeFilter ?? target.sourcePackageMediaTypeFilter;
+  target.sourcePackageFileNameFilter =
+    snapshot.sourcePackageFileNameFilter ?? target.sourcePackageFileNameFilter;
+  target.sourcePackageLatestImportStatusFilter =
+    snapshot.sourcePackageLatestImportStatusFilter ??
+    target.sourcePackageLatestImportStatusFilter;
+  target.sourcePackageLimit =
+    snapshot.sourcePackageLimit ?? target.sourcePackageLimit;
+  target.importJobStatusFilter =
+    snapshot.importJobStatusFilter ?? target.importJobStatusFilter;
+  target.importJobSourcePackageFilter =
+    snapshot.importJobSourcePackageFilter ?? target.importJobSourcePackageFilter;
+  target.importJobLimit = snapshot.importJobLimit ?? target.importJobLimit;
+  target.contentReleaseStatusFilter =
+    snapshot.contentReleaseStatusFilter ?? target.contentReleaseStatusFilter;
+  target.contentReleaseImportJobFilter =
+    snapshot.contentReleaseImportJobFilter ?? target.contentReleaseImportJobFilter;
+  target.contentReleaseSourcePackageFilter =
+    snapshot.contentReleaseSourcePackageFilter ??
+    target.contentReleaseSourcePackageFilter;
+  target.contentReleaseLimit =
+    snapshot.contentReleaseLimit ?? target.contentReleaseLimit;
   target.participantSessionId = snapshot.participantSessionId ?? target.participantSessionId;
   target.testRunId = snapshot.testRunId ?? target.testRunId;
   target.currentUnitKey = snapshot.currentUnitKey ?? target.currentUnitKey;

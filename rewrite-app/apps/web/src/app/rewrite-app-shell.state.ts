@@ -76,6 +76,18 @@ export interface ShellContentState {
   sourcePackageId: string;
   importJobId: string;
   contentReleaseId: string;
+  sourcePackageStatusFilter: string;
+  sourcePackageMediaTypeFilter: string;
+  sourcePackageFileNameFilter: string;
+  sourcePackageLatestImportStatusFilter: string;
+  sourcePackageLimit: string;
+  importJobStatusFilter: string;
+  importJobSourcePackageFilter: string;
+  importJobLimit: string;
+  contentReleaseStatusFilter: string;
+  contentReleaseImportJobFilter: string;
+  contentReleaseSourcePackageFilter: string;
+  contentReleaseLimit: string;
   forceActivation: boolean;
   sourcePackagesView: string;
   importJobsView: string;
@@ -193,6 +205,18 @@ export function createInitialShellContentState(
     sourcePackageId: "",
     importJobId: "",
     contentReleaseId: "",
+    sourcePackageStatusFilter: "",
+    sourcePackageMediaTypeFilter: "",
+    sourcePackageFileNameFilter: "",
+    sourcePackageLatestImportStatusFilter: "",
+    sourcePackageLimit: "100",
+    importJobStatusFilter: "",
+    importJobSourcePackageFilter: "",
+    importJobLimit: "100",
+    contentReleaseStatusFilter: "",
+    contentReleaseImportJobFilter: "",
+    contentReleaseSourcePackageFilter: "",
+    contentReleaseLimit: "100",
     forceActivation: false,
     sourcePackagesView: 'Use "Refresh Content Reads".',
     importJobsView: 'Use "Refresh Content Reads".',

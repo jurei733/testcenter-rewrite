@@ -70,6 +70,78 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <app-summary-cards [cards]="view.contentCards"></app-summary-cards>
       </article>
 
+      <article class="card">
+        <h2>Content Read Filters</h2>
+        <p>Narrow operator reads across source packages, import jobs, and releases before refreshing the content snapshot.</p>
+        <div class="form-grid full">
+          <label>
+            Source Package Status
+            <select id="sourcePackageStatusFilter" name="sourcePackageStatusFilter" [(ngModel)]="view.content.sourcePackageStatusFilter" (change)="view.persistState()">
+              <option value="">All package statuses</option>
+              <option *ngFor="let status of view.sourcePackageStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Source Package Media Type
+            <input id="sourcePackageMediaTypeFilter" name="sourcePackageMediaTypeFilter" placeholder="application/xml" [(ngModel)]="view.content.sourcePackageMediaTypeFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Source Package File Name
+            <input id="sourcePackageFileNameFilter" name="sourcePackageFileNameFilter" placeholder="fixed.xml" [(ngModel)]="view.content.sourcePackageFileNameFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Latest Import Status
+            <select id="sourcePackageLatestImportStatusFilter" name="sourcePackageLatestImportStatusFilter" [(ngModel)]="view.content.sourcePackageLatestImportStatusFilter" (change)="view.persistState()">
+              <option value="">All latest import statuses</option>
+              <option *ngFor="let status of view.importJobStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Source Package Limit
+            <input id="sourcePackageLimit" name="sourcePackageLimit" inputmode="numeric" [(ngModel)]="view.content.sourcePackageLimit" (change)="view.persistState()" />
+          </label>
+          <label>
+            Import Job Status
+            <select id="importJobStatusFilter" name="importJobStatusFilter" [(ngModel)]="view.content.importJobStatusFilter" (change)="view.persistState()">
+              <option value="">All import statuses</option>
+              <option *ngFor="let status of view.importJobStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Import Job Source Package Id
+            <input id="importJobSourcePackageFilter" name="importJobSourcePackageFilter" placeholder="source package id" [(ngModel)]="view.content.importJobSourcePackageFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Import Job Limit
+            <input id="importJobLimit" name="importJobLimit" inputmode="numeric" [(ngModel)]="view.content.importJobLimit" (change)="view.persistState()" />
+          </label>
+          <label>
+            Release Status
+            <select id="contentReleaseStatusFilter" name="contentReleaseStatusFilter" [(ngModel)]="view.content.contentReleaseStatusFilter" (change)="view.persistState()">
+              <option value="">All release statuses</option>
+              <option *ngFor="let status of view.contentReleaseStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Release Import Job Id
+            <input id="contentReleaseImportJobFilter" name="contentReleaseImportJobFilter" placeholder="import job id" [(ngModel)]="view.content.contentReleaseImportJobFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Release Source Package Id
+            <input id="contentReleaseSourcePackageFilter" name="contentReleaseSourcePackageFilter" placeholder="source package id" [(ngModel)]="view.content.contentReleaseSourcePackageFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Release Limit
+            <input id="contentReleaseLimit" name="contentReleaseLimit" inputmode="numeric" [(ngModel)]="view.content.contentReleaseLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" data-content-filter-action="apply" (click)="view.applyContentReadFilters()">Apply Content Filters</button>
+          <button class="secondary" type="button" (click)="view.useSelectedIdsAsContentReadFilters()">Use Selected IDs</button>
+          <button class="ghost" type="button" (click)="view.clearContentReadFilters()">Clear Content Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Content Action Queue"
         subtitle="Suggested next actions for intake, import diagnostics, retry, and release activation."

@@ -22,6 +22,18 @@ export type PersistedShellState = {
   sourcePackageId: string;
   importJobId: string;
   contentReleaseId: string;
+  sourcePackageStatusFilter: string;
+  sourcePackageMediaTypeFilter: string;
+  sourcePackageFileNameFilter: string;
+  sourcePackageLatestImportStatusFilter: string;
+  sourcePackageLimit: string;
+  importJobStatusFilter: string;
+  importJobSourcePackageFilter: string;
+  importJobLimit: string;
+  contentReleaseStatusFilter: string;
+  contentReleaseImportJobFilter: string;
+  contentReleaseSourcePackageFilter: string;
+  contentReleaseLimit: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;

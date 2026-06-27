@@ -11,6 +11,11 @@ import type {
   ListImportJobsResponse,
   ListSourcePackagesResponse
 } from "@testcenter-rewrite-app/contracts";
+import {
+  contentReleaseStatuses,
+  importJobStatuses,
+  sourcePackageStatuses
+} from "@testcenter-rewrite-app/domain";
 import { DEFAULT_SOURCE_DOCUMENT, type SummaryCard } from "./rewrite-app-shell.types";
 import {
   parseJsonDocument,
@@ -34,6 +39,9 @@ export class ContentViewFacade {
   private readonly router = inject(Router);
 
   readonly content = this.uiState.content;
+  readonly sourcePackageStatusOptions = sourcePackageStatuses;
+  readonly importJobStatusOptions = importJobStatuses;
+  readonly contentReleaseStatusOptions = contentReleaseStatuses;
 
   init(): void {
     this.viewState.setActiveView("content");
@@ -48,6 +56,42 @@ export class ContentViewFacade {
     this.content.sourceMediaType = "application/xml";
     this.content.sourceDocument = DEFAULT_SOURCE_DOCUMENT;
     this.persistState();
+  }
+
+  clearContentReadFilters(): void {
+    this.content.sourcePackageStatusFilter = "";
+    this.content.sourcePackageMediaTypeFilter = "";
+    this.content.sourcePackageFileNameFilter = "";
+    this.content.sourcePackageLatestImportStatusFilter = "";
+    this.content.sourcePackageLimit = "100";
+    this.content.importJobStatusFilter = "";
+    this.content.importJobSourcePackageFilter = "";
+    this.content.importJobLimit = "100";
+    this.content.contentReleaseStatusFilter = "";
+    this.content.contentReleaseImportJobFilter = "";
+    this.content.contentReleaseSourcePackageFilter = "";
+    this.content.contentReleaseLimit = "100";
+    this.persistState();
+    this.viewState.onActionAsync(() => this.contentService.refreshContentReads());
+  }
+
+  useSelectedIdsAsContentReadFilters(): void {
+    const sourcePackageId = this.content.sourcePackageId.trim();
+    const importJobId = this.content.importJobId.trim();
+    if (sourcePackageId) {
+      this.content.importJobSourcePackageFilter = sourcePackageId;
+      this.content.contentReleaseSourcePackageFilter = sourcePackageId;
+    }
+    if (importJobId) {
+      this.content.contentReleaseImportJobFilter = importJobId;
+    }
+    this.persistState();
+    this.refreshContentReads();
+  }
+
+  applyContentReadFilters(): void {
+    this.persistState();
+    this.refreshContentReads();
   }
 
   get contentCards(): SummaryCard[] {

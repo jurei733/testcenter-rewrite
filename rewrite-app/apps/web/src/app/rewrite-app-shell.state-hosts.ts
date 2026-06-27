@@ -140,6 +140,78 @@ export function createShellPersistenceStateHost(args: {
     set contentReleaseId(nextValue) {
       args.contentState.contentReleaseId = nextValue;
     },
+    get sourcePackageStatusFilter() {
+      return args.contentState.sourcePackageStatusFilter;
+    },
+    set sourcePackageStatusFilter(nextValue) {
+      args.contentState.sourcePackageStatusFilter = nextValue;
+    },
+    get sourcePackageMediaTypeFilter() {
+      return args.contentState.sourcePackageMediaTypeFilter;
+    },
+    set sourcePackageMediaTypeFilter(nextValue) {
+      args.contentState.sourcePackageMediaTypeFilter = nextValue;
+    },
+    get sourcePackageFileNameFilter() {
+      return args.contentState.sourcePackageFileNameFilter;
+    },
+    set sourcePackageFileNameFilter(nextValue) {
+      args.contentState.sourcePackageFileNameFilter = nextValue;
+    },
+    get sourcePackageLatestImportStatusFilter() {
+      return args.contentState.sourcePackageLatestImportStatusFilter;
+    },
+    set sourcePackageLatestImportStatusFilter(nextValue) {
+      args.contentState.sourcePackageLatestImportStatusFilter = nextValue;
+    },
+    get sourcePackageLimit() {
+      return args.contentState.sourcePackageLimit;
+    },
+    set sourcePackageLimit(nextValue) {
+      args.contentState.sourcePackageLimit = nextValue;
+    },
+    get importJobStatusFilter() {
+      return args.contentState.importJobStatusFilter;
+    },
+    set importJobStatusFilter(nextValue) {
+      args.contentState.importJobStatusFilter = nextValue;
+    },
+    get importJobSourcePackageFilter() {
+      return args.contentState.importJobSourcePackageFilter;
+    },
+    set importJobSourcePackageFilter(nextValue) {
+      args.contentState.importJobSourcePackageFilter = nextValue;
+    },
+    get importJobLimit() {
+      return args.contentState.importJobLimit;
+    },
+    set importJobLimit(nextValue) {
+      args.contentState.importJobLimit = nextValue;
+    },
+    get contentReleaseStatusFilter() {
+      return args.contentState.contentReleaseStatusFilter;
+    },
+    set contentReleaseStatusFilter(nextValue) {
+      args.contentState.contentReleaseStatusFilter = nextValue;
+    },
+    get contentReleaseImportJobFilter() {
+      return args.contentState.contentReleaseImportJobFilter;
+    },
+    set contentReleaseImportJobFilter(nextValue) {
+      args.contentState.contentReleaseImportJobFilter = nextValue;
+    },
+    get contentReleaseSourcePackageFilter() {
+      return args.contentState.contentReleaseSourcePackageFilter;
+    },
+    set contentReleaseSourcePackageFilter(nextValue) {
+      args.contentState.contentReleaseSourcePackageFilter = nextValue;
+    },
+    get contentReleaseLimit() {
+      return args.contentState.contentReleaseLimit;
+    },
+    set contentReleaseLimit(nextValue) {
+      args.contentState.contentReleaseLimit = nextValue;
+    },
     get participantSessionId() {
       return args.runtimeState.participantSessionId;
     },

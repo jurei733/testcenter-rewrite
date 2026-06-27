@@ -23,8 +23,28 @@ export function createContentReadsStateHost(args: {
     options?: { quiet?: boolean }
   ): Promise<T>;
   workspaceState: ShellWorkspaceState;
+  contentState: ShellContentState;
   createWorkspaceContentPresentationHost(): WorkspaceContentPresentationHost;
 }): ShellContentReadsHost {
+  const readQueryValue = (value: unknown): string =>
+    typeof value === "string" ? value.trim() : String(value ?? "").trim();
+
+  const appendQuery = (
+    path: string,
+    entries: Array<[string, unknown]>
+  ): string => {
+    const query = new URLSearchParams();
+    for (const [key, value] of entries) {
+      const trimmedValue = readQueryValue(value);
+      if (trimmedValue) {
+        query.set(key, trimmedValue);
+      }
+    }
+
+    const queryString = query.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
   const buildWorkspaceActivityPath = (): string => {
     const path = resolveRoutePath(
       productionApiRoutes.workspace.listWorkspaceActivityEvents,
@@ -34,10 +54,10 @@ export function createContentReadsStateHost(args: {
       }
     );
     const query = new URLSearchParams();
-    const eventType = args.workspaceState.workspaceActivityEventType.trim();
-    const subjectType = args.workspaceState.workspaceActivitySubjectType.trim();
-    const subjectId = args.workspaceState.workspaceActivitySubjectId.trim();
-    const limit = args.workspaceState.workspaceActivityLimit.trim();
+    const eventType = readQueryValue(args.workspaceState.workspaceActivityEventType);
+    const subjectType = readQueryValue(args.workspaceState.workspaceActivitySubjectType);
+    const subjectId = readQueryValue(args.workspaceState.workspaceActivitySubjectId);
+    const limit = readQueryValue(args.workspaceState.workspaceActivityLimit);
 
     if (eventType) {
       query.set("eventType", eventType);
@@ -56,6 +76,51 @@ export function createContentReadsStateHost(args: {
     return queryString ? `${path}?${queryString}` : path;
   };
 
+  const buildSourcePackagesPath = (): string =>
+    appendQuery(
+      resolveRoutePath(productionApiRoutes.workspace.listSourcePackages, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+      [
+        ["status", args.contentState.sourcePackageStatusFilter],
+        ["mediaType", args.contentState.sourcePackageMediaTypeFilter],
+        ["fileName", args.contentState.sourcePackageFileNameFilter],
+        [
+          "latestImportStatus",
+          args.contentState.sourcePackageLatestImportStatusFilter
+        ],
+        ["limit", args.contentState.sourcePackageLimit]
+      ]
+    );
+
+  const buildImportJobsPath = (): string =>
+    appendQuery(
+      resolveRoutePath(productionApiRoutes.workspace.listImportJobs, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+      [
+        ["status", args.contentState.importJobStatusFilter],
+        ["sourcePackageId", args.contentState.importJobSourcePackageFilter],
+        ["limit", args.contentState.importJobLimit]
+      ]
+    );
+
+  const buildContentReleasesPath = (): string =>
+    appendQuery(
+      resolveRoutePath(productionApiRoutes.workspace.listContentReleases, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+      [
+        ["status", args.contentState.contentReleaseStatusFilter],
+        ["importJobId", args.contentState.contentReleaseImportJobFilter],
+        ["sourcePackageId", args.contentState.contentReleaseSourcePackageFilter],
+        ["limit", args.contentState.contentReleaseLimit]
+      ]
+    );
+
   return {
     request: args.request,
     getWorkspaceOverviewPath: () =>
@@ -64,26 +129,14 @@ export function createContentReadsStateHost(args: {
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
     getWorkspaceActivityPath: buildWorkspaceActivityPath,
-    getSourcePackagesPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listSourcePackages, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
-    getImportJobsPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listImportJobs, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+    getSourcePackagesPath: buildSourcePackagesPath,
+    getImportJobsPath: buildImportJobsPath,
     getParticipantSessionsPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
-    getContentReleasesPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listContentReleases, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+    getContentReleasesPath: buildContentReleasesPath,
     createWorkspaceContentPresentationHost: args.createWorkspaceContentPresentationHost
   };
 }

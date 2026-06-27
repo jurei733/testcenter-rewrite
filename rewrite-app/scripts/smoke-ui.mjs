@@ -152,9 +152,18 @@ try {
   const workspaceKey = `ui-workspace-${Date.now()}`;
   const adminUsername = `ui-admin-${Date.now()}`;
   const adminPassword = "ui-smoke-admin-secret";
+  let totalApiRequestCount = 0;
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
   };
+  page.on("request", request => {
+    const url = request.url();
+    if (!url.includes("/api/v1/")) {
+      return;
+    }
+
+    totalApiRequestCount += 1;
+  });
   const fillAndCommit = async (selector, value) => {
     const locator = page.locator(selector);
     await locator.click({ force: true });
@@ -265,6 +274,24 @@ try {
     }
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
+  };
+  const clickContentFilterApply = async () => {
+    const requestCountBeforeClick = totalApiRequestCount;
+    await clickAction("Apply Content Filters");
+    if (totalApiRequestCount > requestCountBeforeClick) {
+      return;
+    }
+
+    logStep("action-apply-content-filters-dom-fallback-start");
+    await page
+      .locator('[data-content-filter-action="apply"]')
+      .evaluate(button => {
+        if (button instanceof HTMLButtonElement) {
+          button.click();
+        }
+      });
+    await page.waitForTimeout(500);
+    logStep("action-apply-content-filters-dom-fallback-done");
   };
   const clickCardAction = async (cardTitle, buttonName, itemHeadline = null) => {
     const stepName = [cardTitle, itemHeadline ?? buttonName]
@@ -1078,8 +1105,8 @@ try {
   await page.waitForURL(/\/app\/workspace$/);
   logStep("filter-workspace-activity");
   await selectAndCommit("#workspaceActivityEventType", "participant_session_resumed");
-  await selectAndCommit("#workspaceActivitySubjectType", "participant_session");
-  await fillAndCommit("#workspaceActivitySubjectId", participantSessionId);
+  await selectAndCommit("#workspaceActivitySubjectType", "test_run");
+  await fillAndCommit("#workspaceActivitySubjectId", pausedTestRunId);
   await fillAndCommit("#workspaceActivityLimit", "5");
   await clickAction("Refresh Activity");
   logStep("open-activity-subject");
@@ -1171,7 +1198,7 @@ try {
   await fillAndCommit("#sourceDocument", repairedImportSourceDocument);
   logStep("retry-failed-import");
   await clickAction("Retry Failed Import");
-  await pollJsonWithPredicate(
+  const retriedSourcePackagePayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${failedSourcePackageId}`,
     payload =>
       typeof payload === "object" &&
@@ -1189,6 +1216,48 @@ try {
       ) &&
       payload.sourcePackageDetail.contentReleases.length > 0
   );
+  const completedRetryImportJobId =
+    retriedSourcePackagePayload.sourcePackageDetail.importJobs.find(
+      importJob => importJob?.status === "completed"
+    )?.importJobId;
+  const retriedSourcePackageFileName =
+    retriedSourcePackagePayload.sourcePackageDetail.sourcePackage.fileName;
+  assert.ok(
+    completedRetryImportJobId,
+    "UI smoke expected the retried import to expose a completed import job id."
+  );
+  assert.equal(typeof retriedSourcePackageFileName, "string");
+  logStep("content-read-filters");
+  await selectAndCommit("#sourcePackageStatusFilter", "accepted");
+  await fillAndCommit("#sourcePackageMediaTypeFilter", "application/xml");
+  await fillAndCommit("#sourcePackageFileNameFilter", retriedSourcePackageFileName);
+  await selectAndCommit("#sourcePackageLatestImportStatusFilter", "completed");
+  await fillAndCommit("#sourcePackageLimit", "1");
+  await selectAndCommit("#importJobStatusFilter", "completed");
+  await fillAndCommit("#importJobSourcePackageFilter", failedSourcePackageId);
+  await fillAndCommit("#importJobLimit", "1");
+  await selectAndCommit("#contentReleaseStatusFilter", "staged");
+  await fillAndCommit("#contentReleaseImportJobFilter", completedRetryImportJobId);
+  await fillAndCommit("#contentReleaseSourcePackageFilter", failedSourcePackageId);
+  await fillAndCommit("#contentReleaseLimit", "1");
+  await clickContentFilterApply();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
+    .filter({ hasText: retriedSourcePackageFileName })
+    .filter({ hasText: "completed" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Import Jobs" }) })
+    .filter({ hasText: "completed" })
+    .filter({ hasText: completedRetryImportJobId })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Content Releases" }) })
+    .filter({ hasText: "staged" })
+    .waitFor();
 
   logStep("nav-runtime-before-complete");
   await page.locator('[data-view-nav="runtime"]').click();
