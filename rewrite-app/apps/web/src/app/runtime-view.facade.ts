@@ -19,6 +19,21 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 
+type RuntimePlayerPreview = {
+  hasRun: boolean;
+  bookletLabel: string;
+  unitLabel: string;
+  unitKey: string;
+  runStatus: string;
+  runId: string;
+  availableActions: string[];
+  hint: string;
+  canSaveProgress: boolean;
+  canResume: boolean;
+  canComplete: boolean;
+  saveProgressLabel: string;
+};
+
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -303,6 +318,60 @@ export class RuntimeViewFacade {
     ];
   }
 
+  get playerPreview(): RuntimePlayerPreview {
+    const currentRunState = parseJsonDocument<ParticipantCurrentRunStateResponse>(
+      this.runtime.currentRunStateView
+    )?.currentRunState;
+
+    if (!currentRunState) {
+      return {
+        hasRun: false,
+        bookletLabel: "No active booklet",
+        unitLabel: "No unit loaded",
+        unitKey: "n/a",
+        runStatus: "idle",
+        runId: this.runtime.testRunId.trim() || "no run selected",
+        availableActions: [],
+        hint: "Sign in and resume a participant session to load the first unit.",
+        canSaveProgress: false,
+        canResume: false,
+        canComplete: false,
+        saveProgressLabel: "Save Progress"
+      };
+    }
+
+    const unitLabel =
+      currentRunState.currentUnit.displayLabel ??
+      currentRunState.currentUnit.unitKey ??
+      "Untitled unit";
+    const unitKey = currentRunState.currentUnit.unitKey ?? "n/a";
+    const canSaveProgress =
+      currentRunState.availableActions.includes("save_progress");
+    const canResume = currentRunState.availableActions.includes("resume");
+    const canComplete = currentRunState.availableActions.includes("complete");
+
+    return {
+      hasRun: true,
+      bookletLabel: currentRunState.booklet.displayLabel,
+      unitLabel,
+      unitKey,
+      runStatus: currentRunState.testRun.status,
+      runId: currentRunState.testRun.testRunId,
+      availableActions: currentRunState.availableActions,
+      hint:
+        currentRunState.testRun.status === "completed"
+          ? "This run is complete; monitor reads should no longer list it as an open blocker."
+          : "This preview is sourced from the same current-state endpoint a participant shell can use.",
+      canSaveProgress,
+      canResume,
+      canComplete,
+      saveProgressLabel:
+        currentRunState.testRun.status === "paused"
+          ? "Save Running"
+          : "Save Paused"
+    };
+  }
+
   get runtimeActionItems(): RecordCollectionItem[] {
     const runtimeState = parseJsonDocument<ParticipantRuntimeStateResponse>(
       this.runtime.runtimeStateView
@@ -504,6 +573,14 @@ export class RuntimeViewFacade {
 
   saveProgressRunning(): void {
     this.viewState.onActionAsync(() => this.runtimeService.saveProgress("running"));
+  }
+
+  saveProgressFromPreview(): void {
+    if (this.playerPreview.runStatus === "paused") {
+      this.saveProgressRunning();
+      return;
+    }
+    this.saveProgressPaused();
   }
 
   resumeRun(): void {

@@ -798,6 +798,18 @@ try {
       payload.currentRunState.testRun.status === "paused" &&
       payload.currentRunState.testRun.currentUnitKey === "unit-paused"
   );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#playerPreviewStatus")?.textContent?.trim() ===
+        "paused" &&
+      document.querySelector("#playerPreviewUnitKey")?.textContent?.trim() ===
+        "unit-paused" &&
+      document
+        .querySelector("#playerPreviewActions")
+        ?.textContent?.includes("resume"),
+    undefined,
+    { timeout: 15_000 }
+  );
   const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
   assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
   await fillAndCommit("#testRunId", pausedTestRunId);

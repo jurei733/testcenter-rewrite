@@ -58,6 +58,40 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <app-summary-cards [cards]="view.runtimeCards"></app-summary-cards>
       </article>
 
+      <article class="card" id="participantPlayerPreview">
+        <h2>Participant Player Preview</h2>
+        <p>A minimal participant-facing view of the selected run, sourced from the current-state read model.</p>
+        <div class="record-card" [class.is-selected]="view.playerPreview.hasRun">
+          <header>
+            <div>
+              <h3 id="playerPreviewUnit">{{ view.playerPreview.unitLabel }}</h3>
+              <span id="playerPreviewBooklet">{{ view.playerPreview.bookletLabel }}</span>
+            </div>
+            <span id="playerPreviewStatus">{{ view.playerPreview.runStatus }}</span>
+          </header>
+          <dl>
+            <div>
+              <dt>Unit Key</dt>
+              <dd id="playerPreviewUnitKey">{{ view.playerPreview.unitKey }}</dd>
+            </div>
+            <div>
+              <dt>Run</dt>
+              <dd id="playerPreviewRunId">{{ view.playerPreview.runId }}</dd>
+            </div>
+            <div>
+              <dt>Available Actions</dt>
+              <dd id="playerPreviewActions">{{ view.playerPreview.availableActions.join(", ") || "none" }}</dd>
+            </div>
+          </dl>
+          <p>{{ view.playerPreview.hint }}</p>
+          <div class="actions">
+            <button class="secondary" type="button" [disabled]="!view.playerPreview.canSaveProgress" (click)="view.saveProgressFromPreview()">Preview {{ view.playerPreview.saveProgressLabel }}</button>
+            <button class="ghost" type="button" [disabled]="!view.playerPreview.canResume" (click)="view.resumeRun()">Resume</button>
+            <button class="ghost" type="button" [disabled]="!view.playerPreview.canComplete" (click)="view.completeRun()">Complete</button>
+          </div>
+        </div>
+      </article>
+
       <app-record-collection
         title="Runtime Action Queue"
         subtitle="Suggested next actions derived from the selected session, current run, and monitor blockers."
