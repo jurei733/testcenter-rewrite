@@ -46,7 +46,7 @@
     "test:integration:postgres:built": "node ./scripts/run-postgres-integration.mjs",
     "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api && ng build rewrite-app-web --configuration development",
     "start:api": "node apps/api/dist/apps/api/src/index.js",
-    "start:local": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_BOOTSTRAP_DEMO=true npm run start:api",
+    "start:local": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_BOOTSTRAP_DEMO=true node ./scripts/with-build-metadata.mjs npm run start:api",
     "start:compose:postgres": "docker compose -f docker-compose.postgres.yml up --build",
     "start:compose:postgres:demo": "FIRST_SLICE_BOOTSTRAP_DEMO=true docker compose -f docker-compose.postgres.yml up --build",
     "stop:compose:postgres": "docker compose -f docker-compose.postgres.yml down",

@@ -64,6 +64,7 @@ npm run start:local
 ```
 
 That builds the API and Angular shell, migrates `./.data/local.sqlite`, starts the API with SQLite persistence and protected operator routes, then serves the app at `http://127.0.0.1:4310/app`.
+The local start also fills `APP_BUILD_SHA` from Git and `APP_BUILD_TIMESTAMP` from the current UTC time when they are not already set, so `/manifest`, `/metrics`, and the startup banner identify the running build.
 
 `start:local` also enables the local demo bootstrap. On a clean local database it creates:
 
