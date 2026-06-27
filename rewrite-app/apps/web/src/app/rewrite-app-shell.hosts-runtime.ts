@@ -41,6 +41,18 @@ export function createRuntimeActionsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getUpdateReviewPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.updateReview, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim(),
+        reviewId: args.runtimeState.reviewId.trim()
+      }),
+    getDeleteReviewPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.deleteReview, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim(),
+        reviewId: args.runtimeState.reviewId.trim()
+      }),
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getLoginKey: () => args.runtimeState.loginKey,
     getGroupKey: () => args.runtimeState.groupKey,

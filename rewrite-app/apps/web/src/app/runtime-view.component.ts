@@ -44,6 +44,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="currentUnitKey" name="currentUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
           </label>
           <label>
+            Review Id
+            <input id="reviewId" name="reviewId" placeholder="Filled after creating or selecting a review" [(ngModel)]="view.runtime.reviewId" (change)="view.persistState()" />
+          </label>
+          <label>
             Reviewer Id
             <input id="reviewerId" name="reviewerId" [(ngModel)]="view.runtime.reviewerId" (change)="view.persistState()" />
           </label>
@@ -67,6 +71,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
           <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
+          <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
+          <button class="ghost" type="button" (click)="view.deleteReview()">Delete Review</button>
           <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
           <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
           <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
@@ -190,7 +196,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Reviews"
         subtitle="Operator review comments attached to participant test runs or units."
         [items]="view.reviewItems"
-        (itemAction)="view.selectTestRun($event)"
+        (itemAction)="view.selectReview($event)"
         emptyState="Create or load reviews to inspect operator notes."
       ></app-record-collection>
 

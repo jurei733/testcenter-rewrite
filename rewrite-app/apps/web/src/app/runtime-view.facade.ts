@@ -344,6 +344,7 @@ export class RuntimeViewFacade {
           item.review.unitKey ?? "whole run"
         ],
         rows: [
+          { label: "Review Id", value: item.review.reviewId },
           { label: "Comment", value: this.formatResponsePreview(item.review.comment) },
           { label: "Run", value: item.review.testRunId },
           {
@@ -361,11 +362,15 @@ export class RuntimeViewFacade {
             this.runtime.currentUnitKey.trim() === item.review.unitKey),
         actionLabel: "Select Review",
         actionPayload: {
+          reviewId: item.review.reviewId,
           testRunId: item.review.testRunId,
           currentUnitKey: item.review.unitKey ?? "",
           participantSessionId: item.review.participantSessionId,
           loginKey: item.participantSession?.loginKey ?? "",
-          groupKey: item.participantSession?.groupKey ?? ""
+          groupKey: item.participantSession?.groupKey ?? "",
+          reviewerId: item.review.reviewerId,
+          reviewCategory: item.review.category,
+          reviewComment: item.review.comment
         }
       })) ?? []
     );
@@ -774,6 +779,14 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.createReview());
   }
 
+  updateReview(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.updateReview());
+  }
+
+  deleteReview(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.deleteReview());
+  }
+
   exportReviewsCsv(): void {
     this.viewState.onActionAsync(() => this.runtimeService.exportReviewsCsv());
   }
@@ -852,6 +865,22 @@ export class RuntimeViewFacade {
       await this.runtimeService.loadParticipantSessionDetail();
       await this.runtimeService.refreshRuntimeReads(true);
     });
+  }
+
+  selectReview(item: RecordCollectionItem): void {
+    if (item.actionPayload?.reviewId) {
+      this.runtime.reviewId = item.actionPayload.reviewId;
+    }
+    if (item.actionPayload?.reviewerId) {
+      this.runtime.reviewerId = item.actionPayload.reviewerId;
+    }
+    if (item.actionPayload?.reviewCategory) {
+      this.runtime.reviewCategory = item.actionPayload.reviewCategory;
+    }
+    if (item.actionPayload?.reviewComment) {
+      this.runtime.reviewComment = item.actionPayload.reviewComment;
+    }
+    this.selectTestRun(item);
   }
 
   private findParticipantSessionIdByLoginKey(loginKey: string): string | null {

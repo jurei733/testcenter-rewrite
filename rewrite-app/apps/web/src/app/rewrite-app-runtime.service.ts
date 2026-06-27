@@ -12,10 +12,12 @@ import {
   completeRunAction,
   createReviewAction,
   deleteGroupResultsAction,
+  deleteReviewAction,
   participantSignInAction,
   resumeParticipantSessionAction,
   resumeRunAction,
-  saveProgressAction
+  saveProgressAction,
+  updateReviewAction
 } from "./rewrite-app-shell.runtime-actions";
 import {
   exportReviewsCsvAction,
@@ -148,10 +150,39 @@ export class RewriteAppRuntimeService {
         this.refreshCrossViewStateAfterRuntimeChange()
       )
     );
+    this.runtimeState.reviewId = payload.item.review.reviewId;
     await loadReviewsAction(this.hosts.createRuntimeReadsHost());
     this.feedback.rememberActivity(
       "Review Created",
       `${payload.item.review.category} review saved for ${payload.item.review.testRunId}.`
+    );
+  }
+
+  async updateReview(): Promise<void> {
+    const payload = await updateReviewAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+    this.runtimeState.reviewId = payload.item.review.reviewId;
+    await loadReviewsAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Review Updated",
+      `${payload.item.review.category} review updated for ${payload.item.review.testRunId}.`
+    );
+  }
+
+  async deleteReview(): Promise<void> {
+    const payload = await deleteReviewAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+    this.runtimeState.reviewId = "";
+    await loadReviewsAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Review Deleted",
+      `Review ${payload.deletedReviewId} deleted.`
     );
   }
 

@@ -1,5 +1,6 @@
 import type {
   CreateReviewRequest,
+  DeleteReviewResponse,
   ReviewResponse,
   DeleteGroupResultsResponse,
   ParticipantSignInRequest,
@@ -7,7 +8,8 @@ import type {
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
-  SaveTestRunProgressResponse
+  SaveTestRunProgressResponse,
+  UpdateReviewRequest
 } from "@testcenter-rewrite-app/contracts";
 
 import {
@@ -33,6 +35,8 @@ export interface ShellRuntimeActionsHost {
   getCompleteRunPath(): string;
   getDeleteGroupResultsPath(): string;
   getCreateReviewPath(): string;
+  getUpdateReviewPath(): string;
+  getDeleteReviewPath(): string;
   getWorkspaceKey(): string;
   getLoginKey(): string;
   getGroupKey(): string;
@@ -62,6 +66,36 @@ export async function createReviewAction(
       category: host.getReviewCategory().trim(),
       comment: host.getReviewComment().trim()
     } satisfies CreateReviewRequest
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function updateReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<ReviewResponse> {
+  const payload = await host.request<ReviewResponse>(
+    "Update Review",
+    "PATCH",
+    host.getUpdateReviewPath(),
+    {
+      unitKey: host.getCurrentUnitKey().trim() || null,
+      reviewerId: host.getReviewerId().trim(),
+      category: host.getReviewCategory().trim(),
+      comment: host.getReviewComment().trim()
+    } satisfies UpdateReviewRequest
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function deleteReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<DeleteReviewResponse> {
+  const payload = await host.request<DeleteReviewResponse>(
+    "Delete Review",
+    "DELETE",
+    host.getDeleteReviewPath()
   );
   await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;

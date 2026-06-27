@@ -47,6 +47,7 @@ export interface ShellRuntimeState {
   testRunId: string;
   currentUnitKey: string;
   currentUnitResponse: string;
+  reviewId: string;
   reviewerId: string;
   reviewCategory: string;
   reviewComment: string;
@@ -149,6 +150,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     testRunId: "",
     currentUnitKey: "unit-1",
     currentUnitResponse: "",
+    reviewId: "",
     reviewerId: "operator-ui",
     reviewCategory: "note",
     reviewComment: "",

@@ -235,7 +235,20 @@ try {
     () =>
       document.body.textContent?.includes("Smoke review for adjusted response") &&
       document.body.textContent?.includes("operator-ui") &&
-      document.body.textContent?.includes("note · student-demo"),
+      document.body.textContent?.includes("note · student-demo") &&
+      document.querySelector("#reviewId")?.value?.trim().length > 0,
+    undefined,
+    { timeout: 15_000 }
+  );
+
+  await page.locator("#reviewComment").fill("Updated smoke review note");
+  await page.locator("#reviewComment").dispatchEvent("input");
+  await page.locator("#reviewComment").dispatchEvent("change");
+  await page.getByRole("button", { name: "Update Review" }).click();
+  await page.waitForFunction(
+    () =>
+      document.body.textContent?.includes("Updated smoke review note") &&
+      document.body.textContent?.includes("Review Updated"),
     undefined,
     { timeout: 15_000 }
   );
@@ -248,10 +261,16 @@ try {
     () =>
       document
         .querySelector("#reviewExportPreview")
-        ?.textContent?.includes("Smoke review for adjusted response"),
+        ?.textContent?.includes("Updated smoke review note"),
     undefined,
     { timeout: 15_000 }
   );
+
+  await page.getByRole("button", { name: "Delete Review" }).click();
+  await page
+    .getByText("Create or load reviews to inspect operator notes.")
+    .waitFor({ timeout: 15_000 });
+  await page.getByText("Review Deleted").waitFor({ timeout: 15_000 });
 
   const responseDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Responses CSV" }).click();
