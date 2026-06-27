@@ -228,6 +228,17 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#workspaceLogExportPreview")
+        ?.textContent?.includes("test_run_progress_saved"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   process.stdout.write(`Local demo smoke passed at ${baseUrl}/app\n`);
 } finally {
   if (browser) {

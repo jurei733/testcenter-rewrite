@@ -72,6 +72,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions/:participantSessionId",
     exportResponseCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
+    exportLogCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
     listContentReleases:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
     getContentRelease:

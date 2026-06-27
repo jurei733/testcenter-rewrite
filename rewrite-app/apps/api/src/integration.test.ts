@@ -1194,6 +1194,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       responseCsv.body,
       /"demo-tenant","demo-workspace","student-demo","group:student-demo".*"unit-intro","My first demo response"/
     );
+
+    const logCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(logCsv.status, 200);
+    assert.equal(logCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(logCsv.body, /^tenantKey,workspaceKey,activityEventId,eventType,/);
+    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"participant_signed_in"/);
+    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"test_run_progress_saved"/);
   } finally {
     await closeServer(isolated.server);
   }

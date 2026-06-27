@@ -36,6 +36,10 @@ export class WorkspaceViewFacade {
     return this.uiState.workspace.workspaceActivityView;
   }
 
+  get workspaceLogExportView(): string {
+    return this.uiState.workspace.workspaceLogExportView;
+  }
+
   get workspaceActionItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetWorkspaceOverviewResponse>(
       this.workspace.workspaceOverviewView
@@ -472,6 +476,10 @@ export class WorkspaceViewFacade {
     this.viewState.onActionAsync(() =>
       this.workspaceService.refreshWorkspaceDirectory()
     );
+  }
+
+  exportWorkspaceLogCsv(): void {
+    this.viewState.onActionAsync(() => this.workspaceService.exportWorkspaceLogCsv());
   }
 
   selectTenant(item: RecordCollectionItem): void {

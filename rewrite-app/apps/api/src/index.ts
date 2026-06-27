@@ -835,6 +835,9 @@ const participantSessionDetailPattern = createRoutePattern(
 const responseCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportResponseCsv
 );
+const logCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportLogCsv
+);
 const importJobDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getImportJob
 );
@@ -890,6 +893,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
   ["GET", responseCsvExportPattern],
+  ["GET", logCsvExportPattern],
   ["GET", contentReleaseListPattern],
   ["GET", contentReleaseDetailPattern],
   ["GET", contentReleaseActivationReadinessPattern],
@@ -1220,6 +1224,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       responseCsvExportPattern,
       productionApiRoutes.workspace.exportResponseCsv
+    ],
+    [
+      "GET",
+      logCsvExportPattern,
+      productionApiRoutes.workspace.exportLogCsv
     ],
     [
       "GET",
@@ -2034,6 +2043,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
+      const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
         const tenantKey = decodeRouteGroup(importJobListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(importJobListMatch.groups.workspaceKey);
@@ -2153,6 +2163,27 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendCsv(response, 200, `${workspaceKey}-responses.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && logCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(logCsvExportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(logCsvExportMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportLogCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-logs.csv`, csv);
         return;
       }
 

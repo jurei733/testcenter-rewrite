@@ -82,6 +82,26 @@ export class RewriteAppWorkspaceService {
     );
   }
 
+  async exportWorkspaceLogCsv(): Promise<string> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Workspace Log CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportLogCsv, {
+        tenantKey,
+        workspaceKey
+      })
+    );
+
+    this.workspaceState.workspaceLogExportView = csv;
+    this.feedback.rememberActivity(
+      "Workspace Log Exported",
+      `CSV log export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async bootstrapWorkspaceFlow(): Promise<void> {
     await runBootstrapWorkspaceFlow(createBootstrapWorkspaceFlowHost({
       createTenant: () => this.createTenant(),

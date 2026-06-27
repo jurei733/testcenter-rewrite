@@ -88,6 +88,10 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     eventType?: WorkspaceActivityEvent["eventType"];
   }): Promise<WorkspaceActivityEventListItem[]>;
+  exportLogCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
   getSourcePackageDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -287,6 +291,7 @@ export const firstSliceUseCases = {
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
+  exportLogCsv: "ExportLogCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
   listSourcePackages: "ListSourcePackages",
   createSourcePackage: "CreateSourcePackage",
@@ -986,6 +991,50 @@ const formatResponseCsv = (input: {
         row.status,
         row.updatedAt,
         row.completedAt
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatWorkspaceActivityCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  activityEvents: WorkspaceActivityEvent[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "activityEventId",
+    "eventType",
+    "actorId",
+    "subjectType",
+    "subjectId",
+    "occurredAt",
+    "summary",
+    "detailsJson"
+  ];
+  const rows = [...input.activityEvents].sort(
+    (left, right) =>
+      left.occurredAt.localeCompare(right.occurredAt) ||
+      left.activityEventId.localeCompare(right.activityEventId)
+  );
+
+  return [
+    header.join(","),
+    ...rows.map(activityEvent =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        activityEvent.activityEventId,
+        activityEvent.eventType,
+        activityEvent.actorId ?? "",
+        activityEvent.subjectType,
+        activityEvent.subjectId,
+        activityEvent.occurredAt,
+        activityEvent.summary,
+        JSON.stringify(activityEvent.details)
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -2204,6 +2253,24 @@ export const createFirstSliceServices = (
           )
           .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
           .map(activityEvent => ({ activityEvent }));
+      },
+      async exportLogCsv(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const activityEvents =
+          await repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+
+        return formatWorkspaceActivityCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          activityEvents
+        });
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(

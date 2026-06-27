@@ -68,6 +68,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button class="ghost" type="button" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
+          <button class="ghost" type="button" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
         </div>
       </article>
 
@@ -138,6 +139,12 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="No detailed workspace activity is loaded yet."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Workspace Log CSV Export</h2>
+        <p>Workspace activity events in chronological CSV form for audit and operations handoff.</p>
+        <pre id="workspaceLogExportPreview">{{ view.workspaceLogExportView }}</pre>
+      </article>
+
       <app-json-panel
         title="Workspace Overview"
         subtitle="Read Model"
@@ -150,6 +157,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Operator Timeline"
         viewId="workspaceActivityView"
         [content]="view.workspaceActivityView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Workspace Log CSV Export"
+        subtitle="Operator Timeline CSV"
+        viewId="workspaceLogExportView"
+        [content]="view.workspaceLogExportView"
       ></app-json-panel>
     </div>
   `

@@ -84,6 +84,7 @@ export interface ShellWorkspaceState {
   workspacesView: string;
   workspaceOverviewView: string;
   workspaceActivityView: string;
+  workspaceLogExportView: string;
   workspaceLoaded: boolean;
 }
 
@@ -184,6 +185,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
+    workspaceLogExportView: 'Use "Export Workspace Logs CSV".',
     workspaceLoaded: false
   };
 }
