@@ -10,6 +10,10 @@ import type {
   ListWorkspacesResponse,
   ListWorkspaceActivityEventsResponse
 } from "@testcenter-rewrite-app/contracts";
+import {
+  workspaceActivityEventTypes,
+  workspaceActivitySubjectTypes
+} from "@testcenter-rewrite-app/domain";
 import type { SummaryCard } from "./rewrite-app-shell.types";
 import {
   parseJsonDocument,
@@ -33,6 +37,8 @@ export class WorkspaceViewFacade {
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
 
   readonly workspace = this.uiState.workspace;
+  readonly workspaceActivityEventTypeOptions = workspaceActivityEventTypes;
+  readonly workspaceActivitySubjectTypeOptions = workspaceActivitySubjectTypes;
 
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
@@ -591,6 +597,21 @@ export class WorkspaceViewFacade {
 
   refreshStudyMonitor(): void {
     this.viewState.onActionAsync(() => this.workspaceService.refreshStudyMonitor());
+  }
+
+  refreshWorkspaceActivity(): void {
+    this.persistState();
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.refreshWorkspaceActivity()
+    );
+  }
+
+  clearWorkspaceActivityFilters(): void {
+    this.workspace.workspaceActivityEventType = "";
+    this.workspace.workspaceActivitySubjectType = "";
+    this.workspace.workspaceActivitySubjectId = "";
+    this.workspace.workspaceActivityLimit = "100";
+    this.refreshWorkspaceActivity();
   }
 
   openStudyMonitorGroup(item: RecordCollectionItem): void {

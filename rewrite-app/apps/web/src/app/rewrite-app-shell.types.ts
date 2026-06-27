@@ -29,6 +29,10 @@ export type PersistedShellState = {
   groupKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
+  workspaceActivityEventType: string;
+  workspaceActivitySubjectType: string;
+  workspaceActivitySubjectId: string;
+  workspaceActivityLimit: string;
   forceActivation: boolean;
   adminUsername: string;
   adminDisplayName: string;

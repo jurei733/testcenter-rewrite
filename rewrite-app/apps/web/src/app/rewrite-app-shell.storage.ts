@@ -17,6 +17,10 @@ export type ShellPersistenceTarget = {
   groupKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
+  workspaceActivityEventType: string;
+  workspaceActivitySubjectType: string;
+  workspaceActivitySubjectId: string;
+  workspaceActivityLimit: string;
   forceActivation: boolean;
   adminUsername: string;
   adminDisplayName: string;
@@ -57,6 +61,10 @@ export const createPersistedShellState = (
   groupKey: target.groupKey,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
+  workspaceActivityEventType: target.workspaceActivityEventType,
+  workspaceActivitySubjectType: target.workspaceActivitySubjectType,
+  workspaceActivitySubjectId: target.workspaceActivitySubjectId,
+  workspaceActivityLimit: target.workspaceActivityLimit,
   forceActivation: target.forceActivation,
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
@@ -98,6 +106,14 @@ export const applyHydratedShellState = (
   target.groupKey = snapshot.groupKey ?? target.groupKey;
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;
+  target.workspaceActivityEventType =
+    snapshot.workspaceActivityEventType ?? target.workspaceActivityEventType;
+  target.workspaceActivitySubjectType =
+    snapshot.workspaceActivitySubjectType ?? target.workspaceActivitySubjectType;
+  target.workspaceActivitySubjectId =
+    snapshot.workspaceActivitySubjectId ?? target.workspaceActivitySubjectId;
+  target.workspaceActivityLimit =
+    snapshot.workspaceActivityLimit ?? target.workspaceActivityLimit;
   target.forceActivation = snapshot.forceActivation ?? target.forceActivation;
   target.adminUsername = snapshot.adminUsername ?? target.adminUsername;
   target.adminDisplayName = snapshot.adminDisplayName ?? target.adminDisplayName;

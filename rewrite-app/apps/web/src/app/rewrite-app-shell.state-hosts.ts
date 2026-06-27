@@ -182,6 +182,30 @@ export function createShellPersistenceStateHost(args: {
     set autoRefreshSeconds(nextValue) {
       args.workspaceState.autoRefreshSeconds = nextValue;
     },
+    get workspaceActivityEventType() {
+      return args.workspaceState.workspaceActivityEventType;
+    },
+    set workspaceActivityEventType(nextValue) {
+      args.workspaceState.workspaceActivityEventType = nextValue;
+    },
+    get workspaceActivitySubjectType() {
+      return args.workspaceState.workspaceActivitySubjectType;
+    },
+    set workspaceActivitySubjectType(nextValue) {
+      args.workspaceState.workspaceActivitySubjectType = nextValue;
+    },
+    get workspaceActivitySubjectId() {
+      return args.workspaceState.workspaceActivitySubjectId;
+    },
+    set workspaceActivitySubjectId(nextValue) {
+      args.workspaceState.workspaceActivitySubjectId = nextValue;
+    },
+    get workspaceActivityLimit() {
+      return args.workspaceState.workspaceActivityLimit;
+    },
+    set workspaceActivityLimit(nextValue) {
+      args.workspaceState.workspaceActivityLimit = nextValue;
+    },
     get forceActivation() {
       return args.contentState.forceActivation;
     },

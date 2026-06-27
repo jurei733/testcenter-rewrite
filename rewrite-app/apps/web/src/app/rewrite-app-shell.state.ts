@@ -88,6 +88,10 @@ export interface ShellWorkspaceState {
   workspaceKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
+  workspaceActivityEventType: string;
+  workspaceActivitySubjectType: string;
+  workspaceActivitySubjectId: string;
+  workspaceActivityLimit: string;
   tenantsView: string;
   workspacesView: string;
   workspaceOverviewView: string;
@@ -199,6 +203,10 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceKey: "demo-workspace",
     autoRefreshEnabled: true,
     autoRefreshSeconds: 8,
+    workspaceActivityEventType: "",
+    workspaceActivitySubjectType: "",
+    workspaceActivitySubjectId: "",
+    workspaceActivityLimit: "100",
     tenantsView: 'Use "Refresh Tenant Directory".',
     workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',

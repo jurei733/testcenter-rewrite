@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import type {
   GetStudyMonitorGroupResponse,
   GetStudyMonitorSummaryResponse,
+  ListWorkspaceActivityEventsResponse,
   ListTenantsResponse,
   ListWorkspacesResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -72,6 +73,28 @@ export class RewriteAppWorkspaceService {
       this.feedback.rememberActivity(
         "Study Monitor Refreshed",
         `${payload.studyMonitorSummary.groups.length} group(s), ${payload.studyMonitorSummary.participantSessionCount} participant session(s).`
+      );
+    }
+  }
+
+  async refreshWorkspaceActivity(quiet = false): Promise<void> {
+    const host = this.contentHosts.createContentReadsHost();
+    const payload = await this.requestState.request<ListWorkspaceActivityEventsResponse>(
+      "Workspace Activity",
+      "GET",
+      host.getWorkspaceActivityPath(),
+      undefined,
+      { quiet }
+    );
+
+    this.workspaceState.workspaceActivityView = prettyPrintJson(
+      payload,
+      this.workspaceState.workspaceActivityView
+    );
+    if (!quiet) {
+      this.feedback.rememberActivity(
+        "Workspace Activity Refreshed",
+        `${payload.items.length} event(s) loaded with the current timeline filters.`
       );
     }
   }

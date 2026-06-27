@@ -140,9 +140,67 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="Open a group from the study monitor to inspect participant detail."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Workspace Activity Filters</h2>
+        <p>Focus the operator timeline by event, subject, or a concrete subject id before refreshing the activity feed.</p>
+        <div class="form-grid">
+          <label>
+            Event Type
+            <select
+              id="workspaceActivityEventType"
+              name="workspaceActivityEventType"
+              [(ngModel)]="view.workspace.workspaceActivityEventType"
+              (change)="view.persistState()"
+            >
+              <option value="">All events</option>
+              <option *ngFor="let eventType of view.workspaceActivityEventTypeOptions" [value]="eventType">{{ eventType }}</option>
+            </select>
+          </label>
+          <label>
+            Subject Type
+            <select
+              id="workspaceActivitySubjectType"
+              name="workspaceActivitySubjectType"
+              [(ngModel)]="view.workspace.workspaceActivitySubjectType"
+              (change)="view.persistState()"
+            >
+              <option value="">All subjects</option>
+              <option *ngFor="let subjectType of view.workspaceActivitySubjectTypeOptions" [value]="subjectType">{{ subjectType }}</option>
+            </select>
+          </label>
+          <label>
+            Subject Id
+            <input
+              id="workspaceActivitySubjectId"
+              name="workspaceActivitySubjectId"
+              [(ngModel)]="view.workspace.workspaceActivitySubjectId"
+              (change)="view.persistState()"
+              placeholder="Optional exact id"
+            />
+          </label>
+          <label>
+            Limit
+            <input
+              id="workspaceActivityLimit"
+              name="workspaceActivityLimit"
+              type="number"
+              min="1"
+              max="500"
+              step="1"
+              [(ngModel)]="view.workspace.workspaceActivityLimit"
+              (change)="view.persistState()"
+            />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshWorkspaceActivityButton" class="primary" type="button" (click)="view.refreshWorkspaceActivity()">Refresh Activity</button>
+          <button class="ghost" type="button" (click)="view.clearWorkspaceActivityFilters()">Clear Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Workspace Activity"
-        subtitle="Latest operator and system events for this scope."
+        subtitle="Latest operator and system events for this scope, narrowed by the current filters."
         [items]="view.workspaceActivityItems"
         (itemAction)="view.openActivitySubject($event)"
         emptyState="No workspace activity yet."

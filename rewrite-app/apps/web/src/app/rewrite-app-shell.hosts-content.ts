@@ -25,6 +25,37 @@ export function createContentReadsStateHost(args: {
   workspaceState: ShellWorkspaceState;
   createWorkspaceContentPresentationHost(): WorkspaceContentPresentationHost;
 }): ShellContentReadsHost {
+  const buildWorkspaceActivityPath = (): string => {
+    const path = resolveRoutePath(
+      productionApiRoutes.workspace.listWorkspaceActivityEvents,
+      {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }
+    );
+    const query = new URLSearchParams();
+    const eventType = args.workspaceState.workspaceActivityEventType.trim();
+    const subjectType = args.workspaceState.workspaceActivitySubjectType.trim();
+    const subjectId = args.workspaceState.workspaceActivitySubjectId.trim();
+    const limit = args.workspaceState.workspaceActivityLimit.trim();
+
+    if (eventType) {
+      query.set("eventType", eventType);
+    }
+    if (subjectType) {
+      query.set("subjectType", subjectType);
+    }
+    if (subjectId) {
+      query.set("subjectId", subjectId);
+    }
+    if (limit) {
+      query.set("limit", limit);
+    }
+
+    const queryString = query.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
   return {
     request: args.request,
     getWorkspaceOverviewPath: () =>
@@ -32,11 +63,7 @@ export function createContentReadsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
-    getWorkspaceActivityPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listWorkspaceActivityEvents, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+    getWorkspaceActivityPath: buildWorkspaceActivityPath,
     getSourcePackagesPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.listSourcePackages, {
         tenantKey: args.workspaceState.tenantKey.trim(),

@@ -1062,6 +1062,12 @@ try {
   logStep("nav-workspace-activity");
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
+  logStep("filter-workspace-activity");
+  await selectAndCommit("#workspaceActivityEventType", "participant_session_resumed");
+  await selectAndCommit("#workspaceActivitySubjectType", "participant_session");
+  await fillAndCommit("#workspaceActivitySubjectId", participantSessionId);
+  await fillAndCommit("#workspaceActivityLimit", "5");
+  await clickAction("Refresh Activity");
   logStep("open-activity-subject");
   await page
     .locator("article.card")
