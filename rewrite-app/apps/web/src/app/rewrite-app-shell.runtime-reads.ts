@@ -1,6 +1,7 @@
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
+  ListReviewsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
@@ -27,8 +28,12 @@ export interface ShellRuntimeReadsHost {
   getParticipantSessionDetailPath(): string;
   getDetailedResponsesPath(): string;
   setDetailedResponsesView(nextValue: string): void;
+  getReviewsPath(): string;
+  setReviewsView(nextValue: string): void;
   getResponseCsvExportPath(): string;
   setResponseExportView(nextValue: string): void;
+  getReviewCsvExportPath(): string;
+  setReviewExportView(nextValue: string): void;
   getCurrentRunStatePath(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
 }
@@ -114,6 +119,18 @@ export async function exportResponsesCsvAction(
   return csv;
 }
 
+export async function exportReviewsCsvAction(
+  host: ShellRuntimeReadsHost
+): Promise<string> {
+  const csv = await host.request<string>(
+    "Review CSV Export",
+    "GET",
+    host.getReviewCsvExportPath()
+  );
+  host.setReviewExportView(csv);
+  return csv;
+}
+
 export async function loadDetailedResponsesAction(
   host: ShellRuntimeReadsHost
 ): Promise<ListDetailedResponsesResponse> {
@@ -123,5 +140,17 @@ export async function loadDetailedResponsesAction(
     host.getDetailedResponsesPath()
   );
   host.setDetailedResponsesView(JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+export async function loadReviewsAction(
+  host: ShellRuntimeReadsHost
+): Promise<ListReviewsResponse> {
+  const payload = await host.request<ListReviewsResponse>(
+    "Reviews",
+    "GET",
+    host.getReviewsPath()
+  );
+  host.setReviewsView(JSON.stringify(payload, null, 2));
   return payload;
 }

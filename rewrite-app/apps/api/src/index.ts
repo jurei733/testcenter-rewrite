@@ -29,6 +29,7 @@ import {
   type CreateAdminUserResponse,
   type CreateImportJobRequest,
   type CreateImportJobResponse,
+  type CreateReviewRequest,
   type CreateSourcePackageRequest,
   type CreateSourcePackageResponse,
   type CreateTenantRequest,
@@ -36,12 +37,14 @@ import {
   type CreateWorkspaceRequest,
   type CreateWorkspaceResponse,
   type DeleteGroupResultsResponse,
+  type DeleteReviewResponse,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetAdminCurrentSessionResponse,
   type GetImportJobResponse,
   type GetParticipantSessionResponse,
   type ListDetailedResponsesResponse,
+  type ListReviewsResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
@@ -65,6 +68,7 @@ import {
   type ResumeParticipantSessionResponse,
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
+  type ReviewResponse,
   type RuntimeOperationalEvent,
   type ResetAdminUserPasswordRequest,
   type ResetAdminUserPasswordResponse,
@@ -75,6 +79,7 @@ import {
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
+  type UpdateReviewRequest,
   productionApiRoutes,
   type PublicAdminSession,
   type PublicAdminUser,
@@ -844,8 +849,17 @@ const responseCsvExportPattern = createRoutePattern(
 const logCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportLogCsv
 );
+const reviewCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportReviewCsv
+);
 const detailedResponsesPattern = createRoutePattern(
   productionApiRoutes.workspace.listDetailedResponses
+);
+const reviewListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listReviews
+);
+const reviewDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.updateReview
 );
 const deleteGroupResultsPattern = createRoutePattern(
   productionApiRoutes.workspace.deleteGroupResults
@@ -906,9 +920,14 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
   ["GET", detailedResponsesPattern],
+  ["GET", reviewListPattern],
+  ["POST", reviewListPattern],
+  ["PATCH", reviewDetailPattern],
+  ["DELETE", reviewDetailPattern],
   ["DELETE", deleteGroupResultsPattern],
   ["GET", responseCsvExportPattern],
   ["GET", logCsvExportPattern],
+  ["GET", reviewCsvExportPattern],
   ["GET", contentReleaseListPattern],
   ["GET", contentReleaseDetailPattern],
   ["GET", contentReleaseActivationReadinessPattern],
@@ -1246,6 +1265,26 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listDetailedResponses
     ],
     [
+      "GET",
+      reviewListPattern,
+      productionApiRoutes.workspace.listReviews
+    ],
+    [
+      "POST",
+      reviewListPattern,
+      productionApiRoutes.workspace.createReview
+    ],
+    [
+      "PATCH",
+      reviewDetailPattern,
+      productionApiRoutes.workspace.updateReview
+    ],
+    [
+      "DELETE",
+      reviewDetailPattern,
+      productionApiRoutes.workspace.deleteReview
+    ],
+    [
       "DELETE",
       deleteGroupResultsPattern,
       productionApiRoutes.workspace.deleteGroupResults
@@ -1259,6 +1298,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       logCsvExportPattern,
       productionApiRoutes.workspace.exportLogCsv
+    ],
+    [
+      "GET",
+      reviewCsvExportPattern,
+      productionApiRoutes.workspace.exportReviewCsv
     ],
     [
       "GET",
@@ -2102,9 +2146,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
       const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
+      const reviewListMatch = reviewListPattern.exec(pathname);
+      const reviewDetailMatch = reviewDetailPattern.exec(pathname);
       const deleteGroupResultsMatch = deleteGroupResultsPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
+      const reviewCsvExportMatch = reviewCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
         const tenantKey = decodeRouteGroup(importJobListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(importJobListMatch.groups.workspaceKey);
@@ -2227,6 +2274,106 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (request.method === "GET" && reviewListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(reviewListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(reviewListMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceReview.listReviews({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListReviewsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "POST" && reviewListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(reviewListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(reviewListMatch.groups.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<CreateReviewRequest>(request);
+        const item = await services.workspaceReview.createReview({
+          tenantKey,
+          workspaceKey,
+          participantSessionId: body.participantSessionId,
+          testRunId: body.testRunId,
+          unitKey: body.unitKey,
+          reviewerId: body.reviewerId,
+          category: body.category,
+          comment: body.comment
+        });
+        sendJson<ReviewResponse>(response, 201, { item });
+        return;
+      }
+
+      if (request.method === "PATCH" && reviewDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(reviewDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(reviewDetailMatch.groups.workspaceKey);
+        const reviewId = decodeRouteGroup(reviewDetailMatch.groups.reviewId);
+        if (!tenantKey || !workspaceKey || !reviewId) {
+          sendError(
+            response,
+            400,
+            "invalid_review_scope",
+            "tenantKey, workspaceKey, and reviewId are required."
+          );
+          return;
+        }
+
+        const body = await readJsonBody<UpdateReviewRequest>(request);
+        const item = await services.workspaceReview.updateReview({
+          tenantKey,
+          workspaceKey,
+          reviewId,
+          unitKey: body.unitKey,
+          reviewerId: body.reviewerId,
+          category: body.category,
+          comment: body.comment
+        });
+        sendJson<ReviewResponse>(response, 200, { item });
+        return;
+      }
+
+      if (request.method === "DELETE" && reviewDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(reviewDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(reviewDetailMatch.groups.workspaceKey);
+        const reviewId = decodeRouteGroup(reviewDetailMatch.groups.reviewId);
+        if (!tenantKey || !workspaceKey || !reviewId) {
+          sendError(
+            response,
+            400,
+            "invalid_review_scope",
+            "tenantKey, workspaceKey, and reviewId are required."
+          );
+          return;
+        }
+
+        const deletedReviewId = await services.workspaceReview.deleteReview({
+          tenantKey,
+          workspaceKey,
+          reviewId
+        });
+        sendJson<DeleteReviewResponse>(response, 200, { deletedReviewId });
+        return;
+      }
+
       if (request.method === "DELETE" && deleteGroupResultsMatch?.groups) {
         const tenantKey = decodeRouteGroup(deleteGroupResultsMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -2293,6 +2440,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendCsv(response, 200, `${workspaceKey}-logs.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && reviewCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(reviewCsvExportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          reviewCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceReview.exportReviewCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-reviews.csv`, csv);
         return;
       }
 

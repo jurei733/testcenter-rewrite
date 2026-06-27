@@ -41,7 +41,10 @@ export type WorkspaceActivityEventType =
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
-  | "group_results_deleted";
+  | "group_results_deleted"
+  | "review_created"
+  | "review_updated"
+  | "review_deleted";
 export type WorkspaceActivitySubjectType =
   | "workspace"
   | "source_package"
@@ -353,6 +356,26 @@ export type WorkspaceDetailedResponse = {
   status: TestRun["status"];
   updatedAt: string;
   completedAt: string | null;
+};
+
+export type WorkspaceReview = {
+  reviewId: string;
+  tenantId: string;
+  workspaceId: string;
+  participantSessionId: string;
+  testRunId: string;
+  unitKey: string | null;
+  reviewerId: string;
+  category: string;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspaceReviewListItem = {
+  review: WorkspaceReview;
+  participantSession: ParticipantSession | null;
+  testRun: TestRun | null;
 };
 
 export type WorkspaceGroupResultDeletion = {

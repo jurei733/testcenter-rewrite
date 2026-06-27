@@ -11,6 +11,7 @@ import type {
   Tenant,
   TestRun,
   WorkspaceActivityEvent,
+  WorkspaceReview,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
@@ -24,6 +25,7 @@ type InMemoryFirstSliceState = {
   workspacesByScope: Map<string, Workspace>;
   workspacesByKey: Map<string, Workspace>;
   workspaceActivityEvents: Map<string, WorkspaceActivityEvent>;
+  workspaceReviews: Map<string, WorkspaceReview>;
   sourcePackages: Map<string, SourcePackage>;
   importJobs: Map<string, ImportJob>;
   contentReleases: Map<string, ContentRelease>;
@@ -41,6 +43,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   workspacesByScope: new Map(),
   workspacesByKey: new Map(),
   workspaceActivityEvents: new Map(),
+  workspaceReviews: new Map(),
   sourcePackages: new Map(),
   importJobs: new Map(),
   contentReleases: new Map(),
@@ -219,6 +222,20 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         }
       }
       return deletedCount;
+    },
+    async getWorkspaceReviewById(reviewId) {
+      return state.workspaceReviews.get(reviewId) ?? null;
+    },
+    async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.workspaceReviews.values()).filter(
+        review => review.tenantId === tenantId && review.workspaceId === workspaceId
+      );
+    },
+    async saveWorkspaceReview(review) {
+      state.workspaceReviews.set(review.reviewId, review);
+    },
+    async deleteWorkspaceReview(reviewId) {
+      return state.workspaceReviews.delete(reviewId);
     }
   };
 };

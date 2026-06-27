@@ -1,4 +1,6 @@
 import type {
+  CreateReviewRequest,
+  ReviewResponse,
   DeleteGroupResultsResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
@@ -30,13 +32,39 @@ export interface ShellRuntimeActionsHost {
   getResumeRunPath(): string;
   getCompleteRunPath(): string;
   getDeleteGroupResultsPath(): string;
+  getCreateReviewPath(): string;
   getWorkspaceKey(): string;
   getLoginKey(): string;
   getGroupKey(): string;
+  getParticipantSessionId(): string;
+  getTestRunId(): string;
   getCurrentUnitKey(): string;
   getCurrentUnitResponse(): string;
+  getReviewerId(): string;
+  getReviewCategory(): string;
+  getReviewComment(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
+}
+
+export async function createReviewAction(
+  host: ShellRuntimeActionsHost
+): Promise<ReviewResponse> {
+  const payload = await host.request<ReviewResponse>(
+    "Create Review",
+    "POST",
+    host.getCreateReviewPath(),
+    {
+      participantSessionId: host.getParticipantSessionId().trim(),
+      testRunId: host.getTestRunId().trim(),
+      unitKey: host.getCurrentUnitKey().trim() || null,
+      reviewerId: host.getReviewerId().trim(),
+      category: host.getReviewCategory().trim(),
+      comment: host.getReviewComment().trim()
+    } satisfies CreateReviewRequest
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }
 
 export async function deleteGroupResultsAction(

@@ -43,7 +43,19 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Current Unit Key
             <input id="currentUnitKey" name="currentUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
           </label>
+          <label>
+            Reviewer Id
+            <input id="reviewerId" name="reviewerId" [(ngModel)]="view.runtime.reviewerId" (change)="view.persistState()" />
+          </label>
+          <label>
+            Review Category
+            <input id="reviewCategory" name="reviewCategory" [(ngModel)]="view.runtime.reviewCategory" (change)="view.persistState()" />
+          </label>
         </div>
+        <label>
+          Review Comment
+          <textarea id="reviewComment" name="reviewComment" [(ngModel)]="view.runtime.reviewComment" (change)="view.persistState()" placeholder="Operator note for the selected run or unit."></textarea>
+        </label>
         <div class="actions">
           <button class="primary" type="button" (click)="view.participantSignIn()">Sign In</button>
           <button class="secondary" type="button" (click)="view.resumeSession()">Resume Session</button>
@@ -54,8 +66,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
+          <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
+          <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
           <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
           <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
+          <button class="ghost" type="button" (click)="view.exportReviewsCsv()">Export Review CSV</button>
         </div>
       </article>
 
@@ -171,10 +186,24 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Load detailed responses to inspect saved answers across the workspace."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Reviews"
+        subtitle="Operator review comments attached to participant test runs or units."
+        [items]="view.reviewItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="Create or load reviews to inspect operator notes."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Response CSV Export</h2>
         <p>Workspace-wide participant responses in CSV format, ready for operator download or inspection.</p>
         <pre id="responseExportPreview">{{ view.runtime.responseExportView }}</pre>
+      </article>
+
+      <article class="card">
+        <h2>Review CSV Export</h2>
+        <p>Workspace-wide review comments in CSV format with participant and run context.</p>
+        <pre id="reviewExportPreview">{{ view.runtime.reviewExportView }}</pre>
       </article>
 
       <app-record-collection
@@ -207,7 +236,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Current Run State" subtitle="Booklet Context" viewId="currentRunStateView" [content]="view.runtime.currentRunStateView"></app-json-panel>
       <app-json-panel title="Monitor Open Runs" subtitle="Activation Guard Signal" viewId="openRunsView" [content]="view.runtime.openRunsView"></app-json-panel>
       <app-json-panel title="Detailed Responses" subtitle="Workspace Response Read Model" viewId="detailedResponsesView" [content]="view.runtime.detailedResponsesView"></app-json-panel>
+      <app-json-panel title="Reviews" subtitle="Workspace Review Read Model" viewId="reviewsView" [content]="view.runtime.reviewsView"></app-json-panel>
       <app-json-panel title="Response CSV Export" subtitle="Workspace Responses" viewId="responseExportView" [content]="view.runtime.responseExportView"></app-json-panel>
+      <app-json-panel title="Review CSV Export" subtitle="Workspace Reviews" viewId="reviewExportView" [content]="view.runtime.reviewExportView"></app-json-panel>
       <app-json-panel title="Runtime And Monitor" subtitle="Live Session State" viewId="runtimeMonitorView" [content]="view.runtime.runtimeMonitorView"></app-json-panel>
     </div>
   `

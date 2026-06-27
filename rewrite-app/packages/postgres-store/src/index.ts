@@ -16,7 +16,8 @@ import type {
   Tenant,
   TestRun,
   Workspace,
-  WorkspaceActivityEvent
+  WorkspaceActivityEvent,
+  WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
 
 type Row = QueryResultRow & Record<string, unknown>;
@@ -238,7 +239,27 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 5;
+const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
+  row
+    ? {
+        reviewId: String(row.review_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        participantSessionId: String(row.participant_session_id),
+        testRunId: String(row.test_run_id),
+        unitKey:
+          row.unit_key === null || row.unit_key === undefined
+            ? null
+            : String(row.unit_key),
+        reviewerId: String(row.reviewer_id),
+        category: String(row.category),
+        comment: String(row.comment_text),
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 6;
 
 const migrations: PostgresMigration[] = [
   {
@@ -432,6 +453,30 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE test_runs
       ADD COLUMN unit_responses_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 6,
+    name: "add_workspace_reviews",
+    sql: `
+      CREATE TABLE IF NOT EXISTS workspace_reviews (
+        review_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        test_run_id TEXT NOT NULL,
+        unit_key TEXT,
+        reviewer_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        comment_text TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_reviews_workspace
+        ON workspace_reviews (tenant_id, workspace_id, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_workspace_reviews_test_run
+        ON workspace_reviews (test_run_id);
     `
   }
 ];
@@ -1079,6 +1124,63 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [testRunIds]
       );
       return result.rowCount ?? 0;
+    },
+    async getWorkspaceReviewById(reviewId) {
+      return one(
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+         FROM workspace_reviews
+         WHERE review_id = $1`,
+        [reviewId],
+        mapWorkspaceReview
+      );
+    },
+    async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
+      return many(
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+         FROM workspace_reviews
+         WHERE tenant_id = $1 AND workspace_id = $2
+         ORDER BY updated_at DESC, created_at DESC`,
+        [tenantId, workspaceId],
+        mapWorkspaceReview
+      );
+    },
+    async saveWorkspaceReview(review) {
+      await pool.query(
+        `INSERT INTO workspace_reviews (
+          review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT(review_id) DO UPDATE SET
+          tenant_id = EXCLUDED.tenant_id,
+          workspace_id = EXCLUDED.workspace_id,
+          participant_session_id = EXCLUDED.participant_session_id,
+          test_run_id = EXCLUDED.test_run_id,
+          unit_key = EXCLUDED.unit_key,
+          reviewer_id = EXCLUDED.reviewer_id,
+          category = EXCLUDED.category,
+          comment_text = EXCLUDED.comment_text,
+          created_at = EXCLUDED.created_at,
+          updated_at = EXCLUDED.updated_at`,
+        [
+          review.reviewId,
+          review.tenantId,
+          review.workspaceId,
+          review.participantSessionId,
+          review.testRunId,
+          review.unitKey,
+          review.reviewerId,
+          review.category,
+          review.comment,
+          review.createdAt,
+          review.updatedAt
+        ]
+      );
+    },
+    async deleteWorkspaceReview(reviewId) {
+      const result = await pool.query(
+        `DELETE FROM workspace_reviews WHERE review_id = $1`,
+        [reviewId]
+      );
+      return (result.rowCount ?? 0) > 0;
     }
   };
 };

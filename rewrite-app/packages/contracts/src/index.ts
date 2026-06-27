@@ -27,6 +27,7 @@ import type {
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
+  WorkspaceReviewListItem,
   WorkspaceActivityEventType,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
@@ -79,8 +80,18 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
     exportLogCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
+    exportReviewCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/reviews.csv",
     listDetailedResponses:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
+    listReviews:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
+    createReview:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
+    updateReview:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews/:reviewId",
+    deleteReview:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews/:reviewId",
     deleteGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups/:groupKey",
     listContentReleases:
@@ -337,6 +348,34 @@ export type GetParticipantSessionResponse = {
 
 export type ListDetailedResponsesResponse = {
   items: WorkspaceDetailedResponse[];
+};
+
+export type CreateReviewRequest = {
+  participantSessionId: string;
+  testRunId: string;
+  unitKey?: string | null;
+  reviewerId: string;
+  category: string;
+  comment: string;
+};
+
+export type UpdateReviewRequest = {
+  unitKey?: string | null;
+  reviewerId?: string;
+  category?: string;
+  comment?: string;
+};
+
+export type ListReviewsResponse = {
+  items: WorkspaceReviewListItem[];
+};
+
+export type ReviewResponse = {
+  item: WorkspaceReviewListItem;
+};
+
+export type DeleteReviewResponse = {
+  deletedReviewId: string;
 };
 
 export type DeleteGroupResultsResponse = {

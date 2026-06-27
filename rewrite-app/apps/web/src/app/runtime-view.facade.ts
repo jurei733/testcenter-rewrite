@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
+  ListReviewsResponse,
   ListParticipantSessionsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
@@ -326,6 +327,45 @@ export class RuntimeViewFacade {
           participantSessionId: item.participantSessionId,
           loginKey: item.loginKey,
           groupKey: item.groupKey
+        }
+      })) ?? []
+    );
+  }
+
+  get reviewItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListReviewsResponse>(this.runtime.reviewsView);
+    return (
+      payload?.items.map(item => ({
+        headline: `${item.review.category} · ${item.participantSession?.loginKey ?? "unknown"}`,
+        subline: item.review.reviewId,
+        badges: [
+          item.review.reviewerId,
+          item.testRun?.status ?? "missing run",
+          item.review.unitKey ?? "whole run"
+        ],
+        rows: [
+          { label: "Comment", value: this.formatResponsePreview(item.review.comment) },
+          { label: "Run", value: item.review.testRunId },
+          {
+            label: "Session",
+            value: item.review.participantSessionId
+          },
+          {
+            label: "Updated",
+            value: this.formatDateTime(item.review.updatedAt)
+          }
+        ],
+        selected:
+          this.runtime.testRunId.trim() === item.review.testRunId &&
+          (item.review.unitKey === null ||
+            this.runtime.currentUnitKey.trim() === item.review.unitKey),
+        actionLabel: "Select Review",
+        actionPayload: {
+          testRunId: item.review.testRunId,
+          currentUnitKey: item.review.unitKey ?? "",
+          participantSessionId: item.review.participantSessionId,
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey: item.participantSession?.groupKey ?? ""
         }
       })) ?? []
     );
@@ -724,6 +764,18 @@ export class RuntimeViewFacade {
 
   loadDetailedResponses(): void {
     this.viewState.onActionAsync(() => this.runtimeService.loadDetailedResponses());
+  }
+
+  loadReviews(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.loadReviews());
+  }
+
+  createReview(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.createReview());
+  }
+
+  exportReviewsCsv(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.exportReviewsCsv());
   }
 
   confirmDeleteGroupResults(): void {

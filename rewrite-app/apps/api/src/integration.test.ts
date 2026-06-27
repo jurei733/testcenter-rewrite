@@ -1262,6 +1262,128 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       /"demo-tenant","demo-workspace","student-demo","group:student-demo".*"unit-intro","My first demo response"/
     );
 
+    const createdReview = await requestJsonAt<{
+      item: {
+        review: {
+          reviewId: string;
+          reviewerId: string;
+          category: string;
+          comment: string;
+          unitKey: string | null;
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          participantSessionId:
+            participantSignIn.body.participantSession.participantSessionId,
+          testRunId: resumed.body.testRun.testRunId,
+          unitKey: "unit-intro",
+          reviewerId: "integration-reviewer",
+          category: "quality-check",
+          comment: "Initial integration review"
+        }
+      }
+    );
+
+    assert.equal(createdReview.status, 201);
+    assert.equal(createdReview.body.item.review.reviewerId, "integration-reviewer");
+    assert.equal(createdReview.body.item.review.unitKey, "unit-intro");
+
+    const updatedReview = await requestJsonAt<{
+      item: {
+        review: {
+          reviewId: string;
+          category: string;
+          comment: string;
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews/${createdReview.body.item.review.reviewId}`,
+      {
+        method: "PATCH",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          category: "final-check",
+          comment: "Updated integration review"
+        }
+      }
+    );
+
+    assert.equal(updatedReview.status, 200);
+    assert.equal(updatedReview.body.item.review.category, "final-check");
+    assert.equal(updatedReview.body.item.review.comment, "Updated integration review");
+
+    const reviews = await requestJsonAt<{
+      items: Array<{
+        review: {
+          reviewId: string;
+          category: string;
+          comment: string;
+        };
+        participantSession: { loginKey: string } | null;
+        testRun: { bookletKey: string } | null;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(reviews.status, 200);
+    assert.equal(reviews.body.items.length, 1);
+    assert.equal(reviews.body.items[0]?.review.comment, "Updated integration review");
+    assert.equal(reviews.body.items[0]?.participantSession?.loginKey, "student-demo");
+    assert.equal(reviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
+
+    const reviewCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(reviewCsv.status, 200);
+    assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(reviewCsv.body, /^tenantKey,workspaceKey,reviewId,loginKey,/);
+    assert.match(
+      reviewCsv.body,
+      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","integration-reviewer","final-check","Updated integration review"/
+    );
+
+    const deletedReview = await requestJsonAt<{ deletedReviewId: string }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews/${createdReview.body.item.review.reviewId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(deletedReview.status, 200);
+    assert.equal(
+      deletedReview.body.deletedReviewId,
+      createdReview.body.item.review.reviewId
+    );
+
     const logCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv",
@@ -1277,6 +1399,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(logCsv.body, /^tenantKey,workspaceKey,activityEventId,eventType,/);
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"participant_signed_in"/);
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"test_run_progress_saved"/);
+    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_created"/);
+    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_deleted"/);
 
     const groupDeletion = await requestJsonAt<{
       deletion: {

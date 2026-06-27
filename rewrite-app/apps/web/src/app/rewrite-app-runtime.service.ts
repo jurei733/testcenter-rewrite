@@ -10,6 +10,7 @@ import { RewriteAppShellRuntimeHostsService } from "./rewrite-app-shell-runtime-
 import { loadParticipantSessionDetailAction } from "./rewrite-app-shell.runtime";
 import {
   completeRunAction,
+  createReviewAction,
   deleteGroupResultsAction,
   participantSignInAction,
   resumeParticipantSessionAction,
@@ -17,8 +18,10 @@ import {
   saveProgressAction
 } from "./rewrite-app-shell.runtime-actions";
 import {
+  exportReviewsCsvAction,
   exportResponsesCsvAction,
   loadDetailedResponsesAction,
+  loadReviewsAction,
   refreshRuntimeReadsAction
 } from "./rewrite-app-shell.runtime-reads";
 import { runParticipantHappyPathFlow } from "./rewrite-app-shell.workflows";
@@ -108,11 +111,47 @@ export class RewriteAppRuntimeService {
     return csv;
   }
 
+  async exportReviewsCsv(): Promise<string> {
+    const csv = await exportReviewsCsvAction(this.hosts.createRuntimeReadsHost());
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-reviews.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Review CSV Downloaded",
+      `Review export saved as ${workspaceKey}-reviews.csv.`
+    );
+    return csv;
+  }
+
   async loadDetailedResponses(): Promise<void> {
     const payload = await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
     this.feedback.rememberActivity(
       "Detailed Responses Loaded",
       `${payload.items.length} response row(s) loaded.`
+    );
+  }
+
+  async loadReviews(): Promise<void> {
+    const payload = await loadReviewsAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Reviews Loaded",
+      `${payload.items.length} review(s) loaded.`
+    );
+  }
+
+  async createReview(): Promise<void> {
+    const payload = await createReviewAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+    await loadReviewsAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Review Created",
+      `${payload.item.review.category} review saved for ${payload.item.review.testRunId}.`
     );
   }
 

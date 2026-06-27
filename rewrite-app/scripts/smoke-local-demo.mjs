@@ -227,6 +227,32 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.locator("#reviewComment").fill("Smoke review for adjusted response");
+  await page.locator("#reviewComment").dispatchEvent("input");
+  await page.locator("#reviewComment").dispatchEvent("change");
+  await page.getByRole("button", { name: "Create Review" }).click();
+  await page.waitForFunction(
+    () =>
+      document.body.textContent?.includes("Smoke review for adjusted response") &&
+      document.body.textContent?.includes("operator-ui") &&
+      document.body.textContent?.includes("note · student-demo"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
+  const reviewDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Review CSV" }).click();
+  const reviewDownload = await reviewDownloadPromise;
+  assert.equal(reviewDownload.suggestedFilename(), "demo-workspace-reviews.csv");
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#reviewExportPreview")
+        ?.textContent?.includes("Smoke review for adjusted response"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   const responseDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Responses CSV" }).click();
   const responseDownload = await responseDownloadPromise;

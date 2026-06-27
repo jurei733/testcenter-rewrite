@@ -14,6 +14,7 @@ import type {
   Tenant,
   TestRun,
   WorkspaceActivityEvent,
+  WorkspaceReview,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
@@ -26,6 +27,7 @@ type PersistedFirstSliceState = {
   workspacesByScope: Record<string, Workspace>;
   workspacesByKey: Record<string, Workspace>;
   workspaceActivityEvents: Record<string, WorkspaceActivityEvent>;
+  workspaceReviews: Record<string, WorkspaceReview>;
   sourcePackages: Record<string, SourcePackage>;
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
@@ -42,6 +44,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   workspacesByScope: {},
   workspacesByKey: {},
   workspaceActivityEvents: {},
+  workspaceReviews: {},
   sourcePackages: {},
   importJobs: {},
   contentReleases: {},
@@ -338,6 +341,29 @@ export const createFileFirstSliceRepository = (
         }
       });
       return deletedCount;
+    },
+    async getWorkspaceReviewById(reviewId) {
+      const state = await getState();
+      return state.workspaceReviews[reviewId] ?? null;
+    },
+    async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return Object.values(state.workspaceReviews).filter(
+        review => review.tenantId === tenantId && review.workspaceId === workspaceId
+      );
+    },
+    async saveWorkspaceReview(review) {
+      await mutate(state => {
+        state.workspaceReviews[review.reviewId] = review;
+      });
+    },
+    async deleteWorkspaceReview(reviewId) {
+      let deleted = false;
+      await mutate(state => {
+        deleted = Boolean(state.workspaceReviews[reviewId]);
+        delete state.workspaceReviews[reviewId];
+      });
+      return deleted;
     }
   };
 };

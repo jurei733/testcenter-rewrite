@@ -36,11 +36,21 @@ export function createRuntimeActionsStateHost(args: {
         workspaceKey: args.workspaceState.workspaceKey.trim(),
         groupKey: args.runtimeState.groupKey.trim()
       }),
+    getCreateReviewPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.createReview, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getLoginKey: () => args.runtimeState.loginKey,
     getGroupKey: () => args.runtimeState.groupKey,
+    getParticipantSessionId: () => args.runtimeState.participantSessionId,
+    getTestRunId: () => args.runtimeState.testRunId,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
     getCurrentUnitResponse: () => args.runtimeState.currentUnitResponse,
+    getReviewerId: () => args.runtimeState.reviewerId,
+    getReviewCategory: () => args.runtimeState.reviewCategory,
+    getReviewComment: () => args.runtimeState.reviewComment,
     createRuntimePresentationHost: args.createRuntimePresentationHost,
     refreshCrossViewStateAfterRuntimeChange:
       args.refreshCrossViewStateAfterRuntimeChange
@@ -83,16 +93,32 @@ export function createRuntimeReadsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getReviewCsvExportPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.exportReviewCsv, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
     getDetailedResponsesPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.listDetailedResponses, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+    getReviewsPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.listReviews, {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
     setDetailedResponsesView: nextValue => {
       args.runtimeState.detailedResponsesView = nextValue;
     },
+    setReviewsView: nextValue => {
+      args.runtimeState.reviewsView = nextValue;
+    },
     setResponseExportView: nextValue => {
       args.runtimeState.responseExportView = nextValue;
+    },
+    setReviewExportView: nextValue => {
+      args.runtimeState.reviewExportView = nextValue;
     },
     getCurrentRunStatePath: () =>
       resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {

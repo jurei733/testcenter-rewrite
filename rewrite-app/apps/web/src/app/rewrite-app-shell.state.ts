@@ -47,13 +47,18 @@ export interface ShellRuntimeState {
   testRunId: string;
   currentUnitKey: string;
   currentUnitResponse: string;
+  reviewerId: string;
+  reviewCategory: string;
+  reviewComment: string;
   participantSessionsView: string;
   participantSessionDetailView: string;
   runtimeStateView: string;
   currentRunStateView: string;
   openRunsView: string;
   detailedResponsesView: string;
+  reviewsView: string;
   responseExportView: string;
+  reviewExportView: string;
   runtimeMonitorView: string;
   runtimeLoaded: boolean;
 }
@@ -144,13 +149,18 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     testRunId: "",
     currentUnitKey: "unit-1",
     currentUnitResponse: "",
+    reviewerId: "operator-ui",
+    reviewCategory: "note",
+    reviewComment: "",
     participantSessionsView: 'Use "Refresh Runtime Reads".',
     participantSessionDetailView: 'Use "Participant Session Detail".',
     runtimeStateView: 'Use "Refresh Runtime Reads".',
     currentRunStateView: 'Use "Refresh Runtime Reads".',
     openRunsView: 'Use "Refresh Runtime Reads".',
     detailedResponsesView: 'Use "Detailed Responses".',
+    reviewsView: 'Use "Load Reviews".',
     responseExportView: 'Use "Export Responses CSV".',
+    reviewExportView: 'Use "Export Review CSV".',
     runtimeMonitorView: "Use runtime actions to populate the latest action result.",
     runtimeLoaded: false
   };

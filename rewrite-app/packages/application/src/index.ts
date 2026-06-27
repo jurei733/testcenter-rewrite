@@ -32,6 +32,8 @@ import type {
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
+  WorkspaceReview,
+  WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorSummary,
@@ -158,6 +160,41 @@ export type WorkspaceResultsPort = {
   }): Promise<WorkspaceGroupResultDeletion>;
 };
 
+export type WorkspaceReviewPort = {
+  listReviews(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceReviewListItem[]>;
+  createReview(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    participantSessionId: string;
+    testRunId: string;
+    unitKey?: string | null;
+    reviewerId: string;
+    category: string;
+    comment: string;
+  }): Promise<WorkspaceReviewListItem>;
+  updateReview(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    reviewId: string;
+    unitKey?: string | null;
+    reviewerId?: string;
+    category?: string;
+    comment?: string;
+  }): Promise<WorkspaceReviewListItem>;
+  deleteReview(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    reviewId: string;
+  }): Promise<string>;
+  exportReviewCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
+};
+
 export type ParticipantRuntimePort = {
   signIn(input: {
     workspaceKey: string;
@@ -271,6 +308,7 @@ export type FirstSlicePorts = {
   contentIntake: ContentIntakePort;
   workspaceAdminRead: WorkspaceAdminReadPort;
   workspaceResults: WorkspaceResultsPort;
+  workspaceReview: WorkspaceReviewPort;
   participantRuntime: ParticipantRuntimePort;
   monitorRead: MonitorReadPort;
 };
@@ -322,6 +360,11 @@ export const firstSliceUseCases = {
   listParticipantSessions: "ListParticipantSessions",
   getParticipantSessionDetail: "GetParticipantSessionDetail",
   listDetailedResponses: "ListDetailedResponses",
+  listReviews: "ListReviews",
+  createReview: "CreateReview",
+  updateReview: "UpdateReview",
+  deleteReview: "DeleteReview",
+  exportReviewCsv: "ExportReviewCsv",
   deleteGroupResults: "DeleteGroupResults",
   exportResponseCsv: "ExportResponseCsv",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
@@ -429,6 +472,13 @@ export type FirstSliceRepository = {
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
+  getWorkspaceReviewById(reviewId: string): Promise<WorkspaceReview | null>;
+  listWorkspaceReviewsByWorkspace(
+    tenantId: string,
+    workspaceId: string
+  ): Promise<WorkspaceReview[]>;
+  saveWorkspaceReview(review: WorkspaceReview): Promise<void>;
+  deleteWorkspaceReview(reviewId: string): Promise<boolean>;
 };
 
 export type FirstSliceDependencies = {
@@ -555,6 +605,38 @@ const normalizeGroupKey = (value: unknown): string => {
   }
 
   return value.trim();
+};
+
+const normalizeReviewText = (
+  value: unknown,
+  fieldName: string,
+  errorCode: string
+): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(
+      400,
+      errorCode,
+      `${fieldName} is required.`
+    );
+  }
+
+  return value.trim();
+};
+
+const normalizeOptionalUnitKey = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "review_unit_key_invalid",
+      "unitKey must be a string when provided."
+    );
+  }
+
+  return value.trim() || null;
 };
 
 const normalizeAdminRoleAssignmentInputs = (
@@ -1071,6 +1153,90 @@ const formatWorkspaceActivityCsv = (input: {
         activityEvent.occurredAt,
         activityEvent.summary,
         JSON.stringify(activityEvent.details)
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const buildWorkspaceReviewListItems = (input: {
+  reviews: WorkspaceReview[];
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): WorkspaceReviewListItem[] => {
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const testRunsById = new Map(
+    input.testRuns.map(testRun => [testRun.testRunId, normalizeTestRun(testRun)])
+  );
+
+  return [...input.reviews]
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.createdAt.localeCompare(left.createdAt) ||
+        left.reviewId.localeCompare(right.reviewId)
+    )
+    .map(review => ({
+      review,
+      participantSession:
+        participantSessionsById.get(review.participantSessionId) ?? null,
+      testRun: testRunsById.get(review.testRunId) ?? null
+    }));
+};
+
+const formatReviewCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  reviews: WorkspaceReview[];
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): string => {
+  const items = buildWorkspaceReviewListItems({
+    reviews: input.reviews,
+    participantSessions: input.participantSessions,
+    testRuns: input.testRuns
+  });
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "reviewId",
+    "loginKey",
+    "groupKey",
+    "participantSessionId",
+    "testRunId",
+    "bookletKey",
+    "unitKey",
+    "reviewerId",
+    "category",
+    "comment",
+    "createdAt",
+    "updatedAt"
+  ];
+
+  return [
+    header.join(","),
+    ...items.map(item =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        item.review.reviewId,
+        item.participantSession?.loginKey ?? "",
+        item.participantSession?.groupKey ?? "",
+        item.review.participantSessionId,
+        item.review.testRunId,
+        item.testRun?.bookletKey ?? "",
+        item.review.unitKey ?? "",
+        item.review.reviewerId,
+        item.review.category,
+        item.review.comment,
+        item.review.createdAt,
+        item.review.updatedAt
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -2980,6 +3146,266 @@ export const createFirstSliceServices = (
           affectedParticipantSessionIds,
           deletedTestRunIds
         };
+      }
+    },
+    workspaceReview: {
+      async listReviews(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [reviews, participantSessions, testRuns] = await Promise.all([
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+
+        return buildWorkspaceReviewListItems({
+          reviews,
+          participantSessions,
+          testRuns
+        });
+      },
+      async createReview(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const participantSession = await requireParticipantSession(
+          repository,
+          input.participantSessionId
+        );
+        const testRun = await repository.getTestRunById(input.testRunId);
+
+        if (
+          participantSession.tenantId !== workspace.tenantId ||
+          participantSession.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "participant_session_not_found",
+            `Participant session '${input.participantSessionId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        if (
+          !testRun ||
+          testRun.tenantId !== workspace.tenantId ||
+          testRun.workspaceId !== workspace.workspaceId ||
+          testRun.participantSessionId !== participantSession.participantSessionId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${input.testRunId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const timestamp = now();
+        const review: WorkspaceReview = {
+          reviewId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          participantSessionId: participantSession.participantSessionId,
+          testRunId: testRun.testRunId,
+          unitKey: normalizeOptionalUnitKey(input.unitKey),
+          reviewerId: normalizeReviewText(
+            input.reviewerId,
+            "reviewerId",
+            "review_reviewer_required"
+          ),
+          category: normalizeReviewText(
+            input.category,
+            "category",
+            "review_category_required"
+          ),
+          comment: normalizeReviewText(
+            input.comment,
+            "comment",
+            "review_comment_required"
+          ),
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+
+        await repository.saveWorkspaceReview(review);
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "review_created",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: review.testRunId,
+          summary: `Review '${review.reviewId}' created for test run '${review.testRunId}'.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category
+          }
+        });
+
+        return {
+          review,
+          participantSession,
+          testRun: normalizeTestRun(testRun)
+        };
+      },
+      async updateReview(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const existingReview = await repository.getWorkspaceReviewById(
+          input.reviewId
+        );
+
+        if (
+          !existingReview ||
+          existingReview.tenantId !== workspace.tenantId ||
+          existingReview.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "review_not_found",
+            `Review '${input.reviewId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const review: WorkspaceReview = {
+          ...existingReview,
+          unitKey:
+            input.unitKey === undefined
+              ? existingReview.unitKey
+              : normalizeOptionalUnitKey(input.unitKey),
+          reviewerId:
+            input.reviewerId === undefined
+              ? existingReview.reviewerId
+              : normalizeReviewText(
+                  input.reviewerId,
+                  "reviewerId",
+                  "review_reviewer_required"
+                ),
+          category:
+            input.category === undefined
+              ? existingReview.category
+              : normalizeReviewText(
+                  input.category,
+                  "category",
+                  "review_category_required"
+                ),
+          comment:
+            input.comment === undefined
+              ? existingReview.comment
+              : normalizeReviewText(
+                  input.comment,
+                  "comment",
+                  "review_comment_required"
+                ),
+          updatedAt: now()
+        };
+
+        await repository.saveWorkspaceReview(review);
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "review_updated",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: review.testRunId,
+          summary: `Review '${review.reviewId}' updated.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category
+          }
+        });
+
+        const [participantSession, testRun] = await Promise.all([
+          repository.getParticipantSessionById(review.participantSessionId),
+          repository.getTestRunById(review.testRunId)
+        ]);
+
+        return {
+          review,
+          participantSession,
+          testRun: testRun ? normalizeTestRun(testRun) : null
+        };
+      },
+      async deleteReview(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const review = await repository.getWorkspaceReviewById(input.reviewId);
+
+        if (
+          !review ||
+          review.tenantId !== workspace.tenantId ||
+          review.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "review_not_found",
+            `Review '${input.reviewId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        await repository.deleteWorkspaceReview(review.reviewId);
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "review_deleted",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: review.testRunId,
+          summary: `Review '${review.reviewId}' deleted.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category
+          }
+        });
+
+        return review.reviewId;
+      },
+      async exportReviewCsv(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [reviews, participantSessions, testRuns] = await Promise.all([
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+
+        return formatReviewCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          reviews,
+          participantSessions,
+          testRuns
+        });
       }
     },
     contentIntake: {
