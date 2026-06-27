@@ -1348,6 +1348,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(saved.body.testRun.currentUnitKey, "unit-intro");
     assert.equal(saved.body.testRun.unitResponses["unit-intro"], "My first demo response");
 
+    const unknownUnitSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "unit-missing",
+          status: "paused",
+          unitResponse: "This should not be stored"
+        }
+      }
+    );
+
+    assert.equal(unknownUnitSave.status, 404);
+    assert.equal(unknownUnitSave.body.error, "unit_not_found");
+
     const stateAfterResponse = await requestJsonAt<{
       currentRunState: {
         testRun: { unitResponses: Record<string, string> };

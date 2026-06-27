@@ -1161,13 +1161,14 @@ try {
     .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
     .filter({ hasText: "2 group(s)" })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "2 missing response(s)" })
+    .filter({ hasText: "4 missing response(s)" })
     .waitFor();
   await studyMonitorCard
     .locator(".record-card")
-    .filter({ has: page.getByRole("heading", { name: "unit-paused" }) })
-    .filter({ hasText: "1/1 answered" })
-    .filter({ hasText: "0 missing" })
+    .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "1/2 answered" })
+    .filter({ hasText: "1 missing" })
     .waitFor();
   await studyMonitorCard
     .locator(".record-card")
@@ -1212,7 +1213,7 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  await clickCardAction("Study Monitor", "Open Unit Detail", "unit-paused");
+  await clickCardAction("Study Monitor", "Open Unit Detail", "Paused Work");
   await page.waitForFunction(
     () => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(
@@ -1222,7 +1223,7 @@ try {
       );
       return (
         detailCard?.textContent?.includes("unit-paused") &&
-        detailCard.textContent.includes("0 missing") &&
+        detailCard.textContent.includes("1 missing") &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("answered")
       );

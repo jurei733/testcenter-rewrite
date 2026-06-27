@@ -100,7 +100,7 @@ export type PersistedShellState = {
 
 export const SHELL_STORAGE_KEY = "testcenter-rewrite-app-shell";
 export const DEFAULT_SOURCE_DOCUMENT =
-  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /></booklet></assessment>';
+  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route" /><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 
 export const createInitialSummaryCards = (): SummaryCard[] => [
   {

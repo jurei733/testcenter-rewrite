@@ -1987,6 +1987,33 @@ const resolveRuntimeBookletUnits = (
   );
 };
 
+const requireRuntimeUnitForBooklet = (
+  contentRelease: ContentRelease,
+  bookletKey: string,
+  unitKey: string
+): void => {
+  const bookletEntry =
+    contentRelease.runtimeSnapshot.bookletEntries.find(
+      candidate => candidate.bookletKey === bookletKey
+    ) ?? null;
+
+  if (!bookletEntry) {
+    throw new FirstSliceError(
+      409,
+      "test_run_booklet_not_found",
+      `Booklet '${bookletKey}' from the test run was not found in content release '${contentRelease.contentReleaseId}'.`
+    );
+  }
+
+  if (!bookletEntry.unitEntries.some(candidate => candidate.unitKey === unitKey)) {
+    throw new FirstSliceError(
+      404,
+      "unit_not_found",
+      `Unit '${unitKey}' was not found in booklet '${bookletKey}'.`
+    );
+  }
+};
+
 const sortWorkspaceContentReleases = (
   releases: ContentRelease[]
 ): ContentRelease[] =>
@@ -5048,15 +5075,29 @@ export const createFirstSliceServices = (
           );
         }
 
+        const requestedUnitKey = String(input.currentUnitKey ?? "").trim();
+        const nextCurrentUnitKey = requestedUnitKey || null;
+        if (nextCurrentUnitKey) {
+          const contentRelease = await requireContentRelease(
+            repository,
+            testRun.contentReleaseId
+          );
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            nextCurrentUnitKey
+          );
+        }
+
         const nextUnitResponses = { ...testRun.unitResponses };
-        if (input.currentUnitKey && input.unitResponse != null) {
-          nextUnitResponses[input.currentUnitKey] = input.unitResponse;
+        if (nextCurrentUnitKey && input.unitResponse != null) {
+          nextUnitResponses[nextCurrentUnitKey] = input.unitResponse;
         }
 
         const updatedRun: TestRun = {
           ...testRun,
           status: input.status,
-          currentUnitKey: input.currentUnitKey,
+          currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
           updatedAt: now()
         };
