@@ -1795,12 +1795,12 @@ test("source document import accepts testcenter-style XML aliases", async () => 
       mediaType: "application/xml",
       sourceDocument: `
         <assessment xmlns:tc="https://example.testcenter.local/schema">
-          <testlet tc:key="booklet:alias" tc:title="Alias Booklet">
-            <unitRef tc:ref="unit-alpha" tc:label="Alpha Unit" />
+          <tc:testlet tc:key="booklet:alias" tc:title="Alias Booklet">
+            <tc:unitRef tc:ref="unit-alpha" tc:label="Alpha Unit" />
             <unitDefinition alias="unit-beta" displayName="Beta Unit" />
-            <item code="unit-beta" label="Duplicate Beta Unit" />
+            <tc:item code="unit-beta" label="Duplicate Beta Unit" />
             <item href="unit-gamma" />
-          </testlet>
+          </tc:testlet>
         </assessment>
       `
     }

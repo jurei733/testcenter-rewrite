@@ -1558,13 +1558,13 @@ const normalizeParsedXmlContentStructure = (
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
   for (const bookletMatch of sourceDocument.matchAll(
-    /<(booklet|testlet)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet))\b([^>]*)>([\s\S]*?)<\/\1>/gi
   )) {
     const bookletAttributes = parseXmlAttributes(bookletMatch[2] ?? "");
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
     for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
-      /<(unit|unitRef|unit-ref|unitReference|unitDefinition|item)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|item))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       unitEntries.push({
