@@ -152,6 +152,7 @@ try {
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"
   );
+  await page.locator("#participantRouteUnitResponse").fill("Intro answer from smoke");
 
   await page.locator("#participantRouteNextUnitButton").click();
   await page.waitForFunction(
@@ -160,6 +161,16 @@ try {
         "unit-practice" &&
       document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
         "2 / 3",
+    undefined,
+    { timeout: 15_000 }
+  );
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        "unit-intro" &&
+      document.querySelector("#participantRouteUnitResponse")?.value ===
+        "Intro answer from smoke",
     undefined,
     { timeout: 15_000 }
   );

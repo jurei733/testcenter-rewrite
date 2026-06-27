@@ -2358,7 +2358,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
           currentUnitKey: body.currentUnitKey,
-          status: body.status
+          status: body.status,
+          unitResponse: body.unitResponse
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
         return;

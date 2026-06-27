@@ -194,6 +194,7 @@ export type TestRun = {
   bookletKey: string;
   status: TestRunStatus;
   currentUnitKey: string | null;
+  unitResponses: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;

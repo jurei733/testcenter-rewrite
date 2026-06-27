@@ -71,6 +71,16 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               <dd id="participantRouteActions">{{ view.player.actions.join(", ") || "none" }}</dd>
             </div>
           </dl>
+          <label>
+            Unit Response
+            <textarea
+              id="participantRouteUnitResponse"
+              name="participantRouteUnitResponse"
+              [disabled]="!view.player.canSaveProgress"
+              [(ngModel)]="view.runtime.currentUnitResponse"
+              placeholder="Write the participant response for this unit."
+            ></textarea>
+          </label>
           <div class="actions">
             <button id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
             <button id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>

@@ -224,6 +224,9 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
           row.current_unit_key === null || row.current_unit_key === undefined
             ? null
             : String(row.current_unit_key),
+        unitResponses: JSON.parse(
+          String(row.unit_responses_json ?? "{}")
+        ) as Record<string, string>,
         createdAt: String(row.created_at),
         updatedAt: String(row.updated_at),
         completedAt:
@@ -254,7 +257,7 @@ const mapWorkspaceActivityEvent = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 10;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 11;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -483,6 +486,14 @@ const sqliteMigrations: SqliteMigration[] = [
         ON admin_audit_events (subject_admin_user_id, occurred_at);
       CREATE INDEX IF NOT EXISTS idx_admin_audit_events_actor
         ON admin_audit_events (actor_admin_user_id, occurred_at);
+    `
+  },
+  {
+    version: 11,
+    name: "add_test_run_unit_responses",
+    sql: `
+      ALTER TABLE test_runs
+      ADD COLUMN unit_responses_json TEXT NOT NULL DEFAULT '{}';
     `
   }
 ];
@@ -1117,7 +1128,7 @@ export const createSqliteFirstSliceRepository = (
     async getTestRunById(testRunId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE test_run_id = ?`
         )
@@ -1127,7 +1138,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByParticipantSessionId(participantSessionId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE participant_session_id = ?`
         )
@@ -1137,7 +1148,7 @@ export const createSqliteFirstSliceRepository = (
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE participant_session_id = ? AND status != 'completed'
            ORDER BY updated_at ASC
@@ -1149,7 +1160,7 @@ export const createSqliteFirstSliceRepository = (
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
+          `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, created_at, updated_at, completed_at
            FROM test_runs
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1160,8 +1171,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO test_runs (
-            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, created_at, updated_at, completed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, status, current_unit_key, unit_responses_json, created_at, updated_at, completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(test_run_id) DO UPDATE SET
             participant_session_id = excluded.participant_session_id,
             tenant_id = excluded.tenant_id,
@@ -1170,6 +1181,7 @@ export const createSqliteFirstSliceRepository = (
             booklet_key = excluded.booklet_key,
             status = excluded.status,
             current_unit_key = excluded.current_unit_key,
+            unit_responses_json = excluded.unit_responses_json,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at,
             completed_at = excluded.completed_at`
@@ -1183,6 +1195,7 @@ export const createSqliteFirstSliceRepository = (
           testRun.bookletKey,
           testRun.status,
           testRun.currentUnitKey,
+          JSON.stringify(testRun.unitResponses),
           testRun.createdAt,
           testRun.updatedAt,
           testRun.completedAt

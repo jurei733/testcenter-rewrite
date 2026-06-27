@@ -148,6 +148,7 @@ export type ParticipantRuntimePort = {
     testRunId: string;
     currentUnitKey: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
+    unitResponse?: string | null;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
   completeRun(input: { testRunId: string }): Promise<TestRun>;
@@ -891,8 +892,15 @@ const getLatestParticipantSessionRun = async (
     return null;
   }
 
-  return testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+  return normalizeTestRun(
+    testRuns.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]!
+  );
 };
+
+const normalizeTestRun = (testRun: TestRun): TestRun => ({
+  ...testRun,
+  unitResponses: testRun.unitResponses ?? {}
+});
 
 const toDisplayLabel = (prefix: string, key: string | null): string | null => {
   if (!key) {
@@ -2786,7 +2794,7 @@ export const createFirstSliceServices = (
         if (latestTestRun.status === "completed") {
           return {
             participantSession,
-            latestTestRun,
+            latestTestRun: normalizeTestRun(latestTestRun),
             runtimeStatus: "completed",
             availableAction: "none"
           };
@@ -2794,7 +2802,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
-          latestTestRun,
+          latestTestRun: normalizeTestRun(latestTestRun),
           runtimeStatus: "in_progress",
           availableAction: "resume"
         };
@@ -2817,29 +2825,30 @@ export const createFirstSliceServices = (
           );
         }
 
+        const currentTestRun = normalizeTestRun(latestTestRun);
         const contentRelease = await requireContentRelease(
           repository,
-          latestTestRun.contentReleaseId
+          currentTestRun.contentReleaseId
         );
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
-        if (latestTestRun.status === "paused") {
+        if (currentTestRun.status === "paused") {
           availableActions.push("resume", "save_progress", "complete");
-        } else if (latestTestRun.status === "running") {
+        } else if (currentTestRun.status === "running") {
           availableActions.push("save_progress", "complete");
         }
 
         return {
           participantSession,
-          testRun: latestTestRun,
-          booklet: resolveRuntimeBooklet(contentRelease, latestTestRun.bookletKey),
+          testRun: currentTestRun,
+          booklet: resolveRuntimeBooklet(contentRelease, currentTestRun.bookletKey),
           currentUnit: resolveRuntimeUnit(
             contentRelease,
-            latestTestRun.bookletKey,
-            latestTestRun.currentUnitKey
+            currentTestRun.bookletKey,
+            currentTestRun.currentUnitKey
           ),
           bookletUnits: resolveRuntimeBookletUnits(
             contentRelease,
-            latestTestRun.bookletKey
+            currentTestRun.bookletKey
           ),
           availableActions
         };
@@ -2859,7 +2868,7 @@ export const createFirstSliceServices = (
         );
 
         if (existingRun) {
-          return existingRun;
+          return normalizeTestRun(existingRun);
         }
 
         const timestamp = now();
@@ -2875,6 +2884,7 @@ export const createFirstSliceServices = (
           currentUnitKey:
             contentRelease.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitKey ??
             "unit-1",
+          unitResponses: {},
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
@@ -2910,7 +2920,7 @@ export const createFirstSliceServices = (
         if (existingRun) {
           if (existingRun.status === "paused") {
             const resumedRun: TestRun = {
-              ...existingRun,
+              ...normalizeTestRun(existingRun),
               status: "running",
               updatedAt: now()
             };
@@ -2930,7 +2940,7 @@ export const createFirstSliceServices = (
             return resumedRun;
           }
 
-          return existingRun;
+          return normalizeTestRun(existingRun);
         }
 
         const latestRun = await getLatestParticipantSessionRun(
@@ -2950,9 +2960,9 @@ export const createFirstSliceServices = (
         });
       },
       async saveProgress(input) {
-        const testRun = await repository.getTestRunById(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(input.testRunId);
 
-        if (!testRun) {
+        if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
@@ -2960,6 +2970,7 @@ export const createFirstSliceServices = (
           );
         }
 
+        const testRun = normalizeTestRun(storedTestRun);
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -2968,10 +2979,16 @@ export const createFirstSliceServices = (
           );
         }
 
+        const nextUnitResponses = { ...testRun.unitResponses };
+        if (input.currentUnitKey && input.unitResponse != null) {
+          nextUnitResponses[input.currentUnitKey] = input.unitResponse;
+        }
+
         const updatedRun: TestRun = {
           ...testRun,
           status: input.status,
           currentUnitKey: input.currentUnitKey,
+          unitResponses: nextUnitResponses,
           updatedAt: now()
         };
         await repository.saveTestRun(updatedRun);
@@ -2990,9 +3007,9 @@ export const createFirstSliceServices = (
         return updatedRun;
       },
       async resumeRun(input) {
-        const testRun = await repository.getTestRunById(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(input.testRunId);
 
-        if (!testRun) {
+        if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
@@ -3000,6 +3017,7 @@ export const createFirstSliceServices = (
           );
         }
 
+        const testRun = normalizeTestRun(storedTestRun);
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -3032,9 +3050,9 @@ export const createFirstSliceServices = (
         return resumedRun;
       },
       async completeRun(input) {
-        const testRun = await repository.getTestRunById(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(input.testRunId);
 
-        if (!testRun) {
+        if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
@@ -3042,6 +3060,7 @@ export const createFirstSliceServices = (
           );
         }
 
+        const testRun = normalizeTestRun(storedTestRun);
         if (testRun.status === "completed") {
           return testRun;
         }

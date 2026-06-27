@@ -207,6 +207,7 @@ export type ParticipantLaunchRequest = {
 export type SaveTestRunProgressRequest = {
   currentUnitKey: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
+  unitResponse?: string | null;
 };
 
 export type CreateTenantResponse = {

@@ -45,6 +45,7 @@ export interface ShellRuntimeState {
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  currentUnitResponse: string;
   participantSessionsView: string;
   participantSessionDetailView: string;
   runtimeStateView: string;
@@ -136,6 +137,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",
+    currentUnitResponse: "",
     participantSessionsView: 'Use "Refresh Runtime Reads".',
     participantSessionDetailView: 'Use "Participant Session Detail".',
     runtimeStateView: 'Use "Refresh Runtime Reads".',

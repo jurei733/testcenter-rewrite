@@ -37,6 +37,7 @@ type ParticipantPlayerState = {
   canResumeRun: boolean;
   canComplete: boolean;
   saveProgressLabel: string;
+  unitResponse: string;
 };
 
 type ParticipantEntryParameters = {
@@ -155,7 +156,8 @@ export class ParticipantViewFacade {
         canGoNextUnit: false,
         canResumeRun: false,
         canComplete: false,
-        saveProgressLabel: "Save Progress"
+        saveProgressLabel: "Save Progress",
+        unitResponse: ""
       };
     }
 
@@ -198,7 +200,8 @@ export class ParticipantViewFacade {
       saveProgressLabel:
         currentState.testRun.status === "paused"
           ? "Save Running"
-          : "Save Paused"
+          : "Save Paused",
+      unitResponse: unitKey ? currentState.testRun.unitResponses[unitKey] ?? "" : ""
     };
   }
 
@@ -216,7 +219,11 @@ export class ParticipantViewFacade {
 
   saveProgressFromPlayer(): void {
     this.viewState.onActionAsync(() =>
-      this.saveProgressInternal(this.player.runStatus === "paused" ? "running" : "paused")
+      this.saveProgressInternal(
+        this.player.runStatus === "paused" ? "running" : "paused",
+        this.runtime.currentUnitKey.trim() || null,
+        this.runtime.currentUnitResponse
+      )
     );
   }
 
@@ -277,7 +284,8 @@ export class ParticipantViewFacade {
 
   private async saveProgressInternal(
     status: "paused" | "running",
-    currentUnitKey = this.runtime.currentUnitKey.trim() || null
+    currentUnitKey = this.runtime.currentUnitKey.trim() || null,
+    unitResponse?: string | null
   ): Promise<void> {
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
@@ -287,7 +295,8 @@ export class ParticipantViewFacade {
       }),
       {
         currentUnitKey,
-        status
+        status,
+        unitResponse
       } satisfies SaveTestRunProgressRequest
     );
 
@@ -308,6 +317,14 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const currentUnitKey = this.runtime.currentUnitKey.trim();
+    if (currentUnitKey) {
+      await this.saveProgressInternal(
+        "running",
+        currentUnitKey,
+        this.runtime.currentUnitResponse
+      );
+    }
     await this.saveProgressInternal("running", targetUnitKey);
   }
 
@@ -375,6 +392,7 @@ export class ParticipantViewFacade {
         this.runtime.currentRunStateView
       );
       this.syncRun(payload.currentRunState.testRun);
+      this.syncCurrentUnitResponse(payload.currentRunState);
       this.persistState();
     } catch (error) {
       if (
@@ -401,6 +419,15 @@ export class ParticipantViewFacade {
     if (testRun.currentUnitKey != null) {
       this.runtime.currentUnitKey = testRun.currentUnitKey;
     }
+  }
+
+  private syncCurrentUnitResponse(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"]
+  ): void {
+    const unitKey = currentState.currentUnit.unitKey;
+    this.runtime.currentUnitResponse = unitKey
+      ? currentState.testRun.unitResponses[unitKey] ?? ""
+      : "";
   }
 
   private readCurrentRunState():

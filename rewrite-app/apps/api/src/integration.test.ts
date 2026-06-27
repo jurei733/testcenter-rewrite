@@ -1088,6 +1088,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const resumed = await requestJsonAt<{
       testRun: {
+        testRunId: string;
         status: string;
         bookletKey: string;
         currentUnitKey: string | null;
@@ -1116,6 +1117,43 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.deepEqual(
       currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
       ["unit-intro", "unit-practice", "unit-finish"]
+    );
+
+    const saved = await requestJsonAt<{
+      testRun: {
+        currentUnitKey: string | null;
+        unitResponses: Record<string, string>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: "My first demo response"
+        }
+      }
+    );
+
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.testRun.currentUnitKey, "unit-intro");
+    assert.equal(saved.body.testRun.unitResponses["unit-intro"], "My first demo response");
+
+    const stateAfterResponse = await requestJsonAt<{
+      currentRunState: {
+        testRun: { unitResponses: Record<string, string> };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+
+    assert.equal(stateAfterResponse.status, 200);
+    assert.equal(
+      stateAfterResponse.body.currentRunState.testRun.unitResponses["unit-intro"],
+      "My first demo response"
     );
   } finally {
     await closeServer(isolated.server);
