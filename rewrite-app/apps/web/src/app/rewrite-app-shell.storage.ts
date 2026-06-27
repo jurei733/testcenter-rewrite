@@ -15,6 +15,11 @@ export type ShellPersistenceTarget = {
   currentUnitKey: string;
   loginKey: string;
   groupKey: string;
+  participantSessionStatusFilter: string;
+  participantSessionGroupFilter: string;
+  participantSessionLoginFilter: string;
+  participantSessionReleaseFilter: string;
+  participantSessionLimit: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   workspaceActivityEventType: string;
@@ -59,6 +64,11 @@ export const createPersistedShellState = (
   currentUnitKey: target.currentUnitKey,
   loginKey: target.loginKey,
   groupKey: target.groupKey,
+  participantSessionStatusFilter: target.participantSessionStatusFilter,
+  participantSessionGroupFilter: target.participantSessionGroupFilter,
+  participantSessionLoginFilter: target.participantSessionLoginFilter,
+  participantSessionReleaseFilter: target.participantSessionReleaseFilter,
+  participantSessionLimit: target.participantSessionLimit,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
   workspaceActivityEventType: target.workspaceActivityEventType,
@@ -104,6 +114,18 @@ export const applyHydratedShellState = (
   target.currentUnitKey = snapshot.currentUnitKey ?? target.currentUnitKey;
   target.loginKey = snapshot.loginKey ?? target.loginKey;
   target.groupKey = snapshot.groupKey ?? target.groupKey;
+  target.participantSessionStatusFilter =
+    snapshot.participantSessionStatusFilter ??
+    target.participantSessionStatusFilter;
+  target.participantSessionGroupFilter =
+    snapshot.participantSessionGroupFilter ?? target.participantSessionGroupFilter;
+  target.participantSessionLoginFilter =
+    snapshot.participantSessionLoginFilter ?? target.participantSessionLoginFilter;
+  target.participantSessionReleaseFilter =
+    snapshot.participantSessionReleaseFilter ??
+    target.participantSessionReleaseFilter;
+  target.participantSessionLimit =
+    snapshot.participantSessionLimit ?? target.participantSessionLimit;
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;
   target.workspaceActivityEventType =

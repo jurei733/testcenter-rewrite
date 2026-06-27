@@ -917,6 +917,20 @@ try {
     participantSessionId,
     "UI smoke expected participantSessionId to be populated after the runtime happy path."
   );
+  logStep("filter-participant-sessions");
+  await selectAndCommit("#participantSessionStatusFilter", "signed_in");
+  await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
+  await fillAndCommit("#participantSessionLimit", "1");
+  await clickAction("Refresh Sessions");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Sessions" })
+    })
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .first()
+    .waitFor();
   await fillAndCommit("#participantSessionId", participantSessionId);
   logStep("resume-session");
   await clickAction("Resume Session");

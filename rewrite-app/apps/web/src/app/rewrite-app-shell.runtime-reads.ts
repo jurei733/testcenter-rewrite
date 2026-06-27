@@ -1,6 +1,7 @@
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
+  ListParticipantSessionsResponse,
   ListReviewsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
@@ -24,6 +25,8 @@ export interface ShellRuntimeReadsHost {
   ): Promise<T>;
   isCurrentRunMissingError(error: unknown): boolean;
   getOpenRunsPath(): string;
+  getParticipantSessionsPath(): string;
+  setParticipantSessionsView(nextValue: string): void;
   getRuntimeStatePath(): string;
   getParticipantSessionDetailPath(): string;
   getDetailedResponsesPath(): string;
@@ -105,6 +108,21 @@ export async function refreshRuntimeReadsAction(
     currentRunStatePayload,
     quiet
   );
+}
+
+export async function loadParticipantSessionsAction(
+  host: ShellRuntimeReadsHost,
+  quiet = false
+): Promise<ListParticipantSessionsResponse> {
+  const payload = await host.request<ListParticipantSessionsResponse>(
+    "Participant Sessions",
+    "GET",
+    host.getParticipantSessionsPath(),
+    undefined,
+    { quiet }
+  );
+  host.setParticipantSessionsView(JSON.stringify(payload, null, 2));
+  return payload;
 }
 
 export async function exportResponsesCsvAction(

@@ -82,6 +82,39 @@ export function createRuntimeReadsStateHost(args: {
   runtimeState: ShellRuntimeState;
   createRuntimePresentationHost(): RuntimePresentationHost;
 }): ShellRuntimeReadsHost {
+  const buildParticipantSessionsPath = (): string => {
+    const path = resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
+    const query = new URLSearchParams();
+    const status = args.runtimeState.participantSessionStatusFilter.trim();
+    const groupKey = args.runtimeState.participantSessionGroupFilter.trim();
+    const loginKey = args.runtimeState.participantSessionLoginFilter.trim();
+    const contentReleaseId =
+      args.runtimeState.participantSessionReleaseFilter.trim();
+    const limit = args.runtimeState.participantSessionLimit.trim();
+
+    if (status) {
+      query.set("status", status);
+    }
+    if (groupKey) {
+      query.set("groupKey", groupKey);
+    }
+    if (loginKey) {
+      query.set("loginKey", loginKey);
+    }
+    if (contentReleaseId) {
+      query.set("contentReleaseId", contentReleaseId);
+    }
+    if (limit) {
+      query.set("limit", limit);
+    }
+
+    const queryString = query.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
   return {
     request: args.request,
     isCurrentRunMissingError: args.isCurrentRunMissingError,
@@ -90,6 +123,10 @@ export function createRuntimeReadsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getParticipantSessionsPath: buildParticipantSessionsPath,
+    setParticipantSessionsView: nextValue => {
+      args.runtimeState.participantSessionsView = nextValue;
+    },
     getRuntimeStatePath: () =>
       resolveRoutePath(productionApiRoutes.participant.getRuntimeState, {
         participantSessionId: args.runtimeState.participantSessionId.trim()

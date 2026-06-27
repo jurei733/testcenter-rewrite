@@ -22,6 +22,7 @@ import {
 import {
   exportReviewsCsvAction,
   exportResponsesCsvAction,
+  loadParticipantSessionsAction,
   loadDetailedResponsesAction,
   loadReviewsAction,
   refreshRuntimeReadsAction
@@ -90,6 +91,19 @@ export class RewriteAppRuntimeService {
       this.getParticipantSessionId(),
       quiet
     );
+  }
+
+  async loadParticipantSessions(quiet = false): Promise<void> {
+    const payload = await loadParticipantSessionsAction(
+      this.hosts.createRuntimeReadsHost(),
+      quiet
+    );
+    if (!quiet) {
+      this.feedback.rememberActivity(
+        "Participant Sessions Loaded",
+        `${payload.items.length} session(s) loaded with the current filters.`
+      );
+    }
   }
 
   async loadParticipantSessionDetail(): Promise<GetParticipantSessionResponse> {

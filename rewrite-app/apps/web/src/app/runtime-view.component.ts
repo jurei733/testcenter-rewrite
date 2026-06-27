@@ -152,9 +152,75 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article class="card">
+        <h2>Participant Session Filters</h2>
+        <p>Narrow the operator session list by status, group, login, release, or a small result limit.</p>
+        <div class="form-grid">
+          <label>
+            Status
+            <select
+              id="participantSessionStatusFilter"
+              name="participantSessionStatusFilter"
+              [(ngModel)]="view.runtime.participantSessionStatusFilter"
+              (change)="view.persistState()"
+            >
+              <option value="">All statuses</option>
+              <option *ngFor="let status of view.participantSessionStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Group Key
+            <input
+              id="participantSessionGroupFilter"
+              name="participantSessionGroupFilter"
+              [(ngModel)]="view.runtime.participantSessionGroupFilter"
+              (change)="view.persistState()"
+              placeholder="Optional group key"
+            />
+          </label>
+          <label>
+            Login Key
+            <input
+              id="participantSessionLoginFilter"
+              name="participantSessionLoginFilter"
+              [(ngModel)]="view.runtime.participantSessionLoginFilter"
+              (change)="view.persistState()"
+              placeholder="Optional login key"
+            />
+          </label>
+          <label>
+            Content Release Id
+            <input
+              id="participantSessionReleaseFilter"
+              name="participantSessionReleaseFilter"
+              [(ngModel)]="view.runtime.participantSessionReleaseFilter"
+              (change)="view.persistState()"
+              placeholder="Optional release id"
+            />
+          </label>
+          <label>
+            Limit
+            <input
+              id="participantSessionLimit"
+              name="participantSessionLimit"
+              type="number"
+              min="1"
+              max="500"
+              step="1"
+              [(ngModel)]="view.runtime.participantSessionLimit"
+              (change)="view.persistState()"
+            />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="refreshParticipantSessionsButton" class="primary" type="button" (click)="view.refreshParticipantSessions()">Refresh Sessions</button>
+          <button class="ghost" type="button" (click)="view.clearParticipantSessionFilters()">Clear Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Participant Sessions"
-        subtitle="Known sessions, their latest run state, and release context."
+        subtitle="Known sessions, their latest run state, and release context, narrowed by the current filters."
         [items]="view.participantSessionItems"
         (itemAction)="view.selectParticipantSession($event)"
         emptyState="No participant sessions loaded yet."

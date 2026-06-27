@@ -170,6 +170,36 @@ export function createShellPersistenceStateHost(args: {
     set groupKey(nextValue) {
       args.runtimeState.groupKey = nextValue;
     },
+    get participantSessionStatusFilter() {
+      return args.runtimeState.participantSessionStatusFilter;
+    },
+    set participantSessionStatusFilter(nextValue) {
+      args.runtimeState.participantSessionStatusFilter = nextValue;
+    },
+    get participantSessionGroupFilter() {
+      return args.runtimeState.participantSessionGroupFilter;
+    },
+    set participantSessionGroupFilter(nextValue) {
+      args.runtimeState.participantSessionGroupFilter = nextValue;
+    },
+    get participantSessionLoginFilter() {
+      return args.runtimeState.participantSessionLoginFilter;
+    },
+    set participantSessionLoginFilter(nextValue) {
+      args.runtimeState.participantSessionLoginFilter = nextValue;
+    },
+    get participantSessionReleaseFilter() {
+      return args.runtimeState.participantSessionReleaseFilter;
+    },
+    set participantSessionReleaseFilter(nextValue) {
+      args.runtimeState.participantSessionReleaseFilter = nextValue;
+    },
+    get participantSessionLimit() {
+      return args.runtimeState.participantSessionLimit;
+    },
+    set participantSessionLimit(nextValue) {
+      args.runtimeState.participantSessionLimit = nextValue;
+    },
     get autoRefreshEnabled() {
       return args.workspaceState.autoRefreshEnabled;
     },

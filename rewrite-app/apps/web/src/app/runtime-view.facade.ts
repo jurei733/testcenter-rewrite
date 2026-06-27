@@ -9,6 +9,7 @@ import type {
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
+import { participantSessionStatuses } from "@testcenter-rewrite-app/domain";
 
 import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
@@ -44,6 +45,7 @@ export class RuntimeViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
 
   readonly runtime = this.uiState.runtime;
+  readonly participantSessionStatusOptions = participantSessionStatuses;
 
   get participantSessionsView(): string {
     return this.uiState.runtime.participantSessionsView;
@@ -768,6 +770,22 @@ export class RuntimeViewFacade {
 
   refreshRuntimeReads(): void {
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
+  }
+
+  refreshParticipantSessions(): void {
+    this.persistState();
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.loadParticipantSessions()
+    );
+  }
+
+  clearParticipantSessionFilters(): void {
+    this.runtime.participantSessionStatusFilter = "";
+    this.runtime.participantSessionGroupFilter = "";
+    this.runtime.participantSessionLoginFilter = "";
+    this.runtime.participantSessionReleaseFilter = "";
+    this.runtime.participantSessionLimit = "100";
+    this.refreshParticipantSessions();
   }
 
   saveProgressPaused(): void {
