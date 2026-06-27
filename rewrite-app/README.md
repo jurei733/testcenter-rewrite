@@ -292,7 +292,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session/response/review reads, and filtered workspace activity reads, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, study-monitor unit progress, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -358,6 +358,7 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
+- study-monitor summary, group drill-down, and unit-progress cards
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
