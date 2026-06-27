@@ -82,7 +82,22 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <dt>Available Actions</dt>
               <dd id="playerPreviewActions">{{ view.playerPreview.availableActions.join(", ") || "none" }}</dd>
             </div>
+            <div>
+              <dt>Current Response</dt>
+              <dd id="playerPreviewUnitResponseText">{{ view.playerPreview.unitResponse || "empty" }}</dd>
+            </div>
           </dl>
+          <label>
+            Current Unit Response
+            <textarea
+              id="runtimeUnitResponse"
+              name="runtimeUnitResponse"
+              [disabled]="!view.playerPreview.canSaveProgress"
+              [(ngModel)]="view.runtime.currentUnitResponse"
+              (change)="view.persistState()"
+              placeholder="Write or inspect the response saved for this unit."
+            ></textarea>
+          </label>
           <p>{{ view.playerPreview.hint }}</p>
           <div class="actions">
             <button class="secondary" type="button" [disabled]="!view.playerPreview.canSaveProgress" (click)="view.saveProgressFromPreview()">Preview {{ view.playerPreview.saveProgressLabel }}</button>
@@ -131,6 +146,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         [items]="view.participantRunHistoryItems"
         (itemAction)="view.selectTestRun($event)"
         emptyState="No session run history loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Unit Responses"
+        subtitle="Saved participant responses for the selected run."
+        [items]="view.unitResponseItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="No unit responses saved for the selected run yet."
       ></app-record-collection>
 
       <app-record-collection

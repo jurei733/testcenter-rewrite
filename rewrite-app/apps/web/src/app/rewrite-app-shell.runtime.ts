@@ -46,6 +46,7 @@ type RuntimeTestRunLike =
       testRunId: string;
       status?: string;
       currentUnitKey?: string | null;
+      unitResponses?: Record<string, string>;
       completedAt?: string | null;
     }
   | null

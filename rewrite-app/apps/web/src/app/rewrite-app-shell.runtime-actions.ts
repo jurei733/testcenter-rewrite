@@ -31,6 +31,7 @@ export interface ShellRuntimeActionsHost {
   getWorkspaceKey(): string;
   getLoginKey(): string;
   getCurrentUnitKey(): string;
+  getCurrentUnitResponse(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
 }
@@ -76,7 +77,8 @@ export async function saveProgressAction(
     host.getSaveProgressPath(),
     {
       currentUnitKey: host.getCurrentUnitKey().trim() || null,
-      status
+      status,
+      unitResponse: host.getCurrentUnitResponse()
     } satisfies SaveTestRunProgressRequest
   );
   applySaveProgressResult(host.createRuntimePresentationHost(), payload, status);

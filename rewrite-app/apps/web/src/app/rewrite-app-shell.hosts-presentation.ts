@@ -37,6 +37,8 @@ export function createRuntimePresentationStateHost(args: {
       args.runtimeState.testRunId = testRun.testRunId || args.runtimeState.testRunId;
       if (testRun.currentUnitKey) {
         args.runtimeState.currentUnitKey = testRun.currentUnitKey;
+        args.runtimeState.currentUnitResponse =
+          testRun.unitResponses?.[testRun.currentUnitKey] ?? "";
       }
       args.persistShellState();
     },

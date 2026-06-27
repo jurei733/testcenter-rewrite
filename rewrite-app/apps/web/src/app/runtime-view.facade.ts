@@ -24,6 +24,7 @@ type RuntimePlayerPreview = {
   bookletLabel: string;
   unitLabel: string;
   unitKey: string;
+  unitResponse: string;
   runStatus: string;
   runId: string;
   availableActions: string[];
@@ -135,11 +136,18 @@ export class RuntimeViewFacade {
       payload?.participantSessionDetail.testRuns.map(testRun => ({
         headline: testRun.testRunId,
         subline: testRun.status,
-        badges: [testRun.bookletKey],
+        badges: [
+          testRun.bookletKey,
+          `${Object.keys(testRun.unitResponses ?? {}).length} response(s)`
+        ],
         rows: [
           {
             label: "Current Unit",
             value: testRun.currentUnitKey ?? "none"
+          },
+          {
+            label: "Unit Responses",
+            value: String(Object.keys(testRun.unitResponses ?? {}).length)
           },
           {
             label: "Created",
@@ -215,6 +223,9 @@ export class RuntimeViewFacade {
       return [];
     }
 
+    const currentUnitKey = detail.currentUnit.unitKey ?? "";
+    const unitResponses = detail.testRun.unitResponses ?? {};
+
     return [
       {
         headline: detail.booklet.displayLabel,
@@ -224,6 +235,16 @@ export class RuntimeViewFacade {
           {
             label: "Current Unit",
             value: detail.currentUnit.displayLabel ?? detail.currentUnit.unitKey ?? "none"
+          },
+          {
+            label: "Current Response",
+            value: currentUnitKey
+              ? this.formatResponsePreview(unitResponses[currentUnitKey] ?? "")
+              : "none"
+          },
+          {
+            label: "Responses",
+            value: String(Object.keys(unitResponses).length)
           },
           {
             label: "Booklet Key",
@@ -242,6 +263,39 @@ export class RuntimeViewFacade {
         }
       }
     ];
+  }
+
+  get unitResponseItems(): RecordCollectionItem[] {
+    const currentRunState = parseJsonDocument<ParticipantCurrentRunStateResponse>(
+      this.runtime.currentRunStateView
+    )?.currentRunState;
+    if (currentRunState) {
+      return this.createUnitResponseItems({
+        testRunId: currentRunState.testRun.testRunId,
+        status: currentRunState.testRun.status,
+        currentUnitKey: currentRunState.testRun.currentUnitKey,
+        unitResponses: currentRunState.testRun.unitResponses ?? {}
+      });
+    }
+
+    const sessionDetail = parseJsonDocument<GetParticipantSessionResponse>(
+      this.runtime.participantSessionDetailView
+    )?.participantSessionDetail;
+    const selectedRun =
+      sessionDetail?.testRuns.find(
+        testRun => testRun.testRunId === this.runtime.testRunId.trim()
+      ) ?? sessionDetail?.testRuns[0];
+
+    if (!selectedRun) {
+      return [];
+    }
+
+    return this.createUnitResponseItems({
+      testRunId: selectedRun.testRunId,
+      status: selectedRun.status,
+      currentUnitKey: selectedRun.currentUnitKey,
+      unitResponses: selectedRun.unitResponses ?? {}
+    });
   }
 
   get openRunItems(): RecordCollectionItem[] {
@@ -329,6 +383,7 @@ export class RuntimeViewFacade {
         bookletLabel: "No active booklet",
         unitLabel: "No unit loaded",
         unitKey: "n/a",
+        unitResponse: "",
         runStatus: "idle",
         runId: this.runtime.testRunId.trim() || "no run selected",
         availableActions: [],
@@ -349,12 +404,14 @@ export class RuntimeViewFacade {
       currentRunState.availableActions.includes("save_progress");
     const canResume = currentRunState.availableActions.includes("resume");
     const canComplete = currentRunState.availableActions.includes("complete");
+    const unitResponse = currentRunState.testRun.unitResponses?.[unitKey] ?? "";
 
     return {
       hasRun: true,
       bookletLabel: currentRunState.booklet.displayLabel,
       unitLabel,
       unitKey,
+      unitResponse,
       runStatus: currentRunState.testRun.status,
       runId: currentRunState.testRun.testRunId,
       availableActions: currentRunState.availableActions,
@@ -684,6 +741,47 @@ export class RuntimeViewFacade {
       item => item.participantSession.loginKey === loginKey
     );
     return matchingItem?.participantSession.participantSessionId ?? null;
+  }
+
+  private createUnitResponseItems(input: {
+    testRunId: string;
+    status: string;
+    currentUnitKey: string | null;
+    unitResponses: Record<string, string>;
+  }): RecordCollectionItem[] {
+    return Object.entries(input.unitResponses)
+      .sort(([leftUnitKey], [rightUnitKey]) => leftUnitKey.localeCompare(rightUnitKey))
+      .map(([unitKey, response]) => ({
+        headline: unitKey,
+        subline: input.testRunId,
+        badges: [input.status, `${response.length} char(s)`],
+        rows: [
+          {
+            label: "Response",
+            value: this.formatResponsePreview(response)
+          },
+          {
+            label: "Length",
+            value: String(response.length)
+          }
+        ],
+        selected:
+          this.runtime.testRunId.trim() === input.testRunId &&
+          this.runtime.currentUnitKey.trim() === unitKey,
+        actionLabel: "Select Unit",
+        actionPayload: {
+          testRunId: input.testRunId,
+          currentUnitKey: unitKey
+        }
+      }));
+  }
+
+  private formatResponsePreview(value: string): string {
+    const normalized = value.trim();
+    if (!normalized) {
+      return "empty";
+    }
+    return normalized.length > 96 ? `${normalized.slice(0, 93)}...` : normalized;
   }
 
   private formatDateTime(value: string): string {

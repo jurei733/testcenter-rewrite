@@ -33,6 +33,7 @@ export function createRuntimeActionsStateHost(args: {
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getLoginKey: () => args.runtimeState.loginKey,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
+    getCurrentUnitResponse: () => args.runtimeState.currentUnitResponse,
     createRuntimePresentationHost: args.createRuntimePresentationHost,
     refreshCrossViewStateAfterRuntimeChange:
       args.refreshCrossViewStateAfterRuntimeChange

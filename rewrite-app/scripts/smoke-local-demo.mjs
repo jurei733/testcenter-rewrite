@@ -188,6 +188,33 @@ try {
   );
   assert.equal(await page.locator("#adminUsername").inputValue(), "demo-admin");
 
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
+  await page.locator("#runtimeUnitResponse").waitFor({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Refresh Runtime Reads" }).click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#playerPreviewUnitResponseText")
+        ?.textContent?.includes("Intro answer from smoke") &&
+      document.querySelector("#runtimeUnitResponse")?.value ===
+        "Intro answer from smoke",
+    undefined,
+    { timeout: 15_000 }
+  );
+
+  await page.locator("#runtimeUnitResponse").fill("Operator adjusted smoke response");
+  await page.getByRole("button", { name: /^Preview Save/ }).click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#playerPreviewUnitResponseText")
+        ?.textContent?.includes("Operator adjusted smoke response") &&
+      document.querySelector("#runtimeUnitResponse")?.value ===
+        "Operator adjusted smoke response",
+    undefined,
+    { timeout: 15_000 }
+  );
+
   process.stdout.write(`Local demo smoke passed at ${baseUrl}/app\n`);
 } finally {
   if (browser) {
