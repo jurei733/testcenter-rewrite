@@ -41,7 +41,8 @@
     "test:integration:postgres": "npm run build && node ./scripts/run-postgres-integration.mjs",
     "test:integration:postgres:built": "node ./scripts/run-postgres-integration.mjs",
     "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api && ng build rewrite-app-web --configuration development",
-    "start:api": "node apps/api/dist/apps/api/src/index.js"
+    "start:api": "node apps/api/dist/apps/api/src/index.js",
+    "start:local": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/local.sqlite FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true npm run start:api"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.10",
