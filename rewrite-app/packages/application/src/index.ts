@@ -2228,7 +2228,19 @@ export const createFirstSliceServices = (
 ): FirstSliceServices => {
   const repository = dependencies.repository;
   const idGenerator = dependencies.idGenerator ?? randomUUID;
-  const now = dependencies.now ?? (() => new Date().toISOString());
+  const rawNow = dependencies.now ?? (() => new Date().toISOString());
+  let lastTimestampMs = 0;
+  const now = (): string => {
+    const rawTimestamp = rawNow();
+    const timestampMs = Date.parse(rawTimestamp);
+    if (!Number.isFinite(timestampMs)) {
+      return rawTimestamp;
+    }
+
+    const nextTimestampMs = Math.max(timestampMs, lastTimestampMs + 1);
+    lastTimestampMs = nextTimestampMs;
+    return new Date(nextTimestampMs).toISOString();
+  };
   const adminSessionTtlMs = dependencies.adminSessionTtlMs ?? ADMIN_SESSION_TTL_MS;
 
   const recordWorkspaceActivity = async (input: {
