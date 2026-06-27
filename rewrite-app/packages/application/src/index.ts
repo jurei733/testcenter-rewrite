@@ -26,6 +26,7 @@ import type {
   WorkspaceContentReleaseDetail,
   WorkspaceActivityEvent,
   WorkspaceActivityEventListItem,
+  WorkspaceActivitySubjectType,
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
@@ -102,6 +103,9 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
     eventType?: WorkspaceActivityEvent["eventType"];
+    subjectType?: WorkspaceActivitySubjectType;
+    subjectId?: string;
+    limit?: number;
   }): Promise<WorkspaceActivityEventListItem[]>;
   exportLogCsv(input: {
     tenantKey: string;
@@ -2929,12 +2933,18 @@ export const createFirstSliceServices = (
             workspace.tenantId,
             workspace.workspaceId
           );
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
         return activityEvents
-          .filter(activityEvent =>
-            input.eventType ? activityEvent.eventType === input.eventType : true
+          .filter(
+            activityEvent =>
+              (!input.eventType || activityEvent.eventType === input.eventType) &&
+              (!input.subjectType ||
+                activityEvent.subjectType === input.subjectType) &&
+              (!input.subjectId || activityEvent.subjectId === input.subjectId)
           )
           .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+          .slice(0, limit)
           .map(activityEvent => ({ activityEvent }));
       },
       async exportLogCsv(input) {

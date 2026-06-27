@@ -29,6 +29,7 @@ import type {
   WorkspaceParticipantSessionListItem,
   WorkspaceReviewListItem,
   WorkspaceActivityEventType,
+  WorkspaceActivitySubjectType,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorGroupDetail,
@@ -172,6 +173,9 @@ export type ActivateContentReleaseBlockedErrorDetails = {
 
 export type WorkspaceActivityEventListQuery = {
   eventType?: WorkspaceActivityEventType;
+  subjectType?: WorkspaceActivitySubjectType;
+  subjectId?: string;
+  limit?: number;
 };
 
 export type AdminAuditEventListQuery = {

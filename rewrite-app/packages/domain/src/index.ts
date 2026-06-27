@@ -45,6 +45,24 @@ export type WorkspaceActivityEventType =
   | "review_created"
   | "review_updated"
   | "review_deleted";
+export const workspaceActivityEventTypes = [
+  "workspace_created",
+  "source_package_created",
+  "import_job_completed",
+  "import_job_failed",
+  "source_package_import_retried",
+  "content_release_activated",
+  "content_release_activation_blocked",
+  "participant_signed_in",
+  "participant_session_resumed",
+  "test_run_progress_saved",
+  "test_run_resumed",
+  "test_run_completed",
+  "group_results_deleted",
+  "review_created",
+  "review_updated",
+  "review_deleted"
+] as const satisfies readonly WorkspaceActivityEventType[];
 export type WorkspaceActivitySubjectType =
   | "workspace"
   | "source_package"
@@ -52,6 +70,14 @@ export type WorkspaceActivitySubjectType =
   | "content_release"
   | "participant_session"
   | "test_run";
+export const workspaceActivitySubjectTypes = [
+  "workspace",
+  "source_package",
+  "import_job",
+  "content_release",
+  "participant_session",
+  "test_run"
+] as const satisfies readonly WorkspaceActivitySubjectType[];
 
 export type Tenant = {
   tenantId: string;

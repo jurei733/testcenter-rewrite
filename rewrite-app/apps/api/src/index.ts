@@ -92,7 +92,11 @@ import {
   type AdminSession,
   type AdminUser,
   type AdminAuditEventType,
+  type WorkspaceActivityEventType,
+  type WorkspaceActivitySubjectType,
   adminAuditEventTypes,
+  workspaceActivityEventTypes,
+  workspaceActivitySubjectTypes,
   firstProductionSliceCapabilities
 } from "@testcenter-rewrite-app/domain";
 import {
@@ -2052,11 +2056,62 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const eventType = url.searchParams.get("eventType") ?? undefined;
+        const eventType = url.searchParams.get("eventType")?.trim() || undefined;
+        if (
+          eventType &&
+          !workspaceActivityEventTypes.includes(eventType as WorkspaceActivityEventType)
+        ) {
+          sendError(
+            response,
+            400,
+            "workspace_activity_event_type_invalid",
+            `Workspace activity event type '${eventType}' is not supported.`
+          );
+          return;
+        }
+
+        const subjectType =
+          url.searchParams.get("subjectType")?.trim() || undefined;
+        if (
+          subjectType &&
+          !workspaceActivitySubjectTypes.includes(
+            subjectType as WorkspaceActivitySubjectType
+          )
+        ) {
+          sendError(
+            response,
+            400,
+            "workspace_activity_subject_type_invalid",
+            `Workspace activity subject type '${subjectType}' is not supported.`
+          );
+          return;
+        }
+
+        const subjectId = url.searchParams.get("subjectId")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "workspace_activity_limit_invalid",
+            "Workspace activity limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listWorkspaceActivityEvents({
           tenantKey,
           workspaceKey,
-          eventType: eventType as never
+          eventType: eventType as WorkspaceActivityEventType | undefined,
+          subjectType: subjectType as WorkspaceActivitySubjectType | undefined,
+          subjectId,
+          limit
         });
         sendJson<ListWorkspaceActivityEventsResponse>(response, 200, { items });
         return;

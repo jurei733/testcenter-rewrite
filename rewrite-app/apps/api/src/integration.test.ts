@@ -2270,6 +2270,74 @@ test("workspace participant-session list shows latest run and active release", a
     ),
     true
   );
+
+  const signedInActivityEvents = await requestJson<{
+    items: Array<{ activityEvent: { eventType: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_signed_in`
+  );
+
+  assert.equal(signedInActivityEvents.status, 200);
+  assert.equal(signedInActivityEvents.body.items.length > 0, true);
+  assert.equal(
+    signedInActivityEvents.body.items.every(
+      item => item.activityEvent.eventType === "participant_signed_in"
+    ),
+    true
+  );
+
+  const sessionActivityEvents = await requestJson<{
+    items: Array<{
+      activityEvent: { subjectType: string; subjectId: string };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?subjectType=participant_session&subjectId=${signIn.body.participantSession.participantSessionId}`
+  );
+
+  assert.equal(sessionActivityEvents.status, 200);
+  assert.equal(sessionActivityEvents.body.items.length, 1);
+  assert.equal(
+    sessionActivityEvents.body.items[0]?.activityEvent.subjectType,
+    "participant_session"
+  );
+  assert.equal(
+    sessionActivityEvents.body.items[0]?.activityEvent.subjectId,
+    signIn.body.participantSession.participantSessionId
+  );
+
+  const limitedActivityEvents = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?limit=1`
+  );
+
+  assert.equal(limitedActivityEvents.status, 200);
+  assert.equal(limitedActivityEvents.body.items.length, 1);
+
+  const invalidActivityEventType = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=unsupported`
+  );
+
+  assert.equal(invalidActivityEventType.status, 400);
+  assert.equal(
+    invalidActivityEventType.body.error,
+    "workspace_activity_event_type_invalid"
+  );
+
+  const invalidActivitySubjectType = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?subjectType=unsupported`
+  );
+
+  assert.equal(invalidActivitySubjectType.status, 400);
+  assert.equal(
+    invalidActivitySubjectType.body.error,
+    "workspace_activity_subject_type_invalid"
+  );
+
+  const invalidActivityLimit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?limit=0`
+  );
+
+  assert.equal(invalidActivityLimit.status, 400);
+  assert.equal(invalidActivityLimit.body.error, "workspace_activity_limit_invalid");
 });
 
 test("metrics endpoint exposes runtime counters and request ids", async () => {
