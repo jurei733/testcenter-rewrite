@@ -129,6 +129,7 @@ try {
   const health = await pollJson(`${baseUrl}/healthz`);
   const readiness = await pollJson(`${baseUrl}/readyz`);
   const manifest = await pollJson(`${baseUrl}/manifest`);
+  const config = await pollJson(`${baseUrl}/diagnostics/config`);
 
   await expectHead(`${baseUrl}/healthz`);
   await expectHead(`${baseUrl}/readyz`);
@@ -158,6 +159,23 @@ try {
     throw new Error(
       `Expected manifest storage.kind=${store} but got ${manifest.storage?.kind ?? "unknown"}.`
     );
+  }
+
+  if (config.runtimeConfig?.storage?.kind !== store) {
+    throw new Error(
+      `Expected runtime config storage.kind=${store} but got ${config.runtimeConfig?.storage?.kind ?? "unknown"}.`
+    );
+  }
+
+  for (const [label, value] of [
+    ["maxJsonBodyBytes", config.runtimeConfig?.maxJsonBodyBytes],
+    ["headersTimeoutMs", config.runtimeConfig?.httpTimeouts?.headersTimeoutMs],
+    ["requestTimeoutMs", config.runtimeConfig?.httpTimeouts?.requestTimeoutMs],
+    ["keepAliveTimeoutMs", config.runtimeConfig?.httpTimeouts?.keepAliveTimeoutMs]
+  ]) {
+    if (typeof value !== "number" || value < 1) {
+      throw new Error(`Startup smoke expected runtime config ${label} to be positive.`);
+    }
   }
 
   for (const marker of [

@@ -334,7 +334,7 @@ npm run smoke:startup:sqlite
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:startup:postgres
 ```
 
-Those boot the built API process, poll `/healthz`, `/readyz`, and `/manifest`, verify `HEAD` compatibility for health/readiness/shell/participant entrypoints, then stop the process again.
+Those boot the built API process, poll `/healthz`, `/readyz`, `/manifest`, and `/diagnostics/config`, verify `HEAD` compatibility for health/readiness/shell/participant entrypoints, then stop the process again.
 
 For graceful rollout verification, run:
 
