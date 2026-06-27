@@ -1415,12 +1415,15 @@ const normalizeParsedJsonContentStructure = (
     : (parsed as {
         bookletEntries?: unknown;
         booklets?: unknown;
+        testlets?: unknown;
       });
   const rawBooklets = Array.isArray(candidate.bookletEntries)
     ? candidate.bookletEntries
     : Array.isArray(candidate.booklets)
       ? candidate.booklets
-      : [];
+      : Array.isArray(candidate.testlets)
+        ? candidate.testlets
+        : [];
 
   const contentStructure: SourcePackageContentStructure = {
     bookletEntries: rawBooklets
@@ -1434,14 +1437,24 @@ const normalizeParsedJsonContentStructure = (
           ? booklet.unitEntries
           : Array.isArray(booklet.units)
             ? booklet.units
-            : [];
+            : Array.isArray(booklet.unitRefs)
+              ? booklet.unitRefs
+              : Array.isArray(booklet.unitReferences)
+                ? booklet.unitReferences
+                : Array.isArray(booklet.items)
+                  ? booklet.items
+                  : [];
 
         return {
           bookletKey: String(
             booklet.bookletKey ??
               booklet.bookletId ??
+              booklet.testletKey ??
+              booklet.testletId ??
               booklet.key ??
               booklet.id ??
+              booklet.alias ??
+              booklet.code ??
               ""
           ).trim(),
           displayLabel: String(
@@ -1449,6 +1462,7 @@ const normalizeParsedJsonContentStructure = (
               booklet.label ??
               booklet.title ??
               booklet.name ??
+              booklet.displayName ??
               ""
           ).trim(),
           unitEntries: rawUnits
@@ -1465,10 +1479,18 @@ const normalizeParsedJsonContentStructure = (
                     unit.key ??
                     unit.id ??
                     unit.ref ??
+                    unit.alias ??
+                    unit.code ??
+                    unit.href ??
                     ""
                 ).trim(),
                 displayLabel: String(
-                  unit.displayLabel ?? unit.label ?? unit.title ?? unit.name ?? ""
+                  unit.displayLabel ??
+                    unit.label ??
+                    unit.title ??
+                    unit.name ??
+                    unit.displayName ??
+                    ""
                 ).trim()
               };
             })
@@ -1518,7 +1540,10 @@ const readXmlAttribute = (
   ]);
   for (const candidateName of candidateNames) {
     const normalizedName = candidateName.toLowerCase();
-    const match = normalizedEntries.find(([key]) => key === normalizedName);
+    const match = normalizedEntries.find(([key]) => {
+      const localName = key.split(":").at(-1) ?? key;
+      return key === normalizedName || localName === normalizedName;
+    });
     if (match) {
       return match[1];
     }
@@ -1533,13 +1558,15 @@ const normalizeParsedXmlContentStructure = (
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
   for (const bookletMatch of sourceDocument.matchAll(
-    /<booklet\b([^>]*)>([\s\S]*?)<\/booklet>/gi
+    /<(booklet|testlet)\b([^>]*)>([\s\S]*?)<\/\1>/gi
   )) {
-    const bookletAttributes = parseXmlAttributes(bookletMatch[1] ?? "");
+    const bookletAttributes = parseXmlAttributes(bookletMatch[2] ?? "");
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
-    for (const unitMatch of (bookletMatch[2] ?? "").matchAll(/<unit\b([^>]*?)(?:\/>|>([\s\S]*?)<\/unit>)/gi)) {
-      const unitAttributes = parseXmlAttributes(unitMatch[1] ?? "");
+    for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
+      /<(unit|unitRef|unit-ref|unitReference|unitDefinition|item)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+    )) {
+      const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       unitEntries.push({
         unitKey: String(
           readXmlAttribute(
@@ -1548,7 +1575,10 @@ const normalizeParsedXmlContentStructure = (
             "unitId",
             "key",
             "id",
-            "ref"
+            "ref",
+            "alias",
+            "code",
+            "href"
           ) ?? ""
         ).trim(),
         displayLabel: String(
@@ -1557,7 +1587,8 @@ const normalizeParsedXmlContentStructure = (
             "displayLabel",
             "label",
             "title",
-            "name"
+            "name",
+            "displayName"
           ) ?? ""
         ).trim()
       });
@@ -1569,8 +1600,12 @@ const normalizeParsedXmlContentStructure = (
           bookletAttributes,
           "bookletKey",
           "bookletId",
+          "testletKey",
+          "testletId",
           "key",
-          "id"
+          "id",
+          "alias",
+          "code"
         ) ?? ""
       ).trim(),
       displayLabel: String(
@@ -1579,7 +1614,8 @@ const normalizeParsedXmlContentStructure = (
           "displayLabel",
           "label",
           "title",
-          "name"
+          "name",
+          "displayName"
         ) ?? ""
       ).trim(),
       unitEntries
