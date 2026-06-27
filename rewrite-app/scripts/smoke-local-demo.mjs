@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const buildMetadataWrapper = resolve(appRoot, "scripts/with-build-metadata.mjs");
 const sqliteFile = resolve(
   appRoot,
   process.env.LOCAL_DEMO_SMOKE_SQLITE_FILE ?? ".data/local-demo-smoke.sqlite"
@@ -101,7 +102,7 @@ const baseEnv = {
 await run(npmCommand, ["run", "db:migrate:sqlite:built"], { env: baseEnv });
 
 const port = await getAvailablePort();
-const api = spawn(npmCommand, ["run", "start:api"], {
+const api = spawn(process.execPath, [buildMetadataWrapper, npmCommand, "run", "start:api"], {
   cwd: appRoot,
   stdio: "inherit",
   env: {
@@ -118,9 +119,15 @@ api.once("error", error => {
 
 const baseUrl = `http://127.0.0.1:${port}`;
 let browser = null;
+let adminSessionToken = "";
 
 try {
   await waitForJson(`${baseUrl}/readyz`);
+  const manifest = await waitForJson(`${baseUrl}/manifest`);
+  assert.equal(typeof manifest.build?.commitSha, "string");
+  assert.ok(manifest.build.commitSha.length > 0);
+  assert.equal(typeof manifest.build?.builtAt, "string");
+  assert.match(manifest.build.builtAt, /^\d{4}-\d{2}-\d{2}T/);
 
   browser = await chromium.launch();
   const page = await browser.newPage();
@@ -187,6 +194,8 @@ try {
     { timeout: 15_000 }
   );
   assert.equal(await page.locator("#adminUsername").inputValue(), "demo-admin");
+  adminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  assert.ok(adminSessionToken.length > 0);
 
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
   await page.locator("#runtimeUnitResponse").waitFor({ timeout: 15_000 });
@@ -302,6 +311,8 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.locator("#groupKey").fill("group:student-demo");
+  await page.locator("#groupKey").dispatchEvent("change");
   await page.waitForFunction(
     () => document.querySelector("#groupKey")?.value === "group:student-demo",
     undefined,
@@ -312,22 +323,41 @@ try {
     await dialog.accept();
   });
   await page.getByRole("button", { name: "Delete Group Results" }).click();
-  await page
-    .getByText("Load detailed responses to inspect saved answers across the workspace.")
-    .waitFor({ timeout: 15_000 });
   await page.getByText("Group Results Deleted").waitFor({ timeout: 15_000 });
+  const remainingResponses = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?groupKey=${encodeURIComponent("group:student-demo")}&limit=10`,
+    {
+      headers: {
+        authorization: `Bearer ${adminSessionToken}`
+      }
+    }
+  ).then(async response => {
+    assert.equal(response.status, 200);
+    return response.json();
+  });
+  assert.equal(remainingResponses.items.length, 0);
 
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Refresh Study Monitor" }).click();
-  await page.waitForFunction(
-    () =>
-      document.body.textContent?.includes("group:student-demo") &&
-      document.body.textContent?.includes("0 running") &&
-      document.body.textContent?.includes("Responses") &&
-      document.body.textContent?.includes("0"),
-    undefined,
-    { timeout: 15_000 }
+  await page
+    .getByRole("heading", { name: "Study Monitor", exact: true })
+    .waitFor({ timeout: 15_000 });
+  const studyMonitor = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/summary`,
+    {
+      headers: {
+        authorization: `Bearer ${adminSessionToken}`
+      }
+    }
+  ).then(async response => {
+    assert.equal(response.status, 200);
+    return response.json();
+  });
+  const demoGroup = studyMonitor.studyMonitorSummary.groups.find(
+    group => group.groupKey === "group:student-demo"
   );
+  assert.equal(demoGroup?.testRunCount ?? 0, 0);
+  assert.equal(demoGroup?.responseCount ?? 0, 0);
 
   const logDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
