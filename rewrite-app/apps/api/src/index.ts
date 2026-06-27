@@ -9,6 +9,7 @@ import {
   createFirstSliceServices,
   type FirstSliceError,
   type FirstSliceRepository,
+  type FirstSliceServices,
   firstSliceUseCases
 } from "@testcenter-rewrite-app/application";
 import {
@@ -151,6 +152,83 @@ const resolveStoreKind = (): RuntimeStoreKind => {
   );
 };
 
+const localDemoBootstrap = {
+  adminUsername: "demo-admin",
+  adminPassword: "demo-admin-password",
+  tenantKey: "demo-tenant",
+  workspaceKey: "demo-workspace",
+  participantLoginKey: "student-demo",
+  sourceFileName: "demo-assessment.xml",
+  sourceMediaType: "application/xml",
+  sourceDocument:
+    '<assessment><booklet key="booklet:demo" label="Demo Booklet"><unit key="unit-intro" label="Introduction" /><unit key="unit-practice" label="Practice" /><unit key="unit-finish" label="Finish" /></booklet></assessment>'
+} as const;
+
+const bootstrapLocalDemoState = async (input: {
+  repository: FirstSliceRepository;
+  services: FirstSliceServices;
+}): Promise<void> => {
+  const { repository, services } = input;
+  const existingAdminUsers = await repository.listAdminUsers();
+  if (existingAdminUsers.length === 0) {
+    await services.adminAuth.bootstrapAdminUser({
+      username: localDemoBootstrap.adminUsername,
+      displayName: "Demo Platform Admin",
+      password: localDemoBootstrap.adminPassword
+    });
+  }
+
+  let tenant = await repository.getTenantByKey(localDemoBootstrap.tenantKey);
+  if (!tenant) {
+    tenant = await services.platform.createTenant({
+      tenantKey: localDemoBootstrap.tenantKey,
+      displayName: "Demo Tenant"
+    });
+  }
+
+  let workspace = await repository.getWorkspaceByScope(
+    localDemoBootstrap.tenantKey,
+    localDemoBootstrap.workspaceKey
+  );
+  if (!workspace) {
+    workspace = await services.platform.createWorkspace({
+      tenantKey: localDemoBootstrap.tenantKey,
+      workspaceKey: localDemoBootstrap.workspaceKey,
+      displayName: "Demo Workspace"
+    });
+  }
+
+  const existingReleases = await repository.listContentReleasesByWorkspace(
+    tenant.tenantId,
+    workspace.workspaceId
+  );
+  if (existingReleases.some(contentRelease => contentRelease.status === "active")) {
+    return;
+  }
+
+  const sourcePackage = await services.contentIntake.createSourcePackage({
+    tenantKey: localDemoBootstrap.tenantKey,
+    workspaceKey: localDemoBootstrap.workspaceKey,
+    fileName: localDemoBootstrap.sourceFileName,
+    mediaType: localDemoBootstrap.sourceMediaType,
+    sourceDocument: localDemoBootstrap.sourceDocument
+  });
+  const result = await services.createImportJobWithRelease({
+    tenantKey: localDemoBootstrap.tenantKey,
+    workspaceKey: localDemoBootstrap.workspaceKey,
+    sourcePackageId: sourcePackage.sourcePackageId
+  });
+
+  if (result.stagedContentRelease) {
+    await services.contentIntake.activateContentRelease({
+      tenantKey: localDemoBootstrap.tenantKey,
+      workspaceKey: localDemoBootstrap.workspaceKey,
+      contentReleaseId: result.stagedContentRelease.contentReleaseId,
+      activatedByActorId: "local-demo-bootstrap"
+    });
+  }
+};
+
 const createRepositoryFromEnvironment = async () => {
   const store = resolveStoreKind();
 
@@ -223,8 +301,18 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
     false
   );
+  const demoBootstrapEnabled = parseBooleanEnvironmentFlag(
+    "FIRST_SLICE_BOOTSTRAP_DEMO",
+    false
+  );
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
+  const services = createFirstSliceServices({ repository });
+
+  if (demoBootstrapEnabled) {
+    await bootstrapLocalDemoState({ repository, services });
+  }
+
   return {
     config: {
       port: configuredPort,
@@ -236,13 +324,14 @@ const createApiRuntime = async () => {
         firstSliceSqliteFilePresent: Boolean(process.env.FIRST_SLICE_SQLITE_FILE),
         firstSlicePostgresUrlPresent: Boolean(process.env.FIRST_SLICE_POSTGRES_URL),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
+        firstSliceBootstrapDemo: demoBootstrapEnabled,
         appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
         appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP)
       }
     },
     repositoryConfig,
     repository,
-    services: createFirstSliceServices({ repository }),
+    services,
     metrics: createRuntimeMetrics(),
     recentOperationalEvents: [] as RuntimeOperationalEvent[],
     lifecycle: {

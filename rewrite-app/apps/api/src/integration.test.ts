@@ -1019,6 +1019,94 @@ test("operator API can require a platform-admin bearer session", async () => {
   }
 });
 
+test("local demo bootstrap seeds a directly usable app state", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        environment: { firstSliceBootstrapDemo: boolean };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.environment.firstSliceBootstrapDemo, true);
+
+    const signIn = await requestJsonAt<{
+      sessionToken: string;
+      adminUser: { username: string };
+      roleAssignments: Array<{ role: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "demo-admin",
+        password: "demo-admin-password"
+      }
+    });
+
+    assert.equal(signIn.status, 200);
+    assert.equal(signIn.body.adminUser.username, "demo-admin");
+    assert.equal(signIn.body.roleAssignments[0]?.role, "platform_admin");
+
+    const overview = await requestJsonAt<{
+      workspaceOverview: {
+        workspace: { workspaceKey: string };
+        activeContentReleaseId: string | null;
+        contentReleaseCount: number;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(overview.status, 200);
+    assert.equal(overview.body.workspaceOverview.workspace.workspaceKey, "demo-workspace");
+    assert.equal(typeof overview.body.workspaceOverview.activeContentReleaseId, "string");
+    assert.ok(overview.body.workspaceOverview.contentReleaseCount >= 1);
+
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string; loginKey: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    });
+
+    assert.equal(participantSignIn.status, 200);
+    assert.equal(participantSignIn.body.participantSession.loginKey, "student-demo");
+
+    const resumed = await requestJsonAt<{
+      testRun: {
+        status: string;
+        bookletKey: string;
+        currentUnitKey: string | null;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+
+    assert.equal(resumed.status, 200);
+    assert.equal(resumed.body.testRun.status, "running");
+    assert.equal(resumed.body.testRun.bookletKey, "booklet:demo");
+    assert.equal(resumed.body.testRun.currentUnitKey, "unit-intro");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("failed import can be retried on the same source package", async () => {
   const tenantKey = "integration-tenant-retry";
   const workspaceKey = "integration-workspace-retry";

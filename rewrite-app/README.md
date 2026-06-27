@@ -63,9 +63,18 @@ For a durable one-command local app start, run:
 npm run start:local
 ```
 
-That builds the API and Angular shell, migrates `./.data/local.sqlite`, starts the API with SQLite persistence and protected operator routes, then serves the app at `http://127.0.0.1:4310/app`. On first use, open the Ops view and run the admin bootstrap/sign-in flow.
+That builds the API and Angular shell, migrates `./.data/local.sqlite`, starts the API with SQLite persistence and protected operator routes, then serves the app at `http://127.0.0.1:4310/app`.
 
-To reset that local demo state and repeat first-use bootstrap from a clean SQLite database, run:
+`start:local` also enables the local demo bootstrap. On a clean local database it creates:
+
+- platform admin: `demo-admin` / `demo-admin-password`
+- tenant/workspace: `demo-tenant` / `demo-workspace`
+- active demo content release with a three-unit demo booklet
+- participant entry URL: `http://127.0.0.1:4310/participant?workspaceKey=demo-workspace&loginKey=student-demo`
+
+If the local database already has an admin user or active demo release, the bootstrap leaves the existing state in place.
+
+To reset that local demo state and let `start:local` seed it again from a clean SQLite database, run:
 
 ```bash
 npm run reset:local
