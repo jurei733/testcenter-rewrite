@@ -11,7 +11,7 @@
     "build": "npm run build:core && npm run build:web",
     "build:core": "tsc -b packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api",
     "build:web": "ng build rewrite-app-web",
-    "ci": "npm run typecheck && npm run build && npm run test:integration && npm run smoke:startup:sqlite && npm run smoke:shutdown:sqlite && npm run smoke:ui",
+    "ci": "npm run typecheck && npm run build && npm run test:integration && npm run smoke:startup:sqlite && npm run smoke:shutdown:sqlite && npm run smoke:ui && npm run smoke:ui:operator-auth",
     "install:browsers": "playwright install chromium",
     "db:doctor": "npm run build && node ./scripts/storage-admin.mjs doctor",
     "db:doctor:built": "node ./scripts/storage-admin.mjs doctor",

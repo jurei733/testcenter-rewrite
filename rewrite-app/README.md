@@ -84,7 +84,7 @@ That executes:
 - memory + sqlite integration tests
 - a built-server startup smoke test against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
-- a browser-driven Angular UI smoke against SQLite
+- browser-driven Angular UI smokes against SQLite in open and protected operator modes
 
 For explicit storage administration, run:
 
