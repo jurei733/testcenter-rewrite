@@ -912,6 +912,30 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedOverview.status, 401);
     assert.equal(rejectedOverview.body.error, "admin_session_missing");
 
+    const rejectedStudyMonitorSummary = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/summary"
+    );
+
+    assert.equal(rejectedStudyMonitorSummary.status, 401);
+    assert.equal(rejectedStudyMonitorSummary.body.error, "admin_session_missing");
+
+    const rejectedStudyMonitorBooklet = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/booklets/booklet%3Aauth"
+    );
+
+    assert.equal(rejectedStudyMonitorBooklet.status, 401);
+    assert.equal(rejectedStudyMonitorBooklet.body.error, "admin_session_missing");
+
+    const rejectedStudyMonitorUnit = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/units/unit-auth"
+    );
+
+    assert.equal(rejectedStudyMonitorUnit.status, 401);
+    assert.equal(rejectedStudyMonitorUnit.body.error, "admin_session_missing");
+
     const overview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
     }>(
