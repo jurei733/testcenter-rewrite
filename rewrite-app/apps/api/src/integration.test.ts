@@ -1213,11 +1213,13 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         testRunCount: number;
         runningCount: number;
         responseCount: number;
+        reviewCount: number;
         groups: Array<{
           groupKey: string;
           participantSessionCount: number;
           runningCount: number;
           responseCount: number;
+          reviewCount: number;
         }>;
       };
     }>(
@@ -1235,6 +1237,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitor.body.studyMonitorSummary.testRunCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.runningCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 1);
+    assert.equal(studyMonitor.body.studyMonitorSummary.reviewCount, 0);
     assert.equal(
       studyMonitor.body.studyMonitorSummary.groups[0]?.groupKey,
       "group:student-demo"
@@ -1243,6 +1246,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       studyMonitor.body.studyMonitorSummary.groups[0]?.participantSessionCount,
       1
     );
+    assert.equal(studyMonitor.body.studyMonitorSummary.groups[0]?.reviewCount, 0);
 
     const responseCsv = await requestTextAt(
       isolated.baseUrl,
@@ -1348,6 +1352,32 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(reviews.body.items[0]?.review.comment, "Updated integration review");
     assert.equal(reviews.body.items[0]?.participantSession?.loginKey, "student-demo");
     assert.equal(reviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
+
+    const reviewedStudyMonitor = await requestJsonAt<{
+      studyMonitorSummary: {
+        reviewCount: number;
+        groups: Array<{ groupKey: string; reviewCount: number }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/summary",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(reviewedStudyMonitor.status, 200);
+    assert.equal(reviewedStudyMonitor.body.studyMonitorSummary.reviewCount, 1);
+    assert.equal(
+      reviewedStudyMonitor.body.studyMonitorSummary.groups[0]?.groupKey,
+      "group:student-demo"
+    );
+    assert.equal(
+      reviewedStudyMonitor.body.studyMonitorSummary.groups[0]?.reviewCount,
+      1
+    );
 
     const participantSessionDetail = await requestJsonAt<{
       participantSessionDetail: {

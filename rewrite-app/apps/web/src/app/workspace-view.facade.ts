@@ -53,12 +53,14 @@ export class WorkspaceViewFacade {
         badges: [
           `${group.runningCount} running`,
           `${group.pausedCount} paused`,
-          `${group.completedCount} completed`
+          `${group.completedCount} completed`,
+          `${group.reviewCount ?? 0} review(s)`
         ],
         rows: [
           { label: "Not Started", value: String(group.notStartedCount) },
           { label: "Test Runs", value: String(group.testRunCount) },
           { label: "Responses", value: String(group.responseCount) },
+          { label: "Reviews", value: String(group.reviewCount ?? 0) },
           {
             label: "Latest Activity",
             value: group.latestActivityAt

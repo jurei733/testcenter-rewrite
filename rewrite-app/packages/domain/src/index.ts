@@ -278,6 +278,7 @@ export type WorkspaceStudyMonitorGroup = {
   pausedCount: number;
   completedCount: number;
   responseCount: number;
+  reviewCount: number;
   latestActivityAt: string | null;
 };
 
@@ -321,6 +322,7 @@ export type WorkspaceStudyMonitorSummary = {
   pausedCount: number;
   completedCount: number;
   responseCount: number;
+  reviewCount: number;
   groups: WorkspaceStudyMonitorGroup[];
 };
 

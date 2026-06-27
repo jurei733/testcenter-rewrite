@@ -1866,6 +1866,7 @@ const buildStudyMonitorSummary = (input: {
   generatedAt: string;
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
+  reviews: WorkspaceReview[];
 }): WorkspaceStudyMonitorSummary => {
   const latestRunsBySessionId = getLatestTestRunByParticipantSessionId(input.testRuns);
   const testRunsBySessionId = new Map<string, TestRun[]>();
@@ -1892,6 +1893,7 @@ const buildStudyMonitorSummary = (input: {
       pausedCount: 0,
       completedCount: 0,
       responseCount: 0,
+      reviewCount: 0,
       latestActivityAt: null
     };
 
@@ -1901,6 +1903,12 @@ const buildStudyMonitorSummary = (input: {
       (total, testRun) => total + Object.keys(testRun.unitResponses).length,
       0
     );
+    const sessionTestRunIds = new Set(
+      sessionRuns.map(testRun => testRun.testRunId)
+    );
+    group.reviewCount += input.reviews.filter(review =>
+      sessionTestRunIds.has(review.testRunId)
+    ).length;
     if (!latestRun) {
       group.notStartedCount += 1;
     } else if (latestRun.status === "running") {
@@ -1940,6 +1948,7 @@ const buildStudyMonitorSummary = (input: {
     pausedCount: groups.reduce((total, group) => total + group.pausedCount, 0),
     completedCount: groups.reduce((total, group) => total + group.completedCount, 0),
     responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
+    reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
     groups
   };
 };
@@ -2776,12 +2785,16 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [participantSessions, testRuns] = await Promise.all([
+        const [participantSessions, testRuns, reviews] = await Promise.all([
           repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId),
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
         ]);
 
         return buildStudyMonitorSummary({
@@ -2789,7 +2802,8 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           generatedAt: now(),
           participantSessions,
-          testRuns
+          testRuns,
+          reviews
         });
       },
       async getStudyMonitorGroupDetail(input) {

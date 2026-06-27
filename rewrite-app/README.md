@@ -253,7 +253,7 @@ The added read side now makes the first slice inspectable:
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
-- study monitor summary returns workspace-wide group progress with participant sessions, latest run states, response counts, and latest activity timestamps
+- study monitor summary returns workspace-wide group progress with participant sessions, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, latest runs, response counts, review counts, and per-run context for operator follow-up
 - source-package listing shows uploaded packages together with their latest import attempt
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
