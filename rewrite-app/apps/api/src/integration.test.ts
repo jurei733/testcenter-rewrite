@@ -2747,6 +2747,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.equal(healthResponse.status, 200);
   assert.ok(healthResponse.headers.get("x-request-id"));
 
+  const headHealthResponse = await fetch(`${baseUrl}/healthz`, { method: "HEAD" });
+  assert.equal(headHealthResponse.status, 200);
+  assert.ok(headHealthResponse.headers.get("x-request-id"));
+  assert.equal(await headHealthResponse.text(), "");
+
   const metricsResponse = await fetch(`${baseUrl}/metrics`);
   assert.equal(metricsResponse.status, 200);
   assert.ok(metricsResponse.headers.get("x-request-id"));
@@ -2782,10 +2787,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   };
 
   assert.equal(metrics.phase, "production-baseline");
-  assert.ok(metrics.runtime.totalRequests >= 2);
+  assert.ok(metrics.runtime.totalRequests >= 3);
   assert.ok(metrics.runtime.completedRequests >= 1);
   assert.ok(metrics.requestCountsByMethod.GET >= 2);
-  assert.ok(metrics.requestCountsByRoute["GET /healthz"] >= 1);
+  assert.ok(metrics.requestCountsByMethod.HEAD >= 1);
+  assert.ok(metrics.requestCountsByRoute["GET /healthz"] >= 2);
   assert.ok(metrics.requestCountsByRoute["GET /metrics"] >= 1);
   assert.ok(metrics.responseCountsByStatusCode["200"] >= 1);
   assert.equal(typeof metrics.memory.rssBytes, "number");
@@ -2857,6 +2863,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
 });
 
 test("frontend shell exposes multi-view navigation and diagnostics entrypoints", async () => {
+  const appHeadResponse = await requestText("/app", { method: "HEAD" });
+  assert.equal(appHeadResponse.status, 200);
+  assert.match(appHeadResponse.contentType ?? "", /text\/html/);
+  assert.equal(appHeadResponse.body, "");
+
   const appResponse = await requestText("/app");
 
   assert.equal(appResponse.status, 200);
@@ -2874,6 +2885,17 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
     participantEntryResponse.headers.get("location"),
     "/app/participant?workspaceKey=demo-workspace"
   );
+
+  const participantEntryHeadResponse = await fetch(
+    `${baseUrl}/participant?workspaceKey=demo-workspace`,
+    { method: "HEAD", redirect: "manual" }
+  );
+  assert.equal(participantEntryHeadResponse.status, 302);
+  assert.equal(
+    participantEntryHeadResponse.headers.get("location"),
+    "/app/participant?workspaceKey=demo-workspace"
+  );
+  assert.equal(await participantEntryHeadResponse.text(), "");
 
   const scriptMatch = appResponse.body.match(
     /<script src="([^"]*main[^"]*\.js)" type="module"><\/script>/

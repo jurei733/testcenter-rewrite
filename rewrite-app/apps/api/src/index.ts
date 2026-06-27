@@ -660,7 +660,18 @@ const sendJson = <T>(
   body: T
 ): void => {
   response.writeHead(statusCode, jsonHeaders);
-  response.end(JSON.stringify(body, null, 2));
+  endResponse(response, JSON.stringify(body, null, 2));
+};
+
+const headResponses = new WeakSet<ServerResponse>();
+
+const endResponse = (response: ServerResponse, body?: string | Buffer): void => {
+  if (headResponses.has(response)) {
+    response.end();
+    return;
+  }
+
+  response.end(body);
 };
 
 const sendHtml = (
@@ -669,7 +680,7 @@ const sendHtml = (
   html: string
 ): void => {
   response.writeHead(statusCode, htmlHeaders);
-  response.end(html);
+  endResponse(response, html);
 };
 
 const sendText = (
@@ -678,7 +689,7 @@ const sendText = (
   text: string
 ): void => {
   response.writeHead(statusCode, textHeaders);
-  response.end(text);
+  endResponse(response, text);
 };
 
 const sendCsv = (
@@ -692,7 +703,7 @@ const sendCsv = (
     "content-disposition": `attachment; filename="${filename}"`,
     "cache-control": "no-cache"
   });
-  response.end(text);
+  endResponse(response, text);
 };
 
 const sendAsset = (
@@ -705,7 +716,7 @@ const sendAsset = (
     "content-type": contentType,
     "cache-control": "no-cache"
   });
-  response.end(body);
+  endResponse(response, body);
 };
 
 const sendRedirect = (
@@ -717,7 +728,7 @@ const sendRedirect = (
     location,
     "cache-control": "no-cache"
   });
-  response.end();
+  endResponse(response);
 };
 
 const sendError = (
@@ -1476,8 +1487,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     const requestId = randomUUID();
     const requestStartedAt = process.hrtime.bigint();
     const method = request.method ?? "UNKNOWN";
+    const effectiveMethod = method === "HEAD" ? "GET" : method;
     const metrics = runtime.metrics;
-    const routeLabel = resolveMetricsRouteLabel(method, new URL(request.url ?? "/", "http://127.0.0.1").pathname);
+    const routeLabel = resolveMetricsRouteLabel(
+      effectiveMethod,
+      new URL(request.url ?? "/", "http://127.0.0.1").pathname
+    );
 
     response.setHeader("x-request-id", requestId);
     metrics.activeRequests += 1;
@@ -1505,6 +1520,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     if (!request.url || !request.method) {
       sendError(response, 400, "invalid_request", "Missing request URL or method.");
       return;
+    }
+
+    if (method === "HEAD") {
+      headResponses.add(response);
+      request.method = effectiveMethod;
     }
 
     const url = new URL(request.url, "http://127.0.0.1");
