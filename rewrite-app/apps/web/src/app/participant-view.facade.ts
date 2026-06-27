@@ -41,6 +41,13 @@ type ParticipantEntryParameters = {
   currentUnitKey?: string | null;
 };
 
+type NormalizedParticipantEntryParameters = {
+  workspaceKey: string;
+  loginKey: string;
+  participantSessionId: string;
+  currentUnitKey: string;
+};
+
 @Injectable({ providedIn: "root" })
 export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
@@ -58,28 +65,65 @@ export class ParticipantViewFacade {
     this.viewState.persistShellState();
   }
 
-  applyEntryParameters(parameters: ParticipantEntryParameters): void {
-    const workspaceKey = parameters.workspaceKey?.trim();
-    const loginKey = parameters.loginKey?.trim();
-    const participantSessionId = parameters.participantSessionId?.trim();
-    const currentUnitKey = parameters.currentUnitKey?.trim();
+  startFromEntryParameters(parameters: ParticipantEntryParameters): void {
+    const normalized = this.applyEntryParameters(parameters);
 
-    if (workspaceKey) {
-      this.workspace.workspaceKey = workspaceKey;
-    }
-    if (loginKey) {
-      this.runtime.loginKey = loginKey;
-    }
-    if (participantSessionId) {
-      this.runtime.participantSessionId = participantSessionId;
-    }
-    if (currentUnitKey) {
-      this.runtime.currentUnitKey = currentUnitKey;
+    if (normalized.participantSessionId) {
+      this.viewState.onActionAsync(() => this.resumeSessionInternal());
+      return;
     }
 
-    if (workspaceKey || loginKey || participantSessionId || currentUnitKey) {
+    if (normalized.workspaceKey && normalized.loginKey) {
+      this.viewState.onActionAsync(async () => {
+        await this.signInInternal();
+        await this.resumeSessionInternal();
+      });
+    }
+  }
+
+  private applyEntryParameters(
+    parameters: ParticipantEntryParameters
+  ): NormalizedParticipantEntryParameters {
+    const normalized = {
+      workspaceKey: parameters.workspaceKey?.trim() ?? "",
+      loginKey: parameters.loginKey?.trim() ?? "",
+      participantSessionId: parameters.participantSessionId?.trim() ?? "",
+      currentUnitKey: parameters.currentUnitKey?.trim() ?? ""
+    };
+
+    if (normalized.workspaceKey) {
+      const loginChanged =
+        normalized.loginKey &&
+        normalized.loginKey !== this.runtime.loginKey.trim() &&
+        !normalized.participantSessionId;
+      this.workspace.workspaceKey = normalized.workspaceKey;
+      if (loginChanged) {
+        this.runtime.participantSessionId = "";
+        this.runtime.testRunId = "";
+        this.runtime.currentRunStateView = 'Use "Start Or Resume".';
+      }
+    }
+
+    if (normalized.loginKey) {
+      this.runtime.loginKey = normalized.loginKey;
+    }
+    if (normalized.participantSessionId) {
+      this.runtime.participantSessionId = normalized.participantSessionId;
+    }
+    if (normalized.currentUnitKey) {
+      this.runtime.currentUnitKey = normalized.currentUnitKey;
+    }
+
+    if (
+      normalized.workspaceKey ||
+      normalized.loginKey ||
+      normalized.participantSessionId ||
+      normalized.currentUnitKey
+    ) {
       this.persistState();
     }
+
+    return normalized;
   }
 
   get player(): ParticipantPlayerState {

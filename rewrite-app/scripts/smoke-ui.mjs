@@ -728,8 +728,7 @@ try {
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
-  logStep("participant-route-sign-in");
-  await clickAction("Participant Sign In");
+  logStep("participant-route-auto-start");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const participantRouteSessionsPayload = await pollJsonWithPredicate(
     participantRouteSessionsUrl,
@@ -752,11 +751,9 @@ try {
   })?.participantSession?.participantSessionId;
   assert.ok(
     participantRouteSessionId,
-    "UI smoke expected a participant route session id after sign-in."
+    "UI smoke expected a participant route session id after opening the entry URL."
   );
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
-  logStep("participant-route-start");
-  await clickAction("Start Or Resume");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
@@ -768,6 +765,13 @@ try {
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.status === "running"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+      "running",
+    undefined,
+    { timeout: 15_000 }
   );
   await fillAndCommit("#participantRouteCurrentUnitKey", "unit-participant-route");
   await clickAction("Save Paused");

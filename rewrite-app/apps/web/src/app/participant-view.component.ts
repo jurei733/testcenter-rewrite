@@ -13,7 +13,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
     <div class="stack">
       <article class="card">
         <h2>Participant Entry</h2>
-        <p>Use this focused route to start or continue a participant session without opening operator tooling.</p>
+        <p>Use this focused route to start or continue a participant session without opening operator tooling. Links with a workspace and login key start the session automatically.</p>
         <div class="form-grid">
           <label>
             Workspace Key
@@ -83,7 +83,7 @@ export class ParticipantViewComponent implements OnInit {
   ngOnInit(): void {
     this.view.init();
     const query = new URLSearchParams(window.location.search);
-    this.view.applyEntryParameters({
+    this.view.startFromEntryParameters({
       workspaceKey: query.get("workspaceKey"),
       loginKey: query.get("loginKey"),
       participantSessionId: query.get("participantSessionId"),
