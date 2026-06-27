@@ -792,15 +792,19 @@ try {
 
   logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
+  const participantRouteGroupKey = "group:participant-route-smoke";
   await page.goto(
     `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
       workspaceKey
-    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}`,
+    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
+      participantRouteGroupKey
+    )}`,
     { waitUntil: "networkidle" }
   );
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
+  await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
   logStep("participant-route-auto-start");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const participantRouteSessionsPayload = await pollJsonWithPredicate(
@@ -813,6 +817,7 @@ try {
         const participantSession = item?.participantSession;
         return (
           participantSession?.loginKey === participantRouteLoginKey &&
+          participantSession?.groupKey === participantRouteGroupKey &&
           typeof participantSession?.participantSessionId === "string" &&
           participantSession.participantSessionId.length > 0
         );
@@ -890,9 +895,12 @@ try {
   await page.goto(
     `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
       workspaceKey
-    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}`,
+    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
+      participantRouteGroupKey
+    )}`,
     { waitUntil: "networkidle" }
   );
+  await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await page.waitForFunction(
@@ -951,7 +959,9 @@ try {
     .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
+  const participantGroupKey = "group:student-ui";
   await fillAndCommit("#loginKey", participantLoginKey);
+  await fillAndCommit("#groupKey", participantGroupKey);
   await clickAction("Sign In");
   const participantSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const hasParticipantSession = payload =>
@@ -1056,7 +1066,7 @@ try {
   await fillAndCommit("#testRunId", pausedTestRunId);
   logStep("filter-detailed-responses");
   await fillAndCommit("#detailedResponseLoginFilter", participantLoginKey);
-  await fillAndCommit("#detailedResponseGroupFilter", "group:student-ui");
+  await fillAndCommit("#detailedResponseGroupFilter", participantGroupKey);
   await fillAndCommit("#detailedResponseSessionFilter", participantSessionId);
   await fillAndCommit("#detailedResponseRunFilter", pausedTestRunId);
   await fillAndCommit("#detailedResponseUnitFilter", "unit-paused");
@@ -1064,7 +1074,7 @@ try {
   await fillAndCommit("#detailedResponseLimit", "1");
   await clickAction("Apply Response Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=${participantLoginKey}&groupKey=group%3Astudent-ui&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=paused&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=paused&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
@@ -1083,7 +1093,7 @@ try {
   await clickAction("Create Review");
   logStep("filter-reviews");
   await fillAndCommit("#reviewLoginFilter", participantLoginKey);
-  await fillAndCommit("#reviewGroupFilter", "group:student-ui");
+  await fillAndCommit("#reviewGroupFilter", participantGroupKey);
   await fillAndCommit("#reviewSessionFilter", participantSessionId);
   await fillAndCommit("#reviewRunFilter", pausedTestRunId);
   await fillAndCommit("#reviewUnitFilter", "unit-paused");
@@ -1092,7 +1102,7 @@ try {
   await fillAndCommit("#reviewLimit", "1");
   await clickAction("Apply Review Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=${participantLoginKey}&groupKey=group%3Astudent-ui&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&reviewerId=operator-ui&category=note&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&reviewerId=operator-ui&category=note&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
@@ -1149,7 +1159,7 @@ try {
     .filter({ hasText: "1/1 answered" })
     .filter({ hasText: "0 missing" })
     .waitFor();
-  await clickCardAction("Study Monitor", "Open Group Detail", "group:student-ui");
+  await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
   await page.waitForFunction(
     () => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(

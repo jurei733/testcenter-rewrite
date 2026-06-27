@@ -261,6 +261,7 @@ export type ParticipantRuntimePort = {
   signIn(input: {
     workspaceKey: string;
     loginKey: string;
+    groupKey?: string;
   }): Promise<ParticipantSession>;
   getRuntimeState(input: {
     participantSessionId: string;
@@ -4344,6 +4345,8 @@ export const createFirstSliceServices = (
         const workspace = await repository.getWorkspaceByWorkspaceKey(
           input.workspaceKey
         );
+        const requestedGroupKey = String(input.groupKey ?? "").trim();
+        const groupKey = requestedGroupKey || `group:${input.loginKey}`;
 
         if (!workspace) {
           throw new FirstSliceError(
@@ -4376,6 +4379,7 @@ export const createFirstSliceServices = (
           .filter(
             participantSession =>
               participantSession.loginKey === input.loginKey &&
+              participantSession.groupKey === groupKey &&
               participantSession.contentReleaseId ===
                 activeRelease.contentReleaseId &&
               participantSession.status !== "closed"
@@ -4392,6 +4396,7 @@ export const createFirstSliceServices = (
             summary: `Participant '${reusableSession.loginKey}' re-entered an existing session.`,
             details: {
               loginKey: reusableSession.loginKey,
+              groupKey: reusableSession.groupKey,
               contentReleaseId: reusableSession.contentReleaseId,
               reused: true
             }
@@ -4405,7 +4410,7 @@ export const createFirstSliceServices = (
           workspaceId: workspace.workspaceId,
           contentReleaseId: activeRelease.contentReleaseId,
           loginKey: input.loginKey,
-          groupKey: `group:${input.loginKey}`,
+          groupKey,
           status: "signed_in",
           createdAt: now()
         };
@@ -4419,6 +4424,7 @@ export const createFirstSliceServices = (
           summary: `Participant '${participantSession.loginKey}' signed in.`,
           details: {
             loginKey: participantSession.loginKey,
+            groupKey: participantSession.groupKey,
             contentReleaseId: participantSession.contentReleaseId
           }
         });

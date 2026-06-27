@@ -251,6 +251,7 @@ export type AdminAuditEventListQuery = {
 export type ParticipantSignInRequest = {
   workspaceKey: string;
   loginKey: string;
+  groupKey?: string;
 };
 
 export type PublicAdminUser = Omit<AdminUser, "passwordHash">;

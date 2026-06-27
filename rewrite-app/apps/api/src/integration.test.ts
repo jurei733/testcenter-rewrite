@@ -2395,12 +2395,17 @@ test("participant sign-in reuses an open session for the active release", async 
   );
 
   const firstSignIn = await requestJson<{
-    participantSession: { participantSessionId: string; status: string };
+    participantSession: {
+      participantSessionId: string;
+      groupKey: string;
+      status: string;
+    };
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
     body: {
       workspaceKey,
-      loginKey: "reentry-student"
+      loginKey: "reentry-student",
+      groupKey: "group:custom-reentry"
     }
   });
   const secondSignIn = await requestJson<{
@@ -2409,11 +2414,13 @@ test("participant sign-in reuses an open session for the active release", async 
     method: "POST",
     body: {
       workspaceKey,
-      loginKey: "reentry-student"
+      loginKey: "reentry-student",
+      groupKey: "group:custom-reentry"
     }
   });
 
   assert.equal(secondSignIn.status, 200);
+  assert.equal(firstSignIn.body.participantSession.groupKey, "group:custom-reentry");
   assert.equal(
     secondSignIn.body.participantSession.participantSessionId,
     firstSignIn.body.participantSession.participantSessionId
@@ -2431,7 +2438,8 @@ test("participant sign-in reuses an open session for the active release", async 
     method: "POST",
     body: {
       workspaceKey,
-      loginKey: "reentry-student"
+      loginKey: "reentry-student",
+      groupKey: "group:custom-reentry"
     }
   });
 
@@ -2442,12 +2450,16 @@ test("participant sign-in reuses an open session for the active release", async 
   assert.equal(thirdSignIn.body.participantSession.status, "launched");
 
   const participantSessions = await requestJson<{
-    items: Array<{ participantSession: { loginKey: string } }>;
+    items: Array<{ participantSession: { loginKey: string; groupKey: string } }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`
   );
 
   assert.equal(participantSessions.status, 200);
+  const reentrySession = participantSessions.body.items.find(
+    item => item.participantSession.loginKey === "reentry-student"
+  )?.participantSession;
+  assert.equal(reentrySession?.groupKey, "group:custom-reentry");
   assert.equal(
     participantSessions.body.items.filter(
       item => item.participantSession.loginKey === "reentry-student"

@@ -43,6 +43,7 @@ type ParticipantPlayerState = {
 type ParticipantEntryParameters = {
   workspaceKey?: string | null;
   loginKey?: string | null;
+  groupKey?: string | null;
   participantSessionId?: string | null;
   currentUnitKey?: string | null;
 };
@@ -50,6 +51,7 @@ type ParticipantEntryParameters = {
 type NormalizedParticipantEntryParameters = {
   workspaceKey: string;
   loginKey: string;
+  groupKey: string;
   participantSessionId: string;
   currentUnitKey: string;
 };
@@ -93,6 +95,7 @@ export class ParticipantViewFacade {
     const normalized = {
       workspaceKey: parameters.workspaceKey?.trim() ?? "",
       loginKey: parameters.loginKey?.trim() ?? "",
+      groupKey: parameters.groupKey?.trim() ?? "",
       participantSessionId: parameters.participantSessionId?.trim() ?? "",
       currentUnitKey: parameters.currentUnitKey?.trim() ?? ""
     };
@@ -113,6 +116,9 @@ export class ParticipantViewFacade {
     if (normalized.loginKey) {
       this.runtime.loginKey = normalized.loginKey;
     }
+    if (normalized.groupKey) {
+      this.runtime.groupKey = normalized.groupKey;
+    }
     if (normalized.participantSessionId) {
       this.runtime.participantSessionId = normalized.participantSessionId;
     }
@@ -123,6 +129,7 @@ export class ParticipantViewFacade {
     if (
       normalized.workspaceKey ||
       normalized.loginKey ||
+      normalized.groupKey ||
       normalized.participantSessionId ||
       normalized.currentUnitKey
     ) {
@@ -250,7 +257,8 @@ export class ParticipantViewFacade {
       productionApiRoutes.participant.signIn,
       {
         workspaceKey: this.workspace.workspaceKey.trim(),
-        loginKey: this.runtime.loginKey.trim()
+        loginKey: this.runtime.loginKey.trim(),
+        groupKey: this.runtime.groupKey.trim() || undefined
       } satisfies ParticipantSignInRequest
     );
 

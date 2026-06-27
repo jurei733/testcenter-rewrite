@@ -122,7 +122,8 @@ export async function participantSignInAction(
     host.getParticipantSignInPath(),
     {
       workspaceKey: host.getWorkspaceKey().trim(),
-      loginKey: host.getLoginKey().trim()
+      loginKey: host.getLoginKey().trim(),
+      groupKey: host.getGroupKey().trim() || undefined
     } satisfies ParticipantSignInRequest
   );
   applyParticipantSignInResult(host.createRuntimePresentationHost(), payload);

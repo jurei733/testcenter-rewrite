@@ -24,6 +24,10 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <input id="participantLoginKey" name="participantLoginKey" [(ngModel)]="view.runtime.loginKey" (change)="view.persistState()" />
           </label>
           <label>
+            Group Key
+            <input id="participantRouteGroupKey" name="participantRouteGroupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
+          </label>
+          <label>
             Session Id
             <input id="participantRouteSessionId" name="participantRouteSessionId" placeholder="Filled after sign-in" [(ngModel)]="view.runtime.participantSessionId" (change)="view.persistState()" />
           </label>
@@ -102,6 +106,7 @@ export class ParticipantViewComponent implements OnInit {
     this.view.startFromEntryParameters({
       workspaceKey: query.get("workspaceKey"),
       loginKey: query.get("loginKey"),
+      groupKey: query.get("groupKey"),
       participantSessionId: query.get("participantSessionId"),
       currentUnitKey: query.get("currentUnitKey")
     });
