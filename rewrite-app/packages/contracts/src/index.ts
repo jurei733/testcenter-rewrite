@@ -12,6 +12,7 @@ import type {
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantSession,
+  ParticipantSessionStatus,
   ParticipantRuntimeState,
   SourcePackage,
   SourcePackageContentStructure,
@@ -175,6 +176,14 @@ export type WorkspaceActivityEventListQuery = {
   eventType?: WorkspaceActivityEventType;
   subjectType?: WorkspaceActivitySubjectType;
   subjectId?: string;
+  limit?: number;
+};
+
+export type ParticipantSessionListQuery = {
+  status?: ParticipantSessionStatus;
+  groupKey?: string;
+  loginKey?: string;
+  contentReleaseId?: string;
   limit?: number;
 };
 

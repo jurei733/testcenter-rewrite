@@ -2164,10 +2164,24 @@ test("workspace participant-session list shows latest run and active release", a
     `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST" }
   );
+  const signedInOnly = await requestJson<{
+    participantSession: { participantSessionId: string; loginKey: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "session-student-waiting"
+    }
+  });
 
   const participantSessions = await requestJson<{
     items: Array<{
-      participantSession: { loginKey: string; participantSessionId: string };
+      participantSession: {
+        loginKey: string;
+        participantSessionId: string;
+        groupKey: string;
+        status: string;
+      };
       latestTestRun: { testRunId: string; status: string } | null;
       contentRelease: { contentReleaseId: string; status: string } | null;
     }>;
@@ -2176,24 +2190,94 @@ test("workspace participant-session list shows latest run and active release", a
   );
 
   assert.equal(participantSessions.status, 200);
-  assert.equal(participantSessions.body.items.length, 1);
+  assert.equal(participantSessions.body.items.length, 2);
+  const resumedSessionItem = participantSessions.body.items.find(
+    item =>
+      item.participantSession.participantSessionId ===
+      signIn.body.participantSession.participantSessionId
+  );
+  assert.notEqual(resumedSessionItem, undefined);
   assert.equal(
-    participantSessions.body.items[0]?.participantSession.loginKey,
+    resumedSessionItem?.participantSession.loginKey,
     "session-student"
   );
   assert.equal(
-    participantSessions.body.items[0]?.latestTestRun?.testRunId,
+    resumedSessionItem?.latestTestRun?.testRunId,
     resumedRun.body.testRun.testRunId
   );
   assert.equal(
-    participantSessions.body.items[0]?.latestTestRun?.status,
+    resumedSessionItem?.latestTestRun?.status,
     "running"
   );
   assert.equal(
-    participantSessions.body.items[0]?.contentRelease?.contentReleaseId,
+    resumedSessionItem?.contentRelease?.contentReleaseId,
     contentReleaseId
   );
-  assert.equal(participantSessions.body.items[0]?.contentRelease?.status, "active");
+  assert.equal(resumedSessionItem?.contentRelease?.status, "active");
+
+  const loginFilteredSessions = await requestJson<typeof participantSessions.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?loginKey=session-student`
+  );
+
+  assert.equal(loginFilteredSessions.status, 200);
+  assert.equal(loginFilteredSessions.body.items.length, 1);
+  assert.equal(
+    loginFilteredSessions.body.items[0]?.participantSession.participantSessionId,
+    signIn.body.participantSession.participantSessionId
+  );
+
+  const groupFilteredSessions = await requestJson<typeof participantSessions.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?groupKey=group%3Asession-student-waiting`
+  );
+
+  assert.equal(groupFilteredSessions.status, 200);
+  assert.equal(groupFilteredSessions.body.items.length, 1);
+  assert.equal(
+    groupFilteredSessions.body.items[0]?.participantSession.participantSessionId,
+    signedInOnly.body.participantSession.participantSessionId
+  );
+
+  const launchedSessions = await requestJson<typeof participantSessions.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?status=launched`
+  );
+
+  assert.equal(launchedSessions.status, 200);
+  assert.equal(launchedSessions.body.items.length, 1);
+  assert.equal(
+    launchedSessions.body.items[0]?.participantSession.participantSessionId,
+    signIn.body.participantSession.participantSessionId
+  );
+
+  const releaseFilteredSessions = await requestJson<typeof participantSessions.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?contentReleaseId=${contentReleaseId}&limit=1`
+  );
+
+  assert.equal(releaseFilteredSessions.status, 200);
+  assert.equal(releaseFilteredSessions.body.items.length, 1);
+  assert.equal(
+    releaseFilteredSessions.body.items[0]?.contentRelease?.contentReleaseId,
+    contentReleaseId
+  );
+
+  const invalidParticipantSessionStatus = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?status=unsupported`
+  );
+
+  assert.equal(invalidParticipantSessionStatus.status, 400);
+  assert.equal(
+    invalidParticipantSessionStatus.body.error,
+    "participant_session_status_invalid"
+  );
+
+  const invalidParticipantSessionLimit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?limit=0`
+  );
+
+  assert.equal(invalidParticipantSessionLimit.status, 400);
+  assert.equal(
+    invalidParticipantSessionLimit.body.error,
+    "participant_session_limit_invalid"
+  );
 
   const participantSessionDetail = await requestJson<{
     participantSessionDetail: {

@@ -16,6 +16,7 @@ import type {
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantSession,
+  ParticipantSessionStatus,
   ParticipantRuntimeState,
   SourcePackage,
   SourcePackageContentStructure,
@@ -128,6 +129,11 @@ export type WorkspaceAdminReadPort = {
   listParticipantSessions(input: {
     tenantKey: string;
     workspaceKey: string;
+    status?: ParticipantSessionStatus;
+    groupKey?: string;
+    loginKey?: string;
+    contentReleaseId?: string;
+    limit?: number;
   }): Promise<WorkspaceParticipantSessionListItem[]>;
   getParticipantSessionDetail(input: {
     tenantKey: string;
@@ -3225,8 +3231,19 @@ export const createFirstSliceServices = (
           workspace.workspaceId
         );
 
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+
         return participantSessions
+          .filter(
+            participantSession =>
+              (!input.status || participantSession.status === input.status) &&
+              (!input.groupKey || participantSession.groupKey === input.groupKey) &&
+              (!input.loginKey || participantSession.loginKey === input.loginKey) &&
+              (!input.contentReleaseId ||
+                participantSession.contentReleaseId === input.contentReleaseId)
+          )
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+          .slice(0, limit)
           .map<WorkspaceParticipantSessionListItem>(participantSession => {
             const sessionRuns = testRuns
               .filter(

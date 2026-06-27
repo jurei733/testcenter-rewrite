@@ -16,6 +16,11 @@ export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export type ImportJobStatus = "queued" | "running" | "failed" | "completed";
 export type ContentReleaseStatus = "staged" | "active" | "superseded";
 export type ParticipantSessionStatus = "signed_in" | "launched" | "closed";
+export const participantSessionStatuses = [
+  "signed_in",
+  "launched",
+  "closed"
+] as const satisfies readonly ParticipantSessionStatus[];
 export type TestRunStatus = "created" | "running" | "paused" | "completed";
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",

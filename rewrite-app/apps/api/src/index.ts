@@ -92,9 +92,11 @@ import {
   type AdminSession,
   type AdminUser,
   type AdminAuditEventType,
+  type ParticipantSessionStatus,
   type WorkspaceActivityEventType,
   type WorkspaceActivitySubjectType,
   adminAuditEventTypes,
+  participantSessionStatuses,
   workspaceActivityEventTypes,
   workspaceActivitySubjectTypes,
   firstProductionSliceCapabilities
@@ -2305,9 +2307,49 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (
+          status &&
+          !participantSessionStatuses.includes(status as ParticipantSessionStatus)
+        ) {
+          sendError(
+            response,
+            400,
+            "participant_session_status_invalid",
+            `Participant session status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const groupKey = url.searchParams.get("groupKey")?.trim() || undefined;
+        const loginKey = url.searchParams.get("loginKey")?.trim() || undefined;
+        const contentReleaseId =
+          url.searchParams.get("contentReleaseId")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "participant_session_limit_invalid",
+            "Participant session limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listParticipantSessions({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          status: status as ParticipantSessionStatus | undefined,
+          groupKey,
+          loginKey,
+          contentReleaseId,
+          limit
         });
         sendJson<ListParticipantSessionsResponse>(response, 200, { items });
         return;
