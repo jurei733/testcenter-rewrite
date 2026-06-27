@@ -180,6 +180,8 @@ Then adjust the storage variables for your local mode.
 
 The Docker build context excludes local `.env`, `.env.local`, data, cache, and build-output files so local secrets or generated state are not sent to the Docker daemon.
 
+`FIRST_SLICE_MAX_JSON_BODY_BYTES` defaults to `1048576` and limits JSON command payloads before they are accumulated in memory. Oversized requests return `413 request_body_too_large`.
+
 `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` are optional and surface through the API manifest, metrics, and startup banner for release identification.
 
 When you build the production image, you can also pass them as Docker build args:
@@ -384,7 +386,7 @@ For runtime probes:
 - `/metrics` returns JSON runtime metrics including request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
-- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, and whether operator auth is required
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, and whether operator auth is required
 - `/readyz` is a storage-aware readiness check
 - `/metrics` exposes lightweight runtime request/error counters for the current API process
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format

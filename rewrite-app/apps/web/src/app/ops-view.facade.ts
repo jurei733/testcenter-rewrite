@@ -822,6 +822,10 @@ export class OpsViewFacade {
             value: config.operatorAuthRequired ? "yes" : "no"
           },
           {
+            label: "JSON Body Limit",
+            value: `${config.maxJsonBodyBytes} bytes`
+          },
+          {
             label: "Postgres Url Present",
             value: config.environment.firstSlicePostgresUrlPresent ? "yes" : "no"
           }

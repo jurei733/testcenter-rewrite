@@ -1105,6 +1105,52 @@ test("operator API can require a platform-admin bearer session", async () => {
   }
 });
 
+test("API rejects JSON request bodies above the configured limit", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_MAX_JSON_BODY_BYTES: "96"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        maxJsonBodyBytes: number;
+        environment: { firstSliceMaxJsonBodyBytesPresent: boolean };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.maxJsonBodyBytes, 96);
+    assert.equal(
+      config.body.runtimeConfig.environment.firstSliceMaxJsonBodyBytesPresent,
+      true
+    );
+
+    const oversizedResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/admin/auth/bootstrap`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          username: "large-body-admin",
+          displayName: "Large Body Admin",
+          password: "x".repeat(128)
+        })
+      }
+    );
+    const oversizedBody = (await oversizedResponse.json()) as {
+      error: string;
+      details: { maxJsonBodyBytes: number };
+    };
+
+    assert.equal(oversizedResponse.status, 413);
+    assert.equal(oversizedBody.error, "request_body_too_large");
+    assert.equal(oversizedBody.details.maxJsonBodyBytes, 96);
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("local demo bootstrap seeds a directly usable app state", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -2841,6 +2887,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     runtimeConfig: {
       port: number;
       shutdownDrainDelayMs: number;
+      maxJsonBodyBytes: number;
       storage: { kind: string; location: string | null };
       environment: {
         firstSliceStore: string;
@@ -2851,6 +2898,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
 
   assert.equal(typeof config.runtimeConfig.port, "number");
   assert.equal(typeof config.runtimeConfig.shutdownDrainDelayMs, "number");
+  assert.equal(typeof config.runtimeConfig.maxJsonBodyBytes, "number");
   assert.equal(config.runtimeConfig.storage.kind, diagnostics.storage.kind);
   assert.equal(
     typeof config.runtimeConfig.environment.firstSliceStore,

@@ -556,6 +556,7 @@ export type GetRuntimeConfigResponse = {
   runtimeConfig: {
     port: number;
     shutdownDrainDelayMs: number;
+    maxJsonBodyBytes: number;
     operatorAuthRequired: boolean;
     storage: {
       kind: "memory" | "file" | "sqlite" | "postgres";
@@ -567,6 +568,7 @@ export type GetRuntimeConfigResponse = {
       firstSliceFilePresent: boolean;
       firstSliceSqliteFilePresent: boolean;
       firstSlicePostgresUrlPresent: boolean;
+      firstSliceMaxJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
       firstSliceBootstrapDemo: boolean;
       appBuildShaPresent: boolean;

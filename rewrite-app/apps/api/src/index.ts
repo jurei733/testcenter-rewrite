@@ -148,6 +148,18 @@ const parseIntegerEnvironmentValue = (
   return parsedValue;
 };
 
+const parsePositiveIntegerEnvironmentValue = (
+  envKey: string,
+  fallbackValue: number
+): number => {
+  const parsedValue = parseIntegerEnvironmentValue(envKey, fallbackValue);
+  if (parsedValue < 1) {
+    throw new Error(`${envKey} must be a positive integer.`);
+  }
+
+  return parsedValue;
+};
+
 const parseBooleanEnvironmentFlag = (
   envKey: string,
   fallbackValue = false
@@ -325,6 +337,10 @@ const createApiRuntime = async () => {
     "SHUTDOWN_DRAIN_DELAY_MS",
     DEFAULT_SHUTDOWN_DRAIN_DELAY_MS
   );
+  const maxJsonBodyBytes = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_MAX_JSON_BODY_BYTES",
+    DEFAULT_MAX_JSON_BODY_BYTES
+  );
   const operatorAuthRequired = parseBooleanEnvironmentFlag(
     "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
     false
@@ -345,12 +361,16 @@ const createApiRuntime = async () => {
     config: {
       port: configuredPort,
       shutdownDrainDelayMs,
+      maxJsonBodyBytes,
       operatorAuthRequired,
       environment: {
         firstSliceStore: store,
         firstSliceFilePresent: Boolean(process.env.FIRST_SLICE_FILE),
         firstSliceSqliteFilePresent: Boolean(process.env.FIRST_SLICE_SQLITE_FILE),
         firstSlicePostgresUrlPresent: Boolean(process.env.FIRST_SLICE_POSTGRES_URL),
+        firstSliceMaxJsonBodyBytesPresent: Boolean(
+          process.env.FIRST_SLICE_MAX_JSON_BODY_BYTES
+        ),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
         firstSliceBootstrapDemo: demoBootstrapEnabled,
         appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
@@ -428,6 +448,7 @@ const textHeaders = {
 
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
+const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
 
 type RuntimeMetrics = {
   startedAt: string;
@@ -441,6 +462,7 @@ type RuntimeMetrics = {
   errorCounts: {
     firstSlice: number;
     invalidJson: number;
+    requestBodyTooLarge: number;
     routeNotFound: number;
     storageNotReady: number;
     internal: number;
@@ -468,6 +490,7 @@ const createRuntimeMetrics = (): RuntimeMetrics => ({
   errorCounts: {
     firstSlice: 0,
     invalidJson: 0,
+    requestBodyTooLarge: 0,
     routeNotFound: 0,
     storageNotReady: 0,
     internal: 0
@@ -803,11 +826,36 @@ const requireBearerToken = (
   return token;
 };
 
-const readJsonBody = async <T>(request: IncomingMessage): Promise<T> => {
+class RequestBodyTooLargeError extends Error {
+  constructor(readonly maxJsonBodyBytes: number) {
+    super(`Request body exceeds the configured ${maxJsonBodyBytes} byte limit.`);
+    this.name = "RequestBodyTooLargeError";
+  }
+}
+
+const readJsonBody = async <T>(
+  request: IncomingMessage,
+  maxJsonBodyBytes: number
+): Promise<T> => {
+  const contentLengthHeader = request.headers["content-length"];
+  const contentLength =
+    typeof contentLengthHeader === "string" && /^\d+$/.test(contentLengthHeader)
+      ? Number.parseInt(contentLengthHeader, 10)
+      : null;
+  if (contentLength !== null && contentLength > maxJsonBodyBytes) {
+    throw new RequestBodyTooLargeError(maxJsonBodyBytes);
+  }
+
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
 
   for await (const chunk of request) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxJsonBodyBytes) {
+      throw new RequestBodyTooLargeError(maxJsonBodyBytes);
+    }
+    chunks.push(buffer);
   }
 
   const payload = Buffer.concat(chunks).toString("utf8");
@@ -1529,6 +1577,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
     const url = new URL(request.url, "http://127.0.0.1");
     const pathname = url.pathname;
+    const readRequestJsonBody = <T>(): Promise<T> =>
+      readJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
 
     try {
       if (request.method === "GET" && isParticipantEntryPath(pathname)) {
@@ -1671,6 +1721,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           runtimeConfig: {
             port: runtime.config.port,
             shutdownDrainDelayMs: runtime.config.shutdownDrainDelayMs,
+            maxJsonBodyBytes: runtime.config.maxJsonBodyBytes,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
             storage: {
               kind: runtime.repositoryConfig.kind,
@@ -1687,7 +1738,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "POST" &&
         pathname === productionApiRoutes.admin.bootstrap
       ) {
-        const body = await readJsonBody<BootstrapAdminUserRequest>(request);
+        const body = await readRequestJsonBody<BootstrapAdminUserRequest>();
         const { adminUser, roleAssignments } =
           await services.adminAuth.bootstrapAdminUser(body);
         sendJson<BootstrapAdminUserResponse>(response, 201, {
@@ -1701,7 +1752,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "POST" &&
         pathname === productionApiRoutes.admin.signIn
       ) {
-        const body = await readJsonBody<AdminSignInRequest>(request);
+        const body = await readRequestJsonBody<AdminSignInRequest>();
         const { adminUser, adminSession, roleAssignments } =
           await services.adminAuth.signIn(body);
         sendJson<AdminSignInResponse>(response, 200, {
@@ -1885,7 +1936,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<CreateAdminUserRequest>(request);
+        const body = await readRequestJsonBody<CreateAdminUserRequest>();
         const item = await services.adminDirectory.createAdminUser({
           sessionToken,
           username: body.username,
@@ -1916,7 +1967,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<UpdateAdminUserRequest>(request);
+        const body = await readRequestJsonBody<UpdateAdminUserRequest>();
         const item = await services.adminDirectory.updateAdminUser({
           sessionToken,
           adminUserId,
@@ -1947,7 +1998,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<ResetAdminUserPasswordRequest>(request);
+        const body = await readRequestJsonBody<ResetAdminUserPasswordRequest>();
         const item = await services.adminDirectory.resetAdminUserPassword({
           sessionToken,
           adminUserId,
@@ -1976,7 +2027,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<AssignAdminRoleRequest>(request);
+        const body = await readRequestJsonBody<AssignAdminRoleRequest>();
         const item = await services.adminDirectory.assignAdminRole({
           sessionToken,
           adminUserId,
@@ -2089,7 +2140,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "POST" &&
         pathname === productionApiRoutes.platform.createTenant
       ) {
-        const body = await readJsonBody<CreateTenantRequest>(request);
+        const body = await readRequestJsonBody<CreateTenantRequest>();
         const tenant = await services.platform.createTenant(body);
         sendJson<CreateTenantResponse>(response, 201, { tenant });
         return;
@@ -2115,7 +2166,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<CreateWorkspaceRequest>(request);
+        const body = await readRequestJsonBody<CreateWorkspaceRequest>();
         const workspace = await services.platform.createWorkspace({
           tenantKey,
           workspaceKey: body.workspaceKey,
@@ -2414,7 +2465,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<RetrySourcePackageImportRequest>(request);
+        const body = await readRequestJsonBody<RetrySourcePackageImportRequest>();
         const result = await services.contentIntake.retrySourcePackageImport({
           tenantKey,
           workspaceKey,
@@ -2443,7 +2494,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<CreateSourcePackageRequest>(request);
+        const body = await readRequestJsonBody<CreateSourcePackageRequest>();
         const sourcePackage = await services.contentIntake.createSourcePackage({
           tenantKey,
           workspaceKey,
@@ -2710,7 +2761,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<CreateReviewRequest>(request);
+        const body = await readRequestJsonBody<CreateReviewRequest>();
         const item = await services.workspaceReview.createReview({
           tenantKey,
           workspaceKey,
@@ -2739,7 +2790,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<UpdateReviewRequest>(request);
+        const body = await readRequestJsonBody<UpdateReviewRequest>();
         const item = await services.workspaceReview.updateReview({
           tenantKey,
           workspaceKey,
@@ -2893,7 +2944,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<CreateImportJobRequest>(request);
+        const body = await readRequestJsonBody<CreateImportJobRequest>();
         const result = await services.createImportJobWithRelease({
           tenantKey,
           workspaceKey,
@@ -3052,7 +3103,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<ActivateContentReleaseRequest>(request);
+        const body = await readRequestJsonBody<ActivateContentReleaseRequest>();
         const contentRelease = await services.contentIntake.activateContentRelease({
           tenantKey,
           workspaceKey,
@@ -3069,7 +3120,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "POST" &&
         pathname === productionApiRoutes.participant.signIn
       ) {
-        const body = await readJsonBody<ParticipantSignInRequest>(request);
+        const body = await readRequestJsonBody<ParticipantSignInRequest>();
         const participantSession = await services.participantRuntime.signIn(body);
         sendJson<ParticipantSignInResponse>(response, 200, { participantSession });
         return;
@@ -3127,7 +3178,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         request.method === "POST" &&
         pathname === productionApiRoutes.participant.launch
       ) {
-        const body = await readJsonBody<ParticipantLaunchRequest>(request);
+        const body = await readRequestJsonBody<ParticipantLaunchRequest>();
         const testRun = await services.participantRuntime.launch(body);
         sendJson<ParticipantLaunchResponse>(response, 200, { testRun });
         return;
@@ -3163,7 +3214,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const body = await readJsonBody<SaveTestRunProgressRequest>(request);
+        const body = await readRequestJsonBody<SaveTestRunProgressRequest>();
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
           currentUnitKey: body.currentUnitKey,
@@ -3276,6 +3327,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (error instanceof SyntaxError) {
         metrics.errorCounts.invalidJson += 1;
         sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
+        return;
+      }
+
+      if (error instanceof RequestBodyTooLargeError) {
+        metrics.errorCounts.requestBodyTooLarge += 1;
+        sendError(
+          response,
+          413,
+          "request_body_too_large",
+          "Request body exceeds the configured JSON payload limit.",
+          { maxJsonBodyBytes: error.maxJsonBodyBytes }
+        );
         return;
       }
 
