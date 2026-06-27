@@ -19,12 +19,24 @@
         <span>{{ app.ops.storageSchemaVersion }}</span>
       </div>
       <div class="status-pill">
+        <strong>Auth</strong>
+        <span id="authModeBadge">{{ app.ops.operatorAuthMode }}</span>
+      </div>
+      <div class="status-pill">
+        <strong>Port</strong>
+        <span id="runtimePortBadge">{{ app.ops.runtimePort }}</span>
+      </div>
+      <div class="status-pill">
         <strong>Routes</strong>
-        <span>18+</span>
+        <span id="routeCountBadge">{{ app.ops.routeCount }}</span>
+      </div>
+      <div class="status-pill">
+        <strong>Build</strong>
+        <span id="buildRefBadge">{{ app.ops.buildRef }}</span>
       </div>
       <div class="status-pill">
         <strong>Shells</strong>
-        <span>4</span>
+        <span>{{ app.views.length }}</span>
       </div>
       <div class="status-pill">
         <strong>View</strong>

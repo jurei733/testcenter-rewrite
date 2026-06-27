@@ -303,6 +303,29 @@ try {
     })
     .waitFor();
   await waitForNotBusy("initial-load");
+  await page.waitForFunction(
+    ([expectedPort, expectedAuthMode]) => {
+      const authMode = document.querySelector("#authModeBadge")?.textContent?.trim();
+      const runtimePort = document
+        .querySelector("#runtimePortBadge")
+        ?.textContent?.trim();
+      const routeCount = Number.parseInt(
+        document.querySelector("#routeCountBadge")?.textContent?.trim() ?? "",
+        10
+      );
+      const buildRef = document.querySelector("#buildRefBadge")?.textContent?.trim();
+      return (
+        authMode === expectedAuthMode &&
+        runtimePort === String(expectedPort) &&
+        Number.isFinite(routeCount) &&
+        routeCount >= 30 &&
+        !!buildRef &&
+        buildRef !== "unknown"
+      );
+    },
+    [port, process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true" ? "required" : "open"],
+    { timeout: 15_000 }
+  );
   logStep("raw-debug-toggle");
   assert.equal(
     await page.locator(".raw-debug-panel").count(),

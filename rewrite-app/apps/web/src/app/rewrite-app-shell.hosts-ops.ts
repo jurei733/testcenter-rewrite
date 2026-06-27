@@ -40,6 +40,18 @@ export function createShellOpsStateHost(args: {
     setReadinessBadge: nextValue => {
       args.opsState.readinessBadge = nextValue;
     },
+    setRouteCount: nextValue => {
+      args.opsState.routeCount = String(nextValue);
+    },
+    setRuntimePort: nextValue => {
+      args.opsState.runtimePort = String(nextValue);
+    },
+    setOperatorAuthMode: nextValue => {
+      args.opsState.operatorAuthMode = nextValue;
+    },
+    setBuildRef: nextValue => {
+      args.opsState.buildRef = nextValue;
+    },
     setDiagnosticsLoaded: nextValue => {
       args.opsState.diagnosticsLoaded = nextValue;
     },

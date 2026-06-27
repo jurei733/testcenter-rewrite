@@ -49,6 +49,10 @@ export function finishForegroundShellRequest(
   if (host.foregroundRequestDepth === 0) {
     host.activeRequestLabel.set(null);
   }
+  flushShellRender(host);
+}
+
+export function flushShellRender(host: ShellRequestStateHost): void {
   host.renderVersion.update(version => version + 1);
   host.applicationRef.tick();
 }

@@ -5,7 +5,8 @@ import {
   applyForegroundShellError,
   applyForegroundShellResponse,
   beginForegroundShellRequest,
-  finishForegroundShellRequest
+  finishForegroundShellRequest,
+  flushShellRender
 } from "./rewrite-app-shell.request-state";
 import { createShellRequestStateHost } from "./rewrite-app-shell.state-hosts";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -66,6 +67,8 @@ export class RewriteAppShellRequestService {
     } finally {
       if (!options.quiet) {
         finishForegroundShellRequest(this.createRequestStateHost());
+      } else {
+        flushShellRender(this.createRequestStateHost());
       }
     }
   }

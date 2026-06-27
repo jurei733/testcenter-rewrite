@@ -6,6 +6,10 @@ export interface ShellOpsState {
   storageKind: string;
   storageSchemaVersion: string;
   readinessBadge: string;
+  routeCount: string;
+  runtimePort: string;
+  operatorAuthMode: string;
+  buildRef: string;
   runtimeHealthView: string;
   runtimeMetricsView: string;
   runtimeDiagnosticsView: string;
@@ -91,6 +95,10 @@ export function createInitialShellOpsState(): ShellOpsState {
     storageKind: "unknown",
     storageSchemaVersion: "n/a",
     readinessBadge: "unknown",
+    routeCount: "n/a",
+    runtimePort: "n/a",
+    operatorAuthMode: "unknown",
+    buildRef: "local",
     runtimeHealthView: 'Use "Refresh Diagnostics".',
     runtimeMetricsView: 'Use "Refresh Diagnostics".',
     runtimeDiagnosticsView: 'Use "Refresh Diagnostics".',
