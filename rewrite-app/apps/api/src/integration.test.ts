@@ -1486,6 +1486,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           expectedRunCount: number;
           responseCount: number;
           missingResponseCount: number;
+          unexpectedResponseCount: number;
         }>;
         groups: Array<{
           groupKey: string;
@@ -1538,26 +1539,30 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         unitKey: unit.unitKey,
         expectedRunCount: unit.expectedRunCount,
         responseCount: unit.responseCount,
-        missingResponseCount: unit.missingResponseCount
+        missingResponseCount: unit.missingResponseCount,
+        unexpectedResponseCount: unit.unexpectedResponseCount
       })),
       [
         {
           unitKey: "unit-finish",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-intro",
           expectedRunCount: 1,
           responseCount: 1,
-          missingResponseCount: 0
+          missingResponseCount: 0,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         }
       ]
     );
@@ -1861,6 +1866,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           expectedRunCount: number;
           responseCount: number;
           missingResponseCount: number;
+          unexpectedResponseCount: number;
         }>;
       };
     }>(
@@ -1902,26 +1908,30 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         unitKey: unit.unitKey,
         expectedRunCount: unit.expectedRunCount,
         responseCount: unit.responseCount,
-        missingResponseCount: unit.missingResponseCount
+        missingResponseCount: unit.missingResponseCount,
+        unexpectedResponseCount: unit.unexpectedResponseCount
       })),
       [
         {
           unitKey: "unit-finish",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-intro",
           expectedRunCount: 1,
           responseCount: 1,
-          missingResponseCount: 0
+          missingResponseCount: 0,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         }
       ]
     );
@@ -1947,6 +1957,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           expectedRunCount: number;
           responseCount: number;
           missingResponseCount: number;
+          unexpectedResponseCount: number;
         }>;
       };
     }>(
@@ -1999,26 +2010,30 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         unitKey: unit.unitKey,
         expectedRunCount: unit.expectedRunCount,
         responseCount: unit.responseCount,
-        missingResponseCount: unit.missingResponseCount
+        missingResponseCount: unit.missingResponseCount,
+        unexpectedResponseCount: unit.unexpectedResponseCount
       })),
       [
         {
           unitKey: "unit-finish",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-intro",
           expectedRunCount: 1,
           responseCount: 1,
-          missingResponseCount: 0
+          missingResponseCount: 0,
+          unexpectedResponseCount: 0
         },
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
           responseCount: 0,
-          missingResponseCount: 1
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0
         }
       ]
     );
@@ -2046,6 +2061,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         expectedRunCount: number;
         responseCount: number;
         missingResponseCount: number;
+        unexpectedResponseCount: number;
         completedRunCount: number;
         reviewCount: number;
         testRuns: Array<{
@@ -2074,6 +2090,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorUnit.body.studyMonitorUnit.expectedRunCount, 1);
     assert.equal(studyMonitorUnit.body.studyMonitorUnit.responseCount, 1);
     assert.equal(studyMonitorUnit.body.studyMonitorUnit.missingResponseCount, 0);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.unexpectedResponseCount, 0);
     assert.equal(studyMonitorUnit.body.studyMonitorUnit.completedRunCount, 0);
     assert.equal(studyMonitorUnit.body.studyMonitorUnit.reviewCount, 1);
     assert.equal(

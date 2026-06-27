@@ -13,6 +13,7 @@ import type {
   ListWorkspaceActivityEventsResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
+  type WorkspaceStudyMonitorUnitProgress,
   workspaceActivityEventTypes,
   workspaceActivitySubjectTypes
 } from "@testcenter-rewrite-app/domain";
@@ -41,6 +42,16 @@ export class WorkspaceViewFacade {
   readonly workspace = this.uiState.workspace;
   readonly workspaceActivityEventTypeOptions = workspaceActivityEventTypes;
   readonly workspaceActivitySubjectTypeOptions = workspaceActivitySubjectTypes;
+
+  private readonly unitProgressBadges = (
+    unit: WorkspaceStudyMonitorUnitProgress
+  ): string[] => [
+    `${unit.responseCount}/${unit.expectedRunCount} answered`,
+    `${unit.missingResponseCount} missing`,
+    ...(unit.unexpectedResponseCount > 0
+      ? [`${unit.unexpectedResponseCount} unexpected`]
+      : [])
+  ];
 
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
@@ -137,13 +148,14 @@ export class WorkspaceViewFacade {
       ...summary.unitProgress.map(unit => ({
         headline: unit.displayLabel,
         subline: unit.unitKey,
-        badges: [
-          `${unit.responseCount}/${unit.expectedRunCount} answered`,
-          `${unit.missingResponseCount} missing`
-        ],
+        badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
           { label: "Responses", value: String(unit.responseCount) },
+          {
+            label: "Unexpected Responses",
+            value: String(unit.unexpectedResponseCount)
+          },
           { label: "Completed Runs", value: String(unit.completedRunCount) },
           {
             label: "Latest Activity",
@@ -194,13 +206,14 @@ export class WorkspaceViewFacade {
       ...detail.unitProgress.map(unit => ({
         headline: unit.displayLabel,
         subline: unit.unitKey,
-        badges: [
-          `${unit.responseCount}/${unit.expectedRunCount} answered`,
-          `${unit.missingResponseCount} missing`
-        ],
+        badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
           { label: "Responses", value: String(unit.responseCount) },
+          {
+            label: "Unexpected Responses",
+            value: String(unit.unexpectedResponseCount)
+          },
           { label: "Completed Runs", value: String(unit.completedRunCount) },
           {
             label: "Latest Activity",
@@ -313,13 +326,14 @@ export class WorkspaceViewFacade {
       ...detail.unitProgress.map(unit => ({
         headline: unit.displayLabel,
         subline: unit.unitKey,
-        badges: [
-          `${unit.responseCount}/${unit.expectedRunCount} answered`,
-          `${unit.missingResponseCount} missing`
-        ],
+        badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
           { label: "Responses", value: String(unit.responseCount) },
+          {
+            label: "Unexpected Responses",
+            value: String(unit.unexpectedResponseCount)
+          },
           { label: "Completed Runs", value: String(unit.completedRunCount) },
           {
             label: "Latest Activity",
@@ -373,11 +387,18 @@ export class WorkspaceViewFacade {
         badges: [
           `${detail.responseCount}/${detail.expectedRunCount} answered`,
           `${detail.missingResponseCount} missing`,
+          ...(detail.unexpectedResponseCount > 0
+            ? [`${detail.unexpectedResponseCount} unexpected`]
+            : []),
           `${detail.reviewCount} review(s)`
         ],
         rows: [
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
+          {
+            label: "Unexpected Responses",
+            value: String(detail.unexpectedResponseCount)
+          },
           { label: "Completed Runs", value: String(detail.completedRunCount) },
           {
             label: "Generated",

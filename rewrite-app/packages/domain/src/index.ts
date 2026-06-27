@@ -341,6 +341,7 @@ export type WorkspaceStudyMonitorUnitProgress = {
   expectedRunCount: number;
   responseCount: number;
   missingResponseCount: number;
+  unexpectedResponseCount: number;
   completedRunCount: number;
   latestActivityAt: string | null;
 };
@@ -416,6 +417,7 @@ export type WorkspaceStudyMonitorUnitDetail = {
   expectedRunCount: number;
   responseCount: number;
   missingResponseCount: number;
+  unexpectedResponseCount: number;
   completedRunCount: number;
   reviewCount: number;
   testRuns: WorkspaceStudyMonitorUnitRun[];

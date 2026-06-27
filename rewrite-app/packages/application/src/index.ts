@@ -2122,6 +2122,7 @@ const buildStudyMonitorUnitProgress = (input: {
       expectedRunCount: 0,
       responseCount: 0,
       missingResponseCount: 0,
+      unexpectedResponseCount: 0,
       completedRunCount: 0,
       latestActivityAt: null
     };
@@ -2166,8 +2167,8 @@ const buildStudyMonitorUnitProgress = (input: {
       }
 
       const progress = ensureProgress(unitKey, unitKey);
-      progress.expectedRunCount += 1;
       progress.responseCount += 1;
+      progress.unexpectedResponseCount += 1;
       if (testRun.status === "completed") {
         progress.completedRunCount += 1;
       }
@@ -2658,6 +2659,9 @@ const buildStudyMonitorUnitDetail = (input: {
     responseCount: testRuns.filter(item => item.answered).length,
     missingResponseCount: testRuns.filter(
       item => item.expected && !item.answered
+    ).length,
+    unexpectedResponseCount: testRuns.filter(
+      item => !item.expected && item.answered
     ).length,
     completedRunCount: testRuns.filter(
       item => item.testRun.status === "completed"
