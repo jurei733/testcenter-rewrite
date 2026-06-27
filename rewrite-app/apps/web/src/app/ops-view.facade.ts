@@ -826,6 +826,10 @@ export class OpsViewFacade {
             value: `${config.maxJsonBodyBytes} bytes`
           },
           {
+            label: "HTTP Timeouts",
+            value: `headers ${config.httpTimeouts.headersTimeoutMs}ms, request ${config.httpTimeouts.requestTimeoutMs}ms, keep-alive ${config.httpTimeouts.keepAliveTimeoutMs}ms`
+          },
+          {
             label: "Postgres Url Present",
             value: config.environment.firstSlicePostgresUrlPresent ? "yes" : "no"
           }

@@ -341,6 +341,18 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_MAX_JSON_BODY_BYTES",
     DEFAULT_MAX_JSON_BODY_BYTES
   );
+  const httpHeadersTimeoutMs = parsePositiveIntegerEnvironmentValue(
+    "HTTP_HEADERS_TIMEOUT_MS",
+    DEFAULT_HTTP_HEADERS_TIMEOUT_MS
+  );
+  const httpRequestTimeoutMs = parsePositiveIntegerEnvironmentValue(
+    "HTTP_REQUEST_TIMEOUT_MS",
+    DEFAULT_HTTP_REQUEST_TIMEOUT_MS
+  );
+  const httpKeepAliveTimeoutMs = parsePositiveIntegerEnvironmentValue(
+    "HTTP_KEEP_ALIVE_TIMEOUT_MS",
+    DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS
+  );
   const operatorAuthRequired = parseBooleanEnvironmentFlag(
     "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
     false
@@ -362,6 +374,11 @@ const createApiRuntime = async () => {
       port: configuredPort,
       shutdownDrainDelayMs,
       maxJsonBodyBytes,
+      httpTimeouts: {
+        headersTimeoutMs: httpHeadersTimeoutMs,
+        requestTimeoutMs: httpRequestTimeoutMs,
+        keepAliveTimeoutMs: httpKeepAliveTimeoutMs
+      },
       operatorAuthRequired,
       environment: {
         firstSliceStore: store,
@@ -373,6 +390,11 @@ const createApiRuntime = async () => {
         ),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
         firstSliceBootstrapDemo: demoBootstrapEnabled,
+        httpHeadersTimeoutMsPresent: Boolean(process.env.HTTP_HEADERS_TIMEOUT_MS),
+        httpRequestTimeoutMsPresent: Boolean(process.env.HTTP_REQUEST_TIMEOUT_MS),
+        httpKeepAliveTimeoutMsPresent: Boolean(
+          process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS
+        ),
         appBuildShaPresent: Boolean(process.env.APP_BUILD_SHA),
         appBuildTimestampPresent: Boolean(process.env.APP_BUILD_TIMESTAMP)
       }
@@ -449,6 +471,9 @@ const textHeaders = {
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
+const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 60_000;
+const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS = 5_000;
 
 type RuntimeMetrics = {
   startedAt: string;
@@ -1722,6 +1747,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             port: runtime.config.port,
             shutdownDrainDelayMs: runtime.config.shutdownDrainDelayMs,
             maxJsonBodyBytes: runtime.config.maxJsonBodyBytes,
+            httpTimeouts: runtime.config.httpTimeouts,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
             storage: {
               kind: runtime.repositoryConfig.kind,
@@ -3367,10 +3393,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     }
   };
 
+const applyHttpServerTimeouts = (
+  server: ReturnType<typeof createServer>,
+  runtime: Awaited<ReturnType<typeof createApiRuntime>>
+): void => {
+  server.headersTimeout = runtime.config.httpTimeouts.headersTimeoutMs;
+  server.requestTimeout = runtime.config.httpTimeouts.requestTimeoutMs;
+  server.keepAliveTimeout = runtime.config.httpTimeouts.keepAliveTimeoutMs;
+};
+
 export const createProductionApiServer = async () =>
   {
     const runtime = await createApiRuntime();
     const server = createServer(createRequestHandler(runtime));
+    applyHttpServerTimeouts(server, runtime);
     server.once("close", () => {
       void runtime.shutdown();
     });
@@ -3382,6 +3418,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const port = runtime.config.port;
   const shutdownDrainDelayMs = runtime.config.shutdownDrainDelayMs;
   const server = createServer(createRequestHandler(runtime));
+  applyHttpServerTimeouts(server, runtime);
   let shuttingDown = false;
 
   const closeServer = () => {

@@ -182,6 +182,8 @@ The Docker build context excludes local `.env`, `.env.local`, data, cache, and b
 
 `FIRST_SLICE_MAX_JSON_BODY_BYTES` defaults to `1048576` and limits JSON command payloads before they are accumulated in memory. Oversized requests return `413 request_body_too_large`.
 
+`HTTP_HEADERS_TIMEOUT_MS`, `HTTP_REQUEST_TIMEOUT_MS`, and `HTTP_KEEP_ALIVE_TIMEOUT_MS` default to `60000`, `120000`, and `5000`, respectively. They are applied to the Node HTTP server and exposed through `/diagnostics/config`.
+
 `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` are optional and surface through the API manifest, metrics, and startup banner for release identification.
 
 When you build the production image, you can also pass them as Docker build args:
@@ -386,7 +388,7 @@ For runtime probes:
 - `/metrics` returns JSON runtime metrics including request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
-- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, and whether operator auth is required
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, and whether operator auth is required
 - `/readyz` is a storage-aware readiness check
 - `/metrics` exposes lightweight runtime request/error counters for the current API process
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format

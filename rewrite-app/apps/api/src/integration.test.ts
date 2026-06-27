@@ -1151,6 +1151,57 @@ test("API rejects JSON request bodies above the configured limit", async () => {
   }
 });
 
+test("HTTP server timeouts are configurable and exposed", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    HTTP_HEADERS_TIMEOUT_MS: "7000",
+    HTTP_REQUEST_TIMEOUT_MS: "11000",
+    HTTP_KEEP_ALIVE_TIMEOUT_MS: "3000"
+  });
+
+  try {
+    assert.equal(isolated.server.headersTimeout, 7000);
+    assert.equal(isolated.server.requestTimeout, 11000);
+    assert.equal(isolated.server.keepAliveTimeout, 3000);
+
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        httpTimeouts: {
+          headersTimeoutMs: number;
+          requestTimeoutMs: number;
+          keepAliveTimeoutMs: number;
+        };
+        environment: {
+          httpHeadersTimeoutMsPresent: boolean;
+          httpRequestTimeoutMsPresent: boolean;
+          httpKeepAliveTimeoutMsPresent: boolean;
+        };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+
+    assert.equal(config.status, 200);
+    assert.deepEqual(config.body.runtimeConfig.httpTimeouts, {
+      headersTimeoutMs: 7000,
+      requestTimeoutMs: 11000,
+      keepAliveTimeoutMs: 3000
+    });
+    assert.equal(
+      config.body.runtimeConfig.environment.httpHeadersTimeoutMsPresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment.httpRequestTimeoutMsPresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment.httpKeepAliveTimeoutMsPresent,
+      true
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("local demo bootstrap seeds a directly usable app state", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -2888,6 +2939,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       port: number;
       shutdownDrainDelayMs: number;
       maxJsonBodyBytes: number;
+      httpTimeouts: {
+        headersTimeoutMs: number;
+        requestTimeoutMs: number;
+        keepAliveTimeoutMs: number;
+      };
       storage: { kind: string; location: string | null };
       environment: {
         firstSliceStore: string;
@@ -2899,6 +2955,12 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.equal(typeof config.runtimeConfig.port, "number");
   assert.equal(typeof config.runtimeConfig.shutdownDrainDelayMs, "number");
   assert.equal(typeof config.runtimeConfig.maxJsonBodyBytes, "number");
+  assert.equal(typeof config.runtimeConfig.httpTimeouts.headersTimeoutMs, "number");
+  assert.equal(typeof config.runtimeConfig.httpTimeouts.requestTimeoutMs, "number");
+  assert.equal(
+    typeof config.runtimeConfig.httpTimeouts.keepAliveTimeoutMs,
+    "number"
+  );
   assert.equal(config.runtimeConfig.storage.kind, diagnostics.storage.kind);
   assert.equal(
     typeof config.runtimeConfig.environment.firstSliceStore,
