@@ -1133,6 +1133,22 @@ try {
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await clickAction("Refresh Study Monitor");
+  const studyMonitorCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Study Monitor", exact: true })
+  });
+  await studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
+    .filter({ hasText: "2 group(s)" })
+    .filter({ hasText: "3 unit(s)" })
+    .filter({ hasText: "2 missing response(s)" })
+    .waitFor();
+  await studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "unit-paused" }) })
+    .filter({ hasText: "1/1 answered" })
+    .filter({ hasText: "0 missing" })
+    .waitFor();
   await clickCardAction("Study Monitor", "Open Group Detail", "group:student-ui");
   await page.waitForFunction(
     () => {
@@ -1144,7 +1160,10 @@ try {
       return (
         detailCard?.textContent?.includes("group:student-ui") &&
         detailCard.textContent.includes("student-ui") &&
-        detailCard.textContent.includes("1 run(s)")
+        detailCard.textContent.includes("1 run(s)") &&
+        detailCard.textContent.includes("unit-paused") &&
+        detailCard.textContent.includes("1/1 answered") &&
+        detailCard.textContent.includes("0 missing")
       );
     },
     undefined,
