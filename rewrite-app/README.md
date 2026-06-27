@@ -249,15 +249,16 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/revoked, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and prevent self-disable or self platform-role revoke lockouts
-- admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, user management, password reset, and role assignment/revocation
+- protected admin directory reads are filterable by username, status, role, tenant/workspace scope, and limit so platform operators can narrow user-management follow-up without leaving the shell
+- admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, user management, password reset, and role assignment/revocation, filterable by event type, actor admin id, subject admin id, and limit
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
 - study monitor summary returns workspace-wide group progress with participant sessions, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, latest runs, response counts, review counts, and per-run context for operator follow-up
-- source-package listing shows uploaded packages together with their latest import attempt
+- source-package listing shows uploaded packages together with their latest import attempt, filterable by status, media type, file name, latest import status, and limit
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
-- import-job listing shows completed and failed imports together with persisted diagnostics and source-package context
+- import-job listing shows completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
@@ -271,7 +272,7 @@ The added read side now makes the first slice inspectable:
 - content-release activation readiness now previews whether a staged release can be switched in immediately or is currently blocked by open runs on the active release
 - workspace activity events now provide a persisted operator timeline for setup, import, activation, and runtime actions, filterable by event type, subject type, subject id, and limit
 - failed source packages can now be retried in place with corrected manifest data, producing a fresh import job on the same package identity
-- content-release listing returns staged/active/superseded releases together with their import/source-package lineage
+- content-release listing returns staged/active/superseded releases together with their import/source-package lineage, filterable by status, import job, source package, and limit
 - participant runtime can now be re-entered through session context, not only through `testRunId`
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
@@ -287,7 +288,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered participant-session reads, and filtered workspace activity reads, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, and operator timeline/session filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session reads, and filtered workspace activity reads, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, and operator timeline/session/content filters
 
 ## Current Persistence Boundary
 
@@ -349,7 +350,7 @@ npm run smoke:ui:operator-auth
 
 That builds the Angular frontend, boots the built API process on SQLite, and drives a real browser through:
 
-- admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
+- admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
