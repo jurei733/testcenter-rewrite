@@ -1,6 +1,6 @@
 import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
 
-export type AppView = "workspace" | "content" | "runtime" | "ops";
+export type AppView = "workspace" | "content" | "runtime" | "participant" | "ops";
 
 export type SummaryCard = {
   label: string;

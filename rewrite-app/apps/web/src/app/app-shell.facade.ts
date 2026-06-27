@@ -25,6 +25,7 @@ export class AppShellFacade {
     { id: "workspace", label: "Workspace", link: "/workspace" },
     { id: "content", label: "Content", link: "/content" },
     { id: "runtime", label: "Runtime", link: "/runtime" },
+    { id: "participant", label: "Participant", link: "/participant" },
     { id: "ops", label: "Diagnostics", link: "/ops" }
   ] as const;
 
@@ -78,7 +79,7 @@ export class AppShellFacade {
       },
       {
         title: "Participant Runtime",
-        route: "/runtime",
+        route: "/participant",
         items: [
           {
             label: "Session",

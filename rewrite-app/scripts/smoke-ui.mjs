@@ -717,6 +717,108 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "active")
   );
 
+  logStep("nav-participant");
+  await page.locator('[data-view-nav="participant"]').click();
+  await page.waitForURL(/\/app\/participant$/);
+  await page.locator("#participantLoginKey").waitFor();
+  logStep("participant-route-sign-in");
+  const participantRouteLoginKey = "student-participant-route";
+  await fillAndCommit("#participantWorkspaceKey", workspaceKey);
+  await fillAndCommit("#participantLoginKey", participantRouteLoginKey);
+  await clickAction("Participant Sign In");
+  const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
+  const participantRouteSessionsPayload = await pollJsonWithPredicate(
+    participantRouteSessionsUrl,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => {
+        const participantSession = item?.participantSession;
+        return (
+          participantSession?.loginKey === participantRouteLoginKey &&
+          typeof participantSession?.participantSessionId === "string" &&
+          participantSession.participantSessionId.length > 0
+        );
+      })
+  );
+  const participantRouteSessionId = participantRouteSessionsPayload.items.find(item => {
+    const participantSession = item?.participantSession;
+    return participantSession?.loginKey === participantRouteLoginKey;
+  })?.participantSession?.participantSessionId;
+  assert.ok(
+    participantRouteSessionId,
+    "UI smoke expected a participant route session id after sign-in."
+  );
+  await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
+  logStep("participant-route-start");
+  await clickAction("Start Or Resume");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running"
+  );
+  await fillAndCommit("#participantRouteCurrentUnitKey", "unit-participant-route");
+  await clickAction("Save Paused");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "paused" &&
+      payload.currentRunState.testRun.currentUnitKey === "unit-participant-route"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "paused" &&
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        "unit-participant-route" &&
+      document
+        .querySelector("#participantRouteActions")
+        ?.textContent?.includes("resume"),
+    undefined,
+    { timeout: 15_000 }
+  );
+  await clickAction("Resume Run");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running"
+  );
+  await clickAction("Complete Test");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "completed"
+  );
+
   logStep("nav-runtime");
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
