@@ -52,8 +52,39 @@ export class WorkspaceViewFacade {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
     );
-    return (
-      payload?.studyMonitorSummary.groups.map(group => ({
+    const summary = payload?.studyMonitorSummary;
+    if (!summary) {
+      return [];
+    }
+
+    const missingResponseCount = summary.unitProgress.reduce(
+      (total, unit) => total + unit.missingResponseCount,
+      0
+    );
+
+    return [
+      {
+        headline: `${summary.workspaceKey} monitor`,
+        subline: `${summary.participantSessionCount} participant session(s), ${summary.testRunCount} run(s)`,
+        badges: [
+          `${summary.groups.length} group(s)`,
+          `${summary.unitProgress.length} unit(s)`,
+          `${missingResponseCount} missing response(s)`
+        ],
+        rows: [
+          { label: "Tenant", value: summary.tenantKey },
+          { label: "Running", value: String(summary.runningCount) },
+          { label: "Paused", value: String(summary.pausedCount) },
+          { label: "Completed", value: String(summary.completedCount) },
+          { label: "Responses", value: String(summary.responseCount) },
+          { label: "Reviews", value: String(summary.reviewCount) },
+          {
+            label: "Generated",
+            value: this.formatDateTime(summary.generatedAt)
+          }
+        ]
+      },
+      ...summary.groups.map(group => ({
         headline: group.groupKey,
         subline: `${group.participantSessionCount} participant session(s)`,
         badges: [
@@ -76,8 +107,27 @@ export class WorkspaceViewFacade {
         ],
         actionLabel: "Open Group Detail",
         actionPayload: { groupKey: group.groupKey }
-      })) ?? []
-    );
+      })),
+      ...summary.unitProgress.map(unit => ({
+        headline: unit.displayLabel,
+        subline: unit.unitKey,
+        badges: [
+          `${unit.responseCount}/${unit.expectedRunCount} answered`,
+          `${unit.missingResponseCount} missing`
+        ],
+        rows: [
+          { label: "Expected Runs", value: String(unit.expectedRunCount) },
+          { label: "Responses", value: String(unit.responseCount) },
+          { label: "Completed Runs", value: String(unit.completedRunCount) },
+          {
+            label: "Latest Activity",
+            value: unit.latestActivityAt
+              ? this.formatDateTime(unit.latestActivityAt)
+              : "none"
+          }
+        ]
+      }))
+    ];
   }
 
   get studyMonitorGroupItems(): RecordCollectionItem[] {
