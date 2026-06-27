@@ -68,6 +68,17 @@ type AdminSessionViewPayload = Partial<
     AdminSignOutResponse
 >;
 
+const localDemoAccess = {
+  adminUsername: "demo-admin",
+  adminDisplayName: "Demo Platform Admin",
+  adminPassword: "demo-admin-password",
+  tenantKey: "demo-tenant",
+  workspaceKey: "demo-workspace",
+  participantLoginKey: "student-demo",
+  participantPath:
+    "/participant?workspaceKey=demo-workspace&loginKey=student-demo"
+} as const;
+
 @Injectable({ providedIn: "root" })
 export class OpsViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -140,6 +151,16 @@ export class OpsViewFacade {
 
   resetAdminUserPassword(): void {
     this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
+  }
+
+  signInLocalDemoAdmin(): void {
+    this.viewState.onActionAsync(async () => {
+      this.ops.adminUsername = localDemoAccess.adminUsername;
+      this.ops.adminDisplayName = localDemoAccess.adminDisplayName;
+      this.ops.adminPassword = localDemoAccess.adminPassword;
+      this.persistState();
+      await this.opsService.signInAdmin();
+    });
   }
 
   selectAdminUser(item: RecordCollectionItem): void {
@@ -482,6 +503,45 @@ export class OpsViewFacade {
     });
 
     return items;
+  }
+
+  get localDemoAccessItems(): RecordCollectionItem[] {
+    const config = parseJsonDocument<GetRuntimeConfigResponse>(
+      this.ops.runtimeConfigView
+    )?.runtimeConfig;
+    if (!config?.environment.firstSliceBootstrapDemo) {
+      return [];
+    }
+
+    return [
+      {
+        headline: "Local demo is ready",
+        subline: `${localDemoAccess.tenantKey} / ${localDemoAccess.workspaceKey}`,
+        badges: ["demo bootstrap", config.storage.kind],
+        rows: [
+          {
+            label: "Admin",
+            value: `${localDemoAccess.adminUsername} / ${localDemoAccess.adminPassword}`
+          },
+          {
+            label: "Participant",
+            value: localDemoAccess.participantPath
+          },
+          {
+            label: "Login Key",
+            value: localDemoAccess.participantLoginKey
+          }
+        ],
+        actionLabel: "Sign In Demo Admin",
+        actionPayload: { demoCommand: "signInLocalDemoAdmin" }
+      }
+    ];
+  }
+
+  runLocalDemoAccessAction(item: RecordCollectionItem): void {
+    if (item.actionPayload?.demoCommand === "signInLocalDemoAdmin") {
+      this.signInLocalDemoAdmin();
+    }
   }
 
   runOpsSuggestion(item: RecordCollectionItem): void {

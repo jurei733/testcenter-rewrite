@@ -429,6 +429,7 @@ export type GetRuntimeConfigResponse = {
       firstSliceSqliteFilePresent: boolean;
       firstSlicePostgresUrlPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
+      firstSliceBootstrapDemo: boolean;
       appBuildShaPresent: boolean;
       appBuildTimestampPresent: boolean;
     };

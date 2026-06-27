@@ -29,6 +29,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <app-record-collection
+        title="Local Demo Access"
+        subtitle="When local demo bootstrap is enabled, use these ready-made credentials and direct participant entry link."
+        [items]="view.localDemoAccessItems"
+        (itemAction)="view.runLocalDemoAccessAction($event)"
+        emptyState="Refresh diagnostics to detect whether local demo bootstrap is enabled."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Admin Access</h2>
         <p>Bootstrap the first platform admin, sign in, and verify the active bearer session from the browser.</p>
