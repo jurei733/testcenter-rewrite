@@ -26,6 +26,7 @@ export type PersistedShellState = {
   testRunId: string;
   currentUnitKey: string;
   loginKey: string;
+  groupKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   forceActivation: boolean;

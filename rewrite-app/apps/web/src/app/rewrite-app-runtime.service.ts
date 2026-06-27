@@ -10,6 +10,7 @@ import { RewriteAppShellRuntimeHostsService } from "./rewrite-app-shell-runtime-
 import { loadParticipantSessionDetailAction } from "./rewrite-app-shell.runtime";
 import {
   completeRunAction,
+  deleteGroupResultsAction,
   participantSignInAction,
   resumeParticipantSessionAction,
   resumeRunAction,
@@ -112,6 +113,19 @@ export class RewriteAppRuntimeService {
     this.feedback.rememberActivity(
       "Detailed Responses Loaded",
       `${payload.items.length} response row(s) loaded.`
+    );
+  }
+
+  async deleteGroupResults(): Promise<void> {
+    const payload = await deleteGroupResultsAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+    await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Group Results Deleted",
+      `${payload.deletion.deletedTestRunCount} run(s) and ${payload.deletion.deletedResponseCount} response(s) deleted for ${payload.deletion.groupKey}.`
     );
   }
 

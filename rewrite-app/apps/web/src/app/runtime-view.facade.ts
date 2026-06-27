@@ -80,7 +80,8 @@ export class RuntimeViewFacade {
         actionLabel: "Select + Load",
         actionPayload: {
           participantSessionId: item.participantSession.participantSessionId,
-          loginKey: item.participantSession.loginKey
+          loginKey: item.participantSession.loginKey,
+          groupKey: item.participantSession.groupKey
         }
       })) ?? []
     );
@@ -123,7 +124,8 @@ export class RuntimeViewFacade {
         actionLabel: "Select + Load",
         actionPayload: {
           participantSessionId: detail.participantSession.participantSessionId,
-          loginKey: detail.participantSession.loginKey
+          loginKey: detail.participantSession.loginKey,
+          groupKey: detail.participantSession.groupKey
         }
       }
     ];
@@ -322,7 +324,8 @@ export class RuntimeViewFacade {
           testRunId: item.testRunId,
           currentUnitKey: item.unitKey,
           participantSessionId: item.participantSessionId,
-          loginKey: item.loginKey
+          loginKey: item.loginKey,
+          groupKey: item.groupKey
         }
       })) ?? []
     );
@@ -354,7 +357,8 @@ export class RuntimeViewFacade {
         actionPayload: {
           testRunId: openRun.testRunId,
           currentUnitKey: openRun.currentUnitKey ?? "",
-          loginKey: openRun.loginKey
+          loginKey: openRun.loginKey,
+          groupKey: openRun.groupKey
         }
       })) ?? []
     );
@@ -722,6 +726,24 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.loadDetailedResponses());
   }
 
+  confirmDeleteGroupResults(): void {
+    const groupKey = this.runtime.groupKey.trim();
+    if (!groupKey) {
+      this.deleteGroupResults();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Delete all collected test runs for group '${groupKey}' in this workspace?`
+    );
+    if (confirmed) {
+      this.deleteGroupResults();
+    }
+  }
+
+  private deleteGroupResults(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.deleteGroupResults());
+  }
+
   selectParticipantSession(item: RecordCollectionItem): void {
     const participantSessionId = item.actionPayload?.participantSessionId?.trim();
     if (!participantSessionId) {
@@ -731,6 +753,9 @@ export class RuntimeViewFacade {
     this.runtime.participantSessionId = participantSessionId;
     if (item.actionPayload?.loginKey) {
       this.runtime.loginKey = item.actionPayload.loginKey;
+    }
+    if (item.actionPayload?.groupKey) {
+      this.runtime.groupKey = item.actionPayload.groupKey;
     }
     this.persistState();
     this.viewState.onActionAsync(async () => {
@@ -751,6 +776,9 @@ export class RuntimeViewFacade {
     }
     if (item.actionPayload?.loginKey) {
       this.runtime.loginKey = item.actionPayload.loginKey;
+    }
+    if (item.actionPayload?.groupKey) {
+      this.runtime.groupKey = item.actionPayload.groupKey;
     }
     if (item.actionPayload?.participantSessionId) {
       this.runtime.participantSessionId = item.actionPayload.participantSessionId;

@@ -164,6 +164,12 @@ export function createShellPersistenceStateHost(args: {
     set loginKey(nextValue) {
       args.runtimeState.loginKey = nextValue;
     },
+    get groupKey() {
+      return args.runtimeState.groupKey;
+    },
+    set groupKey(nextValue) {
+      args.runtimeState.groupKey = nextValue;
+    },
     get autoRefreshEnabled() {
       return args.workspaceState.autoRefreshEnabled;
     },

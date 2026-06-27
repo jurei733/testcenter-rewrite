@@ -35,6 +35,7 @@ import {
   type CreateTenantResponse,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResponse,
+  type DeleteGroupResultsResponse,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetAdminCurrentSessionResponse,
@@ -842,6 +843,9 @@ const logCsvExportPattern = createRoutePattern(
 const detailedResponsesPattern = createRoutePattern(
   productionApiRoutes.workspace.listDetailedResponses
 );
+const deleteGroupResultsPattern = createRoutePattern(
+  productionApiRoutes.workspace.deleteGroupResults
+);
 const importJobDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getImportJob
 );
@@ -897,6 +901,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
   ["GET", detailedResponsesPattern],
+  ["DELETE", deleteGroupResultsPattern],
   ["GET", responseCsvExportPattern],
   ["GET", logCsvExportPattern],
   ["GET", contentReleaseListPattern],
@@ -1229,6 +1234,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       detailedResponsesPattern,
       productionApiRoutes.workspace.listDetailedResponses
+    ],
+    [
+      "DELETE",
+      deleteGroupResultsPattern,
+      productionApiRoutes.workspace.deleteGroupResults
     ],
     [
       "GET",
@@ -2053,6 +2063,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
       const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
+      const deleteGroupResultsMatch = deleteGroupResultsPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
@@ -2174,6 +2185,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendJson<ListDetailedResponsesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "DELETE" && deleteGroupResultsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(deleteGroupResultsMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          deleteGroupResultsMatch.groups.workspaceKey
+        );
+        const groupKey = decodeRouteGroup(deleteGroupResultsMatch.groups.groupKey);
+        if (!tenantKey || !workspaceKey || !groupKey) {
+          sendError(
+            response,
+            400,
+            "invalid_group_result_scope",
+            "tenantKey, workspaceKey, and groupKey are required."
+          );
+          return;
+        }
+
+        const deletion = await services.workspaceResults.deleteGroupResults({
+          tenantKey,
+          workspaceKey,
+          groupKey
+        });
+        sendJson<DeleteGroupResultsResponse>(response, 200, { deletion });
         return;
       }
 

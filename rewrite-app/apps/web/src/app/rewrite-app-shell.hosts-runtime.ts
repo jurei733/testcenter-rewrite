@@ -30,8 +30,15 @@ export function createRuntimeActionsStateHost(args: {
       resolveRoutePath(productionApiRoutes.participant.completeRun, {
         testRunId: args.runtimeState.testRunId.trim()
       }),
+    getDeleteGroupResultsPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.deleteGroupResults, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim(),
+        groupKey: args.runtimeState.groupKey.trim()
+      }),
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getLoginKey: () => args.runtimeState.loginKey,
+    getGroupKey: () => args.runtimeState.groupKey,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
     getCurrentUnitResponse: () => args.runtimeState.currentUnitResponse,
     createRuntimePresentationHost: args.createRuntimePresentationHost,

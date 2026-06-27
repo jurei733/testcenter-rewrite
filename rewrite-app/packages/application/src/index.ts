@@ -29,6 +29,7 @@ import type {
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
+  WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceSourcePackageDetail,
@@ -144,6 +145,14 @@ export type WorkspaceAdminReadPort = {
   }): Promise<WorkspaceContentReleaseListItem[]>;
 };
 
+export type WorkspaceResultsPort = {
+  deleteGroupResults(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    groupKey: string;
+  }): Promise<WorkspaceGroupResultDeletion>;
+};
+
 export type ParticipantRuntimePort = {
   signIn(input: {
     workspaceKey: string;
@@ -256,6 +265,7 @@ export type FirstSlicePorts = {
   platform: PlatformPort;
   contentIntake: ContentIntakePort;
   workspaceAdminRead: WorkspaceAdminReadPort;
+  workspaceResults: WorkspaceResultsPort;
   participantRuntime: ParticipantRuntimePort;
   monitorRead: MonitorReadPort;
 };
@@ -306,6 +316,7 @@ export const firstSliceUseCases = {
   listParticipantSessions: "ListParticipantSessions",
   getParticipantSessionDetail: "GetParticipantSessionDetail",
   listDetailedResponses: "ListDetailedResponses",
+  deleteGroupResults: "DeleteGroupResults",
   exportResponseCsv: "ExportResponseCsv",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
   listImportJobs: "ListImportJobs",
@@ -411,6 +422,7 @@ export type FirstSliceRepository = {
   ): Promise<TestRun | null>;
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
+  deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
 };
 
 export type FirstSliceDependencies = {
@@ -525,6 +537,18 @@ const normalizeOptionalScopeKey = (value: unknown, fieldName: string): string | 
   }
 
   return value.trim() || null;
+};
+
+const normalizeGroupKey = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(
+      400,
+      "group_key_required",
+      "groupKey is required."
+    );
+  }
+
+  return value.trim();
 };
 
 const normalizeAdminRoleAssignmentInputs = (
@@ -2767,6 +2791,70 @@ export const createFirstSliceServices = (
           participantSessions,
           testRuns
         });
+      }
+    },
+    workspaceResults: {
+      async deleteGroupResults(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const groupKey = normalizeGroupKey(input.groupKey);
+        const [participantSessions, testRuns] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+        const affectedParticipantSessionIds = participantSessions
+          .filter(participantSession => participantSession.groupKey === groupKey)
+          .map(participantSession => participantSession.participantSessionId)
+          .sort();
+        const affectedParticipantSessionIdSet = new Set(
+          affectedParticipantSessionIds
+        );
+        const deletedTestRuns = testRuns
+          .filter(testRun =>
+            affectedParticipantSessionIdSet.has(testRun.participantSessionId)
+          )
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+        const deletedTestRunIds = deletedTestRuns.map(testRun => testRun.testRunId);
+        const deletedResponseCount = deletedTestRuns.reduce(
+          (total, testRun) =>
+            total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
+          0
+        );
+        const deletedTestRunCount = await repository.deleteTestRunsByIds(
+          deletedTestRunIds
+        );
+
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "group_results_deleted",
+          subjectType: "workspace",
+          subjectId: workspace.workspaceId,
+          summary: `Deleted ${deletedTestRunCount} test run(s) for group '${groupKey}'.`,
+          details: {
+            groupKey,
+            deletedTestRunCount,
+            deletedResponseCount,
+            affectedParticipantSessionIds,
+            deletedTestRunIds
+          }
+        });
+
+        return {
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          groupKey,
+          deletedTestRunCount,
+          deletedResponseCount,
+          affectedParticipantSessionIds,
+          deletedTestRunIds
+        };
       }
     },
     contentIntake: {

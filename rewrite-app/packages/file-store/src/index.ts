@@ -326,6 +326,18 @@ export const createFileFirstSliceRepository = (
       await mutate(state => {
         state.testRuns[testRun.testRunId] = testRun;
       });
+    },
+    async deleteTestRunsByIds(testRunIds) {
+      let deletedCount = 0;
+      await mutate(state => {
+        for (const testRunId of testRunIds) {
+          if (state.testRuns[testRunId]) {
+            delete state.testRuns[testRunId];
+            deletedCount += 1;
+          }
+        }
+      });
+      return deletedCount;
     }
   };
 };

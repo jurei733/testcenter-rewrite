@@ -1069,6 +1069,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           testRun.completedAt
         ]
       );
+    },
+    async deleteTestRunsByIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const result = await pool.query(
+        "DELETE FROM test_runs WHERE test_run_id = ANY($1::text[])",
+        [testRunIds]
+      );
+      return result.rowCount ?? 0;
     }
   };
 };

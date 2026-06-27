@@ -1200,6 +1200,16 @@ export const createSqliteFirstSliceRepository = (
           testRun.updatedAt,
           testRun.completedAt
         );
+    },
+    async deleteTestRunsByIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const placeholders = testRunIds.map(() => "?").join(", ");
+      const result = database
+        .prepare(`DELETE FROM test_runs WHERE test_run_id IN (${placeholders})`)
+        .run(...testRunIds);
+      return Number(result.changes);
     }
   };
 };

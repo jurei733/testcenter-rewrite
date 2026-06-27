@@ -221,6 +221,8 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs/{importJobId}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions/{participantSessionId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/responses/detailed`
+- `DELETE /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/results/groups/{groupKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/responses.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/logs.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/content-releases`
@@ -250,6 +252,8 @@ The added read side now makes the first slice inspectable:
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release
 - participant-session detail now resolves one session together with its content release and full run history
+- detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context
+- group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
 - response CSV export returns persisted unit responses with participant, run, booklet, unit, status, and timestamp context
 - workspace log CSV export returns the persisted activity timeline with event metadata and details JSON
 - content-release detail now resolves a single release together with its import/source-package lineage, attached sessions/runs, and neighboring activation history within the workspace release line

@@ -1,4 +1,5 @@
 import type {
+  DeleteGroupResultsResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionResponse,
@@ -28,12 +29,26 @@ export interface ShellRuntimeActionsHost {
   getSaveProgressPath(): string;
   getResumeRunPath(): string;
   getCompleteRunPath(): string;
+  getDeleteGroupResultsPath(): string;
   getWorkspaceKey(): string;
   getLoginKey(): string;
+  getGroupKey(): string;
   getCurrentUnitKey(): string;
   getCurrentUnitResponse(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
+}
+
+export async function deleteGroupResultsAction(
+  host: ShellRuntimeActionsHost
+): Promise<DeleteGroupResultsResponse> {
+  const payload = await host.request<DeleteGroupResultsResponse>(
+    "Delete Group Results",
+    "DELETE",
+    host.getDeleteGroupResultsPath()
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }
 
 export async function participantSignInAction(

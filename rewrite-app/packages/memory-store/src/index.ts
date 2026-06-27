@@ -210,6 +210,15 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async saveTestRun(testRun) {
       state.testRuns.set(testRun.testRunId, testRun);
+    },
+    async deleteTestRunsByIds(testRunIds) {
+      let deletedCount = 0;
+      for (const testRunId of testRunIds) {
+        if (state.testRuns.delete(testRunId)) {
+          deletedCount += 1;
+        }
+      }
+      return deletedCount;
     }
   };
 };

@@ -42,6 +42,7 @@ export interface ShellOpsState {
 
 export interface ShellRuntimeState {
   loginKey: string;
+  groupKey: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -137,6 +138,7 @@ export function createInitialShellOpsState(): ShellOpsState {
 export function createInitialShellRuntimeState(): ShellRuntimeState {
   return {
     loginKey: "student-ui",
+    groupKey: "group:student-ui",
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",

@@ -240,6 +240,21 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.waitForFunction(
+    () => document.querySelector("#groupKey")?.value === "group:student-demo",
+    undefined,
+    { timeout: 15_000 }
+  );
+  page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /group 'group:student-demo'/);
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Delete Group Results" }).click();
+  await page
+    .getByText("Load detailed responses to inspect saved answers across the workspace.")
+    .waitFor({ timeout: 15_000 });
+  await page.getByText("Group Results Deleted").waitFor({ timeout: 15_000 });
+
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   const logDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();

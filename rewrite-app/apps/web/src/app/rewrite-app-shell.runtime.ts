@@ -24,6 +24,7 @@ export interface RuntimePresentationHost {
   getWorkspaceKey(): string;
   getParticipantSessionId(): string;
   setParticipantSessionId(nextValue: string): void;
+  setGroupKey(nextValue: string): void;
   syncRuntimeStateFromRun(testRun: RuntimeTestRunLike): void;
   getOpenRunsView(): string;
   setOpenRunsView(nextValue: string): void;
@@ -57,6 +58,7 @@ export function applyParticipantSignInResult(
   payload: ParticipantSignInResponse
 ): void {
   host.setParticipantSessionId(payload.participantSession.participantSessionId);
+  host.setGroupKey(payload.participantSession.groupKey);
   host.updateRuntimeSummary(
     payload.participantSession.status,
     `Session ${payload.participantSession.participantSessionId} signed in for login ${payload.participantSession.loginKey}.`
@@ -252,6 +254,9 @@ export function applyRuntimeReadsWithSession(
   );
 
   host.setRuntimeLoaded(true);
+  host.setGroupKey(
+    sessionDetailPayload.participantSessionDetail.participantSession.groupKey
+  );
   host.syncRuntimeStateFromRun(runtimeStatePayload.runtimeState.latestTestRun);
   host.updateRuntimeSummary(
     runtimeStatePayload.runtimeState.availableAction ??

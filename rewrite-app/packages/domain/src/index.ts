@@ -40,7 +40,8 @@ export type WorkspaceActivityEventType =
   | "participant_session_resumed"
   | "test_run_progress_saved"
   | "test_run_resumed"
-  | "test_run_completed";
+  | "test_run_completed"
+  | "group_results_deleted";
 export type WorkspaceActivitySubjectType =
   | "workspace"
   | "source_package"
@@ -326,6 +327,16 @@ export type WorkspaceDetailedResponse = {
   status: TestRun["status"];
   updatedAt: string;
   completedAt: string | null;
+};
+
+export type WorkspaceGroupResultDeletion = {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKey: string;
+  deletedTestRunCount: number;
+  deletedResponseCount: number;
+  affectedParticipantSessionIds: string[];
+  deletedTestRunIds: string[];
 };
 
 export type WorkspaceActivityEventListItem = {

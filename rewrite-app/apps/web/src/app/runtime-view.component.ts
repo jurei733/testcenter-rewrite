@@ -28,6 +28,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="loginKey" name="loginKey" [(ngModel)]="view.runtime.loginKey" (change)="view.persistState()" />
           </label>
           <label>
+            Group Key
+            <input id="groupKey" name="groupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
+          </label>
+          <label>
             Session Id
             <input id="participantSessionId" name="participantSessionId" placeholder="Filled from sign-in" [(ngModel)]="view.runtime.participantSessionId" (change)="view.persistState()" />
           </label>
@@ -50,6 +54,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
+          <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
           <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
         </div>
       </article>

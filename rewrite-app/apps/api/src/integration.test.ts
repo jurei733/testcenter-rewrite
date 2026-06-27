@@ -1240,6 +1240,51 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(logCsv.body, /^tenantKey,workspaceKey,activityEventId,eventType,/);
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"participant_signed_in"/);
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"test_run_progress_saved"/);
+
+    const groupDeletion = await requestJsonAt<{
+      deletion: {
+        groupKey: string;
+        deletedTestRunCount: number;
+        deletedResponseCount: number;
+        affectedParticipantSessionIds: string[];
+        deletedTestRunIds: string[];
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups/group%3Astudent-demo",
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(groupDeletion.status, 200);
+    assert.equal(groupDeletion.body.deletion.groupKey, "group:student-demo");
+    assert.equal(groupDeletion.body.deletion.deletedTestRunCount, 1);
+    assert.equal(groupDeletion.body.deletion.deletedResponseCount, 1);
+    assert.deepEqual(groupDeletion.body.deletion.affectedParticipantSessionIds, [
+      participantSignIn.body.participantSession.participantSessionId
+    ]);
+    assert.deepEqual(groupDeletion.body.deletion.deletedTestRunIds, [
+      resumed.body.testRun.testRunId
+    ]);
+
+    const detailedResponsesAfterDeletion = await requestJsonAt<{
+      items: unknown[];
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(detailedResponsesAfterDeletion.status, 200);
+    assert.deepEqual(detailedResponsesAfterDeletion.body.items, []);
   } finally {
     await closeServer(isolated.server);
   }

@@ -24,6 +24,7 @@ import type {
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
+  WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceActivityEventType,
@@ -77,6 +78,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
     listDetailedResponses:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
+    deleteGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups/:groupKey",
     listContentReleases:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
     getContentRelease:
@@ -327,6 +330,10 @@ export type GetParticipantSessionResponse = {
 
 export type ListDetailedResponsesResponse = {
   items: WorkspaceDetailedResponse[];
+};
+
+export type DeleteGroupResultsResponse = {
+  deletion: WorkspaceGroupResultDeletion;
 };
 
 export type ListContentReleasesResponse = {

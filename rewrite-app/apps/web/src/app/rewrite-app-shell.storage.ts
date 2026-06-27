@@ -14,6 +14,7 @@ export type ShellPersistenceTarget = {
   testRunId: string;
   currentUnitKey: string;
   loginKey: string;
+  groupKey: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   forceActivation: boolean;
@@ -53,6 +54,7 @@ export const createPersistedShellState = (
   testRunId: target.testRunId,
   currentUnitKey: target.currentUnitKey,
   loginKey: target.loginKey,
+  groupKey: target.groupKey,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
   forceActivation: target.forceActivation,
@@ -93,6 +95,7 @@ export const applyHydratedShellState = (
   target.testRunId = snapshot.testRunId ?? target.testRunId;
   target.currentUnitKey = snapshot.currentUnitKey ?? target.currentUnitKey;
   target.loginKey = snapshot.loginKey ?? target.loginKey;
+  target.groupKey = snapshot.groupKey ?? target.groupKey;
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;
   target.forceActivation = snapshot.forceActivation ?? target.forceActivation;
