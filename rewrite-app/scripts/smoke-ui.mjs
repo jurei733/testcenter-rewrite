@@ -1189,6 +1189,24 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await clickCardAction("Study Monitor", "Open Unit Detail", "unit-paused");
+  await page.waitForFunction(
+    () => {
+      const detailCard = Array.from(document.querySelectorAll("article.card")).find(
+        card =>
+          card.querySelector("h3")?.textContent?.trim() ===
+          "Study Monitor Unit Detail"
+      );
+      return (
+        detailCard?.textContent?.includes("unit-paused") &&
+        detailCard.textContent.includes("0 missing") &&
+        detailCard.textContent.includes("student-ui") &&
+        detailCard.textContent.includes("answered")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
 
   logStep("nav-content-blocked-activation");
   await page.locator('[data-view-nav="content"]').click();

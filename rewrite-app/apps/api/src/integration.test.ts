@@ -1815,6 +1815,72 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       ]
     );
 
+    const studyMonitorUnit = await requestJsonAt<{
+      studyMonitorUnit: {
+        unitKey: string;
+        displayLabel: string;
+        expectedRunCount: number;
+        responseCount: number;
+        missingResponseCount: number;
+        completedRunCount: number;
+        reviewCount: number;
+        testRuns: Array<{
+          testRun: { testRunId: string; status: string; bookletKey: string };
+          participantSession: { loginKey: string; groupKey: string } | null;
+          expected: boolean;
+          answered: boolean;
+          response: string | null;
+          responseLength: number;
+          reviewCount: number;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/units/unit-intro",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitorUnit.status, 200);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.unitKey, "unit-intro");
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.displayLabel, "Introduction");
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.expectedRunCount, 1);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.responseCount, 1);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.missingResponseCount, 0);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.completedRunCount, 0);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.reviewCount, 1);
+    assert.equal(
+      studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.testRun.testRunId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(
+      studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.participantSession?.loginKey,
+      "student-demo"
+    );
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.expected, true);
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.answered, true);
+    assert.equal(
+      studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.response,
+      "My first demo response"
+    );
+    assert.equal(studyMonitorUnit.body.studyMonitorUnit.testRuns[0]?.reviewCount, 1);
+
+    const missingStudyMonitorUnit = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/units/unit-missing",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(missingStudyMonitorUnit.status, 404);
+    assert.equal(missingStudyMonitorUnit.body.error, "study_monitor_unit_not_found");
+
     const reviewCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv",

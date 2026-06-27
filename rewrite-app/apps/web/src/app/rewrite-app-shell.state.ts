@@ -141,6 +141,7 @@ export interface ShellWorkspaceState {
   workspaceActivityView: string;
   studyMonitorView: string;
   studyMonitorGroupView: string;
+  studyMonitorUnitView: string;
   workspaceLogExportView: string;
   workspaceLoaded: boolean;
 }
@@ -299,6 +300,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceActivityView: 'Use "Refresh Content Reads".',
     studyMonitorView: 'Use "Refresh Study Monitor".',
     studyMonitorGroupView: "Select a group from the study monitor.",
+    studyMonitorUnitView: "Select a unit from the study monitor.",
     workspaceLogExportView: 'Use "Export Workspace Logs CSV".',
     workspaceLoaded: false
   };

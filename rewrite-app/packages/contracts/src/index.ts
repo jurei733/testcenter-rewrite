@@ -37,6 +37,7 @@ import type {
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorSummary,
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
@@ -68,6 +69,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/summary",
     getStudyMonitorGroup:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/groups/:groupKey",
+    getStudyMonitorUnit:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/units/:unitKey",
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
     createSourcePackage: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
@@ -381,6 +384,10 @@ export type GetStudyMonitorSummaryResponse = {
 
 export type GetStudyMonitorGroupResponse = {
   studyMonitorGroup: WorkspaceStudyMonitorGroupDetail;
+};
+
+export type GetStudyMonitorUnitResponse = {
+  studyMonitorUnit: WorkspaceStudyMonitorUnitDetail;
 };
 
 export type ListWorkspaceActivityEventsResponse = {

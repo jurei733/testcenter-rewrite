@@ -128,7 +128,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Study Monitor"
         subtitle="Workspace-wide group progress derived from participant sessions and latest run states."
         [items]="view.studyMonitorItems"
-        (itemAction)="view.openStudyMonitorGroup($event)"
+        (itemAction)="view.openStudyMonitorItem($event)"
         emptyState="Refresh the study monitor to inspect group progress."
       ></app-record-collection>
 
@@ -138,6 +138,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         [items]="view.studyMonitorGroupItems"
         (itemAction)="view.openActivitySubject($event)"
         emptyState="Open a group from the study monitor to inspect participant detail."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Study Monitor Unit Detail"
+        subtitle="Selected unit runs, missing responses, answers, and review pressure."
+        [items]="view.studyMonitorUnitItems"
+        (itemAction)="view.openActivitySubject($event)"
+        emptyState="Open a unit from the study monitor to inspect run detail."
       ></app-record-collection>
 
       <article class="card">

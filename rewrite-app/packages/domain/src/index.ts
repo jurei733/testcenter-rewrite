@@ -361,6 +361,16 @@ export type WorkspaceStudyMonitorGroupRun = {
   reviewCount: number;
 };
 
+export type WorkspaceStudyMonitorUnitRun = {
+  testRun: TestRun;
+  participantSession: ParticipantSession | null;
+  expected: boolean;
+  answered: boolean;
+  response: string | null;
+  responseLength: number;
+  reviewCount: number;
+};
+
 export type WorkspaceStudyMonitorGroupDetail = {
   tenantKey: string;
   workspaceKey: string;
@@ -373,6 +383,20 @@ export type WorkspaceStudyMonitorGroupDetail = {
   sessions: WorkspaceStudyMonitorGroupSession[];
   testRuns: WorkspaceStudyMonitorGroupRun[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
+};
+
+export type WorkspaceStudyMonitorUnitDetail = {
+  tenantKey: string;
+  workspaceKey: string;
+  unitKey: string;
+  displayLabel: string;
+  generatedAt: string;
+  expectedRunCount: number;
+  responseCount: number;
+  missingResponseCount: number;
+  completedRunCount: number;
+  reviewCount: number;
+  testRuns: WorkspaceStudyMonitorUnitRun[];
 };
 
 export type WorkspaceStudyMonitorSummary = {

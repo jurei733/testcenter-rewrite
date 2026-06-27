@@ -42,6 +42,7 @@ import type {
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorUnitProgress,
   WorkspaceStudyMonitorSummary,
   WorkspaceOverview
@@ -104,6 +105,11 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     groupKey: string;
   }): Promise<WorkspaceStudyMonitorGroupDetail>;
+  getStudyMonitorUnitDetail(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    unitKey: string;
+  }): Promise<WorkspaceStudyMonitorUnitDetail>;
   listWorkspaceActivityEvents(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -2341,6 +2347,102 @@ const buildStudyMonitorGroupDetail = (input: {
   };
 };
 
+const buildStudyMonitorUnitDetail = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  unitKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorUnitDetail => {
+  const normalizedUnitKey = input.unitKey.trim();
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const contentReleasesById = new Map(
+    input.contentReleases.map(contentRelease => [
+      contentRelease.contentReleaseId,
+      contentRelease
+    ])
+  );
+  const displayLabel =
+    input.contentReleases
+      .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+      .flatMap(booklet => booklet.unitEntries)
+      .find(unit => unit.unitKey === normalizedUnitKey)?.displayLabel ??
+    normalizedUnitKey;
+
+  const testRuns = input.testRuns
+    .map(normalizeTestRun)
+    .flatMap(testRun => {
+      const participantSession =
+        participantSessionsById.get(testRun.participantSessionId) ?? null;
+      const contentRelease =
+        contentReleasesById.get(testRun.contentReleaseId) ??
+        (participantSession
+          ? contentReleasesById.get(participantSession.contentReleaseId)
+          : undefined);
+      const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+        bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
+      );
+      const expected =
+        booklet?.unitEntries.some(unitEntry => unitEntry.unitKey === normalizedUnitKey) ??
+        false;
+      const response = testRun.unitResponses[normalizedUnitKey] ?? null;
+      const answered = response != null;
+
+      if (!expected && !answered) {
+        return [];
+      }
+
+      return [
+        {
+          testRun,
+          participantSession,
+          expected,
+          answered,
+          response,
+          responseLength: response?.length ?? 0,
+          reviewCount: input.reviews.filter(
+            review =>
+              review.testRunId === testRun.testRunId &&
+              review.unitKey === normalizedUnitKey
+          ).length
+        }
+      ];
+    })
+    .sort(
+      (left, right) =>
+        right.testRun.updatedAt.localeCompare(left.testRun.updatedAt) ||
+        (left.participantSession?.loginKey ?? "").localeCompare(
+          right.participantSession?.loginKey ?? ""
+        )
+    );
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    unitKey: normalizedUnitKey,
+    displayLabel,
+    generatedAt: input.generatedAt,
+    expectedRunCount: testRuns.filter(item => item.expected).length,
+    responseCount: testRuns.filter(item => item.answered).length,
+    missingResponseCount: testRuns.filter(
+      item => item.expected && !item.answered
+    ).length,
+    completedRunCount: testRuns.filter(
+      item => item.testRun.status === "completed"
+    ).length,
+    reviewCount: testRuns.reduce((total, item) => total + item.reviewCount, 0),
+    testRuns
+  };
+};
+
 export const createFirstSliceServices = (
   dependencies: FirstSliceDependencies
 ): FirstSliceServices => {
@@ -3208,6 +3310,53 @@ export const createFirstSliceServices = (
             404,
             "study_monitor_group_not_found",
             `Study monitor group '${groupKey}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        return detail;
+      },
+      async getStudyMonitorUnitDetail(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const unitKey = input.unitKey.trim();
+        const [participantSessions, testRuns, contentReleases, reviews] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const detail = buildStudyMonitorUnitDetail({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          unitKey,
+          generatedAt: now(),
+          participantSessions,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+
+        if (detail.expectedRunCount === 0 && detail.responseCount === 0) {
+          throw new FirstSliceError(
+            404,
+            "study_monitor_unit_not_found",
+            `Study monitor unit '${unitKey}' was not found in workspace '${input.workspaceKey}'.`
           );
         }
 

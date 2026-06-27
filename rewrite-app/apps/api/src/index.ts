@@ -50,6 +50,7 @@ import {
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
   type GetStudyMonitorGroupResponse,
+  type GetStudyMonitorUnitResponse,
   type GetStudyMonitorSummaryResponse,
   type GetWorkspaceOverviewResponse,
   type ListAdminAuditEventsResponse,
@@ -956,6 +957,9 @@ const studyMonitorSummaryPattern = createRoutePattern(
 const studyMonitorGroupPattern = createRoutePattern(
   productionApiRoutes.workspace.getStudyMonitorGroup
 );
+const studyMonitorUnitPattern = createRoutePattern(
+  productionApiRoutes.workspace.getStudyMonitorUnit
+);
 const workspaceActivityEventListPattern = createRoutePattern(
   productionApiRoutes.workspace.listWorkspaceActivityEvents
 );
@@ -1378,6 +1382,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       studyMonitorGroupPattern,
       productionApiRoutes.workspace.getStudyMonitorGroup
+    ],
+    [
+      "GET",
+      studyMonitorUnitPattern,
+      productionApiRoutes.workspace.getStudyMonitorUnit
     ],
     [
       "GET",
@@ -2240,6 +2249,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const workspaceOverviewMatch = workspaceOverviewPattern.exec(pathname);
       const studyMonitorSummaryMatch = studyMonitorSummaryPattern.exec(pathname);
       const studyMonitorGroupMatch = studyMonitorGroupPattern.exec(pathname);
+      const studyMonitorUnitMatch = studyMonitorUnitPattern.exec(pathname);
       if (request.method === "GET" && workspaceOverviewMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -2318,6 +2328,34 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
         sendJson<GetStudyMonitorGroupResponse>(response, 200, {
           studyMonitorGroup
+        });
+        return;
+      }
+
+      if (request.method === "GET" && studyMonitorUnitMatch?.groups) {
+        const tenantKey = decodeRouteGroup(studyMonitorUnitMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          studyMonitorUnitMatch.groups.workspaceKey
+        );
+        const unitKey = decodeRouteGroup(studyMonitorUnitMatch.groups.unitKey);
+        if (!tenantKey || !workspaceKey || !unitKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and unitKey are required."
+          );
+          return;
+        }
+
+        const studyMonitorUnit =
+          await services.workspaceAdminRead.getStudyMonitorUnitDetail({
+            tenantKey,
+            workspaceKey,
+            unitKey
+          });
+        sendJson<GetStudyMonitorUnitResponse>(response, 200, {
+          studyMonitorUnit
         });
         return;
       }

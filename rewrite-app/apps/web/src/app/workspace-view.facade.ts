@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import type {
   GetStudyMonitorGroupResponse,
   GetStudyMonitorSummaryResponse,
+  GetStudyMonitorUnitResponse,
   GetWorkspaceOverviewResponse,
   ListParticipantSessionsResponse,
   ListTenantsResponse,
@@ -125,7 +126,9 @@ export class WorkspaceViewFacade {
               ? this.formatDateTime(unit.latestActivityAt)
               : "none"
           }
-        ]
+        ],
+        actionLabel: "Open Unit Detail",
+        actionPayload: { unitKey: unit.unitKey }
       }))
     ];
   }
@@ -218,7 +221,9 @@ export class WorkspaceViewFacade {
               ? this.formatDateTime(unit.latestActivityAt)
               : "none"
           }
-        ]
+        ],
+        actionLabel: "Open Unit Detail",
+        actionPayload: { unitKey: unit.unitKey }
       })),
       ...detail.testRuns.map(item => ({
         headline: item.testRun.testRunId,
@@ -241,6 +246,68 @@ export class WorkspaceViewFacade {
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
           currentUnitKey: item.testRun.currentUnitKey ?? ""
+        }
+      }))
+    ];
+  }
+
+  get studyMonitorUnitItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorUnitResponse>(
+      this.workspace.studyMonitorUnitView
+    );
+    const detail = payload?.studyMonitorUnit;
+    if (!detail) {
+      return [];
+    }
+
+    return [
+      {
+        headline: detail.displayLabel,
+        subline: detail.unitKey,
+        badges: [
+          `${detail.responseCount}/${detail.expectedRunCount} answered`,
+          `${detail.missingResponseCount} missing`,
+          `${detail.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Tenant", value: detail.tenantKey },
+          { label: "Workspace", value: detail.workspaceKey },
+          { label: "Completed Runs", value: String(detail.completedRunCount) },
+          {
+            label: "Generated",
+            value: this.formatDateTime(detail.generatedAt)
+          }
+        ]
+      },
+      ...detail.testRuns.map(item => ({
+        headline: item.participantSession?.loginKey ?? "unknown participant",
+        subline: item.testRun.testRunId,
+        badges: [
+          item.testRun.status,
+          item.answered ? "answered" : "missing",
+          `${item.reviewCount} review(s)`
+        ],
+        rows: [
+          {
+            label: "Group",
+            value: item.participantSession?.groupKey ?? "unknown group"
+          },
+          { label: "Booklet", value: item.testRun.bookletKey },
+          { label: "Expected", value: item.expected ? "yes" : "no" },
+          { label: "Response Length", value: String(item.responseLength) },
+          {
+            label: "Updated",
+            value: this.formatDateTime(item.testRun.updatedAt)
+          }
+        ],
+        actionLabel: "Open Run",
+        actionPayload: {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          currentUnitKey: detail.unitKey
         }
       }))
     ];
@@ -693,6 +760,15 @@ export class WorkspaceViewFacade {
     this.refreshWorkspaceActivity();
   }
 
+  openStudyMonitorItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.unitKey?.trim()) {
+      this.openStudyMonitorUnit(item);
+      return;
+    }
+
+    this.openStudyMonitorGroup(item);
+  }
+
   openStudyMonitorGroup(item: RecordCollectionItem): void {
     const groupKey = item.actionPayload?.groupKey?.trim();
     if (!groupKey) {
@@ -701,6 +777,17 @@ export class WorkspaceViewFacade {
 
     this.viewState.onActionAsync(() =>
       this.workspaceService.loadStudyMonitorGroup(groupKey)
+    );
+  }
+
+  openStudyMonitorUnit(item: RecordCollectionItem): void {
+    const unitKey = item.actionPayload?.unitKey?.trim();
+    if (!unitKey) {
+      return;
+    }
+
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.loadStudyMonitorUnit(unitKey)
     );
   }
 

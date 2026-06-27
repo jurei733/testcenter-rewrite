@@ -218,6 +218,9 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}`
@@ -281,6 +284,7 @@ The added read side now makes the first slice inspectable:
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
 - participant launch/resume can now carry an explicit `bookletKey` so entry links and operator flows can start a specific booklet from the active release
+- study-monitor reads now include workspace summary, group drill-down, and unit drill-down with per-run answer/missing/review status
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
@@ -416,4 +420,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, common wrapper objects, and booklet/testlet/assessment-test/unit/item-ref aliases
 - participant launch is still simplified, but now supports explicit group keys and booklet selection on participant entry links
-- monitor reads now include workspace summary, group drill-down, unit-progress coverage, and open-run blockers, but still do not cover every original Testcenter monitor view
+- monitor reads now include workspace summary, group drill-down, unit drill-down, unit-progress coverage, and open-run blockers, but still do not cover every original Testcenter monitor view
