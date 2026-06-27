@@ -989,6 +989,28 @@ try {
       payload.items.length > 0
   );
 
+  logStep("study-monitor-group-detail");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await clickAction("Refresh Study Monitor");
+  await clickCardAction("Study Monitor", "Open Group Detail", "group:student-ui");
+  await page.waitForFunction(
+    () => {
+      const detailCard = Array.from(document.querySelectorAll("article.card")).find(
+        card =>
+          card.querySelector("h3")?.textContent?.trim() ===
+          "Study Monitor Group Detail"
+      );
+      return (
+        detailCard?.textContent?.includes("group:student-ui") &&
+        detailCard.textContent.includes("student-ui") &&
+        detailCard.textContent.includes("1 run(s)")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+
   logStep("nav-content-blocked-activation");
   await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);

@@ -1,6 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  GetStudyMonitorGroupResponse,
   GetStudyMonitorSummaryResponse,
   ListTenantsResponse,
   ListWorkspacesResponse
@@ -73,6 +74,29 @@ export class RewriteAppWorkspaceService {
         `${payload.studyMonitorSummary.groups.length} group(s), ${payload.studyMonitorSummary.participantSessionCount} participant session(s).`
       );
     }
+  }
+
+  async loadStudyMonitorGroup(groupKey: string): Promise<void> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<GetStudyMonitorGroupResponse>(
+      "Study Monitor Group",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorGroup, {
+        tenantKey,
+        workspaceKey,
+        groupKey
+      })
+    );
+
+    this.workspaceState.studyMonitorGroupView = prettyPrintJson(
+      payload,
+      this.workspaceState.studyMonitorGroupView
+    );
+    this.feedback.rememberActivity(
+      "Study Monitor Group Loaded",
+      `${payload.studyMonitorGroup.groupKey}: ${payload.studyMonitorGroup.participantSessionCount} session(s), ${payload.studyMonitorGroup.testRunCount} run(s).`
+    );
   }
 
   async refreshTenantDirectory(): Promise<void> {

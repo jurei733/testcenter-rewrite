@@ -2,6 +2,7 @@ import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import type {
+  GetStudyMonitorGroupResponse,
   GetStudyMonitorSummaryResponse,
   GetWorkspaceOverviewResponse,
   ListParticipantSessionsResponse,
@@ -64,9 +65,98 @@ export class WorkspaceViewFacade {
               ? this.formatDateTime(group.latestActivityAt)
               : "none"
           }
-        ]
+        ],
+        actionLabel: "Open Group Detail",
+        actionPayload: { groupKey: group.groupKey }
       })) ?? []
     );
+  }
+
+  get studyMonitorGroupItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorGroupResponse>(
+      this.workspace.studyMonitorGroupView
+    );
+    const detail = payload?.studyMonitorGroup;
+    if (!detail) {
+      return [];
+    }
+
+    return [
+      {
+        headline: detail.groupKey,
+        subline: `${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
+        badges: [
+          `${detail.responseCount} response(s)`,
+          `${detail.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Tenant", value: detail.tenantKey },
+          { label: "Workspace", value: detail.workspaceKey },
+          {
+            label: "Generated",
+            value: this.formatDateTime(detail.generatedAt)
+          },
+          {
+            label: "Latest Session",
+            value:
+              detail.sessions[0]?.participantSession.loginKey ??
+              "no participant sessions"
+          },
+          {
+            label: "Latest Run",
+            value: detail.testRuns[0]?.testRun.status ?? "no runs"
+          }
+        ]
+      },
+      ...detail.sessions.map(session => ({
+        headline: session.participantSession.loginKey,
+        subline: session.participantSession.participantSessionId,
+        badges: [
+          session.participantSession.status,
+          session.latestTestRun?.status ?? "not started"
+        ],
+        rows: [
+          { label: "Runs", value: String(session.testRunCount) },
+          { label: "Responses", value: String(session.responseCount) },
+          { label: "Reviews", value: String(session.reviewCount) },
+          {
+            label: "Latest Activity",
+            value: session.latestActivityAt
+              ? this.formatDateTime(session.latestActivityAt)
+              : "none"
+          }
+        ],
+        actionLabel: "Open Runtime",
+        actionPayload: {
+          subjectType: "participant_session",
+          subjectId: session.participantSession.participantSessionId,
+          loginKey: session.participantSession.loginKey
+        }
+      })),
+      ...detail.testRuns.map(item => ({
+        headline: item.testRun.testRunId,
+        subline: item.participantSession?.loginKey ?? "unknown participant",
+        badges: [item.testRun.status, item.testRun.bookletKey],
+        rows: [
+          { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
+          { label: "Responses", value: String(item.responseCount) },
+          { label: "Reviews", value: String(item.reviewCount) },
+          {
+            label: "Updated",
+            value: this.formatDateTime(item.testRun.updatedAt)
+          }
+        ],
+        actionLabel: "Open Run",
+        actionPayload: {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        }
+      }))
+    ];
   }
 
   get workspaceActionItems(): RecordCollectionItem[] {
@@ -499,6 +589,17 @@ export class WorkspaceViewFacade {
 
   refreshStudyMonitor(): void {
     this.viewState.onActionAsync(() => this.workspaceService.refreshStudyMonitor());
+  }
+
+  openStudyMonitorGroup(item: RecordCollectionItem): void {
+    const groupKey = item.actionPayload?.groupKey?.trim();
+    if (!groupKey) {
+      return;
+    }
+
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.loadStudyMonitorGroup(groupKey)
+    );
   }
 
   refreshTenantDirectory(): void {

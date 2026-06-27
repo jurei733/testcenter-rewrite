@@ -212,6 +212,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `POST /api/v1/tenants/{tenantKey}/workspaces`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
@@ -253,6 +254,7 @@ The added read side now makes the first slice inspectable:
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
 - study monitor summary returns workspace-wide group progress with participant sessions, latest run states, response counts, and latest activity timestamps
+- study monitor group detail drills into one group with participant sessions, latest runs, response counts, review counts, and per-run context for operator follow-up
 - source-package listing shows uploaded packages together with their latest import attempt
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context
@@ -405,4 +407,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from either source-package metadata or a simple manifest-like source document instead of only hardcoded defaults
 - participant launch is simplified
-- monitor reads prove the shape, not full operational parity
+- monitor reads now include workspace summary, group drill-down, and open-run blockers, but still do not cover every original Testcenter monitor view

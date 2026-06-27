@@ -1349,6 +1349,61 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(reviews.body.items[0]?.participantSession?.loginKey, "student-demo");
     assert.equal(reviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
 
+    const studyMonitorGroup = await requestJsonAt<{
+      studyMonitorGroup: {
+        groupKey: string;
+        participantSessionCount: number;
+        testRunCount: number;
+        responseCount: number;
+        reviewCount: number;
+        sessions: Array<{
+          participantSession: { participantSessionId: string; loginKey: string };
+          latestTestRun: { testRunId: string; status: string } | null;
+          testRunCount: number;
+          responseCount: number;
+          reviewCount: number;
+        }>;
+        testRuns: Array<{
+          testRun: { testRunId: string; status: string };
+          responseCount: number;
+          reviewCount: number;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/groups/group%3Astudent-demo",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitorGroup.status, 200);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.groupKey, "group:student-demo");
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.participantSessionCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.testRunCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.responseCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.reviewCount, 1);
+    assert.equal(
+      studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.participantSession.loginKey,
+      "student-demo"
+    );
+    assert.equal(
+      studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.latestTestRun?.testRunId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(
+      studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.responseCount,
+      1
+    );
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.reviewCount, 1);
+    assert.equal(
+      studyMonitorGroup.body.studyMonitorGroup.testRuns[0]?.testRun.testRunId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.testRuns[0]?.reviewCount, 1);
+
     const reviewCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv",

@@ -281,6 +281,35 @@ export type WorkspaceStudyMonitorGroup = {
   latestActivityAt: string | null;
 };
 
+export type WorkspaceStudyMonitorGroupSession = {
+  participantSession: ParticipantSession;
+  latestTestRun: TestRun | null;
+  testRunCount: number;
+  responseCount: number;
+  reviewCount: number;
+  latestActivityAt: string | null;
+};
+
+export type WorkspaceStudyMonitorGroupRun = {
+  testRun: TestRun;
+  participantSession: ParticipantSession | null;
+  responseCount: number;
+  reviewCount: number;
+};
+
+export type WorkspaceStudyMonitorGroupDetail = {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKey: string;
+  generatedAt: string;
+  participantSessionCount: number;
+  testRunCount: number;
+  responseCount: number;
+  reviewCount: number;
+  sessions: WorkspaceStudyMonitorGroupSession[];
+  testRuns: WorkspaceStudyMonitorGroupRun[];
+};
+
 export type WorkspaceStudyMonitorSummary = {
   tenantKey: string;
   workspaceKey: string;

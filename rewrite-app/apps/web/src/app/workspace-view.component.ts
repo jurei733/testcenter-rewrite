@@ -128,7 +128,16 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Study Monitor"
         subtitle="Workspace-wide group progress derived from participant sessions and latest run states."
         [items]="view.studyMonitorItems"
+        (itemAction)="view.openStudyMonitorGroup($event)"
         emptyState="Refresh the study monitor to inspect group progress."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Study Monitor Group Detail"
+        subtitle="Selected group sessions, runs, responses, and review pressure."
+        [items]="view.studyMonitorGroupItems"
+        (itemAction)="view.openActivitySubject($event)"
+        emptyState="Open a group from the study monitor to inspect participant detail."
       ></app-record-collection>
 
       <app-record-collection
@@ -165,6 +174,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Group Progress"
         viewId="studyMonitorView"
         [content]="view.workspace.studyMonitorView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor Group Detail"
+        subtitle="Selected Group Read Model"
+        viewId="studyMonitorGroupView"
+        [content]="view.workspace.studyMonitorGroupView"
       ></app-json-panel>
 
       <app-json-panel

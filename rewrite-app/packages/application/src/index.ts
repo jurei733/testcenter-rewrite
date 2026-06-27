@@ -36,6 +36,7 @@ import type {
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
+  WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorSummary,
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
@@ -92,6 +93,11 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceStudyMonitorSummary>;
+  getStudyMonitorGroupDetail(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    groupKey: string;
+  }): Promise<WorkspaceStudyMonitorGroupDetail>;
   listWorkspaceActivityEvents(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1938,6 +1944,97 @@ const buildStudyMonitorSummary = (input: {
   };
 };
 
+const buildStudyMonitorGroupDetail = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorGroupDetail => {
+  const groupParticipantSessions = input.participantSessions
+    .filter(participantSession => participantSession.groupKey === input.groupKey)
+    .sort((left, right) => left.loginKey.localeCompare(right.loginKey));
+  const groupParticipantSessionIds = new Set(
+    groupParticipantSessions.map(
+      participantSession => participantSession.participantSessionId
+    )
+  );
+  const groupTestRuns = input.testRuns
+    .filter(testRun => groupParticipantSessionIds.has(testRun.participantSessionId))
+    .map(normalizeTestRun)
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.testRunId.localeCompare(left.testRunId)
+    );
+  const groupTestRunIds = new Set(groupTestRuns.map(testRun => testRun.testRunId));
+  const groupReviews = input.reviews.filter(review =>
+    groupTestRunIds.has(review.testRunId)
+  );
+  const latestRunsBySessionId =
+    getLatestTestRunByParticipantSessionId(groupTestRuns);
+  const testRunsBySessionId = new Map<string, TestRun[]>();
+  for (const testRun of groupTestRuns) {
+    const sessionRuns = testRunsBySessionId.get(testRun.participantSessionId) ?? [];
+    sessionRuns.push(testRun);
+    testRunsBySessionId.set(testRun.participantSessionId, sessionRuns);
+  }
+
+  const countResponses = (testRuns: TestRun[]): number =>
+    testRuns.reduce(
+      (total, testRun) => total + Object.keys(testRun.unitResponses).length,
+      0
+    );
+  const countReviews = (testRunIds: Set<string>): number =>
+    groupReviews.filter(review => testRunIds.has(review.testRunId)).length;
+  const sessions = groupParticipantSessions.map(participantSession => {
+    const sessionRuns =
+      testRunsBySessionId.get(participantSession.participantSessionId) ?? [];
+    const sessionTestRunIds = new Set(sessionRuns.map(testRun => testRun.testRunId));
+    const latestActivityAt =
+      sessionRuns.map(testRun => testRun.updatedAt).sort().at(-1) ??
+      participantSession.createdAt;
+
+    return {
+      participantSession,
+      latestTestRun:
+        latestRunsBySessionId.get(participantSession.participantSessionId) ??
+        null,
+      testRunCount: sessionRuns.length,
+      responseCount: countResponses(sessionRuns),
+      reviewCount: countReviews(sessionTestRunIds),
+      latestActivityAt
+    };
+  });
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    groupKey: input.groupKey,
+    generatedAt: input.generatedAt,
+    participantSessionCount: groupParticipantSessions.length,
+    testRunCount: groupTestRuns.length,
+    responseCount: countResponses(groupTestRuns),
+    reviewCount: groupReviews.length,
+    sessions,
+    testRuns: groupTestRuns.map(testRun => ({
+      testRun,
+      participantSession:
+        groupParticipantSessions.find(
+          participantSession =>
+            participantSession.participantSessionId ===
+            testRun.participantSessionId
+        ) ?? null,
+      responseCount: Object.keys(testRun.unitResponses).length,
+      reviewCount: groupReviews.filter(
+        review => review.testRunId === testRun.testRunId
+      ).length
+    }))
+  };
+};
+
 export const createFirstSliceServices = (
   dependencies: FirstSliceDependencies
 ): FirstSliceServices => {
@@ -2694,6 +2791,44 @@ export const createFirstSliceServices = (
           participantSessions,
           testRuns
         });
+      },
+      async getStudyMonitorGroupDetail(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const groupKey = normalizeGroupKey(input.groupKey);
+        const [participantSessions, testRuns, reviews] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId),
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+        const detail = buildStudyMonitorGroupDetail({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          groupKey,
+          generatedAt: now(),
+          participantSessions,
+          testRuns,
+          reviews
+        });
+
+        if (detail.participantSessionCount === 0) {
+          throw new FirstSliceError(
+            404,
+            "study_monitor_group_not_found",
+            `Study monitor group '${groupKey}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        return detail;
       },
       async listWorkspaceActivityEvents(input) {
         const workspace = await requireWorkspace(
