@@ -2286,6 +2286,10 @@ test("source document import accepts testcenter-style XML aliases", async () => 
             <tc:item code="unit-beta" label="Duplicate Beta Unit" />
             <item href="unit-gamma" />
           </tc:testlet>
+          <tc:assessmentTest tc:identifier="booklet:qti" tc:title="QTI Booklet">
+            <tc:assessmentItemRef tc:identifier="unit-reading" tc:title="Reading Unit" />
+            <item-ref identifier="unit-writing" title="Writing Unit" />
+          </tc:assessmentTest>
         </assessment>
       `
     }
@@ -2334,6 +2338,14 @@ test("source document import accepts testcenter-style XML aliases", async () => 
             { unitKey: "unit-alpha", displayLabel: "Alpha Unit" },
             { unitKey: "unit-beta", displayLabel: "Beta Unit" },
             { unitKey: "unit-gamma", displayLabel: "Unit unit gamma" }
+          ]
+        },
+        {
+          bookletKey: "booklet:qti",
+          displayLabel: "QTI Booklet",
+          unitEntries: [
+            { unitKey: "unit-reading", displayLabel: "Reading Unit" },
+            { unitKey: "unit-writing", displayLabel: "Writing Unit" }
           ]
         }
       ]

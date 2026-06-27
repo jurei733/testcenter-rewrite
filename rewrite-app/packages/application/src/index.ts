@@ -1702,13 +1702,13 @@ const normalizeParsedXmlContentStructure = (
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
   for (const bookletMatch of sourceDocument.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet))\b([^>]*)>([\s\S]*?)<\/\1>/gi
+    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet|assessmentTest|assessment-test|test))\b([^>]*)>([\s\S]*?)<\/\1>/gi
   )) {
     const bookletAttributes = parseXmlAttributes(bookletMatch[2] ?? "");
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
     for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
-      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|item))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItemRef|assessment-item-ref|itemRef|item-ref|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       unitEntries.push({
@@ -1717,6 +1717,7 @@ const normalizeParsedXmlContentStructure = (
             unitAttributes,
             "unitKey",
             "unitId",
+            "identifier",
             "key",
             "id",
             "ref",
@@ -1746,6 +1747,9 @@ const normalizeParsedXmlContentStructure = (
           "bookletId",
           "testletKey",
           "testletId",
+          "assessmentTestKey",
+          "assessmentTestId",
+          "identifier",
           "key",
           "id",
           "alias",
