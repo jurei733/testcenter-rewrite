@@ -262,12 +262,12 @@ The added read side now makes the first slice inspectable:
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
-- detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context
-- review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units
+- detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
+- review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units, with review reads filterable by login, group, session, run, unit, reviewer, category, and limit
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
-- response CSV export returns persisted unit responses with participant, run, booklet, unit, status, and timestamp context
+- response CSV export returns persisted unit responses with participant, run, booklet, unit, status, and timestamp context, using the same filters as detailed response inspection
 - workspace log CSV export returns the persisted activity timeline with event metadata and details JSON
-- review CSV export returns persisted operator comments with participant, run, booklet, unit, reviewer, category, and timestamp context
+- review CSV export returns persisted operator comments with participant, run, booklet, unit, reviewer, category, and timestamp context, using the same filters as review reads
 - content-release detail now resolves a single release together with its import/source-package lineage, attached sessions/runs, and neighboring activation history within the workspace release line
 - content-release activation readiness now previews whether a staged release can be switched in immediately or is currently blocked by open runs on the active release
 - workspace activity events now provide a persisted operator timeline for setup, import, activation, and runtime actions, filterable by event type, subject type, subject id, and limit
@@ -288,7 +288,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session reads, and filtered workspace activity reads, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, and operator timeline/session/content filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session/response/review reads, and filtered workspace activity reads, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
