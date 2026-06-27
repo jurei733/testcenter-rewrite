@@ -1024,6 +1024,7 @@ try {
   );
   await fillAndCommit("#currentUnitKey", "unit-paused");
   await expectInputValue("#currentUnitKey", "unit-paused");
+  await fillAndCommit("#runtimeUnitResponse", "Filtered response smoke");
   await clickAction("Save Paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
@@ -1053,6 +1054,58 @@ try {
   const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
   assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
   await fillAndCommit("#testRunId", pausedTestRunId);
+  logStep("filter-detailed-responses");
+  await fillAndCommit("#detailedResponseLoginFilter", participantLoginKey);
+  await fillAndCommit("#detailedResponseGroupFilter", "group:student-ui");
+  await fillAndCommit("#detailedResponseSessionFilter", participantSessionId);
+  await fillAndCommit("#detailedResponseRunFilter", pausedTestRunId);
+  await fillAndCommit("#detailedResponseUnitFilter", "unit-paused");
+  await selectAndCommit("#detailedResponseStatusFilter", "paused");
+  await fillAndCommit("#detailedResponseLimit", "1");
+  await clickAction("Apply Response Filters");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=${participantLoginKey}&groupKey=group%3Astudent-ui&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=paused&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 1 &&
+      payload.items[0]?.response === "Filtered response smoke"
+  );
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Detailed Responses" }) })
+    .filter({ hasText: "Filtered response smoke" })
+    .filter({ hasText: "unit-paused" })
+    .waitFor();
+  await fillAndCommit("#reviewComment", "Filtered review smoke");
+  logStep("create-filtered-review");
+  await clickAction("Create Review");
+  logStep("filter-reviews");
+  await fillAndCommit("#reviewLoginFilter", participantLoginKey);
+  await fillAndCommit("#reviewGroupFilter", "group:student-ui");
+  await fillAndCommit("#reviewSessionFilter", participantSessionId);
+  await fillAndCommit("#reviewRunFilter", pausedTestRunId);
+  await fillAndCommit("#reviewUnitFilter", "unit-paused");
+  await fillAndCommit("#reviewReviewerFilter", "operator-ui");
+  await fillAndCommit("#reviewCategoryFilter", "note");
+  await fillAndCommit("#reviewLimit", "1");
+  await clickAction("Apply Review Filters");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=${participantLoginKey}&groupKey=group%3Astudent-ui&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&reviewerId=operator-ui&category=note&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 1 &&
+      payload.items[0]?.review?.comment === "Filtered review smoke"
+  );
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Reviews", exact: true }) })
+    .filter({ hasText: "Filtered review smoke" })
+    .filter({ hasText: "operator-ui" })
+    .waitFor();
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(

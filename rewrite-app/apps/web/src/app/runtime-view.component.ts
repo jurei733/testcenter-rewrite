@@ -258,6 +258,49 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No unit responses saved for the selected run yet."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Detailed Response Filters</h2>
+        <p>Narrow response inspection and response CSV export by participant, run, unit, status, or limit.</p>
+        <div class="form-grid">
+          <label>
+            Login Key
+            <input id="detailedResponseLoginFilter" name="detailedResponseLoginFilter" [(ngModel)]="view.runtime.detailedResponseLoginFilter" (change)="view.persistState()" placeholder="Optional login key" />
+          </label>
+          <label>
+            Group Key
+            <input id="detailedResponseGroupFilter" name="detailedResponseGroupFilter" [(ngModel)]="view.runtime.detailedResponseGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
+          </label>
+          <label>
+            Session Id
+            <input id="detailedResponseSessionFilter" name="detailedResponseSessionFilter" [(ngModel)]="view.runtime.detailedResponseSessionFilter" (change)="view.persistState()" placeholder="Optional session id" />
+          </label>
+          <label>
+            Test Run Id
+            <input id="detailedResponseRunFilter" name="detailedResponseRunFilter" [(ngModel)]="view.runtime.detailedResponseRunFilter" (change)="view.persistState()" placeholder="Optional run id" />
+          </label>
+          <label>
+            Unit Key
+            <input id="detailedResponseUnitFilter" name="detailedResponseUnitFilter" [(ngModel)]="view.runtime.detailedResponseUnitFilter" (change)="view.persistState()" placeholder="Optional unit key" />
+          </label>
+          <label>
+            Status
+            <select id="detailedResponseStatusFilter" name="detailedResponseStatusFilter" [(ngModel)]="view.runtime.detailedResponseStatusFilter" (change)="view.persistState()">
+              <option value="">All statuses</option>
+              <option *ngFor="let status of view.testRunStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Limit
+            <input id="detailedResponseLimit" name="detailedResponseLimit" type="number" min="1" max="500" step="1" [(ngModel)]="view.runtime.detailedResponseLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyDetailedResponseFilters()">Apply Response Filters</button>
+          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsDetailedResponseFilters()">Use Selected Run</button>
+          <button class="ghost" type="button" (click)="view.clearDetailedResponseFilters()">Clear Response Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Detailed Responses"
         subtitle="Workspace-wide response inspection with participant, run, unit, and status context."
@@ -265,6 +308,50 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         (itemAction)="view.selectTestRun($event)"
         emptyState="Load detailed responses to inspect saved answers across the workspace."
       ></app-record-collection>
+
+      <article class="card">
+        <h2>Review Filters</h2>
+        <p>Narrow review reads and review CSV export by participant, run, unit, reviewer, category, or limit.</p>
+        <div class="form-grid">
+          <label>
+            Login Key
+            <input id="reviewLoginFilter" name="reviewLoginFilter" [(ngModel)]="view.runtime.reviewLoginFilter" (change)="view.persistState()" placeholder="Optional login key" />
+          </label>
+          <label>
+            Group Key
+            <input id="reviewGroupFilter" name="reviewGroupFilter" [(ngModel)]="view.runtime.reviewGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
+          </label>
+          <label>
+            Session Id
+            <input id="reviewSessionFilter" name="reviewSessionFilter" [(ngModel)]="view.runtime.reviewSessionFilter" (change)="view.persistState()" placeholder="Optional session id" />
+          </label>
+          <label>
+            Test Run Id
+            <input id="reviewRunFilter" name="reviewRunFilter" [(ngModel)]="view.runtime.reviewRunFilter" (change)="view.persistState()" placeholder="Optional run id" />
+          </label>
+          <label>
+            Unit Key
+            <input id="reviewUnitFilter" name="reviewUnitFilter" [(ngModel)]="view.runtime.reviewUnitFilter" (change)="view.persistState()" placeholder="Optional unit key" />
+          </label>
+          <label>
+            Reviewer Id
+            <input id="reviewReviewerFilter" name="reviewReviewerFilter" [(ngModel)]="view.runtime.reviewReviewerFilter" (change)="view.persistState()" placeholder="Optional reviewer id" />
+          </label>
+          <label>
+            Category
+            <input id="reviewCategoryFilter" name="reviewCategoryFilter" [(ngModel)]="view.runtime.reviewCategoryFilter" (change)="view.persistState()" placeholder="Optional category" />
+          </label>
+          <label>
+            Limit
+            <input id="reviewLimit" name="reviewLimit" type="number" min="1" max="500" step="1" [(ngModel)]="view.runtime.reviewLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyReviewFilters()">Apply Review Filters</button>
+          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsReviewFilters()">Use Selected Review Scope</button>
+          <button class="ghost" type="button" (click)="view.clearReviewFilters()">Clear Review Filters</button>
+        </div>
+      </article>
 
       <app-record-collection
         title="Reviews"

@@ -272,6 +272,96 @@ export function createShellPersistenceStateHost(args: {
     set participantSessionLimit(nextValue) {
       args.runtimeState.participantSessionLimit = nextValue;
     },
+    get detailedResponseLoginFilter() {
+      return args.runtimeState.detailedResponseLoginFilter;
+    },
+    set detailedResponseLoginFilter(nextValue) {
+      args.runtimeState.detailedResponseLoginFilter = nextValue;
+    },
+    get detailedResponseGroupFilter() {
+      return args.runtimeState.detailedResponseGroupFilter;
+    },
+    set detailedResponseGroupFilter(nextValue) {
+      args.runtimeState.detailedResponseGroupFilter = nextValue;
+    },
+    get detailedResponseSessionFilter() {
+      return args.runtimeState.detailedResponseSessionFilter;
+    },
+    set detailedResponseSessionFilter(nextValue) {
+      args.runtimeState.detailedResponseSessionFilter = nextValue;
+    },
+    get detailedResponseRunFilter() {
+      return args.runtimeState.detailedResponseRunFilter;
+    },
+    set detailedResponseRunFilter(nextValue) {
+      args.runtimeState.detailedResponseRunFilter = nextValue;
+    },
+    get detailedResponseUnitFilter() {
+      return args.runtimeState.detailedResponseUnitFilter;
+    },
+    set detailedResponseUnitFilter(nextValue) {
+      args.runtimeState.detailedResponseUnitFilter = nextValue;
+    },
+    get detailedResponseStatusFilter() {
+      return args.runtimeState.detailedResponseStatusFilter;
+    },
+    set detailedResponseStatusFilter(nextValue) {
+      args.runtimeState.detailedResponseStatusFilter = nextValue;
+    },
+    get detailedResponseLimit() {
+      return args.runtimeState.detailedResponseLimit;
+    },
+    set detailedResponseLimit(nextValue) {
+      args.runtimeState.detailedResponseLimit = nextValue;
+    },
+    get reviewLoginFilter() {
+      return args.runtimeState.reviewLoginFilter;
+    },
+    set reviewLoginFilter(nextValue) {
+      args.runtimeState.reviewLoginFilter = nextValue;
+    },
+    get reviewGroupFilter() {
+      return args.runtimeState.reviewGroupFilter;
+    },
+    set reviewGroupFilter(nextValue) {
+      args.runtimeState.reviewGroupFilter = nextValue;
+    },
+    get reviewSessionFilter() {
+      return args.runtimeState.reviewSessionFilter;
+    },
+    set reviewSessionFilter(nextValue) {
+      args.runtimeState.reviewSessionFilter = nextValue;
+    },
+    get reviewRunFilter() {
+      return args.runtimeState.reviewRunFilter;
+    },
+    set reviewRunFilter(nextValue) {
+      args.runtimeState.reviewRunFilter = nextValue;
+    },
+    get reviewUnitFilter() {
+      return args.runtimeState.reviewUnitFilter;
+    },
+    set reviewUnitFilter(nextValue) {
+      args.runtimeState.reviewUnitFilter = nextValue;
+    },
+    get reviewReviewerFilter() {
+      return args.runtimeState.reviewReviewerFilter;
+    },
+    set reviewReviewerFilter(nextValue) {
+      args.runtimeState.reviewReviewerFilter = nextValue;
+    },
+    get reviewCategoryFilter() {
+      return args.runtimeState.reviewCategoryFilter;
+    },
+    set reviewCategoryFilter(nextValue) {
+      args.runtimeState.reviewCategoryFilter = nextValue;
+    },
+    get reviewLimit() {
+      return args.runtimeState.reviewLimit;
+    },
+    set reviewLimit(nextValue) {
+      args.runtimeState.reviewLimit = nextValue;
+    },
     get autoRefreshEnabled() {
       return args.workspaceState.autoRefreshEnabled;
     },

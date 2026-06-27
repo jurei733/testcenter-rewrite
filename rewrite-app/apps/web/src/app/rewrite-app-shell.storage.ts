@@ -32,6 +32,21 @@ export type ShellPersistenceTarget = {
   participantSessionLoginFilter: string;
   participantSessionReleaseFilter: string;
   participantSessionLimit: string;
+  detailedResponseLoginFilter: string;
+  detailedResponseGroupFilter: string;
+  detailedResponseSessionFilter: string;
+  detailedResponseRunFilter: string;
+  detailedResponseUnitFilter: string;
+  detailedResponseStatusFilter: string;
+  detailedResponseLimit: string;
+  reviewLoginFilter: string;
+  reviewGroupFilter: string;
+  reviewSessionFilter: string;
+  reviewRunFilter: string;
+  reviewUnitFilter: string;
+  reviewReviewerFilter: string;
+  reviewCategoryFilter: string;
+  reviewLimit: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   workspaceActivityEventType: string;
@@ -104,6 +119,21 @@ export const createPersistedShellState = (
   participantSessionLoginFilter: target.participantSessionLoginFilter,
   participantSessionReleaseFilter: target.participantSessionReleaseFilter,
   participantSessionLimit: target.participantSessionLimit,
+  detailedResponseLoginFilter: target.detailedResponseLoginFilter,
+  detailedResponseGroupFilter: target.detailedResponseGroupFilter,
+  detailedResponseSessionFilter: target.detailedResponseSessionFilter,
+  detailedResponseRunFilter: target.detailedResponseRunFilter,
+  detailedResponseUnitFilter: target.detailedResponseUnitFilter,
+  detailedResponseStatusFilter: target.detailedResponseStatusFilter,
+  detailedResponseLimit: target.detailedResponseLimit,
+  reviewLoginFilter: target.reviewLoginFilter,
+  reviewGroupFilter: target.reviewGroupFilter,
+  reviewSessionFilter: target.reviewSessionFilter,
+  reviewRunFilter: target.reviewRunFilter,
+  reviewUnitFilter: target.reviewUnitFilter,
+  reviewReviewerFilter: target.reviewReviewerFilter,
+  reviewCategoryFilter: target.reviewCategoryFilter,
+  reviewLimit: target.reviewLimit,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
   workspaceActivityEventType: target.workspaceActivityEventType,
@@ -267,6 +297,63 @@ export const applyHydratedShellState = (
       snapshot.participantSessionLimit,
       target.participantSessionLimit
     );
+  target.detailedResponseLoginFilter = hydrateString(
+    snapshot.detailedResponseLoginFilter,
+    target.detailedResponseLoginFilter
+  );
+  target.detailedResponseGroupFilter = hydrateString(
+    snapshot.detailedResponseGroupFilter,
+    target.detailedResponseGroupFilter
+  );
+  target.detailedResponseSessionFilter = hydrateString(
+    snapshot.detailedResponseSessionFilter,
+    target.detailedResponseSessionFilter
+  );
+  target.detailedResponseRunFilter = hydrateString(
+    snapshot.detailedResponseRunFilter,
+    target.detailedResponseRunFilter
+  );
+  target.detailedResponseUnitFilter = hydrateString(
+    snapshot.detailedResponseUnitFilter,
+    target.detailedResponseUnitFilter
+  );
+  target.detailedResponseStatusFilter = hydrateString(
+    snapshot.detailedResponseStatusFilter,
+    target.detailedResponseStatusFilter
+  );
+  target.detailedResponseLimit = hydrateString(
+    snapshot.detailedResponseLimit,
+    target.detailedResponseLimit
+  );
+  target.reviewLoginFilter = hydrateString(
+    snapshot.reviewLoginFilter,
+    target.reviewLoginFilter
+  );
+  target.reviewGroupFilter = hydrateString(
+    snapshot.reviewGroupFilter,
+    target.reviewGroupFilter
+  );
+  target.reviewSessionFilter = hydrateString(
+    snapshot.reviewSessionFilter,
+    target.reviewSessionFilter
+  );
+  target.reviewRunFilter = hydrateString(
+    snapshot.reviewRunFilter,
+    target.reviewRunFilter
+  );
+  target.reviewUnitFilter = hydrateString(
+    snapshot.reviewUnitFilter,
+    target.reviewUnitFilter
+  );
+  target.reviewReviewerFilter = hydrateString(
+    snapshot.reviewReviewerFilter,
+    target.reviewReviewerFilter
+  );
+  target.reviewCategoryFilter = hydrateString(
+    snapshot.reviewCategoryFilter,
+    target.reviewCategoryFilter
+  );
+  target.reviewLimit = hydrateString(snapshot.reviewLimit, target.reviewLimit);
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;
   target.workspaceActivityEventType =

@@ -85,37 +85,82 @@ export function createRuntimeReadsStateHost(args: {
   const readQueryValue = (value: unknown): string =>
     typeof value === "string" ? value.trim() : String(value ?? "").trim();
 
+  const appendQueryValue = (
+    query: URLSearchParams,
+    key: string,
+    value: unknown
+  ): void => {
+    const queryValue = readQueryValue(value);
+    if (queryValue) {
+      query.set(key, queryValue);
+    }
+  };
+
+  const withQuery = (path: string, query: URLSearchParams): string => {
+    const queryString = query.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
+
   const buildParticipantSessionsPath = (): string => {
     const path = resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
       tenantKey: args.workspaceState.tenantKey.trim(),
       workspaceKey: args.workspaceState.workspaceKey.trim()
     });
     const query = new URLSearchParams();
-    const status = readQueryValue(args.runtimeState.participantSessionStatusFilter);
-    const groupKey = readQueryValue(args.runtimeState.participantSessionGroupFilter);
-    const loginKey = readQueryValue(args.runtimeState.participantSessionLoginFilter);
-    const contentReleaseId =
-      readQueryValue(args.runtimeState.participantSessionReleaseFilter);
-    const limit = readQueryValue(args.runtimeState.participantSessionLimit);
+    appendQueryValue(query, "status", args.runtimeState.participantSessionStatusFilter);
+    appendQueryValue(query, "groupKey", args.runtimeState.participantSessionGroupFilter);
+    appendQueryValue(query, "loginKey", args.runtimeState.participantSessionLoginFilter);
+    appendQueryValue(
+      query,
+      "contentReleaseId",
+      args.runtimeState.participantSessionReleaseFilter
+    );
+    appendQueryValue(query, "limit", args.runtimeState.participantSessionLimit);
 
-    if (status) {
-      query.set("status", status);
-    }
-    if (groupKey) {
-      query.set("groupKey", groupKey);
-    }
-    if (loginKey) {
-      query.set("loginKey", loginKey);
-    }
-    if (contentReleaseId) {
-      query.set("contentReleaseId", contentReleaseId);
-    }
-    if (limit) {
-      query.set("limit", limit);
-    }
+    return withQuery(path, query);
+  };
 
-    const queryString = query.toString();
-    return queryString ? `${path}?${queryString}` : path;
+  const buildDetailedResponsesPath = (route: string): string => {
+    const path = resolveRoutePath(route, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
+    const query = new URLSearchParams();
+    appendQueryValue(query, "loginKey", args.runtimeState.detailedResponseLoginFilter);
+    appendQueryValue(query, "groupKey", args.runtimeState.detailedResponseGroupFilter);
+    appendQueryValue(
+      query,
+      "participantSessionId",
+      args.runtimeState.detailedResponseSessionFilter
+    );
+    appendQueryValue(query, "testRunId", args.runtimeState.detailedResponseRunFilter);
+    appendQueryValue(query, "unitKey", args.runtimeState.detailedResponseUnitFilter);
+    appendQueryValue(query, "status", args.runtimeState.detailedResponseStatusFilter);
+    appendQueryValue(query, "limit", args.runtimeState.detailedResponseLimit);
+
+    return withQuery(path, query);
+  };
+
+  const buildReviewsPath = (route: string): string => {
+    const path = resolveRoutePath(route, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
+    const query = new URLSearchParams();
+    appendQueryValue(query, "loginKey", args.runtimeState.reviewLoginFilter);
+    appendQueryValue(query, "groupKey", args.runtimeState.reviewGroupFilter);
+    appendQueryValue(
+      query,
+      "participantSessionId",
+      args.runtimeState.reviewSessionFilter
+    );
+    appendQueryValue(query, "testRunId", args.runtimeState.reviewRunFilter);
+    appendQueryValue(query, "unitKey", args.runtimeState.reviewUnitFilter);
+    appendQueryValue(query, "reviewerId", args.runtimeState.reviewReviewerFilter);
+    appendQueryValue(query, "category", args.runtimeState.reviewCategoryFilter);
+    appendQueryValue(query, "limit", args.runtimeState.reviewLimit);
+
+    return withQuery(path, query);
   };
 
   return {
@@ -141,25 +186,12 @@ export function createRuntimeReadsStateHost(args: {
         participantSessionId: args.runtimeState.participantSessionId.trim()
       }),
     getResponseCsvExportPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.exportResponseCsv, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+      buildDetailedResponsesPath(productionApiRoutes.workspace.exportResponseCsv),
     getReviewCsvExportPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.exportReviewCsv, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+      buildReviewsPath(productionApiRoutes.workspace.exportReviewCsv),
     getDetailedResponsesPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listDetailedResponses, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
-    getReviewsPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.listReviews, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+      buildDetailedResponsesPath(productionApiRoutes.workspace.listDetailedResponses),
+    getReviewsPath: () => buildReviewsPath(productionApiRoutes.workspace.listReviews),
     setDetailedResponsesView: nextValue => {
       args.runtimeState.detailedResponsesView = nextValue;
     },

@@ -58,6 +58,21 @@ export interface ShellRuntimeState {
   participantSessionLoginFilter: string;
   participantSessionReleaseFilter: string;
   participantSessionLimit: string;
+  detailedResponseLoginFilter: string;
+  detailedResponseGroupFilter: string;
+  detailedResponseSessionFilter: string;
+  detailedResponseRunFilter: string;
+  detailedResponseUnitFilter: string;
+  detailedResponseStatusFilter: string;
+  detailedResponseLimit: string;
+  reviewLoginFilter: string;
+  reviewGroupFilter: string;
+  reviewSessionFilter: string;
+  reviewRunFilter: string;
+  reviewUnitFilter: string;
+  reviewReviewerFilter: string;
+  reviewCategoryFilter: string;
+  reviewLimit: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -193,6 +208,21 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionLoginFilter: "",
     participantSessionReleaseFilter: "",
     participantSessionLimit: "100",
+    detailedResponseLoginFilter: "",
+    detailedResponseGroupFilter: "",
+    detailedResponseSessionFilter: "",
+    detailedResponseRunFilter: "",
+    detailedResponseUnitFilter: "",
+    detailedResponseStatusFilter: "",
+    detailedResponseLimit: "100",
+    reviewLoginFilter: "",
+    reviewGroupFilter: "",
+    reviewSessionFilter: "",
+    reviewRunFilter: "",
+    reviewUnitFilter: "",
+    reviewReviewerFilter: "",
+    reviewCategoryFilter: "",
+    reviewLimit: "100",
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",

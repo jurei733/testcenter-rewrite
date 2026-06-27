@@ -9,7 +9,10 @@ import type {
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
-import { participantSessionStatuses } from "@testcenter-rewrite-app/domain";
+import {
+  participantSessionStatuses,
+  testRunStatuses
+} from "@testcenter-rewrite-app/domain";
 
 import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
@@ -46,6 +49,7 @@ export class RuntimeViewFacade {
 
   readonly runtime = this.uiState.runtime;
   readonly participantSessionStatusOptions = participantSessionStatuses;
+  readonly testRunStatusOptions = testRunStatuses;
 
   get participantSessionsView(): string {
     return this.uiState.runtime.participantSessionsView;
@@ -786,6 +790,60 @@ export class RuntimeViewFacade {
     this.runtime.participantSessionReleaseFilter = "";
     this.runtime.participantSessionLimit = "100";
     this.refreshParticipantSessions();
+  }
+
+  applyDetailedResponseFilters(): void {
+    this.persistState();
+    this.loadDetailedResponses();
+  }
+
+  useSelectedRuntimeAsDetailedResponseFilters(): void {
+    this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.detailedResponseSessionFilter =
+      this.runtime.participantSessionId.trim();
+    this.runtime.detailedResponseRunFilter = this.runtime.testRunId.trim();
+    this.runtime.detailedResponseUnitFilter = this.runtime.currentUnitKey.trim();
+    this.applyDetailedResponseFilters();
+  }
+
+  clearDetailedResponseFilters(): void {
+    this.runtime.detailedResponseLoginFilter = "";
+    this.runtime.detailedResponseGroupFilter = "";
+    this.runtime.detailedResponseSessionFilter = "";
+    this.runtime.detailedResponseRunFilter = "";
+    this.runtime.detailedResponseUnitFilter = "";
+    this.runtime.detailedResponseStatusFilter = "";
+    this.runtime.detailedResponseLimit = "100";
+    this.applyDetailedResponseFilters();
+  }
+
+  applyReviewFilters(): void {
+    this.persistState();
+    this.loadReviews();
+  }
+
+  useSelectedRuntimeAsReviewFilters(): void {
+    this.runtime.reviewLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.reviewGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.reviewSessionFilter = this.runtime.participantSessionId.trim();
+    this.runtime.reviewRunFilter = this.runtime.testRunId.trim();
+    this.runtime.reviewUnitFilter = this.runtime.currentUnitKey.trim();
+    this.runtime.reviewReviewerFilter = this.runtime.reviewerId.trim();
+    this.runtime.reviewCategoryFilter = this.runtime.reviewCategory.trim();
+    this.applyReviewFilters();
+  }
+
+  clearReviewFilters(): void {
+    this.runtime.reviewLoginFilter = "";
+    this.runtime.reviewGroupFilter = "";
+    this.runtime.reviewSessionFilter = "";
+    this.runtime.reviewRunFilter = "";
+    this.runtime.reviewUnitFilter = "";
+    this.runtime.reviewReviewerFilter = "";
+    this.runtime.reviewCategoryFilter = "";
+    this.runtime.reviewLimit = "100";
+    this.applyReviewFilters();
   }
 
   saveProgressPaused(): void {
