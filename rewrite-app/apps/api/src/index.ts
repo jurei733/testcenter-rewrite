@@ -92,11 +92,17 @@ import {
   type AdminSession,
   type AdminUser,
   type AdminAuditEventType,
+  type ContentReleaseStatus,
+  type ImportJobStatus,
   type ParticipantSessionStatus,
+  type SourcePackageStatus,
   type WorkspaceActivityEventType,
   type WorkspaceActivitySubjectType,
   adminAuditEventTypes,
+  contentReleaseStatuses,
+  importJobStatuses,
   participantSessionStatuses,
+  sourcePackageStatuses,
   workspaceActivityEventTypes,
   workspaceActivitySubjectTypes,
   firstProductionSliceCapabilities
@@ -2139,9 +2145,59 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (status && !sourcePackageStatuses.includes(status as SourcePackageStatus)) {
+          sendError(
+            response,
+            400,
+            "source_package_status_invalid",
+            `Source package status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const latestImportStatus =
+          url.searchParams.get("latestImportStatus")?.trim() || undefined;
+        if (
+          latestImportStatus &&
+          !importJobStatuses.includes(latestImportStatus as ImportJobStatus)
+        ) {
+          sendError(
+            response,
+            400,
+            "source_package_latest_import_status_invalid",
+            `Latest import status '${latestImportStatus}' is not supported.`
+          );
+          return;
+        }
+
+        const mediaType = url.searchParams.get("mediaType")?.trim() || undefined;
+        const fileName = url.searchParams.get("fileName")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "source_package_limit_invalid",
+            "Source package limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listSourcePackages({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          status: status as SourcePackageStatus | undefined,
+          mediaType,
+          fileName,
+          latestImportStatus: latestImportStatus as ImportJobStatus | undefined,
+          limit
         });
         sendJson<ListSourcePackagesResponse>(response, 200, { items });
         return;
@@ -2261,9 +2317,42 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (status && !importJobStatuses.includes(status as ImportJobStatus)) {
+          sendError(
+            response,
+            400,
+            "import_job_status_invalid",
+            `Import job status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const sourcePackageId =
+          url.searchParams.get("sourcePackageId")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "import_job_limit_invalid",
+            "Import job limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listImportJobs({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          status: status as ImportJobStatus | undefined,
+          sourcePackageId,
+          limit
         });
         sendJson<ListImportJobsResponse>(response, 200, { items });
         return;
@@ -2641,9 +2730,47 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (
+          status &&
+          !contentReleaseStatuses.includes(status as ContentReleaseStatus)
+        ) {
+          sendError(
+            response,
+            400,
+            "content_release_status_invalid",
+            `Content release status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const importJobId = url.searchParams.get("importJobId")?.trim() || undefined;
+        const sourcePackageId =
+          url.searchParams.get("sourcePackageId")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "content_release_limit_invalid",
+            "Content release limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listContentReleases({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          status: status as ContentReleaseStatus | undefined,
+          importJobId,
+          sourcePackageId,
+          limit
         });
         sendJson<ListContentReleasesResponse>(response, 200, { items });
         return;

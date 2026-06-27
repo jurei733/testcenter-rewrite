@@ -1643,7 +1643,12 @@ test("failed import can be retried on the same source package", async () => {
   });
 
   const failedImport = await requestJson<{
-    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    importJob: {
+      importJobId: string;
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
     stagedContentRelease: null;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
     method: "POST",
@@ -1661,8 +1666,13 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(failedImport.body.stagedContentRelease, null);
 
   const retriedImport = await requestJson<{
-    sourcePackage: { sourcePackageId: string; status: string };
-    importJob: { status: string };
+    sourcePackage: {
+      sourcePackageId: string;
+      fileName: string;
+      mediaType: string;
+      status: string;
+    };
+    importJob: { importJobId: string; sourcePackageId: string; status: string };
     stagedContentRelease: { contentReleaseId: string } | null;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${sourcePackage.body.sourcePackage.sourcePackageId}/retry-import`,
@@ -1681,6 +1691,126 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(retriedImport.body.sourcePackage.status, "accepted");
   assert.equal(retriedImport.body.importJob.status, "completed");
   assert.ok(retriedImport.body.stagedContentRelease?.contentReleaseId);
+
+  const acceptedSourcePackages = await requestJson<{
+    items: Array<{
+      sourcePackage: {
+        sourcePackageId: string;
+        fileName: string;
+        mediaType: string;
+        status: string;
+      };
+      latestImportJob: { status: string } | null;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fxml&fileName=fixed.xml&latestImportStatus=completed&limit=1`
+  );
+
+  assert.equal(acceptedSourcePackages.status, 200);
+  assert.equal(acceptedSourcePackages.body.items.length, 1);
+  assert.equal(
+    acceptedSourcePackages.body.items[0]?.sourcePackage.sourcePackageId,
+    sourcePackage.body.sourcePackage.sourcePackageId
+  );
+  assert.equal(
+    acceptedSourcePackages.body.items[0]?.latestImportJob?.status,
+    "completed"
+  );
+
+  const failedImportJobs = await requestJson<{
+    items: Array<{ importJob: { importJobId: string; status: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs?status=failed&sourcePackageId=${sourcePackage.body.sourcePackage.sourcePackageId}`
+  );
+
+  assert.equal(failedImportJobs.status, 200);
+  assert.equal(failedImportJobs.body.items.length, 1);
+  assert.equal(
+    failedImportJobs.body.items[0]?.importJob.importJobId,
+    failedImport.body.importJob.importJobId
+  );
+
+  const limitedImportJobs = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs?sourcePackageId=${sourcePackage.body.sourcePackage.sourcePackageId}&limit=1`
+  );
+
+  assert.equal(limitedImportJobs.status, 200);
+  assert.equal(limitedImportJobs.body.items.length, 1);
+
+  const stagedContentReleases = await requestJson<{
+    items: Array<{
+      contentRelease: { contentReleaseId: string; status: string };
+      importJob: { importJobId: string } | null;
+      sourcePackage: { sourcePackageId: string } | null;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases?status=staged&sourcePackageId=${sourcePackage.body.sourcePackage.sourcePackageId}&importJobId=${retriedImport.body.importJob.importJobId}&limit=1`
+  );
+
+  assert.equal(stagedContentReleases.status, 200);
+  assert.equal(stagedContentReleases.body.items.length, 1);
+  assert.equal(
+    stagedContentReleases.body.items[0]?.contentRelease.contentReleaseId,
+    retriedImport.body.stagedContentRelease.contentReleaseId
+  );
+  assert.equal(
+    stagedContentReleases.body.items[0]?.sourcePackage?.sourcePackageId,
+    sourcePackage.body.sourcePackage.sourcePackageId
+  );
+
+  const invalidSourcePackageStatus = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=unsupported`
+  );
+  assert.equal(invalidSourcePackageStatus.status, 400);
+  assert.equal(
+    invalidSourcePackageStatus.body.error,
+    "source_package_status_invalid"
+  );
+
+  const invalidSourcePackageLatestImportStatus = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?latestImportStatus=unsupported`
+  );
+  assert.equal(invalidSourcePackageLatestImportStatus.status, 400);
+  assert.equal(
+    invalidSourcePackageLatestImportStatus.body.error,
+    "source_package_latest_import_status_invalid"
+  );
+
+  const invalidSourcePackageLimit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?limit=0`
+  );
+  assert.equal(invalidSourcePackageLimit.status, 400);
+  assert.equal(invalidSourcePackageLimit.body.error, "source_package_limit_invalid");
+
+  const invalidImportJobStatus = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs?status=unsupported`
+  );
+  assert.equal(invalidImportJobStatus.status, 400);
+  assert.equal(invalidImportJobStatus.body.error, "import_job_status_invalid");
+
+  const invalidImportJobLimit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs?limit=0`
+  );
+  assert.equal(invalidImportJobLimit.status, 400);
+  assert.equal(invalidImportJobLimit.body.error, "import_job_limit_invalid");
+
+  const invalidContentReleaseStatus = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases?status=unsupported`
+  );
+  assert.equal(invalidContentReleaseStatus.status, 400);
+  assert.equal(
+    invalidContentReleaseStatus.body.error,
+    "content_release_status_invalid"
+  );
+
+  const invalidContentReleaseLimit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases?limit=0`
+  );
+  assert.equal(invalidContentReleaseLimit.status, 400);
+  assert.equal(
+    invalidContentReleaseLimit.body.error,
+    "content_release_limit_invalid"
+  );
 });
 
 test("source document import normalizes fallback labels and duplicate entries", async () => {

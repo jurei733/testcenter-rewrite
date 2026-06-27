@@ -10,8 +10,10 @@ import type {
   AdminUserStatus,
   ContentReleaseActivationReadiness,
   ContentRelease,
+  ContentReleaseStatus,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
+  ImportJobStatus,
   ImportJobDiagnostic,
   OpenMonitorRun,
   ParticipantCurrentRunState,
@@ -19,6 +21,7 @@ import type {
   ParticipantSessionStatus,
   ParticipantRuntimeState,
   SourcePackage,
+  SourcePackageStatus,
   SourcePackageContentStructure,
   Tenant,
   TestRun,
@@ -120,6 +123,11 @@ export type WorkspaceAdminReadPort = {
   listSourcePackages(input: {
     tenantKey: string;
     workspaceKey: string;
+    status?: SourcePackageStatus;
+    mediaType?: string;
+    fileName?: string;
+    latestImportStatus?: ImportJobStatus;
+    limit?: number;
   }): Promise<WorkspaceSourcePackageListItem[]>;
   getImportJobDetail(input: {
     tenantKey: string;
@@ -161,10 +169,17 @@ export type WorkspaceAdminReadPort = {
   listImportJobs(input: {
     tenantKey: string;
     workspaceKey: string;
+    status?: ImportJobStatus;
+    sourcePackageId?: string;
+    limit?: number;
   }): Promise<WorkspaceImportJobListItem[]>;
   listContentReleases(input: {
     tenantKey: string;
     workspaceKey: string;
+    status?: ContentReleaseStatus;
+    importJobId?: string;
+    sourcePackageId?: string;
+    limit?: number;
   }): Promise<WorkspaceContentReleaseListItem[]>;
 };
 
@@ -3029,8 +3044,9 @@ export const createFirstSliceServices = (
           workspace.workspaceId
         );
 
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+
         return sourcePackages
-          .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt))
           .map<WorkspaceSourcePackageListItem>(sourcePackage => {
             const latestImportJob =
               importJobs
@@ -3044,7 +3060,21 @@ export const createFirstSliceServices = (
               sourcePackage,
               latestImportJob
             };
-          });
+          })
+          .filter(
+            item =>
+              (!input.status || item.sourcePackage.status === input.status) &&
+              (!input.mediaType || item.sourcePackage.mediaType === input.mediaType) &&
+              (!input.fileName || item.sourcePackage.fileName === input.fileName) &&
+              (!input.latestImportStatus ||
+                item.latestImportJob?.status === input.latestImportStatus)
+          )
+          .sort((left, right) =>
+            right.sourcePackage.uploadedAt.localeCompare(
+              left.sourcePackage.uploadedAt
+            )
+          )
+          .slice(0, limit);
       },
       async getImportJobDetail(input) {
         const workspace = await requireWorkspace(
@@ -3098,8 +3128,17 @@ export const createFirstSliceServices = (
           workspace.workspaceId
         );
 
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+
         return importJobs
+          .filter(
+            importJob =>
+              (!input.status || importJob.status === input.status) &&
+              (!input.sourcePackageId ||
+                importJob.sourcePackageId === input.sourcePackageId)
+          )
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+          .slice(0, limit)
           .map<WorkspaceImportJobListItem>(importJob => ({
             importJob,
             sourcePackage:
@@ -3447,14 +3486,31 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
+        const matchingImportJobIds = input.sourcePackageId
+          ? new Set(
+              importJobs
+                .filter(
+                  importJob => importJob.sourcePackageId === input.sourcePackageId
+                )
+                .map(importJob => importJob.importJobId)
+            )
+          : null;
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
         return buildWorkspaceContentReleaseListItems({
-          contentReleases,
+          contentReleases: contentReleases.filter(
+            contentRelease =>
+              (!input.status || contentRelease.status === input.status) &&
+              (!input.importJobId ||
+                contentRelease.importJobId === input.importJobId) &&
+              (!matchingImportJobIds ||
+                matchingImportJobIds.has(contentRelease.importJobId))
+          ),
           importJobs,
           sourcePackages,
           participantSessions,
           testRuns
-        });
+        }).slice(0, limit);
       }
     },
     workspaceResults: {

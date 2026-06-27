@@ -8,13 +8,16 @@ import type {
   AdminUserStatus,
   ContentReleaseActivationReadiness,
   ContentRelease,
+  ContentReleaseStatus,
   ImportJob,
+  ImportJobStatus,
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantSession,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
   SourcePackage,
+  SourcePackageStatus,
   SourcePackageContentStructure,
   Tenant,
   TestRun,
@@ -184,6 +187,27 @@ export type ParticipantSessionListQuery = {
   groupKey?: string;
   loginKey?: string;
   contentReleaseId?: string;
+  limit?: number;
+};
+
+export type SourcePackageListQuery = {
+  status?: SourcePackageStatus;
+  mediaType?: string;
+  fileName?: string;
+  latestImportStatus?: ImportJobStatus;
+  limit?: number;
+};
+
+export type ImportJobListQuery = {
+  status?: ImportJobStatus;
+  sourcePackageId?: string;
+  limit?: number;
+};
+
+export type ContentReleaseListQuery = {
+  status?: ContentReleaseStatus;
+  importJobId?: string;
+  sourcePackageId?: string;
   limit?: number;
 };
 

@@ -13,8 +13,24 @@ export type AdminAuditEventType =
   | "admin_role_assigned"
   | "admin_role_revoked";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
+export const sourcePackageStatuses = [
+  "uploaded",
+  "accepted",
+  "rejected"
+] as const satisfies readonly SourcePackageStatus[];
 export type ImportJobStatus = "queued" | "running" | "failed" | "completed";
+export const importJobStatuses = [
+  "queued",
+  "running",
+  "failed",
+  "completed"
+] as const satisfies readonly ImportJobStatus[];
 export type ContentReleaseStatus = "staged" | "active" | "superseded";
+export const contentReleaseStatuses = [
+  "staged",
+  "active",
+  "superseded"
+] as const satisfies readonly ContentReleaseStatus[];
 export type ParticipantSessionStatus = "signed_in" | "launched" | "closed";
 export const participantSessionStatuses = [
   "signed_in",
