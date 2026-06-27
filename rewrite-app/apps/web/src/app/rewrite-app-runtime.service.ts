@@ -15,7 +15,10 @@ import {
   resumeRunAction,
   saveProgressAction
 } from "./rewrite-app-shell.runtime-actions";
-import { refreshRuntimeReadsAction } from "./rewrite-app-shell.runtime-reads";
+import {
+  exportResponsesCsvAction,
+  refreshRuntimeReadsAction
+} from "./rewrite-app-shell.runtime-reads";
 import { runParticipantHappyPathFlow } from "./rewrite-app-shell.workflows";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -85,6 +88,10 @@ export class RewriteAppRuntimeService {
     return loadParticipantSessionDetailAction(
       this.presentationHosts.createRuntimePresentationHost()
     );
+  }
+
+  async exportResponsesCsv(): Promise<string> {
+    return exportResponsesCsvAction(this.hosts.createRuntimeReadsHost());
   }
 
   async participantHappyPathFlow(): Promise<void> {

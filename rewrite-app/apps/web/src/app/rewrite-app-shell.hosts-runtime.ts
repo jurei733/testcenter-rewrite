@@ -71,6 +71,14 @@ export function createRuntimeReadsStateHost(args: {
         workspaceKey: args.workspaceState.workspaceKey.trim(),
         participantSessionId: args.runtimeState.participantSessionId.trim()
       }),
+    getResponseCsvExportPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.exportResponseCsv, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+    setResponseExportView: nextValue => {
+      args.runtimeState.responseExportView = nextValue;
+    },
     getCurrentRunStatePath: () =>
       resolveRoutePath(productionApiRoutes.participant.getCurrentRunState, {
         participantSessionId: args.runtimeState.participantSessionId.trim()

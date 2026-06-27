@@ -653,6 +653,20 @@ const sendText = (
   response.end(text);
 };
 
+const sendCsv = (
+  response: ServerResponse,
+  statusCode: number,
+  filename: string,
+  text: string
+): void => {
+  response.writeHead(statusCode, {
+    "content-type": "text/csv; charset=utf-8",
+    "content-disposition": `attachment; filename="${filename}"`,
+    "cache-control": "no-cache"
+  });
+  response.end(text);
+};
+
 const sendAsset = (
   response: ServerResponse,
   statusCode: number,
@@ -818,6 +832,9 @@ const participantSessionListPattern = createRoutePattern(
 const participantSessionDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getParticipantSession
 );
+const responseCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportResponseCsv
+);
 const importJobDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getImportJob
 );
@@ -872,6 +889,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", importJobDetailPattern],
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
+  ["GET", responseCsvExportPattern],
   ["GET", contentReleaseListPattern],
   ["GET", contentReleaseDetailPattern],
   ["GET", contentReleaseActivationReadinessPattern],
@@ -1197,6 +1215,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       participantSessionDetailPattern,
       productionApiRoutes.workspace.getParticipantSession
+    ],
+    [
+      "GET",
+      responseCsvExportPattern,
+      productionApiRoutes.workspace.exportResponseCsv
     ],
     [
       "GET",
@@ -2010,6 +2033,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionListMatch = participantSessionListPattern.exec(pathname);
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
+      const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
         const tenantKey = decodeRouteGroup(importJobListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(importJobListMatch.groups.workspaceKey);
@@ -2106,6 +2130,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<GetParticipantSessionResponse>(response, 200, {
           participantSessionDetail
         });
+        return;
+      }
+
+      if (request.method === "GET" && responseCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(responseCsvExportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          responseCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportResponseCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-responses.csv`, csv);
         return;
       }
 

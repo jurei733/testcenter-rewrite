@@ -24,6 +24,8 @@ export interface ShellRuntimeReadsHost {
   getOpenRunsPath(): string;
   getRuntimeStatePath(): string;
   getParticipantSessionDetailPath(): string;
+  getResponseCsvExportPath(): string;
+  setResponseExportView(nextValue: string): void;
   getCurrentRunStatePath(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
 }
@@ -95,4 +97,16 @@ export async function refreshRuntimeReadsAction(
     currentRunStatePayload,
     quiet
   );
+}
+
+export async function exportResponsesCsvAction(
+  host: ShellRuntimeReadsHost
+): Promise<string> {
+  const csv = await host.request<string>(
+    "Response CSV Export",
+    "GET",
+    host.getResponseCsvExportPath()
+  );
+  host.setResponseExportView(csv);
+  return csv;
 }

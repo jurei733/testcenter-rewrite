@@ -684,6 +684,10 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantSessionDetail());
   }
 
+  exportResponsesCsv(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.exportResponsesCsv());
+  }
+
   selectParticipantSession(item: RecordCollectionItem): void {
     const participantSessionId = item.actionPayload?.participantSessionId?.trim();
     if (!participantSessionId) {

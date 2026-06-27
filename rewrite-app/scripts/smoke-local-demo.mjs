@@ -201,8 +201,11 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await page.locator(".status-banner").waitFor({ state: "hidden", timeout: 15_000 });
 
   await page.locator("#runtimeUnitResponse").fill("Operator adjusted smoke response");
+  await page.locator("#runtimeUnitResponse").dispatchEvent("input");
+  await page.locator("#runtimeUnitResponse").dispatchEvent("change");
   await page.getByRole("button", { name: /^Preview Save/ }).click();
   await page.waitForFunction(
     () =>
@@ -211,6 +214,16 @@ try {
         ?.textContent?.includes("Operator adjusted smoke response") &&
       document.querySelector("#runtimeUnitResponse")?.value ===
         "Operator adjusted smoke response",
+    undefined,
+    { timeout: 15_000 }
+  );
+
+  await page.getByRole("button", { name: "Export Responses CSV" }).click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#responseExportPreview")
+        ?.textContent?.includes("Operator adjusted smoke response"),
     undefined,
     { timeout: 15_000 }
   );

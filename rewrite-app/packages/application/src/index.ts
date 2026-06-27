@@ -111,6 +111,10 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     participantSessionId: string;
   }): Promise<WorkspaceParticipantSessionDetail>;
+  exportResponseCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -291,6 +295,7 @@ export const firstSliceUseCases = {
   getImportJobDetail: "GetImportJobDetail",
   listParticipantSessions: "ListParticipantSessions",
   getParticipantSessionDetail: "GetParticipantSessionDetail",
+  exportResponseCsv: "ExportResponseCsv",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
   listImportJobs: "ListImportJobs",
   listContentReleases: "ListContentReleases",
@@ -901,6 +906,92 @@ const normalizeTestRun = (testRun: TestRun): TestRun => ({
   ...testRun,
   unitResponses: testRun.unitResponses ?? {}
 });
+
+const escapeCsvCell = (value: string | null | undefined): string => {
+  const normalizedValue = value ?? "";
+  return `"${normalizedValue.replace(/"/g, "\"\"")}"`;
+};
+
+const formatResponseCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): string => {
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const rows = input.testRuns.flatMap(testRun => {
+    const normalizedTestRun = normalizeTestRun(testRun);
+    const participantSession =
+      participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
+
+    return Object.entries(normalizedTestRun.unitResponses).map(
+      ([unitKey, response]) => ({
+        tenantKey: input.tenantKey,
+        workspaceKey: input.workspaceKey,
+        loginKey: participantSession?.loginKey ?? "",
+        groupKey: participantSession?.groupKey ?? "",
+        participantSessionId: normalizedTestRun.participantSessionId,
+        testRunId: normalizedTestRun.testRunId,
+        bookletKey: normalizedTestRun.bookletKey,
+        unitKey,
+        response,
+        status: normalizedTestRun.status,
+        updatedAt: normalizedTestRun.updatedAt,
+        completedAt: normalizedTestRun.completedAt ?? ""
+      })
+    );
+  });
+
+  rows.sort(
+    (left, right) =>
+      left.loginKey.localeCompare(right.loginKey) ||
+      left.participantSessionId.localeCompare(right.participantSessionId) ||
+      left.testRunId.localeCompare(right.testRunId) ||
+      left.unitKey.localeCompare(right.unitKey)
+  );
+
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "loginKey",
+    "groupKey",
+    "participantSessionId",
+    "testRunId",
+    "bookletKey",
+    "unitKey",
+    "response",
+    "status",
+    "updatedAt",
+    "completedAt"
+  ];
+
+  return [
+    header.join(","),
+    ...rows.map(row =>
+      [
+        row.tenantKey,
+        row.workspaceKey,
+        row.loginKey,
+        row.groupKey,
+        row.participantSessionId,
+        row.testRunId,
+        row.bookletKey,
+        row.unitKey,
+        row.response,
+        row.status,
+        row.updatedAt,
+        row.completedAt
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
 
 const toDisplayLabel = (prefix: string, key: string | null): string | null => {
   if (!key) {
@@ -2434,6 +2525,27 @@ export const createFirstSliceServices = (
           contentRelease,
           testRuns
         };
+      },
+      async exportResponseCsv(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [participantSessions, testRuns] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+
+        return formatResponseCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          participantSessions,
+          testRuns
+        });
       },
       async getContentReleaseActivationReadiness(input) {
         const workspace = await requireWorkspace(

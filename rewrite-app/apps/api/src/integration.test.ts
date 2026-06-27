@@ -50,10 +50,31 @@ const requestText = async (
   path: string,
   init?: {
     method?: string;
+    headers?: Record<string, string>;
   }
 ): Promise<{ status: number; body: string; contentType: string | null }> => {
   const response = await fetch(baseUrl + path, {
-    method: init?.method ?? "GET"
+    method: init?.method ?? "GET",
+    headers: init?.headers
+  });
+  return {
+    status: response.status,
+    body: await response.text(),
+    contentType: response.headers.get("content-type")
+  };
+};
+
+const requestTextAt = async (
+  rootUrl: string,
+  path: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+  }
+): Promise<{ status: number; body: string; contentType: string | null }> => {
+  const response = await fetch(rootUrl + path, {
+    method: init?.method ?? "GET",
+    headers: init?.headers
   });
   return {
     status: response.status,
@@ -1154,6 +1175,24 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(
       stateAfterResponse.body.currentRunState.testRun.unitResponses["unit-intro"],
       "My first demo response"
+    );
+
+    const responseCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(responseCsv.status, 200);
+    assert.equal(responseCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(responseCsv.body, /^tenantKey,workspaceKey,loginKey,groupKey,/);
+    assert.match(
+      responseCsv.body,
+      /"demo-tenant","demo-workspace","student-demo","group:student-demo".*"unit-intro","My first demo response"/
     );
   } finally {
     await closeServer(isolated.server);

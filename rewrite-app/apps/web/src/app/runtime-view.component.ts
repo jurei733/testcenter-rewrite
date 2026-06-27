@@ -49,6 +49,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.resumeRun()">Resume Run</button>
           <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
+          <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
         </div>
       </article>
 
@@ -156,6 +157,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No unit responses saved for the selected run yet."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Response CSV Export</h2>
+        <p>Workspace-wide participant responses in CSV format, ready for operator download or inspection.</p>
+        <pre id="responseExportPreview">{{ view.runtime.responseExportView }}</pre>
+      </article>
+
       <app-record-collection
         title="Runtime State Detail"
         subtitle="The current session-level runtime status and next action."
@@ -185,6 +192,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Runtime State" subtitle="Session Status" viewId="runtimeStateView" [content]="view.runtime.runtimeStateView"></app-json-panel>
       <app-json-panel title="Current Run State" subtitle="Booklet Context" viewId="currentRunStateView" [content]="view.runtime.currentRunStateView"></app-json-panel>
       <app-json-panel title="Monitor Open Runs" subtitle="Activation Guard Signal" viewId="openRunsView" [content]="view.runtime.openRunsView"></app-json-panel>
+      <app-json-panel title="Response CSV Export" subtitle="Workspace Responses" viewId="responseExportView" [content]="view.runtime.responseExportView"></app-json-panel>
       <app-json-panel title="Runtime And Monitor" subtitle="Live Session State" viewId="runtimeMonitorView" [content]="view.runtime.runtimeMonitorView"></app-json-panel>
     </div>
   `
