@@ -46,6 +46,8 @@ rewrite-app/
 
 ## Verification
 
+Use Node.js 22 LTS. The checked-in Dockerfile, GitHub Actions workflow, `.node-version`, and `.nvmrc` all target Node 22 so local runs match CI and the production container baseline.
+
 Run inside `rewrite-app/`:
 
 ```bash
