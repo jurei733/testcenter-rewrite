@@ -892,6 +892,10 @@ try {
       "currentUnit" in payload.currentRunState &&
       payload.currentRunState.currentUnit?.unitKey != null
   );
+  await expectInputValue(
+    "#currentUnitKey",
+    pausedCurrentState.currentRunState.currentUnit.unitKey
+  );
   await fillAndCommit("#currentUnitKey", "unit-paused");
   await expectInputValue("#currentUnitKey", "unit-paused");
   await clickAction("Save Paused");
