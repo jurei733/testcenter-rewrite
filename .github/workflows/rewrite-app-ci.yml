@@ -25,7 +25,8 @@ jobs:
           cache-dependency-path: rewrite-app/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run ci
+      - name: Run full SQLite and browser verification
+        run: npm run ci
 
   verify-postgres:
     runs-on: ubuntu-latest
