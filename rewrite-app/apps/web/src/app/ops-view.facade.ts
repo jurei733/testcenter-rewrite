@@ -158,6 +158,31 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
   }
 
+  applyAdminUserFilters(): void {
+    this.persistState();
+    this.refreshAdminUsers();
+  }
+
+  clearAdminUserFilters(): void {
+    this.ops.adminUserUsernameFilter = "";
+    this.ops.adminUserStatusFilter = "";
+    this.ops.adminUserRoleFilter = "";
+    this.ops.adminUserTenantFilter = "";
+    this.ops.adminUserWorkspaceFilter = "";
+    this.ops.adminUserLimit = "100";
+    this.persistState();
+  }
+
+  useAdminManagementScopeAsUserFilters(): void {
+    this.ops.adminUserRoleFilter = this.ops.adminRoleRole;
+    this.ops.adminUserTenantFilter = this.ops.adminRoleTenantKey;
+    this.ops.adminUserWorkspaceFilter =
+      this.ops.adminRoleRole === "workspace_admin"
+        ? this.ops.adminRoleWorkspaceKey
+        : "";
+    this.persistState();
+  }
+
   applyAdminAuditFilters(): void {
     this.persistState();
     this.refreshAdminAuditEvents();

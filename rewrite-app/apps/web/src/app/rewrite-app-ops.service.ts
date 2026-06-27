@@ -141,7 +141,7 @@ export class RewriteAppOpsService {
     const payload = await this.requestState.request<ListAdminUsersResponse>(
       "Admin Users",
       "GET",
-      productionApiRoutes.admin.listUsers,
+      this.buildAdminUsersPath(),
       undefined,
       { headers: this.createAdminHeaders() }
     );
@@ -309,14 +309,28 @@ export class RewriteAppOpsService {
     await this.refreshAdminUsers();
   }
 
+  private buildAdminUsersPath(): string {
+    return this.appendQuery(productionApiRoutes.admin.listUsers, [
+      ["username", this.opsState.adminUserUsernameFilter],
+      ["status", this.opsState.adminUserStatusFilter],
+      ["role", this.opsState.adminUserRoleFilter],
+      ["tenantKey", this.opsState.adminUserTenantFilter],
+      ["workspaceKey", this.opsState.adminUserWorkspaceFilter],
+      ["limit", this.opsState.adminUserLimit]
+    ]);
+  }
+
   private buildAdminAuditEventsPath(): string {
-    const query = new URLSearchParams();
-    const entries: Array<[string, string]> = [
+    return this.appendQuery(productionApiRoutes.admin.listAuditEvents, [
       ["eventType", this.opsState.adminAuditEventTypeFilter],
       ["actorAdminUserId", this.opsState.adminAuditActorFilter],
       ["subjectAdminUserId", this.opsState.adminAuditSubjectFilter],
       ["limit", this.opsState.adminAuditLimit]
-    ];
+    ]);
+  }
+
+  private appendQuery(path: string, entries: Array<[string, string]>): string {
+    const query = new URLSearchParams();
 
     for (const [key, value] of entries) {
       const trimmedValue = value.trim();
@@ -326,9 +340,7 @@ export class RewriteAppOpsService {
     }
 
     const queryString = query.toString();
-    return queryString
-      ? `${productionApiRoutes.admin.listAuditEvents}?${queryString}`
-      : productionApiRoutes.admin.listAuditEvents;
+    return queryString ? `${path}?${queryString}` : path;
   }
 
   private async bootstrapAdminUser(): Promise<BootstrapAdminUserResponse> {

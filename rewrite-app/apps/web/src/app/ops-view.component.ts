@@ -180,6 +180,48 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article class="card">
+        <h2>Admin User Filters</h2>
+        <p>Narrow the protected admin directory by username, status, role, scope, or a bounded result limit.</p>
+        <div class="form-grid">
+          <label>
+            Username Contains
+            <input id="adminUserUsernameFilter" name="adminUserUsernameFilter" placeholder="workspace" [(ngModel)]="view.ops.adminUserUsernameFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Status
+            <select id="adminUserStatusFilter" name="adminUserStatusFilter" [(ngModel)]="view.ops.adminUserStatusFilter" (change)="view.persistState()">
+              <option value="">All statuses</option>
+              <option *ngFor="let status of view.adminStatusOptions" [ngValue]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Role
+            <select id="adminUserRoleFilter" name="adminUserRoleFilter" [(ngModel)]="view.ops.adminUserRoleFilter" (change)="view.persistState()">
+              <option value="">All roles</option>
+              <option *ngFor="let role of view.adminRoleOptions" [ngValue]="role">{{ role }}</option>
+            </select>
+          </label>
+          <label>
+            Tenant Key
+            <input id="adminUserTenantFilter" name="adminUserTenantFilter" placeholder="tenant key" [(ngModel)]="view.ops.adminUserTenantFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Workspace Key
+            <input id="adminUserWorkspaceFilter" name="adminUserWorkspaceFilter" placeholder="workspace key" [(ngModel)]="view.ops.adminUserWorkspaceFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            User Limit
+            <input id="adminUserLimit" name="adminUserLimit" inputmode="numeric" [(ngModel)]="view.ops.adminUserLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyAdminUserFilters()">Apply User Filters</button>
+          <button class="secondary" type="button" (click)="view.useAdminManagementScopeAsUserFilters()">Use Role Scope</button>
+          <button class="ghost" type="button" (click)="view.clearAdminUserFilters()">Clear User Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Admin Users"
         subtitle="Protected platform-admin directory with public user fields and role scopes."

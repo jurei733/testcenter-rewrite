@@ -677,6 +677,36 @@ try {
   );
   assert.equal(disabledWorkspaceAdminSignIn.status, 401);
 
+  logStep("admin-user-filters");
+  await fillAndCommit("#adminUserUsernameFilter", "workspace");
+  await selectAndCommit("#adminUserStatusFilter", "disabled");
+  await selectAndCommit("#adminUserRoleFilter", "workspace_admin");
+  await fillAndCommit("#adminUserTenantFilter", tenantKey);
+  await fillAndCommit("#adminUserWorkspaceFilter", workspaceKey);
+  await fillAndCommit("#adminUserLimit", "1");
+  await clickAction("Apply User Filters");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=workspace&status=disabled&role=workspace_admin&tenantKey=${tenantKey}&workspaceKey=${workspaceKey}&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 1 &&
+      payload.items.every(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item?.adminUser?.status === "disabled"
+      )
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: workspaceAdminUserId })
+    .filter({ hasText: "disabled" })
+    .waitFor();
+
   logStep("admin-audit-events");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/audit-events`,

@@ -332,6 +332,42 @@ export function createShellPersistenceStateHost(args: {
     set adminSessionToken(nextValue) {
       args.opsState.adminSessionToken = nextValue;
     },
+    get adminUserUsernameFilter() {
+      return args.opsState.adminUserUsernameFilter;
+    },
+    set adminUserUsernameFilter(nextValue) {
+      args.opsState.adminUserUsernameFilter = nextValue;
+    },
+    get adminUserStatusFilter() {
+      return args.opsState.adminUserStatusFilter;
+    },
+    set adminUserStatusFilter(nextValue) {
+      args.opsState.adminUserStatusFilter = nextValue;
+    },
+    get adminUserRoleFilter() {
+      return args.opsState.adminUserRoleFilter;
+    },
+    set adminUserRoleFilter(nextValue) {
+      args.opsState.adminUserRoleFilter = nextValue;
+    },
+    get adminUserTenantFilter() {
+      return args.opsState.adminUserTenantFilter;
+    },
+    set adminUserTenantFilter(nextValue) {
+      args.opsState.adminUserTenantFilter = nextValue;
+    },
+    get adminUserWorkspaceFilter() {
+      return args.opsState.adminUserWorkspaceFilter;
+    },
+    set adminUserWorkspaceFilter(nextValue) {
+      args.opsState.adminUserWorkspaceFilter = nextValue;
+    },
+    get adminUserLimit() {
+      return args.opsState.adminUserLimit;
+    },
+    set adminUserLimit(nextValue) {
+      args.opsState.adminUserLimit = nextValue;
+    },
     get adminAuditEventTypeFilter() {
       return args.opsState.adminAuditEventTypeFilter;
     },

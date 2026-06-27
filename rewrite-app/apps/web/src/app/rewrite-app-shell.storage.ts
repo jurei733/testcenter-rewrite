@@ -42,6 +42,12 @@ export type ShellPersistenceTarget = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminUserUsernameFilter: string;
+  adminUserStatusFilter: string;
+  adminUserRoleFilter: string;
+  adminUserTenantFilter: string;
+  adminUserWorkspaceFilter: string;
+  adminUserLimit: string;
   adminAuditEventTypeFilter: string;
   adminAuditActorFilter: string;
   adminAuditSubjectFilter: string;
@@ -108,6 +114,12 @@ export const createPersistedShellState = (
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
   adminSessionToken: target.adminSessionToken,
+  adminUserUsernameFilter: target.adminUserUsernameFilter,
+  adminUserStatusFilter: target.adminUserStatusFilter,
+  adminUserRoleFilter: target.adminUserRoleFilter,
+  adminUserTenantFilter: target.adminUserTenantFilter,
+  adminUserWorkspaceFilter: target.adminUserWorkspaceFilter,
+  adminUserLimit: target.adminUserLimit,
   adminAuditEventTypeFilter: target.adminAuditEventTypeFilter,
   adminAuditActorFilter: target.adminAuditActorFilter,
   adminAuditSubjectFilter: target.adminAuditSubjectFilter,
@@ -286,6 +298,30 @@ export const applyHydratedShellState = (
   target.adminSessionToken = hydrateString(
     snapshot.adminSessionToken,
     target.adminSessionToken
+  );
+  target.adminUserUsernameFilter = hydrateString(
+    snapshot.adminUserUsernameFilter,
+    target.adminUserUsernameFilter
+  );
+  target.adminUserStatusFilter = hydrateString(
+    snapshot.adminUserStatusFilter,
+    target.adminUserStatusFilter
+  );
+  target.adminUserRoleFilter = hydrateString(
+    snapshot.adminUserRoleFilter,
+    target.adminUserRoleFilter
+  );
+  target.adminUserTenantFilter = hydrateString(
+    snapshot.adminUserTenantFilter,
+    target.adminUserTenantFilter
+  );
+  target.adminUserWorkspaceFilter = hydrateString(
+    snapshot.adminUserWorkspaceFilter,
+    target.adminUserWorkspaceFilter
+  );
+  target.adminUserLimit = hydrateString(
+    snapshot.adminUserLimit,
+    target.adminUserLimit
   );
   target.adminAuditEventTypeFilter = hydrateString(
     snapshot.adminAuditEventTypeFilter,
