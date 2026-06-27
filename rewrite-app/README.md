@@ -393,10 +393,11 @@ For runtime probes:
 
 ## CI / Deployability
 
-- [../.github/workflows/rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) now verifies:
-  - memory + sqlite CI path
-  - browser smoke with optional operator auth enabled
-  - Postgres integration + startup smoke
+- [.github/workflows/ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
+  - Node 22 typecheck and production build
+  - memory + sqlite integration matrix
+  - Postgres integration against a service database
+  - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
   - Docker compose release smoke with explicit migrate + api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate and api services, restart policies, and service healthchecks
