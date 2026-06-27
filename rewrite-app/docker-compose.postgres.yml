@@ -30,6 +30,7 @@ services:
       FIRST_SLICE_STORE: postgres
       FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@rewrite-app-postgres:5432/rewrite_app
       FIRST_SLICE_OPERATOR_AUTH_REQUIRED: ${FIRST_SLICE_OPERATOR_AUTH_REQUIRED:-true}
+      FIRST_SLICE_BOOTSTRAP_DEMO: ${FIRST_SLICE_BOOTSTRAP_DEMO:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4310/readyz >/dev/null || exit 1"]
       interval: 10s

@@ -8,6 +8,7 @@ const buildTimestamp =
   process.env.APP_BUILD_TIMESTAMP ?? new Date().toISOString();
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED ?? "true";
+const bootstrapDemo = process.env.FIRST_SLICE_BOOTSTRAP_DEMO ?? "false";
 
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise, reject) => {
@@ -125,7 +126,8 @@ try {
       ...process.env,
       APP_BUILD_SHA: buildSha,
       APP_BUILD_TIMESTAMP: buildTimestamp,
-      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired
+      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
+      FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo
     }
   });
 
@@ -182,10 +184,15 @@ try {
     config.runtimeConfig?.environment?.firstSlicePostgresUrlPresent,
     true
   );
+  expectEqual(
+    "runtimeConfig.environment.firstSliceBootstrapDemo",
+    config.runtimeConfig?.environment?.firstSliceBootstrapDemo,
+    parseBooleanFlag(bootstrapDemo)
+  );
   expectEqual("apiContainer.user", apiContainerUser, "node");
 
   process.stdout.write(
-    `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired}\n`
+    `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired} bootstrapDemo=${bootstrapDemo}\n`
   );
 } catch (error) {
   await dumpComposeLogs();

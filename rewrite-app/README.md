@@ -146,10 +146,22 @@ FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true npm run start:api
 For a local containerized API + Postgres stack, run:
 
 ```bash
-docker compose -f docker-compose.postgres.yml up --build
+npm run start:compose:postgres
 ```
 
 The container image and compose stack default `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, so the operator surface starts in a production-like protected mode. Set `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=false` only for an intentionally open local sandbox.
+
+To start the same Postgres-backed stack with the local demo tenant, admin, active release, and participant link pre-seeded, run:
+
+```bash
+npm run start:compose:postgres:demo
+```
+
+Stop the compose stack with:
+
+```bash
+npm run stop:compose:postgres
+```
 
 That stack now runs in two explicit application roles:
 
