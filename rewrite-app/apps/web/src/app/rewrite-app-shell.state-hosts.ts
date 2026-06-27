@@ -242,6 +242,12 @@ export function createShellPersistenceStateHost(args: {
     set groupKey(nextValue) {
       args.runtimeState.groupKey = nextValue;
     },
+    get bookletKey() {
+      return args.runtimeState.bookletKey;
+    },
+    set bookletKey(nextValue) {
+      args.runtimeState.bookletKey = nextValue;
+    },
     get participantSessionStatusFilter() {
       return args.runtimeState.participantSessionStatusFilter;
     },

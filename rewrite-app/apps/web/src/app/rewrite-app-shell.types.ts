@@ -39,6 +39,7 @@ export type PersistedShellState = {
   currentUnitKey: string;
   loginKey: string;
   groupKey: string;
+  bookletKey: string;
   participantSessionStatusFilter: string;
   participantSessionGroupFilter: string;
   participantSessionLoginFilter: string;

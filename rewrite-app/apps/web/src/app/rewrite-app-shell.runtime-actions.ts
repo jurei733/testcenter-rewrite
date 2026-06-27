@@ -5,6 +5,7 @@ import type {
   DeleteGroupResultsResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
+  ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
@@ -40,6 +41,7 @@ export interface ShellRuntimeActionsHost {
   getWorkspaceKey(): string;
   getLoginKey(): string;
   getGroupKey(): string;
+  getBookletKey(): string;
   getParticipantSessionId(): string;
   getTestRunId(): string;
   getCurrentUnitKey(): string;
@@ -136,7 +138,10 @@ export async function resumeParticipantSessionAction(
   const payload = await host.request<ResumeParticipantSessionResponse>(
     "Resume Session",
     "POST",
-    host.getResumeParticipantSessionPath()
+    host.getResumeParticipantSessionPath(),
+    {
+      bookletKey: host.getBookletKey().trim() || undefined
+    } satisfies ResumeParticipantSessionRequest
   );
   applyResumeParticipantSessionResult(
     host.createRuntimePresentationHost(),

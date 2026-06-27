@@ -66,6 +66,7 @@ import {
   type ParticipantLaunchRequest,
   type ParticipantLaunchResponse,
   type ParticipantRuntimeStateResponse,
+  type ResumeParticipantSessionRequest,
   type ResumeTestRunResponse,
   type ResumeParticipantSessionResponse,
   type RetrySourcePackageImportRequest,
@@ -887,6 +888,38 @@ const readJsonBody = async <T>(
   return JSON.parse(payload) as T;
 };
 
+const readOptionalJsonBody = async <T>(
+  request: IncomingMessage,
+  maxJsonBodyBytes: number
+): Promise<T | null> => {
+  const contentLengthHeader = request.headers["content-length"];
+  const contentLength =
+    typeof contentLengthHeader === "string" && /^\d+$/.test(contentLengthHeader)
+      ? Number.parseInt(contentLengthHeader, 10)
+      : null;
+  if (contentLength !== null && contentLength > maxJsonBodyBytes) {
+    throw new RequestBodyTooLargeError(maxJsonBodyBytes);
+  }
+  if (contentLength === 0) {
+    return null;
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  for await (const chunk of request) {
+    const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxJsonBodyBytes) {
+      throw new RequestBodyTooLargeError(maxJsonBodyBytes);
+    }
+    chunks.push(buffer);
+  }
+
+  const payload = Buffer.concat(chunks).toString("utf8").trim();
+  return payload ? (JSON.parse(payload) as T) : null;
+};
+
 const isFirstSliceError = (value: unknown): value is FirstSliceError =>
   value instanceof Error &&
   "statusCode" in value &&
@@ -1604,6 +1637,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     const pathname = url.pathname;
     const readRequestJsonBody = <T>(): Promise<T> =>
       readJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
+    const readOptionalRequestJsonBody = <T>(): Promise<T | null> =>
+      readOptionalJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
 
     try {
       if (request.method === "GET" && isParticipantEntryPath(pathname)) {
@@ -3225,8 +3260,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const body =
+          await readOptionalRequestJsonBody<ResumeParticipantSessionRequest>();
         const testRun = await services.participantRuntime.resumeSession({
-          participantSessionId
+          participantSessionId,
+          bookletKey: body?.bookletKey
         });
         sendJson<ResumeParticipantSessionResponse>(response, 200, { testRun });
         return;

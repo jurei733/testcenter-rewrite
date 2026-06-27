@@ -793,11 +793,14 @@ try {
   logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
+  const participantRouteBookletKey = "booklet:starter";
   await page.goto(
     `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
       workspaceKey
     )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
       participantRouteGroupKey
+    )}&bookletKey=${encodeURIComponent(
+      participantRouteBookletKey
     )}`,
     { waitUntil: "networkidle" }
   );
@@ -805,6 +808,7 @@ try {
   await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
   await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
+  await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
   logStep("participant-route-auto-start");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const participantRouteSessionsPayload = await pollJsonWithPredicate(
@@ -897,10 +901,13 @@ try {
       workspaceKey
     )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
       participantRouteGroupKey
+    )}&bookletKey=${encodeURIComponent(
+      participantRouteBookletKey
     )}`,
     { waitUntil: "networkidle" }
   );
   await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
+  await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await page.waitForFunction(
@@ -960,8 +967,10 @@ try {
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
+  const participantBookletKey = "booklet:starter";
   await fillAndCommit("#loginKey", participantLoginKey);
   await fillAndCommit("#groupKey", participantGroupKey);
+  await fillAndCommit("#bookletKey", participantBookletKey);
   await clickAction("Sign In");
   const participantSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const hasParticipantSession = payload =>
@@ -1026,7 +1035,8 @@ try {
       typeof payload.currentRunState === "object" &&
       payload.currentRunState != null &&
       "currentUnit" in payload.currentRunState &&
-      payload.currentRunState.currentUnit?.unitKey != null
+      payload.currentRunState.currentUnit?.unitKey != null &&
+      payload.currentRunState.testRun?.bookletKey === participantBookletKey
   );
   await expectInputValue(
     "#currentUnitKey",

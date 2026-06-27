@@ -4,6 +4,7 @@ import type {
   ParticipantCurrentRunStateResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
+  ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
@@ -44,6 +45,7 @@ type ParticipantEntryParameters = {
   workspaceKey?: string | null;
   loginKey?: string | null;
   groupKey?: string | null;
+  bookletKey?: string | null;
   participantSessionId?: string | null;
   currentUnitKey?: string | null;
 };
@@ -52,6 +54,7 @@ type NormalizedParticipantEntryParameters = {
   workspaceKey: string;
   loginKey: string;
   groupKey: string;
+  bookletKey: string;
   participantSessionId: string;
   currentUnitKey: string;
 };
@@ -96,6 +99,7 @@ export class ParticipantViewFacade {
       workspaceKey: parameters.workspaceKey?.trim() ?? "",
       loginKey: parameters.loginKey?.trim() ?? "",
       groupKey: parameters.groupKey?.trim() ?? "",
+      bookletKey: parameters.bookletKey?.trim() ?? "",
       participantSessionId: parameters.participantSessionId?.trim() ?? "",
       currentUnitKey: parameters.currentUnitKey?.trim() ?? ""
     };
@@ -119,6 +123,9 @@ export class ParticipantViewFacade {
     if (normalized.groupKey) {
       this.runtime.groupKey = normalized.groupKey;
     }
+    if (normalized.bookletKey) {
+      this.runtime.bookletKey = normalized.bookletKey;
+    }
     if (normalized.participantSessionId) {
       this.runtime.participantSessionId = normalized.participantSessionId;
     }
@@ -130,6 +137,7 @@ export class ParticipantViewFacade {
       normalized.workspaceKey ||
       normalized.loginKey ||
       normalized.groupKey ||
+      normalized.bookletKey ||
       normalized.participantSessionId ||
       normalized.currentUnitKey
     ) {
@@ -278,7 +286,10 @@ export class ParticipantViewFacade {
       "POST",
       resolveRoutePath(productionApiRoutes.participant.resumeSession, {
         participantSessionId: this.runtime.participantSessionId.trim()
-      })
+      }),
+      {
+        bookletKey: this.runtime.bookletKey.trim() || undefined
+      } satisfies ResumeParticipantSessionRequest
     );
 
     this.syncRun(payload.testRun);

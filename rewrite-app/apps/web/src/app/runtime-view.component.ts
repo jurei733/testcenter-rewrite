@@ -32,6 +32,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="groupKey" name="groupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
           </label>
           <label>
+            Booklet Key
+            <input id="bookletKey" name="bookletKey" [(ngModel)]="view.runtime.bookletKey" (change)="view.persistState()" />
+          </label>
+          <label>
             Session Id
             <input id="participantSessionId" name="participantSessionId" placeholder="Filled from sign-in" [(ngModel)]="view.runtime.participantSessionId" (change)="view.persistState()" />
           </label>

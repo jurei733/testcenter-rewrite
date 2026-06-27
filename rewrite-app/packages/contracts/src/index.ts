@@ -297,6 +297,11 @@ export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
 
 export type ParticipantLaunchRequest = {
   participantSessionId: string;
+  bookletKey?: string;
+};
+
+export type ResumeParticipantSessionRequest = {
+  bookletKey?: string;
 };
 
 export type SaveTestRunProgressRequest = {

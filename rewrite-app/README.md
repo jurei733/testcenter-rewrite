@@ -70,7 +70,7 @@ That builds the API and Angular shell, migrates `./.data/local.sqlite`, starts t
 - platform admin: `demo-admin` / `demo-admin-password`
 - tenant/workspace: `demo-tenant` / `demo-workspace`
 - active demo content release with a three-unit demo booklet
-- participant entry URL: `http://127.0.0.1:4310/participant?workspaceKey=demo-workspace&loginKey=student-demo&groupKey=group:student-demo`
+- participant entry URL: `http://127.0.0.1:4310/participant?workspaceKey=demo-workspace&loginKey=student-demo&groupKey=group:student-demo&bookletKey=booklet:demo`
 
 If the local database already has an admin user or active demo release, the bootstrap leaves the existing state in place.
 
@@ -280,6 +280,7 @@ The added read side now makes the first slice inspectable:
 - participant runtime can now be re-entered through session context, not only through `testRunId`
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
+- participant launch/resume can now carry an explicit `bookletKey` so entry links and operator flows can start a specific booklet from the active release
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
@@ -414,5 +415,5 @@ It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, common wrapper objects, and booklet/testlet/assessment-test/unit/item-ref aliases
-- participant launch is still simplified, but now supports explicit group keys on participant entry links
+- participant launch is still simplified, but now supports explicit group keys and booklet selection on participant entry links
 - monitor reads now include workspace summary, group drill-down, unit-progress coverage, and open-run blockers, but still do not cover every original Testcenter monitor view

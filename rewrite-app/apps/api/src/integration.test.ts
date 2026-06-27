@@ -2468,6 +2468,111 @@ test("participant sign-in reuses an open session for the active release", async 
   );
 });
 
+test("participant session launch can target a specific booklet", async () => {
+  const tenantKey = "integration-tenant-booklet-launch";
+  const workspaceKey = "integration-workspace-booklet-launch";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "booklet-launch.json",
+      mediaType: "application/json",
+      contentStructure: {
+        bookletEntries: [
+          {
+            bookletKey: "booklet:alpha",
+            displayLabel: "Alpha Booklet",
+            unitEntries: [{ unitKey: "unit-alpha-1", displayLabel: "Alpha 1" }]
+          },
+          {
+            bookletKey: "booklet:beta",
+            displayLabel: "Beta Booklet",
+            unitEntries: [
+              { unitKey: "unit-beta-1", displayLabel: "Beta 1" },
+              { unitKey: "unit-beta-2", displayLabel: "Beta 2" }
+            ]
+          }
+        ]
+      }
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "integration-test" }
+    }
+  );
+
+  const firstSignIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "booklet-launch-student",
+      groupKey: "group:booklet-launch"
+    }
+  });
+
+  const betaRun = await requestJson<{
+    testRun: { bookletKey: string; currentUnitKey: string | null; status: string };
+  }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    {
+      method: "POST",
+      body: { bookletKey: "booklet:beta" }
+    }
+  );
+
+  assert.equal(betaRun.status, 200);
+  assert.equal(betaRun.body.testRun.status, "running");
+  assert.equal(betaRun.body.testRun.bookletKey, "booklet:beta");
+  assert.equal(betaRun.body.testRun.currentUnitKey, "unit-beta-1");
+
+  const secondSignIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "unknown-booklet-student",
+      groupKey: "group:booklet-launch"
+    }
+  });
+
+  const unknownBooklet = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${secondSignIn.body.participantSession.participantSessionId}/resume`,
+    {
+      method: "POST",
+      body: { bookletKey: "booklet:missing" }
+    }
+  );
+
+  assert.equal(unknownBooklet.status, 404);
+  assert.equal(unknownBooklet.body.error, "booklet_not_found");
+});
+
 test("activation guard returns blocking open-run details", async () => {
   const tenantKey = "integration-tenant-activation";
   const workspaceKey = "integration-workspace-activation";

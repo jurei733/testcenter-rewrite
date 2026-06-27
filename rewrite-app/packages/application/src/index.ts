@@ -269,8 +269,11 @@ export type ParticipantRuntimePort = {
   getCurrentRunState(input: {
     participantSessionId: string;
   }): Promise<ParticipantCurrentRunState>;
-  launch(input: { participantSessionId: string }): Promise<TestRun>;
-  resumeSession(input: { participantSessionId: string }): Promise<TestRun>;
+  launch(input: { participantSessionId: string; bookletKey?: string }): Promise<TestRun>;
+  resumeSession(input: {
+    participantSessionId: string;
+    bookletKey?: string;
+  }): Promise<TestRun>;
   saveProgress(input: {
     testRunId: string;
     currentUnitKey: string | null;
@@ -4529,6 +4532,21 @@ export const createFirstSliceServices = (
           return normalizeTestRun(existingRun);
         }
 
+        const requestedBookletKey = String(input.bookletKey ?? "").trim();
+        const selectedBooklet = requestedBookletKey
+          ? contentRelease.runtimeSnapshot.bookletEntries.find(
+              booklet => booklet.bookletKey === requestedBookletKey
+            )
+          : contentRelease.runtimeSnapshot.bookletEntries[0];
+
+        if (requestedBookletKey && !selectedBooklet) {
+          throw new FirstSliceError(
+            404,
+            "booklet_not_found",
+            `Booklet '${requestedBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
+          );
+        }
+
         const timestamp = now();
         const testRun: TestRun = {
           testRunId: idGenerator(),
@@ -4536,12 +4554,10 @@ export const createFirstSliceServices = (
           tenantId: participantSession.tenantId,
           workspaceId: participantSession.workspaceId,
           contentReleaseId: participantSession.contentReleaseId,
-          bookletKey: contentRelease.runtimeSnapshot.bookletEntries[0]?.bookletKey ??
-            `booklet:${participantSession.loginKey}`,
+          bookletKey:
+            selectedBooklet?.bookletKey ?? `booklet:${participantSession.loginKey}`,
           status: "running",
-          currentUnitKey:
-            contentRelease.runtimeSnapshot.bookletEntries[0]?.unitEntries[0]?.unitKey ??
-            "unit-1",
+          currentUnitKey: selectedBooklet?.unitEntries[0]?.unitKey ?? "unit-1",
           unitResponses: {},
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -4561,6 +4577,7 @@ export const createFirstSliceServices = (
           summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
           details: {
             participantSessionId: participantSession.participantSessionId,
+            bookletKey: testRun.bookletKey,
             currentUnitKey: testRun.currentUnitKey
           }
         });
@@ -4614,7 +4631,8 @@ export const createFirstSliceServices = (
         }
 
         return this.launch({
-          participantSessionId: participantSession.participantSessionId
+          participantSessionId: participantSession.participantSessionId,
+          bookletKey: input.bookletKey
         });
       },
       async saveProgress(input) {

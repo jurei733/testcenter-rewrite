@@ -39,6 +39,7 @@ export function createRuntimePresentationStateHost(args: {
         return;
       }
       args.runtimeState.testRunId = testRun.testRunId || args.runtimeState.testRunId;
+      args.runtimeState.bookletKey = testRun.bookletKey || args.runtimeState.bookletKey;
       if (testRun.currentUnitKey) {
         args.runtimeState.currentUnitKey = testRun.currentUnitKey;
         args.runtimeState.currentUnitResponse =

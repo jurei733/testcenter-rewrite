@@ -56,6 +56,7 @@ export function createRuntimeActionsStateHost(args: {
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getLoginKey: () => args.runtimeState.loginKey,
     getGroupKey: () => args.runtimeState.groupKey,
+    getBookletKey: () => args.runtimeState.bookletKey,
     getParticipantSessionId: () => args.runtimeState.participantSessionId,
     getTestRunId: () => args.runtimeState.testRunId,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
