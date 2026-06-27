@@ -16,6 +16,7 @@ import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.ser
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppShellWorkspaceHostsService } from "./rewrite-app-shell-workspace-hosts.service";
 import { createBootstrapWorkspaceFlowHost } from "./rewrite-app-shell.hosts";
+import { downloadTextFile } from "./download-text-file";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { runBootstrapWorkspaceFlow } from "./rewrite-app-shell.workflows";
@@ -95,6 +96,11 @@ export class RewriteAppWorkspaceService {
     );
 
     this.workspaceState.workspaceLogExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-logs.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
     this.feedback.rememberActivity(
       "Workspace Log Exported",
       `CSV log export loaded for ${tenantKey}/${workspaceKey}.`

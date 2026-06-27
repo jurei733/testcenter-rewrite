@@ -218,7 +218,10 @@ try {
     { timeout: 15_000 }
   );
 
+  const responseDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Responses CSV" }).click();
+  const responseDownload = await responseDownloadPromise;
+  assert.equal(responseDownload.suggestedFilename(), "demo-workspace-responses.csv");
   await page.waitForFunction(
     () =>
       document
@@ -229,7 +232,10 @@ try {
   );
 
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  const logDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
+  const logDownload = await logDownloadPromise;
+  assert.equal(logDownload.suggestedFilename(), "demo-workspace-logs.csv");
   await page.waitForFunction(
     () =>
       document

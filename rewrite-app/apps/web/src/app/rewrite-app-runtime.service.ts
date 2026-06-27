@@ -21,6 +21,7 @@ import {
 } from "./rewrite-app-shell.runtime-reads";
 import { runParticipantHappyPathFlow } from "./rewrite-app-shell.workflows";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
+import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
@@ -91,7 +92,18 @@ export class RewriteAppRuntimeService {
   }
 
   async exportResponsesCsv(): Promise<string> {
-    return exportResponsesCsvAction(this.hosts.createRuntimeReadsHost());
+    const csv = await exportResponsesCsvAction(this.hosts.createRuntimeReadsHost());
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-responses.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Response CSV Downloaded",
+      `Response export saved as ${workspaceKey}-responses.csv.`
+    );
+    return csv;
   }
 
   async participantHappyPathFlow(): Promise<void> {
