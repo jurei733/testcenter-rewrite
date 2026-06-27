@@ -1432,6 +1432,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         runningCount: number;
         responseCount: number;
         reviewCount: number;
+        bookletProgress: Array<{
+          bookletKey: string;
+          displayLabel: string;
+          participantSessionCount: number;
+          testRunCount: number;
+          runningCount: number;
+          responseCount: number;
+          unitCount: number;
+        }>;
         unitProgress: Array<{
           unitKey: string;
           expectedRunCount: number;
@@ -1462,6 +1471,28 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitor.body.studyMonitorSummary.runningCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.reviewCount, 0);
+    assert.deepEqual(
+      studyMonitor.body.studyMonitorSummary.bookletProgress.map(booklet => ({
+        bookletKey: booklet.bookletKey,
+        displayLabel: booklet.displayLabel,
+        participantSessionCount: booklet.participantSessionCount,
+        testRunCount: booklet.testRunCount,
+        runningCount: booklet.runningCount,
+        responseCount: booklet.responseCount,
+        unitCount: booklet.unitCount
+      })),
+      [
+        {
+          bookletKey: "booklet:demo",
+          displayLabel: "Demo Booklet",
+          participantSessionCount: 1,
+          testRunCount: 1,
+          runningCount: 1,
+          responseCount: 1,
+          unitCount: 3
+        }
+      ]
+    );
     assert.deepEqual(
       studyMonitor.body.studyMonitorSummary.unitProgress.map(unit => ({
         unitKey: unit.unitKey,
@@ -1813,6 +1844,119 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           missingResponseCount: 1
         }
       ]
+    );
+
+    const studyMonitorBooklet = await requestJsonAt<{
+      studyMonitorBooklet: {
+        bookletKey: string;
+        displayLabel: string;
+        participantSessionCount: number;
+        testRunCount: number;
+        runningCount: number;
+        responseCount: number;
+        reviewCount: number;
+        unitCount: number;
+        testRuns: Array<{
+          testRun: { testRunId: string; status: string; bookletKey: string };
+          participantSession: { loginKey: string; groupKey: string } | null;
+          responseCount: number;
+          reviewCount: number;
+        }>;
+        unitProgress: Array<{
+          unitKey: string;
+          expectedRunCount: number;
+          responseCount: number;
+          missingResponseCount: number;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/booklets/booklet%3Ademo",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitorBooklet.status, 200);
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.bookletKey,
+      "booklet:demo"
+    );
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.displayLabel,
+      "Demo Booklet"
+    );
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.participantSessionCount,
+      1
+    );
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.testRunCount, 1);
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.runningCount, 1);
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.responseCount, 1);
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.reviewCount, 1);
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.unitCount, 3);
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.testRun.testRunId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.participantSession
+        ?.loginKey,
+      "student-demo"
+    );
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.responseCount,
+      1
+    );
+    assert.equal(
+      studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.reviewCount,
+      1
+    );
+    assert.deepEqual(
+      studyMonitorBooklet.body.studyMonitorBooklet.unitProgress.map(unit => ({
+        unitKey: unit.unitKey,
+        expectedRunCount: unit.expectedRunCount,
+        responseCount: unit.responseCount,
+        missingResponseCount: unit.missingResponseCount
+      })),
+      [
+        {
+          unitKey: "unit-finish",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        },
+        {
+          unitKey: "unit-intro",
+          expectedRunCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0
+        },
+        {
+          unitKey: "unit-practice",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        }
+      ]
+    );
+
+    const missingStudyMonitorBooklet = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/booklets/booklet%3Amissing",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(missingStudyMonitorBooklet.status, 404);
+    assert.equal(
+      missingStudyMonitorBooklet.body.error,
+      "study_monitor_booklet_not_found"
     );
 
     const studyMonitorUnit = await requestJsonAt<{

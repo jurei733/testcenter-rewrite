@@ -1169,6 +1169,29 @@ try {
     .filter({ hasText: "1/1 answered" })
     .filter({ hasText: "0 missing" })
     .waitFor();
+  await studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Starter" }) })
+    .filter({ hasText: "booklet:starter" })
+    .waitFor();
+  await clickCardAction("Study Monitor", "Open Booklet Detail", "Starter");
+  await page.waitForFunction(
+    () => {
+      const detailCard = Array.from(document.querySelectorAll("article.card")).find(
+        card =>
+          card.querySelector("h3")?.textContent?.trim() ===
+          "Study Monitor Booklet Detail"
+      );
+      return (
+        detailCard?.textContent?.includes("booklet:starter") &&
+        detailCard.textContent.includes("student-ui") &&
+        detailCard.textContent.includes("unit-paused") &&
+        detailCard.textContent.includes("run(s)")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
   await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
   await page.waitForFunction(
     () => {

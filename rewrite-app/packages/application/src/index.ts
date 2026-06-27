@@ -41,6 +41,8 @@ import type {
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
+  WorkspaceStudyMonitorBookletDetail,
+  WorkspaceStudyMonitorBookletProgress,
   WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorUnitProgress,
@@ -105,6 +107,11 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     groupKey: string;
   }): Promise<WorkspaceStudyMonitorGroupDetail>;
+  getStudyMonitorBookletDetail(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    bookletKey: string;
+  }): Promise<WorkspaceStudyMonitorBookletDetail>;
   getStudyMonitorUnitDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -2151,6 +2158,99 @@ const buildStudyMonitorUnitProgress = (input: {
   );
 };
 
+const buildStudyMonitorBookletProgress = (input: {
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorBookletProgress[] => {
+  type MutableBookletProgress = WorkspaceStudyMonitorBookletProgress & {
+    participantSessionIds: Set<string>;
+  };
+  const contentReleasesById = new Map(
+    input.contentReleases.map(contentRelease => [
+      contentRelease.contentReleaseId,
+      contentRelease
+    ])
+  );
+  const sessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const reviewsByTestRunId = new Map<string, number>();
+  for (const review of input.reviews) {
+    reviewsByTestRunId.set(
+      review.testRunId,
+      (reviewsByTestRunId.get(review.testRunId) ?? 0) + 1
+    );
+  }
+  const progressByBookletKey = new Map<string, MutableBookletProgress>();
+
+  const ensureProgress = (testRun: TestRun): MutableBookletProgress => {
+    const participantSession = sessionsById.get(testRun.participantSessionId);
+    const contentRelease =
+      contentReleasesById.get(testRun.contentReleaseId) ??
+      (participantSession
+        ? contentReleasesById.get(participantSession.contentReleaseId)
+        : undefined);
+    const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+      bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
+    );
+    const existing = progressByBookletKey.get(testRun.bookletKey);
+    if (existing) {
+      return existing;
+    }
+
+    const created: MutableBookletProgress = {
+      bookletKey: testRun.bookletKey,
+      displayLabel: booklet?.displayLabel ?? testRun.bookletKey,
+      participantSessionCount: 0,
+      participantSessionIds: new Set<string>(),
+      testRunCount: 0,
+      createdCount: 0,
+      runningCount: 0,
+      pausedCount: 0,
+      completedCount: 0,
+      responseCount: 0,
+      reviewCount: 0,
+      unitCount: booklet?.unitEntries.length ?? 0,
+      latestActivityAt: null
+    };
+    progressByBookletKey.set(testRun.bookletKey, created);
+    return created;
+  };
+
+  for (const testRun of input.testRuns.map(normalizeTestRun)) {
+    const progress = ensureProgress(testRun);
+    progress.participantSessionIds.add(testRun.participantSessionId);
+    progress.participantSessionCount = progress.participantSessionIds.size;
+    progress.testRunCount += 1;
+    progress.responseCount += Object.keys(testRun.unitResponses).length;
+    progress.reviewCount += reviewsByTestRunId.get(testRun.testRunId) ?? 0;
+    if (testRun.status === "created") {
+      progress.createdCount += 1;
+    } else if (testRun.status === "running") {
+      progress.runningCount += 1;
+    } else if (testRun.status === "paused") {
+      progress.pausedCount += 1;
+    } else if (testRun.status === "completed") {
+      progress.completedCount += 1;
+    }
+    if (
+      !progress.latestActivityAt ||
+      testRun.updatedAt.localeCompare(progress.latestActivityAt) > 0
+    ) {
+      progress.latestActivityAt = testRun.updatedAt;
+    }
+  }
+
+  return Array.from(progressByBookletKey.values())
+    .map(({ participantSessionIds: _participantSessionIds, ...progress }) => progress)
+    .sort((left, right) => left.bookletKey.localeCompare(right.bookletKey));
+};
+
 const buildStudyMonitorSummary = (input: {
   tenantKey: string;
   workspaceKey: string;
@@ -2242,6 +2342,12 @@ const buildStudyMonitorSummary = (input: {
     responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
     reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
     groups,
+    bookletProgress: buildStudyMonitorBookletProgress({
+      participantSessions: input.participantSessions,
+      testRuns: input.testRuns,
+      contentReleases: input.contentReleases,
+      reviews: input.reviews
+    }),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: input.participantSessions,
       testRuns: input.testRuns,
@@ -2342,6 +2448,97 @@ const buildStudyMonitorGroupDetail = (input: {
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: groupParticipantSessions,
       testRuns: groupTestRuns,
+      contentReleases: input.contentReleases
+    })
+  };
+};
+
+const buildStudyMonitorBookletDetail = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  bookletKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorBookletDetail => {
+  const bookletKey = input.bookletKey.trim();
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const contentReleasesById = new Map(
+    input.contentReleases.map(contentRelease => [
+      contentRelease.contentReleaseId,
+      contentRelease
+    ])
+  );
+  const bookletTestRuns = input.testRuns
+    .map(normalizeTestRun)
+    .filter(testRun => testRun.bookletKey === bookletKey)
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.testRunId.localeCompare(left.testRunId)
+    );
+  const participantSessionIds = new Set(
+    bookletTestRuns.map(testRun => testRun.participantSessionId)
+  );
+  const bookletReviews = input.reviews.filter(review =>
+    bookletTestRuns.some(testRun => testRun.testRunId === review.testRunId)
+  );
+  const booklet =
+    bookletTestRuns
+      .map(testRun => {
+        const participantSession = participantSessionsById.get(
+          testRun.participantSessionId
+        );
+        const contentRelease =
+          contentReleasesById.get(testRun.contentReleaseId) ??
+          (participantSession
+            ? contentReleasesById.get(participantSession.contentReleaseId)
+            : undefined);
+        return contentRelease?.runtimeSnapshot.bookletEntries.find(
+          bookletEntry => bookletEntry.bookletKey === bookletKey
+        );
+      })
+      .find(Boolean) ?? null;
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    bookletKey,
+    displayLabel: booklet?.displayLabel ?? bookletKey,
+    generatedAt: input.generatedAt,
+    participantSessionCount: participantSessionIds.size,
+    testRunCount: bookletTestRuns.length,
+    createdCount: bookletTestRuns.filter(testRun => testRun.status === "created")
+      .length,
+    runningCount: bookletTestRuns.filter(testRun => testRun.status === "running")
+      .length,
+    pausedCount: bookletTestRuns.filter(testRun => testRun.status === "paused").length,
+    completedCount: bookletTestRuns.filter(testRun => testRun.status === "completed")
+      .length,
+    responseCount: bookletTestRuns.reduce(
+      (total, testRun) => total + Object.keys(testRun.unitResponses).length,
+      0
+    ),
+    reviewCount: bookletReviews.length,
+    unitCount: booklet?.unitEntries.length ?? 0,
+    testRuns: bookletTestRuns.map(testRun => ({
+      testRun,
+      participantSession:
+        participantSessionsById.get(testRun.participantSessionId) ?? null,
+      responseCount: Object.keys(testRun.unitResponses).length,
+      reviewCount: bookletReviews.filter(review => review.testRunId === testRun.testRunId)
+        .length
+    })),
+    unitProgress: buildStudyMonitorUnitProgress({
+      participantSessions: input.participantSessions,
+      testRuns: bookletTestRuns,
       contentReleases: input.contentReleases
     })
   };
@@ -3310,6 +3507,53 @@ export const createFirstSliceServices = (
             404,
             "study_monitor_group_not_found",
             `Study monitor group '${groupKey}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        return detail;
+      },
+      async getStudyMonitorBookletDetail(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const bookletKey = input.bookletKey.trim();
+        const [participantSessions, testRuns, contentReleases, reviews] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const detail = buildStudyMonitorBookletDetail({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          bookletKey,
+          generatedAt: now(),
+          participantSessions,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+
+        if (detail.testRunCount === 0) {
+          throw new FirstSliceError(
+            404,
+            "study_monitor_booklet_not_found",
+            `Study monitor booklet '${bookletKey}' was not found in workspace '${input.workspaceKey}'.`
           );
         }
 

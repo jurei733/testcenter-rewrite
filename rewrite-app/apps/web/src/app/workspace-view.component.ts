@@ -141,6 +141,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Study Monitor Booklet Detail"
+        subtitle="Selected booklet runs, status pressure, unit coverage, and review pressure."
+        [items]="view.studyMonitorBookletItems"
+        (itemAction)="view.openStudyMonitorBookletDetailItem($event)"
+        emptyState="Open a booklet from the study monitor to inspect booklet detail."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Study Monitor Unit Detail"
         subtitle="Selected unit runs, missing responses, answers, and review pressure."
         [items]="view.studyMonitorUnitItems"
@@ -247,6 +255,20 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Selected Group Read Model"
         viewId="studyMonitorGroupView"
         [content]="view.workspace.studyMonitorGroupView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor Booklet Detail"
+        subtitle="Selected Booklet Read Model"
+        viewId="studyMonitorBookletView"
+        [content]="view.workspace.studyMonitorBookletView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor Unit Detail"
+        subtitle="Selected Unit Read Model"
+        viewId="studyMonitorUnitView"
+        [content]="view.workspace.studyMonitorUnitView"
       ></app-json-panel>
 
       <app-json-panel

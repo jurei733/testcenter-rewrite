@@ -345,6 +345,21 @@ export type WorkspaceStudyMonitorUnitProgress = {
   latestActivityAt: string | null;
 };
 
+export type WorkspaceStudyMonitorBookletProgress = {
+  bookletKey: string;
+  displayLabel: string;
+  participantSessionCount: number;
+  testRunCount: number;
+  createdCount: number;
+  runningCount: number;
+  pausedCount: number;
+  completedCount: number;
+  responseCount: number;
+  reviewCount: number;
+  unitCount: number;
+  latestActivityAt: string | null;
+};
+
 export type WorkspaceStudyMonitorGroupSession = {
   participantSession: ParticipantSession;
   latestTestRun: TestRun | null;
@@ -368,6 +383,13 @@ export type WorkspaceStudyMonitorUnitRun = {
   answered: boolean;
   response: string | null;
   responseLength: number;
+  reviewCount: number;
+};
+
+export type WorkspaceStudyMonitorBookletRun = {
+  testRun: TestRun;
+  participantSession: ParticipantSession | null;
+  responseCount: number;
   reviewCount: number;
 };
 
@@ -399,6 +421,25 @@ export type WorkspaceStudyMonitorUnitDetail = {
   testRuns: WorkspaceStudyMonitorUnitRun[];
 };
 
+export type WorkspaceStudyMonitorBookletDetail = {
+  tenantKey: string;
+  workspaceKey: string;
+  bookletKey: string;
+  displayLabel: string;
+  generatedAt: string;
+  participantSessionCount: number;
+  testRunCount: number;
+  createdCount: number;
+  runningCount: number;
+  pausedCount: number;
+  completedCount: number;
+  responseCount: number;
+  reviewCount: number;
+  unitCount: number;
+  testRuns: WorkspaceStudyMonitorBookletRun[];
+  unitProgress: WorkspaceStudyMonitorUnitProgress[];
+};
+
 export type WorkspaceStudyMonitorSummary = {
   tenantKey: string;
   workspaceKey: string;
@@ -412,6 +453,7 @@ export type WorkspaceStudyMonitorSummary = {
   responseCount: number;
   reviewCount: number;
   groups: WorkspaceStudyMonitorGroup[];
+  bookletProgress: WorkspaceStudyMonitorBookletProgress[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
 };
 
