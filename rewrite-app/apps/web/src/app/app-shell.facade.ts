@@ -1,9 +1,15 @@
 import { Injectable, inject } from "@angular/core";
 
+import type { GetRuntimeConfigResponse } from "@testcenter-rewrite-app/contracts";
+
 import type { AppView } from "./rewrite-app-shell.types";
+import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import type { LiveContextSection } from "./live-context.component";
+
+const localDemoParticipantLink =
+  "/participant?workspaceKey=demo-workspace&loginKey=student-demo";
 
 @Injectable({ providedIn: "root" })
 export class AppShellFacade {
@@ -35,6 +41,17 @@ export class AppShellFacade {
 
   get showRawDebug(): boolean {
     return this.uiState.showRawDebug;
+  }
+
+  get localDemoBootstrapEnabled(): boolean {
+    const runtimeConfig = parseJsonDocument<GetRuntimeConfigResponse>(
+      this.ops.runtimeConfigView
+    )?.runtimeConfig;
+    return runtimeConfig?.environment.firstSliceBootstrapDemo === true;
+  }
+
+  get localDemoParticipantLink(): string {
+    return localDemoParticipantLink;
   }
 
   get lastResponsePreview(): string {

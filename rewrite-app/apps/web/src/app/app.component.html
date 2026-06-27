@@ -8,6 +8,10 @@
         This Angular app now runs as routed frontend surface for workspace setup,
         content intake, participant runtime, and operator diagnostics.
       </p>
+      <div class="actions hero-actions" *ngIf="app.localDemoBootstrapEnabled">
+        <a class="button-link primary" [href]="app.localDemoParticipantLink">Start Demo Participant</a>
+        <a class="button-link ghost" routerLink="/ops">Sign In Demo Admin</a>
+      </div>
     </div>
     <div class="hero-panel status-grid">
       <div class="status-pill">

@@ -282,6 +282,25 @@ button:disabled {
   transform: none;
 }
 
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.button-link:hover {
+  transform: translateY(-1px);
+}
+
+.hero-actions {
+  margin-top: 20px;
+}
+
 .primary {
   background: var(--accent);
   color: white;
