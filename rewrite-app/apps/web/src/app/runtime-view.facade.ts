@@ -362,6 +362,43 @@ export class RuntimeViewFacade {
     );
   }
 
+  get selectedSessionReviewItems(): RecordCollectionItem[] {
+    const detail = parseJsonDocument<GetParticipantSessionResponse>(
+      this.runtime.participantSessionDetailView
+    )?.participantSessionDetail;
+    if (!detail) {
+      return [];
+    }
+
+    return detail.reviews.map(review => ({
+      headline: `${review.category} · ${review.unitKey ?? "whole run"}`,
+      subline: review.reviewId,
+      badges: [review.reviewerId, review.testRunId],
+      rows: [
+        { label: "Comment", value: this.formatResponsePreview(review.comment) },
+        { label: "Participant", value: detail.participantSession.loginKey },
+        { label: "Run", value: review.testRunId },
+        { label: "Updated", value: this.formatDateTime(review.updatedAt) }
+      ],
+      selected:
+        this.runtime.testRunId.trim() === review.testRunId &&
+        (review.unitKey === null ||
+          this.runtime.currentUnitKey.trim() === review.unitKey),
+      actionLabel: "Select Review",
+      actionPayload: {
+        reviewId: review.reviewId,
+        testRunId: review.testRunId,
+        currentUnitKey: review.unitKey ?? "",
+        participantSessionId: review.participantSessionId,
+        loginKey: detail.participantSession.loginKey,
+        groupKey: detail.participantSession.groupKey,
+        reviewerId: review.reviewerId,
+        reviewCategory: review.category,
+        reviewComment: review.comment
+      }
+    }));
+  }
+
   get reviewItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListReviewsResponse>(this.runtime.reviewsView);
     return (

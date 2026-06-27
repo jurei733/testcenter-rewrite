@@ -177,6 +177,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Selected Session Reviews"
+        subtitle="Review comments attached to the active participant session."
+        [items]="view.selectedSessionReviewItems"
+        (itemAction)="view.selectReview($event)"
+        emptyState="No reviews attached to this participant session yet."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Unit Responses"
         subtitle="Saved participant responses for the selected run."
         [items]="view.unitResponseItems"

@@ -253,6 +253,23 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.getByRole("button", { name: "Participant Session Detail" }).click();
+  await page.waitForFunction(
+    () => {
+      const reviewCard = Array.from(document.querySelectorAll("article.card")).find(
+        card =>
+          card.querySelector("h3")?.textContent?.trim() ===
+          "Selected Session Reviews"
+      );
+      return (
+        reviewCard?.textContent?.includes("Updated smoke review note") &&
+        reviewCard.textContent.includes("operator-ui")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+
   const reviewDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Review CSV" }).click();
   const reviewDownload = await reviewDownloadPromise;
