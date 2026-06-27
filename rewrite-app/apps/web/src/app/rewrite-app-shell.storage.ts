@@ -122,99 +122,206 @@ export const createPersistedShellState = (
   activeView: target.activeView
 });
 
+const hydrateString = (value: unknown, fallback: string): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return fallback;
+};
+
 export const applyHydratedShellState = (
   target: ShellPersistenceTarget,
   snapshot: Partial<PersistedShellState>
 ): void => {
-  target.tenantKey = snapshot.tenantKey ?? target.tenantKey;
-  target.workspaceKey = snapshot.workspaceKey ?? target.workspaceKey;
-  target.sourceFileName = snapshot.sourceFileName ?? target.sourceFileName;
-  target.sourceMediaType = snapshot.sourceMediaType ?? target.sourceMediaType;
-  target.sourceDocument = snapshot.sourceDocument ?? target.sourceDocument;
-  target.sourcePackageId = snapshot.sourcePackageId ?? target.sourcePackageId;
-  target.importJobId = snapshot.importJobId ?? target.importJobId;
-  target.contentReleaseId = snapshot.contentReleaseId ?? target.contentReleaseId;
+  target.tenantKey = hydrateString(snapshot.tenantKey, target.tenantKey);
+  target.workspaceKey = hydrateString(snapshot.workspaceKey, target.workspaceKey);
+  target.sourceFileName = hydrateString(
+    snapshot.sourceFileName,
+    target.sourceFileName
+  );
+  target.sourceMediaType = hydrateString(
+    snapshot.sourceMediaType,
+    target.sourceMediaType
+  );
+  target.sourceDocument = hydrateString(
+    snapshot.sourceDocument,
+    target.sourceDocument
+  );
+  target.sourcePackageId = hydrateString(
+    snapshot.sourcePackageId,
+    target.sourcePackageId
+  );
+  target.importJobId = hydrateString(snapshot.importJobId, target.importJobId);
+  target.contentReleaseId = hydrateString(
+    snapshot.contentReleaseId,
+    target.contentReleaseId
+  );
   target.sourcePackageStatusFilter =
-    snapshot.sourcePackageStatusFilter ?? target.sourcePackageStatusFilter;
+    hydrateString(
+      snapshot.sourcePackageStatusFilter,
+      target.sourcePackageStatusFilter
+    );
   target.sourcePackageMediaTypeFilter =
-    snapshot.sourcePackageMediaTypeFilter ?? target.sourcePackageMediaTypeFilter;
+    hydrateString(
+      snapshot.sourcePackageMediaTypeFilter,
+      target.sourcePackageMediaTypeFilter
+    );
   target.sourcePackageFileNameFilter =
-    snapshot.sourcePackageFileNameFilter ?? target.sourcePackageFileNameFilter;
+    hydrateString(
+      snapshot.sourcePackageFileNameFilter,
+      target.sourcePackageFileNameFilter
+    );
   target.sourcePackageLatestImportStatusFilter =
-    snapshot.sourcePackageLatestImportStatusFilter ??
-    target.sourcePackageLatestImportStatusFilter;
+    hydrateString(
+      snapshot.sourcePackageLatestImportStatusFilter,
+      target.sourcePackageLatestImportStatusFilter
+    );
   target.sourcePackageLimit =
-    snapshot.sourcePackageLimit ?? target.sourcePackageLimit;
+    hydrateString(snapshot.sourcePackageLimit, target.sourcePackageLimit);
   target.importJobStatusFilter =
-    snapshot.importJobStatusFilter ?? target.importJobStatusFilter;
+    hydrateString(snapshot.importJobStatusFilter, target.importJobStatusFilter);
   target.importJobSourcePackageFilter =
-    snapshot.importJobSourcePackageFilter ?? target.importJobSourcePackageFilter;
-  target.importJobLimit = snapshot.importJobLimit ?? target.importJobLimit;
+    hydrateString(
+      snapshot.importJobSourcePackageFilter,
+      target.importJobSourcePackageFilter
+    );
+  target.importJobLimit = hydrateString(
+    snapshot.importJobLimit,
+    target.importJobLimit
+  );
   target.contentReleaseStatusFilter =
-    snapshot.contentReleaseStatusFilter ?? target.contentReleaseStatusFilter;
+    hydrateString(
+      snapshot.contentReleaseStatusFilter,
+      target.contentReleaseStatusFilter
+    );
   target.contentReleaseImportJobFilter =
-    snapshot.contentReleaseImportJobFilter ?? target.contentReleaseImportJobFilter;
+    hydrateString(
+      snapshot.contentReleaseImportJobFilter,
+      target.contentReleaseImportJobFilter
+    );
   target.contentReleaseSourcePackageFilter =
-    snapshot.contentReleaseSourcePackageFilter ??
-    target.contentReleaseSourcePackageFilter;
+    hydrateString(
+      snapshot.contentReleaseSourcePackageFilter,
+      target.contentReleaseSourcePackageFilter
+    );
   target.contentReleaseLimit =
-    snapshot.contentReleaseLimit ?? target.contentReleaseLimit;
-  target.participantSessionId = snapshot.participantSessionId ?? target.participantSessionId;
-  target.testRunId = snapshot.testRunId ?? target.testRunId;
-  target.currentUnitKey = snapshot.currentUnitKey ?? target.currentUnitKey;
-  target.loginKey = snapshot.loginKey ?? target.loginKey;
-  target.groupKey = snapshot.groupKey ?? target.groupKey;
+    hydrateString(snapshot.contentReleaseLimit, target.contentReleaseLimit);
+  target.participantSessionId = hydrateString(
+    snapshot.participantSessionId,
+    target.participantSessionId
+  );
+  target.testRunId = hydrateString(snapshot.testRunId, target.testRunId);
+  target.currentUnitKey = hydrateString(
+    snapshot.currentUnitKey,
+    target.currentUnitKey
+  );
+  target.loginKey = hydrateString(snapshot.loginKey, target.loginKey);
+  target.groupKey = hydrateString(snapshot.groupKey, target.groupKey);
   target.participantSessionStatusFilter =
-    snapshot.participantSessionStatusFilter ??
-    target.participantSessionStatusFilter;
+    hydrateString(
+      snapshot.participantSessionStatusFilter,
+      target.participantSessionStatusFilter
+    );
   target.participantSessionGroupFilter =
-    snapshot.participantSessionGroupFilter ?? target.participantSessionGroupFilter;
+    hydrateString(
+      snapshot.participantSessionGroupFilter,
+      target.participantSessionGroupFilter
+    );
   target.participantSessionLoginFilter =
-    snapshot.participantSessionLoginFilter ?? target.participantSessionLoginFilter;
+    hydrateString(
+      snapshot.participantSessionLoginFilter,
+      target.participantSessionLoginFilter
+    );
   target.participantSessionReleaseFilter =
-    snapshot.participantSessionReleaseFilter ??
-    target.participantSessionReleaseFilter;
+    hydrateString(
+      snapshot.participantSessionReleaseFilter,
+      target.participantSessionReleaseFilter
+    );
   target.participantSessionLimit =
-    snapshot.participantSessionLimit ?? target.participantSessionLimit;
+    hydrateString(
+      snapshot.participantSessionLimit,
+      target.participantSessionLimit
+    );
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;
   target.workspaceActivityEventType =
-    snapshot.workspaceActivityEventType ?? target.workspaceActivityEventType;
+    hydrateString(
+      snapshot.workspaceActivityEventType,
+      target.workspaceActivityEventType
+    );
   target.workspaceActivitySubjectType =
-    snapshot.workspaceActivitySubjectType ?? target.workspaceActivitySubjectType;
+    hydrateString(
+      snapshot.workspaceActivitySubjectType,
+      target.workspaceActivitySubjectType
+    );
   target.workspaceActivitySubjectId =
-    snapshot.workspaceActivitySubjectId ?? target.workspaceActivitySubjectId;
+    hydrateString(
+      snapshot.workspaceActivitySubjectId,
+      target.workspaceActivitySubjectId
+    );
   target.workspaceActivityLimit =
-    snapshot.workspaceActivityLimit ?? target.workspaceActivityLimit;
+    hydrateString(snapshot.workspaceActivityLimit, target.workspaceActivityLimit);
   target.forceActivation = snapshot.forceActivation ?? target.forceActivation;
-  target.adminUsername = snapshot.adminUsername ?? target.adminUsername;
-  target.adminDisplayName = snapshot.adminDisplayName ?? target.adminDisplayName;
-  target.adminSessionToken = snapshot.adminSessionToken ?? target.adminSessionToken;
+  target.adminUsername = hydrateString(
+    snapshot.adminUsername,
+    target.adminUsername
+  );
+  target.adminDisplayName = hydrateString(
+    snapshot.adminDisplayName,
+    target.adminDisplayName
+  );
+  target.adminSessionToken = hydrateString(
+    snapshot.adminSessionToken,
+    target.adminSessionToken
+  );
   target.adminCreateUsername =
-    snapshot.adminCreateUsername ?? target.adminCreateUsername;
+    hydrateString(snapshot.adminCreateUsername, target.adminCreateUsername);
   target.adminCreateDisplayName =
-    snapshot.adminCreateDisplayName ?? target.adminCreateDisplayName;
+    hydrateString(
+      snapshot.adminCreateDisplayName,
+      target.adminCreateDisplayName
+    );
   target.adminCreateRole = snapshot.adminCreateRole ?? target.adminCreateRole;
   target.adminCreateTenantKey =
-    snapshot.adminCreateTenantKey ?? target.adminCreateTenantKey;
+    hydrateString(snapshot.adminCreateTenantKey, target.adminCreateTenantKey);
   target.adminCreateWorkspaceKey =
-    snapshot.adminCreateWorkspaceKey ?? target.adminCreateWorkspaceKey;
+    hydrateString(
+      snapshot.adminCreateWorkspaceKey,
+      target.adminCreateWorkspaceKey
+    );
   target.adminRoleTargetUserId =
-    snapshot.adminRoleTargetUserId ?? target.adminRoleTargetUserId;
+    hydrateString(snapshot.adminRoleTargetUserId, target.adminRoleTargetUserId);
   target.adminRoleRole = snapshot.adminRoleRole ?? target.adminRoleRole;
   target.adminRoleTenantKey =
-    snapshot.adminRoleTenantKey ?? target.adminRoleTenantKey;
+    hydrateString(snapshot.adminRoleTenantKey, target.adminRoleTenantKey);
   target.adminRoleWorkspaceKey =
-    snapshot.adminRoleWorkspaceKey ?? target.adminRoleWorkspaceKey;
+    hydrateString(
+      snapshot.adminRoleWorkspaceKey,
+      target.adminRoleWorkspaceKey
+    );
   target.adminRevokeTargetUserId =
-    snapshot.adminRevokeTargetUserId ?? target.adminRevokeTargetUserId;
+    hydrateString(
+      snapshot.adminRevokeTargetUserId,
+      target.adminRevokeTargetUserId
+    );
   target.adminRevokeRoleAssignmentId =
-    snapshot.adminRevokeRoleAssignmentId ?? target.adminRevokeRoleAssignmentId;
+    hydrateString(
+      snapshot.adminRevokeRoleAssignmentId,
+      target.adminRevokeRoleAssignmentId
+    );
   target.adminStatusTargetUserId =
-    snapshot.adminStatusTargetUserId ?? target.adminStatusTargetUserId;
+    hydrateString(
+      snapshot.adminStatusTargetUserId,
+      target.adminStatusTargetUserId
+    );
   target.adminStatusValue = snapshot.adminStatusValue ?? target.adminStatusValue;
   target.adminResetTargetUserId =
-    snapshot.adminResetTargetUserId ?? target.adminResetTargetUserId;
+    hydrateString(snapshot.adminResetTargetUserId, target.adminResetTargetUserId);
   target.showRawDebug = snapshot.showRawDebug ?? target.showRawDebug;
   target.activeView = snapshot.activeView ?? target.activeView;
 };
