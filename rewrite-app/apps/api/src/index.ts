@@ -577,6 +577,18 @@ const sendAsset = (
   response.end(body);
 };
 
+const sendRedirect = (
+  response: ServerResponse,
+  statusCode: 301 | 302 | 307 | 308,
+  location: string
+): void => {
+  response.writeHead(statusCode, {
+    location,
+    "cache-control": "no-cache"
+  });
+  response.end();
+};
+
 const sendError = (
   response: ServerResponse,
   statusCode: number,
@@ -894,6 +906,9 @@ const resolveFrontendBuildDirectory = (): string => {
 const frontendBuildDirectory = resolveFrontendBuildDirectory();
 const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
 
+const isParticipantEntryPath = (pathname: string): boolean =>
+  pathname === "/participant" || pathname === "/participant/";
+
 const resolveFrontendContentType = (pathname: string): string => {
   switch (extname(pathname)) {
     case ".css":
@@ -982,6 +997,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname.startsWith("/app/")) {
     return "GET /app/*";
+  }
+
+  if (method === "GET" && isParticipantEntryPath(pathname)) {
+    return "GET /participant";
   }
 
   if (method === "GET" && pathname === "/healthz") {
@@ -1184,6 +1203,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     const pathname = url.pathname;
 
     try {
+      if (request.method === "GET" && isParticipantEntryPath(pathname)) {
+        sendRedirect(response, 302, `/app/participant${url.search}`);
+        return;
+      }
+
       if (request.method === "GET" && (pathname === "/" || pathname.startsWith("/app"))) {
         await serveFrontendRequest(response, pathname);
         return;

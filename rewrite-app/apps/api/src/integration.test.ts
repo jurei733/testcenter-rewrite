@@ -1493,6 +1493,16 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.match(appResponse.body, /<base href="\/app\/"\s*\/?>/);
   assert.match(appResponse.body, /<title>Testcenter Rewrite App<\/title>/);
 
+  const participantEntryResponse = await fetch(
+    `${baseUrl}/participant?workspaceKey=demo-workspace`,
+    { redirect: "manual" }
+  );
+  assert.equal(participantEntryResponse.status, 302);
+  assert.equal(
+    participantEntryResponse.headers.get("location"),
+    "/app/participant?workspaceKey=demo-workspace"
+  );
+
   const scriptMatch = appResponse.body.match(
     /<script src="([^"]*main[^"]*\.js)" type="module"><\/script>/
   );
