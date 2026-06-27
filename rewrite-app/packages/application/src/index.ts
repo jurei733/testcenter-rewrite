@@ -3735,6 +3735,38 @@ export const createFirstSliceServices = (
           );
         }
 
+        const reusableSession = (
+          await repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        )
+          .filter(
+            participantSession =>
+              participantSession.loginKey === input.loginKey &&
+              participantSession.contentReleaseId ===
+                activeRelease.contentReleaseId &&
+              participantSession.status !== "closed"
+          )
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+
+        if (reusableSession) {
+          await recordWorkspaceActivity({
+            tenantId: reusableSession.tenantId,
+            workspaceId: reusableSession.workspaceId,
+            eventType: "participant_signed_in",
+            subjectType: "participant_session",
+            subjectId: reusableSession.participantSessionId,
+            summary: `Participant '${reusableSession.loginKey}' re-entered an existing session.`,
+            details: {
+              loginKey: reusableSession.loginKey,
+              contentReleaseId: reusableSession.contentReleaseId,
+              reused: true
+            }
+          });
+          return reusableSession;
+        }
+
         const participantSession: ParticipantSession = {
           participantSessionId: idGenerator(),
           tenantId: workspace.tenantId,

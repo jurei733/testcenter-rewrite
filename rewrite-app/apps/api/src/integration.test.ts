@@ -1644,6 +1644,109 @@ test("source document import normalizes fallback labels and duplicate entries", 
   );
 });
 
+test("participant sign-in reuses an open session for the active release", async () => {
+  const tenantKey = "integration-tenant-session-reentry";
+  const workspaceKey = "integration-workspace-session-reentry";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "reentry.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+        "<assessment><booklet key=\"booklet:reentry\" label=\"Reentry\"><unit key=\"unit-reentry\" label=\"Reentry Unit\" /></booklet></assessment>"
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "integration-test" }
+    }
+  );
+
+  const firstSignIn = await requestJson<{
+    participantSession: { participantSessionId: string; status: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "reentry-student"
+    }
+  });
+  const secondSignIn = await requestJson<{
+    participantSession: { participantSessionId: string; status: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "reentry-student"
+    }
+  });
+
+  assert.equal(secondSignIn.status, 200);
+  assert.equal(
+    secondSignIn.body.participantSession.participantSessionId,
+    firstSignIn.body.participantSession.participantSessionId
+  );
+  assert.equal(secondSignIn.body.participantSession.status, "signed_in");
+
+  await requestJson(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST" }
+  );
+
+  const thirdSignIn = await requestJson<{
+    participantSession: { participantSessionId: string; status: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "reentry-student"
+    }
+  });
+
+  assert.equal(
+    thirdSignIn.body.participantSession.participantSessionId,
+    firstSignIn.body.participantSession.participantSessionId
+  );
+  assert.equal(thirdSignIn.body.participantSession.status, "launched");
+
+  const participantSessions = await requestJson<{
+    items: Array<{ participantSession: { loginKey: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`
+  );
+
+  assert.equal(participantSessions.status, 200);
+  assert.equal(
+    participantSessions.body.items.filter(
+      item => item.participantSession.loginKey === "reentry-student"
+    ).length,
+    1
+  );
+});
+
 test("activation guard returns blocking open-run details", async () => {
   const tenantKey = "integration-tenant-activation";
   const workspaceKey = "integration-workspace-activation";

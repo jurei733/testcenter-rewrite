@@ -271,6 +271,7 @@ The added read side now makes the first slice inspectable:
 - failed source packages can now be retried in place with corrected manifest data, producing a fresh import job on the same package identity
 - content-release listing returns staged/active/superseded releases together with their import/source-package lineage
 - participant runtime can now be re-entered through session context, not only through `testRunId`
+- participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure`, which the import step turns into the release runtime snapshot
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
