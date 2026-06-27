@@ -103,7 +103,8 @@ export class RuntimeViewFacade {
         subline: detail.participantSession.participantSessionId,
         badges: [
           detail.participantSession.status,
-          detail.contentRelease?.status ?? "no release"
+          detail.contentRelease?.status ?? "no release",
+          `${detail.reviewCount ?? 0} review(s)`
         ],
         rows: [
           {
@@ -113,6 +114,18 @@ export class RuntimeViewFacade {
           {
             label: "Release",
             value: detail.contentRelease?.releaseLabel ?? "none"
+          },
+          {
+            label: "Runs",
+            value: String(detail.testRuns.length)
+          },
+          {
+            label: "Responses",
+            value: String(detail.responseCount ?? 0)
+          },
+          {
+            label: "Reviews",
+            value: String(detail.reviewCount ?? 0)
           },
           {
             label: "Created",
@@ -136,45 +149,62 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<GetParticipantSessionResponse>(
       this.runtime.participantSessionDetailView
     );
+    const detail = payload?.participantSessionDetail;
+    const runSummaries =
+      detail?.runSummaries ??
+      detail?.testRuns.map(testRun => ({
+        testRun,
+        responseCount: Object.keys(testRun.unitResponses ?? {}).length,
+        reviewCount: 0
+      }));
+
     return (
-      payload?.participantSessionDetail.testRuns.map(testRun => ({
-        headline: testRun.testRunId,
-        subline: testRun.status,
-        badges: [
-          testRun.bookletKey,
-          `${Object.keys(testRun.unitResponses ?? {}).length} response(s)`
-        ],
-        rows: [
-          {
-            label: "Current Unit",
-            value: testRun.currentUnitKey ?? "none"
-          },
-          {
-            label: "Unit Responses",
-            value: String(Object.keys(testRun.unitResponses ?? {}).length)
-          },
-          {
-            label: "Created",
-            value: this.formatDateTime(testRun.createdAt)
-          },
-          {
-            label: "Updated",
-            value: this.formatDateTime(testRun.updatedAt)
-          },
-          {
-            label: "Completed",
-            value: testRun.completedAt
-              ? this.formatDateTime(testRun.completedAt)
-              : "not completed"
+      runSummaries?.map(summary => {
+        const testRun = summary.testRun;
+        return {
+          headline: testRun.testRunId,
+          subline: testRun.status,
+          badges: [
+            testRun.bookletKey,
+            `${summary.responseCount} response(s)`,
+            `${summary.reviewCount} review(s)`
+          ],
+          rows: [
+            {
+              label: "Current Unit",
+              value: testRun.currentUnitKey ?? "none"
+            },
+            {
+              label: "Unit Responses",
+              value: String(summary.responseCount)
+            },
+            {
+              label: "Reviews",
+              value: String(summary.reviewCount)
+            },
+            {
+              label: "Created",
+              value: this.formatDateTime(testRun.createdAt)
+            },
+            {
+              label: "Updated",
+              value: this.formatDateTime(testRun.updatedAt)
+            },
+            {
+              label: "Completed",
+              value: testRun.completedAt
+                ? this.formatDateTime(testRun.completedAt)
+                : "not completed"
+            }
+          ],
+          selected: this.runtime.testRunId.trim() === testRun.testRunId,
+          actionLabel: "Select + Sync",
+          actionPayload: {
+            testRunId: testRun.testRunId,
+            currentUnitKey: testRun.currentUnitKey ?? ""
           }
-        ],
-        selected: this.runtime.testRunId.trim() === testRun.testRunId,
-        actionLabel: "Select + Sync",
-        actionPayload: {
-          testRunId: testRun.testRunId,
-          currentUnitKey: testRun.currentUnitKey ?? ""
-        }
-      })) ?? []
+        };
+      }) ?? []
     );
   }
 

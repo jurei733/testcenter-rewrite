@@ -1349,6 +1349,50 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(reviews.body.items[0]?.participantSession?.loginKey, "student-demo");
     assert.equal(reviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
 
+    const participantSessionDetail = await requestJsonAt<{
+      participantSessionDetail: {
+        responseCount: number;
+        reviewCount: number;
+        runSummaries: Array<{
+          testRun: { testRunId: string; status: string };
+          responseCount: number;
+          reviewCount: number;
+        }>;
+        reviews: Array<{ reviewId: string; comment: string }>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-sessions/${participantSignIn.body.participantSession.participantSessionId}`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(participantSessionDetail.status, 200);
+    assert.equal(participantSessionDetail.body.participantSessionDetail.responseCount, 1);
+    assert.equal(participantSessionDetail.body.participantSessionDetail.reviewCount, 1);
+    assert.equal(
+      participantSessionDetail.body.participantSessionDetail.runSummaries[0]?.testRun
+        .testRunId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(
+      participantSessionDetail.body.participantSessionDetail.runSummaries[0]
+        ?.responseCount,
+      1
+    );
+    assert.equal(
+      participantSessionDetail.body.participantSessionDetail.runSummaries[0]
+        ?.reviewCount,
+      1
+    );
+    assert.equal(
+      participantSessionDetail.body.participantSessionDetail.reviews[0]?.comment,
+      "Updated integration review"
+    );
+
     const studyMonitorGroup = await requestJsonAt<{
       studyMonitorGroup: {
         groupKey: string;
@@ -2041,6 +2085,14 @@ test("workspace participant-session list shows latest run and active release", a
       participantSession: { participantSessionId: string; loginKey: string };
       contentRelease: { contentReleaseId: string; status: string } | null;
       testRuns: Array<{ testRunId: string; status: string }>;
+      runSummaries: Array<{
+        testRun: { testRunId: string; status: string };
+        responseCount: number;
+        reviewCount: number;
+      }>;
+      responseCount: number;
+      reviewCount: number;
+      reviews: Array<{ reviewId: string }>;
     };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions/${signIn.body.participantSession.participantSessionId}`
@@ -2058,6 +2110,23 @@ test("workspace participant-session list shows latest run and active release", a
   assert.equal(
     participantSessionDetail.body.participantSessionDetail.testRuns[0]?.testRunId,
     resumedRun.body.testRun.testRunId
+  );
+  assert.equal(participantSessionDetail.body.participantSessionDetail.responseCount, 0);
+  assert.equal(participantSessionDetail.body.participantSessionDetail.reviewCount, 0);
+  assert.equal(participantSessionDetail.body.participantSessionDetail.reviews.length, 0);
+  assert.equal(
+    participantSessionDetail.body.participantSessionDetail.runSummaries[0]?.testRun
+      .testRunId,
+    resumedRun.body.testRun.testRunId
+  );
+  assert.equal(
+    participantSessionDetail.body.participantSessionDetail.runSummaries[0]
+      ?.responseCount,
+    0
+  );
+  assert.equal(
+    participantSessionDetail.body.participantSessionDetail.runSummaries[0]?.reviewCount,
+    0
   );
 
   const activityEvents = await requestJson<{

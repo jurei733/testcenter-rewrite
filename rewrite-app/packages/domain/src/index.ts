@@ -365,10 +365,20 @@ export type WorkspaceParticipantSessionListItem = {
   contentRelease: ContentRelease | null;
 };
 
+export type WorkspaceParticipantSessionRunSummary = {
+  testRun: TestRun;
+  responseCount: number;
+  reviewCount: number;
+};
+
 export type WorkspaceParticipantSessionDetail = {
   participantSession: ParticipantSession;
   contentRelease: ContentRelease | null;
   testRuns: TestRun[];
+  runSummaries: WorkspaceParticipantSessionRunSummary[];
+  responseCount: number;
+  reviewCount: number;
+  reviews: WorkspaceReview[];
 };
 
 export type WorkspaceDetailedResponse = {

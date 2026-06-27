@@ -3172,20 +3172,50 @@ export const createFirstSliceServices = (
           );
         }
 
-        const contentRelease =
-          (await repository.getContentReleaseById(
-            participantSession.contentReleaseId
-          )) ?? null;
-        const testRuns = (
-          await repository.listTestRunsByParticipantSessionId(
+        const [contentRelease, rawTestRuns, workspaceReviews] = await Promise.all([
+          repository.getContentReleaseById(participantSession.contentReleaseId),
+          repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
+          ),
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
           )
-        ).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+        ]);
+        const testRuns = rawTestRuns
+          .map(normalizeTestRun)
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+        const testRunIds = new Set(testRuns.map(testRun => testRun.testRunId));
+        const reviews = workspaceReviews
+          .filter(
+            review =>
+              review.participantSessionId ===
+                participantSession.participantSessionId &&
+              testRunIds.has(review.testRunId)
+          )
+          .sort(
+            (left, right) =>
+              right.updatedAt.localeCompare(left.updatedAt) ||
+              right.reviewId.localeCompare(left.reviewId)
+          );
 
         return {
           participantSession,
-          contentRelease,
-          testRuns
+          contentRelease: contentRelease ?? null,
+          testRuns,
+          runSummaries: testRuns.map(testRun => ({
+            testRun,
+            responseCount: Object.keys(testRun.unitResponses).length,
+            reviewCount: reviews.filter(
+              review => review.testRunId === testRun.testRunId
+            ).length
+          })),
+          responseCount: testRuns.reduce(
+            (total, testRun) => total + Object.keys(testRun.unitResponses).length,
+            0
+          ),
+          reviewCount: reviews.length,
+          reviews
         };
       },
       async listDetailedResponses(input) {

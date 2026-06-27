@@ -260,7 +260,7 @@ The added read side now makes the first slice inspectable:
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release
-- participant-session detail now resolves one session together with its content release and full run history
+- participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context
 - review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
