@@ -45,6 +45,7 @@ import {
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
+  type GetStudyMonitorSummaryResponse,
   type GetWorkspaceOverviewResponse,
   type ListAdminAuditEventsResponse,
   type ListWorkspaceActivityEventsResponse,
@@ -807,6 +808,9 @@ const workspaceCreatePattern = createRoutePattern(
 const workspaceOverviewPattern = createRoutePattern(
   productionApiRoutes.workspace.getWorkspaceOverview
 );
+const studyMonitorSummaryPattern = createRoutePattern(
+  productionApiRoutes.workspace.getStudyMonitorSummary
+);
 const workspaceActivityEventListPattern = createRoutePattern(
   productionApiRoutes.workspace.listWorkspaceActivityEvents
 );
@@ -890,6 +894,7 @@ type OperatorAccessScope =
 
 const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", workspaceOverviewPattern],
+  ["GET", studyMonitorSummaryPattern],
   ["GET", workspaceActivityEventListPattern],
   ["POST", sourcePackageCreatePattern],
   ["GET", sourcePackageListPattern],
@@ -1204,6 +1209,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", workspaceCreatePattern, productionApiRoutes.workspace.createWorkspace],
     ["GET", workspaceCreatePattern, productionApiRoutes.workspace.listWorkspaces],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
+    [
+      "GET",
+      studyMonitorSummaryPattern,
+      productionApiRoutes.workspace.getStudyMonitorSummary
+    ],
     [
       "GET",
       workspaceActivityEventListPattern,
@@ -1885,6 +1895,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const workspaceOverviewMatch = workspaceOverviewPattern.exec(pathname);
+      const studyMonitorSummaryMatch = studyMonitorSummaryPattern.exec(pathname);
       if (request.method === "GET" && workspaceOverviewMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -1907,6 +1918,34 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
         sendJson<GetWorkspaceOverviewResponse>(response, 200, {
           workspaceOverview
+        });
+        return;
+      }
+
+      if (request.method === "GET" && studyMonitorSummaryMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          studyMonitorSummaryMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          studyMonitorSummaryMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const studyMonitorSummary =
+          await services.workspaceAdminRead.getStudyMonitorSummary({
+            tenantKey,
+            workspaceKey
+          });
+        sendJson<GetStudyMonitorSummaryResponse>(response, 200, {
+          studyMonitorSummary
         });
         return;
       }

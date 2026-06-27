@@ -34,6 +34,7 @@ import type {
   WorkspaceParticipantSessionListItem,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
+  WorkspaceStudyMonitorSummary,
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
 
@@ -85,6 +86,10 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceOverview>;
+  getStudyMonitorSummary(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceStudyMonitorSummary>;
   listWorkspaceActivityEvents(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -305,6 +310,7 @@ export const firstSliceUseCases = {
   listWorkspaces: "ListWorkspaces",
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
+  getStudyMonitorSummary: "GetStudyMonitorSummary",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
@@ -1576,6 +1582,103 @@ const buildWorkspaceContentReleaseListItems = (input: {
     }
   );
 
+const getLatestTestRunByParticipantSessionId = (
+  testRuns: TestRun[]
+): Map<string, TestRun> => {
+  const latestBySessionId = new Map<string, TestRun>();
+  for (const testRun of testRuns) {
+    const currentLatest = latestBySessionId.get(testRun.participantSessionId);
+    if (!currentLatest || testRun.updatedAt.localeCompare(currentLatest.updatedAt) > 0) {
+      latestBySessionId.set(testRun.participantSessionId, normalizeTestRun(testRun));
+    }
+  }
+  return latestBySessionId;
+};
+
+const buildStudyMonitorSummary = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): WorkspaceStudyMonitorSummary => {
+  const latestRunsBySessionId = getLatestTestRunByParticipantSessionId(input.testRuns);
+  const testRunsBySessionId = new Map<string, TestRun[]>();
+  for (const testRun of input.testRuns) {
+    const sessionRuns = testRunsBySessionId.get(testRun.participantSessionId) ?? [];
+    sessionRuns.push(normalizeTestRun(testRun));
+    testRunsBySessionId.set(testRun.participantSessionId, sessionRuns);
+  }
+
+  const groupsByKey = new Map<string, WorkspaceStudyMonitorSummary["groups"][number]>();
+  for (const participantSession of input.participantSessions) {
+    const groupKey = participantSession.groupKey || "unknown-group";
+    const latestRun = latestRunsBySessionId.get(
+      participantSession.participantSessionId
+    );
+    const sessionRuns =
+      testRunsBySessionId.get(participantSession.participantSessionId) ?? [];
+    const group = groupsByKey.get(groupKey) ?? {
+      groupKey,
+      participantSessionCount: 0,
+      testRunCount: 0,
+      notStartedCount: 0,
+      runningCount: 0,
+      pausedCount: 0,
+      completedCount: 0,
+      responseCount: 0,
+      latestActivityAt: null
+    };
+
+    group.participantSessionCount += 1;
+    group.testRunCount += sessionRuns.length;
+    group.responseCount += sessionRuns.reduce(
+      (total, testRun) => total + Object.keys(testRun.unitResponses).length,
+      0
+    );
+    if (!latestRun) {
+      group.notStartedCount += 1;
+    } else if (latestRun.status === "running") {
+      group.runningCount += 1;
+    } else if (latestRun.status === "paused") {
+      group.pausedCount += 1;
+    } else if (latestRun.status === "completed") {
+      group.completedCount += 1;
+    } else {
+      group.notStartedCount += 1;
+    }
+
+    const latestSessionActivity =
+      sessionRuns.map(testRun => testRun.updatedAt).sort().at(-1) ??
+      participantSession.createdAt;
+    if (
+      !group.latestActivityAt ||
+      latestSessionActivity.localeCompare(group.latestActivityAt) > 0
+    ) {
+      group.latestActivityAt = latestSessionActivity;
+    }
+    groupsByKey.set(groupKey, group);
+  }
+
+  const groups = Array.from(groupsByKey.values()).sort((left, right) =>
+    left.groupKey.localeCompare(right.groupKey)
+  );
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    generatedAt: input.generatedAt,
+    participantSessionCount: input.participantSessions.length,
+    testRunCount: input.testRuns.length,
+    notStartedCount: groups.reduce((total, group) => total + group.notStartedCount, 0),
+    runningCount: groups.reduce((total, group) => total + group.runningCount, 0),
+    pausedCount: groups.reduce((total, group) => total + group.pausedCount, 0),
+    completedCount: groups.reduce((total, group) => total + group.completedCount, 0),
+    responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
+    groups
+  };
+};
+
 export const createFirstSliceServices = (
   dependencies: FirstSliceDependencies
 ): FirstSliceServices => {
@@ -2310,6 +2413,28 @@ export const createFirstSliceServices = (
           openTestRunCount: testRuns.filter(testRun => testRun.status !== "completed")
             .length
         };
+      },
+      async getStudyMonitorSummary(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [participantSessions, testRuns] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+
+        return buildStudyMonitorSummary({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          generatedAt: now(),
+          participantSessions,
+          testRuns
+        });
       },
       async listWorkspaceActivityEvents(input) {
         const workspace = await requireWorkspace(

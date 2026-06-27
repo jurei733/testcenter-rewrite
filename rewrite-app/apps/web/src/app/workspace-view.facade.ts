@@ -2,6 +2,7 @@ import { Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import type {
+  GetStudyMonitorSummaryResponse,
   GetWorkspaceOverviewResponse,
   ListParticipantSessionsResponse,
   ListTenantsResponse,
@@ -38,6 +39,34 @@ export class WorkspaceViewFacade {
 
   get workspaceLogExportView(): string {
     return this.uiState.workspace.workspaceLogExportView;
+  }
+
+  get studyMonitorItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
+      this.workspace.studyMonitorView
+    );
+    return (
+      payload?.studyMonitorSummary.groups.map(group => ({
+        headline: group.groupKey,
+        subline: `${group.participantSessionCount} participant session(s)`,
+        badges: [
+          `${group.runningCount} running`,
+          `${group.pausedCount} paused`,
+          `${group.completedCount} completed`
+        ],
+        rows: [
+          { label: "Not Started", value: String(group.notStartedCount) },
+          { label: "Test Runs", value: String(group.testRunCount) },
+          { label: "Responses", value: String(group.responseCount) },
+          {
+            label: "Latest Activity",
+            value: group.latestActivityAt
+              ? this.formatDateTime(group.latestActivityAt)
+              : "none"
+          }
+        ]
+      })) ?? []
+    );
   }
 
   get workspaceActionItems(): RecordCollectionItem[] {
@@ -466,6 +495,10 @@ export class WorkspaceViewFacade {
 
   refreshWorkspaceOverview(): void {
     this.viewState.onActionAsync(() => this.workspaceService.refreshWorkspaceOverview());
+  }
+
+  refreshStudyMonitor(): void {
+    this.viewState.onActionAsync(() => this.workspaceService.refreshStudyMonitor());
   }
 
   refreshTenantDirectory(): void {

@@ -266,6 +266,32 @@ export type WorkspaceOverview = {
   openTestRunCount: number;
 };
 
+export type WorkspaceStudyMonitorGroup = {
+  groupKey: string;
+  participantSessionCount: number;
+  testRunCount: number;
+  notStartedCount: number;
+  runningCount: number;
+  pausedCount: number;
+  completedCount: number;
+  responseCount: number;
+  latestActivityAt: string | null;
+};
+
+export type WorkspaceStudyMonitorSummary = {
+  tenantKey: string;
+  workspaceKey: string;
+  generatedAt: string;
+  participantSessionCount: number;
+  testRunCount: number;
+  notStartedCount: number;
+  runningCount: number;
+  pausedCount: number;
+  completedCount: number;
+  responseCount: number;
+  groups: WorkspaceStudyMonitorGroup[];
+};
+
 export type WorkspaceContentReleaseListItem = {
   contentRelease: ContentRelease;
   importJob: ImportJob | null;

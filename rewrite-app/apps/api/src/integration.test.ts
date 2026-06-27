@@ -1207,6 +1207,43 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(detailedResponses.body.items[0]?.response, "My first demo response");
     assert.equal(detailedResponses.body.items[0]?.responseLength, 22);
 
+    const studyMonitor = await requestJsonAt<{
+      studyMonitorSummary: {
+        participantSessionCount: number;
+        testRunCount: number;
+        runningCount: number;
+        responseCount: number;
+        groups: Array<{
+          groupKey: string;
+          participantSessionCount: number;
+          runningCount: number;
+          responseCount: number;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/summary",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitor.status, 200);
+    assert.equal(studyMonitor.body.studyMonitorSummary.participantSessionCount, 1);
+    assert.equal(studyMonitor.body.studyMonitorSummary.testRunCount, 1);
+    assert.equal(studyMonitor.body.studyMonitorSummary.runningCount, 1);
+    assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 1);
+    assert.equal(
+      studyMonitor.body.studyMonitorSummary.groups[0]?.groupKey,
+      "group:student-demo"
+    );
+    assert.equal(
+      studyMonitor.body.studyMonitorSummary.groups[0]?.participantSessionCount,
+      1
+    );
+
     const responseCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv",

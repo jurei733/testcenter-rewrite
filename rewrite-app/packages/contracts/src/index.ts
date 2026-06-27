@@ -30,6 +30,7 @@ import type {
   WorkspaceActivityEventType,
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
+  WorkspaceStudyMonitorSummary,
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
 
@@ -56,6 +57,8 @@ export const productionApiRoutes = {
     createWorkspace: "/api/v1/tenants/:tenantKey/workspaces",
     listWorkspaces: "/api/v1/tenants/:tenantKey/workspaces",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
+    getStudyMonitorSummary:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/summary",
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
     createSourcePackage: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
@@ -283,6 +286,10 @@ export type ListAdminAuditEventsResponse = {
 
 export type GetWorkspaceOverviewResponse = {
   workspaceOverview: WorkspaceOverview;
+};
+
+export type GetStudyMonitorSummaryResponse = {
+  studyMonitorSummary: WorkspaceStudyMonitorSummary;
 };
 
 export type ListWorkspaceActivityEventsResponse = {

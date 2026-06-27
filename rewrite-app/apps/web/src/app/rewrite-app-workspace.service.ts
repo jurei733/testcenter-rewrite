@@ -1,6 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  GetStudyMonitorSummaryResponse,
   ListTenantsResponse,
   ListWorkspacesResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -46,6 +47,32 @@ export class RewriteAppWorkspaceService {
 
   async refreshWorkspaceOverview(quiet = false): Promise<void> {
     await refreshWorkspaceOverviewAction(this.contentHosts.createContentReadsHost(), quiet);
+  }
+
+  async refreshStudyMonitor(quiet = false): Promise<void> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<GetStudyMonitorSummaryResponse>(
+      "Study Monitor Summary",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorSummary, {
+        tenantKey,
+        workspaceKey
+      }),
+      undefined,
+      { quiet }
+    );
+
+    this.workspaceState.studyMonitorView = prettyPrintJson(
+      payload,
+      this.workspaceState.studyMonitorView
+    );
+    if (!quiet) {
+      this.feedback.rememberActivity(
+        "Study Monitor Refreshed",
+        `${payload.studyMonitorSummary.groups.length} group(s), ${payload.studyMonitorSummary.participantSessionCount} participant session(s).`
+      );
+    }
   }
 
   async refreshTenantDirectory(): Promise<void> {

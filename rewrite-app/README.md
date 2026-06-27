@@ -211,6 +211,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces`
 - `POST /api/v1/tenants/{tenantKey}/workspaces`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
@@ -246,6 +247,7 @@ The added read side now makes the first slice inspectable:
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts
+- study monitor summary returns workspace-wide group progress with participant sessions, latest run states, response counts, and latest activity timestamps
 - source-package listing shows uploaded packages together with their latest import attempt
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context

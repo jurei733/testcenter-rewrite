@@ -66,6 +66,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button class="primary" type="button" (click)="view.createTenant()">Create Tenant</button>
           <button class="secondary" type="button" (click)="view.createWorkspace()">Create Workspace</button>
           <button class="ghost" type="button" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
+          <button class="ghost" type="button" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
           <button class="ghost" type="button" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
@@ -124,6 +125,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Study Monitor"
+        subtitle="Workspace-wide group progress derived from participant sessions and latest run states."
+        [items]="view.studyMonitorItems"
+        emptyState="Refresh the study monitor to inspect group progress."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Workspace Activity"
         subtitle="Latest operator and system events for this scope."
         [items]="view.workspaceActivityItems"
@@ -150,6 +158,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Read Model"
         viewId="workspaceOverviewView"
         [content]="view.workspace.workspaceOverviewView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor"
+        subtitle="Group Progress"
+        viewId="studyMonitorView"
+        [content]="view.workspace.studyMonitorView"
       ></app-json-panel>
 
       <app-json-panel

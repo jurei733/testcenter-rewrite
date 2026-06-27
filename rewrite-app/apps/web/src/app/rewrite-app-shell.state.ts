@@ -86,6 +86,7 @@ export interface ShellWorkspaceState {
   workspacesView: string;
   workspaceOverviewView: string;
   workspaceActivityView: string;
+  studyMonitorView: string;
   workspaceLogExportView: string;
   workspaceLoaded: boolean;
 }
@@ -189,6 +190,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
+    studyMonitorView: 'Use "Refresh Study Monitor".',
     workspaceLogExportView: 'Use "Export Workspace Logs CSV".',
     workspaceLoaded: false
   };

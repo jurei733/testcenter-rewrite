@@ -256,6 +256,17 @@ try {
   await page.getByText("Group Results Deleted").waitFor({ timeout: 15_000 });
 
   await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Refresh Study Monitor" }).click();
+  await page.waitForFunction(
+    () =>
+      document.body.textContent?.includes("group:student-demo") &&
+      document.body.textContent?.includes("0 running") &&
+      document.body.textContent?.includes("Responses") &&
+      document.body.textContent?.includes("0"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   const logDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
   const logDownload = await logDownloadPromise;
