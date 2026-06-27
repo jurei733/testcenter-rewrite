@@ -813,6 +813,45 @@ try {
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.status === "running"
   );
+  logStep("participant-entry-reentry");
+  await page.goto(
+    `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
+      workspaceKey
+    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}`,
+    { waitUntil: "networkidle" }
+  );
+  await page.locator("#participantLoginKey").waitFor();
+  await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
+  await page.waitForFunction(
+    ([expectedSessionId]) =>
+      document.querySelector("#participantRouteSessionId")?.value ===
+        expectedSessionId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running",
+    [participantRouteSessionId],
+    { timeout: 15_000 }
+  );
+  const participantRouteReentryPayload = await pollJsonWithPredicate(
+    participantRouteSessionsUrl,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.filter(item => {
+        const participantSession = item?.participantSession;
+        return participantSession?.loginKey === participantRouteLoginKey;
+      }).length === 1
+  );
+  const participantRouteReentrySessionId =
+    participantRouteReentryPayload.items.find(item => {
+      const participantSession = item?.participantSession;
+      return participantSession?.loginKey === participantRouteLoginKey;
+    })?.participantSession?.participantSessionId;
+  assert.equal(
+    participantRouteReentrySessionId,
+    participantRouteSessionId,
+    "UI smoke expected participant re-entry to reuse the open session."
+  );
   await clickAction("Complete Test");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
