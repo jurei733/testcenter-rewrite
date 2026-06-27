@@ -1432,6 +1432,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         runningCount: number;
         responseCount: number;
         reviewCount: number;
+        unitProgress: Array<{
+          unitKey: string;
+          expectedRunCount: number;
+          responseCount: number;
+          missingResponseCount: number;
+        }>;
         groups: Array<{
           groupKey: string;
           participantSessionCount: number;
@@ -1456,6 +1462,34 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitor.body.studyMonitorSummary.runningCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.reviewCount, 0);
+    assert.deepEqual(
+      studyMonitor.body.studyMonitorSummary.unitProgress.map(unit => ({
+        unitKey: unit.unitKey,
+        expectedRunCount: unit.expectedRunCount,
+        responseCount: unit.responseCount,
+        missingResponseCount: unit.missingResponseCount
+      })),
+      [
+        {
+          unitKey: "unit-finish",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        },
+        {
+          unitKey: "unit-intro",
+          expectedRunCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0
+        },
+        {
+          unitKey: "unit-practice",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        }
+      ]
+    );
     assert.equal(
       studyMonitor.body.studyMonitorSummary.groups[0]?.groupKey,
       "group:student-demo"
@@ -1711,6 +1745,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           responseCount: number;
           reviewCount: number;
         }>;
+        unitProgress: Array<{
+          unitKey: string;
+          expectedRunCount: number;
+          responseCount: number;
+          missingResponseCount: number;
+        }>;
       };
     }>(
       isolated.baseUrl,
@@ -1746,6 +1786,34 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       resumed.body.testRun.testRunId
     );
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.testRuns[0]?.reviewCount, 1);
+    assert.deepEqual(
+      studyMonitorGroup.body.studyMonitorGroup.unitProgress.map(unit => ({
+        unitKey: unit.unitKey,
+        expectedRunCount: unit.expectedRunCount,
+        responseCount: unit.responseCount,
+        missingResponseCount: unit.missingResponseCount
+      })),
+      [
+        {
+          unitKey: "unit-finish",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        },
+        {
+          unitKey: "unit-intro",
+          expectedRunCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0
+        },
+        {
+          unitKey: "unit-practice",
+          expectedRunCount: 1,
+          responseCount: 0,
+          missingResponseCount: 1
+        }
+      ]
+    );
 
     const reviewCsv = await requestTextAt(
       isolated.baseUrl,

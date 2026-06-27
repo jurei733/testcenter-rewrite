@@ -95,7 +95,8 @@ export class WorkspaceViewFacade {
         subline: `${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
         badges: [
           `${detail.responseCount} response(s)`,
-          `${detail.reviewCount} review(s)`
+          `${detail.reviewCount} review(s)`,
+          `${detail.unitProgress.length} unit(s)`
         ],
         rows: [
           { label: "Tenant", value: detail.tenantKey },
@@ -113,6 +114,15 @@ export class WorkspaceViewFacade {
           {
             label: "Latest Run",
             value: detail.testRuns[0]?.testRun.status ?? "no runs"
+          },
+          {
+            label: "Missing Responses",
+            value: String(
+              detail.unitProgress.reduce(
+                (total, unit) => total + unit.missingResponseCount,
+                0
+              )
+            )
           }
         ]
       },
@@ -140,6 +150,25 @@ export class WorkspaceViewFacade {
           subjectId: session.participantSession.participantSessionId,
           loginKey: session.participantSession.loginKey
         }
+      })),
+      ...detail.unitProgress.map(unit => ({
+        headline: unit.displayLabel,
+        subline: unit.unitKey,
+        badges: [
+          `${unit.responseCount}/${unit.expectedRunCount} answered`,
+          `${unit.missingResponseCount} missing`
+        ],
+        rows: [
+          { label: "Expected Runs", value: String(unit.expectedRunCount) },
+          { label: "Responses", value: String(unit.responseCount) },
+          { label: "Completed Runs", value: String(unit.completedRunCount) },
+          {
+            label: "Latest Activity",
+            value: unit.latestActivityAt
+              ? this.formatDateTime(unit.latestActivityAt)
+              : "none"
+          }
+        ]
       })),
       ...detail.testRuns.map(item => ({
         headline: item.testRun.testRunId,

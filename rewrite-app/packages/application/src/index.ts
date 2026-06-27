@@ -42,6 +42,7 @@ import type {
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorUnitProgress,
   WorkspaceStudyMonitorSummary,
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
@@ -2039,12 +2040,110 @@ const getLatestTestRunByParticipantSessionId = (
   return latestBySessionId;
 };
 
+const buildStudyMonitorUnitProgress = (input: {
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+}): WorkspaceStudyMonitorUnitProgress[] => {
+  const contentReleasesById = new Map(
+    input.contentReleases.map(contentRelease => [
+      contentRelease.contentReleaseId,
+      contentRelease
+    ])
+  );
+  const sessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const progressByUnitKey = new Map<string, WorkspaceStudyMonitorUnitProgress>();
+
+  const ensureProgress = (
+    unitKey: string,
+    displayLabel: string
+  ): WorkspaceStudyMonitorUnitProgress => {
+    const existing = progressByUnitKey.get(unitKey);
+    if (existing) {
+      return existing;
+    }
+
+    const created: WorkspaceStudyMonitorUnitProgress = {
+      unitKey,
+      displayLabel,
+      expectedRunCount: 0,
+      responseCount: 0,
+      missingResponseCount: 0,
+      completedRunCount: 0,
+      latestActivityAt: null
+    };
+    progressByUnitKey.set(unitKey, created);
+    return created;
+  };
+
+  for (const testRun of input.testRuns.map(normalizeTestRun)) {
+    const participantSession = sessionsById.get(testRun.participantSessionId);
+    const contentRelease = participantSession
+      ? contentReleasesById.get(participantSession.contentReleaseId)
+      : null;
+    const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+      bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
+    );
+    const responseUnitKeys = new Set(Object.keys(testRun.unitResponses));
+    const expectedUnitKeys = new Set<string>();
+
+    for (const unitEntry of booklet?.unitEntries ?? []) {
+      expectedUnitKeys.add(unitEntry.unitKey);
+      const progress = ensureProgress(unitEntry.unitKey, unitEntry.displayLabel);
+      progress.expectedRunCount += 1;
+      if (responseUnitKeys.has(unitEntry.unitKey)) {
+        progress.responseCount += 1;
+      } else {
+        progress.missingResponseCount += 1;
+      }
+      if (testRun.status === "completed") {
+        progress.completedRunCount += 1;
+      }
+      if (
+        !progress.latestActivityAt ||
+        testRun.updatedAt.localeCompare(progress.latestActivityAt) > 0
+      ) {
+        progress.latestActivityAt = testRun.updatedAt;
+      }
+    }
+
+    for (const unitKey of responseUnitKeys) {
+      if (expectedUnitKeys.has(unitKey)) {
+        continue;
+      }
+
+      const progress = ensureProgress(unitKey, unitKey);
+      progress.expectedRunCount += 1;
+      progress.responseCount += 1;
+      if (testRun.status === "completed") {
+        progress.completedRunCount += 1;
+      }
+      if (
+        !progress.latestActivityAt ||
+        testRun.updatedAt.localeCompare(progress.latestActivityAt) > 0
+      ) {
+        progress.latestActivityAt = testRun.updatedAt;
+      }
+    }
+  }
+
+  return Array.from(progressByUnitKey.values()).sort((left, right) =>
+    left.unitKey.localeCompare(right.unitKey)
+  );
+};
+
 const buildStudyMonitorSummary = (input: {
   tenantKey: string;
   workspaceKey: string;
   generatedAt: string;
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
+  contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
 }): WorkspaceStudyMonitorSummary => {
   const latestRunsBySessionId = getLatestTestRunByParticipantSessionId(input.testRuns);
@@ -2128,7 +2227,12 @@ const buildStudyMonitorSummary = (input: {
     completedCount: groups.reduce((total, group) => total + group.completedCount, 0),
     responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
     reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
-    groups
+    groups,
+    unitProgress: buildStudyMonitorUnitProgress({
+      participantSessions: input.participantSessions,
+      testRuns: input.testRuns,
+      contentReleases: input.contentReleases
+    })
   };
 };
 
@@ -2139,6 +2243,7 @@ const buildStudyMonitorGroupDetail = (input: {
   generatedAt: string;
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
+  contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
 }): WorkspaceStudyMonitorGroupDetail => {
   const groupParticipantSessions = input.participantSessions
@@ -2219,7 +2324,12 @@ const buildStudyMonitorGroupDetail = (input: {
       reviewCount: groupReviews.filter(
         review => review.testRunId === testRun.testRunId
       ).length
-    }))
+    })),
+    unitProgress: buildStudyMonitorUnitProgress({
+      participantSessions: groupParticipantSessions,
+      testRuns: groupTestRuns,
+      contentReleases: input.contentReleases
+    })
   };
 };
 
@@ -3018,17 +3128,25 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [participantSessions, testRuns, reviews] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId),
-          repository.listWorkspaceReviewsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          )
-        ]);
+        const [participantSessions, testRuns, contentReleases, reviews] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return buildStudyMonitorSummary({
           tenantKey: input.tenantKey,
@@ -3036,6 +3154,7 @@ export const createFirstSliceServices = (
           generatedAt: now(),
           participantSessions,
           testRuns,
+          contentReleases,
           reviews
         });
       },
@@ -3046,17 +3165,25 @@ export const createFirstSliceServices = (
           input.workspaceKey
         );
         const groupKey = normalizeGroupKey(input.groupKey);
-        const [participantSessions, testRuns, reviews] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId),
-          repository.listWorkspaceReviewsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          )
-        ]);
+        const [participantSessions, testRuns, contentReleases, reviews] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
         const detail = buildStudyMonitorGroupDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
@@ -3064,6 +3191,7 @@ export const createFirstSliceServices = (
           generatedAt: now(),
           participantSessions,
           testRuns,
+          contentReleases,
           reviews
         });
 
