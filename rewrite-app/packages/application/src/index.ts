@@ -151,10 +151,24 @@ export type WorkspaceAdminReadPort = {
   listDetailedResponses(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    status?: TestRun["status"];
+    limit?: number;
   }): Promise<WorkspaceDetailedResponse[]>;
   exportResponseCsv(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    status?: TestRun["status"];
+    limit?: number;
   }): Promise<string>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
@@ -195,6 +209,14 @@ export type WorkspaceReviewPort = {
   listReviews(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    reviewerId?: string;
+    category?: string;
+    limit?: number;
   }): Promise<WorkspaceReviewListItem[]>;
   createReview(input: {
     tenantKey: string;
@@ -223,6 +245,14 @@ export type WorkspaceReviewPort = {
   exportReviewCsv(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    reviewerId?: string;
+    category?: string;
+    limit?: number;
   }): Promise<string>;
 };
 
@@ -1073,48 +1103,107 @@ const escapeCsvCell = (value: string | null | undefined): string => {
   return `"${normalizedValue.replace(/"/g, "\"\"")}"`;
 };
 
-const formatResponseCsv = (input: {
+type DetailedResponseFilters = {
+  loginKey?: string;
+  groupKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  status?: TestRun["status"];
+  limit?: number;
+};
+
+type WorkspaceReviewFilters = {
+  loginKey?: string;
+  groupKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  reviewerId?: string;
+  category?: string;
+  limit?: number;
+};
+
+const normalizeExactFilter = (value: string | undefined): string | undefined => {
+  const normalizedValue = value?.trim();
+  return normalizedValue ? normalizedValue : undefined;
+};
+
+const resolveOperatorReadLimit = (limit: number | undefined): number =>
+  Math.max(1, Math.min(limit ?? 500, 500));
+
+const listDetailedResponsesForWorkspace = (input: {
   tenantKey: string;
   workspaceKey: string;
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
-}): string => {
+} & DetailedResponseFilters): WorkspaceDetailedResponse[] => {
   const participantSessionsById = new Map(
     input.participantSessions.map(participantSession => [
       participantSession.participantSessionId,
       participantSession
     ])
   );
-  const rows = input.testRuns.flatMap(testRun => {
-    const normalizedTestRun = normalizeTestRun(testRun);
-    const participantSession =
-      participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
+  const filters = {
+    loginKey: normalizeExactFilter(input.loginKey),
+    groupKey: normalizeExactFilter(input.groupKey),
+    participantSessionId: normalizeExactFilter(input.participantSessionId),
+    testRunId: normalizeExactFilter(input.testRunId),
+    unitKey: normalizeExactFilter(input.unitKey),
+    status: input.status
+  };
 
-    return Object.entries(normalizedTestRun.unitResponses).map(
-      ([unitKey, response]) => ({
-        tenantKey: input.tenantKey,
-        workspaceKey: input.workspaceKey,
-        loginKey: participantSession?.loginKey ?? "",
-        groupKey: participantSession?.groupKey ?? "",
-        participantSessionId: normalizedTestRun.participantSessionId,
-        testRunId: normalizedTestRun.testRunId,
-        bookletKey: normalizedTestRun.bookletKey,
-        unitKey,
-        response,
-        status: normalizedTestRun.status,
-        updatedAt: normalizedTestRun.updatedAt,
-        completedAt: normalizedTestRun.completedAt ?? ""
-      })
-    );
-  });
+  return input.testRuns
+    .flatMap(testRun => {
+      const normalizedTestRun = normalizeTestRun(testRun);
+      const participantSession =
+        participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
 
-  rows.sort(
-    (left, right) =>
-      left.loginKey.localeCompare(right.loginKey) ||
-      left.participantSessionId.localeCompare(right.participantSessionId) ||
-      left.testRunId.localeCompare(right.testRunId) ||
-      left.unitKey.localeCompare(right.unitKey)
-  );
+      return Object.entries(normalizedTestRun.unitResponses).map(
+        ([unitKey, response]) => ({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          loginKey: participantSession?.loginKey ?? "",
+          groupKey: participantSession?.groupKey ?? "",
+          participantSessionId: normalizedTestRun.participantSessionId,
+          testRunId: normalizedTestRun.testRunId,
+          bookletKey: normalizedTestRun.bookletKey,
+          unitKey,
+          response,
+          responseLength: response.length,
+          status: normalizedTestRun.status,
+          updatedAt: normalizedTestRun.updatedAt,
+          completedAt: normalizedTestRun.completedAt
+        })
+      );
+    })
+    .filter(
+      row =>
+        (!filters.loginKey || row.loginKey === filters.loginKey) &&
+        (!filters.groupKey || row.groupKey === filters.groupKey) &&
+        (!filters.participantSessionId ||
+          row.participantSessionId === filters.participantSessionId) &&
+        (!filters.testRunId || row.testRunId === filters.testRunId) &&
+        (!filters.unitKey || row.unitKey === filters.unitKey) &&
+        (!filters.status || row.status === filters.status)
+    )
+    .sort(
+      (left, right) =>
+        left.loginKey.localeCompare(right.loginKey) ||
+        left.participantSessionId.localeCompare(right.participantSessionId) ||
+        left.testRunId.localeCompare(right.testRunId) ||
+        left.unitKey.localeCompare(right.unitKey)
+    )
+    .slice(0, resolveOperatorReadLimit(input.limit));
+};
+
+const formatResponseCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+} & DetailedResponseFilters): string => {
+  const rows = listDetailedResponsesForWorkspace(input);
 
   const header = [
     "tenantKey",
@@ -1202,7 +1291,7 @@ const buildWorkspaceReviewListItems = (input: {
   reviews: WorkspaceReview[];
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
-}): WorkspaceReviewListItem[] => {
+} & WorkspaceReviewFilters): WorkspaceReviewListItem[] => {
   const participantSessionsById = new Map(
     input.participantSessions.map(participantSession => [
       participantSession.participantSessionId,
@@ -1212,20 +1301,43 @@ const buildWorkspaceReviewListItems = (input: {
   const testRunsById = new Map(
     input.testRuns.map(testRun => [testRun.testRunId, normalizeTestRun(testRun)])
   );
+  const filters = {
+    loginKey: normalizeExactFilter(input.loginKey),
+    groupKey: normalizeExactFilter(input.groupKey),
+    participantSessionId: normalizeExactFilter(input.participantSessionId),
+    testRunId: normalizeExactFilter(input.testRunId),
+    unitKey: normalizeExactFilter(input.unitKey),
+    reviewerId: normalizeExactFilter(input.reviewerId),
+    category: normalizeExactFilter(input.category)
+  };
 
   return [...input.reviews]
-    .sort(
-      (left, right) =>
-        right.updatedAt.localeCompare(left.updatedAt) ||
-        right.createdAt.localeCompare(left.createdAt) ||
-        left.reviewId.localeCompare(right.reviewId)
-    )
     .map(review => ({
       review,
       participantSession:
         participantSessionsById.get(review.participantSessionId) ?? null,
       testRun: testRunsById.get(review.testRunId) ?? null
-    }));
+    }))
+    .filter(
+      item =>
+        (!filters.loginKey ||
+          item.participantSession?.loginKey === filters.loginKey) &&
+        (!filters.groupKey ||
+          item.participantSession?.groupKey === filters.groupKey) &&
+        (!filters.participantSessionId ||
+          item.review.participantSessionId === filters.participantSessionId) &&
+        (!filters.testRunId || item.review.testRunId === filters.testRunId) &&
+        (!filters.unitKey || item.review.unitKey === filters.unitKey) &&
+        (!filters.reviewerId || item.review.reviewerId === filters.reviewerId) &&
+        (!filters.category || item.review.category === filters.category)
+    )
+    .sort(
+      (left, right) =>
+        right.review.updatedAt.localeCompare(left.review.updatedAt) ||
+        right.review.createdAt.localeCompare(left.review.createdAt) ||
+        left.review.reviewId.localeCompare(right.review.reviewId)
+    )
+    .slice(0, resolveOperatorReadLimit(input.limit));
 };
 
 const formatReviewCsv = (input: {
@@ -1234,11 +1346,19 @@ const formatReviewCsv = (input: {
   reviews: WorkspaceReview[];
   participantSessions: ParticipantSession[];
   testRuns: TestRun[];
-}): string => {
+} & WorkspaceReviewFilters): string => {
   const items = buildWorkspaceReviewListItems({
     reviews: input.reviews,
     participantSessions: input.participantSessions,
-    testRuns: input.testRuns
+    testRuns: input.testRuns,
+    loginKey: input.loginKey,
+    groupKey: input.groupKey,
+    participantSessionId: input.participantSessionId,
+    testRunId: input.testRunId,
+    unitKey: input.unitKey,
+    reviewerId: input.reviewerId,
+    category: input.category,
+    limit: input.limit
   });
   const header = [
     "tenantKey",
@@ -1280,52 +1400,6 @@ const formatReviewCsv = (input: {
         .join(",")
     )
   ].join("\n") + "\n";
-};
-
-const listDetailedResponsesForWorkspace = (input: {
-  tenantKey: string;
-  workspaceKey: string;
-  participantSessions: ParticipantSession[];
-  testRuns: TestRun[];
-}): WorkspaceDetailedResponse[] => {
-  const participantSessionsById = new Map(
-    input.participantSessions.map(participantSession => [
-      participantSession.participantSessionId,
-      participantSession
-    ])
-  );
-
-  return input.testRuns
-    .flatMap(testRun => {
-      const normalizedTestRun = normalizeTestRun(testRun);
-      const participantSession =
-        participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
-
-      return Object.entries(normalizedTestRun.unitResponses).map(
-        ([unitKey, response]) => ({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          loginKey: participantSession?.loginKey ?? "",
-          groupKey: participantSession?.groupKey ?? "",
-          participantSessionId: normalizedTestRun.participantSessionId,
-          testRunId: normalizedTestRun.testRunId,
-          bookletKey: normalizedTestRun.bookletKey,
-          unitKey,
-          response,
-          responseLength: response.length,
-          status: normalizedTestRun.status,
-          updatedAt: normalizedTestRun.updatedAt,
-          completedAt: normalizedTestRun.completedAt
-        })
-      );
-    })
-    .sort(
-      (left, right) =>
-        left.loginKey.localeCompare(right.loginKey) ||
-        left.participantSessionId.localeCompare(right.participantSessionId) ||
-        left.testRunId.localeCompare(right.testRunId) ||
-        left.unitKey.localeCompare(right.unitKey)
-    );
 };
 
 const toDisplayLabel = (prefix: string, key: string | null): string | null => {
@@ -3438,7 +3512,14 @@ export const createFirstSliceServices = (
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           participantSessions,
-          testRuns
+          testRuns,
+          loginKey: input.loginKey,
+          groupKey: input.groupKey,
+          participantSessionId: input.participantSessionId,
+          testRunId: input.testRunId,
+          unitKey: input.unitKey,
+          status: input.status,
+          limit: input.limit
         });
       },
       async exportResponseCsv(input) {
@@ -3459,7 +3540,14 @@ export const createFirstSliceServices = (
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           participantSessions,
-          testRuns
+          testRuns,
+          loginKey: input.loginKey,
+          groupKey: input.groupKey,
+          participantSessionId: input.participantSessionId,
+          testRunId: input.testRunId,
+          unitKey: input.unitKey,
+          status: input.status,
+          limit: input.limit
         });
       },
       async getContentReleaseActivationReadiness(input) {
@@ -3651,7 +3739,15 @@ export const createFirstSliceServices = (
         return buildWorkspaceReviewListItems({
           reviews,
           participantSessions,
-          testRuns
+          testRuns,
+          loginKey: input.loginKey,
+          groupKey: input.groupKey,
+          participantSessionId: input.participantSessionId,
+          testRunId: input.testRunId,
+          unitKey: input.unitKey,
+          reviewerId: input.reviewerId,
+          category: input.category,
+          limit: input.limit
         });
       },
       async createReview(input) {
@@ -3885,7 +3981,15 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           reviews,
           participantSessions,
-          testRuns
+          testRuns,
+          loginKey: input.loginKey,
+          groupKey: input.groupKey,
+          participantSessionId: input.participantSessionId,
+          testRunId: input.testRunId,
+          unitKey: input.unitKey,
+          reviewerId: input.reviewerId,
+          category: input.category,
+          limit: input.limit
         });
       }
     },

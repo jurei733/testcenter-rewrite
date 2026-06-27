@@ -38,6 +38,12 @@ export const participantSessionStatuses = [
   "closed"
 ] as const satisfies readonly ParticipantSessionStatus[];
 export type TestRunStatus = "created" | "running" | "paused" | "completed";
+export const testRunStatuses = [
+  "created",
+  "running",
+  "paused",
+  "completed"
+] as const satisfies readonly TestRunStatus[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
   "admin_sign_in_failed",

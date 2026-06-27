@@ -38,6 +38,7 @@ import {
   type CreateWorkspaceResponse,
   type DeleteGroupResultsResponse,
   type DeleteReviewResponse,
+  type DetailedResponseListQuery,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetAdminCurrentSessionResponse,
@@ -82,6 +83,7 @@ import {
   type UpdateAdminUserResponse,
   type AdminUserListQuery,
   type UpdateReviewRequest,
+  type WorkspaceReviewListQuery,
   productionApiRoutes,
   type PublicAdminSession,
   type PublicAdminUser,
@@ -99,6 +101,7 @@ import {
   type ImportJobStatus,
   type ParticipantSessionStatus,
   type SourcePackageStatus,
+  type TestRunStatus,
   type WorkspaceActivityEventType,
   type WorkspaceActivitySubjectType,
   adminAuditEventTypes,
@@ -106,6 +109,7 @@ import {
   importJobStatuses,
   participantSessionStatuses,
   sourcePackageStatuses,
+  testRunStatuses,
   workspaceActivityEventTypes,
   workspaceActivitySubjectTypes,
   firstProductionSliceCapabilities
@@ -1382,6 +1386,90 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 const decodeRouteGroup = (value: string | undefined): string | null =>
   value ? decodeURIComponent(value) : null;
 
+const readOptionalQueryValue = (url: URL, key: string): string | undefined =>
+  url.searchParams.get(key)?.trim() || undefined;
+
+const parseOperatorReadLimit = (
+  url: URL,
+  response: ServerResponse,
+  error: string,
+  message: string
+): { ok: true; limit?: number } | { ok: false } => {
+  const limitRawValue = readOptionalQueryValue(url, "limit");
+  const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
+  if (
+    limitRawValue &&
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+  ) {
+    sendError(response, 400, error, message);
+    return { ok: false };
+  }
+
+  return { ok: true, limit };
+};
+
+const parseDetailedResponseListQuery = (
+  url: URL,
+  response: ServerResponse
+): DetailedResponseListQuery | null => {
+  const status = readOptionalQueryValue(url, "status");
+  if (status && !testRunStatuses.includes(status as TestRunStatus)) {
+    sendError(
+      response,
+      400,
+      "detailed_response_status_invalid",
+      `Detailed response status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const limitResult = parseOperatorReadLimit(
+    url,
+    response,
+    "detailed_response_limit_invalid",
+    "Detailed response limit must be an integer between 1 and 500."
+  );
+  if (!limitResult.ok) {
+    return null;
+  }
+
+  return {
+    loginKey: readOptionalQueryValue(url, "loginKey"),
+    groupKey: readOptionalQueryValue(url, "groupKey"),
+    participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
+    testRunId: readOptionalQueryValue(url, "testRunId"),
+    unitKey: readOptionalQueryValue(url, "unitKey"),
+    status: status as TestRunStatus | undefined,
+    limit: limitResult.limit
+  };
+};
+
+const parseWorkspaceReviewListQuery = (
+  url: URL,
+  response: ServerResponse
+): WorkspaceReviewListQuery | null => {
+  const limitResult = parseOperatorReadLimit(
+    url,
+    response,
+    "workspace_review_limit_invalid",
+    "Workspace review limit must be an integer between 1 and 500."
+  );
+  if (!limitResult.ok) {
+    return null;
+  }
+
+  return {
+    loginKey: readOptionalQueryValue(url, "loginKey"),
+    groupKey: readOptionalQueryValue(url, "groupKey"),
+    participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
+    testRunId: readOptionalQueryValue(url, "testRunId"),
+    unitKey: readOptionalQueryValue(url, "unitKey"),
+    reviewerId: readOptionalQueryValue(url, "reviewerId"),
+    category: readOptionalQueryValue(url, "category"),
+    limit: limitResult.limit
+  };
+};
+
 const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
   async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
@@ -2548,9 +2636,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseDetailedResponseListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const items = await services.workspaceAdminRead.listDetailedResponses({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendJson<ListDetailedResponsesResponse>(response, 200, { items });
         return;
@@ -2569,9 +2663,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseWorkspaceReviewListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const items = await services.workspaceReview.listReviews({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendJson<ListReviewsResponse>(response, 200, { items });
         return;
@@ -2696,9 +2796,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseDetailedResponseListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const csv = await services.workspaceAdminRead.exportResponseCsv({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendCsv(response, 200, `${workspaceKey}-responses.csv`, csv);
         return;
@@ -2740,9 +2846,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseWorkspaceReviewListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const csv = await services.workspaceReview.exportReviewCsv({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendCsv(response, 200, `${workspaceKey}-reviews.csv`, csv);
         return;

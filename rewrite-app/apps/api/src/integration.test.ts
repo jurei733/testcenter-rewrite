@@ -1272,6 +1272,62 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(detailedResponses.body.items[0]?.response, "My first demo response");
     assert.equal(detailedResponses.body.items[0]?.responseLength, 22);
 
+    const filteredDetailedResponses = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        testRunId: string;
+        unitKey: string;
+        status: string;
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?loginKey=student-demo&groupKey=group%3Astudent-demo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&status=running&limit=1`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(filteredDetailedResponses.status, 200);
+    assert.equal(filteredDetailedResponses.body.items.length, 1);
+    assert.equal(filteredDetailedResponses.body.items[0]?.loginKey, "student-demo");
+    assert.equal(filteredDetailedResponses.body.items[0]?.unitKey, "unit-intro");
+    assert.equal(filteredDetailedResponses.body.items[0]?.status, "running");
+
+    const invalidDetailedResponseStatus = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?status=unknown",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(invalidDetailedResponseStatus.status, 400);
+    assert.equal(
+      invalidDetailedResponseStatus.body.error,
+      "detailed_response_status_invalid"
+    );
+
+    const invalidDetailedResponseLimit = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?limit=0",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(invalidDetailedResponseLimit.status, 400);
+    assert.equal(
+      invalidDetailedResponseLimit.body.error,
+      "detailed_response_limit_invalid"
+    );
+
     const studyMonitor = await requestJsonAt<{
       studyMonitorSummary: {
         participantSessionCount: number;
@@ -1330,6 +1386,19 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       responseCsv.body,
       /"demo-tenant","demo-workspace","student-demo","group:student-demo".*"unit-intro","My first demo response"/
     );
+
+    const filteredResponseCsv = await requestTextAt(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv?testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&limit=1`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(filteredResponseCsv.status, 200);
+    assert.match(filteredResponseCsv.body, /"unit-intro","My first demo response"/);
 
     const createdReview = await requestJsonAt<{
       item: {
@@ -1417,6 +1486,44 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(reviews.body.items[0]?.review.comment, "Updated integration review");
     assert.equal(reviews.body.items[0]?.participantSession?.loginKey, "student-demo");
     assert.equal(reviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
+
+    const filteredReviews = await requestJsonAt<{
+      items: Array<{
+        review: {
+          reviewerId: string;
+          category: string;
+          unitKey: string | null;
+        };
+        participantSession: { loginKey: string; groupKey: string } | null;
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews?loginKey=student-demo&groupKey=group%3Astudent-demo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&reviewerId=integration-reviewer&category=final-check&limit=1`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(filteredReviews.status, 200);
+    assert.equal(filteredReviews.body.items.length, 1);
+    assert.equal(filteredReviews.body.items[0]?.review.reviewerId, "integration-reviewer");
+    assert.equal(filteredReviews.body.items[0]?.review.category, "final-check");
+    assert.equal(filteredReviews.body.items[0]?.participantSession?.loginKey, "student-demo");
+
+    const invalidReviewLimit = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews?limit=0",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(invalidReviewLimit.status, 400);
+    assert.equal(invalidReviewLimit.body.error, "workspace_review_limit_invalid");
 
     const reviewedStudyMonitor = await requestJsonAt<{
       studyMonitorSummary: {
@@ -1559,6 +1666,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(
       reviewCsv.body,
       /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","integration-reviewer","final-check","Updated integration review"/
+    );
+
+    const filteredReviewCsv = await requestTextAt(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv?reviewerId=integration-reviewer&category=final-check&limit=1`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(filteredReviewCsv.status, 200);
+    assert.match(
+      filteredReviewCsv.body,
+      /"unit-intro","integration-reviewer","final-check","Updated integration review"/
     );
 
     const deletedReview = await requestJsonAt<{ deletedReviewId: string }>(

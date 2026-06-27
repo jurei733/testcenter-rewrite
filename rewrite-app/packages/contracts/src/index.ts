@@ -190,6 +190,27 @@ export type ParticipantSessionListQuery = {
   limit?: number;
 };
 
+export type DetailedResponseListQuery = {
+  loginKey?: string;
+  groupKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  status?: TestRun["status"];
+  limit?: number;
+};
+
+export type WorkspaceReviewListQuery = {
+  loginKey?: string;
+  groupKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  reviewerId?: string;
+  category?: string;
+  limit?: number;
+};
+
 export type SourcePackageListQuery = {
   status?: SourcePackageStatus;
   mediaType?: string;
