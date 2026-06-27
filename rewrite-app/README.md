@@ -63,6 +63,14 @@ npm run start:local
 
 That builds the API and Angular shell, migrates `./.data/local.sqlite`, starts the API with SQLite persistence and protected operator routes, then serves the app at `http://127.0.0.1:4310/app`. On first use, open the Ops view and run the admin bootstrap/sign-in flow.
 
+To reset that local demo state and repeat first-use bootstrap from a clean SQLite database, run:
+
+```bash
+npm run reset:local
+```
+
+The reset only removes `./.data/local.sqlite` and SQLite's matching WAL/SHM sidecar files used by `npm run start:local`. For scripted checks, `LOCAL_STATE_SQLITE_FILE` can point the reset helper at a disposable SQLite file instead.
+
 For the local production-like verification path, run:
 
 ```bash
