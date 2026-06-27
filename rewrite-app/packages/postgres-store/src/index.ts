@@ -1181,6 +1181,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [reviewId]
       );
       return (result.rowCount ?? 0) > 0;
+    },
+    async deleteWorkspaceReviewsByTestRunIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const result = await pool.query(
+        "DELETE FROM workspace_reviews WHERE test_run_id = ANY($1::text[])",
+        [testRunIds]
+      );
+      return result.rowCount ?? 0;
     }
   };
 };

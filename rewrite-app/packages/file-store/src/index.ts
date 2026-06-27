@@ -364,6 +364,19 @@ export const createFileFirstSliceRepository = (
         delete state.workspaceReviews[reviewId];
       });
       return deleted;
+    },
+    async deleteWorkspaceReviewsByTestRunIds(testRunIds) {
+      const testRunIdSet = new Set(testRunIds);
+      let deletedCount = 0;
+      await mutate(state => {
+        for (const review of Object.values(state.workspaceReviews)) {
+          if (testRunIdSet.has(review.testRunId)) {
+            delete state.workspaceReviews[review.reviewId];
+            deletedCount += 1;
+          }
+        }
+      });
+      return deletedCount;
     }
   };
 };

@@ -236,6 +236,17 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async deleteWorkspaceReview(reviewId) {
       return state.workspaceReviews.delete(reviewId);
+    },
+    async deleteWorkspaceReviewsByTestRunIds(testRunIds) {
+      const testRunIdSet = new Set(testRunIds);
+      let deletedCount = 0;
+      for (const review of state.workspaceReviews.values()) {
+        if (testRunIdSet.has(review.testRunId)) {
+          state.workspaceReviews.delete(review.reviewId);
+          deletedCount += 1;
+        }
+      }
+      return deletedCount;
     }
   };
 };

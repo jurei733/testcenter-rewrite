@@ -384,6 +384,7 @@ export type WorkspaceGroupResultDeletion = {
   groupKey: string;
   deletedTestRunCount: number;
   deletedResponseCount: number;
+  deletedReviewCount: number;
   affectedParticipantSessionIds: string[];
   deletedTestRunIds: string[];
 };

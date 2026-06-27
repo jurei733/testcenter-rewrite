@@ -1402,11 +1402,35 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_created"/);
     assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_deleted"/);
 
+    const cleanupReview = await requestJsonAt<{
+      item: { review: { reviewId: string } };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          participantSessionId:
+            participantSignIn.body.participantSession.participantSessionId,
+          testRunId: resumed.body.testRun.testRunId,
+          unitKey: "unit-intro",
+          reviewerId: "cleanup-reviewer",
+          category: "cleanup-check",
+          comment: "Review removed by group deletion"
+        }
+      }
+    );
+    assert.equal(cleanupReview.status, 201);
+
     const groupDeletion = await requestJsonAt<{
       deletion: {
         groupKey: string;
         deletedTestRunCount: number;
         deletedResponseCount: number;
+        deletedReviewCount: number;
         affectedParticipantSessionIds: string[];
         deletedTestRunIds: string[];
       };
@@ -1425,6 +1449,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(groupDeletion.body.deletion.groupKey, "group:student-demo");
     assert.equal(groupDeletion.body.deletion.deletedTestRunCount, 1);
     assert.equal(groupDeletion.body.deletion.deletedResponseCount, 1);
+    assert.equal(groupDeletion.body.deletion.deletedReviewCount, 1);
     assert.deepEqual(groupDeletion.body.deletion.affectedParticipantSessionIds, [
       participantSignIn.body.participantSession.participantSessionId
     ]);
@@ -1446,6 +1471,19 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(detailedResponsesAfterDeletion.status, 200);
     assert.deepEqual(detailedResponsesAfterDeletion.body.items, []);
+
+    const reviewsAfterDeletion = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(reviewsAfterDeletion.status, 200);
+    assert.deepEqual(reviewsAfterDeletion.body.items, []);
   } finally {
     await closeServer(isolated.server);
   }

@@ -1316,6 +1316,18 @@ export const createSqliteFirstSliceRepository = (
         .prepare(`DELETE FROM workspace_reviews WHERE review_id = ?`)
         .run(reviewId);
       return Number(result.changes) > 0;
+    },
+    async deleteWorkspaceReviewsByTestRunIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const placeholders = testRunIds.map(() => "?").join(", ");
+      const result = database
+        .prepare(
+          `DELETE FROM workspace_reviews WHERE test_run_id IN (${placeholders})`
+        )
+        .run(...testRunIds);
+      return Number(result.changes);
     }
   };
 };

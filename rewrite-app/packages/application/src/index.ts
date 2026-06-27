@@ -479,6 +479,7 @@ export type FirstSliceRepository = {
   ): Promise<WorkspaceReview[]>;
   saveWorkspaceReview(review: WorkspaceReview): Promise<void>;
   deleteWorkspaceReview(reviewId: string): Promise<boolean>;
+  deleteWorkspaceReviewsByTestRunIds(testRunIds: string[]): Promise<number>;
 };
 
 export type FirstSliceDependencies = {
@@ -3117,6 +3118,8 @@ export const createFirstSliceServices = (
             total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
           0
         );
+        const deletedReviewCount =
+          await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
         const deletedTestRunCount = await repository.deleteTestRunsByIds(
           deletedTestRunIds
         );
@@ -3132,6 +3135,7 @@ export const createFirstSliceServices = (
             groupKey,
             deletedTestRunCount,
             deletedResponseCount,
+            deletedReviewCount,
             affectedParticipantSessionIds,
             deletedTestRunIds
           }
@@ -3143,6 +3147,7 @@ export const createFirstSliceServices = (
           groupKey,
           deletedTestRunCount,
           deletedResponseCount,
+          deletedReviewCount,
           affectedParticipantSessionIds,
           deletedTestRunIds
         };

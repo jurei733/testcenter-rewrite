@@ -195,7 +195,7 @@ export class RewriteAppRuntimeService {
     await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
     this.feedback.rememberActivity(
       "Group Results Deleted",
-      `${payload.deletion.deletedTestRunCount} run(s) and ${payload.deletion.deletedResponseCount} response(s) deleted for ${payload.deletion.groupKey}.`
+      `${payload.deletion.deletedTestRunCount} run(s), ${payload.deletion.deletedResponseCount} response(s), and ${payload.deletion.deletedReviewCount} review(s) deleted for ${payload.deletion.groupKey}.`
     );
   }
 
