@@ -1318,24 +1318,74 @@ const hasStructuredContent = (
       contentStructure.bookletEntries.length > 0
   );
 
+const normalizeManifestToken = (value: unknown): string =>
+  String(value ?? "").trim();
+
+const normalizeManifestLabel = (
+  value: unknown,
+  fallbackPrefix: string,
+  key: string
+): string => {
+  const label = normalizeManifestToken(value);
+  return label || toDisplayLabel(fallbackPrefix, key) || key;
+};
+
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
-  const bookletEntries = contentStructure.bookletEntries
-    .map(bookletEntry => ({
-      bookletKey: bookletEntry.bookletKey,
-      displayLabel: bookletEntry.displayLabel,
-      unitEntries: bookletEntry.unitEntries.map(unitEntry => ({
-        unitKey: unitEntry.unitKey,
-        displayLabel: unitEntry.displayLabel
-      }))
-    }))
-    .filter(
-      bookletEntry =>
-        bookletEntry.bookletKey.length > 0 &&
-        bookletEntry.displayLabel.length > 0 &&
-        bookletEntry.unitEntries.length > 0
-    );
+  const bookletEntriesByKey = new Map<
+    string,
+    ContentReleaseRuntimeSnapshot["bookletEntries"][number]
+  >();
+  const unitKeysByBookletKey = new Map<string, Set<string>>();
+
+  for (const bookletEntry of contentStructure.bookletEntries) {
+    const bookletKey = normalizeManifestToken(bookletEntry.bookletKey);
+    if (!bookletKey) {
+      continue;
+    }
+
+    const normalizedBooklet =
+      bookletEntriesByKey.get(bookletKey) ??
+      {
+        bookletKey,
+        displayLabel: normalizeManifestLabel(
+          bookletEntry.displayLabel,
+          "Booklet",
+          bookletKey
+        ),
+        unitEntries: []
+      };
+    const unitKeys =
+      unitKeysByBookletKey.get(bookletKey) ?? new Set<string>();
+
+    const rawUnitEntries = Array.isArray(bookletEntry.unitEntries)
+      ? bookletEntry.unitEntries
+      : [];
+    for (const unitEntry of rawUnitEntries) {
+      const unitKey = normalizeManifestToken(unitEntry.unitKey);
+      if (!unitKey || unitKeys.has(unitKey)) {
+        continue;
+      }
+
+      normalizedBooklet.unitEntries.push({
+        unitKey,
+        displayLabel: normalizeManifestLabel(
+          unitEntry.displayLabel,
+          "Unit",
+          unitKey
+        )
+      });
+      unitKeys.add(unitKey);
+    }
+
+    if (normalizedBooklet.unitEntries.length > 0) {
+      bookletEntriesByKey.set(bookletKey, normalizedBooklet);
+      unitKeysByBookletKey.set(bookletKey, unitKeys);
+    }
+  }
+
+  const bookletEntries = Array.from(bookletEntriesByKey.values());
 
   if (bookletEntries.length === 0) {
     return null;
@@ -1347,14 +1397,19 @@ const normalizeContentStructure = (
 const normalizeParsedJsonContentStructure = (
   parsed: unknown
 ): ContentReleaseRuntimeSnapshot | null => {
-  if (typeof parsed !== "object" || parsed === null) {
+  if (
+    !Array.isArray(parsed) &&
+    (typeof parsed !== "object" || parsed === null)
+  ) {
     return null;
   }
 
-  const candidate = parsed as {
-    bookletEntries?: unknown;
-    booklets?: unknown;
-  };
+  const candidate = Array.isArray(parsed)
+    ? { booklets: parsed }
+    : (parsed as {
+        bookletEntries?: unknown;
+        booklets?: unknown;
+      });
   const rawBooklets = Array.isArray(candidate.bookletEntries)
     ? candidate.bookletEntries
     : Array.isArray(candidate.booklets)
@@ -1377,10 +1432,18 @@ const normalizeParsedJsonContentStructure = (
 
         return {
           bookletKey: String(
-            booklet.bookletKey ?? booklet.key ?? booklet.id ?? ""
+            booklet.bookletKey ??
+              booklet.bookletId ??
+              booklet.key ??
+              booklet.id ??
+              ""
           ).trim(),
           displayLabel: String(
-            booklet.displayLabel ?? booklet.label ?? booklet.title ?? ""
+            booklet.displayLabel ??
+              booklet.label ??
+              booklet.title ??
+              booklet.name ??
+              ""
           ).trim(),
           unitEntries: rawUnits
             .map(rawUnit => {
@@ -1390,9 +1453,16 @@ const normalizeParsedJsonContentStructure = (
 
               const unit = rawUnit as Record<string, unknown>;
               return {
-                unitKey: String(unit.unitKey ?? unit.key ?? unit.id ?? "").trim(),
+                unitKey: String(
+                  unit.unitKey ??
+                    unit.unitId ??
+                    unit.key ??
+                    unit.id ??
+                    unit.ref ??
+                    ""
+                ).trim(),
                 displayLabel: String(
-                  unit.displayLabel ?? unit.label ?? unit.title ?? ""
+                  unit.displayLabel ?? unit.label ?? unit.title ?? unit.name ?? ""
                 ).trim()
               };
             })
@@ -1466,23 +1536,45 @@ const normalizeParsedXmlContentStructure = (
       const unitAttributes = parseXmlAttributes(unitMatch[1] ?? "");
       unitEntries.push({
         unitKey: String(
-          readXmlAttribute(unitAttributes, "unitKey", "key", "id") ?? ""
+          readXmlAttribute(
+            unitAttributes,
+            "unitKey",
+            "unitId",
+            "key",
+            "id",
+            "ref"
+          ) ?? ""
         ).trim(),
         displayLabel: String(
-          readXmlAttribute(unitAttributes, "displayLabel", "label", "title") ??
-            ""
+          readXmlAttribute(
+            unitAttributes,
+            "displayLabel",
+            "label",
+            "title",
+            "name"
+          ) ?? ""
         ).trim()
       });
     }
 
     bookletEntries.push({
       bookletKey: String(
-        readXmlAttribute(bookletAttributes, "bookletKey", "key", "id") ??
-          ""
+        readXmlAttribute(
+          bookletAttributes,
+          "bookletKey",
+          "bookletId",
+          "key",
+          "id"
+        ) ?? ""
       ).trim(),
       displayLabel: String(
-        readXmlAttribute(bookletAttributes, "displayLabel", "label", "title") ??
-          ""
+        readXmlAttribute(
+          bookletAttributes,
+          "displayLabel",
+          "label",
+          "title",
+          "name"
+        ) ?? ""
       ).trim(),
       unitEntries
     });

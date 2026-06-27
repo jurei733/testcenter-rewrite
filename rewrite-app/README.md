@@ -274,6 +274,7 @@ The added read side now makes the first slice inspectable:
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure`, which the import step turns into the release runtime snapshot
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
+- manifest-derived runtime structures are normalized during import: keys are trimmed, duplicate booklet/unit entries are collapsed, missing display labels fall back to readable key-derived labels, and common `bookletId`/`unitId`/`ref` fields are accepted
 - imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
 - guarded activation now returns explicit blocking details for open runs on the currently active release, so operators and the shell can see why a release switch was rejected
 - runtime now supports `running -> paused -> running -> completed` on test-runs
@@ -401,6 +402,6 @@ For runtime probes:
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
-- importer behavior is still small, but can now derive runtime structure from either source-package metadata or a simple manifest-like source document instead of only hardcoded defaults
+- importer behavior is still limited, but can now derive and normalize runtime structure from either source-package metadata or a simple manifest-like source document instead of only hardcoded defaults
 - participant launch is simplified
 - monitor reads prove the shape, not full operational parity
