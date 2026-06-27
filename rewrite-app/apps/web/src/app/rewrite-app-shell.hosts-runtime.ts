@@ -76,6 +76,14 @@ export function createRuntimeReadsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getDetailedResponsesPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.listDetailedResponses, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+    setDetailedResponsesView: nextValue => {
+      args.runtimeState.detailedResponsesView = nextValue;
+    },
     setResponseExportView: nextValue => {
       args.runtimeState.responseExportView = nextValue;
     },

@@ -218,6 +218,15 @@ try {
     { timeout: 15_000 }
   );
 
+  await page.getByRole("button", { name: "Detailed Responses" }).click();
+  await page.waitForFunction(
+    () =>
+      document.body.textContent?.includes("Operator adjusted smoke response") &&
+      document.body.textContent?.includes("student-demo · unit-intro"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   const responseDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Responses CSV" }).click();
   const responseDownload = await responseDownloadPromise;

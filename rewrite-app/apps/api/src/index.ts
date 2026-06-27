@@ -40,6 +40,7 @@ import {
   type GetAdminCurrentSessionResponse,
   type GetImportJobResponse,
   type GetParticipantSessionResponse,
+  type ListDetailedResponsesResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
@@ -838,6 +839,9 @@ const responseCsvExportPattern = createRoutePattern(
 const logCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportLogCsv
 );
+const detailedResponsesPattern = createRoutePattern(
+  productionApiRoutes.workspace.listDetailedResponses
+);
 const importJobDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getImportJob
 );
@@ -892,6 +896,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", importJobDetailPattern],
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
+  ["GET", detailedResponsesPattern],
   ["GET", responseCsvExportPattern],
   ["GET", logCsvExportPattern],
   ["GET", contentReleaseListPattern],
@@ -1219,6 +1224,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       participantSessionDetailPattern,
       productionApiRoutes.workspace.getParticipantSession
+    ],
+    [
+      "GET",
+      detailedResponsesPattern,
+      productionApiRoutes.workspace.listDetailedResponses
     ],
     [
       "GET",
@@ -2042,6 +2052,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionListMatch = participantSessionListPattern.exec(pathname);
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
+      const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
@@ -2140,6 +2151,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<GetParticipantSessionResponse>(response, 200, {
           participantSessionDetail
         });
+        return;
+      }
+
+      if (request.method === "GET" && detailedResponsesMatch?.groups) {
+        const tenantKey = decodeRouteGroup(detailedResponsesMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          detailedResponsesMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listDetailedResponses({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListDetailedResponsesResponse>(response, 200, { items });
         return;
       }
 

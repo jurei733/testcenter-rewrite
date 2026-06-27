@@ -1,5 +1,6 @@
 import type {
   GetParticipantSessionResponse,
+  ListDetailedResponsesResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
@@ -24,6 +25,8 @@ export interface ShellRuntimeReadsHost {
   getOpenRunsPath(): string;
   getRuntimeStatePath(): string;
   getParticipantSessionDetailPath(): string;
+  getDetailedResponsesPath(): string;
+  setDetailedResponsesView(nextValue: string): void;
   getResponseCsvExportPath(): string;
   setResponseExportView(nextValue: string): void;
   getCurrentRunStatePath(): string;
@@ -109,4 +112,16 @@ export async function exportResponsesCsvAction(
   );
   host.setResponseExportView(csv);
   return csv;
+}
+
+export async function loadDetailedResponsesAction(
+  host: ShellRuntimeReadsHost
+): Promise<ListDetailedResponsesResponse> {
+  const payload = await host.request<ListDetailedResponsesResponse>(
+    "Detailed Responses",
+    "GET",
+    host.getDetailedResponsesPath()
+  );
+  host.setDetailedResponsesView(JSON.stringify(payload, null, 2));
+  return payload;
 }

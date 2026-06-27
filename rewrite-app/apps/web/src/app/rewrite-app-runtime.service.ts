@@ -17,6 +17,7 @@ import {
 } from "./rewrite-app-shell.runtime-actions";
 import {
   exportResponsesCsvAction,
+  loadDetailedResponsesAction,
   refreshRuntimeReadsAction
 } from "./rewrite-app-shell.runtime-reads";
 import { runParticipantHappyPathFlow } from "./rewrite-app-shell.workflows";
@@ -104,6 +105,14 @@ export class RewriteAppRuntimeService {
       `Response export saved as ${workspaceKey}-responses.csv.`
     );
     return csv;
+  }
+
+  async loadDetailedResponses(): Promise<void> {
+    const payload = await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Detailed Responses Loaded",
+      `${payload.items.length} response row(s) loaded.`
+    );
   }
 
   async participantHappyPathFlow(): Promise<void> {

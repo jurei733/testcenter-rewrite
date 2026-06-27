@@ -312,6 +312,22 @@ export type WorkspaceParticipantSessionDetail = {
   testRuns: TestRun[];
 };
 
+export type WorkspaceDetailedResponse = {
+  tenantKey: string;
+  workspaceKey: string;
+  loginKey: string;
+  groupKey: string;
+  participantSessionId: string;
+  testRunId: string;
+  bookletKey: string;
+  unitKey: string;
+  response: string;
+  responseLength: number;
+  status: TestRun["status"];
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 export type WorkspaceActivityEventListItem = {
   activityEvent: WorkspaceActivityEvent;
 };

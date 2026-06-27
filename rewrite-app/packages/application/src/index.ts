@@ -28,6 +28,7 @@ import type {
   WorkspaceActivityEventListItem,
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
+  WorkspaceDetailedResponse,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceSourcePackageDetail,
@@ -115,6 +116,10 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     participantSessionId: string;
   }): Promise<WorkspaceParticipantSessionDetail>;
+  listDetailedResponses(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceDetailedResponse[]>;
   exportResponseCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -300,6 +305,7 @@ export const firstSliceUseCases = {
   getImportJobDetail: "GetImportJobDetail",
   listParticipantSessions: "ListParticipantSessions",
   getParticipantSessionDetail: "GetParticipantSessionDetail",
+  listDetailedResponses: "ListDetailedResponses",
   exportResponseCsv: "ExportResponseCsv",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
   listImportJobs: "ListImportJobs",
@@ -1040,6 +1046,52 @@ const formatWorkspaceActivityCsv = (input: {
         .join(",")
     )
   ].join("\n") + "\n";
+};
+
+const listDetailedResponsesForWorkspace = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): WorkspaceDetailedResponse[] => {
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+
+  return input.testRuns
+    .flatMap(testRun => {
+      const normalizedTestRun = normalizeTestRun(testRun);
+      const participantSession =
+        participantSessionsById.get(normalizedTestRun.participantSessionId) ?? null;
+
+      return Object.entries(normalizedTestRun.unitResponses).map(
+        ([unitKey, response]) => ({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          loginKey: participantSession?.loginKey ?? "",
+          groupKey: participantSession?.groupKey ?? "",
+          participantSessionId: normalizedTestRun.participantSessionId,
+          testRunId: normalizedTestRun.testRunId,
+          bookletKey: normalizedTestRun.bookletKey,
+          unitKey,
+          response,
+          responseLength: response.length,
+          status: normalizedTestRun.status,
+          updatedAt: normalizedTestRun.updatedAt,
+          completedAt: normalizedTestRun.completedAt
+        })
+      );
+    })
+    .sort(
+      (left, right) =>
+        left.loginKey.localeCompare(right.loginKey) ||
+        left.participantSessionId.localeCompare(right.participantSessionId) ||
+        left.testRunId.localeCompare(right.testRunId) ||
+        left.unitKey.localeCompare(right.unitKey)
+    );
 };
 
 const toDisplayLabel = (prefix: string, key: string | null): string | null => {
@@ -2592,6 +2644,27 @@ export const createFirstSliceServices = (
           contentRelease,
           testRuns
         };
+      },
+      async listDetailedResponses(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [participantSessions, testRuns] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+        ]);
+
+        return listDetailedResponsesForWorkspace({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          participantSessions,
+          testRuns
+        });
       },
       async exportResponseCsv(input) {
         const workspace = await requireWorkspace(

@@ -2,6 +2,7 @@ import { Injectable, inject } from "@angular/core";
 
 import type {
   GetParticipantSessionResponse,
+  ListDetailedResponsesResponse,
   ListParticipantSessionsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
@@ -296,6 +297,35 @@ export class RuntimeViewFacade {
       currentUnitKey: selectedRun.currentUnitKey,
       unitResponses: selectedRun.unitResponses ?? {}
     });
+  }
+
+  get detailedResponseItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListDetailedResponsesResponse>(
+      this.runtime.detailedResponsesView
+    );
+    return (
+      payload?.items.map(item => ({
+        headline: `${item.loginKey} · ${item.unitKey}`,
+        subline: item.testRunId,
+        badges: [item.status, item.bookletKey, `${item.responseLength} char(s)`],
+        rows: [
+          { label: "Response", value: this.formatResponsePreview(item.response) },
+          { label: "Group", value: item.groupKey || "unknown" },
+          { label: "Session", value: item.participantSessionId },
+          { label: "Updated", value: this.formatDateTime(item.updatedAt) }
+        ],
+        selected:
+          this.runtime.testRunId.trim() === item.testRunId &&
+          this.runtime.currentUnitKey.trim() === item.unitKey,
+        actionLabel: "Select Response",
+        actionPayload: {
+          testRunId: item.testRunId,
+          currentUnitKey: item.unitKey,
+          participantSessionId: item.participantSessionId,
+          loginKey: item.loginKey
+        }
+      })) ?? []
+    );
   }
 
   get openRunItems(): RecordCollectionItem[] {
@@ -688,6 +718,10 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.exportResponsesCsv());
   }
 
+  loadDetailedResponses(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.loadDetailedResponses());
+  }
+
   selectParticipantSession(item: RecordCollectionItem): void {
     const participantSessionId = item.actionPayload?.participantSessionId?.trim();
     if (!participantSessionId) {
@@ -717,6 +751,9 @@ export class RuntimeViewFacade {
     }
     if (item.actionPayload?.loginKey) {
       this.runtime.loginKey = item.actionPayload.loginKey;
+    }
+    if (item.actionPayload?.participantSessionId) {
+      this.runtime.participantSessionId = item.actionPayload.participantSessionId;
     }
     if (!this.runtime.participantSessionId.trim() && this.runtime.loginKey.trim()) {
       const derivedParticipantSessionId = this.findParticipantSessionIdByLoginKey(

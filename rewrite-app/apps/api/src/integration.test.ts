@@ -1177,6 +1177,36 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       "My first demo response"
     );
 
+    const detailedResponses = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        testRunId: string;
+        bookletKey: string;
+        unitKey: string;
+        response: string;
+        responseLength: number;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(detailedResponses.status, 200);
+    assert.deepEqual(detailedResponses.body.items.map(item => item.unitKey), [
+      "unit-intro"
+    ]);
+    assert.equal(detailedResponses.body.items[0]?.loginKey, "student-demo");
+    assert.equal(detailedResponses.body.items[0]?.groupKey, "group:student-demo");
+    assert.equal(detailedResponses.body.items[0]?.bookletKey, "booklet:demo");
+    assert.equal(detailedResponses.body.items[0]?.response, "My first demo response");
+    assert.equal(detailedResponses.body.items[0]?.responseLength, 22);
+
     const responseCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv",

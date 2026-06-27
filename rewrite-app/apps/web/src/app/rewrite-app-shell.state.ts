@@ -51,6 +51,7 @@ export interface ShellRuntimeState {
   runtimeStateView: string;
   currentRunStateView: string;
   openRunsView: string;
+  detailedResponsesView: string;
   responseExportView: string;
   runtimeMonitorView: string;
   runtimeLoaded: boolean;
@@ -145,6 +146,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     runtimeStateView: 'Use "Refresh Runtime Reads".',
     currentRunStateView: 'Use "Refresh Runtime Reads".',
     openRunsView: 'Use "Refresh Runtime Reads".',
+    detailedResponsesView: 'Use "Detailed Responses".',
     responseExportView: 'Use "Export Responses CSV".',
     runtimeMonitorView: "Use runtime actions to populate the latest action result.",
     runtimeLoaded: false

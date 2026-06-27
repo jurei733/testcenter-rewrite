@@ -23,6 +23,7 @@ import type {
   WorkspaceActivityEventListItem,
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
+  WorkspaceDetailedResponse,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceActivityEventType,
@@ -74,6 +75,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
     exportLogCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
+    listDetailedResponses:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
     listContentReleases:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
     getContentRelease:
@@ -320,6 +323,10 @@ export type ListParticipantSessionsResponse = {
 
 export type GetParticipantSessionResponse = {
   participantSessionDetail: WorkspaceParticipantSessionDetail;
+};
+
+export type ListDetailedResponsesResponse = {
+  items: WorkspaceDetailedResponse[];
 };
 
 export type ListContentReleasesResponse = {
