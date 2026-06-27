@@ -406,6 +406,6 @@ For runtime probes:
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
-- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents with common booklet/testlet and unit reference aliases
+- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, common wrapper objects, and booklet/testlet/unit reference aliases
 - participant launch is simplified
 - monitor reads now include workspace summary, group drill-down, and open-run blockers, but still do not cover every original Testcenter monitor view

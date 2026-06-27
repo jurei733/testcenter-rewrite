@@ -1704,21 +1704,23 @@ test("source document import normalizes fallback labels and duplicate entries", 
       fileName: "normalization.json",
       mediaType: "application/json",
       sourceDocument: JSON.stringify({
-        booklets: [
-          {
-            bookletId: " booklet:alpha ",
-            units: [
-              { unitId: " unit-alpha ", title: " Alpha Unit " },
-              { unitId: "unit-alpha", title: "Duplicate Alpha Unit" },
-              { ref: "unit-beta" }
-            ]
-          },
-          {
-            id: "booklet:alpha",
-            title: "Duplicate Booklet",
-            units: [{ id: "unit-gamma", name: "Gamma Unit" }]
-          }
-        ]
+        manifest: {
+          testlets: [
+            {
+              bookletId: " booklet:alpha ",
+              unitRefs: [
+                { unitId: " unit-alpha ", title: " Alpha Unit " },
+                { unitId: "unit-alpha", title: "Duplicate Alpha Unit" },
+                { ref: "unit-beta" }
+              ]
+            },
+            {
+              id: "booklet:alpha",
+              title: "Duplicate Booklet",
+              unit: { id: "unit-gamma", name: "Gamma Unit" }
+            }
+          ]
+        }
       })
     }
   });

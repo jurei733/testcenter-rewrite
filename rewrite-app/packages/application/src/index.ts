@@ -1410,20 +1410,58 @@ const normalizeParsedJsonContentStructure = (
     return null;
   }
 
+  const asObject = (value: unknown): Record<string, unknown> | null =>
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  const readEntries = (...values: unknown[]): unknown[] => {
+    for (const value of values) {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (asObject(value)) {
+        return [value];
+      }
+    }
+    return [];
+  };
+  const hasBookletEntries = (value: unknown): value is Record<string, unknown> => {
+    const objectValue = asObject(value);
+    if (!objectValue) {
+      return false;
+    }
+    return (
+      readEntries(
+        objectValue.bookletEntries,
+        objectValue.booklets,
+        objectValue.testlets,
+        objectValue.booklet,
+        objectValue.testlet
+      ).length > 0
+    );
+  };
+
+  const parsedObject = asObject(parsed);
   const candidate = Array.isArray(parsed)
     ? { booklets: parsed }
-    : (parsed as {
-        bookletEntries?: unknown;
-        booklets?: unknown;
-        testlets?: unknown;
-      });
-  const rawBooklets = Array.isArray(candidate.bookletEntries)
-    ? candidate.bookletEntries
-    : Array.isArray(candidate.booklets)
-      ? candidate.booklets
-      : Array.isArray(candidate.testlets)
-        ? candidate.testlets
-        : [];
+    : [
+        parsedObject,
+        asObject(parsedObject?.contentStructure),
+        asObject(parsedObject?.manifest),
+        asObject(parsedObject?.assessment),
+        asObject(parsedObject?.testcenter)
+      ].find(hasBookletEntries);
+  if (!candidate) {
+    return null;
+  }
+
+  const rawBooklets = readEntries(
+    candidate.bookletEntries,
+    candidate.booklets,
+    candidate.testlets,
+    candidate.booklet,
+    candidate.testlet
+  );
 
   const contentStructure: SourcePackageContentStructure = {
     bookletEntries: rawBooklets
@@ -1433,17 +1471,17 @@ const normalizeParsedJsonContentStructure = (
         }
 
         const booklet = rawBooklet as Record<string, unknown>;
-        const rawUnits = Array.isArray(booklet.unitEntries)
-          ? booklet.unitEntries
-          : Array.isArray(booklet.units)
-            ? booklet.units
-            : Array.isArray(booklet.unitRefs)
-              ? booklet.unitRefs
-              : Array.isArray(booklet.unitReferences)
-                ? booklet.unitReferences
-                : Array.isArray(booklet.items)
-                  ? booklet.items
-                  : [];
+        const rawUnits = readEntries(
+          booklet.unitEntries,
+          booklet.units,
+          booklet.unitRefs,
+          booklet.unitReferences,
+          booklet.items,
+          booklet.unit,
+          booklet.unitRef,
+          booklet.unitReference,
+          booklet.item
+        );
 
         return {
           bookletKey: String(
