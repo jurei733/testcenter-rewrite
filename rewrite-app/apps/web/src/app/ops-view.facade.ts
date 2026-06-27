@@ -10,7 +10,11 @@ import type {
   GetRuntimeConfigResponse,
   GetRuntimeDiagnosticsResponse
 } from "@testcenter-rewrite-app/contracts";
-import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+import {
+  adminAuditEventTypes,
+  type AdminRole,
+  type AdminUserStatus
+} from "@testcenter-rewrite-app/domain";
 
 import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
@@ -92,6 +96,7 @@ export class OpsViewFacade {
     "platform_admin"
   ];
   readonly adminStatusOptions: AdminUserStatus[] = ["active", "disabled"];
+  readonly adminAuditEventTypeOptions = adminAuditEventTypes;
 
   init(): void {
     this.viewState.setActiveView("ops");
@@ -151,6 +156,33 @@ export class OpsViewFacade {
 
   resetAdminUserPassword(): void {
     this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
+  }
+
+  applyAdminAuditFilters(): void {
+    this.persistState();
+    this.refreshAdminAuditEvents();
+  }
+
+  clearAdminAuditFilters(): void {
+    this.ops.adminAuditEventTypeFilter = "";
+    this.ops.adminAuditActorFilter = "";
+    this.ops.adminAuditSubjectFilter = "";
+    this.ops.adminAuditLimit = "100";
+    this.persistState();
+  }
+
+  useSelectedAdminUserAsAuditSubject(): void {
+    const adminUserId =
+      this.ops.adminStatusTargetUserId.trim() ||
+      this.ops.adminRoleTargetUserId.trim() ||
+      this.ops.adminRevokeTargetUserId.trim() ||
+      this.ops.adminResetTargetUserId.trim();
+    if (!adminUserId) {
+      return;
+    }
+
+    this.ops.adminAuditSubjectFilter = adminUserId;
+    this.persistState();
   }
 
   signInLocalDemoAdmin(): void {

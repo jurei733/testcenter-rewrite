@@ -54,6 +54,10 @@ export type PersistedShellState = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminAuditEventTypeFilter: string;
+  adminAuditActorFilter: string;
+  adminAuditSubjectFilter: string;
+  adminAuditLimit: string;
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreateRole: AdminRole;

@@ -196,6 +196,37 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Refresh admin users to inspect role assignments."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Admin Audit Filters</h2>
+        <p>Narrow the protected audit trail by event type, actor, subject, or a bounded result limit.</p>
+        <div class="form-grid">
+          <label>
+            Event Type
+            <select id="adminAuditEventTypeFilter" name="adminAuditEventTypeFilter" [(ngModel)]="view.ops.adminAuditEventTypeFilter" (change)="view.persistState()">
+              <option value="">All audit events</option>
+              <option *ngFor="let eventType of view.adminAuditEventTypeOptions" [ngValue]="eventType">{{ eventType }}</option>
+            </select>
+          </label>
+          <label>
+            Actor Admin User ID
+            <input id="adminAuditActorFilter" name="adminAuditActorFilter" placeholder="actor admin user id" [(ngModel)]="view.ops.adminAuditActorFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Subject Admin User ID
+            <input id="adminAuditSubjectFilter" name="adminAuditSubjectFilter" placeholder="subject admin user id" [(ngModel)]="view.ops.adminAuditSubjectFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Audit Limit
+            <input id="adminAuditLimit" name="adminAuditLimit" inputmode="numeric" [(ngModel)]="view.ops.adminAuditLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyAdminAuditFilters()">Apply Audit Filters</button>
+          <button class="secondary" type="button" (click)="view.useSelectedAdminUserAsAuditSubject()">Use Selected User As Subject</button>
+          <button class="ghost" type="button" (click)="view.clearAdminAuditFilters()">Clear Audit Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Admin Audit Events"
         subtitle="Persistent platform-admin trail for admin sign-ins, user management, and role changes."

@@ -678,7 +678,6 @@ try {
   assert.equal(disabledWorkspaceAdminSignIn.status, 401);
 
   logStep("admin-audit-events");
-  await clickAction("Admin Audit Events");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/audit-events`,
     payload =>
@@ -691,6 +690,23 @@ try {
           item?.subjectAdminUserId === workspaceAdminUserId
       ) &&
       payload.items.some(item => item?.eventType === "admin_role_revoked")
+  );
+  await selectAndCommit("#adminAuditEventTypeFilter", "admin_user_updated");
+  await fillAndCommit("#adminAuditSubjectFilter", workspaceAdminUserId);
+  await fillAndCommit("#adminAuditLimit", "1");
+  await clickAction("Apply Audit Filters");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=admin_user_updated&subjectAdminUserId=${workspaceAdminUserId}&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 1 &&
+      payload.items.every(
+        item =>
+          item?.eventType === "admin_user_updated" &&
+          item?.subjectAdminUserId === workspaceAdminUserId
+      )
   );
   await page
     .locator("article.card")

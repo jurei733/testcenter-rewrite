@@ -160,7 +160,7 @@ export class RewriteAppOpsService {
     const payload = await this.requestState.request<ListAdminAuditEventsResponse>(
       "Admin Audit Events",
       "GET",
-      productionApiRoutes.admin.listAuditEvents,
+      this.buildAdminAuditEventsPath(),
       undefined,
       { headers: this.createAdminHeaders() }
     );
@@ -307,6 +307,28 @@ export class RewriteAppOpsService {
     );
     this.persistence.persistShellState();
     await this.refreshAdminUsers();
+  }
+
+  private buildAdminAuditEventsPath(): string {
+    const query = new URLSearchParams();
+    const entries: Array<[string, string]> = [
+      ["eventType", this.opsState.adminAuditEventTypeFilter],
+      ["actorAdminUserId", this.opsState.adminAuditActorFilter],
+      ["subjectAdminUserId", this.opsState.adminAuditSubjectFilter],
+      ["limit", this.opsState.adminAuditLimit]
+    ];
+
+    for (const [key, value] of entries) {
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        query.set(key, trimmedValue);
+      }
+    }
+
+    const queryString = query.toString();
+    return queryString
+      ? `${productionApiRoutes.admin.listAuditEvents}?${queryString}`
+      : productionApiRoutes.admin.listAuditEvents;
   }
 
   private async bootstrapAdminUser(): Promise<BootstrapAdminUserResponse> {

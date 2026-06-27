@@ -42,6 +42,10 @@ export type ShellPersistenceTarget = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminAuditEventTypeFilter: string;
+  adminAuditActorFilter: string;
+  adminAuditSubjectFilter: string;
+  adminAuditLimit: string;
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreateRole: AdminRole;
@@ -104,6 +108,10 @@ export const createPersistedShellState = (
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
   adminSessionToken: target.adminSessionToken,
+  adminAuditEventTypeFilter: target.adminAuditEventTypeFilter,
+  adminAuditActorFilter: target.adminAuditActorFilter,
+  adminAuditSubjectFilter: target.adminAuditSubjectFilter,
+  adminAuditLimit: target.adminAuditLimit,
   adminCreateUsername: target.adminCreateUsername,
   adminCreateDisplayName: target.adminCreateDisplayName,
   adminCreateRole: target.adminCreateRole,
@@ -278,6 +286,22 @@ export const applyHydratedShellState = (
   target.adminSessionToken = hydrateString(
     snapshot.adminSessionToken,
     target.adminSessionToken
+  );
+  target.adminAuditEventTypeFilter = hydrateString(
+    snapshot.adminAuditEventTypeFilter,
+    target.adminAuditEventTypeFilter
+  );
+  target.adminAuditActorFilter = hydrateString(
+    snapshot.adminAuditActorFilter,
+    target.adminAuditActorFilter
+  );
+  target.adminAuditSubjectFilter = hydrateString(
+    snapshot.adminAuditSubjectFilter,
+    target.adminAuditSubjectFilter
+  );
+  target.adminAuditLimit = hydrateString(
+    snapshot.adminAuditLimit,
+    target.adminAuditLimit
   );
   target.adminCreateUsername =
     hydrateString(snapshot.adminCreateUsername, target.adminCreateUsername);

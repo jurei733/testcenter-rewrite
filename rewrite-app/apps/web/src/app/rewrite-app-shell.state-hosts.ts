@@ -332,6 +332,30 @@ export function createShellPersistenceStateHost(args: {
     set adminSessionToken(nextValue) {
       args.opsState.adminSessionToken = nextValue;
     },
+    get adminAuditEventTypeFilter() {
+      return args.opsState.adminAuditEventTypeFilter;
+    },
+    set adminAuditEventTypeFilter(nextValue) {
+      args.opsState.adminAuditEventTypeFilter = nextValue;
+    },
+    get adminAuditActorFilter() {
+      return args.opsState.adminAuditActorFilter;
+    },
+    set adminAuditActorFilter(nextValue) {
+      args.opsState.adminAuditActorFilter = nextValue;
+    },
+    get adminAuditSubjectFilter() {
+      return args.opsState.adminAuditSubjectFilter;
+    },
+    set adminAuditSubjectFilter(nextValue) {
+      args.opsState.adminAuditSubjectFilter = nextValue;
+    },
+    get adminAuditLimit() {
+      return args.opsState.adminAuditLimit;
+    },
+    set adminAuditLimit(nextValue) {
+      args.opsState.adminAuditLimit = nextValue;
+    },
     get adminCreateUsername() {
       return args.opsState.adminCreateUsername;
     },

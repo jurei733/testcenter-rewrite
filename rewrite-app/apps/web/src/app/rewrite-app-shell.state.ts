@@ -22,6 +22,10 @@ export interface ShellOpsState {
   adminSessionView: string;
   adminUsersView: string;
   adminAuditView: string;
+  adminAuditEventTypeFilter: string;
+  adminAuditActorFilter: string;
+  adminAuditSubjectFilter: string;
+  adminAuditLimit: string;
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreatePassword: string;
@@ -145,6 +149,10 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminSessionView: "Use admin bootstrap or sign-in.",
     adminUsersView: 'Use "Admin Users".',
     adminAuditView: 'Use "Admin Audit Events".',
+    adminAuditEventTypeFilter: "",
+    adminAuditActorFilter: "",
+    adminAuditSubjectFilter: "",
+    adminAuditLimit: "100",
     adminCreateUsername: "workspace-admin",
     adminCreateDisplayName: "Workspace Admin",
     adminCreatePassword: "",
