@@ -66,6 +66,28 @@ const pollJson = async url => {
   throw lastError ?? new Error(`Timed out waiting for ${url}`);
 };
 
+const expectHead = async (url, expectedStatus = 200, expectedLocation = null) => {
+  const response = await fetch(url, {
+    method: "HEAD",
+    redirect: "manual"
+  });
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Expected HEAD ${url} to return ${expectedStatus} but got ${response.status}.`
+    );
+  }
+
+  if (expectedLocation !== null && response.headers.get("location") !== expectedLocation) {
+    throw new Error(
+      `Expected HEAD ${url} location ${expectedLocation} but got ${response.headers.get("location") ?? "none"}.`
+    );
+  }
+
+  if ((await response.text()) !== "") {
+    throw new Error(`Expected HEAD ${url} to return an empty response body.`);
+  }
+};
+
 const stopChild = child =>
   new Promise(async (resolvePromise, reject) => {
     if (child.exitCode !== null) {
@@ -103,10 +125,21 @@ const child = spawn(process.execPath, [serverEntry], {
 });
 
 try {
-  const health = await pollJson(`http://127.0.0.1:${port}/healthz`);
-  const readiness = await pollJson(`http://127.0.0.1:${port}/readyz`);
-  const manifest = await pollJson(`http://127.0.0.1:${port}/manifest`);
-  const appHtml = await fetch(`http://127.0.0.1:${port}/app`).then(async response => {
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const health = await pollJson(`${baseUrl}/healthz`);
+  const readiness = await pollJson(`${baseUrl}/readyz`);
+  const manifest = await pollJson(`${baseUrl}/manifest`);
+
+  await expectHead(`${baseUrl}/healthz`);
+  await expectHead(`${baseUrl}/readyz`);
+  await expectHead(`${baseUrl}/app`);
+  await expectHead(
+    `${baseUrl}/participant?workspaceKey=demo-workspace`,
+    302,
+    "/app/participant?workspaceKey=demo-workspace"
+  );
+
+  const appHtml = await fetch(`${baseUrl}/app`).then(async response => {
     if (!response.ok) {
       throw new Error(`Unexpected status ${response.status} for /app.`);
     }
@@ -154,7 +187,7 @@ try {
   }
 
   const mainBundleResponse = await fetch(
-    `http://127.0.0.1:${port}/app/${mainBundleMatch[1]}`
+    `${baseUrl}/app/${mainBundleMatch[1]}`
   );
   if (!mainBundleResponse.ok) {
     throw new Error(
@@ -163,7 +196,7 @@ try {
   }
 
   const stylesheetBundleResponse = await fetch(
-    `http://127.0.0.1:${port}/app/${stylesheetBundleMatch[1]}`
+    `${baseUrl}/app/${stylesheetBundleMatch[1]}`
   );
   if (!stylesheetBundleResponse.ok) {
     throw new Error(
