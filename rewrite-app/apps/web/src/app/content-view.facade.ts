@@ -11,7 +11,7 @@ import type {
   ListImportJobsResponse,
   ListSourcePackagesResponse
 } from "@testcenter-rewrite-app/contracts";
-import type { SummaryCard } from "./rewrite-app-shell.types";
+import { DEFAULT_SOURCE_DOCUMENT, type SummaryCard } from "./rewrite-app-shell.types";
 import {
   parseJsonDocument,
   readStringValue,
@@ -41,6 +41,13 @@ export class ContentViewFacade {
 
   persistState(): void {
     this.viewState.persistShellState();
+  }
+
+  restoreDemoSource(): void {
+    this.content.sourceFileName = "frontend-starter.xml";
+    this.content.sourceMediaType = "application/xml";
+    this.content.sourceDocument = DEFAULT_SOURCE_DOCUMENT;
+    this.persistState();
   }
 
   get contentCards(): SummaryCard[] {
