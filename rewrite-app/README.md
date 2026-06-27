@@ -284,7 +284,8 @@ The added read side now makes the first slice inspectable:
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
 - participant launch/resume can now carry an explicit `bookletKey` so entry links and operator flows can start a specific booklet from the active release
-- study-monitor reads now include workspace summary, group drill-down, and unit drill-down with per-run answer/missing/review status
+- participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses
+- study-monitor reads now include workspace summary, group drill-down, booklet drill-down, and unit drill-down with per-run answer/missing/review status
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from simple JSON or XML content when no explicit `contentStructure` is given
@@ -298,7 +299,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, study-monitor unit progress, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, import, runtime, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor booklet/unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, study-monitor booklet/unit progress, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -364,7 +365,7 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
-- study-monitor summary, group drill-down, and unit-progress cards
+- study-monitor summary, group drill-down, booklet drill-down, and unit-progress cards
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
@@ -419,5 +420,5 @@ It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, common wrapper objects, and booklet/testlet/assessment-test/unit/item-ref aliases
-- participant launch is still simplified, but now supports explicit group keys and booklet selection on participant entry links
+- participant launch is still simplified, but now supports explicit group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
 - monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, and open-run blockers, but still do not cover every original Testcenter monitor view
