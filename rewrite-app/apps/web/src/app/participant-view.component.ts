@@ -82,5 +82,12 @@ export class ParticipantViewComponent implements OnInit {
 
   ngOnInit(): void {
     this.view.init();
+    const query = new URLSearchParams(window.location.search);
+    this.view.applyEntryParameters({
+      workspaceKey: query.get("workspaceKey"),
+      loginKey: query.get("loginKey"),
+      participantSessionId: query.get("participantSessionId"),
+      currentUnitKey: query.get("currentUnitKey")
+    });
   }
 }

@@ -717,14 +717,18 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "active")
   );
 
-  logStep("nav-participant");
-  await page.locator('[data-view-nav="participant"]').click();
-  await page.waitForURL(/\/app\/participant$/);
-  await page.locator("#participantLoginKey").waitFor();
-  logStep("participant-route-sign-in");
+  logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
-  await fillAndCommit("#participantWorkspaceKey", workspaceKey);
-  await fillAndCommit("#participantLoginKey", participantRouteLoginKey);
+  await page.goto(
+    `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
+      workspaceKey
+    )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}`,
+    { waitUntil: "networkidle" }
+  );
+  await page.locator("#participantLoginKey").waitFor();
+  await expectInputValue("#participantWorkspaceKey", workspaceKey);
+  await expectInputValue("#participantLoginKey", participantRouteLoginKey);
+  logStep("participant-route-sign-in");
   await clickAction("Participant Sign In");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const participantRouteSessionsPayload = await pollJsonWithPredicate(

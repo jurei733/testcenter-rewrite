@@ -106,8 +106,8 @@ export class AppShellFacade {
     ];
   }
 
-  init(): void {
-    this.viewState.init();
+  init(initialView: AppView | null = null): void {
+    this.viewState.init(initialView);
   }
 
   destroy(): void {

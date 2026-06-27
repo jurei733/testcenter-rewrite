@@ -36,8 +36,12 @@ export class RewriteAppViewStateService {
     this.uiState.activeView = nextValue;
   }
 
-  init(): void {
+  init(initialView: AppView | null = null): void {
     this.lifecycle.hydrateShellState();
+    if (initialView) {
+      this.activeView = initialView;
+      this.persistShellState();
+    }
     this.lifecycle.scheduleAutoRefresh(
       this.refreshWorkspaceOverview,
       this.refreshContentReads,

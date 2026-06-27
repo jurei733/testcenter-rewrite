@@ -34,6 +34,13 @@ type ParticipantPlayerState = {
   saveProgressLabel: string;
 };
 
+type ParticipantEntryParameters = {
+  workspaceKey?: string | null;
+  loginKey?: string | null;
+  participantSessionId?: string | null;
+  currentUnitKey?: string | null;
+};
+
 @Injectable({ providedIn: "root" })
 export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
@@ -49,6 +56,30 @@ export class ParticipantViewFacade {
 
   persistState(): void {
     this.viewState.persistShellState();
+  }
+
+  applyEntryParameters(parameters: ParticipantEntryParameters): void {
+    const workspaceKey = parameters.workspaceKey?.trim();
+    const loginKey = parameters.loginKey?.trim();
+    const participantSessionId = parameters.participantSessionId?.trim();
+    const currentUnitKey = parameters.currentUnitKey?.trim();
+
+    if (workspaceKey) {
+      this.workspace.workspaceKey = workspaceKey;
+    }
+    if (loginKey) {
+      this.runtime.loginKey = loginKey;
+    }
+    if (participantSessionId) {
+      this.runtime.participantSessionId = participantSessionId;
+    }
+    if (currentUnitKey) {
+      this.runtime.currentUnitKey = currentUnitKey;
+    }
+
+    if (workspaceKey || loginKey || participantSessionId || currentUnitKey) {
+      this.persistState();
+    }
   }
 
   get player(): ParticipantPlayerState {
