@@ -1636,6 +1636,46 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(createdReview.body.item.review.reviewerId, "integration-reviewer");
     assert.equal(createdReview.body.item.review.unitKey, "unit-intro");
 
+    const unknownUnitReview = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          participantSessionId:
+            participantSignIn.body.participantSession.participantSessionId,
+          testRunId: resumed.body.testRun.testRunId,
+          unitKey: "unit-missing",
+          reviewerId: "integration-reviewer",
+          category: "quality-check",
+          comment: "Review should reject unknown unit"
+        }
+      }
+    );
+
+    assert.equal(unknownUnitReview.status, 404);
+    assert.equal(unknownUnitReview.body.error, "unit_not_found");
+
+    const unknownUnitReviewUpdate = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews/${createdReview.body.item.review.reviewId}`,
+      {
+        method: "PATCH",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          unitKey: "unit-missing"
+        }
+      }
+    );
+
+    assert.equal(unknownUnitReviewUpdate.status, 404);
+    assert.equal(unknownUnitReviewUpdate.body.error, "unit_not_found");
+
     const updatedReview = await requestJsonAt<{
       item: {
         review: {

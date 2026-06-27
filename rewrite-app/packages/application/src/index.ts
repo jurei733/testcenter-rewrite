@@ -4354,6 +4354,19 @@ export const createFirstSliceServices = (
           );
         }
 
+        const normalizedUnitKey = normalizeOptionalUnitKey(input.unitKey);
+        if (normalizedUnitKey) {
+          const contentRelease = await requireContentRelease(
+            repository,
+            testRun.contentReleaseId
+          );
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            normalizedUnitKey
+          );
+        }
+
         const timestamp = now();
         const review: WorkspaceReview = {
           reviewId: idGenerator(),
@@ -4361,7 +4374,7 @@ export const createFirstSliceServices = (
           workspaceId: workspace.workspaceId,
           participantSessionId: participantSession.participantSessionId,
           testRunId: testRun.testRunId,
-          unitKey: normalizeOptionalUnitKey(input.unitKey),
+          unitKey: normalizedUnitKey,
           reviewerId: normalizeReviewText(
             input.reviewerId,
             "reviewerId",
@@ -4426,12 +4439,40 @@ export const createFirstSliceServices = (
           );
         }
 
+        const nextUnitKey =
+          input.unitKey === undefined
+            ? existingReview.unitKey
+            : normalizeOptionalUnitKey(input.unitKey);
+
+        if (nextUnitKey) {
+          const testRun = await repository.getTestRunById(existingReview.testRunId);
+
+          if (
+            !testRun ||
+            testRun.tenantId !== workspace.tenantId ||
+            testRun.workspaceId !== workspace.workspaceId
+          ) {
+            throw new FirstSliceError(
+              404,
+              "test_run_not_found",
+              `Test run '${existingReview.testRunId}' was not found in workspace '${input.workspaceKey}'.`
+            );
+          }
+
+          const contentRelease = await requireContentRelease(
+            repository,
+            testRun.contentReleaseId
+          );
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            nextUnitKey
+          );
+        }
+
         const review: WorkspaceReview = {
           ...existingReview,
-          unitKey:
-            input.unitKey === undefined
-              ? existingReview.unitKey
-              : normalizeOptionalUnitKey(input.unitKey),
+          unitKey: nextUnitKey,
           reviewerId:
             input.reviewerId === undefined
               ? existingReview.reviewerId
