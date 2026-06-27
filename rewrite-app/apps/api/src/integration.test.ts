@@ -1102,6 +1102,21 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(resumed.body.testRun.status, "running");
     assert.equal(resumed.body.testRun.bookletKey, "booklet:demo");
     assert.equal(resumed.body.testRun.currentUnitKey, "unit-intro");
+
+    const currentState = await requestJsonAt<{
+      currentRunState: {
+        bookletUnits: Array<{ unitKey: string; displayLabel: string }>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+
+    assert.equal(currentState.status, 200);
+    assert.deepEqual(
+      currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+      ["unit-intro", "unit-practice", "unit-finish"]
+    );
   } finally {
     await closeServer(isolated.server);
   }

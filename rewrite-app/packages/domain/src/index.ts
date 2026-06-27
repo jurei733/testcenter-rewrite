@@ -245,6 +245,10 @@ export type ParticipantCurrentRunState = {
     unitKey: string | null;
     displayLabel: string | null;
   };
+  bookletUnits: Array<{
+    unitKey: string;
+    displayLabel: string;
+  }>;
   availableActions: Array<"save_progress" | "resume" | "complete">;
 };
 

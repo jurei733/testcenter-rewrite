@@ -1274,6 +1274,23 @@ const resolveRuntimeUnit = (
   };
 };
 
+const resolveRuntimeBookletUnits = (
+  contentRelease: ContentRelease,
+  bookletKey: string
+): Array<{ unitKey: string; displayLabel: string }> => {
+  const bookletEntry =
+    contentRelease.runtimeSnapshot.bookletEntries.find(
+      candidate => candidate.bookletKey === bookletKey
+    ) ?? contentRelease.runtimeSnapshot.bookletEntries[0];
+
+  return (
+    bookletEntry?.unitEntries.map(unitEntry => ({
+      unitKey: unitEntry.unitKey,
+      displayLabel: unitEntry.displayLabel
+    })) ?? []
+  );
+};
+
 const sortWorkspaceContentReleases = (
   releases: ContentRelease[]
 ): ContentRelease[] =>
@@ -2819,6 +2836,10 @@ export const createFirstSliceServices = (
             contentRelease,
             latestTestRun.bookletKey,
             latestTestRun.currentUnitKey
+          ),
+          bookletUnits: resolveRuntimeBookletUnits(
+            contentRelease,
+            latestTestRun.bookletKey
           ),
           availableActions
         };

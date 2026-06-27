@@ -59,6 +59,10 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               <dd id="participantRouteUnitKey">{{ view.player.unitKey }}</dd>
             </div>
             <div>
+              <dt>Unit Position</dt>
+              <dd id="participantRouteUnitPosition">{{ view.player.unitPosition }}</dd>
+            </div>
+            <div>
               <dt>Run</dt>
               <dd id="participantRouteRunId">{{ view.player.runId }}</dd>
             </div>
@@ -68,6 +72,8 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             </div>
           </dl>
           <div class="actions">
+            <button id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
+            <button id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>
             <button class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">Complete Test</button>

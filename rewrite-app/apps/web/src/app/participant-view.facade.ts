@@ -25,10 +25,15 @@ type ParticipantPlayerState = {
   bookletLabel: string;
   unitLabel: string;
   unitKey: string;
+  unitPosition: string;
+  previousUnitKey: string | null;
+  nextUnitKey: string | null;
   runStatus: string;
   runId: string;
   actions: string[];
   canSaveProgress: boolean;
+  canGoPreviousUnit: boolean;
+  canGoNextUnit: boolean;
   canResumeRun: boolean;
   canComplete: boolean;
   saveProgressLabel: string;
@@ -139,10 +144,15 @@ export class ParticipantViewFacade {
         bookletLabel: "No booklet loaded",
         unitLabel: "No unit loaded",
         unitKey: "n/a",
+        unitPosition: "n/a",
+        previousUnitKey: null,
+        nextUnitKey: null,
         runStatus: "idle",
         runId: this.runtime.testRunId.trim() || "no run yet",
         actions: [],
         canSaveProgress: false,
+        canGoPreviousUnit: false,
+        canGoNextUnit: false,
         canResumeRun: false,
         canComplete: false,
         saveProgressLabel: "Save Progress"
@@ -154,17 +164,35 @@ export class ParticipantViewFacade {
       currentState.currentUnit.displayLabel ??
       currentState.currentUnit.unitKey ??
       "Untitled unit";
+    const unitKey = currentState.currentUnit.unitKey ?? "";
+    const bookletUnits = currentState.bookletUnits ?? [];
+    const unitIndex = bookletUnits.findIndex(unit => unit.unitKey === unitKey);
+    const previousUnitKey =
+      unitIndex > 0 ? bookletUnits[unitIndex - 1]?.unitKey ?? null : null;
+    const nextUnitKey =
+      unitIndex >= 0 && unitIndex < bookletUnits.length - 1
+        ? bookletUnits[unitIndex + 1]?.unitKey ?? null
+        : null;
+    const canNavigateUnits =
+      currentState.testRun.status === "running" &&
+      availableActions.includes("save_progress");
 
     return {
       headline: unitLabel,
       detail: currentState.booklet.displayLabel,
       bookletLabel: currentState.booklet.displayLabel,
       unitLabel,
-      unitKey: currentState.currentUnit.unitKey ?? "n/a",
+      unitKey: unitKey || "n/a",
+      unitPosition:
+        unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
+      previousUnitKey,
+      nextUnitKey,
       runStatus: currentState.testRun.status,
       runId: currentState.testRun.testRunId,
       actions: availableActions,
       canSaveProgress: availableActions.includes("save_progress"),
+      canGoPreviousUnit: canNavigateUnits && previousUnitKey != null,
+      canGoNextUnit: canNavigateUnits && nextUnitKey != null,
       canResumeRun: availableActions.includes("resume"),
       canComplete: availableActions.includes("complete"),
       saveProgressLabel:
@@ -190,6 +218,14 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() =>
       this.saveProgressInternal(this.player.runStatus === "paused" ? "running" : "paused")
     );
+  }
+
+  goToPreviousUnit(): void {
+    this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("previous"));
+  }
+
+  goToNextUnit(): void {
+    this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("next"));
   }
 
   resumeRun(): void {
@@ -239,7 +275,10 @@ export class ParticipantViewFacade {
     await this.refreshCurrentStateInternal(true);
   }
 
-  private async saveProgressInternal(status: "paused" | "running"): Promise<void> {
+  private async saveProgressInternal(
+    status: "paused" | "running",
+    currentUnitKey = this.runtime.currentUnitKey.trim() || null
+  ): Promise<void> {
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
       "POST",
@@ -247,7 +286,7 @@ export class ParticipantViewFacade {
         testRunId: this.runtime.testRunId.trim()
       }),
       {
-        currentUnitKey: this.runtime.currentUnitKey.trim() || null,
+        currentUnitKey,
         status
       } satisfies SaveTestRunProgressRequest
     );
@@ -259,6 +298,17 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+  }
+
+  private async goToPlayerUnitInternal(direction: "previous" | "next"): Promise<void> {
+    const player = this.player;
+    const targetUnitKey =
+      direction === "previous" ? player.previousUnitKey : player.nextUnitKey;
+    if (!targetUnitKey) {
+      return;
+    }
+
+    await this.saveProgressInternal("running", targetUnitKey);
   }
 
   private async resumeRunInternal(): Promise<void> {

@@ -148,6 +148,21 @@ try {
   );
   assert.equal(await page.locator("#participantWorkspaceKey").inputValue(), "demo-workspace");
   assert.equal(await page.locator("#participantLoginKey").inputValue(), "student-demo");
+  assert.equal(
+    (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
+    "1 / 3"
+  );
+
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        "unit-practice" &&
+      document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
+        "2 / 3",
+    undefined,
+    { timeout: 15_000 }
+  );
 
   await page.goto(`${baseUrl}/app/ops`, { waitUntil: "networkidle" });
   await page.getByText("Local demo is ready").waitFor({ timeout: 15_000 });
