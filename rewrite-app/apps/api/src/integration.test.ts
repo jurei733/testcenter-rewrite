@@ -589,6 +589,71 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(disabledSignIn.status, 401);
   assert.equal(disabledSignIn.body.error, "admin_credentials_invalid");
 
+  const filteredDisabledWorkspaceAdmins = await requestJson<{
+    items: Array<{
+      adminUser: { adminUserId: string; username: string; status: string };
+      roleAssignments: Array<{ role: string }>;
+    }>;
+  }>(
+    `/api/v1/admin/users?username=workspace&status=disabled&role=workspace_admin&tenantKey=${adminTenantKey}&workspaceKey=${adminWorkspaceKey}&limit=1`,
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(filteredDisabledWorkspaceAdmins.status, 200);
+  assert.equal(filteredDisabledWorkspaceAdmins.body.items.length, 1);
+  assert.equal(
+    filteredDisabledWorkspaceAdmins.body.items[0]?.adminUser.adminUserId,
+    createdAdminUser.body.adminUser.adminUserId
+  );
+  assert.equal(
+    filteredDisabledWorkspaceAdmins.body.items[0]?.adminUser.status,
+    "disabled"
+  );
+  assert.equal(
+    filteredDisabledWorkspaceAdmins.body.items[0]?.roleAssignments[0]?.role,
+    "workspace_admin"
+  );
+
+  const invalidAdminUserStatus = await requestJson<{ error: string }>(
+    "/api/v1/admin/users?status=unsupported",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAdminUserStatus.status, 400);
+  assert.equal(invalidAdminUserStatus.body.error, "admin_user_status_invalid");
+
+  const invalidAdminRole = await requestJson<{ error: string }>(
+    "/api/v1/admin/users?role=unsupported",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAdminRole.status, 400);
+  assert.equal(invalidAdminRole.body.error, "admin_role_invalid");
+
+  const invalidAdminUserLimit = await requestJson<{ error: string }>(
+    "/api/v1/admin/users?limit=0",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAdminUserLimit.status, 400);
+  assert.equal(invalidAdminUserLimit.body.error, "admin_user_limit_invalid");
+
   const adminAuditEvents = await requestJson<{
     items: Array<{
       eventType: string;

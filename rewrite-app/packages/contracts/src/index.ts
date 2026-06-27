@@ -211,6 +211,15 @@ export type ContentReleaseListQuery = {
   limit?: number;
 };
 
+export type AdminUserListQuery = {
+  username?: string;
+  status?: AdminUserStatus;
+  role?: AdminRole;
+  tenantKey?: string;
+  workspaceKey?: string;
+  limit?: number;
+};
+
 export type AdminAuditEventListQuery = {
   eventType?: AdminAuditEventType;
   actorAdminUserId?: string;

@@ -283,6 +283,12 @@ export type AdminAuthPort = {
 export type AdminDirectoryPort = {
   listAdminUsers(input: {
     sessionToken: string;
+    username?: string;
+    status?: AdminUserStatus;
+    role?: AdminRole;
+    tenantKey?: string;
+    workspaceKey?: string;
+    limit?: number;
   }): Promise<
     Array<{
       adminUser: AdminUser;
@@ -2451,6 +2457,27 @@ export const createFirstSliceServices = (
           now()
         );
         requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        const usernameFilter = input.username?.trim().toLowerCase() || undefined;
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+        const tenantFilterKey = input.tenantKey?.trim() || undefined;
+        const workspaceFilterKey = input.workspaceKey?.trim() || undefined;
+        const tenantFilter = tenantFilterKey
+          ? await repository.getTenantByKey(tenantFilterKey)
+          : null;
+        if (tenantFilterKey && !tenantFilter) {
+          return [];
+        }
+        const workspaceFilter = workspaceFilterKey
+          ? tenantFilterKey
+            ? await repository.getWorkspaceByScope(
+                tenantFilterKey,
+                workspaceFilterKey
+              )
+            : await repository.getWorkspaceByWorkspaceKey(workspaceFilterKey)
+          : null;
+        if (workspaceFilterKey && !workspaceFilter) {
+          return [];
+        }
 
         const adminUsers = (await repository.listAdminUsers()).sort(
           (left, right) =>
@@ -2458,7 +2485,7 @@ export const createFirstSliceServices = (
             left.username.localeCompare(right.username)
         );
 
-        return Promise.all(
+        const directoryItems = await Promise.all(
           adminUsers.map(async adminUser => ({
             adminUser,
             roleAssignments: await listAdminRoleAssignmentsForUser(
@@ -2467,6 +2494,27 @@ export const createFirstSliceServices = (
             )
           }))
         );
+
+        return directoryItems
+          .filter(
+            item =>
+              (!usernameFilter || item.adminUser.username.includes(usernameFilter)) &&
+              (!input.status || item.adminUser.status === input.status) &&
+              (!input.role ||
+                item.roleAssignments.some(
+                  roleAssignment => roleAssignment.role === input.role
+                )) &&
+              (!tenantFilter ||
+                item.roleAssignments.some(
+                  roleAssignment => roleAssignment.tenantId === tenantFilter.tenantId
+                )) &&
+              (!workspaceFilter ||
+                item.roleAssignments.some(
+                  roleAssignment =>
+                    roleAssignment.workspaceId === workspaceFilter.workspaceId
+                ))
+          )
+          .slice(0, limit);
       },
       async createAdminUser(input) {
         const currentSession = await requireActiveAdminSession(

@@ -80,6 +80,7 @@ import {
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
+  type AdminUserListQuery,
   type UpdateReviewRequest,
   productionApiRoutes,
   type PublicAdminSession,
@@ -89,8 +90,10 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import {
   type AdminRoleAssignment,
+  type AdminRole,
   type AdminSession,
   type AdminUser,
+  type AdminUserStatus,
   type AdminAuditEventType,
   type ContentReleaseStatus,
   type ImportJobStatus,
@@ -1702,8 +1705,62 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const username = url.searchParams.get("username")?.trim() || undefined;
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (status && status !== "active" && status !== "disabled") {
+          sendError(
+            response,
+            400,
+            "admin_user_status_invalid",
+            `Admin user status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const role = url.searchParams.get("role")?.trim() || undefined;
+        if (
+          role &&
+          role !== "platform_admin" &&
+          role !== "tenant_admin" &&
+          role !== "workspace_admin"
+        ) {
+          sendError(
+            response,
+            400,
+            "admin_role_invalid",
+            `Admin role '${role}' is not supported.`
+          );
+          return;
+        }
+
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "admin_user_limit_invalid",
+            "Admin user limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
+        const query: AdminUserListQuery = {
+          username,
+          status: status as AdminUserStatus | undefined,
+          role: role as AdminRole | undefined,
+          tenantKey: url.searchParams.get("tenantKey")?.trim() || undefined,
+          workspaceKey: url.searchParams.get("workspaceKey")?.trim() || undefined,
+          limit
+        };
         const items = await services.adminDirectory.listAdminUsers({
-          sessionToken
+          sessionToken,
+          ...query
         });
         sendJson<ListAdminUsersResponse>(response, 200, {
           items: items.map(toAdminUserDirectoryItem)
