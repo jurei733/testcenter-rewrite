@@ -2481,6 +2481,110 @@ test("failed import can be retried on the same source package", async () => {
   );
 });
 
+test("source-package intake rejects invalid metadata before import", async () => {
+  const tenantKey = "integration-tenant-source-validation";
+  const workspaceKey = "integration-workspace-source-validation";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const blankFileName = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: " ",
+        mediaType: "application/xml",
+        sourceDocument:
+          "<assessment><booklet key=\"booklet:valid\"><unit key=\"unit-valid\" /></booklet></assessment>"
+      }
+    }
+  );
+
+  assert.equal(blankFileName.status, 400);
+  assert.equal(blankFileName.body.error, "source_package_file_name_required");
+
+  const blankMediaType = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "valid.xml",
+        mediaType: " ",
+        sourceDocument:
+          "<assessment><booklet key=\"booklet:valid\"><unit key=\"unit-valid\" /></booklet></assessment>"
+      }
+    }
+  );
+
+  assert.equal(blankMediaType.status, 400);
+  assert.equal(blankMediaType.body.error, "source_package_media_type_required");
+
+  const invalidSourceDocument = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "valid.xml",
+        mediaType: "application/xml",
+        sourceDocument: { xml: "<assessment />" }
+      }
+    }
+  );
+
+  assert.equal(invalidSourceDocument.status, 400);
+  assert.equal(invalidSourceDocument.body.error, "source_document_invalid");
+
+  const validSourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "valid.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+        "<assessment><booklet key=\"booklet:valid\"><unit key=\"unit-valid\" /></booklet></assessment>"
+    }
+  });
+
+  assert.equal(validSourcePackage.status, 201);
+
+  const invalidRetryMediaType = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${validSourcePackage.body.sourcePackage.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        mediaType: ""
+      }
+    }
+  );
+
+  assert.equal(invalidRetryMediaType.status, 400);
+  assert.equal(
+    invalidRetryMediaType.body.error,
+    "source_package_media_type_required"
+  );
+
+  const invalidRetrySourceDocument = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${validSourcePackage.body.sourcePackage.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        sourceDocument: ["not", "a", "document"]
+      }
+    }
+  );
+
+  assert.equal(invalidRetrySourceDocument.status, 400);
+  assert.equal(invalidRetrySourceDocument.body.error, "source_document_invalid");
+});
+
 test("source document import normalizes fallback labels and duplicate entries", async () => {
   const tenantKey = "integration-tenant-manifest-normalization";
   const workspaceKey = "integration-workspace-manifest-normalization";

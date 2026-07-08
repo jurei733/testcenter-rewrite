@@ -693,6 +693,52 @@ const normalizeGroupKey = (value: unknown): string => {
   return value.trim();
 };
 
+const normalizeSourcePackageText = (
+  value: unknown,
+  fieldName: string,
+  errorCode: string
+): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(400, errorCode, `${fieldName} is required.`);
+  }
+
+  return value.trim();
+};
+
+const normalizeOptionalSourcePackageText = (
+  value: unknown,
+  fieldName: string,
+  errorCode: string
+): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return normalizeSourcePackageText(value, fieldName, errorCode);
+};
+
+const normalizeOptionalSourceDocument = (
+  value: unknown
+): string | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "source_document_invalid",
+      "sourceDocument must be a string when provided."
+    );
+  }
+
+  return value.trim() === "" ? null : value;
+};
+
 const normalizeReviewText = (
   value: unknown,
   fieldName: string,
@@ -4708,14 +4754,25 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
+        const sourceDocument = normalizeOptionalSourceDocument(
+          input.sourceDocument
+        );
         const sourcePackage: SourcePackage = {
           sourcePackageId: idGenerator(),
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
-          fileName: input.fileName,
-          mediaType: input.mediaType,
+          fileName: normalizeSourcePackageText(
+            input.fileName,
+            "fileName",
+            "source_package_file_name_required"
+          ),
+          mediaType: normalizeSourcePackageText(
+            input.mediaType,
+            "mediaType",
+            "source_package_media_type_required"
+          ),
           contentStructure: input.contentStructure ?? null,
-          sourceDocument: input.sourceDocument ?? null,
+          sourceDocument: sourceDocument ?? null,
           status: "uploaded",
           uploadedAt: now()
         };
@@ -4757,17 +4814,30 @@ export const createFirstSliceServices = (
           );
         }
 
+        const fileName = normalizeOptionalSourcePackageText(
+          input.fileName,
+          "fileName",
+          "source_package_file_name_required"
+        );
+        const mediaType = normalizeOptionalSourcePackageText(
+          input.mediaType,
+          "mediaType",
+          "source_package_media_type_required"
+        );
+        const sourceDocument = normalizeOptionalSourceDocument(
+          input.sourceDocument
+        );
         const updatedSourcePackage: SourcePackage = {
           ...sourcePackage,
-          fileName: input.fileName ?? sourcePackage.fileName,
-          mediaType: input.mediaType ?? sourcePackage.mediaType,
+          fileName: fileName ?? sourcePackage.fileName,
+          mediaType: mediaType ?? sourcePackage.mediaType,
           contentStructure:
             input.contentStructure !== undefined
               ? input.contentStructure
               : sourcePackage.contentStructure,
           sourceDocument:
-            input.sourceDocument !== undefined
-              ? input.sourceDocument
+            sourceDocument !== undefined
+              ? sourceDocument
               : sourcePackage.sourceDocument,
           status: "uploaded"
         };

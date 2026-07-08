@@ -289,6 +289,7 @@ The added read side now makes the first slice inspectable:
 - study-monitor reads now include workspace summary, group drill-down, booklet drill-down, and unit drill-down with per-run answer/missing/review status
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
+- source-package intake now rejects blank file names, blank media types, and non-string source documents before an import job is created
 - source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from JSON or XML content when no explicit `contentStructure` is given, including nested testcenter/package/test wrapper objects
 - manifest-derived runtime structures are normalized during import: keys are trimmed, duplicate booklet/unit entries are collapsed, missing display labels fall back to readable key-derived labels, and common `bookletId`/`unitId`/`identifier`/`ref` fields plus resource/file/module/task and assessment-test/item-ref aliases are accepted
 - imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
