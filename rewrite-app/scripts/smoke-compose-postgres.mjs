@@ -96,7 +96,23 @@ const expectEqual = (label, actual, expected) => {
   }
 };
 
-const parseBooleanFlag = value => {
+const requestJson = async (url, options = {}) => {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.body ? { "content-type": "application/json" } : {}),
+      ...(options.headers ?? {})
+    },
+    body:
+      options.body && typeof options.body !== "string"
+        ? JSON.stringify(options.body)
+        : options.body
+  });
+  const payload = await response.json().catch(() => null);
+  return { response, payload };
+};
+
+const parseBooleanFlag = (value, label = "boolean flag") => {
   const normalizedValue = value.trim().toLowerCase();
   if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
     return true;
@@ -105,7 +121,7 @@ const parseBooleanFlag = value => {
     return false;
   }
   throw new Error(
-    `FIRST_SLICE_OPERATOR_AUTH_REQUIRED must be a boolean-like flag, got '${value}'.`
+    `${label} must be a boolean-like flag, got '${value}'.`
   );
 };
 
@@ -113,8 +129,86 @@ const dumpComposeLogs = async () => {
   await run("docker", [...composeArgs, "logs"]).catch(() => undefined);
 };
 
+const verifyBootstrappedDemo = async baseUrl => {
+  const adminSignIn = await requestJson(`${baseUrl}/api/v1/admin/auth/sign-in`, {
+    method: "POST",
+    body: {
+      username: "demo-admin",
+      password: "demo-admin-password"
+    }
+  });
+  expectEqual("demo admin sign-in status", adminSignIn.response.status, 200);
+  expectEqual("demo admin username", adminSignIn.payload?.adminUser?.username, "demo-admin");
+  expectEqual(
+    "demo admin first role",
+    adminSignIn.payload?.roleAssignments?.[0]?.role,
+    "platform_admin"
+  );
+
+  const sessionToken = adminSignIn.payload?.sessionToken;
+  if (typeof sessionToken !== "string" || sessionToken.length === 0) {
+    throw new Error("Expected demo admin sign-in to return a bearer session token.");
+  }
+
+  const overview = await requestJson(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo workspace overview status", overview.response.status, 200);
+  expectEqual(
+    "demo workspace key",
+    overview.payload?.workspaceOverview?.workspace?.workspaceKey,
+    "demo-workspace"
+  );
+  if (
+    typeof overview.payload?.workspaceOverview?.activeContentReleaseId !== "string" ||
+    overview.payload.workspaceOverview.activeContentReleaseId.length === 0
+  ) {
+    throw new Error("Expected demo workspace to have an active content release.");
+  }
+
+  const participantSignIn = await requestJson(
+    `${baseUrl}/api/v1/participant/auth/sign-in`,
+    {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    }
+  );
+  expectEqual("demo participant sign-in status", participantSignIn.response.status, 200);
+  expectEqual(
+    "demo participant login key",
+    participantSignIn.payload?.participantSession?.loginKey,
+    "student-demo"
+  );
+
+  const participantSessionId =
+    participantSignIn.payload?.participantSession?.participantSessionId;
+  if (typeof participantSessionId !== "string" || participantSessionId.length === 0) {
+    throw new Error("Expected demo participant sign-in to return a session id.");
+  }
+
+  const resumed = await requestJson(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
+    {
+      method: "POST"
+    }
+  );
+  expectEqual("demo participant resume status", resumed.response.status, 200);
+  expectEqual("demo test run status", resumed.payload?.testRun?.status, "running");
+  expectEqual("demo booklet key", resumed.payload?.testRun?.bookletKey, "booklet:demo");
+  expectEqual("demo current unit key", resumed.payload?.testRun?.currentUnitKey, "unit-intro");
+};
+
 try {
   const expectedSchemaVersion = await readExpectedPostgresSchemaVersion();
+  const baseUrl = "http://127.0.0.1:4310";
 
   await run("docker", [
     ...composeArgs,
@@ -131,9 +225,9 @@ try {
     }
   });
 
-  const readiness = await pollJson("http://127.0.0.1:4310/readyz");
-  const manifest = await pollJson("http://127.0.0.1:4310/manifest");
-  const config = await pollJson("http://127.0.0.1:4310/diagnostics/config");
+  const readiness = await pollJson(`${baseUrl}/readyz`);
+  const manifest = await pollJson(`${baseUrl}/manifest`);
+  const config = await pollJson(`${baseUrl}/diagnostics/config`);
   const apiContainerId = await capture("docker", [
     ...composeArgs,
     "ps",
@@ -177,7 +271,7 @@ try {
   expectEqual(
     "runtimeConfig.operatorAuthRequired",
     config.runtimeConfig?.operatorAuthRequired,
-    parseBooleanFlag(operatorAuthRequired)
+    parseBooleanFlag(operatorAuthRequired, "FIRST_SLICE_OPERATOR_AUTH_REQUIRED")
   );
   expectEqual(
     "runtimeConfig.environment.firstSlicePostgresUrlPresent",
@@ -187,9 +281,13 @@ try {
   expectEqual(
     "runtimeConfig.environment.firstSliceBootstrapDemo",
     config.runtimeConfig?.environment?.firstSliceBootstrapDemo,
-    parseBooleanFlag(bootstrapDemo)
+    parseBooleanFlag(bootstrapDemo, "FIRST_SLICE_BOOTSTRAP_DEMO")
   );
   expectEqual("apiContainer.user", apiContainerUser, "node");
+
+  if (parseBooleanFlag(bootstrapDemo, "FIRST_SLICE_BOOTSTRAP_DEMO")) {
+    await verifyBootstrappedDemo(baseUrl);
+  }
 
   process.stdout.write(
     `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired} bootstrapDemo=${bootstrapDemo}\n`

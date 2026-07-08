@@ -390,6 +390,8 @@ That verifies:
 - build metadata propagation into the running API manifest
 - production-like operator auth configuration in the composed API service
 
+When `FIRST_SLICE_BOOTSTRAP_DEMO=true` is set, the same compose smoke also verifies the seeded demo state by signing in as `demo-admin`, reading the protected demo workspace overview, signing in `student-demo`, and resuming the demo booklet against Postgres.
+
 For runtime probes:
 
 - `/healthz` is a liveness check

@@ -130,8 +130,12 @@ jobs:
         run: npm run smoke:local-demo
 
   compose-postgres-smoke:
-    name: Compose Postgres smoke
+    name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        bootstrap-demo: ["false", "true"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -149,4 +153,5 @@ jobs:
         run: |
           APP_BUILD_SHA="${GITHUB_SHA::12}" \
           APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_BOOTSTRAP_DEMO="${{ matrix.bootstrap-demo }}" \
           npm run smoke:compose:postgres
