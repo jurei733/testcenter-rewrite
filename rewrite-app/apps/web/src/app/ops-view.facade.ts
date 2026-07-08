@@ -79,8 +79,12 @@ const localDemoAccess = {
   tenantKey: "demo-tenant",
   workspaceKey: "demo-workspace",
   participantLoginKey: "student-demo",
-  participantPath:
-    "/participant?workspaceKey=demo-workspace&loginKey=student-demo"
+  participantPath: [
+    "/participant?workspaceKey=demo-workspace",
+    "loginKey=student-demo",
+    "groupKey=group:student-demo",
+    "bookletKey=booklet:demo"
+  ].join("&")
 } as const;
 
 @Injectable({ providedIn: "root" })

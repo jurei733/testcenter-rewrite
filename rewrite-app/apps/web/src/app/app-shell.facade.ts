@@ -8,8 +8,12 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import type { LiveContextSection } from "./live-context.component";
 
-const localDemoParticipantLink =
-  "/participant?workspaceKey=demo-workspace&loginKey=student-demo";
+const localDemoParticipantLink = [
+  "/participant?workspaceKey=demo-workspace",
+  "loginKey=student-demo",
+  "groupKey=group:student-demo",
+  "bookletKey=booklet:demo"
+].join("&");
 
 @Injectable({ providedIn: "root" })
 export class AppShellFacade {

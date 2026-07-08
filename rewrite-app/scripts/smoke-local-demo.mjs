@@ -137,7 +137,12 @@ try {
   await demoLink.waitFor({ timeout: 15_000 });
   assert.equal(
     await demoLink.getAttribute("href"),
-    "/participant?workspaceKey=demo-workspace&loginKey=student-demo"
+    [
+      "/participant?workspaceKey=demo-workspace",
+      "loginKey=student-demo",
+      "groupKey=group:student-demo",
+      "bookletKey=booklet:demo"
+    ].join("&")
   );
   await demoLink.click();
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
@@ -155,6 +160,8 @@ try {
   );
   assert.equal(await page.locator("#participantWorkspaceKey").inputValue(), "demo-workspace");
   assert.equal(await page.locator("#participantLoginKey").inputValue(), "student-demo");
+  assert.equal(await page.locator("#participantRouteGroupKey").inputValue(), "group:student-demo");
+  assert.equal(await page.locator("#participantRouteBookletKey").inputValue(), "booklet:demo");
   assert.equal(
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"
