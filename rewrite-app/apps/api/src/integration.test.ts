@@ -2565,6 +2565,115 @@ test("source document import normalizes fallback labels and duplicate entries", 
   );
 });
 
+test("source document import accepts nested testcenter package manifests", async () => {
+  const tenantKey = "integration-tenant-package-manifest";
+  const workspaceKey = "integration-workspace-package-manifest";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-package-manifest.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        testcenter: {
+          package: {
+            tests: [
+              {
+                identifier: "test:math",
+                booklets: [
+                  {
+                    identifier: "booklet:math-a",
+                    label: "Math A",
+                    resources: [
+                      { path: "units/addition.xml", title: "Addition" },
+                      { fileName: "units/subtraction.xml", displayName: "Subtraction" }
+                    ]
+                  }
+                ]
+              },
+              {
+                assessment: {
+                  testlet: {
+                    assessmentTestId: "booklet:reading",
+                    displayName: "Reading",
+                    module: { moduleId: "unit-reading", label: "Reading Unit" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklet:math-a",
+          displayLabel: "Math A",
+          unitEntries: [
+            { unitKey: "units/addition.xml", displayLabel: "Addition" },
+            { unitKey: "units/subtraction.xml", displayLabel: "Subtraction" }
+          ]
+        },
+        {
+          bookletKey: "booklet:reading",
+          displayLabel: "Reading",
+          unitEntries: [
+            { unitKey: "unit-reading", displayLabel: "Reading Unit" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";
@@ -2587,16 +2696,18 @@ test("source document import accepts testcenter-style XML aliases", async () => 
       mediaType: "application/xml",
       sourceDocument: `
         <assessment xmlns:tc="https://example.testcenter.local/schema">
-          <tc:testlet tc:key="booklet:alias" tc:title="Alias Booklet">
-            <tc:unitRef tc:ref="unit-alpha" tc:label="Alpha Unit" />
-            <unitDefinition alias="unit-beta" displayName="Beta Unit" />
-            <tc:item code="unit-beta" label="Duplicate Beta Unit" />
-            <item href="unit-gamma" />
-          </tc:testlet>
-          <tc:assessmentTest tc:identifier="booklet:qti" tc:title="QTI Booklet">
-            <tc:assessmentItemRef tc:identifier="unit-reading" tc:title="Reading Unit" />
-            <item-ref identifier="unit-writing" title="Writing Unit" />
-          </tc:assessmentTest>
+          <tc:test tc:identifier="test:wrapper">
+            <tc:testlet tc:key="booklet:alias" tc:title="Alias Booklet">
+              <tc:unitRef tc:ref="unit-alpha" tc:label="Alpha Unit" />
+              <unitDefinition alias="unit-beta" displayName="Beta Unit" />
+              <tc:item code="unit-beta" label="Duplicate Beta Unit" />
+              <item href="unit-gamma" />
+            </tc:testlet>
+            <tc:assessmentTest tc:identifier="booklet:qti" tc:title="QTI Booklet">
+              <tc:assessmentItemRef tc:identifier="unit-reading" tc:title="Reading Unit" />
+              <item-ref identifier="unit-writing" title="Writing Unit" />
+            </tc:assessmentTest>
+          </tc:test>
         </assessment>
       `
     }

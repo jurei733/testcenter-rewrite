@@ -1548,43 +1548,63 @@ const normalizeParsedJsonContentStructure = (
     }
     return [];
   };
-  const hasBookletEntries = (value: unknown): value is Record<string, unknown> => {
+  const readBookletEntries = (value: Record<string, unknown>): unknown[] =>
+    readEntries(
+      value.bookletEntries,
+      value.booklets,
+      value.testlets,
+      value.booklet,
+      value.testlet,
+      value.assessmentTests,
+      value.assessmentTest,
+      value["assessment-tests"],
+      value["assessment-test"]
+    );
+  const readNestedManifestContainers = (
+    value: Record<string, unknown>
+  ): unknown[] =>
+    readEntries(
+      value.contentStructure,
+      value.manifest,
+      value.assessment,
+      value.assessments,
+      value.testcenter,
+      value.packageManifest,
+      value.contentPackage,
+      value.package,
+      value.packages,
+      value.tests,
+      value.test,
+      value.testSuites,
+      value.testSuite
+    );
+  const collectBookletEntries = (value: unknown, isRoot = false): unknown[] => {
+    if (Array.isArray(value)) {
+      if (isRoot) {
+        return value;
+      }
+      return value.flatMap(item => collectBookletEntries(item));
+    }
+
     const objectValue = asObject(value);
     if (!objectValue) {
-      return false;
+      return [];
     }
-    return (
-      readEntries(
-        objectValue.bookletEntries,
-        objectValue.booklets,
-        objectValue.testlets,
-        objectValue.booklet,
-        objectValue.testlet
-      ).length > 0
+
+    const directBooklets = readBookletEntries(objectValue);
+    if (directBooklets.length > 0) {
+      return directBooklets;
+    }
+
+    return readNestedManifestContainers(objectValue).flatMap(container =>
+      collectBookletEntries(container)
     );
   };
 
-  const parsedObject = asObject(parsed);
-  const candidate = Array.isArray(parsed)
-    ? { booklets: parsed }
-    : [
-        parsedObject,
-        asObject(parsedObject?.contentStructure),
-        asObject(parsedObject?.manifest),
-        asObject(parsedObject?.assessment),
-        asObject(parsedObject?.testcenter)
-      ].find(hasBookletEntries);
-  if (!candidate) {
+  const rawBooklets = collectBookletEntries(parsed, true);
+  if (rawBooklets.length === 0) {
     return null;
   }
-
-  const rawBooklets = readEntries(
-    candidate.bookletEntries,
-    candidate.booklets,
-    candidate.testlets,
-    candidate.booklet,
-    candidate.testlet
-  );
 
   const contentStructure: SourcePackageContentStructure = {
     bookletEntries: rawBooklets
@@ -1599,11 +1619,21 @@ const normalizeParsedJsonContentStructure = (
           booklet.units,
           booklet.unitRefs,
           booklet.unitReferences,
+          booklet.unitFiles,
           booklet.items,
+          booklet.resources,
+          booklet.files,
+          booklet.modules,
+          booklet.tasks,
           booklet.unit,
           booklet.unitRef,
           booklet.unitReference,
-          booklet.item
+          booklet.unitFile,
+          booklet.item,
+          booklet.resource,
+          booklet.file,
+          booklet.module,
+          booklet.task
         );
 
         return {
@@ -1612,10 +1642,15 @@ const normalizeParsedJsonContentStructure = (
               booklet.bookletId ??
               booklet.testletKey ??
               booklet.testletId ??
+              booklet.assessmentTestKey ??
+              booklet.assessmentTestId ??
+              booklet.identifier ??
               booklet.key ??
               booklet.id ??
               booklet.alias ??
               booklet.code ??
+              booklet.name ??
+              booklet.title ??
               ""
           ).trim(),
           displayLabel: String(
@@ -1637,12 +1672,24 @@ const normalizeParsedJsonContentStructure = (
                 unitKey: String(
                   unit.unitKey ??
                     unit.unitId ??
+                    unit.identifier ??
                     unit.key ??
                     unit.id ??
+                    unit.unitRef ??
                     unit.ref ??
                     unit.alias ??
                     unit.code ??
+                    unit.path ??
+                    unit.src ??
+                    unit.uri ??
+                    unit.file ??
+                    unit.fileName ??
+                    unit.filename ??
+                    unit.resourceId ??
+                    unit.moduleId ??
+                    unit.taskId ??
                     unit.href ??
+                    unit.name ??
                     ""
                 ).trim(),
                 displayLabel: String(
@@ -1713,19 +1760,23 @@ const readXmlAttribute = (
   return undefined;
 };
 
-const normalizeParsedXmlContentStructure = (
-  sourceDocument: string
-): ContentReleaseRuntimeSnapshot | null => {
+const collectXmlBookletEntries = (
+  sourceDocument: string,
+  bookletTagNames: string
+): SourcePackageContentStructure["bookletEntries"] => {
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
   for (const bookletMatch of sourceDocument.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet|assessmentTest|assessment-test|test))\b([^>]*)>([\s\S]*?)<\/\1>/gi
+    new RegExp(
+      `<((?:[a-zA-Z_][\\w.-]*:)?(?:${bookletTagNames}))\\b([^>]*)>([\\s\\S]*?)<\\/\\1>`,
+      "gi"
+    )
   )) {
     const bookletAttributes = parseXmlAttributes(bookletMatch[2] ?? "");
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
     for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
-      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItemRef|assessment-item-ref|itemRef|item-ref|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItemRef|assessment-item-ref|itemRef|item-ref|unitFile|unit-file|resource|file|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       unitEntries.push({
@@ -1740,7 +1791,17 @@ const normalizeParsedXmlContentStructure = (
             "ref",
             "alias",
             "code",
-            "href"
+            "path",
+            "src",
+            "uri",
+            "file",
+            "fileName",
+            "filename",
+            "resourceId",
+            "moduleId",
+            "taskId",
+            "href",
+            "name"
           ) ?? ""
         ).trim(),
         displayLabel: String(
@@ -1787,7 +1848,24 @@ const normalizeParsedXmlContentStructure = (
     });
   }
 
-  return normalizeContentStructure({ bookletEntries });
+  return bookletEntries;
+};
+
+const normalizeParsedXmlContentStructure = (
+  sourceDocument: string
+): ContentReleaseRuntimeSnapshot | null => {
+  const specificBookletEntries = collectXmlBookletEntries(
+    sourceDocument,
+    "booklet|testlet|assessmentTest|assessment-test"
+  );
+
+  if (specificBookletEntries.length > 0) {
+    return normalizeContentStructure({ bookletEntries: specificBookletEntries });
+  }
+
+  return normalizeContentStructure({
+    bookletEntries: collectXmlBookletEntries(sourceDocument, "test")
+  });
 };
 
 const deriveRuntimeSnapshotFromSourceDocument = (
