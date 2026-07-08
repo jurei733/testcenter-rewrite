@@ -266,13 +266,17 @@ export class WorkspaceViewFacade {
         headline: detail.groupKey,
         subline: `${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
         badges: [
+          `${detail.runningCount} running`,
+          `${detail.pausedCount} paused`,
+          `${detail.completedCount} completed`,
+          `${detail.notStartedCount} not started`,
           `${detail.responseCount} response(s)`,
-          `${detail.reviewCount} review(s)`,
-          `${detail.unitProgress.length} unit(s)`
+          `${detail.reviewCount} review(s)`
         ],
         rows: [
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
+          { label: "Tracked Units", value: String(detail.unitProgress.length) },
           {
             label: "Generated",
             value: this.formatDateTime(detail.generatedAt)

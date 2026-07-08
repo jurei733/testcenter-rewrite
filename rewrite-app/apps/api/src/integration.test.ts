@@ -1847,6 +1847,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         groupKey: string;
         participantSessionCount: number;
         testRunCount: number;
+        notStartedCount: number;
+        runningCount: number;
+        pausedCount: number;
+        completedCount: number;
         responseCount: number;
         reviewCount: number;
         sessions: Array<{
@@ -1883,6 +1887,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.groupKey, "group:student-demo");
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.participantSessionCount, 1);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.testRunCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.notStartedCount, 0);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.runningCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.pausedCount, 0);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.completedCount, 0);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.responseCount, 1);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.reviewCount, 1);
     assert.equal(

@@ -401,6 +401,10 @@ export type WorkspaceStudyMonitorGroupDetail = {
   generatedAt: string;
   participantSessionCount: number;
   testRunCount: number;
+  notStartedCount: number;
+  runningCount: number;
+  pausedCount: number;
+  completedCount: number;
   responseCount: number;
   reviewCount: number;
   sessions: WorkspaceStudyMonitorGroupSession[];

@@ -2527,6 +2527,19 @@ const buildStudyMonitorGroupDetail = (input: {
       latestActivityAt
     };
   });
+  const notStartedCount = sessions.filter(
+    session =>
+      !session.latestTestRun || session.latestTestRun.status === "created"
+  ).length;
+  const runningCount = sessions.filter(
+    session => session.latestTestRun?.status === "running"
+  ).length;
+  const pausedCount = sessions.filter(
+    session => session.latestTestRun?.status === "paused"
+  ).length;
+  const completedCount = sessions.filter(
+    session => session.latestTestRun?.status === "completed"
+  ).length;
 
   return {
     tenantKey: input.tenantKey,
@@ -2535,6 +2548,10 @@ const buildStudyMonitorGroupDetail = (input: {
     generatedAt: input.generatedAt,
     participantSessionCount: groupParticipantSessions.length,
     testRunCount: groupTestRuns.length,
+    notStartedCount,
+    runningCount,
+    pausedCount,
+    completedCount,
     responseCount: countResponses(groupTestRuns),
     reviewCount: groupReviews.length,
     sessions,
