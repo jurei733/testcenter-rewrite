@@ -272,7 +272,7 @@ The added read side now makes the first slice inspectable:
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
-- participant roster import now persists operator-managed login/group/booklet/display-name rows, upserts repeated logins within a workspace, records roster import activity, and returns validation warnings when assigned booklets cannot be checked against the active release or are missing from it
+- participant roster import now persists operator-managed login/group/booklet/display-name rows from CSV/TSV/semicolon text or Testtaker/Participant-style XML, upserts repeated logins within a workspace, records roster import activity, and returns validation warnings when assigned booklets cannot be checked against the active release or are missing from it
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
 - review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units, with review reads filterable by login, group, session, run, unit, reviewer, category, and limit
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
@@ -424,6 +424,6 @@ For runtime probes:
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
-- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, nested package/test wrapper objects, and booklet/testlet/assessment-test/unit/resource/file/item-ref aliases
+- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, nested package/test wrapper objects, booklet/testlet/assessment-test/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
 - monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, and open-run blockers, but still do not cover every original Testcenter monitor view
