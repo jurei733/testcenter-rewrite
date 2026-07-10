@@ -760,7 +760,7 @@ try {
     })
     .waitFor();
   logStep("load-source-document-file");
-  const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.xml`;
+  const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.imsmanifest`;
   const uploadedSourcePath = resolve(".data", uploadedSourceFileName);
   await mkdir(dirname(uploadedSourcePath), { recursive: true });
   await writeFile(uploadedSourcePath, uploadedSourceDocument, "utf8");

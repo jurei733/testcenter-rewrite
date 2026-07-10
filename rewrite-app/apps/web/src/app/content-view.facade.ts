@@ -1448,7 +1448,11 @@ export class ContentViewFacade {
     if (normalizedName.endsWith(".json")) {
       return "application/json";
     }
-    if (normalizedName.endsWith(".xml")) {
+    if (
+      normalizedName.endsWith(".xml") ||
+      normalizedName.endsWith(".imsmanifest") ||
+      normalizedName.endsWith(".manifest")
+    ) {
       return "application/xml";
     }
     return file.type || this.content.sourceMediaType.trim() || "text/plain";
