@@ -718,6 +718,50 @@ const normalizeParticipantWorkspaceKey = (value: unknown): string => {
   return workspaceKey;
 };
 
+const normalizeParticipantSessionId = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(
+      400,
+      "participant_session_id_required",
+      "participantSessionId is required."
+    );
+  }
+
+  return value.trim();
+};
+
+const normalizeOptionalRuntimeBookletKey = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "booklet_key_invalid",
+      "bookletKey must be a string when provided."
+    );
+  }
+
+  return value.trim() || undefined;
+};
+
+const normalizeOptionalCurrentUnitKey = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "current_unit_key_invalid",
+      "currentUnitKey must be a string when provided."
+    );
+  }
+
+  return value.trim() || null;
+};
+
 const normalizeAdminRole = (value: unknown): AdminRole => {
   if (typeof value !== "string" || !ADMIN_ROLES.includes(value as AdminRole)) {
     throw new FirstSliceError(
@@ -6224,9 +6268,12 @@ export const createFirstSliceServices = (
         return participantSession;
       },
       async getRuntimeState(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
         const participantSession = await requireParticipantSession(
           repository,
-          input.participantSessionId
+          participantSessionId
         );
         const latestTestRun = await getLatestParticipantSessionRun(
           repository,
@@ -6259,9 +6306,12 @@ export const createFirstSliceServices = (
         };
       },
       async getCurrentRunState(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
         const participantSession = await requireParticipantSession(
           repository,
-          input.participantSessionId
+          participantSessionId
         );
         const latestTestRun = await getLatestParticipantSessionRun(
           repository,
@@ -6272,7 +6322,7 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "participant_session_has_no_current_run",
-            `Participant session '${input.participantSessionId}' has no current test run yet.`
+            `Participant session '${participantSessionId}' has no current test run yet.`
           );
         }
 
@@ -6305,9 +6355,12 @@ export const createFirstSliceServices = (
         };
       },
       async launch(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
         const participantSession = await requireParticipantSession(
           repository,
-          input.participantSessionId
+          participantSessionId
         );
         const contentRelease = await requireContentRelease(
           repository,
@@ -6318,10 +6371,13 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "participant_session_closed",
-            `Participant session '${input.participantSessionId}' is already closed.`
+            `Participant session '${participantSessionId}' is already closed.`
           );
         }
 
+        const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
+          input.bookletKey
+        );
         const existingRun = await repository.getOpenTestRunByParticipantSessionId(
           participantSession.participantSessionId
         );
@@ -6330,7 +6386,6 @@ export const createFirstSliceServices = (
           return normalizeTestRun(existingRun);
         }
 
-        const requestedBookletKey = String(input.bookletKey ?? "").trim();
         const rosterEntry = requestedBookletKey
           ? null
           : await findParticipantRosterEntryByLoginKey(
@@ -6398,9 +6453,15 @@ export const createFirstSliceServices = (
         return testRun;
       },
       async resumeSession(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
         const participantSession = await requireParticipantSession(
           repository,
-          input.participantSessionId
+          participantSessionId
+        );
+        const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
+          input.bookletKey
         );
         const existingRun = await repository.getOpenTestRunByParticipantSessionId(
           participantSession.participantSessionId
@@ -6440,13 +6501,13 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "participant_session_has_no_resumable_run",
-            `Participant session '${input.participantSessionId}' has no resumable test run.`
+            `Participant session '${participantSessionId}' has no resumable test run.`
           );
         }
 
         return this.launch({
           participantSessionId: participantSession.participantSessionId,
-          bookletKey: input.bookletKey
+          bookletKey: requestedBookletKey
         });
       },
       async saveProgress(input) {
@@ -6469,8 +6530,9 @@ export const createFirstSliceServices = (
           );
         }
 
-        const requestedUnitKey = String(input.currentUnitKey ?? "").trim();
-        const nextCurrentUnitKey = requestedUnitKey || null;
+        const nextCurrentUnitKey = normalizeOptionalCurrentUnitKey(
+          input.currentUnitKey
+        );
         if (nextCurrentUnitKey) {
           const contentRelease = await requireContentRelease(
             repository,

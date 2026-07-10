@@ -1380,6 +1380,53 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(invalidStatusSave.status, 400);
     assert.equal(invalidStatusSave.body.error, "test_run_progress_status_invalid");
 
+    const invalidCurrentUnitSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: 42,
+          status: "paused",
+          unitResponse: "This should not be stored either"
+        }
+      }
+    );
+
+    assert.equal(invalidCurrentUnitSave.status, 400);
+    assert.equal(invalidCurrentUnitSave.body.error, "current_unit_key_invalid");
+
+    const missingLaunchSession = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/starter:launch",
+      {
+        method: "POST",
+        body: {}
+      }
+    );
+
+    assert.equal(missingLaunchSession.status, 400);
+    assert.equal(
+      missingLaunchSession.body.error,
+      "participant_session_id_required"
+    );
+
+    const invalidLaunchBooklet = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/starter:launch",
+      {
+        method: "POST",
+        body: {
+          participantSessionId:
+            participantSignIn.body.participantSession.participantSessionId,
+          bookletKey: { key: "booklet:demo" }
+        }
+      }
+    );
+
+    assert.equal(invalidLaunchBooklet.status, 400);
+    assert.equal(invalidLaunchBooklet.body.error, "booklet_key_invalid");
+
     const stateAfterResponse = await requestJsonAt<{
       currentRunState: {
         testRun: { unitResponses: Record<string, string> };
