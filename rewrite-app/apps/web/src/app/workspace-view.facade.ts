@@ -78,7 +78,7 @@ export class WorkspaceViewFacade {
     return [
       {
         headline: `${summary.workspaceKey} monitor`,
-        subline: `${summary.participantSessionCount} participant session(s), ${summary.testRunCount} run(s)`,
+        subline: `${summary.expectedParticipantCount} expected participant(s), ${summary.participantSessionCount} session(s), ${summary.testRunCount} run(s)`,
         badges: [
           `${summary.groups.length} group(s)`,
           `${summary.unitProgress.length} unit(s)`,
@@ -86,6 +86,14 @@ export class WorkspaceViewFacade {
         ],
         rows: [
           { label: "Tenant", value: summary.tenantKey },
+          {
+            label: "Roster Entries",
+            value: String(summary.rosterEntryCount)
+          },
+          {
+            label: "Not Started",
+            value: String(summary.notStartedCount)
+          },
           { label: "Running", value: String(summary.runningCount) },
           { label: "Paused", value: String(summary.pausedCount) },
           { label: "Completed", value: String(summary.completedCount) },
@@ -99,14 +107,16 @@ export class WorkspaceViewFacade {
       },
       ...summary.groups.map(group => ({
         headline: group.groupKey,
-        subline: `${group.participantSessionCount} participant session(s)`,
+        subline: `${group.expectedParticipantCount} expected, ${group.participantSessionCount} session(s)`,
         badges: [
+          `${group.notStartedCount} not started`,
           `${group.runningCount} running`,
           `${group.pausedCount} paused`,
           `${group.completedCount} completed`,
           `${group.reviewCount ?? 0} review(s)`
         ],
         rows: [
+          { label: "Roster Entries", value: String(group.rosterEntryCount) },
           { label: "Not Started", value: String(group.notStartedCount) },
           { label: "Test Runs", value: String(group.testRunCount) },
           { label: "Responses", value: String(group.responseCount) },
@@ -264,7 +274,7 @@ export class WorkspaceViewFacade {
     return [
       {
         headline: detail.groupKey,
-        subline: `${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
+        subline: `${detail.expectedParticipantCount} expected, ${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
         badges: [
           `${detail.runningCount} running`,
           `${detail.pausedCount} paused`,
@@ -276,6 +286,7 @@ export class WorkspaceViewFacade {
         rows: [
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
+          { label: "Roster Entries", value: String(detail.rosterEntryCount) },
           { label: "Tracked Units", value: String(detail.unitProgress.length) },
           {
             label: "Generated",

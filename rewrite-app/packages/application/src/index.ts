@@ -2524,6 +2524,7 @@ const buildStudyMonitorSummary = (input: {
   workspaceKey: string;
   generatedAt: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
@@ -2546,6 +2547,8 @@ const buildStudyMonitorSummary = (input: {
       testRunsBySessionId.get(participantSession.participantSessionId) ?? [];
     const group = groupsByKey.get(groupKey) ?? {
       groupKey,
+      expectedParticipantCount: 0,
+      rosterEntryCount: 0,
       participantSessionCount: 0,
       testRunCount: 0,
       notStartedCount: 0,
@@ -2557,6 +2560,7 @@ const buildStudyMonitorSummary = (input: {
       latestActivityAt: null
     };
 
+    group.expectedParticipantCount += 1;
     group.participantSessionCount += 1;
     group.testRunCount += sessionRuns.length;
     group.responseCount += sessionRuns.reduce(
@@ -2592,6 +2596,39 @@ const buildStudyMonitorSummary = (input: {
     }
     groupsByKey.set(groupKey, group);
   }
+  const sessionLoginKeys = new Set(
+    input.participantSessions.map(participantSession => participantSession.loginKey)
+  );
+  for (const rosterEntry of input.participantRosterEntries) {
+    const groupKey = rosterEntry.groupKey || "unknown-group";
+    const group = groupsByKey.get(groupKey) ?? {
+      groupKey,
+      expectedParticipantCount: 0,
+      rosterEntryCount: 0,
+      participantSessionCount: 0,
+      testRunCount: 0,
+      notStartedCount: 0,
+      runningCount: 0,
+      pausedCount: 0,
+      completedCount: 0,
+      responseCount: 0,
+      reviewCount: 0,
+      latestActivityAt: null
+    };
+
+    group.rosterEntryCount += 1;
+    if (!sessionLoginKeys.has(rosterEntry.loginKey)) {
+      group.expectedParticipantCount += 1;
+      group.notStartedCount += 1;
+    }
+    if (
+      !group.latestActivityAt ||
+      rosterEntry.importedAt.localeCompare(group.latestActivityAt) > 0
+    ) {
+      group.latestActivityAt = rosterEntry.importedAt;
+    }
+    groupsByKey.set(groupKey, group);
+  }
 
   const groups = Array.from(groupsByKey.values()).sort((left, right) =>
     left.groupKey.localeCompare(right.groupKey)
@@ -2601,6 +2638,11 @@ const buildStudyMonitorSummary = (input: {
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
     generatedAt: input.generatedAt,
+    expectedParticipantCount: groups.reduce(
+      (total, group) => total + group.expectedParticipantCount,
+      0
+    ),
+    rosterEntryCount: input.participantRosterEntries.length,
     participantSessionCount: input.participantSessions.length,
     testRunCount: input.testRuns.length,
     notStartedCount: groups.reduce((total, group) => total + group.notStartedCount, 0),
@@ -2630,10 +2672,14 @@ const buildStudyMonitorGroupDetail = (input: {
   groupKey: string;
   generatedAt: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
 }): WorkspaceStudyMonitorGroupDetail => {
+  const groupRosterEntries = input.participantRosterEntries
+    .filter(rosterEntry => rosterEntry.groupKey === input.groupKey)
+    .sort((left, right) => left.loginKey.localeCompare(right.loginKey));
   const groupParticipantSessions = input.participantSessions
     .filter(participantSession => participantSession.groupKey === input.groupKey)
     .sort((left, right) => left.loginKey.localeCompare(right.loginKey));
@@ -2702,20 +2748,29 @@ const buildStudyMonitorGroupDetail = (input: {
   const completedCount = sessions.filter(
     session => session.latestTestRun?.status === "completed"
   ).length;
+  const sessionLoginKeys = new Set(
+    groupParticipantSessions.map(participantSession => participantSession.loginKey)
+  );
+  const rosterOnlyCount = groupRosterEntries.filter(
+    rosterEntry => !sessionLoginKeys.has(rosterEntry.loginKey)
+  ).length;
 
   return {
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
     groupKey: input.groupKey,
     generatedAt: input.generatedAt,
+    expectedParticipantCount: groupParticipantSessions.length + rosterOnlyCount,
+    rosterEntryCount: groupRosterEntries.length,
     participantSessionCount: groupParticipantSessions.length,
     testRunCount: groupTestRuns.length,
-    notStartedCount,
+    notStartedCount: notStartedCount + rosterOnlyCount,
     runningCount,
     pausedCount,
     completedCount,
     responseCount: countResponses(groupTestRuns),
     reviewCount: groupReviews.length,
+    rosterEntries: groupRosterEntries,
     sessions,
     testRuns: groupTestRuns.map(testRun => ({
       testRun,
@@ -3723,9 +3778,19 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [participantSessions, testRuns, contentReleases, reviews] =
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
           await Promise.all([
             repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -3748,6 +3813,7 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           generatedAt: now(),
           participantSessions,
+          participantRosterEntries,
           testRuns,
           contentReleases,
           reviews
@@ -3760,9 +3826,19 @@ export const createFirstSliceServices = (
           input.workspaceKey
         );
         const groupKey = normalizeGroupKey(input.groupKey);
-        const [participantSessions, testRuns, contentReleases, reviews] =
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
           await Promise.all([
             repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -3785,12 +3861,13 @@ export const createFirstSliceServices = (
           groupKey,
           generatedAt: now(),
           participantSessions,
+          participantRosterEntries,
           testRuns,
           contentReleases,
           reviews
         });
 
-        if (detail.participantSessionCount === 0) {
+        if (detail.expectedParticipantCount === 0) {
           throw new FirstSliceError(
             404,
             "study_monitor_group_not_found",

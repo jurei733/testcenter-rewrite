@@ -3223,6 +3223,104 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(resumed.body.testRun.currentUnitKey, "unit-beta-1");
 });
 
+test("study monitor counts saved roster participants before sign-in", async () => {
+  const tenantKey = "integration-tenant-roster-monitor";
+  const workspaceKey = "integration-workspace-roster-monitor";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          "monitor-a,group:monitor-alpha,booklet:starter,Monitor Alpha",
+          "monitor-b,group:monitor-beta,booklet:starter,Monitor Beta"
+        ].join("\n")
+      }
+    }
+  );
+
+  const summary = await requestJson<{
+    studyMonitorSummary: {
+      expectedParticipantCount: number;
+      rosterEntryCount: number;
+      participantSessionCount: number;
+      notStartedCount: number;
+      groups: Array<{
+        groupKey: string;
+        expectedParticipantCount: number;
+        rosterEntryCount: number;
+        participantSessionCount: number;
+        notStartedCount: number;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`
+  );
+
+  assert.equal(summary.status, 200);
+  assert.equal(summary.body.studyMonitorSummary.expectedParticipantCount, 2);
+  assert.equal(summary.body.studyMonitorSummary.rosterEntryCount, 2);
+  assert.equal(summary.body.studyMonitorSummary.participantSessionCount, 0);
+  assert.equal(summary.body.studyMonitorSummary.notStartedCount, 2);
+  assert.deepEqual(
+    summary.body.studyMonitorSummary.groups.map(group => ({
+      groupKey: group.groupKey,
+      expectedParticipantCount: group.expectedParticipantCount,
+      rosterEntryCount: group.rosterEntryCount,
+      participantSessionCount: group.participantSessionCount,
+      notStartedCount: group.notStartedCount
+    })),
+    [
+      {
+        groupKey: "group:monitor-alpha",
+        expectedParticipantCount: 1,
+        rosterEntryCount: 1,
+        participantSessionCount: 0,
+        notStartedCount: 1
+      },
+      {
+        groupKey: "group:monitor-beta",
+        expectedParticipantCount: 1,
+        rosterEntryCount: 1,
+        participantSessionCount: 0,
+        notStartedCount: 1
+      }
+    ]
+  );
+
+  const groupDetail = await requestJson<{
+    studyMonitorGroup: {
+      expectedParticipantCount: number;
+      rosterEntryCount: number;
+      participantSessionCount: number;
+      notStartedCount: number;
+      rosterEntries: Array<{ loginKey: string; displayName: string | null }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/groups/group%3Amonitor-alpha`
+  );
+
+  assert.equal(groupDetail.status, 200);
+  assert.equal(groupDetail.body.studyMonitorGroup.expectedParticipantCount, 1);
+  assert.equal(groupDetail.body.studyMonitorGroup.rosterEntryCount, 1);
+  assert.equal(groupDetail.body.studyMonitorGroup.participantSessionCount, 0);
+  assert.equal(groupDetail.body.studyMonitorGroup.notStartedCount, 1);
+  assert.equal(
+    groupDetail.body.studyMonitorGroup.rosterEntries[0]?.loginKey,
+    "monitor-a"
+  );
+});
+
 test("participant session launch can target a specific booklet", async () => {
   const tenantKey = "integration-tenant-booklet-launch";
   const workspaceKey = "integration-workspace-booklet-launch";

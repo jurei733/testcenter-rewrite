@@ -346,6 +346,8 @@ export type WorkspaceOverview = {
 
 export type WorkspaceStudyMonitorGroup = {
   groupKey: string;
+  expectedParticipantCount: number;
+  rosterEntryCount: number;
   participantSessionCount: number;
   testRunCount: number;
   notStartedCount: number;
@@ -421,6 +423,8 @@ export type WorkspaceStudyMonitorGroupDetail = {
   workspaceKey: string;
   groupKey: string;
   generatedAt: string;
+  expectedParticipantCount: number;
+  rosterEntryCount: number;
   participantSessionCount: number;
   testRunCount: number;
   notStartedCount: number;
@@ -429,6 +433,7 @@ export type WorkspaceStudyMonitorGroupDetail = {
   completedCount: number;
   responseCount: number;
   reviewCount: number;
+  rosterEntries: ParticipantRosterEntry[];
   sessions: WorkspaceStudyMonitorGroupSession[];
   testRuns: WorkspaceStudyMonitorGroupRun[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
@@ -472,6 +477,8 @@ export type WorkspaceStudyMonitorSummary = {
   tenantKey: string;
   workspaceKey: string;
   generatedAt: string;
+  expectedParticipantCount: number;
+  rosterEntryCount: number;
   participantSessionCount: number;
   testRunCount: number;
   notStartedCount: number;

@@ -1229,15 +1229,53 @@ try {
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await clickAction("Refresh Study Monitor");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`,
+    payload => {
+      const summary = payload?.studyMonitorSummary;
+      if (typeof summary !== "object" || summary == null) {
+        return false;
+      }
+      const entrySmokeGroup = Array.isArray(summary.groups)
+        ? summary.groups.find(group => group?.groupKey === "group:entry-smoke")
+        : null;
+      return (
+        summary.expectedParticipantCount === 4 &&
+        summary.rosterEntryCount === 2 &&
+        summary.participantSessionCount === 2 &&
+        summary.testRunCount === 2 &&
+        summary.notStartedCount === 2 &&
+        Array.isArray(summary.groups) &&
+        summary.groups.length === 3 &&
+        entrySmokeGroup?.expectedParticipantCount === 2 &&
+        entrySmokeGroup?.rosterEntryCount === 2 &&
+        entrySmokeGroup?.participantSessionCount === 0 &&
+        entrySmokeGroup?.notStartedCount === 2
+      );
+    }
+  );
   const studyMonitorCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Study Monitor", exact: true })
   });
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
-    .filter({ hasText: "2 group(s)" })
+    .filter({ hasText: "4 expected participant(s)" })
+    .filter({ hasText: "2 session(s)" })
+    .filter({ hasText: "2 run(s)" })
+    .filter({ hasText: "3 group(s)" })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "4 missing response(s)" })
+    .filter({ hasText: "Roster Entries" })
+    .filter({ hasText: "Not Started" })
+    .filter({ hasText: "2" })
+    .waitFor();
+  await studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
+    .filter({ hasText: "2 expected" })
+    .filter({ hasText: "0 session(s)" })
+    .filter({ hasText: "2 not started" })
+    .filter({ hasText: "Roster Entries" })
     .waitFor();
   await studyMonitorCard
     .locator(".record-card")
