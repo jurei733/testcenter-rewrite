@@ -3277,6 +3277,90 @@ test("participant sign-in reuses an open session for the active release", async 
   );
 });
 
+test("participant launch rejects closed sessions after completion", async () => {
+  const tenantKey = "integration-tenant-closed-launch";
+  const workspaceKey = "integration-workspace-closed-launch";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "closed-launch.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+        "<assessment><booklet key=\"booklet:closed\" label=\"Closed\"><unit key=\"unit-closed\" label=\"Closed Unit\" /></booklet></assessment>"
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "integration-test" }
+    }
+  );
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "closed-launch-student"
+    }
+  });
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; status: string };
+  }>(
+    `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST" }
+  );
+
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.status, "running");
+
+  const completed = await requestJson<{
+    testRun: { testRunId: string; status: string };
+  }>(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/complete`, {
+    method: "POST"
+  });
+
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.testRun.status, "completed");
+
+  const directLaunch = await requestJson<{ error: string }>(
+    "/api/v1/participant/starter:launch",
+    {
+      method: "POST",
+      body: {
+        participantSessionId:
+          signIn.body.participantSession.participantSessionId
+      }
+    }
+  );
+
+  assert.equal(directLaunch.status, 409);
+  assert.equal(directLaunch.body.error, "participant_session_closed");
+});
+
 test("workspace participant roster can be imported, updated, and listed", async () => {
   const tenantKey = "integration-tenant-roster";
   const workspaceKey = "integration-workspace-roster";

@@ -6253,6 +6253,14 @@ export const createFirstSliceServices = (
           participantSession.contentReleaseId
         );
 
+        if (participantSession.status === "closed") {
+          throw new FirstSliceError(
+            409,
+            "participant_session_closed",
+            `Participant session '${input.participantSessionId}' is already closed.`
+          );
+        }
+
         const existingRun = await repository.getOpenTestRunByParticipantSessionId(
           participantSession.participantSessionId
         );
