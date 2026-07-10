@@ -74,6 +74,8 @@ export interface ShellRuntimeState {
   reviewReviewerFilter: string;
   reviewCategoryFilter: string;
   reviewLimit: string;
+  entryRosterText: string;
+  entryLinksView: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -227,6 +229,12 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     reviewReviewerFilter: "",
     reviewCategoryFilter: "",
     reviewLimit: "100",
+    entryRosterText: [
+      "student-a,group:demo-a,booklet:demo",
+      "student-b,group:demo-a,booklet:demo",
+      "student-c,group:demo-b,booklet:demo"
+    ].join("\n"),
+    entryLinksView: "",
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",

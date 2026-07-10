@@ -41,6 +41,13 @@ type RuntimePlayerPreview = {
   saveProgressLabel: string;
 };
 
+type RuntimeEntryLink = {
+  loginKey: string;
+  groupKey: string;
+  bookletKey: string;
+  url: string;
+};
+
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -149,6 +156,28 @@ export class RuntimeViewFacade {
         }
       }
     ];
+  }
+
+  get entryLinkItems(): RecordCollectionItem[] {
+    return this.parseEntryLinksView().map(link => ({
+      headline: link.loginKey,
+      subline: link.url,
+      badges: [link.groupKey, link.bookletKey || "default booklet"],
+      rows: [
+        { label: "Login", value: link.loginKey },
+        { label: "Group", value: link.groupKey },
+        { label: "Booklet", value: link.bookletKey || "active release default" },
+        { label: "URL", value: link.url }
+      ],
+      selected: this.runtime.loginKey.trim() === link.loginKey,
+      actionLabel: "Use Link Scope",
+      actionPayload: {
+        loginKey: link.loginKey,
+        groupKey: link.groupKey,
+        bookletKey: link.bookletKey,
+        url: link.url
+      }
+    }));
   }
 
   get participantRunHistoryItems(): RecordCollectionItem[] {
@@ -846,6 +875,22 @@ export class RuntimeViewFacade {
     this.applyReviewFilters();
   }
 
+  generateEntryLinks(): void {
+    const links = this.parseEntryRosterRows();
+    this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
+    this.persistState();
+  }
+
+  useSelectedParticipantAsEntryRoster(): void {
+    const loginKey = this.runtime.loginKey.trim() || "student-demo";
+    const groupKey = this.runtime.groupKey.trim() || `group:${loginKey}`;
+    const bookletKey = this.runtime.bookletKey.trim();
+    this.runtime.entryRosterText = [loginKey, groupKey, bookletKey]
+      .filter(Boolean)
+      .join(",");
+    this.generateEntryLinks();
+  }
+
   saveProgressPaused(): void {
     this.viewState.onActionAsync(() => this.runtimeService.saveProgress("paused"));
   }
@@ -952,6 +997,17 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.deleteGroupResults());
   }
 
+  selectEntryLink(item: RecordCollectionItem): void {
+    if (item.actionPayload?.loginKey) {
+      this.runtime.loginKey = item.actionPayload.loginKey;
+    }
+    if (item.actionPayload?.groupKey) {
+      this.runtime.groupKey = item.actionPayload.groupKey;
+    }
+    this.runtime.bookletKey = item.actionPayload?.bookletKey ?? "";
+    this.persistState();
+  }
+
   selectParticipantSession(item: RecordCollectionItem): void {
     const participantSessionId = item.actionPayload?.participantSessionId?.trim();
     if (!participantSessionId) {
@@ -1034,6 +1090,56 @@ export class RuntimeViewFacade {
       item => item.participantSession.loginKey === loginKey
     );
     return matchingItem?.participantSession.participantSessionId ?? null;
+  }
+
+  private parseEntryRosterRows(): RuntimeEntryLink[] {
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+    return this.runtime.entryRosterText
+      .split(/\r?\n/)
+      .map(row => row.trim())
+      .filter(row => row && !row.startsWith("#"))
+      .map(row => this.parseEntryRosterRow(row))
+      .filter((link): link is Omit<RuntimeEntryLink, "url"> => link != null)
+      .map(link => ({
+        ...link,
+        url: this.buildParticipantEntryUrl(workspaceKey, link)
+      }));
+  }
+
+  private parseEntryRosterRow(row: string): Omit<RuntimeEntryLink, "url"> | null {
+    const [loginKey, groupKey, bookletKey = ""] = row
+      .split(/[,\t;]/)
+      .map(part => part.trim());
+    if (!loginKey || loginKey.toLowerCase() === "loginkey") {
+      return null;
+    }
+    return {
+      loginKey,
+      groupKey: groupKey || `group:${loginKey}`,
+      bookletKey
+    };
+  }
+
+  private parseEntryLinksView(): RuntimeEntryLink[] {
+    const payload = parseJsonDocument<{ links: RuntimeEntryLink[] }>(
+      this.runtime.entryLinksView
+    );
+    return Array.isArray(payload?.links) ? payload.links : [];
+  }
+
+  private buildParticipantEntryUrl(
+    workspaceKey: string,
+    link: Omit<RuntimeEntryLink, "url">
+  ): string {
+    const query = new URLSearchParams({
+      workspaceKey: workspaceKey || "demo-workspace",
+      loginKey: link.loginKey,
+      groupKey: link.groupKey
+    });
+    if (link.bookletKey) {
+      query.set("bookletKey", link.bookletKey);
+    }
+    return `/participant?${query.toString()}`;
   }
 
   private createUnitResponseItems(input: {

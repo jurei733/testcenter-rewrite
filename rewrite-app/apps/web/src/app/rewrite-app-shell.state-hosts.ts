@@ -368,6 +368,18 @@ export function createShellPersistenceStateHost(args: {
     set reviewLimit(nextValue) {
       args.runtimeState.reviewLimit = nextValue;
     },
+    get entryRosterText() {
+      return args.runtimeState.entryRosterText;
+    },
+    set entryRosterText(nextValue) {
+      args.runtimeState.entryRosterText = nextValue;
+    },
+    get entryLinksView() {
+      return args.runtimeState.entryLinksView;
+    },
+    set entryLinksView(nextValue) {
+      args.runtimeState.entryLinksView = nextValue;
+    },
     get autoRefreshEnabled() {
       return args.workspaceState.autoRefreshEnabled;
     },

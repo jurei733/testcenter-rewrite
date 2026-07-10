@@ -246,6 +246,27 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No session run history loaded yet."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Participant Entry Links</h2>
+        <p>Generate participant start links from pasted rows. Use one row per participant: loginKey, groupKey, optional bookletKey.</p>
+        <label>
+          Roster Rows
+          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo"></textarea>
+        </label>
+        <div class="actions">
+          <button id="generateEntryLinksButton" class="primary" type="button" (click)="view.generateEntryLinks()">Generate Entry Links</button>
+          <button class="ghost" type="button" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Generated Entry Links"
+        subtitle="Participant URLs scoped to the selected workspace and optional booklet."
+        [items]="view.entryLinkItems"
+        (itemAction)="view.selectEntryLink($event)"
+        emptyState="Generate entry links from roster rows to inspect them here."
+      ></app-record-collection>
+
       <app-record-collection
         title="Selected Session Reviews"
         subtitle="Review comments attached to the active participant session."

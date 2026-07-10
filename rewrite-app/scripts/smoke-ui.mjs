@@ -997,6 +997,25 @@ try {
       has: page.getByRole("heading", { name: "Runtime Action Queue" })
     })
     .waitFor();
+  logStep("generate-entry-links");
+  await fillAndCommit(
+    "#entryRosterText",
+    [
+      "loginKey,groupKey,bookletKey",
+      `entry-student-a,group:entry-smoke,${participantRouteBookletKey}`,
+      "entry-student-b;group:entry-smoke"
+    ].join("\n")
+  );
+  await page.locator("#generateEntryLinksButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Generated Entry Links" })
+    })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "group%3Aentry-smoke" })
+    .filter({ hasText: "booklet%3Astarter" })
+    .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
