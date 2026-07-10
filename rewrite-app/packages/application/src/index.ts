@@ -1394,6 +1394,7 @@ const formatResponseCsv = (input: {
   tenantKey: string;
   workspaceKey: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
 } & DetailedResponseFilters): string => {
   const rows = listDetailedResponsesForWorkspace(input);
@@ -1410,7 +1411,10 @@ const formatResponseCsv = (input: {
     "response",
     "status",
     "updatedAt",
-    "completedAt"
+    "completedAt",
+    "participantDisplayName",
+    "rosterGroupKey",
+    "rosterBookletKey"
   ];
 
   return [
@@ -1428,7 +1432,10 @@ const formatResponseCsv = (input: {
         row.response,
         row.status,
         row.updatedAt,
-        row.completedAt
+        row.completedAt,
+        row.participantRosterEntry?.displayName ?? "",
+        row.participantRosterEntry?.groupKey ?? "",
+        row.participantRosterEntry?.bookletKey ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -1550,11 +1557,13 @@ const formatReviewCsv = (input: {
   workspaceKey: string;
   reviews: WorkspaceReview[];
   participantSessions: ParticipantSession[];
+  participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
 } & WorkspaceReviewFilters): string => {
   const items = buildWorkspaceReviewListItems({
     reviews: input.reviews,
     participantSessions: input.participantSessions,
+    participantRosterEntries: input.participantRosterEntries,
     testRuns: input.testRuns,
     loginKey: input.loginKey,
     groupKey: input.groupKey,
@@ -1579,7 +1588,10 @@ const formatReviewCsv = (input: {
     "category",
     "comment",
     "createdAt",
-    "updatedAt"
+    "updatedAt",
+    "participantDisplayName",
+    "rosterGroupKey",
+    "rosterBookletKey"
   ];
 
   return [
@@ -1599,7 +1611,10 @@ const formatReviewCsv = (input: {
         item.review.category,
         item.review.comment,
         item.review.createdAt,
-        item.review.updatedAt
+        item.review.updatedAt,
+        item.participantRosterEntry?.displayName ?? "",
+        item.participantRosterEntry?.groupKey ?? "",
+        item.participantRosterEntry?.bookletKey ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -4767,18 +4782,27 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [participantSessions, testRuns] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-        ]);
+        const [participantSessions, participantRosterEntries, testRuns] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return formatResponseCsv({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
@@ -5282,23 +5306,32 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [reviews, participantSessions, testRuns] = await Promise.all([
-          repository.listWorkspaceReviewsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-        ]);
+        const [reviews, participantSessions, participantRosterEntries, testRuns] =
+          await Promise.all([
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return formatReviewCsv({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           reviews,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,

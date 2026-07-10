@@ -276,9 +276,9 @@ The added read side now makes the first slice inspectable:
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
 - review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units, with review reads filterable by login, group, session, run, unit, reviewer, category, and limit
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
-- response CSV export returns persisted unit responses with participant, run, booklet, unit, status, and timestamp context, using the same filters as detailed response inspection
+- response CSV export returns persisted unit responses with participant, run, booklet, unit, status, timestamp, and saved-roster display/assignment context, using the same filters as detailed response inspection
 - workspace log CSV export returns the persisted activity timeline with event metadata and details JSON
-- review CSV export returns persisted operator comments with participant, run, booklet, unit, reviewer, category, and timestamp context, using the same filters as review reads
+- review CSV export returns persisted operator comments with participant, run, booklet, unit, reviewer, category, timestamp, and saved-roster display/assignment context, using the same filters as review reads
 - content-release detail now resolves a single release together with its import/source-package lineage, attached sessions/runs, and neighboring activation history within the workspace release line
 - content-release activation readiness now previews whether a staged release can be switched in immediately, whether open runs block it, and whether saved roster booklet assignments would warn against the selected release
 - workspace activity events now provide a persisted operator timeline for setup, import, activation, and runtime actions, filterable by event type, subject type, subject id, and limit

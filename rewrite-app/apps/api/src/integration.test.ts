@@ -3374,6 +3374,20 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
     "Roster Runtime"
   );
 
+  const responseCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/responses.csv?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
+  );
+  assert.equal(responseCsv.status, 200);
+  assert.equal(responseCsv.contentType, "text/csv; charset=utf-8");
+  assert.match(
+    responseCsv.body,
+    /^tenantKey,workspaceKey,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,response,status,updatedAt,completedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
+  );
+  assert.match(
+    responseCsv.body,
+    /"Roster response".*"Roster Runtime","group:roster-runtime","booklet:beta"/
+  );
+
   const createdReview = await requestJson<{
     item: {
       participantRosterEntry: {
@@ -3421,6 +3435,20 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(
     reviews.body.items[0]?.participantRosterEntry?.displayName,
     "Roster Runtime"
+  );
+
+  const reviewCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/reviews.csv?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
+  );
+  assert.equal(reviewCsv.status, 200);
+  assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");
+  assert.match(
+    reviewCsv.body,
+    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,reviewerId,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
+  );
+  assert.match(
+    reviewCsv.body,
+    /"Roster review".*"Roster Runtime","group:roster-runtime","booklet:beta"/
   );
 });
 
