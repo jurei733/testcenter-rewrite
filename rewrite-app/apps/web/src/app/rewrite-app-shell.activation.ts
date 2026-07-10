@@ -83,6 +83,8 @@ export function applyActivationReadinessView(
         attemptedContentReleaseId: activationReadiness.contentRelease.contentReleaseId,
         activeContentReleaseId: activationReadiness.activeContentReleaseId,
         openRunCount: activationReadiness.blockingOpenRuns.length,
+        participantRosterWarningCount:
+          activationReadiness.participantRosterWarnings.length,
         openRuns: activationReadiness.blockingOpenRuns
       },
       host.getActivationGuardView()
@@ -99,7 +101,7 @@ export function applyActivationReadinessView(
   host.rememberActivity(
     "Release Readiness",
     activationReadiness.canActivate
-      ? `Release ${activationReadiness.contentRelease.contentReleaseId} can activate now.`
-      : `Release ${activationReadiness.contentRelease.contentReleaseId} is blocked by ${activationReadiness.blockingOpenRuns.length} open run(s).`
+      ? `Release ${activationReadiness.contentRelease.contentReleaseId} can activate now with ${activationReadiness.participantRosterWarnings.length} roster warning(s).`
+      : `Release ${activationReadiness.contentRelease.contentReleaseId} is blocked by ${activationReadiness.blockingOpenRuns.length} open run(s) and has ${activationReadiness.participantRosterWarnings.length} roster warning(s).`
   );
 }

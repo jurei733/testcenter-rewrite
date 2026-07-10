@@ -3384,6 +3384,16 @@ test("activation guard returns blocking open-run details", async () => {
     `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
     { method: "POST" }
   );
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText:
+          "activation-student,group:activation,booklet:alpha,Activation Student"
+      }
+    }
+  );
 
   const secondPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -3410,6 +3420,10 @@ test("activation guard returns blocking open-run details", async () => {
       canActivate: boolean;
       activeContentReleaseId: string | null;
       blockingOpenRuns: Array<{ status: string }>;
+      participantRosterWarnings: Array<{
+        loginKey: string;
+        validationWarnings: Array<{ code: string }>;
+      }>;
     };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondImport.body.stagedContentRelease.contentReleaseId}/activation-readiness`
@@ -3425,6 +3439,16 @@ test("activation guard returns blocking open-run details", async () => {
   assert.equal(
     readiness.body.activationReadiness.blockingOpenRuns[0]?.status,
     "running"
+  );
+  assert.equal(
+    readiness.body.activationReadiness.participantRosterWarnings[0]?.loginKey,
+    "activation-student"
+  );
+  assert.deepEqual(
+    readiness.body.activationReadiness.participantRosterWarnings[0]?.validationWarnings.map(
+      warning => warning.code
+    ),
+    ["booklet_not_found_in_active_release"]
   );
 
   const blockedActivation = await requestJson<{

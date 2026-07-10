@@ -4506,12 +4506,22 @@ export const createFirstSliceServices = (
                 activeContentReleaseId: activeRelease.contentReleaseId
               })
             : [];
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+        const participantRosterWarnings = buildParticipantRosterReadItems(
+          participantRosterEntries,
+          contentRelease
+        ).filter(item => item.validationWarnings.length > 0);
 
         return {
           contentRelease,
           activeContentReleaseId: activeRelease?.contentReleaseId ?? null,
           canActivate: blockingOpenRuns.length === 0,
-          blockingOpenRuns
+          blockingOpenRuns,
+          participantRosterWarnings
         };
       },
       async listContentReleases(input) {

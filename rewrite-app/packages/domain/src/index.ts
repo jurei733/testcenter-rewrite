@@ -598,6 +598,7 @@ export type ContentReleaseActivationReadiness = {
   activeContentReleaseId: string | null;
   canActivate: boolean;
   blockingOpenRuns: OpenMonitorRun[];
+  participantRosterWarnings: WorkspaceParticipantRosterItem[];
 };
 
 export type WorkspaceSourcePackageDetail = {

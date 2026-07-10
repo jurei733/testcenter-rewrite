@@ -867,13 +867,15 @@ export class ContentViewFacade {
     if (!detail) {
       return [];
     }
+    const participantRosterWarnings = detail.participantRosterWarnings ?? [];
     return [
       {
         headline: detail.contentRelease.releaseLabel,
         subline: detail.contentRelease.contentReleaseId,
         badges: [
           detail.canActivate ? "can activate" : "blocked",
-          `${detail.blockingOpenRuns.length} open run(s)`
+          `${detail.blockingOpenRuns.length} open run(s)`,
+          `${participantRosterWarnings.length} roster warning(s)`
         ],
         rows: [
           {
@@ -883,6 +885,15 @@ export class ContentViewFacade {
           {
             label: "Status",
             value: detail.contentRelease.status
+          },
+          {
+            label: "Roster Compatibility",
+            value:
+              participantRosterWarnings.length > 0
+                ? participantRosterWarnings
+                    .map(item => `${item.loginKey}: ${item.bookletKey ?? "default"}`)
+                    .join(", ")
+                : "No roster warnings for this release"
           }
         ],
         selected:
