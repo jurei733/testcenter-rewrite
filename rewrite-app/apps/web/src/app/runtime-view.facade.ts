@@ -21,6 +21,7 @@ import {
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
+import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
@@ -178,6 +179,14 @@ export class RuntimeViewFacade {
         url: link.url
       }
     }));
+  }
+
+  get entryLinksCsvPreview(): string {
+    const links = this.parseEntryLinksView();
+    if (links.length === 0) {
+      return "Generate entry links to preview CSV.";
+    }
+    return this.createEntryLinksCsv(links);
   }
 
   get participantRunHistoryItems(): RecordCollectionItem[] {
@@ -881,6 +890,22 @@ export class RuntimeViewFacade {
     this.persistState();
   }
 
+  downloadEntryLinksCsv(): void {
+    let links = this.parseEntryLinksView();
+    if (links.length === 0) {
+      links = this.parseEntryRosterRows();
+      this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
+      this.persistState();
+    }
+
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-participant-entry-links.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: this.createEntryLinksCsv(links)
+    });
+  }
+
   useSelectedParticipantAsEntryRoster(): void {
     const loginKey = this.runtime.loginKey.trim() || "student-demo";
     const groupKey = this.runtime.groupKey.trim() || `group:${loginKey}`;
@@ -1140,6 +1165,23 @@ export class RuntimeViewFacade {
       query.set("bookletKey", link.bookletKey);
     }
     return `/participant?${query.toString()}`;
+  }
+
+  private createEntryLinksCsv(links: RuntimeEntryLink[]): string {
+    const rows = [
+      ["loginKey", "groupKey", "bookletKey", "url"],
+      ...links.map(link => [
+        link.loginKey,
+        link.groupKey,
+        link.bookletKey,
+        link.url
+      ])
+    ];
+    return rows.map(row => row.map(value => this.escapeCsvValue(value)).join(",")).join("\n");
+  }
+
+  private escapeCsvValue(value: string): string {
+    return `"${value.replace(/"/g, "\"\"")}"`;
   }
 
   private createUnitResponseItems(input: {

@@ -1016,6 +1016,11 @@ try {
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
+  await page
+    .locator("#entryLinksCsvPreview")
+    .filter({ hasText: '"loginKey","groupKey","bookletKey","url"' })
+    .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
+    .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";

@@ -255,8 +255,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </label>
         <div class="actions">
           <button id="generateEntryLinksButton" class="primary" type="button" (click)="view.generateEntryLinks()">Generate Entry Links</button>
+          <button id="downloadEntryLinksCsvButton" class="secondary" type="button" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
           <button class="ghost" type="button" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
         </div>
+        <pre id="entryLinksCsvPreview">{{ view.entryLinksCsvPreview }}</pre>
       </article>
 
       <app-record-collection
