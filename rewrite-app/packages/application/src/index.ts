@@ -4462,6 +4462,11 @@ export const createFirstSliceServices = (
             workspace.tenantId,
             workspace.workspaceId
           );
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
         const testRuns = await repository.listTestRunsByWorkspace(
           workspace.tenantId,
           workspace.workspaceId
@@ -4469,6 +4474,9 @@ export const createFirstSliceServices = (
         const contentReleases = await repository.listContentReleasesByWorkspace(
           workspace.tenantId,
           workspace.workspaceId
+        );
+        const participantRosterEntriesByLoginKey = new Map(
+          participantRosterEntries.map(entry => [entry.loginKey, entry])
         );
 
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
@@ -4495,6 +4503,10 @@ export const createFirstSliceServices = (
 
             return {
               participantSession,
+              participantRosterEntry:
+                participantRosterEntriesByLoginKey.get(
+                  participantSession.loginKey
+                ) ?? null,
               latestTestRun: sessionRuns[0] ?? null,
               contentRelease:
                 contentReleases.find(
@@ -4617,12 +4629,21 @@ export const createFirstSliceServices = (
           );
         }
 
-        const [contentRelease, rawTestRuns, workspaceReviews] = await Promise.all([
+        const [
+          contentRelease,
+          rawTestRuns,
+          workspaceReviews,
+          participantRosterEntries
+        ] = await Promise.all([
           repository.getContentReleaseById(participantSession.contentReleaseId),
           repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
           ),
           repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantRosterEntriesByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           )
@@ -4646,6 +4667,10 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
+          participantRosterEntry:
+            participantRosterEntries.find(
+              entry => entry.loginKey === participantSession.loginKey
+            ) ?? null,
           contentRelease: contentRelease ?? null,
           testRuns,
           runSummaries: testRuns.map(testRun => ({

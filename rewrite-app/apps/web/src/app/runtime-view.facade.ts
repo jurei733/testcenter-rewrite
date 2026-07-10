@@ -69,37 +69,54 @@ export class RuntimeViewFacade {
       this.runtime.participantSessionsView
     );
     return (
-      payload?.items.map(item => ({
-        headline: item.participantSession.loginKey,
-        subline: item.participantSession.participantSessionId,
-        badges: [
-          item.participantSession.status,
-          item.latestTestRun?.status ?? "no run"
-        ],
-        rows: [
-          {
-            label: "Group",
-            value: item.participantSession.groupKey
-          },
-          {
-            label: "Release",
-            value: item.contentRelease?.releaseLabel ?? item.participantSession.contentReleaseId
-          },
-        {
-          label: "Created",
-          value: this.formatDateTime(item.participantSession.createdAt)
-        }
-      ],
-        selected:
-          this.runtime.participantSessionId.trim() ===
-          item.participantSession.participantSessionId,
-        actionLabel: "Select + Load",
-        actionPayload: {
-          participantSessionId: item.participantSession.participantSessionId,
-          loginKey: item.participantSession.loginKey,
-          groupKey: item.participantSession.groupKey
-        }
-      })) ?? []
+      payload?.items.map(item => {
+        const displayName = item.participantRosterEntry?.displayName;
+
+        return {
+          headline: displayName ?? item.participantSession.loginKey,
+          subline: displayName
+            ? item.participantSession.loginKey
+            : item.participantSession.participantSessionId,
+          badges: [
+            item.participantSession.status,
+            item.latestTestRun?.status ?? "no run",
+            item.participantRosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            {
+              label: "Session",
+              value: item.participantSession.participantSessionId
+            },
+            {
+              label: "Group",
+              value: item.participantSession.groupKey
+            },
+            {
+              label: "Roster Booklet",
+              value: item.participantRosterEntry?.bookletKey ?? "none"
+            },
+            {
+              label: "Release",
+              value:
+                item.contentRelease?.releaseLabel ??
+                item.participantSession.contentReleaseId
+            },
+            {
+              label: "Created",
+              value: this.formatDateTime(item.participantSession.createdAt)
+            }
+          ],
+          selected:
+            this.runtime.participantSessionId.trim() ===
+            item.participantSession.participantSessionId,
+          actionLabel: "Select + Load",
+          actionPayload: {
+            participantSessionId: item.participantSession.participantSessionId,
+            loginKey: item.participantSession.loginKey,
+            groupKey: item.participantSession.groupKey
+          }
+        };
+      }) ?? []
     );
   }
 
@@ -114,17 +131,30 @@ export class RuntimeViewFacade {
 
     return [
       {
-        headline: detail.participantSession.loginKey,
-        subline: detail.participantSession.participantSessionId,
+        headline:
+          detail.participantRosterEntry?.displayName ??
+          detail.participantSession.loginKey,
+        subline: detail.participantRosterEntry?.displayName
+          ? detail.participantSession.loginKey
+          : detail.participantSession.participantSessionId,
         badges: [
           detail.participantSession.status,
           detail.contentRelease?.status ?? "no release",
-          `${detail.reviewCount ?? 0} review(s)`
+          `${detail.reviewCount ?? 0} review(s)`,
+          detail.participantRosterEntry ? "roster" : "ad hoc"
         ],
         rows: [
           {
+            label: "Session",
+            value: detail.participantSession.participantSessionId
+          },
+          {
             label: "Group",
             value: detail.participantSession.groupKey
+          },
+          {
+            label: "Roster Booklet",
+            value: detail.participantRosterEntry?.bookletKey ?? "none"
           },
           {
             label: "Release",

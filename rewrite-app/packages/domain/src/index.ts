@@ -539,6 +539,7 @@ export type WorkspaceImportJobDetail = {
 
 export type WorkspaceParticipantSessionListItem = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
   latestTestRun: TestRun | null;
   contentRelease: ContentRelease | null;
 };
@@ -551,6 +552,7 @@ export type WorkspaceParticipantSessionRunSummary = {
 
 export type WorkspaceParticipantSessionDetail = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
   contentRelease: ContentRelease | null;
   testRuns: TestRun[];
   runSummaries: WorkspaceParticipantSessionRunSummary[];

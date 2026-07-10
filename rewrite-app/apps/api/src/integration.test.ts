@@ -3264,6 +3264,47 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(resumed.status, 200);
   assert.equal(resumed.body.testRun.bookletKey, "booklet:beta");
   assert.equal(resumed.body.testRun.currentUnitKey, "unit-beta-1");
+
+  const participantSessions = await requestJson<{
+    items: Array<{
+      participantSession: { participantSessionId: string; loginKey: string };
+      participantRosterEntry: {
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      } | null;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?loginKey=roster-runtime-student`
+  );
+  assert.equal(participantSessions.status, 200);
+  assert.equal(participantSessions.body.items.length, 1);
+  assert.equal(
+    participantSessions.body.items[0]?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+  assert.equal(
+    participantSessions.body.items[0]?.participantRosterEntry?.bookletKey,
+    "booklet:beta"
+  );
+
+  const participantSessionDetail = await requestJson<{
+    participantSessionDetail: {
+      participantRosterEntry: {
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      } | null;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions/${signIn.body.participantSession.participantSessionId}`
+  );
+  assert.equal(participantSessionDetail.status, 200);
+  assert.equal(
+    participantSessionDetail.body.participantSessionDetail.participantRosterEntry
+      ?.displayName,
+    "Roster Runtime"
+  );
 });
 
 test("study monitor counts saved roster participants before sign-in", async () => {
