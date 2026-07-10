@@ -65,6 +65,7 @@ export type WorkspaceActivityEventType =
   | "content_release_activation_blocked"
   | "participant_signed_in"
   | "participant_session_resumed"
+  | "participant_roster_imported"
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
@@ -82,6 +83,7 @@ export const workspaceActivityEventTypes = [
   "content_release_activation_blocked",
   "participant_signed_in",
   "participant_session_resumed",
+  "participant_roster_imported",
   "test_run_progress_saved",
   "test_run_resumed",
   "test_run_completed",
@@ -121,6 +123,17 @@ export type Workspace = {
   displayName: string;
   status: WorkspaceStatus;
   createdAt: string;
+};
+
+export type ParticipantRosterEntry = {
+  participantRosterEntryId: string;
+  tenantId: string;
+  workspaceId: string;
+  loginKey: string;
+  groupKey: string;
+  bookletKey: string | null;
+  displayName: string | null;
+  importedAt: string;
 };
 
 export type AdminUser = {

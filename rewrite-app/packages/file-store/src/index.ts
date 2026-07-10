@@ -9,6 +9,7 @@ import type {
   AdminUser,
   ContentRelease,
   ImportJob,
+  ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
   Tenant,
@@ -32,6 +33,7 @@ type PersistedFirstSliceState = {
   importJobs: Record<string, ImportJob>;
   contentReleases: Record<string, ContentRelease>;
   participantSessions: Record<string, ParticipantSession>;
+  participantRosterEntries: Record<string, ParticipantRosterEntry>;
   testRuns: Record<string, TestRun>;
 };
 
@@ -49,6 +51,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   importJobs: {},
   contentReleases: {},
   participantSessions: {},
+  participantRosterEntries: {},
   testRuns: {}
 });
 
@@ -297,6 +300,19 @@ export const createFileFirstSliceRepository = (
       await mutate(state => {
         state.participantSessions[participantSession.participantSessionId] =
           participantSession;
+      });
+    },
+    async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return Object.values(state.participantRosterEntries).filter(
+        entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
+      );
+    },
+    async saveParticipantRosterEntry(participantRosterEntry) {
+      await mutate(state => {
+        state.participantRosterEntries[
+          participantRosterEntry.participantRosterEntryId
+        ] = participantRosterEntry;
       });
     },
     async getTestRunById(testRunId) {

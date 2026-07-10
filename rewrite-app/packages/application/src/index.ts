@@ -17,6 +17,7 @@ import type {
   ImportJobDiagnostic,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantRosterEntry,
   ParticipantSession,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
@@ -157,6 +158,19 @@ export type WorkspaceAdminReadPort = {
     contentReleaseId?: string;
     limit?: number;
   }): Promise<WorkspaceParticipantSessionListItem[]>;
+  importParticipantRoster(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    rosterText: string;
+  }): Promise<{
+    importedCount: number;
+    updatedCount: number;
+    items: ParticipantRosterEntry[];
+  }>;
+  listParticipantRoster(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<ParticipantRosterEntry[]>;
   getParticipantSessionDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -547,6 +561,13 @@ export type FirstSliceRepository = {
     workspaceId: string
   ): Promise<ParticipantSession[]>;
   saveParticipantSession(participantSession: ParticipantSession): Promise<void>;
+  listParticipantRosterEntriesByWorkspace(
+    tenantId: string,
+    workspaceId: string
+  ): Promise<ParticipantRosterEntry[]>;
+  saveParticipantRosterEntry(
+    participantRosterEntry: ParticipantRosterEntry
+  ): Promise<void>;
   getTestRunById(testRunId: string): Promise<TestRun | null>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
@@ -948,6 +969,46 @@ const requireWorkspace = async (
   }
 
   return workspace;
+};
+
+type ParsedParticipantRosterEntry = {
+  loginKey: string;
+  groupKey: string;
+  bookletKey: string | null;
+  displayName: string | null;
+};
+
+const splitRosterLine = (line: string): string[] => {
+  const delimiter = line.includes("\t")
+    ? "\t"
+    : line.includes(";")
+      ? ";"
+      : ",";
+  return line.split(delimiter).map(value => value.trim());
+};
+
+const parseParticipantRosterText = (
+  rosterText: string
+): ParsedParticipantRosterEntry[] => {
+  return rosterText
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith("#"))
+    .flatMap(line => {
+      const [loginKey, groupKey, bookletKey, displayName] = splitRosterLine(line);
+      if (!loginKey || loginKey.toLowerCase() === "loginkey") {
+        return [];
+      }
+
+      return [
+        {
+          loginKey,
+          groupKey: groupKey || `group:${loginKey}`,
+          bookletKey: bookletKey || null,
+          displayName: displayName || null
+        }
+      ];
+    });
 };
 
 const resolveAdminRoleScope = async (
@@ -4143,6 +4204,86 @@ export const createFirstSliceServices = (
                 ) ?? null
             };
           });
+      },
+      async importParticipantRoster(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const parsedEntries = parseParticipantRosterText(input.rosterText);
+        const existingEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+        const entriesByLoginKey = new Map(
+          existingEntries.map(entry => [entry.loginKey, entry])
+        );
+        let importedCount = 0;
+        let updatedCount = 0;
+
+        for (const parsedEntry of parsedEntries) {
+          const existingEntry = entriesByLoginKey.get(parsedEntry.loginKey);
+          const participantRosterEntry: ParticipantRosterEntry = {
+            participantRosterEntryId:
+              existingEntry?.participantRosterEntryId ?? idGenerator(),
+            tenantId: workspace.tenantId,
+            workspaceId: workspace.workspaceId,
+            loginKey: parsedEntry.loginKey,
+            groupKey: parsedEntry.groupKey,
+            bookletKey: parsedEntry.bookletKey,
+            displayName: parsedEntry.displayName,
+            importedAt: now()
+          };
+
+          await repository.saveParticipantRosterEntry(participantRosterEntry);
+          entriesByLoginKey.set(parsedEntry.loginKey, participantRosterEntry);
+
+          if (existingEntry) {
+            updatedCount += 1;
+          } else {
+            importedCount += 1;
+          }
+        }
+
+        if (parsedEntries.length > 0) {
+          await recordWorkspaceActivity({
+            tenantId: workspace.tenantId,
+            workspaceId: workspace.workspaceId,
+            eventType: "participant_roster_imported",
+            subjectType: "workspace",
+            subjectId: workspace.workspaceId,
+            summary: `Imported ${importedCount} and updated ${updatedCount} participant roster entries.`,
+            details: {
+              importedCount,
+              updatedCount,
+              parsedCount: parsedEntries.length
+            }
+          });
+        }
+
+        return {
+          importedCount,
+          updatedCount,
+          items: Array.from(entriesByLoginKey.values()).sort((left, right) =>
+            left.loginKey.localeCompare(right.loginKey)
+          )
+        };
+      },
+      async listParticipantRoster(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const entries = await repository.listParticipantRosterEntriesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        );
+        return entries.sort((left, right) =>
+          left.loginKey.localeCompare(right.loginKey)
+        );
       },
       async getParticipantSessionDetail(input) {
         const workspace = await requireWorkspace(

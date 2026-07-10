@@ -6,6 +6,7 @@ import type {
   AdminUser,
   ContentRelease,
   ImportJob,
+  ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
   Tenant,
@@ -30,6 +31,7 @@ type InMemoryFirstSliceState = {
   importJobs: Map<string, ImportJob>;
   contentReleases: Map<string, ContentRelease>;
   participantSessions: Map<string, ParticipantSession>;
+  participantRosterEntries: Map<string, ParticipantRosterEntry>;
   testRuns: Map<string, TestRun>;
 };
 
@@ -48,6 +50,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   importJobs: new Map(),
   contentReleases: new Map(),
   participantSessions: new Map(),
+  participantRosterEntries: new Map(),
   testRuns: new Map()
 });
 
@@ -187,6 +190,17 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.participantSessions.set(
         participantSession.participantSessionId,
         participantSession
+      );
+    },
+    async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.participantRosterEntries.values()).filter(
+        entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
+      );
+    },
+    async saveParticipantRosterEntry(participantRosterEntry) {
+      state.participantRosterEntries.set(
+        participantRosterEntry.participantRosterEntryId,
+        participantRosterEntry
       );
     },
     async getTestRunById(testRunId) {

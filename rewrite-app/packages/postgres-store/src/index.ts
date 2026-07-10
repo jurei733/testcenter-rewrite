@@ -10,6 +10,7 @@ import type {
   ContentReleaseRuntimeSnapshot,
   ImportJob,
   ImportJobDiagnostic,
+  ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
   SourcePackageContentStructure,
@@ -192,6 +193,28 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
       }
     : null;
 
+const mapParticipantRosterEntry = (
+  row: Row | undefined
+): ParticipantRosterEntry | null =>
+  row
+    ? {
+        participantRosterEntryId: String(row.participant_roster_entry_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        loginKey: String(row.login_key),
+        groupKey: String(row.group_key),
+        bookletKey:
+          row.booklet_key === null || row.booklet_key === undefined
+            ? null
+            : String(row.booklet_key),
+        displayName:
+          row.display_name === null || row.display_name === undefined
+            ? null
+            : String(row.display_name),
+        importedAt: String(row.imported_at)
+      }
+    : null;
+
 const mapTestRun = (row: Row | undefined): TestRun | null =>
   row
     ? {
@@ -259,7 +282,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 6;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 7;
 
 const migrations: PostgresMigration[] = [
   {
@@ -477,6 +500,26 @@ const migrations: PostgresMigration[] = [
         ON workspace_reviews (tenant_id, workspace_id, updated_at);
       CREATE INDEX IF NOT EXISTS idx_workspace_reviews_test_run
         ON workspace_reviews (test_run_id);
+    `
+  },
+  {
+    version: 7,
+    name: "add_participant_roster_entries",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_roster_entries (
+        participant_roster_entry_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        login_key TEXT NOT NULL,
+        group_key TEXT NOT NULL,
+        booklet_key TEXT,
+        display_name TEXT,
+        imported_at TEXT NOT NULL,
+        UNIQUE (tenant_id, workspace_id, login_key)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_participant_roster_entries_workspace
+        ON participant_roster_entries (tenant_id, workspace_id, login_key);
     `
   }
 ];
@@ -1041,6 +1084,38 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.groupKey,
           participantSession.status,
           participantSession.createdAt
+        ]
+      );
+    },
+    async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
+      return many(
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
+         FROM participant_roster_entries
+         WHERE tenant_id = $1 AND workspace_id = $2`,
+        [tenantId, workspaceId],
+        mapParticipantRosterEntry
+      );
+    },
+    async saveParticipantRosterEntry(participantRosterEntry) {
+      await pool.query(
+        `INSERT INTO participant_roster_entries (
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
+          participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
+          group_key = EXCLUDED.group_key,
+          booklet_key = EXCLUDED.booklet_key,
+          display_name = EXCLUDED.display_name,
+          imported_at = EXCLUDED.imported_at`,
+        [
+          participantRosterEntry.participantRosterEntryId,
+          participantRosterEntry.tenantId,
+          participantRosterEntry.workspaceId,
+          participantRosterEntry.loginKey,
+          participantRosterEntry.groupKey,
+          participantRosterEntry.bookletKey,
+          participantRosterEntry.displayName,
+          participantRosterEntry.importedAt
         ]
       );
     },

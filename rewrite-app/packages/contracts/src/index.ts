@@ -13,6 +13,7 @@ import type {
   ImportJobStatus,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantRosterEntry,
   ParticipantSession,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
@@ -90,6 +91,10 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions",
     getParticipantSession:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions/:participantSessionId",
+    importParticipantRoster:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster",
+    listParticipantRoster:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster",
     exportResponseCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
     exportLogCsv:
@@ -306,6 +311,10 @@ export type ParticipantLaunchRequest = {
   bookletKey?: string;
 };
 
+export type ImportParticipantRosterRequest = {
+  rosterText: string;
+};
+
 export type ResumeParticipantSessionRequest = {
   bookletKey?: string;
 };
@@ -438,6 +447,16 @@ export type ListParticipantSessionsResponse = {
 
 export type GetParticipantSessionResponse = {
   participantSessionDetail: WorkspaceParticipantSessionDetail;
+};
+
+export type ImportParticipantRosterResponse = {
+  importedCount: number;
+  updatedCount: number;
+  items: ParticipantRosterEntry[];
+};
+
+export type ListParticipantRosterResponse = {
+  items: ParticipantRosterEntry[];
 };
 
 export type ListDetailedResponsesResponse = {

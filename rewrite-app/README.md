@@ -230,6 +230,8 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs/{importJobId}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions/{participantSessionId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-roster`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-roster`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/responses/detailed`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/reviews`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/reviews`
@@ -270,6 +272,7 @@ The added read side now makes the first slice inspectable:
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
+- participant roster import now persists operator-managed login/group/booklet/display-name rows, upserts repeated logins within a workspace, and records roster import activity for follow-up
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
 - review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units, with review reads filterable by login, group, session, run, unit, reviewer, category, and limit
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
@@ -311,6 +314,7 @@ The added read side now makes the first slice inspectable:
 - [packages/sqlite-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/sqlite-store/src/index.ts) provides the first relational adapter on top of `node:sqlite`, including tracked schema migrations and content-release runtime snapshots
 - [packages/postgres-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/postgres-store/src/index.ts) provides a networked Postgres adapter with its own schema migration bootstrap and the same repository contract as the local stores
 - the SQLite adapter now also persists raw source-package content used for import-time structure derivation
+- memory, file, SQLite, and Postgres stores persist participant roster entries for operator-managed entry-link/run setup
 - import-job persistence now also stores `finishedAt` and structured diagnostics for failed imports
 - [apps/api/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/api/src/index.ts) wires `repository -> services -> HTTP`
 

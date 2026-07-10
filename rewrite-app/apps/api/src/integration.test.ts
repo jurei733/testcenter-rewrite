@@ -2998,6 +2998,92 @@ test("participant sign-in reuses an open session for the active release", async 
   );
 });
 
+test("workspace participant roster can be imported, updated, and listed", async () => {
+  const tenantKey = "integration-tenant-roster";
+  const workspaceKey = "integration-workspace-roster";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const initialImport = await requestJson<{
+    importedCount: number;
+    updatedCount: number;
+    items: Array<{
+      participantRosterEntryId: string;
+      loginKey: string;
+      groupKey: string;
+      bookletKey: string | null;
+      displayName: string | null;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: [
+        "loginKey,groupKey,bookletKey,displayName",
+        "roster-a,group:alpha,booklet:starter,Ada Alpha",
+        "roster-b,,booklet:starter,Ben Default",
+        "# ignored comment"
+      ].join("\n")
+    }
+  });
+
+  assert.equal(initialImport.status, 201);
+  assert.equal(initialImport.body.importedCount, 2);
+  assert.equal(initialImport.body.updatedCount, 0);
+  assert.equal(initialImport.body.items.length, 2);
+  assert.equal(initialImport.body.items[0]?.loginKey, "roster-a");
+  assert.equal(initialImport.body.items[1]?.groupKey, "group:roster-b");
+  assert.equal(initialImport.body.items[1]?.displayName, "Ben Default");
+
+  const rosterAEntryId = initialImport.body.items[0]?.participantRosterEntryId;
+  const updateImport = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: "roster-a;group:updated;booklet:updated;Ada Updated"
+      }
+    }
+  );
+
+  assert.equal(updateImport.status, 201);
+  assert.equal(updateImport.body.importedCount, 0);
+  assert.equal(updateImport.body.updatedCount, 1);
+  assert.equal(updateImport.body.items.length, 2);
+  const updatedRosterA = updateImport.body.items.find(
+    item => item.loginKey === "roster-a"
+  );
+  assert.equal(updatedRosterA?.participantRosterEntryId, rosterAEntryId);
+  assert.equal(updatedRosterA?.groupKey, "group:updated");
+  assert.equal(updatedRosterA?.bookletKey, "booklet:updated");
+  assert.equal(updatedRosterA?.displayName, "Ada Updated");
+
+  const listedRoster = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
+  );
+
+  assert.equal(listedRoster.status, 200);
+  assert.equal(listedRoster.body.items.length, 2);
+  assert.deepEqual(
+    listedRoster.body.items.map(item => item.loginKey),
+    ["roster-a", "roster-b"]
+  );
+
+  const activityEvents = await requestJson<{
+    items: Array<{ activityEvent: { eventType: string; details: unknown } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
+  );
+  assert.equal(activityEvents.status, 200);
+  assert.equal(activityEvents.body.items.length, 2);
+});
+
 test("participant session launch can target a specific booklet", async () => {
   const tenantKey = "integration-tenant-booklet-launch";
   const workspaceKey = "integration-workspace-booklet-launch";

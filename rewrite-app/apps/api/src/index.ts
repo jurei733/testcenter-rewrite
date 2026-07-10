@@ -54,12 +54,15 @@ import {
   type GetStudyMonitorUnitResponse,
   type GetStudyMonitorSummaryResponse,
   type GetWorkspaceOverviewResponse,
+  type ImportParticipantRosterRequest,
+  type ImportParticipantRosterResponse,
   type ListAdminAuditEventsResponse,
   type ListWorkspaceActivityEventsResponse,
   type ListImportJobsResponse,
   type ListAdminUsersResponse,
   type ListTenantsResponse,
   type ListWorkspacesResponse,
+  type ListParticipantRosterResponse,
   type ListParticipantSessionsResponse,
   type ListContentReleasesResponse,
   type ListSourcePackagesResponse,
@@ -991,6 +994,9 @@ const participantSessionListPattern = createRoutePattern(
 const participantSessionDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getParticipantSession
 );
+const participantRosterPattern = createRoutePattern(
+  productionApiRoutes.workspace.listParticipantRoster
+);
 const responseCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportResponseCsv
 );
@@ -1070,6 +1076,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", importJobDetailPattern],
   ["GET", participantSessionListPattern],
   ["GET", participantSessionDetailPattern],
+  ["GET", participantRosterPattern],
+  ["POST", participantRosterPattern],
   ["GET", detailedResponsesPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -2656,6 +2664,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionListMatch = participantSessionListPattern.exec(pathname);
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
+      const participantRosterMatch = participantRosterPattern.exec(pathname);
       const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
       const reviewListMatch = reviewListPattern.exec(pathname);
       const reviewDetailMatch = reviewDetailPattern.exec(pathname);
@@ -2832,6 +2841,64 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<GetParticipantSessionResponse>(response, 200, {
           participantSessionDetail
         });
+        return;
+      }
+
+      if (request.method === "GET" && participantRosterMatch?.groups) {
+        const tenantKey = decodeRouteGroup(participantRosterMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          participantRosterMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listParticipantRoster({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListParticipantRosterResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "POST" && participantRosterMatch?.groups) {
+        const tenantKey = decodeRouteGroup(participantRosterMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          participantRosterMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<ImportParticipantRosterRequest>();
+        if (!body || typeof body.rosterText !== "string") {
+          sendError(
+            response,
+            400,
+            "participant_roster_request_invalid",
+            "rosterText must be a string."
+          );
+          return;
+        }
+
+        const result = await services.workspaceAdminRead.importParticipantRoster({
+          tenantKey,
+          workspaceKey,
+          rosterText: body.rosterText
+        });
+        sendJson<ImportParticipantRosterResponse>(response, 201, result);
         return;
       }
 
