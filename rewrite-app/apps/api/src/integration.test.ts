@@ -1396,6 +1396,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(invalidCurrentUnitSave.status, 400);
     assert.equal(invalidCurrentUnitSave.body.error, "current_unit_key_invalid");
 
+    const invalidUnitResponseSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "unit-intro",
+          status: "paused",
+          unitResponse: { text: "This should not be stored either" }
+        }
+      }
+    );
+
+    assert.equal(invalidUnitResponseSave.status, 400);
+    assert.equal(invalidUnitResponseSave.body.error, "unit_response_invalid");
+
     const invalidSaveTestRunId = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/participant/test-runs/%20/save-progress",

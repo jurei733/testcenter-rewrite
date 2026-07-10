@@ -774,6 +774,22 @@ const normalizeOptionalCurrentUnitKey = (value: unknown): string | null => {
   return value.trim() || null;
 };
 
+const normalizeOptionalUnitResponse = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "unit_response_invalid",
+      "unitResponse must be a string when provided."
+    );
+  }
+
+  return value;
+};
+
 const normalizeAdminRole = (value: unknown): AdminRole => {
   if (typeof value !== "string" || !ADMIN_ROLES.includes(value as AdminRole)) {
     throw new FirstSliceError(
@@ -6546,6 +6562,7 @@ export const createFirstSliceServices = (
         const nextCurrentUnitKey = normalizeOptionalCurrentUnitKey(
           input.currentUnitKey
         );
+        const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         if (nextCurrentUnitKey) {
           const contentRelease = await requireContentRelease(
             repository,
@@ -6559,8 +6576,8 @@ export const createFirstSliceServices = (
         }
 
         const nextUnitResponses = { ...testRun.unitResponses };
-        if (nextCurrentUnitKey && input.unitResponse != null) {
-          nextUnitResponses[nextCurrentUnitKey] = input.unitResponse;
+        if (nextCurrentUnitKey && nextUnitResponse != null) {
+          nextUnitResponses[nextCurrentUnitKey] = nextUnitResponse;
         }
         const nextStatus = normalizeTestRunProgressStatus(input.status);
 
