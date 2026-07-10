@@ -68,6 +68,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <app-record-collection
+        title="Draft Source Document Preview"
+        subtitle="Quick validation of the file currently staged for source-package intake."
+        [items]="view.draftSourceDocumentPreviewItems"
+        emptyState="Load or paste a source document to preview the staged package payload."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Content Snapshot</h2>
         <p>Keep the latest package, import, release, and activation-guard state visible while you work through intake and rollout.</p>

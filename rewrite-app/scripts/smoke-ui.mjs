@@ -782,6 +782,14 @@ try {
     [uploadedSourceFileName, "application/xml", uploadedSourceDocument],
     { timeout: 15_000 }
   );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Draft Source Document Preview" })
+    })
+    .filter({ hasText: uploadedSourceFileName })
+    .filter({ hasText: "1 inferred booklet(s)" })
+    .waitFor();
   logStep("import-and-activate-flow");
   await clickCardAction(
     "Content Action Queue",

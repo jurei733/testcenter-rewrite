@@ -579,13 +579,49 @@ export class ContentViewFacade {
     );
   }
 
+  get draftSourceDocumentPreviewItems(): RecordCollectionItem[] {
+    return this.createSourceDocumentPreviewItems({
+      fileName: this.content.sourceFileName,
+      mediaType: this.content.sourceMediaType,
+      sourceDocument: this.content.sourceDocument,
+      status: "Draft",
+      bookletCount: this.estimateSourceDocumentBookletCount(
+        this.content.sourceMediaType,
+        this.content.sourceDocument
+      ),
+      selected: false
+    });
+  }
+
   get sourceDocumentPreviewItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetSourcePackageResponse>(
       this.content.sourcePackageDetailView
     );
     const sourcePackage = payload?.sourcePackageDetail.sourcePackage;
-    const sourceDocument = sourcePackage?.sourceDocument?.trim();
-    if (!sourcePackage || !sourceDocument) {
+    if (!sourcePackage) {
+      return [];
+    }
+
+    return this.createSourceDocumentPreviewItems({
+      fileName: sourcePackage.fileName,
+      mediaType: sourcePackage.mediaType,
+      sourceDocument: sourcePackage.sourceDocument ?? "",
+      status: sourcePackage.status,
+      bookletCount: sourcePackage.contentStructure?.bookletEntries.length ?? 0,
+      selected: true
+    });
+  }
+
+  private createSourceDocumentPreviewItems(input: {
+    fileName: string;
+    mediaType: string;
+    sourceDocument: string | null | undefined;
+    status: string;
+    bookletCount: number | null;
+    selected: boolean;
+  }): RecordCollectionItem[] {
+    const sourceDocument = input.sourceDocument?.trim();
+    if (!sourceDocument) {
       return [];
     }
 
@@ -595,36 +631,39 @@ export class ContentViewFacade {
         ? `${normalizedPreview.slice(0, 177)}...`
         : normalizedPreview;
     const lineCount = sourceDocument.split(/\r?\n/).length;
-    const bookletCount = sourcePackage.contentStructure?.bookletEntries.length ?? 0;
     const documentKind = this.inferSourceDocumentKind(
-      sourcePackage.mediaType,
+      input.mediaType,
       sourceDocument
     );
+    const bookletBadge =
+      input.bookletCount == null
+        ? "unknown booklet count"
+        : `${input.bookletCount} inferred booklet(s)`;
 
     return [
       {
-        headline: sourcePackage.fileName,
+        headline: input.fileName.trim() || "unnamed-source-document",
         subline: documentKind,
         badges: [
           `${sourceDocument.length} chars`,
           `${lineCount} line(s)`,
-          `${bookletCount} booklet(s)`
+          bookletBadge
         ],
         rows: [
           {
             label: "Media Type",
-            value: sourcePackage.mediaType
+            value: input.mediaType.trim() || "unknown"
           },
           {
             label: "Status",
-            value: sourcePackage.status
+            value: input.status
           },
           {
             label: "Preview",
             value: preview
           }
         ],
-        selected: true
+        selected: input.selected
       }
     ];
   }
@@ -1394,10 +1433,11 @@ export class ContentViewFacade {
   }
 
   private inferSourceDocumentKind(mediaType: string, sourceDocument: string): string {
-    if (mediaType.includes("json") || sourceDocument.trim().startsWith("{")) {
+    const normalizedMediaType = mediaType.toLowerCase();
+    if (normalizedMediaType.includes("json") || sourceDocument.trim().startsWith("{")) {
       return "JSON source document";
     }
-    if (mediaType.includes("xml") || sourceDocument.trim().startsWith("<")) {
+    if (normalizedMediaType.includes("xml") || sourceDocument.trim().startsWith("<")) {
       return "XML source document";
     }
     return "Text source document";
@@ -1412,6 +1452,95 @@ export class ContentViewFacade {
       return "application/xml";
     }
     return file.type || this.content.sourceMediaType.trim() || "text/plain";
+  }
+
+  private estimateSourceDocumentBookletCount(
+    mediaType: string,
+    sourceDocument: string
+  ): number | null {
+    const trimmedDocument = sourceDocument.trim();
+    if (!trimmedDocument) {
+      return null;
+    }
+
+    const normalizedMediaType = mediaType.toLowerCase();
+    if (normalizedMediaType.includes("xml") || trimmedDocument.startsWith("<")) {
+      const specificBookletCount = Array.from(
+        trimmedDocument.matchAll(
+          /<(?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet|assessmentTest|assessment-test)\b/gi
+        )
+      ).length;
+      if (specificBookletCount > 0) {
+        return specificBookletCount;
+      }
+      return Array.from(
+        trimmedDocument.matchAll(/<(?:[a-zA-Z_][\w.-]*:)?test\b/gi)
+      ).length;
+    }
+
+    if (normalizedMediaType.includes("json") || trimmedDocument.startsWith("{")) {
+      try {
+        return this.countJsonBookletHints(JSON.parse(trimmedDocument));
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  private countJsonBookletHints(value: unknown, depth = 0): number {
+    if (depth > 8 || value == null || typeof value !== "object") {
+      return 0;
+    }
+
+    if (Array.isArray(value)) {
+      return value.reduce(
+        (total, item) => total + this.countJsonBookletHints(item, depth + 1),
+        0
+      );
+    }
+
+    const objectValue = value as Record<string, unknown>;
+    const directBookletKeys = [
+      "bookletEntries",
+      "booklets",
+      "testlets",
+      "assessmentTests",
+      "assessment-tests"
+    ];
+    const directCount = directBookletKeys.reduce((total, key) => {
+      const candidate = objectValue[key];
+      if (Array.isArray(candidate)) {
+        return total + candidate.length;
+      }
+      return candidate && typeof candidate === "object" ? total + 1 : total;
+    }, 0);
+
+    if (directCount > 0) {
+      return directCount;
+    }
+
+    const nestedContainerKeys = [
+      "contentStructure",
+      "manifest",
+      "assessment",
+      "assessments",
+      "testcenter",
+      "packageManifest",
+      "contentPackage",
+      "package",
+      "packages",
+      "tests",
+      "test",
+      "testSuites",
+      "testSuite"
+    ];
+    return nestedContainerKeys.reduce(
+      (total, key) =>
+        total + this.countJsonBookletHints(objectValue[key], depth + 1),
+      0
+    );
   }
 
   private formatDateTime(value: string): string {
