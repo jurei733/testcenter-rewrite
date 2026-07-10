@@ -5529,44 +5529,46 @@ export const createFirstSliceServices = (
         );
         const activeRelease =
           workspaceReleases.find(release => release.status === "active") ?? null;
+        const supersededOpenRuns =
+          activeRelease &&
+          activeRelease.contentReleaseId !== targetRelease.contentReleaseId
+            ? await listOpenMonitorRunsForActiveRelease({
+                repository,
+                tenantId: workspace.tenantId,
+                workspaceId: workspace.workspaceId,
+                activeContentReleaseId: activeRelease.contentReleaseId
+              })
+            : [];
 
         if (
           activeRelease &&
           activeRelease.contentReleaseId !== targetRelease.contentReleaseId &&
-          !input.forceActivation
+          !input.forceActivation &&
+          supersededOpenRuns.length > 0
         ) {
-          const openMonitorRuns = await listOpenMonitorRunsForActiveRelease({
-            repository,
+          await recordWorkspaceActivity({
             tenantId: workspace.tenantId,
             workspaceId: workspace.workspaceId,
-            activeContentReleaseId: activeRelease.contentReleaseId
+            eventType: "content_release_activation_blocked",
+            actorId: input.activatedByActorId,
+            subjectType: "content_release",
+            subjectId: targetRelease.contentReleaseId,
+            summary: `Activation blocked for release '${targetRelease.contentReleaseId}'.`,
+            details: {
+              activeContentReleaseId: activeRelease.contentReleaseId,
+              openRuns: supersededOpenRuns
+            }
           });
 
-          if (openMonitorRuns.length > 0) {
-            await recordWorkspaceActivity({
-              tenantId: workspace.tenantId,
-              workspaceId: workspace.workspaceId,
-              eventType: "content_release_activation_blocked",
-              actorId: input.activatedByActorId,
-              subjectType: "content_release",
-              subjectId: targetRelease.contentReleaseId,
-              summary: `Activation blocked for release '${targetRelease.contentReleaseId}'.`,
-              details: {
-                activeContentReleaseId: activeRelease.contentReleaseId,
-                openRuns: openMonitorRuns
-              }
-            });
-
-            throw new FirstSliceError(
-              409,
-              "active_content_release_has_open_runs",
-              `Active content release '${activeRelease.contentReleaseId}' still has ${openMonitorRuns.length} open run(s). Re-submit with forceActivation to supersede it.`,
-              {
-                activeContentReleaseId: activeRelease.contentReleaseId,
-                openRuns: openMonitorRuns
-              } satisfies ActivateContentReleaseBlockedDetails
-            );
-          }
+          throw new FirstSliceError(
+            409,
+            "active_content_release_has_open_runs",
+            `Active content release '${activeRelease.contentReleaseId}' still has ${supersededOpenRuns.length} open run(s). Re-submit with forceActivation to supersede it.`,
+            {
+              activeContentReleaseId: activeRelease.contentReleaseId,
+              openRuns: supersededOpenRuns
+            } satisfies ActivateContentReleaseBlockedDetails
+          );
         }
 
         for (const release of workspaceReleases) {
@@ -5597,7 +5599,10 @@ export const createFirstSliceServices = (
           subjectId: activatedRelease.contentReleaseId,
           summary: `Content release '${activatedRelease.contentReleaseId}' activated.`,
           details: {
-            forced: Boolean(input.forceActivation)
+            forced: Boolean(input.forceActivation),
+            previousActiveContentReleaseId: activeRelease?.contentReleaseId ?? null,
+            supersededOpenRunCount: supersededOpenRuns.length,
+            supersededOpenRuns
           }
         });
         return activatedRelease;

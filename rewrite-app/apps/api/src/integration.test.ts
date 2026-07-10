@@ -4024,6 +4024,92 @@ test("activation guard returns blocking open-run details", async () => {
     ),
     true
   );
+
+  const forcedActivation = await requestJson<{
+    contentRelease: {
+      contentReleaseId: string;
+      status: string;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondImport.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: {
+        activatedByActorId: "integration-test",
+        forceActivation: true
+      }
+    }
+  );
+
+  assert.equal(forcedActivation.status, 200);
+  assert.equal(
+    forcedActivation.body.contentRelease.contentReleaseId,
+    secondImport.body.stagedContentRelease.contentReleaseId
+  );
+  assert.equal(forcedActivation.body.contentRelease.status, "active");
+
+  const firstReleaseAfterForce = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: { status: string };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${firstReleaseId}`
+  );
+  assert.equal(firstReleaseAfterForce.status, 200);
+  assert.equal(
+    firstReleaseAfterForce.body.contentReleaseDetail.contentRelease.status,
+    "superseded"
+  );
+
+  const forcedActivityEvents = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        eventType: string;
+        subjectId: string;
+        details: {
+          forced?: boolean;
+          previousActiveContentReleaseId?: string | null;
+          supersededOpenRunCount?: number;
+          supersededOpenRuns?: Array<{
+            loginKey: string;
+            participantRosterEntry: { displayName: string | null } | null;
+          }>;
+        };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=content_release_activated&limit=1`
+  );
+
+  assert.equal(forcedActivityEvents.status, 200);
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.subjectId,
+    secondImport.body.stagedContentRelease.contentReleaseId
+  );
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.details.forced,
+    true
+  );
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.details
+      .previousActiveContentReleaseId,
+    firstReleaseId
+  );
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.details
+      .supersededOpenRunCount,
+    1
+  );
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.details.supersededOpenRuns?.[0]
+      ?.loginKey,
+    "activation-student"
+  );
+  assert.equal(
+    forcedActivityEvents.body.items[0]?.activityEvent.details.supersededOpenRuns?.[0]
+      ?.participantRosterEntry?.displayName,
+    "Activation Student"
+  );
 });
 
 test("workspace participant-session list shows latest run and active release", async () => {
