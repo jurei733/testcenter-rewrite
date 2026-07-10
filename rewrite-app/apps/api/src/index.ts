@@ -1435,6 +1435,16 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     [
       "GET",
+      participantRosterPattern,
+      productionApiRoutes.workspace.listParticipantRoster
+    ],
+    [
+      "POST",
+      participantRosterPattern,
+      productionApiRoutes.workspace.importParticipantRoster
+    ],
+    [
+      "GET",
       detailedResponsesPattern,
       productionApiRoutes.workspace.listDetailedResponses
     ],

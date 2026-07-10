@@ -3084,6 +3084,21 @@ test("workspace participant roster can be imported, updated, and listed", async 
     ["roster-a", "roster-b"]
   );
 
+  const metricsResponse = await requestJson<{
+    requestCountsByRoute: Record<string, number>;
+  }>("/metrics");
+  assert.equal(metricsResponse.status, 200);
+  assert.ok(
+    metricsResponse.body.requestCountsByRoute[
+      "POST /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster"
+    ] >= 1
+  );
+  assert.ok(
+    metricsResponse.body.requestCountsByRoute[
+      "GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster"
+    ] >= 1
+  );
+
   const activityEvents = await requestJson<{
     items: Array<{ activityEvent: { eventType: string; details: unknown } }>;
   }>(
