@@ -1067,6 +1067,31 @@ try {
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
+  await fillAndCommit(
+    "#entryRosterText",
+    [
+      "<Testtakers>",
+      "  <participant>",
+      "    <login>entry-student-direct-xml</login>",
+      "    <group id=\"group:direct-xml\" />",
+      `    <booklet ref=\"${participantRouteBookletKey}\" />`,
+      "    <firstName>Direct</firstName>",
+      "    <lastName>Xml</lastName>",
+      "  </participant>",
+      "</Testtakers>"
+    ].join("\n")
+  );
+  await page.locator("#generateEntryLinksButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Generated Entry Links" })
+    })
+    .filter({ hasText: "entry-student-direct-xml" })
+    .filter({ hasText: "Direct Xml" })
+    .filter({ hasText: "group%3Adirect-xml" })
+    .filter({ hasText: "booklet%3Astarter" })
+    .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
