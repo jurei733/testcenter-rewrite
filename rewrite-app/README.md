@@ -272,7 +272,7 @@ The added read side now makes the first slice inspectable:
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
 - participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
-- participant roster import now persists operator-managed login/group/booklet/display-name rows, upserts repeated logins within a workspace, and records roster import activity for follow-up
+- participant roster import now persists operator-managed login/group/booklet/display-name rows, upserts repeated logins within a workspace, records roster import activity, and returns validation warnings when assigned booklets cannot be checked against the active release or are missing from it
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
 - review comments let operators attach, edit, list, delete, and export reviewer notes for concrete test runs or units, with review reads filterable by login, group, session, run, unit, reviewer, category, and limit
 - group result deletion removes collected test runs for one group, reports deleted runs/responses, and records a workspace activity event
@@ -304,7 +304,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing with entry-link CSV preview/download, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor booklet/unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation, study-monitor booklet/unit progress, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing with validation warnings and entry-link CSV preview/download, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor booklet/unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation, study-monitor booklet/unit progress, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -401,13 +401,10 @@ For runtime probes:
 
 - `/healthz` is a liveness check
 - `/readyz` is a storage-aware readiness check
-- `/metrics` returns JSON runtime metrics including request counts by route, route latency summaries, and process memory
+- `/metrics` returns JSON runtime metrics including normalized request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
 - `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, and whether operator auth is required
-- `/readyz` is a storage-aware readiness check
-- `/metrics` exposes lightweight runtime request/error counters for the current API process
-- `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/manifest` exposes the active storage mode, schema version, routes, and use-case surface
 - `db:doctor` reports storage reachability plus current vs. target schema version where applicable
 - `db:migrate` applies the adapter-managed schema migrations without going through the HTTP server boot path
