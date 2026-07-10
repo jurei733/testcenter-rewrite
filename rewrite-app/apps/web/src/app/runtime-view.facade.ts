@@ -47,6 +47,7 @@ type RuntimeEntryLink = {
   loginKey: string;
   groupKey: string;
   bookletKey: string;
+  displayName?: string;
   url: string;
 };
 
@@ -192,13 +193,14 @@ export class RuntimeViewFacade {
 
   get entryLinkItems(): RecordCollectionItem[] {
     return this.parseEntryLinksView().map(link => ({
-      headline: link.loginKey,
-      subline: link.url,
+      headline: link.displayName || link.loginKey,
+      subline: link.displayName ? link.loginKey : link.url,
       badges: [link.groupKey, link.bookletKey || "default booklet"],
       rows: [
         { label: "Login", value: link.loginKey },
         { label: "Group", value: link.groupKey },
         { label: "Booklet", value: link.bookletKey || "active release default" },
+        { label: "Display Name", value: link.displayName || "none" },
         { label: "URL", value: link.url }
       ],
       selected: this.runtime.loginKey.trim() === link.loginKey,
@@ -1035,6 +1037,7 @@ export class RuntimeViewFacade {
       loginKey: entry.loginKey,
       groupKey: entry.groupKey,
       bookletKey: entry.bookletKey ?? "",
+      displayName: entry.displayName ?? "",
       url: this.buildParticipantEntryUrl(this.uiState.workspace.workspaceKey.trim(), {
         loginKey: entry.loginKey,
         groupKey: entry.groupKey,
@@ -1287,7 +1290,7 @@ export class RuntimeViewFacade {
   }
 
   private parseEntryRosterRow(row: string): Omit<RuntimeEntryLink, "url"> | null {
-    const [loginKey, groupKey, bookletKey = ""] = row
+    const [loginKey, groupKey, bookletKey = "", displayName = ""] = row
       .split(/[,\t;]/)
       .map(part => part.trim());
     if (!loginKey || loginKey.toLowerCase() === "loginkey") {
@@ -1296,7 +1299,8 @@ export class RuntimeViewFacade {
     return {
       loginKey,
       groupKey: groupKey || `group:${loginKey}`,
-      bookletKey
+      bookletKey,
+      displayName
     };
   }
 
@@ -1331,12 +1335,13 @@ export class RuntimeViewFacade {
 
   private createEntryLinksCsv(links: RuntimeEntryLink[]): string {
     const rows = [
-      ["loginKey", "groupKey", "bookletKey", "url"],
+      ["loginKey", "groupKey", "bookletKey", "url", "displayName"],
       ...links.map(link => [
         link.loginKey,
         link.groupKey,
         link.bookletKey,
-        link.url
+        link.url,
+        link.displayName ?? ""
       ])
     ];
     return rows.map(row => row.map(value => this.escapeCsvValue(value)).join(",")).join("\n");

@@ -1032,13 +1032,15 @@ try {
       has: page.getByRole("heading", { name: "Generated Entry Links" })
     })
     .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "Ada Entry" })
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
   await page
     .locator("#entryLinksCsvPreview")
-    .filter({ hasText: '"loginKey","groupKey","bookletKey","url"' })
+    .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
+    .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
