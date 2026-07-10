@@ -3252,7 +3252,11 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(signIn.body.participantSession.groupKey, "group:roster-runtime");
 
   const resumed = await requestJson<{
-    testRun: { bookletKey: string; currentUnitKey: string | null };
+    testRun: {
+      testRunId: string;
+      bookletKey: string;
+      currentUnitKey: string | null;
+    };
   }>(
     `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
     {
@@ -3303,6 +3307,90 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(
     participantSessionDetail.body.participantSessionDetail.participantRosterEntry
       ?.displayName,
+    "Roster Runtime"
+  );
+
+  const saved = await requestJson<{
+    testRun: { unitResponses: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "unit-beta-1",
+      status: "paused",
+      unitResponse: "Roster response"
+    }
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.testRun.unitResponses["unit-beta-1"], "Roster response");
+
+  const detailedResponses = await requestJson<{
+    items: Array<{
+      participantRosterEntry: {
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      } | null;
+      loginKey: string;
+      unitKey: string;
+      response: string;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
+  );
+  assert.equal(detailedResponses.status, 200);
+  assert.equal(detailedResponses.body.items.length, 1);
+  assert.equal(detailedResponses.body.items[0]?.response, "Roster response");
+  assert.equal(
+    detailedResponses.body.items[0]?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+
+  const createdReview = await requestJson<{
+    item: {
+      participantRosterEntry: {
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      } | null;
+      review: { reviewId: string; category: string };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews`, {
+    method: "POST",
+    body: {
+      participantSessionId: signIn.body.participantSession.participantSessionId,
+      testRunId: resumed.body.testRun.testRunId,
+      unitKey: "unit-beta-1",
+      reviewerId: "integration-reviewer",
+      category: "roster-note",
+      comment: "Roster review"
+    }
+  });
+  assert.equal(createdReview.status, 201);
+  assert.equal(
+    createdReview.body.item.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+
+  const reviews = await requestJson<{
+    items: Array<{
+      participantRosterEntry: {
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      } | null;
+      review: { reviewId: string; category: string };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
+  );
+  assert.equal(reviews.status, 200);
+  assert.equal(reviews.body.items.length, 1);
+  assert.equal(
+    reviews.body.items[0]?.review.reviewId,
+    createdReview.body.item.review.reviewId
+  );
+  assert.equal(
+    reviews.body.items[0]?.participantRosterEntry?.displayName,
     "Roster Runtime"
   );
 });

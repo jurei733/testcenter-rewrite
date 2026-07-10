@@ -566,6 +566,7 @@ export type WorkspaceDetailedResponse = {
   workspaceKey: string;
   loginKey: string;
   groupKey: string;
+  participantRosterEntry: ParticipantRosterEntry | null;
   participantSessionId: string;
   testRunId: string;
   bookletKey: string;
@@ -594,6 +595,7 @@ export type WorkspaceReview = {
 export type WorkspaceReviewListItem = {
   review: WorkspaceReview;
   participantSession: ParticipantSession | null;
+  participantRosterEntry: ParticipantRosterEntry | null;
   testRun: TestRun | null;
 };
 

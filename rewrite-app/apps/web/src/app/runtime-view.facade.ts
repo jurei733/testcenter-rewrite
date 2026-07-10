@@ -468,28 +468,38 @@ export class RuntimeViewFacade {
       this.runtime.detailedResponsesView
     );
     return (
-      payload?.items.map(item => ({
-        headline: `${item.loginKey} · ${item.unitKey}`,
-        subline: item.testRunId,
-        badges: [item.status, item.bookletKey, `${item.responseLength} char(s)`],
-        rows: [
-          { label: "Response", value: this.formatResponsePreview(item.response) },
-          { label: "Group", value: item.groupKey || "unknown" },
-          { label: "Session", value: item.participantSessionId },
-          { label: "Updated", value: this.formatDateTime(item.updatedAt) }
-        ],
-        selected:
-          this.runtime.testRunId.trim() === item.testRunId &&
-          this.runtime.currentUnitKey.trim() === item.unitKey,
-        actionLabel: "Select Response",
-        actionPayload: {
-          testRunId: item.testRunId,
-          currentUnitKey: item.unitKey,
-          participantSessionId: item.participantSessionId,
-          loginKey: item.loginKey,
-          groupKey: item.groupKey
-        }
-      })) ?? []
+      payload?.items.map(item => {
+        const displayName = item.participantRosterEntry?.displayName;
+
+        return {
+          headline: `${displayName ?? item.loginKey} · ${item.unitKey}`,
+          subline: displayName ? item.loginKey : item.testRunId,
+          badges: [
+            item.status,
+            item.bookletKey,
+            `${item.responseLength} char(s)`,
+            item.participantRosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            { label: "Response", value: this.formatResponsePreview(item.response) },
+            { label: "Login", value: item.loginKey },
+            { label: "Group", value: item.groupKey || "unknown" },
+            { label: "Session", value: item.participantSessionId },
+            { label: "Updated", value: this.formatDateTime(item.updatedAt) }
+          ],
+          selected:
+            this.runtime.testRunId.trim() === item.testRunId &&
+            this.runtime.currentUnitKey.trim() === item.unitKey,
+          actionLabel: "Select Response",
+          actionPayload: {
+            testRunId: item.testRunId,
+            currentUnitKey: item.unitKey,
+            participantSessionId: item.participantSessionId,
+            loginKey: item.loginKey,
+            groupKey: item.groupKey
+          }
+        };
+      }) ?? []
     );
   }
 
@@ -507,7 +517,13 @@ export class RuntimeViewFacade {
       badges: [review.reviewerId, review.testRunId],
       rows: [
         { label: "Comment", value: this.formatResponsePreview(review.comment) },
-        { label: "Participant", value: detail.participantSession.loginKey },
+        {
+          label: "Participant",
+          value:
+            detail.participantRosterEntry?.displayName ??
+            detail.participantSession.loginKey
+        },
+        { label: "Login", value: detail.participantSession.loginKey },
         { label: "Run", value: review.testRunId },
         { label: "Updated", value: this.formatDateTime(review.updatedAt) }
       ],
@@ -533,44 +549,54 @@ export class RuntimeViewFacade {
   get reviewItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListReviewsResponse>(this.runtime.reviewsView);
     return (
-      payload?.items.map(item => ({
-        headline: `${item.review.category} · ${item.participantSession?.loginKey ?? "unknown"}`,
-        subline: item.review.reviewId,
-        badges: [
-          item.review.reviewerId,
-          item.testRun?.status ?? "missing run",
-          item.review.unitKey ?? "whole run"
-        ],
-        rows: [
-          { label: "Review Id", value: item.review.reviewId },
-          { label: "Comment", value: this.formatResponsePreview(item.review.comment) },
-          { label: "Run", value: item.review.testRunId },
-          {
-            label: "Session",
-            value: item.review.participantSessionId
-          },
-          {
-            label: "Updated",
-            value: this.formatDateTime(item.review.updatedAt)
+      payload?.items.map(item => {
+        const displayName = item.participantRosterEntry?.displayName;
+        const loginKey = item.participantSession?.loginKey ?? "unknown";
+
+        return {
+          headline: `${item.review.category} · ${displayName ?? loginKey}`,
+          subline: item.review.reviewId,
+          badges: [
+            item.review.reviewerId,
+            item.testRun?.status ?? "missing run",
+            item.review.unitKey ?? "whole run",
+            item.participantRosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            { label: "Review Id", value: item.review.reviewId },
+            {
+              label: "Comment",
+              value: this.formatResponsePreview(item.review.comment)
+            },
+            { label: "Login", value: loginKey },
+            { label: "Run", value: item.review.testRunId },
+            {
+              label: "Session",
+              value: item.review.participantSessionId
+            },
+            {
+              label: "Updated",
+              value: this.formatDateTime(item.review.updatedAt)
+            }
+          ],
+          selected:
+            this.runtime.testRunId.trim() === item.review.testRunId &&
+            (item.review.unitKey === null ||
+              this.runtime.currentUnitKey.trim() === item.review.unitKey),
+          actionLabel: "Select Review",
+          actionPayload: {
+            reviewId: item.review.reviewId,
+            testRunId: item.review.testRunId,
+            currentUnitKey: item.review.unitKey ?? "",
+            participantSessionId: item.review.participantSessionId,
+            loginKey: item.participantSession?.loginKey ?? "",
+            groupKey: item.participantSession?.groupKey ?? "",
+            reviewerId: item.review.reviewerId,
+            reviewCategory: item.review.category,
+            reviewComment: item.review.comment
           }
-        ],
-        selected:
-          this.runtime.testRunId.trim() === item.review.testRunId &&
-          (item.review.unitKey === null ||
-            this.runtime.currentUnitKey.trim() === item.review.unitKey),
-        actionLabel: "Select Review",
-        actionPayload: {
-          reviewId: item.review.reviewId,
-          testRunId: item.review.testRunId,
-          currentUnitKey: item.review.unitKey ?? "",
-          participantSessionId: item.review.participantSessionId,
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey: item.participantSession?.groupKey ?? "",
-          reviewerId: item.review.reviewerId,
-          reviewCategory: item.review.category,
-          reviewComment: item.review.comment
-        }
-      })) ?? []
+        };
+      }) ?? []
     );
   }
 

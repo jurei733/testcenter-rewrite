@@ -1311,6 +1311,7 @@ const listDetailedResponsesForWorkspace = (input: {
   tenantKey: string;
   workspaceKey: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
 } & DetailedResponseFilters): WorkspaceDetailedResponse[] => {
   const participantSessionsById = new Map(
@@ -1318,6 +1319,9 @@ const listDetailedResponsesForWorkspace = (input: {
       participantSession.participantSessionId,
       participantSession
     ])
+  );
+  const participantRosterEntriesByLoginKey = new Map(
+    (input.participantRosterEntries ?? []).map(entry => [entry.loginKey, entry])
   );
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
@@ -1340,6 +1344,10 @@ const listDetailedResponsesForWorkspace = (input: {
           workspaceKey: input.workspaceKey,
           loginKey: participantSession?.loginKey ?? "",
           groupKey: participantSession?.groupKey ?? "",
+          participantRosterEntry: participantSession
+            ? participantRosterEntriesByLoginKey.get(participantSession.loginKey) ??
+              null
+            : null,
           participantSessionId: normalizedTestRun.participantSessionId,
           testRunId: normalizedTestRun.testRunId,
           bookletKey: normalizedTestRun.bookletKey,
@@ -1465,6 +1473,7 @@ const formatWorkspaceActivityCsv = (input: {
 const buildWorkspaceReviewListItems = (input: {
   reviews: WorkspaceReview[];
   participantSessions: ParticipantSession[];
+  participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
 } & WorkspaceReviewFilters): WorkspaceReviewListItem[] => {
   const participantSessionsById = new Map(
@@ -1475,6 +1484,9 @@ const buildWorkspaceReviewListItems = (input: {
   );
   const testRunsById = new Map(
     input.testRuns.map(testRun => [testRun.testRunId, normalizeTestRun(testRun)])
+  );
+  const participantRosterEntriesByLoginKey = new Map(
+    (input.participantRosterEntries ?? []).map(entry => [entry.loginKey, entry])
   );
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
@@ -1487,12 +1499,20 @@ const buildWorkspaceReviewListItems = (input: {
   };
 
   return [...input.reviews]
-    .map(review => ({
-      review,
-      participantSession:
-        participantSessionsById.get(review.participantSessionId) ?? null,
-      testRun: testRunsById.get(review.testRunId) ?? null
-    }))
+    .map(review => {
+      const participantSession =
+        participantSessionsById.get(review.participantSessionId) ?? null;
+
+      return {
+        review,
+        participantSession,
+        participantRosterEntry: participantSession
+          ? participantRosterEntriesByLoginKey.get(participantSession.loginKey) ??
+            null
+          : null,
+        testRun: testRunsById.get(review.testRunId) ?? null
+      };
+    })
     .filter(
       item =>
         (!filters.loginKey ||
@@ -4694,18 +4714,27 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [participantSessions, testRuns] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-        ]);
+        const [participantSessions, participantRosterEntries, testRuns] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return listDetailedResponsesForWorkspace({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
@@ -4928,21 +4957,30 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const [reviews, participantSessions, testRuns] = await Promise.all([
-          repository.listWorkspaceReviewsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-        ]);
+        const [reviews, participantSessions, participantRosterEntries, testRuns] =
+          await Promise.all([
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return buildWorkspaceReviewListItems({
           reviews,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
@@ -5046,10 +5084,19 @@ export const createFirstSliceServices = (
             category: review.category
           }
         });
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
 
         return {
           review,
           participantSession,
+          participantRosterEntry:
+            participantRosterEntries.find(
+              entry => entry.loginKey === participantSession.loginKey
+            ) ?? null,
           testRun: normalizeTestRun(testRun)
         };
       },
@@ -5153,14 +5200,24 @@ export const createFirstSliceServices = (
           }
         });
 
-        const [participantSession, testRun] = await Promise.all([
-          repository.getParticipantSessionById(review.participantSessionId),
-          repository.getTestRunById(review.testRunId)
-        ]);
+        const [participantSession, testRun, participantRosterEntries] =
+          await Promise.all([
+            repository.getParticipantSessionById(review.participantSessionId),
+            repository.getTestRunById(review.testRunId),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
 
         return {
           review,
           participantSession,
+          participantRosterEntry: participantSession
+            ? participantRosterEntries.find(
+                entry => entry.loginKey === participantSession.loginKey
+              ) ?? null
+            : null,
           testRun: testRun ? normalizeTestRun(testRun) : null
         };
       },
