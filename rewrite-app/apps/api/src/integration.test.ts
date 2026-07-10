@@ -2857,6 +2857,120 @@ test("source document import accepts nested testcenter package manifests", async
   );
 });
 
+test("source document import resolves JSON organization item references", async () => {
+  const tenantKey = "integration-tenant-json-organization";
+  const workspaceKey = "integration-workspace-json-organization";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          organizations: [
+            {
+              identifier: "ORG-1",
+              items: [
+                {
+                  identifier: "BOOKLET-ITEM",
+                  identifierref: "RES-BOOKLET-A",
+                  title: "Booklet A",
+                  items: [
+                    {
+                      identifier: "UNIT-ITEM-1",
+                      identifierref: "RES-UNIT-1",
+                      title: "Item One"
+                    },
+                    {
+                      identifier: "UNIT-ITEM-2",
+                      identifierref: "RES-UNIT-2"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          resources: [
+            {
+              identifier: "RES-BOOKLET-A",
+              href: "booklets/booklet-a.xml"
+            },
+            {
+              identifier: "RES-UNIT-1",
+              href: "units/unit-1.xml"
+            },
+            {
+              identifier: "RES-UNIT-2",
+              title: "Item Two",
+              files: [{ href: "units/unit-2.xml" }]
+            }
+          ]
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/booklet-a.xml",
+          displayLabel: "Booklet A",
+          unitEntries: [
+            { unitKey: "units/unit-1.xml", displayLabel: "Item One" },
+            { unitKey: "units/unit-2.xml", displayLabel: "Item Two" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";

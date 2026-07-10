@@ -1762,6 +1762,254 @@ const normalizeParsedJsonContentStructure = (
       value["assessment-tests"],
       value["assessment-test"]
     );
+  const readStringValue = (
+    value: Record<string, unknown>,
+    ...candidateNames: string[]
+  ): string => {
+    for (const candidateName of candidateNames) {
+      const candidateValue = value[candidateName];
+      if (candidateValue !== undefined) {
+        return normalizeManifestToken(candidateValue);
+      }
+    }
+
+    const normalizedEntries = Object.entries(value).map(([key, entryValue]) => [
+      key.toLowerCase(),
+      entryValue
+    ] as const);
+    for (const candidateName of candidateNames) {
+      const normalizedName = candidateName.toLowerCase();
+      const match = normalizedEntries.find(([key]) => key === normalizedName);
+      if (match) {
+        return normalizeManifestToken(match[1]);
+      }
+    }
+
+    return "";
+  };
+  type JsonManifestResource = {
+    key: string;
+    displayLabel: string;
+  };
+  const collectJsonManifestResources = (
+    value: unknown
+  ): Map<string, JsonManifestResource> => {
+    const resources = new Map<string, JsonManifestResource>();
+    const visit = (candidate: unknown): void => {
+      if (Array.isArray(candidate)) {
+        candidate.forEach(item => visit(item));
+        return;
+      }
+
+      const objectValue = asObject(candidate);
+      if (!objectValue) {
+        return;
+      }
+
+      for (const rawResource of readEntries(
+        objectValue.resources,
+        objectValue.resource
+      )) {
+        const resource = asObject(rawResource);
+        if (!resource) {
+          continue;
+        }
+
+        const identifier = readStringValue(
+          resource,
+          "identifier",
+          "id",
+          "key",
+          "resourceId",
+          "resourceIdentifier"
+        );
+        if (!identifier) {
+          continue;
+        }
+
+        const fileCandidates = readEntries(resource.files, resource.file);
+        const firstFile =
+          fileCandidates.find(file => typeof file === "string" || asObject(file)) ??
+          null;
+        const firstFileObject = asObject(firstFile);
+        const fileKey =
+          typeof firstFile === "string"
+            ? normalizeManifestToken(firstFile)
+            : firstFileObject
+              ? readStringValue(
+                  firstFileObject,
+                  "href",
+                  "path",
+                  "src",
+                  "uri",
+                  "fileName",
+                  "filename",
+                  "name"
+                )
+              : "";
+        const key =
+          readStringValue(
+            resource,
+            "href",
+            "path",
+            "src",
+            "uri",
+            "file",
+            "fileName",
+            "filename"
+          ) ||
+          fileKey ||
+          identifier;
+        const displayLabel = normalizeManifestLabel(
+          readStringValue(
+            resource,
+            "displayLabel",
+            "label",
+            "title",
+            "name",
+            "displayName"
+          ),
+          "Resource",
+          key
+        );
+
+        resources.set(identifier, { key, displayLabel });
+      }
+
+      for (const container of readNestedManifestContainers(objectValue)) {
+        visit(container);
+      }
+    };
+
+    visit(value);
+    return resources;
+  };
+  const readJsonOrganizationItems = (
+    value: Record<string, unknown>
+  ): unknown[] => {
+    const items: unknown[] = [];
+    for (const organization of readEntries(
+      value.organizations,
+      value.organization,
+      value.orgs,
+      value.org
+    )) {
+      const organizationObject = asObject(organization);
+      if (organizationObject) {
+        items.push(...readEntries(organizationObject.items, organizationObject.item));
+      }
+    }
+    items.push(...readEntries(value.organizationItems, value.organizationItem));
+    return items;
+  };
+  const collectJsonOrganizationItems = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) {
+      return value.flatMap(item => collectJsonOrganizationItems(item));
+    }
+
+    const objectValue = asObject(value);
+    if (!objectValue) {
+      return [];
+    }
+
+    const directItems = readJsonOrganizationItems(objectValue);
+    if (directItems.length > 0) {
+      return directItems;
+    }
+
+    return readNestedManifestContainers(objectValue).flatMap(container =>
+      collectJsonOrganizationItems(container)
+    );
+  };
+  const collectJsonOrganizationBookletEntries = (
+    value: unknown
+  ): SourcePackageContentStructure["bookletEntries"] => {
+    const resources = collectJsonManifestResources(value);
+    if (resources.size === 0) {
+      return [];
+    }
+
+    return collectJsonOrganizationItems(value)
+      .map(rawItem => {
+        const item = asObject(rawItem);
+        if (!item) {
+          return null;
+        }
+
+        const bookletReference = readStringValue(
+          item,
+          "identifierref",
+          "identifierRef",
+          "ref",
+          "resourceId",
+          "resourceIdentifier"
+        );
+        const bookletResource = resources.get(bookletReference);
+        const rawUnitItems = readEntries(
+          item.items,
+          item.item,
+          item.children,
+          item.childItems
+        );
+        if (!bookletReference || !bookletResource || rawUnitItems.length === 0) {
+          return null;
+        }
+
+        return {
+          bookletKey: bookletResource.key,
+          displayLabel: normalizeManifestLabel(
+            readStringValue(
+              item,
+              "displayLabel",
+              "label",
+              "title",
+              "name",
+              "displayName"
+            ) || bookletResource.displayLabel,
+            "Booklet",
+            bookletResource.key
+          ),
+          unitEntries: rawUnitItems
+            .map(rawUnitItem => {
+              const unitItem = asObject(rawUnitItem);
+              if (!unitItem) {
+                return null;
+              }
+
+              const unitReference = readStringValue(
+                unitItem,
+                "identifierref",
+                "identifierRef",
+                "ref",
+                "resourceId",
+                "resourceIdentifier"
+              );
+              const unitResource = resources.get(unitReference);
+              if (!unitReference || !unitResource) {
+                return null;
+              }
+
+              return {
+                unitKey: unitResource.key,
+                displayLabel: normalizeManifestLabel(
+                  readStringValue(
+                    unitItem,
+                    "displayLabel",
+                    "label",
+                    "title",
+                    "name",
+                    "displayName"
+                  ) || unitResource.displayLabel,
+                  "Unit",
+                  unitResource.key
+                )
+              };
+            })
+            .filter(Boolean) as SourcePackageContentStructure["bookletEntries"][number]["unitEntries"]
+        };
+      })
+      .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
+  };
   const readNestedManifestContainers = (
     value: Record<string, unknown>
   ): unknown[] =>
@@ -1805,7 +2053,15 @@ const normalizeParsedJsonContentStructure = (
 
   const rawBooklets = collectBookletEntries(parsed, true);
   if (rawBooklets.length === 0) {
-    return null;
+    const organizationBookletEntries =
+      collectJsonOrganizationBookletEntries(parsed);
+    if (organizationBookletEntries.length === 0) {
+      return null;
+    }
+
+    return normalizeContentStructure({
+      bookletEntries: organizationBookletEntries
+    });
   }
 
   const contentStructure: SourcePackageContentStructure = {
