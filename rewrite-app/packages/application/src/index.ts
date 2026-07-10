@@ -3034,17 +3034,22 @@ const buildStudyMonitorBookletProgress = (input: {
   }
   const progressByBookletKey = new Map<string, MutableBookletProgress>();
 
+  const findBooklet = (
+    bookletKey: string,
+    preferredContentRelease?: ContentRelease
+  ): ContentReleaseRuntimeSnapshot["bookletEntries"][number] | undefined =>
+    preferredContentRelease?.runtimeSnapshot.bookletEntries.find(
+      bookletEntry => bookletEntry.bookletKey === bookletKey
+    ) ??
+    input.contentReleases
+      .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+      .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
+
   const findBookletDisplayLabel = (
     bookletKey: string,
     preferredContentRelease?: ContentRelease
   ): string => {
-    const booklet =
-      preferredContentRelease?.runtimeSnapshot.bookletEntries.find(
-        bookletEntry => bookletEntry.bookletKey === bookletKey
-      ) ??
-      input.contentReleases
-        .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
-        .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
+    const booklet = findBooklet(bookletKey, preferredContentRelease);
     return booklet?.displayLabel ?? bookletKey;
   };
 
@@ -3052,11 +3057,15 @@ const buildStudyMonitorBookletProgress = (input: {
     bookletKey: string,
     contentRelease?: ContentRelease
   ): MutableBookletProgress => {
-    const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
-      bookletEntry => bookletEntry.bookletKey === bookletKey
-    );
+    const booklet = findBooklet(bookletKey, contentRelease);
     const existing = progressByBookletKey.get(bookletKey);
     if (existing) {
+      if (existing.unitCount === 0 && booklet) {
+        existing.unitCount = booklet.unitEntries.length;
+      }
+      if (existing.displayLabel === bookletKey && booklet?.displayLabel) {
+        existing.displayLabel = booklet.displayLabel;
+      }
       return existing;
     }
 

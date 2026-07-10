@@ -3605,6 +3605,14 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
 
   const rosterMonitorSummary = await requestJson<{
     studyMonitorSummary: {
+      bookletProgress: Array<{
+        bookletKey: string;
+        displayLabel: string;
+        rosterEntryCount: number;
+        expectedParticipantCount: number;
+        notStartedCount: number;
+        unitCount: number;
+      }>;
       unitProgress: Array<{
         unitKey: string;
         rosterExpectedCount: number;
@@ -3616,6 +3624,15 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`
   );
+  const betaBookletProgress =
+    rosterMonitorSummary.body.studyMonitorSummary.bookletProgress.find(
+      booklet => booklet.bookletKey === "booklet:beta"
+    );
+  assert.equal(betaBookletProgress?.displayLabel, "Beta Booklet");
+  assert.equal(betaBookletProgress?.rosterEntryCount, 1);
+  assert.equal(betaBookletProgress?.expectedParticipantCount, 1);
+  assert.equal(betaBookletProgress?.notStartedCount, 1);
+  assert.equal(betaBookletProgress?.unitCount, 1);
   const betaUnitProgress =
     rosterMonitorSummary.body.studyMonitorSummary.unitProgress.find(
       unit => unit.unitKey === "unit-beta-1"
