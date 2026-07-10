@@ -1015,6 +1015,23 @@ try {
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "Ada Entry" })
     .waitFor();
+  await fillAndCommit(
+    "#entryRosterText",
+    [
+      "<Testtakers>",
+      "  <Testtaker login=\"entry-student-xml\" group=\"group:xml-entry\" name=\"Xml Entry\" />",
+      "</Testtakers>"
+    ].join("\n")
+  );
+  await page.locator("#importParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-xml" })
+    .filter({ hasText: "Xml Entry" })
+    .waitFor();
   await page.locator("#loadParticipantRosterButton").click();
   await page
     .locator("article.card")
@@ -1025,7 +1042,6 @@ try {
     .filter({ hasText: "Ben Entry" })
     .waitFor();
   await page.locator("#generateSavedRosterEntryLinksButton").click();
-  await page.locator("#generateEntryLinksButton").click();
   await page
     .locator("article.card")
     .filter({
@@ -1035,6 +1051,15 @@ try {
     .filter({ hasText: "Ada Entry" })
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Generated Entry Links" })
+    })
+    .filter({ hasText: "entry-student-xml" })
+    .filter({ hasText: "Xml Entry" })
+    .filter({ hasText: "group%3Axml-entry" })
     .waitFor();
   await page
     .locator("#entryLinksCsvPreview")
@@ -1241,6 +1266,9 @@ try {
       const entrySmokeGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:entry-smoke")
         : null;
+      const xmlEntryGroup = Array.isArray(summary.groups)
+        ? summary.groups.find(group => group?.groupKey === "group:xml-entry")
+        : null;
       const pausedWorkUnit = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
         : null;
@@ -1251,21 +1279,25 @@ try {
           )
         : 0;
       return (
-        summary.expectedParticipantCount === 4 &&
-        summary.rosterEntryCount === 2 &&
+        summary.expectedParticipantCount === 5 &&
+        summary.rosterEntryCount === 3 &&
         summary.participantSessionCount === 2 &&
         summary.testRunCount === 2 &&
-        summary.notStartedCount === 2 &&
+        summary.notStartedCount === 3 &&
         missingResponseCount === 7 &&
         Array.isArray(summary.groups) &&
-        summary.groups.length === 3 &&
+        summary.groups.length === 4 &&
         pausedWorkUnit?.rosterExpectedCount === 1 &&
         pausedWorkUnit?.expectedRunCount === 3 &&
         pausedWorkUnit?.missingResponseCount === 2 &&
         entrySmokeGroup?.expectedParticipantCount === 2 &&
         entrySmokeGroup?.rosterEntryCount === 2 &&
         entrySmokeGroup?.participantSessionCount === 0 &&
-        entrySmokeGroup?.notStartedCount === 2
+        entrySmokeGroup?.notStartedCount === 2 &&
+        xmlEntryGroup?.expectedParticipantCount === 1 &&
+        xmlEntryGroup?.rosterEntryCount === 1 &&
+        xmlEntryGroup?.participantSessionCount === 0 &&
+        xmlEntryGroup?.notStartedCount === 1
       );
     }
   );
@@ -1275,15 +1307,15 @@ try {
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
-    .filter({ hasText: "4 expected participant(s)" })
+    .filter({ hasText: "5 expected participant(s)" })
     .filter({ hasText: "2 session(s)" })
     .filter({ hasText: "2 run(s)" })
-    .filter({ hasText: "3 group(s)" })
+    .filter({ hasText: "4 group(s)" })
     .filter({ hasText: "3 unit(s)" })
     .filter({ hasText: "7 missing response(s)" })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
-    .filter({ hasText: "2" })
+    .filter({ hasText: "3" })
     .waitFor();
   await studyMonitorCard
     .locator(".record-card")
@@ -1291,6 +1323,14 @@ try {
     .filter({ hasText: "2 expected" })
     .filter({ hasText: "0 session(s)" })
     .filter({ hasText: "2 not started" })
+    .filter({ hasText: "Roster Entries" })
+    .waitFor();
+  await studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "group:xml-entry" }) })
+    .filter({ hasText: "1 expected" })
+    .filter({ hasText: "0 session(s)" })
+    .filter({ hasText: "1 not started" })
     .filter({ hasText: "Roster Entries" })
     .waitFor();
   await clickCardAction("Study Monitor", "Open Group Detail", "group:entry-smoke");

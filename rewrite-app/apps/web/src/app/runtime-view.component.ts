@@ -248,10 +248,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Entry Links</h2>
-        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use one row per participant: loginKey, groupKey, optional bookletKey, optional displayName.</p>
+        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML rosters are accepted too.</p>
         <label>
-          Roster Rows
-          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo"></textarea>
+          Roster Rows or XML
+          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;"></textarea>
         </label>
         <div class="actions">
           <button id="importParticipantRosterButton" class="primary" type="button" (click)="view.importParticipantRoster()">Import Saved Roster</button>
