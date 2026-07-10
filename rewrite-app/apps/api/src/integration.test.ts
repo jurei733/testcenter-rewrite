@@ -2804,8 +2804,8 @@ test("source document import accepts testcenter-style XML aliases", async () => 
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
     method: "POST",
     body: {
-      fileName: "testcenter-style.xml",
-      mediaType: "application/xml",
+      fileName: "testcenter-style.imsmanifest",
+      mediaType: "application/octet-stream",
       sourceDocument: `
         <assessment xmlns:tc="https://example.testcenter.local/schema">
           <tc:test tc:identifier="test:wrapper">

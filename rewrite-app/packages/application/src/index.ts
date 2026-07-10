@@ -1954,7 +1954,12 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     }
   }
 
-  if (normalizedMediaType.includes("xml") || normalizedFileName.endsWith(".xml")) {
+  if (
+    normalizedMediaType.includes("xml") ||
+    normalizedFileName.endsWith(".xml") ||
+    normalizedFileName.endsWith(".imsmanifest") ||
+    normalizedFileName.endsWith(".manifest")
+  ) {
     return {
       runtimeSnapshot: normalizeParsedXmlContentStructure(sourcePackage.sourceDocument),
       diagnostics: []
