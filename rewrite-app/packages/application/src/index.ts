@@ -26,6 +26,7 @@ import type {
   SourcePackageContentStructure,
   Tenant,
   TestRun,
+  TestRunStatus,
   Workspace,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
@@ -604,6 +605,7 @@ const ADMIN_ROLES: AdminRole[] = [
   "workspace_admin"
 ];
 const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
+const TEST_RUN_PROGRESS_STATUSES: TestRunStatus[] = ["running", "paused"];
 
 type AdminRoleAssignmentInput = {
   role: AdminRole;
@@ -673,6 +675,21 @@ const normalizeAdminUserStatus = (value: unknown): AdminUserStatus => {
   }
 
   return value as AdminUserStatus;
+};
+
+const normalizeTestRunProgressStatus = (value: unknown): TestRunStatus => {
+  if (
+    typeof value !== "string" ||
+    !TEST_RUN_PROGRESS_STATUSES.includes(value as TestRunStatus)
+  ) {
+    throw new FirstSliceError(
+      400,
+      "test_run_progress_status_invalid",
+      "Test run progress status must be 'running' or 'paused'."
+    );
+  }
+
+  return value as TestRunStatus;
 };
 
 const normalizeAdminRole = (value: unknown): AdminRole => {
@@ -6426,10 +6443,11 @@ export const createFirstSliceServices = (
         if (nextCurrentUnitKey && input.unitResponse != null) {
           nextUnitResponses[nextCurrentUnitKey] = input.unitResponse;
         }
+        const nextStatus = normalizeTestRunProgressStatus(input.status);
 
         const updatedRun: TestRun = {
           ...testRun,
-          status: input.status,
+          status: nextStatus,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
           updatedAt: now()
