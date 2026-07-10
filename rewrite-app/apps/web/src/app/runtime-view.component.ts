@@ -248,18 +248,29 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Entry Links</h2>
-        <p>Generate participant start links from pasted rows. Use one row per participant: loginKey, groupKey, optional bookletKey.</p>
+        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use one row per participant: loginKey, groupKey, optional bookletKey, optional displayName.</p>
         <label>
           Roster Rows
-          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo"></textarea>
+          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo"></textarea>
         </label>
         <div class="actions">
+          <button id="importParticipantRosterButton" class="primary" type="button" (click)="view.importParticipantRoster()">Import Saved Roster</button>
+          <button id="loadParticipantRosterButton" class="secondary" type="button" (click)="view.loadParticipantRoster()">Load Saved Roster</button>
           <button id="generateEntryLinksButton" class="primary" type="button" (click)="view.generateEntryLinks()">Generate Entry Links</button>
+          <button id="generateSavedRosterEntryLinksButton" class="secondary" type="button" (click)="view.generateEntryLinksFromSavedRoster()">Generate From Saved Roster</button>
           <button id="downloadEntryLinksCsvButton" class="secondary" type="button" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
           <button class="ghost" type="button" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
         </div>
         <pre id="entryLinksCsvPreview">{{ view.entryLinksCsvPreview }}</pre>
       </article>
+
+      <app-record-collection
+        title="Saved Participant Roster"
+        subtitle="Persisted operator roster rows for the selected workspace."
+        [items]="view.participantRosterItems"
+        (itemAction)="view.selectEntryLink($event)"
+        emptyState="Import or load participant roster rows to inspect saved entries."
+      ></app-record-collection>
 
       <app-record-collection
         title="Generated Entry Links"
@@ -425,6 +436,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
+      <app-json-panel title="Participant Roster" subtitle="Saved Entry Rows" viewId="participantRosterView" [content]="view.runtime.participantRosterView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>
       <app-json-panel title="Runtime State" subtitle="Session Status" viewId="runtimeStateView" [content]="view.runtime.runtimeStateView"></app-json-panel>
       <app-json-panel title="Current Run State" subtitle="Booklet Context" viewId="currentRunStateView" [content]="view.runtime.currentRunStateView"></app-json-panel>

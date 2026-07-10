@@ -76,6 +76,7 @@ export interface ShellRuntimeState {
   reviewLimit: string;
   entryRosterText: string;
   entryLinksView: string;
+  participantRosterView: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -235,6 +236,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
       "student-c,group:demo-b,booklet:demo"
     ].join("\n"),
     entryLinksView: "",
+    participantRosterView: 'Use "Load Saved Roster".',
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",

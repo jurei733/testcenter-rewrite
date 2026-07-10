@@ -1,6 +1,7 @@
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
+  ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
   ListReviewsResponse,
   MonitorOpenRunsResponse,
@@ -27,6 +28,8 @@ export interface ShellRuntimeReadsHost {
   getOpenRunsPath(): string;
   getParticipantSessionsPath(): string;
   setParticipantSessionsView(nextValue: string): void;
+  getParticipantRosterPath(): string;
+  setParticipantRosterView(nextValue: string): void;
   getRuntimeStatePath(): string;
   getParticipantSessionDetailPath(): string;
   getDetailedResponsesPath(): string;
@@ -39,6 +42,21 @@ export interface ShellRuntimeReadsHost {
   setReviewExportView(nextValue: string): void;
   getCurrentRunStatePath(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
+}
+
+export async function loadParticipantRosterAction(
+  host: ShellRuntimeReadsHost,
+  quiet = false
+): Promise<ListParticipantRosterResponse> {
+  const payload = await host.request<ListParticipantRosterResponse>(
+    "Participant Roster",
+    "GET",
+    host.getParticipantRosterPath(),
+    undefined,
+    { quiet }
+  );
+  host.setParticipantRosterView(JSON.stringify(payload, null, 2));
+  return payload;
 }
 
 export async function refreshRuntimeReadsAction(

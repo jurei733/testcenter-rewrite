@@ -13,6 +13,7 @@ import {
   createReviewAction,
   deleteGroupResultsAction,
   deleteReviewAction,
+  importParticipantRosterAction,
   participantSignInAction,
   resumeParticipantSessionAction,
   resumeRunAction,
@@ -23,6 +24,7 @@ import {
   exportReviewsCsvAction,
   exportResponsesCsvAction,
   loadParticipantSessionsAction,
+  loadParticipantRosterAction,
   loadDetailedResponsesAction,
   loadReviewsAction,
   refreshRuntimeReadsAction
@@ -102,6 +104,31 @@ export class RewriteAppRuntimeService {
       this.feedback.rememberActivity(
         "Participant Sessions Loaded",
         `${payload.items.length} session(s) loaded with the current filters.`
+      );
+    }
+  }
+
+  async importParticipantRoster(): Promise<void> {
+    const payload = await importParticipantRosterAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+    this.feedback.rememberActivity(
+      "Participant Roster Imported",
+      `${payload.importedCount} imported, ${payload.updatedCount} updated.`
+    );
+  }
+
+  async loadParticipantRoster(quiet = false): Promise<void> {
+    const payload = await loadParticipantRosterAction(
+      this.hosts.createRuntimeReadsHost(),
+      quiet
+    );
+    if (!quiet) {
+      this.feedback.rememberActivity(
+        "Participant Roster Loaded",
+        `${payload.items.length} saved roster entr${payload.items.length === 1 ? "y" : "ies"} loaded.`
       );
     }
   }

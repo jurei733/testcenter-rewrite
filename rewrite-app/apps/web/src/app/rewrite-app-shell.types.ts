@@ -62,6 +62,7 @@ export type PersistedShellState = {
   reviewLimit: string;
   entryRosterText: string;
   entryLinksView: string;
+  participantRosterView: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   workspaceActivityEventType: string;

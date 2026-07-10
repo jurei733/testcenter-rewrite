@@ -1001,11 +1001,30 @@ try {
   await fillAndCommit(
     "#entryRosterText",
     [
-      "loginKey,groupKey,bookletKey",
-      `entry-student-a,group:entry-smoke,${participantRouteBookletKey}`,
-      "entry-student-b;group:entry-smoke"
+      "loginKey,groupKey,bookletKey,displayName",
+      `entry-student-a,group:entry-smoke,${participantRouteBookletKey},Ada Entry`,
+      "entry-student-b;group:entry-smoke;;Ben Entry"
     ].join("\n")
   );
+  await page.locator("#importParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "Ada Entry" })
+    .waitFor();
+  await page.locator("#loadParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-b" })
+    .filter({ hasText: "Ben Entry" })
+    .waitFor();
+  await page.locator("#generateSavedRosterEntryLinksButton").click();
   await page.locator("#generateEntryLinksButton").click();
   await page
     .locator("article.card")

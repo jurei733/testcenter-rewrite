@@ -3,6 +3,8 @@ import type {
   DeleteReviewResponse,
   ReviewResponse,
   DeleteGroupResultsResponse,
+  ImportParticipantRosterRequest,
+  ImportParticipantRosterResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -38,7 +40,10 @@ export interface ShellRuntimeActionsHost {
   getCreateReviewPath(): string;
   getUpdateReviewPath(): string;
   getDeleteReviewPath(): string;
+  getImportParticipantRosterPath(): string;
   getWorkspaceKey(): string;
+  getEntryRosterText(): string;
+  setParticipantRosterView(nextValue: string): void;
   getLoginKey(): string;
   getGroupKey(): string;
   getBookletKey(): string;
@@ -51,6 +56,22 @@ export interface ShellRuntimeActionsHost {
   getReviewComment(): string;
   createRuntimePresentationHost(): RuntimePresentationHost;
   refreshCrossViewStateAfterRuntimeChange(): Promise<void>;
+}
+
+export async function importParticipantRosterAction(
+  host: ShellRuntimeActionsHost
+): Promise<ImportParticipantRosterResponse> {
+  const payload = await host.request<ImportParticipantRosterResponse>(
+    "Import Participant Roster",
+    "POST",
+    host.getImportParticipantRosterPath(),
+    {
+      rosterText: host.getEntryRosterText()
+    } satisfies ImportParticipantRosterRequest
+  );
+  host.setParticipantRosterView(JSON.stringify(payload, null, 2));
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }
 
 export async function createReviewAction(

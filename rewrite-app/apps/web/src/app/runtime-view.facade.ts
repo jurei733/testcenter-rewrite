@@ -4,6 +4,7 @@ import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
   ListReviewsResponse,
+  ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
@@ -179,6 +180,46 @@ export class RuntimeViewFacade {
         url: link.url
       }
     }));
+  }
+
+  get participantRosterItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListParticipantRosterResponse>(
+      this.runtime.participantRosterView
+    );
+    return (
+      payload?.items.map(entry => {
+        const link = {
+          loginKey: entry.loginKey,
+          groupKey: entry.groupKey,
+          bookletKey: entry.bookletKey ?? ""
+        };
+        return {
+          headline: entry.loginKey,
+          subline: entry.displayName ?? entry.participantRosterEntryId,
+          badges: [entry.groupKey, entry.bookletKey ?? "default booklet"],
+          rows: [
+            { label: "Display Name", value: entry.displayName ?? "none" },
+            { label: "Group", value: entry.groupKey },
+            { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+            { label: "Imported", value: this.formatDateTime(entry.importedAt) },
+            {
+              label: "Entry URL",
+              value: this.buildParticipantEntryUrl(
+                this.uiState.workspace.workspaceKey.trim(),
+                link
+              )
+            }
+          ],
+          selected: this.runtime.loginKey.trim() === entry.loginKey,
+          actionLabel: "Use Roster Entry",
+          actionPayload: {
+            loginKey: entry.loginKey,
+            groupKey: entry.groupKey,
+            bookletKey: entry.bookletKey ?? ""
+          }
+        };
+      }) ?? []
+    );
   }
 
   get entryLinksCsvPreview(): string {
@@ -890,6 +931,33 @@ export class RuntimeViewFacade {
     this.persistState();
   }
 
+  importParticipantRoster(): void {
+    this.persistState();
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.importParticipantRoster();
+      this.generateEntryLinksFromSavedRoster();
+    });
+  }
+
+  loadParticipantRoster(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.loadParticipantRoster());
+  }
+
+  generateEntryLinksFromSavedRoster(): void {
+    const links = this.parseParticipantRosterView().map(entry => ({
+      loginKey: entry.loginKey,
+      groupKey: entry.groupKey,
+      bookletKey: entry.bookletKey ?? "",
+      url: this.buildParticipantEntryUrl(this.uiState.workspace.workspaceKey.trim(), {
+        loginKey: entry.loginKey,
+        groupKey: entry.groupKey,
+        bookletKey: entry.bookletKey ?? ""
+      })
+    }));
+    this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
+    this.persistState();
+  }
+
   downloadEntryLinksCsv(): void {
     let links = this.parseEntryLinksView();
     if (links.length === 0) {
@@ -1150,6 +1218,13 @@ export class RuntimeViewFacade {
       this.runtime.entryLinksView
     );
     return Array.isArray(payload?.links) ? payload.links : [];
+  }
+
+  private parseParticipantRosterView(): ListParticipantRosterResponse["items"] {
+    const payload = parseJsonDocument<ListParticipantRosterResponse>(
+      this.runtime.participantRosterView
+    );
+    return Array.isArray(payload?.items) ? payload.items : [];
   }
 
   private buildParticipantEntryUrl(

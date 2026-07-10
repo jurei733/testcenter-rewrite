@@ -380,6 +380,12 @@ export function createShellPersistenceStateHost(args: {
     set entryLinksView(nextValue) {
       args.runtimeState.entryLinksView = nextValue;
     },
+    get participantRosterView() {
+      return args.runtimeState.participantRosterView;
+    },
+    set participantRosterView(nextValue) {
+      args.runtimeState.participantRosterView = nextValue;
+    },
     get autoRefreshEnabled() {
       return args.workspaceState.autoRefreshEnabled;
     },

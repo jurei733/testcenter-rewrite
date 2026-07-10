@@ -53,7 +53,16 @@ export function createRuntimeActionsStateHost(args: {
         workspaceKey: args.workspaceState.workspaceKey.trim(),
         reviewId: args.runtimeState.reviewId.trim()
       }),
+    getImportParticipantRosterPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.importParticipantRoster, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
+    getEntryRosterText: () => args.runtimeState.entryRosterText,
+    setParticipantRosterView: nextValue => {
+      args.runtimeState.participantRosterView = nextValue;
+    },
     getLoginKey: () => args.runtimeState.loginKey,
     getGroupKey: () => args.runtimeState.groupKey,
     getBookletKey: () => args.runtimeState.bookletKey,
@@ -121,6 +130,12 @@ export function createRuntimeReadsStateHost(args: {
     return withQuery(path, query);
   };
 
+  const buildParticipantRosterPath = (): string =>
+    resolveRoutePath(productionApiRoutes.workspace.listParticipantRoster, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
+
   const buildDetailedResponsesPath = (route: string): string => {
     const path = resolveRoutePath(route, {
       tenantKey: args.workspaceState.tenantKey.trim(),
@@ -175,6 +190,10 @@ export function createRuntimeReadsStateHost(args: {
     getParticipantSessionsPath: buildParticipantSessionsPath,
     setParticipantSessionsView: nextValue => {
       args.runtimeState.participantSessionsView = nextValue;
+    },
+    getParticipantRosterPath: buildParticipantRosterPath,
+    setParticipantRosterView: nextValue => {
+      args.runtimeState.participantRosterView = nextValue;
     },
     getRuntimeStatePath: () =>
       resolveRoutePath(productionApiRoutes.participant.getRuntimeState, {
