@@ -2281,6 +2281,77 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(reviewsAfterDeletion.status, 200);
     assert.deepEqual(reviewsAfterDeletion.body.items, []);
+
+    const groupMonitorAfterDeletion = await requestJsonAt<{
+      studyMonitorGroup: {
+        participantSessionCount: number;
+        testRunCount: number;
+        notStartedCount: number;
+        responseCount: number;
+        reviewCount: number;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/groups/group%3Astudent-demo",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(groupMonitorAfterDeletion.status, 200);
+    assert.equal(
+      groupMonitorAfterDeletion.body.studyMonitorGroup.participantSessionCount,
+      1
+    );
+    assert.equal(groupMonitorAfterDeletion.body.studyMonitorGroup.testRunCount, 0);
+    assert.equal(groupMonitorAfterDeletion.body.studyMonitorGroup.notStartedCount, 1);
+    assert.equal(groupMonitorAfterDeletion.body.studyMonitorGroup.responseCount, 0);
+    assert.equal(groupMonitorAfterDeletion.body.studyMonitorGroup.reviewCount, 0);
+
+    const deletionActivity = await requestJsonAt<{
+      items: Array<{
+        activityEvent: {
+          eventType: string;
+          summary: string;
+          details: {
+            groupKey?: string;
+            deletedTestRunCount?: number;
+            deletedResponseCount?: number;
+            deletedReviewCount?: number;
+          };
+        };
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=group_results_deleted&limit=1",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(deletionActivity.status, 200);
+    assert.equal(
+      deletionActivity.body.items[0]?.activityEvent.eventType,
+      "group_results_deleted"
+    );
+    assert.match(
+      deletionActivity.body.items[0]?.activityEvent.summary ?? "",
+      /Deleted 1 test run/
+    );
+    assert.deepEqual(deletionActivity.body.items[0]?.activityEvent.details, {
+      groupKey: "group:student-demo",
+      deletedTestRunCount: 1,
+      deletedResponseCount: 1,
+      deletedReviewCount: 1,
+      affectedParticipantSessionIds: [
+        participantSignIn.body.participantSession.participantSessionId
+      ],
+      deletedTestRunIds: [resumed.body.testRun.testRunId]
+    });
   } finally {
     await closeServer(isolated.server);
   }

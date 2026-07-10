@@ -233,7 +233,10 @@ export class RewriteAppRuntimeService {
         this.refreshCrossViewStateAfterRuntimeChange()
       )
     );
-    await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
+    await Promise.all([
+      loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost()),
+      loadReviewsAction(this.hosts.createRuntimeReadsHost())
+    ]);
     this.feedback.rememberActivity(
       "Group Results Deleted",
       `${payload.deletion.deletedTestRunCount} run(s), ${payload.deletion.deletedResponseCount} response(s), and ${payload.deletion.deletedReviewCount} review(s) deleted for ${payload.deletion.groupKey}.`
