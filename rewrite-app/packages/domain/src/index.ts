@@ -296,6 +296,7 @@ export type OpenMonitorRun = {
   testRunId: string;
   loginKey: string;
   groupKey: string;
+  participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
   status: TestRunStatus;
   currentUnitKey: string | null;

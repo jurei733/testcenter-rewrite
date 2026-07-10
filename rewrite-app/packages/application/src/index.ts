@@ -1215,6 +1215,11 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       input.tenantId,
       input.workspaceId
     );
+  const participantRosterEntries =
+    await input.repository.listParticipantRosterEntriesByWorkspace(
+      input.tenantId,
+      input.workspaceId
+    );
   const activeSessionIds = new Set(
     participantSessions
       .filter(
@@ -1236,13 +1241,18 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       participantSessions.find(
         currentParticipantSession =>
           currentParticipantSession.participantSessionId ===
-          testRun.participantSessionId
+      testRun.participantSessionId
       ) ?? null;
 
     return {
       testRunId: testRun.testRunId,
       loginKey: participantSession?.loginKey ?? "unknown",
       groupKey: participantSession?.groupKey ?? "unknown",
+      participantRosterEntry: participantSession
+        ? participantRosterEntries.find(
+            entry => entry.loginKey === participantSession.loginKey
+          ) ?? null
+        : null,
       bookletKey: testRun.bookletKey,
       status: testRun.status,
       currentUnitKey: testRun.currentUnitKey,
@@ -6010,6 +6020,11 @@ export const createFirstSliceServices = (
             workspace.tenantId,
             workspace.workspaceId
           );
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
 
         return testRuns
           .filter(testRun => testRun.status !== "completed")
@@ -6025,6 +6040,11 @@ export const createFirstSliceServices = (
               testRunId: testRun.testRunId,
               loginKey: participantSession?.loginKey ?? "unknown-login",
               groupKey: participantSession?.groupKey ?? "unknown-group",
+              participantRosterEntry: participantSession
+                ? participantRosterEntries.find(
+                    entry => entry.loginKey === participantSession.loginKey
+                  ) ?? null
+                : null,
               bookletKey: testRun.bookletKey,
               status: testRun.status,
               currentUnitKey: testRun.currentUnitKey,

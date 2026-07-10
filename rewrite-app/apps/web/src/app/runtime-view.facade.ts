@@ -603,33 +603,45 @@ export class RuntimeViewFacade {
   get openRunItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView);
     return (
-      payload?.items.map(openRun => ({
-        headline: openRun.loginKey,
-        subline: openRun.testRunId,
-        badges: [openRun.status, openRun.groupKey],
-        rows: [
-          {
-            label: "Booklet",
-            value: openRun.bookletKey
-          },
-          {
-            label: "Current Unit",
-            value: openRun.currentUnitKey ?? "none"
-          },
-          {
-            label: "Updated",
-            value: this.formatDateTime(openRun.updatedAt)
+      payload?.items.map(openRun => {
+        const displayName = openRun.participantRosterEntry?.displayName;
+
+        return {
+          headline: displayName ?? openRun.loginKey,
+          subline: displayName ? openRun.loginKey : openRun.testRunId,
+          badges: [
+            openRun.status,
+            openRun.groupKey,
+            openRun.participantRosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            {
+              label: "Run",
+              value: openRun.testRunId
+            },
+            {
+              label: "Booklet",
+              value: openRun.bookletKey
+            },
+            {
+              label: "Current Unit",
+              value: openRun.currentUnitKey ?? "none"
+            },
+            {
+              label: "Updated",
+              value: this.formatDateTime(openRun.updatedAt)
+            }
+          ],
+          selected: this.runtime.testRunId.trim() === openRun.testRunId,
+          actionLabel: "Select + Sync",
+          actionPayload: {
+            testRunId: openRun.testRunId,
+            currentUnitKey: openRun.currentUnitKey ?? "",
+            loginKey: openRun.loginKey,
+            groupKey: openRun.groupKey
           }
-        ],
-        selected: this.runtime.testRunId.trim() === openRun.testRunId,
-        actionLabel: "Select + Sync",
-        actionPayload: {
-          testRunId: openRun.testRunId,
-          currentUnitKey: openRun.currentUnitKey ?? "",
-          loginKey: openRun.loginKey,
-          groupKey: openRun.groupKey
-        }
-      })) ?? []
+        };
+      }) ?? []
     );
   }
 
@@ -868,7 +880,10 @@ export class RuntimeViewFacade {
           },
           {
             label: "Participant",
-            value: openRuns[0]?.loginKey ?? "unknown"
+            value:
+              openRuns[0]?.participantRosterEntry?.displayName ??
+              openRuns[0]?.loginKey ??
+              "unknown"
           },
           {
             label: "Expected Result",

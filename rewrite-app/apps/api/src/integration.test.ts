@@ -3747,7 +3747,10 @@ test("activation guard returns blocking open-run details", async () => {
     activationReadiness: {
       canActivate: boolean;
       activeContentReleaseId: string | null;
-      blockingOpenRuns: Array<{ status: string }>;
+      blockingOpenRuns: Array<{
+        status: string;
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
       participantRosterWarnings: Array<{
         loginKey: string;
         validationWarnings: Array<{ code: string }>;
@@ -3769,6 +3772,11 @@ test("activation guard returns blocking open-run details", async () => {
     "running"
   );
   assert.equal(
+    readiness.body.activationReadiness.blockingOpenRuns[0]?.participantRosterEntry
+      ?.displayName,
+    "Activation Student"
+  );
+  assert.equal(
     readiness.body.activationReadiness.participantRosterWarnings[0]?.loginKey,
     "activation-student"
   );
@@ -3784,7 +3792,11 @@ test("activation guard returns blocking open-run details", async () => {
     message: string;
     details: {
       activeContentReleaseId: string;
-      openRuns: Array<{ status: string; loginKey: string }>;
+      openRuns: Array<{
+        status: string;
+        loginKey: string;
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
     };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondImport.body.stagedContentRelease.contentReleaseId}/activate`,
@@ -3805,6 +3817,10 @@ test("activation guard returns blocking open-run details", async () => {
   assert.equal(
     blockedActivation.body.details.openRuns[0]?.loginKey,
     "activation-student"
+  );
+  assert.equal(
+    blockedActivation.body.details.openRuns[0]?.participantRosterEntry?.displayName,
+    "Activation Student"
   );
 
   const activityEvents = await requestJson<{

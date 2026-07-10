@@ -912,25 +912,34 @@ export class ContentViewFacade {
       this.content.contentReleaseActivationReadinessView
     );
     return (
-      payload?.activationReadiness.blockingOpenRuns.map(openRun => ({
-        headline: openRun.loginKey,
-        subline: openRun.testRunId,
-        badges: [openRun.status, openRun.groupKey],
-        rows: [
-          { label: "Booklet", value: openRun.bookletKey },
-          {
-            label: "Current Unit",
-            value: openRun.currentUnitKey ?? "none"
+      payload?.activationReadiness.blockingOpenRuns.map(openRun => {
+        const displayName = openRun.participantRosterEntry?.displayName;
+
+        return {
+          headline: displayName ?? openRun.loginKey,
+          subline: displayName ? openRun.loginKey : openRun.testRunId,
+          badges: [
+            openRun.status,
+            openRun.groupKey,
+            openRun.participantRosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            { label: "Run", value: openRun.testRunId },
+            { label: "Booklet", value: openRun.bookletKey },
+            {
+              label: "Current Unit",
+              value: openRun.currentUnitKey ?? "none"
+            }
+          ],
+          selected: this.uiState.runtime.testRunId.trim() === openRun.testRunId,
+          actionLabel: "Open In Runtime",
+          actionPayload: {
+            loginKey: openRun.loginKey,
+            testRunId: openRun.testRunId,
+            currentUnitKey: openRun.currentUnitKey ?? ""
           }
-        ],
-        selected: this.uiState.runtime.testRunId.trim() === openRun.testRunId,
-        actionLabel: "Open In Runtime",
-        actionPayload: {
-          loginKey: openRun.loginKey,
-          testRunId: openRun.testRunId,
-          currentUnitKey: openRun.currentUnitKey ?? ""
-        }
-      })) ?? []
+        };
+      }) ?? []
     );
   }
 
