@@ -3269,6 +3269,62 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(resumed.body.testRun.bookletKey, "booklet:beta");
   assert.equal(resumed.body.testRun.currentUnitKey, "unit-beta-1");
 
+  const rosterGroupDetailAfterResume = await requestJson<{
+    studyMonitorGroup: {
+      sessions: Array<{
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
+      testRuns: Array<{
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/groups/group%3Aroster-runtime`
+  );
+  assert.equal(rosterGroupDetailAfterResume.status, 200);
+  assert.equal(
+    rosterGroupDetailAfterResume.body.studyMonitorGroup.sessions[0]
+      ?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+  assert.equal(
+    rosterGroupDetailAfterResume.body.studyMonitorGroup.testRuns[0]
+      ?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+
+  const rosterBookletDetailAfterResume = await requestJson<{
+    studyMonitorBooklet: {
+      testRuns: Array<{
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/booklets/booklet%3Abeta`
+  );
+  assert.equal(rosterBookletDetailAfterResume.status, 200);
+  assert.equal(
+    rosterBookletDetailAfterResume.body.studyMonitorBooklet.testRuns[0]
+      ?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+
+  const rosterUnitDetailAfterResume = await requestJson<{
+    studyMonitorUnit: {
+      testRuns: Array<{
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/units/unit-beta-1`
+  );
+  assert.equal(rosterUnitDetailAfterResume.status, 200);
+  assert.equal(
+    rosterUnitDetailAfterResume.body.studyMonitorUnit.testRuns[0]
+      ?.participantRosterEntry?.displayName,
+    "Roster Runtime"
+  );
+
   const participantSessions = await requestJson<{
     items: Array<{
       participantSession: { participantSessionId: string; loginKey: string };

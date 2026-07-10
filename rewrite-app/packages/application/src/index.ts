@@ -2818,6 +2818,15 @@ const buildStudyMonitorGroupDetail = (input: {
   const groupParticipantSessions = input.participantSessions
     .filter(participantSession => participantSession.groupKey === input.groupKey)
     .sort((left, right) => left.loginKey.localeCompare(right.loginKey));
+  const groupRosterEntriesByLoginKey = new Map(
+    groupRosterEntries.map(rosterEntry => [rosterEntry.loginKey, rosterEntry])
+  );
+  const groupParticipantSessionsById = new Map(
+    groupParticipantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
   const groupParticipantSessionIds = new Set(
     groupParticipantSessions.map(
       participantSession => participantSession.participantSessionId
@@ -2861,6 +2870,8 @@ const buildStudyMonitorGroupDetail = (input: {
 
     return {
       participantSession,
+      participantRosterEntry:
+        groupRosterEntriesByLoginKey.get(participantSession.loginKey) ?? null,
       latestTestRun:
         latestRunsBySessionId.get(participantSession.participantSessionId) ??
         null,
@@ -2907,19 +2918,22 @@ const buildStudyMonitorGroupDetail = (input: {
     reviewCount: groupReviews.length,
     rosterEntries: groupRosterEntries,
     sessions,
-    testRuns: groupTestRuns.map(testRun => ({
-      testRun,
-      participantSession:
-        groupParticipantSessions.find(
-          participantSession =>
-            participantSession.participantSessionId ===
-            testRun.participantSessionId
-        ) ?? null,
-      responseCount: Object.keys(testRun.unitResponses).length,
-      reviewCount: groupReviews.filter(
-        review => review.testRunId === testRun.testRunId
-      ).length
-    })),
+    testRuns: groupTestRuns.map(testRun => {
+      const participantSession =
+        groupParticipantSessionsById.get(testRun.participantSessionId) ?? null;
+
+      return {
+        testRun,
+        participantSession,
+        participantRosterEntry: participantSession
+          ? groupRosterEntriesByLoginKey.get(participantSession.loginKey) ?? null
+          : null,
+        responseCount: Object.keys(testRun.unitResponses).length,
+        reviewCount: groupReviews.filter(
+          review => review.testRunId === testRun.testRunId
+        ).length
+      };
+    }),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: groupParticipantSessions,
       participantRosterEntries: groupRosterEntries,
@@ -2979,6 +2993,9 @@ const buildStudyMonitorBookletDetail = (input: {
         left.loginKey.localeCompare(right.loginKey) ||
         left.participantRosterEntryId.localeCompare(right.participantRosterEntryId)
     );
+  const bookletRosterEntriesByLoginKey = new Map(
+    bookletRosterEntries.map(rosterEntry => [rosterEntry.loginKey, rosterEntry])
+  );
   const rosterOnlyCount = bookletRosterEntries.filter(
     rosterEntry => !sessionLoginKeys.has(rosterEntry.loginKey)
   ).length;
@@ -3031,14 +3048,22 @@ const buildStudyMonitorBookletDetail = (input: {
     reviewCount: bookletReviews.length,
     unitCount: booklet?.unitEntries.length ?? 0,
     rosterEntries: bookletRosterEntries,
-    testRuns: bookletTestRuns.map(testRun => ({
-      testRun,
-      participantSession:
-        participantSessionsById.get(testRun.participantSessionId) ?? null,
-      responseCount: Object.keys(testRun.unitResponses).length,
-      reviewCount: bookletReviews.filter(review => review.testRunId === testRun.testRunId)
-        .length
-    })),
+    testRuns: bookletTestRuns.map(testRun => {
+      const participantSession =
+        participantSessionsById.get(testRun.participantSessionId) ?? null;
+
+      return {
+        testRun,
+        participantSession,
+        participantRosterEntry: participantSession
+          ? bookletRosterEntriesByLoginKey.get(participantSession.loginKey) ?? null
+          : null,
+        responseCount: Object.keys(testRun.unitResponses).length,
+        reviewCount: bookletReviews.filter(
+          review => review.testRunId === testRun.testRunId
+        ).length
+      };
+    }),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: input.participantSessions,
       participantRosterEntries: bookletRosterEntries,
@@ -3064,6 +3089,12 @@ const buildStudyMonitorUnitDetail = (input: {
     input.participantSessions.map(participantSession => [
       participantSession.participantSessionId,
       participantSession
+    ])
+  );
+  const rosterEntriesByLoginKey = new Map(
+    input.participantRosterEntries.map(rosterEntry => [
+      rosterEntry.loginKey,
+      rosterEntry
     ])
   );
   const contentReleasesById = new Map(
@@ -3119,6 +3150,9 @@ const buildStudyMonitorUnitDetail = (input: {
         {
           testRun,
           participantSession,
+          participantRosterEntry: participantSession
+            ? rosterEntriesByLoginKey.get(participantSession.loginKey) ?? null
+            : null,
           expected,
           answered,
           response,

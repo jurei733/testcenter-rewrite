@@ -392,6 +392,7 @@ export type WorkspaceStudyMonitorBookletProgress = {
 
 export type WorkspaceStudyMonitorGroupSession = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
   latestTestRun: TestRun | null;
   testRunCount: number;
   responseCount: number;
@@ -402,6 +403,7 @@ export type WorkspaceStudyMonitorGroupSession = {
 export type WorkspaceStudyMonitorGroupRun = {
   testRun: TestRun;
   participantSession: ParticipantSession | null;
+  participantRosterEntry: ParticipantRosterEntry | null;
   responseCount: number;
   reviewCount: number;
 };
@@ -409,6 +411,7 @@ export type WorkspaceStudyMonitorGroupRun = {
 export type WorkspaceStudyMonitorUnitRun = {
   testRun: TestRun;
   participantSession: ParticipantSession | null;
+  participantRosterEntry: ParticipantRosterEntry | null;
   expected: boolean;
   answered: boolean;
   response: string | null;
@@ -419,6 +422,7 @@ export type WorkspaceStudyMonitorUnitRun = {
 export type WorkspaceStudyMonitorBookletRun = {
   testRun: TestRun;
   participantSession: ParticipantSession | null;
+  participantRosterEntry: ParticipantRosterEntry | null;
   responseCount: number;
   reviewCount: number;
 };

@@ -53,6 +53,22 @@ export class WorkspaceViewFacade {
       : [])
   ];
 
+  private readonly monitorParticipantLabel = (item: {
+    participantRosterEntry?: { displayName: string | null; loginKey: string } | null;
+    participantSession?: { loginKey: string } | null;
+  }): string =>
+    item.participantRosterEntry?.displayName ??
+    item.participantSession?.loginKey ??
+    "unknown participant";
+
+  private readonly monitorParticipantLogin = (item: {
+    participantRosterEntry?: { loginKey: string } | null;
+    participantSession?: { loginKey: string } | null;
+  }): string =>
+    item.participantSession?.loginKey ??
+    item.participantRosterEntry?.loginKey ??
+    "unknown participant";
+
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
   }
@@ -271,10 +287,22 @@ export class WorkspaceViewFacade {
         actionPayload: { unitKey: unit.unitKey }
       })),
       ...detail.testRuns.map(item => ({
-        headline: item.participantSession?.loginKey ?? "unknown participant",
+        headline: this.monitorParticipantLabel(item),
         subline: item.testRun.testRunId,
-        badges: [item.testRun.status, item.testRun.bookletKey],
+        badges: [
+          item.participantRosterEntry ? "roster" : "ad hoc",
+          item.testRun.status,
+          item.testRun.bookletKey
+        ],
         rows: [
+          {
+            label: "Login",
+            value: this.monitorParticipantLogin(item)
+          },
+          {
+            label: "Display Name",
+            value: item.participantRosterEntry?.displayName ?? "none"
+          },
           { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
           { label: "Responses", value: String(item.responseCount) },
@@ -334,6 +362,7 @@ export class WorkspaceViewFacade {
           {
             label: "Latest Session",
             value:
+              detail.sessions[0]?.participantRosterEntry?.displayName ??
               detail.sessions[0]?.participantSession.loginKey ??
               "no participant sessions"
           },
@@ -380,13 +409,26 @@ export class WorkspaceViewFacade {
         ]
       })),
       ...detail.sessions.map(session => ({
-        headline: session.participantSession.loginKey,
-        subline: session.participantSession.participantSessionId,
+        headline: this.monitorParticipantLabel(session),
+        subline: session.participantSession.loginKey,
         badges: [
+          session.participantRosterEntry ? "roster" : "ad hoc",
           session.participantSession.status,
           session.latestTestRun?.status ?? "not started"
         ],
         rows: [
+          {
+            label: "Display Name",
+            value: session.participantRosterEntry?.displayName ?? "none"
+          },
+          {
+            label: "Session",
+            value: session.participantSession.participantSessionId
+          },
+          {
+            label: "Booklet",
+            value: session.participantRosterEntry?.bookletKey ?? "none"
+          },
           { label: "Runs", value: String(session.testRunCount) },
           { label: "Responses", value: String(session.responseCount) },
           { label: "Reviews", value: String(session.reviewCount) },
@@ -428,10 +470,22 @@ export class WorkspaceViewFacade {
         actionPayload: { unitKey: unit.unitKey }
       })),
       ...detail.testRuns.map(item => ({
-        headline: item.testRun.testRunId,
-        subline: item.participantSession?.loginKey ?? "unknown participant",
-        badges: [item.testRun.status, item.testRun.bookletKey],
+        headline: this.monitorParticipantLabel(item),
+        subline: item.testRun.testRunId,
+        badges: [
+          item.participantRosterEntry ? "roster" : "ad hoc",
+          item.testRun.status,
+          item.testRun.bookletKey
+        ],
         rows: [
+          {
+            label: "Login",
+            value: this.monitorParticipantLogin(item)
+          },
+          {
+            label: "Display Name",
+            value: item.participantRosterEntry?.displayName ?? "none"
+          },
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
           { label: "Responses", value: String(item.responseCount) },
           { label: "Reviews", value: String(item.reviewCount) },
@@ -510,14 +564,23 @@ export class WorkspaceViewFacade {
         ]
       })),
       ...detail.testRuns.map(item => ({
-        headline: item.participantSession?.loginKey ?? "unknown participant",
+        headline: this.monitorParticipantLabel(item),
         subline: item.testRun.testRunId,
         badges: [
+          item.participantRosterEntry ? "roster" : "ad hoc",
           item.testRun.status,
           item.answered ? "answered" : "missing",
           `${item.reviewCount} review(s)`
         ],
         rows: [
+          {
+            label: "Login",
+            value: this.monitorParticipantLogin(item)
+          },
+          {
+            label: "Display Name",
+            value: item.participantRosterEntry?.displayName ?? "none"
+          },
           {
             label: "Group",
             value: item.participantSession?.groupKey ?? "unknown group"
