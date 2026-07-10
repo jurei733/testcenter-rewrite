@@ -4417,6 +4417,11 @@ export const createFirstSliceServices = (
               participantSession.contentReleaseId === contentRelease.contentReleaseId
           )
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
         const sessionIds = new Set(
           participantSessions.map(
             participantSession => participantSession.participantSessionId
@@ -4469,6 +4474,7 @@ export const createFirstSliceServices = (
           importJob,
           sourcePackage,
           participantSessions,
+          participantRosterEntries,
           testRuns,
           previousActivatedContentReleaseId,
           nextActivatedContentReleaseId,

@@ -1149,30 +1149,51 @@ export class ContentViewFacade {
       this.content.contentReleaseDetailView
     );
     const detail = payload?.contentReleaseDetail;
+    const rosterEntriesByLoginKey = new Map(
+      detail?.participantRosterEntries.map(entry => [entry.loginKey, entry]) ?? []
+    );
     return (
-      detail?.participantSessions.map(participantSession => ({
-        headline: participantSession.loginKey,
-        subline: participantSession.participantSessionId,
-        badges: [participantSession.status, participantSession.groupKey],
-        rows: [
-          {
-            label: "Created",
-            value: this.formatDateTime(participantSession.createdAt)
-          },
-          {
-            label: "Release",
-            value: detail.contentRelease.releaseLabel
+      detail?.participantSessions.map(participantSession => {
+        const rosterEntry = rosterEntriesByLoginKey.get(participantSession.loginKey);
+        const displayName = rosterEntry?.displayName;
+        return {
+          headline: displayName ?? participantSession.loginKey,
+          subline: displayName
+            ? participantSession.loginKey
+            : participantSession.participantSessionId,
+          badges: [
+            participantSession.status,
+            participantSession.groupKey,
+            rosterEntry ? "roster" : "ad hoc"
+          ],
+          rows: [
+            {
+              label: "Session",
+              value: participantSession.participantSessionId
+            },
+            {
+              label: "Booklet",
+              value: rosterEntry?.bookletKey ?? "none"
+            },
+            {
+              label: "Created",
+              value: this.formatDateTime(participantSession.createdAt)
+            },
+            {
+              label: "Release",
+              value: detail.contentRelease.releaseLabel
+            }
+          ],
+          selected:
+            this.uiState.runtime.participantSessionId.trim() ===
+            participantSession.participantSessionId,
+          actionLabel: "Open In Runtime",
+          actionPayload: {
+            participantSessionId: participantSession.participantSessionId,
+            loginKey: participantSession.loginKey
           }
-        ],
-        selected:
-          this.uiState.runtime.participantSessionId.trim() ===
-          participantSession.participantSessionId,
-        actionLabel: "Open In Runtime",
-        actionPayload: {
-          participantSessionId: participantSession.participantSessionId,
-          loginKey: participantSession.loginKey
-        }
-      })) ?? []
+        };
+      }) ?? []
     );
   }
 
@@ -1181,17 +1202,34 @@ export class ContentViewFacade {
       this.content.contentReleaseDetailView
     );
     const detail = payload?.contentReleaseDetail;
+    const rosterEntriesByLoginKey = new Map(
+      detail?.participantRosterEntries.map(entry => [entry.loginKey, entry]) ?? []
+    );
     return (
       detail?.testRuns.map(testRun => {
         const matchingParticipantSession = detail.participantSessions.find(
           participantSession =>
             participantSession.participantSessionId === testRun.participantSessionId
         );
+        const rosterEntry = matchingParticipantSession
+          ? rosterEntriesByLoginKey.get(matchingParticipantSession.loginKey)
+          : undefined;
+        const displayName = rosterEntry?.displayName;
         return {
-          headline: testRun.testRunId,
-          subline: matchingParticipantSession?.loginKey ?? testRun.participantSessionId,
-          badges: [testRun.status, testRun.bookletKey],
+          headline: displayName ?? matchingParticipantSession?.loginKey ?? testRun.testRunId,
+          subline: displayName
+            ? matchingParticipantSession?.loginKey ?? testRun.participantSessionId
+            : testRun.testRunId,
+          badges: [
+            testRun.status,
+            testRun.bookletKey,
+            rosterEntry ? "roster" : "ad hoc"
+          ],
           rows: [
+            {
+              label: "Run",
+              value: testRun.testRunId
+            },
             {
               label: "Current Unit",
               value: testRun.currentUnitKey ?? "none"

@@ -516,6 +516,7 @@ export type WorkspaceContentReleaseDetail = {
   importJob: ImportJob | null;
   sourcePackage: SourcePackage | null;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   previousActivatedContentReleaseId: string | null;
   nextActivatedContentReleaseId: string | null;

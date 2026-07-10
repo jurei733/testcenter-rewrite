@@ -3310,6 +3310,35 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
     "Roster Runtime"
   );
 
+  const contentReleaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      participantRosterEntries: Array<{
+        loginKey: string;
+        displayName: string | null;
+        bookletKey: string | null;
+      }>;
+      participantSessions: Array<{ loginKey: string; participantSessionId: string }>;
+      testRuns: Array<{ testRunId: string; participantSessionId: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+  assert.equal(contentReleaseDetail.status, 200);
+  assert.equal(
+    contentReleaseDetail.body.contentReleaseDetail.participantRosterEntries.find(
+      entry => entry.loginKey === "roster-runtime-student"
+    )?.displayName,
+    "Roster Runtime"
+  );
+  assert.equal(
+    contentReleaseDetail.body.contentReleaseDetail.participantSessions[0]?.loginKey,
+    "roster-runtime-student"
+  );
+  assert.equal(
+    contentReleaseDetail.body.contentReleaseDetail.testRuns[0]?.testRunId,
+    resumed.body.testRun.testRunId
+  );
+
   const saved = await requestJson<{
     testRun: { unitResponses: Record<string, string> };
   }>(`/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`, {
