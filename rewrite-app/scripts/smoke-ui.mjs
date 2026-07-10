@@ -1277,6 +1277,27 @@ try {
     .filter({ hasText: "2 not started" })
     .filter({ hasText: "Roster Entries" })
     .waitFor();
+  await clickCardAction("Study Monitor", "Open Group Detail", "group:entry-smoke");
+  await page.waitForFunction(
+    () => {
+      const detailCard = Array.from(document.querySelectorAll("article.card")).find(
+        card =>
+          card.querySelector("h3")?.textContent?.trim() ===
+          "Study Monitor Group Detail"
+      );
+      return (
+        detailCard?.textContent?.includes("group:entry-smoke") &&
+        detailCard.textContent.includes("entry-student-a") &&
+        detailCard.textContent.includes("Ada Entry") &&
+        detailCard.textContent.includes("entry-student-b") &&
+        detailCard.textContent.includes("Ben Entry") &&
+        detailCard.textContent.includes("not signed in") &&
+        detailCard.textContent.includes("booklet:starter")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })

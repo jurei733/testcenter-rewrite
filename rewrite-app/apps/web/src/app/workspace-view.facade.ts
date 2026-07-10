@@ -271,6 +271,10 @@ export class WorkspaceViewFacade {
       return [];
     }
 
+    const signedInRosterLoginKeys = new Set(
+      detail.sessions.map(session => session.participantSession.loginKey)
+    );
+
     return [
       {
         headline: detail.groupKey,
@@ -313,6 +317,33 @@ export class WorkspaceViewFacade {
           }
         ]
       },
+      ...detail.rosterEntries.map(rosterEntry => ({
+        headline: rosterEntry.displayName ?? rosterEntry.loginKey,
+        subline: rosterEntry.loginKey,
+        badges: [
+          "roster entry",
+          rosterEntry.bookletKey ? rosterEntry.bookletKey : "no booklet",
+          signedInRosterLoginKeys.has(rosterEntry.loginKey)
+            ? "signed in"
+            : "not signed in"
+        ],
+        rows: [
+          { label: "Login", value: rosterEntry.loginKey },
+          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Booklet",
+            value: rosterEntry.bookletKey ?? "none"
+          },
+          {
+            label: "Display Name",
+            value: rosterEntry.displayName ?? "none"
+          },
+          {
+            label: "Imported",
+            value: this.formatDateTime(rosterEntry.importedAt)
+          }
+        ]
+      })),
       ...detail.sessions.map(session => ({
         headline: session.participantSession.loginKey,
         subline: session.participantSession.participantSessionId,
