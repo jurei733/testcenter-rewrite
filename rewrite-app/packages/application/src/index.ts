@@ -730,6 +730,18 @@ const normalizeParticipantSessionId = (value: unknown): string => {
   return value.trim();
 };
 
+const normalizeTestRunId = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FirstSliceError(
+      400,
+      "test_run_id_required",
+      "testRunId is required."
+    );
+  }
+
+  return value.trim();
+};
+
 const normalizeOptionalRuntimeBookletKey = (value: unknown): string | undefined => {
   if (value === undefined || value === null) {
     return undefined;
@@ -6511,13 +6523,14 @@ export const createFirstSliceServices = (
         });
       },
       async saveProgress(input) {
-        const storedTestRun = await repository.getTestRunById(input.testRunId);
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
-            `Test run '${input.testRunId}' was not found.`
+            `Test run '${testRunId}' was not found.`
           );
         }
 
@@ -6526,7 +6539,7 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "test_run_already_completed",
-            `Test run '${input.testRunId}' is already completed.`
+            `Test run '${testRunId}' is already completed.`
           );
         }
 
@@ -6574,13 +6587,14 @@ export const createFirstSliceServices = (
         return updatedRun;
       },
       async resumeRun(input) {
-        const storedTestRun = await repository.getTestRunById(input.testRunId);
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
-            `Test run '${input.testRunId}' was not found.`
+            `Test run '${testRunId}' was not found.`
           );
         }
 
@@ -6589,7 +6603,7 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "test_run_already_completed",
-            `Test run '${input.testRunId}' is already completed.`
+            `Test run '${testRunId}' is already completed.`
           );
         }
 
@@ -6617,13 +6631,14 @@ export const createFirstSliceServices = (
         return resumedRun;
       },
       async completeRun(input) {
-        const storedTestRun = await repository.getTestRunById(input.testRunId);
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
           throw new FirstSliceError(
             404,
             "test_run_not_found",
-            `Test run '${input.testRunId}' was not found.`
+            `Test run '${testRunId}' was not found.`
           );
         }
 

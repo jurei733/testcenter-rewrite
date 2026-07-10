@@ -1396,6 +1396,40 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(invalidCurrentUnitSave.status, 400);
     assert.equal(invalidCurrentUnitSave.body.error, "current_unit_key_invalid");
 
+    const invalidSaveTestRunId = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/test-runs/%20/save-progress",
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: "This should not be stored either"
+        }
+      }
+    );
+
+    assert.equal(invalidSaveTestRunId.status, 400);
+    assert.equal(invalidSaveTestRunId.body.error, "test_run_id_required");
+
+    const invalidResumeTestRunId = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/test-runs/%20/resume",
+      { method: "POST" }
+    );
+
+    assert.equal(invalidResumeTestRunId.status, 400);
+    assert.equal(invalidResumeTestRunId.body.error, "test_run_id_required");
+
+    const invalidCompleteTestRunId = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/test-runs/%20/complete",
+      { method: "POST" }
+    );
+
+    assert.equal(invalidCompleteTestRunId.status, 400);
+    assert.equal(invalidCompleteTestRunId.body.error, "test_run_id_required");
+
     const missingLaunchSession = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/participant/starter:launch",
