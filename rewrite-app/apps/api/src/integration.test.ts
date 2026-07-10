@@ -3219,9 +3219,24 @@ test("participant sign-in reuses an open session for the active release", async 
     }
   );
 
+  const blankSignIn = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        workspaceKey,
+        loginKey: "   "
+      }
+    }
+  );
+
+  assert.equal(blankSignIn.status, 400);
+  assert.equal(blankSignIn.body.error, "participant_login_key_required");
+
   const firstSignIn = await requestJson<{
     participantSession: {
       participantSessionId: string;
+      loginKey: string;
       groupKey: string;
       status: string;
     };
@@ -3229,7 +3244,7 @@ test("participant sign-in reuses an open session for the active release", async 
     method: "POST",
     body: {
       workspaceKey,
-      loginKey: "reentry-student",
+      loginKey: " reentry-student ",
       groupKey: "group:custom-reentry"
     }
   });
@@ -3245,6 +3260,7 @@ test("participant sign-in reuses an open session for the active release", async 
   });
 
   assert.equal(secondSignIn.status, 200);
+  assert.equal(firstSignIn.body.participantSession.loginKey, "reentry-student");
   assert.equal(firstSignIn.body.participantSession.groupKey, "group:custom-reentry");
   assert.equal(
     secondSignIn.body.participantSession.participantSessionId,

@@ -692,6 +692,19 @@ const normalizeTestRunProgressStatus = (value: unknown): TestRunStatus => {
   return value as TestRunStatus;
 };
 
+const normalizeParticipantLoginKey = (value: unknown): string => {
+  const loginKey = String(value ?? "").trim();
+  if (!loginKey) {
+    throw new FirstSliceError(
+      400,
+      "participant_login_key_required",
+      "Participant loginKey is required."
+    );
+  }
+
+  return loginKey;
+};
+
 const normalizeAdminRole = (value: unknown): AdminRole => {
   if (typeof value !== "string" || !ADMIN_ROLES.includes(value as AdminRole)) {
     throw new FirstSliceError(
@@ -6081,6 +6094,7 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantRuntime: {
       async signIn(input) {
+        const loginKey = normalizeParticipantLoginKey(input.loginKey);
         const workspace = await repository.getWorkspaceByWorkspaceKey(
           input.workspaceKey
         );
@@ -6111,11 +6125,11 @@ export const createFirstSliceServices = (
           repository,
           workspace.tenantId,
           workspace.workspaceId,
-          input.loginKey
+          loginKey
         );
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
-          requestedGroupKey || rosterEntry?.groupKey || `group:${input.loginKey}`;
+          requestedGroupKey || rosterEntry?.groupKey || `group:${loginKey}`;
 
         const reusableSession = (
           await repository.listParticipantSessionsByWorkspace(
@@ -6125,7 +6139,7 @@ export const createFirstSliceServices = (
         )
           .filter(
             participantSession =>
-              participantSession.loginKey === input.loginKey &&
+              participantSession.loginKey === loginKey &&
               participantSession.groupKey === groupKey &&
               participantSession.contentReleaseId ===
                 activeRelease.contentReleaseId &&
@@ -6157,7 +6171,7 @@ export const createFirstSliceServices = (
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           contentReleaseId: activeRelease.contentReleaseId,
-          loginKey: input.loginKey,
+          loginKey,
           groupKey,
           status: "signed_in",
           createdAt: now()
