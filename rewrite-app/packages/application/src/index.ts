@@ -1011,6 +1011,19 @@ const parseParticipantRosterText = (
     });
 };
 
+const findParticipantRosterEntryByLoginKey = async (
+  repository: FirstSliceRepository,
+  tenantId: string,
+  workspaceId: string,
+  loginKey: string
+): Promise<ParticipantRosterEntry | null> => {
+  const entries = await repository.listParticipantRosterEntriesByWorkspace(
+    tenantId,
+    workspaceId
+  );
+  return entries.find(entry => entry.loginKey === loginKey) ?? null;
+};
+
 const resolveAdminRoleScope = async (
   repository: FirstSliceRepository,
   input: AdminRoleAssignmentInput
@@ -5124,8 +5137,6 @@ export const createFirstSliceServices = (
         const workspace = await repository.getWorkspaceByWorkspaceKey(
           input.workspaceKey
         );
-        const requestedGroupKey = String(input.groupKey ?? "").trim();
-        const groupKey = requestedGroupKey || `group:${input.loginKey}`;
 
         if (!workspace) {
           throw new FirstSliceError(
@@ -5148,6 +5159,16 @@ export const createFirstSliceServices = (
             `Workspace '${input.workspaceKey}' has no active content release.`
           );
         }
+
+        const rosterEntry = await findParticipantRosterEntryByLoginKey(
+          repository,
+          workspace.tenantId,
+          workspace.workspaceId,
+          input.loginKey
+        );
+        const requestedGroupKey = String(input.groupKey ?? "").trim();
+        const groupKey =
+          requestedGroupKey || rosterEntry?.groupKey || `group:${input.loginKey}`;
 
         const reusableSession = (
           await repository.listParticipantSessionsByWorkspace(
@@ -5177,6 +5198,7 @@ export const createFirstSliceServices = (
               loginKey: reusableSession.loginKey,
               groupKey: reusableSession.groupKey,
               contentReleaseId: reusableSession.contentReleaseId,
+              rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
               reused: true
             }
           });
@@ -5204,7 +5226,8 @@ export const createFirstSliceServices = (
           details: {
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
-            contentReleaseId: participantSession.contentReleaseId
+            contentReleaseId: participantSession.contentReleaseId,
+            rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
           }
         });
         return participantSession;
@@ -5309,17 +5332,32 @@ export const createFirstSliceServices = (
         }
 
         const requestedBookletKey = String(input.bookletKey ?? "").trim();
-        const selectedBooklet = requestedBookletKey
+        const rosterEntry = requestedBookletKey
+          ? null
+          : await findParticipantRosterEntryByLoginKey(
+              repository,
+              participantSession.tenantId,
+              participantSession.workspaceId,
+              participantSession.loginKey
+            );
+        const rosterBookletKey = rosterEntry?.bookletKey?.trim() ?? "";
+        const effectiveBookletKey = requestedBookletKey || rosterBookletKey;
+        const bookletSource = requestedBookletKey
+          ? "request"
+          : rosterBookletKey
+            ? "participant_roster"
+            : "active_release_default";
+        const selectedBooklet = effectiveBookletKey
           ? contentRelease.runtimeSnapshot.bookletEntries.find(
-              booklet => booklet.bookletKey === requestedBookletKey
+              booklet => booklet.bookletKey === effectiveBookletKey
             )
           : contentRelease.runtimeSnapshot.bookletEntries[0];
 
-        if (requestedBookletKey && !selectedBooklet) {
+        if (effectiveBookletKey && !selectedBooklet) {
           throw new FirstSliceError(
             404,
             "booklet_not_found",
-            `Booklet '${requestedBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
+            `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
           );
         }
 
@@ -5354,7 +5392,8 @@ export const createFirstSliceServices = (
           details: {
             participantSessionId: participantSession.participantSessionId,
             bookletKey: testRun.bookletKey,
-            currentUnitKey: testRun.currentUnitKey
+            currentUnitKey: testRun.currentUnitKey,
+            bookletSource
           }
         });
         return testRun;
