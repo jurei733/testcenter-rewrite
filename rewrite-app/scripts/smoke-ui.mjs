@@ -1239,14 +1239,27 @@ try {
       const entrySmokeGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:entry-smoke")
         : null;
+      const pausedWorkUnit = Array.isArray(summary.unitProgress)
+        ? summary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
+        : null;
+      const missingResponseCount = Array.isArray(summary.unitProgress)
+        ? summary.unitProgress.reduce(
+            (total, unit) => total + Number(unit?.missingResponseCount ?? 0),
+            0
+          )
+        : 0;
       return (
         summary.expectedParticipantCount === 4 &&
         summary.rosterEntryCount === 2 &&
         summary.participantSessionCount === 2 &&
         summary.testRunCount === 2 &&
         summary.notStartedCount === 2 &&
+        missingResponseCount === 7 &&
         Array.isArray(summary.groups) &&
         summary.groups.length === 3 &&
+        pausedWorkUnit?.rosterExpectedCount === 1 &&
+        pausedWorkUnit?.expectedRunCount === 3 &&
+        pausedWorkUnit?.missingResponseCount === 2 &&
         entrySmokeGroup?.expectedParticipantCount === 2 &&
         entrySmokeGroup?.rosterEntryCount === 2 &&
         entrySmokeGroup?.participantSessionCount === 0 &&
@@ -1265,6 +1278,7 @@ try {
     .filter({ hasText: "2 run(s)" })
     .filter({ hasText: "3 group(s)" })
     .filter({ hasText: "3 unit(s)" })
+    .filter({ hasText: "7 missing response(s)" })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "2" })
@@ -1302,8 +1316,9 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
     .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "1/2 answered" })
-    .filter({ hasText: "1 missing" })
+    .filter({ hasText: "1/3 answered" })
+    .filter({ hasText: "2 missing" })
+    .filter({ hasText: "Roster Expected" })
     .waitFor();
   await studyMonitorCard
     .locator(".record-card")
@@ -1363,7 +1378,10 @@ try {
       );
       return (
         detailCard?.textContent?.includes("unit-paused") &&
-        detailCard.textContent.includes("1 missing") &&
+        detailCard.textContent.includes("2 missing") &&
+        detailCard.textContent.includes("Roster Expected") &&
+        detailCard.textContent.includes("entry-student-a") &&
+        detailCard.textContent.includes("Ada Entry") &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("answered")
       );

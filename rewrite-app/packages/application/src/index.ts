@@ -2330,6 +2330,7 @@ const getLatestTestRunByParticipantSessionId = (
 
 const buildStudyMonitorUnitProgress = (input: {
   participantSessions: ParticipantSession[];
+  participantRosterEntries?: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
 }): WorkspaceStudyMonitorUnitProgress[] => {
@@ -2359,6 +2360,7 @@ const buildStudyMonitorUnitProgress = (input: {
     const created: WorkspaceStudyMonitorUnitProgress = {
       unitKey,
       displayLabel,
+      rosterExpectedCount: 0,
       expectedRunCount: 0,
       responseCount: 0,
       missingResponseCount: 0,
@@ -2370,6 +2372,7 @@ const buildStudyMonitorUnitProgress = (input: {
     return created;
   };
 
+  const runLoginKeysByBookletKey = new Map<string, Set<string>>();
   for (const testRun of input.testRuns.map(normalizeTestRun)) {
     const participantSession = sessionsById.get(testRun.participantSessionId);
     const contentRelease = participantSession
@@ -2378,6 +2381,12 @@ const buildStudyMonitorUnitProgress = (input: {
     const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
       bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
     );
+    if (participantSession) {
+      const runLoginKeys =
+        runLoginKeysByBookletKey.get(testRun.bookletKey) ?? new Set<string>();
+      runLoginKeys.add(participantSession.loginKey);
+      runLoginKeysByBookletKey.set(testRun.bookletKey, runLoginKeys);
+    }
     const responseUnitKeys = new Set(Object.keys(testRun.unitResponses));
     const expectedUnitKeys = new Set<string>();
 
@@ -2417,6 +2426,33 @@ const buildStudyMonitorUnitProgress = (input: {
         testRun.updatedAt.localeCompare(progress.latestActivityAt) > 0
       ) {
         progress.latestActivityAt = testRun.updatedAt;
+      }
+    }
+  }
+  for (const rosterEntry of input.participantRosterEntries ?? []) {
+    const bookletKey = rosterEntry.bookletKey?.trim();
+    if (
+      !bookletKey ||
+      runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)
+    ) {
+      continue;
+    }
+    const booklet = input.contentReleases
+      .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+      .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
+    if (!booklet) {
+      continue;
+    }
+    for (const unitEntry of booklet.unitEntries) {
+      const progress = ensureProgress(unitEntry.unitKey, unitEntry.displayLabel);
+      progress.rosterExpectedCount += 1;
+      progress.expectedRunCount += 1;
+      progress.missingResponseCount += 1;
+      if (
+        !progress.latestActivityAt ||
+        rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
+      ) {
+        progress.latestActivityAt = rosterEntry.importedAt;
       }
     }
   }
@@ -2713,6 +2749,7 @@ const buildStudyMonitorSummary = (input: {
     }),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: input.participantSessions,
+      participantRosterEntries: input.participantRosterEntries,
       testRuns: input.testRuns,
       contentReleases: input.contentReleases
     })
@@ -2840,6 +2877,7 @@ const buildStudyMonitorGroupDetail = (input: {
     })),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: groupParticipantSessions,
+      participantRosterEntries: groupRosterEntries,
       testRuns: groupTestRuns,
       contentReleases: input.contentReleases
     })
@@ -2958,6 +2996,7 @@ const buildStudyMonitorBookletDetail = (input: {
     })),
     unitProgress: buildStudyMonitorUnitProgress({
       participantSessions: input.participantSessions,
+      participantRosterEntries: bookletRosterEntries,
       testRuns: bookletTestRuns,
       contentReleases: input.contentReleases
     })
@@ -2970,6 +3009,7 @@ const buildStudyMonitorUnitDetail = (input: {
   unitKey: string;
   generatedAt: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
@@ -2987,6 +3027,19 @@ const buildStudyMonitorUnitDetail = (input: {
       contentRelease
     ])
   );
+  const runLoginKeysByBookletKey = new Map<string, Set<string>>();
+  for (const testRun of input.testRuns.map(normalizeTestRun)) {
+    const participantSession = participantSessionsById.get(
+      testRun.participantSessionId
+    );
+    if (!participantSession) {
+      continue;
+    }
+    const runLoginKeys =
+      runLoginKeysByBookletKey.get(testRun.bookletKey) ?? new Set<string>();
+    runLoginKeys.add(participantSession.loginKey);
+    runLoginKeysByBookletKey.set(testRun.bookletKey, runLoginKeys);
+  }
   const displayLabel =
     input.contentReleases
       .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
@@ -3038,8 +3091,38 @@ const buildStudyMonitorUnitDetail = (input: {
         right.testRun.updatedAt.localeCompare(left.testRun.updatedAt) ||
         (left.participantSession?.loginKey ?? "").localeCompare(
           right.participantSession?.loginKey ?? ""
-        )
+      )
     );
+
+  const rosterEntries = input.participantRosterEntries
+    .filter(rosterEntry => {
+      const bookletKey = rosterEntry.bookletKey?.trim();
+      if (
+        !bookletKey ||
+        runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)
+      ) {
+        return false;
+      }
+      return input.contentReleases
+        .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+        .some(
+          bookletEntry =>
+            bookletEntry.bookletKey === bookletKey &&
+            bookletEntry.unitEntries.some(
+              unitEntry => unitEntry.unitKey === normalizedUnitKey
+            )
+        );
+    })
+    .sort(
+      (left, right) =>
+        left.loginKey.localeCompare(right.loginKey) ||
+        left.participantRosterEntryId.localeCompare(right.participantRosterEntryId)
+    );
+  const rosterExpectedCount = rosterEntries.length;
+  const runExpectedCount = testRuns.filter(item => item.expected).length;
+  const runMissingResponseCount = testRuns.filter(
+    item => item.expected && !item.answered
+  ).length;
 
   return {
     tenantKey: input.tenantKey,
@@ -3047,11 +3130,10 @@ const buildStudyMonitorUnitDetail = (input: {
     unitKey: normalizedUnitKey,
     displayLabel,
     generatedAt: input.generatedAt,
-    expectedRunCount: testRuns.filter(item => item.expected).length,
+    rosterExpectedCount,
+    expectedRunCount: runExpectedCount + rosterExpectedCount,
     responseCount: testRuns.filter(item => item.answered).length,
-    missingResponseCount: testRuns.filter(
-      item => item.expected && !item.answered
-    ).length,
+    missingResponseCount: runMissingResponseCount + rosterExpectedCount,
     unexpectedResponseCount: testRuns.filter(
       item => !item.expected && item.answered
     ).length,
@@ -3059,6 +3141,7 @@ const buildStudyMonitorUnitDetail = (input: {
       item => item.testRun.status === "completed"
     ).length,
     reviewCount: testRuns.reduce((total, item) => total + item.reviewCount, 0),
+    rosterEntries,
     testRuns
   };
 };
@@ -4016,9 +4099,13 @@ export const createFirstSliceServices = (
           input.workspaceKey
         );
         const unitKey = input.unitKey.trim();
-        const [participantSessions, testRuns, contentReleases, reviews] =
+        const [participantSessions, participantRosterEntries, testRuns, contentReleases, reviews] =
           await Promise.all([
             repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -4041,6 +4128,7 @@ export const createFirstSliceServices = (
           unitKey,
           generatedAt: now(),
           participantSessions,
+          participantRosterEntries,
           testRuns,
           contentReleases,
           reviews

@@ -165,6 +165,7 @@ export class WorkspaceViewFacade {
         badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
+          { label: "Roster Expected", value: String(unit.rosterExpectedCount) },
           { label: "Responses", value: String(unit.responseCount) },
           {
             label: "Unexpected Responses",
@@ -252,6 +253,7 @@ export class WorkspaceViewFacade {
         badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
+          { label: "Roster Expected", value: String(unit.rosterExpectedCount) },
           { label: "Responses", value: String(unit.responseCount) },
           {
             label: "Unexpected Responses",
@@ -408,6 +410,7 @@ export class WorkspaceViewFacade {
         badges: this.unitProgressBadges(unit),
         rows: [
           { label: "Expected Runs", value: String(unit.expectedRunCount) },
+          { label: "Roster Expected", value: String(unit.rosterExpectedCount) },
           { label: "Responses", value: String(unit.responseCount) },
           {
             label: "Unexpected Responses",
@@ -475,6 +478,10 @@ export class WorkspaceViewFacade {
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
           {
+            label: "Roster Expected",
+            value: String(detail.rosterExpectedCount)
+          },
+          {
             label: "Unexpected Responses",
             value: String(detail.unexpectedResponseCount)
           },
@@ -485,6 +492,23 @@ export class WorkspaceViewFacade {
           }
         ]
       },
+      ...detail.rosterEntries.map(rosterEntry => ({
+        headline: rosterEntry.displayName ?? rosterEntry.loginKey,
+        subline: rosterEntry.loginKey,
+        badges: ["roster expected", "missing", rosterEntry.bookletKey ?? "no booklet"],
+        rows: [
+          { label: "Login", value: rosterEntry.loginKey },
+          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Booklet",
+            value: rosterEntry.bookletKey ?? "none"
+          },
+          {
+            label: "Imported",
+            value: this.formatDateTime(rosterEntry.importedAt)
+          }
+        ]
+      })),
       ...detail.testRuns.map(item => ({
         headline: item.participantSession?.loginKey ?? "unknown participant",
         subline: item.testRun.testRunId,

@@ -362,6 +362,7 @@ export type WorkspaceStudyMonitorGroup = {
 export type WorkspaceStudyMonitorUnitProgress = {
   unitKey: string;
   displayLabel: string;
+  rosterExpectedCount: number;
   expectedRunCount: number;
   responseCount: number;
   missingResponseCount: number;
@@ -448,12 +449,14 @@ export type WorkspaceStudyMonitorUnitDetail = {
   unitKey: string;
   displayLabel: string;
   generatedAt: string;
+  rosterExpectedCount: number;
   expectedRunCount: number;
   responseCount: number;
   missingResponseCount: number;
   unexpectedResponseCount: number;
   completedRunCount: number;
   reviewCount: number;
+  rosterEntries: ParticipantRosterEntry[];
   testRuns: WorkspaceStudyMonitorUnitRun[];
 };
 

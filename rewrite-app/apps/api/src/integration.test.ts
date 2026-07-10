@@ -3191,6 +3191,49 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
     ["booklet_not_found_in_active_release"]
   );
 
+  const rosterMonitorSummary = await requestJson<{
+    studyMonitorSummary: {
+      unitProgress: Array<{
+        unitKey: string;
+        rosterExpectedCount: number;
+        expectedRunCount: number;
+        responseCount: number;
+        missingResponseCount: number;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`
+  );
+  const betaUnitProgress =
+    rosterMonitorSummary.body.studyMonitorSummary.unitProgress.find(
+      unit => unit.unitKey === "unit-beta-1"
+    );
+  assert.equal(betaUnitProgress?.rosterExpectedCount, 1);
+  assert.equal(betaUnitProgress?.expectedRunCount, 1);
+  assert.equal(betaUnitProgress?.responseCount, 0);
+  assert.equal(betaUnitProgress?.missingResponseCount, 1);
+
+  const rosterUnitDetail = await requestJson<{
+    studyMonitorUnit: {
+      rosterExpectedCount: number;
+      expectedRunCount: number;
+      responseCount: number;
+      missingResponseCount: number;
+      rosterEntries: Array<{ loginKey: string; displayName: string | null }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/units/unit-beta-1`
+  );
+  assert.equal(rosterUnitDetail.status, 200);
+  assert.equal(rosterUnitDetail.body.studyMonitorUnit.rosterExpectedCount, 1);
+  assert.equal(rosterUnitDetail.body.studyMonitorUnit.expectedRunCount, 1);
+  assert.equal(rosterUnitDetail.body.studyMonitorUnit.responseCount, 0);
+  assert.equal(rosterUnitDetail.body.studyMonitorUnit.missingResponseCount, 1);
+  assert.equal(
+    rosterUnitDetail.body.studyMonitorUnit.rosterEntries[0]?.loginKey,
+    "roster-runtime-student"
+  );
+
   const signIn = await requestJson<{
     participantSession: {
       participantSessionId: string;
