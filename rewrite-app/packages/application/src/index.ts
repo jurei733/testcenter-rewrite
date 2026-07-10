@@ -705,6 +705,19 @@ const normalizeParticipantLoginKey = (value: unknown): string => {
   return loginKey;
 };
 
+const normalizeParticipantWorkspaceKey = (value: unknown): string => {
+  const workspaceKey = String(value ?? "").trim();
+  if (!workspaceKey) {
+    throw new FirstSliceError(
+      400,
+      "participant_workspace_key_required",
+      "Participant workspaceKey is required."
+    );
+  }
+
+  return workspaceKey;
+};
+
 const normalizeAdminRole = (value: unknown): AdminRole => {
   if (typeof value !== "string" || !ADMIN_ROLES.includes(value as AdminRole)) {
     throw new FirstSliceError(
@@ -6094,16 +6107,17 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantRuntime: {
       async signIn(input) {
+        const workspaceKey = normalizeParticipantWorkspaceKey(input.workspaceKey);
         const loginKey = normalizeParticipantLoginKey(input.loginKey);
         const workspace = await repository.getWorkspaceByWorkspaceKey(
-          input.workspaceKey
+          workspaceKey
         );
 
         if (!workspace) {
           throw new FirstSliceError(
             404,
             "workspace_not_found",
-            `Workspace '${input.workspaceKey}' was not found.`
+            `Workspace '${workspaceKey}' was not found.`
           );
         }
 
