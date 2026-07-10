@@ -2796,7 +2796,8 @@ test("source document import accepts nested testcenter package manifests", async
                     label: "Math A",
                     resources: [
                       { path: "units/addition.xml", title: "Addition" },
-                      { fileName: "units/subtraction.xml", displayName: "Subtraction" }
+                      { fileName: "units/subtraction.xml", displayName: "Subtraction" },
+                      "units/multiplication.xml"
                     ]
                   }
                 ]
@@ -2858,7 +2859,11 @@ test("source document import accepts nested testcenter package manifests", async
           displayLabel: "Math A",
           unitEntries: [
             { unitKey: "units/addition.xml", displayLabel: "Addition" },
-            { unitKey: "units/subtraction.xml", displayLabel: "Subtraction" }
+            { unitKey: "units/subtraction.xml", displayLabel: "Subtraction" },
+            {
+              unitKey: "units/multiplication.xml",
+              displayLabel: "Unit units/multiplication.xml"
+            }
           ]
         },
         {

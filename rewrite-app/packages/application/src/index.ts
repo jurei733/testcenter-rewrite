@@ -2164,6 +2164,13 @@ const normalizeParsedJsonContentStructure = (
           ).trim(),
           unitEntries: rawUnits
             .map(rawUnit => {
+              if (typeof rawUnit === "string") {
+                return {
+                  unitKey: rawUnit.trim(),
+                  displayLabel: ""
+                };
+              }
+
               if (typeof rawUnit !== "object" || rawUnit === null) {
                 return null;
               }
