@@ -1962,6 +1962,195 @@ const readXmlAttribute = (
   return undefined;
 };
 
+const readXmlChildText = (
+  content: string,
+  ...candidateTagNames: string[]
+): string | undefined => {
+  for (const tagName of candidateTagNames) {
+    const match = content.match(
+      new RegExp(
+        `<((?:[a-zA-Z_][\\w.-]*:)?${tagName})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`,
+        "i"
+      )
+    );
+    const value = match?.[2]?.replace(/<[^>]+>/g, "").trim();
+    if (value) {
+      return decodeXmlAttributeValue(value);
+    }
+  }
+  return undefined;
+};
+
+type XmlManifestResource = {
+  key: string;
+  displayLabel: string;
+};
+
+const collectXmlManifestResources = (
+  sourceDocument: string
+): Map<string, XmlManifestResource> => {
+  const resources = new Map<string, XmlManifestResource>();
+
+  for (const resourceMatch of sourceDocument.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?resource)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+  )) {
+    const resourceAttributes = parseXmlAttributes(resourceMatch[2] ?? "");
+    const identifier = normalizeManifestToken(
+      readXmlAttribute(resourceAttributes, "identifier", "id", "key")
+    );
+    if (!identifier) {
+      continue;
+    }
+
+    const resourceContent = resourceMatch[3] ?? "";
+    const fileMatch = resourceContent.match(
+      /<((?:[a-zA-Z_][\w.-]*:)?file)\b([^>]*?)(?:\/>|>[\s\S]*?<\/\1>)/i
+    );
+    const fileAttributes = fileMatch ? parseXmlAttributes(fileMatch[2] ?? "") : {};
+    const key = normalizeManifestToken(
+      readXmlAttribute(resourceAttributes, "href", "path", "src", "uri") ??
+        readXmlAttribute(fileAttributes, "href", "path", "src", "uri") ??
+        identifier
+    );
+    const displayLabel = normalizeManifestLabel(
+      readXmlAttribute(
+        resourceAttributes,
+        "displayLabel",
+        "label",
+        "title",
+        "name",
+        "displayName"
+      ) ?? readXmlChildText(resourceContent, "title", "label"),
+      "Resource",
+      key
+    );
+
+    resources.set(identifier, { key, displayLabel });
+  }
+
+  return resources;
+};
+
+type XmlManifestItemNode = {
+  attributes: Record<string, string>;
+  children: XmlManifestItemNode[];
+  contentStart: number;
+  contentEnd: number;
+};
+
+const collectXmlManifestItems = (sourceDocument: string): XmlManifestItemNode[] => {
+  const root: XmlManifestItemNode = {
+    attributes: {},
+    children: [],
+    contentStart: 0,
+    contentEnd: sourceDocument.length
+  };
+  const stack: XmlManifestItemNode[] = [root];
+
+  for (const match of sourceDocument.matchAll(
+    /<(\/)?((?:[a-zA-Z_][\w.-]*:)?item)\b([^>]*?)(\/?)>/gi
+  )) {
+    if (match[1]) {
+      const current = stack.pop();
+      if (current && current !== root) {
+        current.contentEnd = match.index ?? current.contentEnd;
+      }
+      if (stack.length === 0) {
+        stack.push(root);
+      }
+      continue;
+    }
+
+    const node: XmlManifestItemNode = {
+      attributes: parseXmlAttributes(match[3] ?? ""),
+      children: [],
+      contentStart: (match.index ?? 0) + match[0].length,
+      contentEnd: (match.index ?? 0) + match[0].length
+    };
+    stack.at(-1)?.children.push(node);
+
+    if (!match[4]) {
+      stack.push(node);
+    }
+  }
+
+  return root.children;
+};
+
+const collectXmlOrganizationBookletEntries = (
+  sourceDocument: string
+): SourcePackageContentStructure["bookletEntries"] => {
+  const resources = collectXmlManifestResources(sourceDocument);
+  if (resources.size === 0) {
+    return [];
+  }
+
+  return collectXmlManifestItems(sourceDocument)
+    .map(item => {
+      const bookletReference = normalizeManifestToken(
+        readXmlAttribute(item.attributes, "identifierref", "identifierRef", "ref")
+      );
+      const bookletResource = resources.get(bookletReference);
+      if (!bookletReference || !bookletResource || item.children.length === 0) {
+        return null;
+      }
+
+      const bookletContent = sourceDocument.slice(item.contentStart, item.contentEnd);
+      return {
+        bookletKey: bookletResource.key,
+        displayLabel: normalizeManifestToken(
+          readXmlChildText(bookletContent, "title", "label") ??
+            readXmlAttribute(
+              item.attributes,
+              "displayLabel",
+              "label",
+              "title",
+              "name",
+              "displayName"
+            ) ??
+            bookletResource.displayLabel
+        ),
+        unitEntries: item.children
+          .map(unitItem => {
+            const unitReference = normalizeManifestToken(
+              readXmlAttribute(
+                unitItem.attributes,
+                "identifierref",
+                "identifierRef",
+                "ref"
+              )
+            );
+            const unitResource = resources.get(unitReference);
+            if (!unitReference || !unitResource) {
+              return null;
+            }
+
+            const unitContent = sourceDocument.slice(
+              unitItem.contentStart,
+              unitItem.contentEnd
+            );
+            return {
+              unitKey: unitResource.key,
+              displayLabel: normalizeManifestToken(
+                readXmlChildText(unitContent, "title", "label") ??
+                  readXmlAttribute(
+                    unitItem.attributes,
+                    "displayLabel",
+                    "label",
+                    "title",
+                    "name",
+                    "displayName"
+                  ) ??
+                  unitResource.displayLabel
+              )
+            };
+          })
+          .filter(Boolean) as SourcePackageContentStructure["bookletEntries"][number]["unitEntries"]
+      };
+    })
+    .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
+};
+
 const collectXmlBookletEntries = (
   sourceDocument: string,
   bookletTagNames: string
@@ -2063,6 +2252,14 @@ const normalizeParsedXmlContentStructure = (
 
   if (specificBookletEntries.length > 0) {
     return normalizeContentStructure({ bookletEntries: specificBookletEntries });
+  }
+
+  const organizationBookletEntries =
+    collectXmlOrganizationBookletEntries(sourceDocument);
+  if (organizationBookletEntries.length > 0) {
+    return normalizeContentStructure({
+      bookletEntries: organizationBookletEntries
+    });
   }
 
   return normalizeContentStructure({
