@@ -373,8 +373,11 @@ export type WorkspaceStudyMonitorUnitProgress = {
 export type WorkspaceStudyMonitorBookletProgress = {
   bookletKey: string;
   displayLabel: string;
+  expectedParticipantCount: number;
+  rosterEntryCount: number;
   participantSessionCount: number;
   testRunCount: number;
+  notStartedCount: number;
   createdCount: number;
   runningCount: number;
   pausedCount: number;
@@ -460,8 +463,11 @@ export type WorkspaceStudyMonitorBookletDetail = {
   bookletKey: string;
   displayLabel: string;
   generatedAt: string;
+  expectedParticipantCount: number;
+  rosterEntryCount: number;
   participantSessionCount: number;
   testRunCount: number;
+  notStartedCount: number;
   createdCount: number;
   runningCount: number;
   pausedCount: number;
@@ -469,6 +475,7 @@ export type WorkspaceStudyMonitorBookletDetail = {
   responseCount: number;
   reviewCount: number;
   unitCount: number;
+  rosterEntries: ParticipantRosterEntry[];
   testRuns: WorkspaceStudyMonitorBookletRun[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
 };

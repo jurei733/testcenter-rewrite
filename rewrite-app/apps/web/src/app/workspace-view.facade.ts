@@ -133,14 +133,18 @@ export class WorkspaceViewFacade {
       })),
       ...summary.bookletProgress.map(booklet => ({
         headline: booklet.displayLabel,
-        subline: booklet.bookletKey,
+        subline: `${booklet.expectedParticipantCount} expected, ${booklet.participantSessionCount} session(s)`,
         badges: [
+          `${booklet.notStartedCount} not started`,
           `${booklet.runningCount} running`,
           `${booklet.pausedCount} paused`,
           `${booklet.completedCount} completed`,
           `${booklet.reviewCount} review(s)`
         ],
         rows: [
+          { label: "Booklet", value: booklet.bookletKey },
+          { label: "Roster Entries", value: String(booklet.rosterEntryCount) },
+          { label: "Not Started", value: String(booklet.notStartedCount) },
           { label: "Participant Sessions", value: String(booklet.participantSessionCount) },
           { label: "Test Runs", value: String(booklet.testRunCount) },
           { label: "Responses", value: String(booklet.responseCount) },
@@ -192,8 +196,9 @@ export class WorkspaceViewFacade {
     return [
       {
         headline: detail.displayLabel,
-        subline: detail.bookletKey,
+        subline: `${detail.expectedParticipantCount} expected, ${detail.participantSessionCount} session(s), ${detail.testRunCount} run(s)`,
         badges: [
+          `${detail.notStartedCount} not started`,
           `${detail.testRunCount} run(s)`,
           `${detail.responseCount} response(s)`,
           `${detail.reviewCount} review(s)`,
@@ -202,6 +207,9 @@ export class WorkspaceViewFacade {
         rows: [
           { label: "Tenant", value: detail.tenantKey },
           { label: "Workspace", value: detail.workspaceKey },
+          { label: "Booklet", value: detail.bookletKey },
+          { label: "Roster Entries", value: String(detail.rosterEntryCount) },
+          { label: "Not Started", value: String(detail.notStartedCount) },
           { label: "Participant Sessions", value: String(detail.participantSessionCount) },
           { label: "Created Runs", value: String(detail.createdCount) },
           { label: "Running Runs", value: String(detail.runningCount) },
@@ -213,6 +221,31 @@ export class WorkspaceViewFacade {
           }
         ]
       },
+      ...detail.rosterEntries.map(rosterEntry => ({
+        headline: rosterEntry.displayName ?? rosterEntry.loginKey,
+        subline: rosterEntry.loginKey,
+        badges: [
+          "roster entry",
+          rosterEntry.groupKey,
+          detail.testRuns.some(
+            item => item.participantSession?.loginKey === rosterEntry.loginKey
+          )
+            ? "started"
+            : "not started"
+        ],
+        rows: [
+          { label: "Login", value: rosterEntry.loginKey },
+          { label: "Group", value: rosterEntry.groupKey },
+          {
+            label: "Display Name",
+            value: rosterEntry.displayName ?? "none"
+          },
+          {
+            label: "Imported",
+            value: this.formatDateTime(rosterEntry.importedAt)
+          }
+        ]
+      })),
       ...detail.unitProgress.map(unit => ({
         headline: unit.displayLabel,
         subline: unit.unitKey,

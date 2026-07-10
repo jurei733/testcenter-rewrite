@@ -1320,6 +1320,11 @@ try {
       );
       return (
         detailCard?.textContent?.includes("booklet:starter") &&
+        detailCard.textContent.includes("3 expected") &&
+        detailCard.textContent.includes("1 not started") &&
+        detailCard.textContent.includes("Roster Entries") &&
+        detailCard.textContent.includes("entry-student-a") &&
+        detailCard.textContent.includes("Ada Entry") &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("unit-paused") &&
         detailCard.textContent.includes("run(s)")

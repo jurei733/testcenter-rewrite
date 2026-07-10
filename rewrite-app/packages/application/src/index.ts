@@ -2428,6 +2428,7 @@ const buildStudyMonitorUnitProgress = (input: {
 
 const buildStudyMonitorBookletProgress = (input: {
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
@@ -2456,27 +2457,41 @@ const buildStudyMonitorBookletProgress = (input: {
   }
   const progressByBookletKey = new Map<string, MutableBookletProgress>();
 
-  const ensureProgress = (testRun: TestRun): MutableBookletProgress => {
-    const participantSession = sessionsById.get(testRun.participantSessionId);
-    const contentRelease =
-      contentReleasesById.get(testRun.contentReleaseId) ??
-      (participantSession
-        ? contentReleasesById.get(participantSession.contentReleaseId)
-        : undefined);
+  const findBookletDisplayLabel = (
+    bookletKey: string,
+    preferredContentRelease?: ContentRelease
+  ): string => {
+    const booklet =
+      preferredContentRelease?.runtimeSnapshot.bookletEntries.find(
+        bookletEntry => bookletEntry.bookletKey === bookletKey
+      ) ??
+      input.contentReleases
+        .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+        .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
+    return booklet?.displayLabel ?? bookletKey;
+  };
+
+  const ensureProgress = (
+    bookletKey: string,
+    contentRelease?: ContentRelease
+  ): MutableBookletProgress => {
     const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
-      bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
+      bookletEntry => bookletEntry.bookletKey === bookletKey
     );
-    const existing = progressByBookletKey.get(testRun.bookletKey);
+    const existing = progressByBookletKey.get(bookletKey);
     if (existing) {
       return existing;
     }
 
     const created: MutableBookletProgress = {
-      bookletKey: testRun.bookletKey,
-      displayLabel: booklet?.displayLabel ?? testRun.bookletKey,
+      bookletKey,
+      displayLabel: booklet?.displayLabel ?? findBookletDisplayLabel(bookletKey),
+      expectedParticipantCount: 0,
+      rosterEntryCount: 0,
       participantSessionCount: 0,
       participantSessionIds: new Set<string>(),
       testRunCount: 0,
+      notStartedCount: 0,
       createdCount: 0,
       runningCount: 0,
       pausedCount: 0,
@@ -2486,14 +2501,31 @@ const buildStudyMonitorBookletProgress = (input: {
       unitCount: booklet?.unitEntries.length ?? 0,
       latestActivityAt: null
     };
-    progressByBookletKey.set(testRun.bookletKey, created);
+    progressByBookletKey.set(bookletKey, created);
     return created;
   };
 
+  const sessionLoginKeysByBookletKey = new Map<string, Set<string>>();
   for (const testRun of input.testRuns.map(normalizeTestRun)) {
-    const progress = ensureProgress(testRun);
+    const participantSession = sessionsById.get(testRun.participantSessionId);
+    const contentRelease =
+      contentReleasesById.get(testRun.contentReleaseId) ??
+      (participantSession
+        ? contentReleasesById.get(participantSession.contentReleaseId)
+        : undefined);
+    const progress = ensureProgress(testRun.bookletKey, contentRelease);
+    const previousParticipantSessionCount = progress.participantSessionIds.size;
     progress.participantSessionIds.add(testRun.participantSessionId);
     progress.participantSessionCount = progress.participantSessionIds.size;
+    if (progress.participantSessionCount > previousParticipantSessionCount) {
+      progress.expectedParticipantCount += 1;
+    }
+    if (participantSession) {
+      const sessionLoginKeys =
+        sessionLoginKeysByBookletKey.get(testRun.bookletKey) ?? new Set<string>();
+      sessionLoginKeys.add(participantSession.loginKey);
+      sessionLoginKeysByBookletKey.set(testRun.bookletKey, sessionLoginKeys);
+    }
     progress.testRunCount += 1;
     progress.responseCount += Object.keys(testRun.unitResponses).length;
     progress.reviewCount += reviewsByTestRunId.get(testRun.testRunId) ?? 0;
@@ -2511,6 +2543,26 @@ const buildStudyMonitorBookletProgress = (input: {
       testRun.updatedAt.localeCompare(progress.latestActivityAt) > 0
     ) {
       progress.latestActivityAt = testRun.updatedAt;
+    }
+  }
+  for (const rosterEntry of input.participantRosterEntries) {
+    const bookletKey = rosterEntry.bookletKey?.trim();
+    if (!bookletKey) {
+      continue;
+    }
+    const progress = ensureProgress(bookletKey);
+    progress.rosterEntryCount += 1;
+    const sessionLoginKeys =
+      sessionLoginKeysByBookletKey.get(bookletKey) ?? new Set<string>();
+    if (!sessionLoginKeys.has(rosterEntry.loginKey)) {
+      progress.expectedParticipantCount += 1;
+      progress.notStartedCount += 1;
+    }
+    if (
+      !progress.latestActivityAt ||
+      rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
+    ) {
+      progress.latestActivityAt = rosterEntry.importedAt;
     }
   }
 
@@ -2654,6 +2706,7 @@ const buildStudyMonitorSummary = (input: {
     groups,
     bookletProgress: buildStudyMonitorBookletProgress({
       participantSessions: input.participantSessions,
+      participantRosterEntries: input.participantRosterEntries,
       testRuns: input.testRuns,
       contentReleases: input.contentReleases,
       reviews: input.reviews
@@ -2799,6 +2852,7 @@ const buildStudyMonitorBookletDetail = (input: {
   bookletKey: string;
   generatedAt: string;
   participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
   testRuns: TestRun[];
   contentReleases: ContentRelease[];
   reviews: WorkspaceReview[];
@@ -2827,6 +2881,24 @@ const buildStudyMonitorBookletDetail = (input: {
   const participantSessionIds = new Set(
     bookletTestRuns.map(testRun => testRun.participantSessionId)
   );
+  const sessionLoginKeys = new Set(
+    bookletTestRuns
+      .map(testRun => participantSessionsById.get(testRun.participantSessionId))
+      .filter((participantSession): participantSession is ParticipantSession =>
+        Boolean(participantSession)
+      )
+      .map(participantSession => participantSession.loginKey)
+  );
+  const bookletRosterEntries = input.participantRosterEntries
+    .filter(rosterEntry => rosterEntry.bookletKey?.trim() === bookletKey)
+    .sort(
+      (left, right) =>
+        left.loginKey.localeCompare(right.loginKey) ||
+        left.participantRosterEntryId.localeCompare(right.participantRosterEntryId)
+    );
+  const rosterOnlyCount = bookletRosterEntries.filter(
+    rosterEntry => !sessionLoginKeys.has(rosterEntry.loginKey)
+  ).length;
   const bookletReviews = input.reviews.filter(review =>
     bookletTestRuns.some(testRun => testRun.testRunId === review.testRunId)
   );
@@ -2845,7 +2917,11 @@ const buildStudyMonitorBookletDetail = (input: {
           bookletEntry => bookletEntry.bookletKey === bookletKey
         );
       })
-      .find(Boolean) ?? null;
+      .find(Boolean) ??
+    input.contentReleases
+      .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+      .find(bookletEntry => bookletEntry.bookletKey === bookletKey) ??
+    null;
 
   return {
     tenantKey: input.tenantKey,
@@ -2853,8 +2929,11 @@ const buildStudyMonitorBookletDetail = (input: {
     bookletKey,
     displayLabel: booklet?.displayLabel ?? bookletKey,
     generatedAt: input.generatedAt,
+    expectedParticipantCount: participantSessionIds.size + rosterOnlyCount,
+    rosterEntryCount: bookletRosterEntries.length,
     participantSessionCount: participantSessionIds.size,
     testRunCount: bookletTestRuns.length,
+    notStartedCount: rosterOnlyCount,
     createdCount: bookletTestRuns.filter(testRun => testRun.status === "created")
       .length,
     runningCount: bookletTestRuns.filter(testRun => testRun.status === "running")
@@ -2868,6 +2947,7 @@ const buildStudyMonitorBookletDetail = (input: {
     ),
     reviewCount: bookletReviews.length,
     unitCount: booklet?.unitEntries.length ?? 0,
+    rosterEntries: bookletRosterEntries,
     testRuns: bookletTestRuns.map(testRun => ({
       testRun,
       participantSession:
@@ -3884,9 +3964,13 @@ export const createFirstSliceServices = (
           input.workspaceKey
         );
         const bookletKey = input.bookletKey.trim();
-        const [participantSessions, testRuns, contentReleases, reviews] =
+        const [participantSessions, participantRosterEntries, testRuns, contentReleases, reviews] =
           await Promise.all([
             repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
               workspace.tenantId,
               workspace.workspaceId
             ),
@@ -3909,12 +3993,13 @@ export const createFirstSliceServices = (
           bookletKey,
           generatedAt: now(),
           participantSessions,
+          participantRosterEntries,
           testRuns,
           contentReleases,
           reviews
         });
 
-        if (detail.testRunCount === 0) {
+        if (detail.expectedParticipantCount === 0) {
           throw new FirstSliceError(
             404,
             "study_monitor_booklet_not_found",

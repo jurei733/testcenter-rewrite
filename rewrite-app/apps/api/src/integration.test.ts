@@ -3262,6 +3262,14 @@ test("study monitor counts saved roster participants before sign-in", async () =
         participantSessionCount: number;
         notStartedCount: number;
       }>;
+      bookletProgress: Array<{
+        bookletKey: string;
+        expectedParticipantCount: number;
+        rosterEntryCount: number;
+        participantSessionCount: number;
+        testRunCount: number;
+        notStartedCount: number;
+      }>;
     };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`
@@ -3297,6 +3305,26 @@ test("study monitor counts saved roster participants before sign-in", async () =
       }
     ]
   );
+  assert.deepEqual(
+    summary.body.studyMonitorSummary.bookletProgress.map(booklet => ({
+      bookletKey: booklet.bookletKey,
+      expectedParticipantCount: booklet.expectedParticipantCount,
+      rosterEntryCount: booklet.rosterEntryCount,
+      participantSessionCount: booklet.participantSessionCount,
+      testRunCount: booklet.testRunCount,
+      notStartedCount: booklet.notStartedCount
+    })),
+    [
+      {
+        bookletKey: "booklet:starter",
+        expectedParticipantCount: 2,
+        rosterEntryCount: 2,
+        participantSessionCount: 0,
+        testRunCount: 0,
+        notStartedCount: 2
+      }
+    ]
+  );
 
   const groupDetail = await requestJson<{
     studyMonitorGroup: {
@@ -3318,6 +3346,36 @@ test("study monitor counts saved roster participants before sign-in", async () =
   assert.equal(
     groupDetail.body.studyMonitorGroup.rosterEntries[0]?.loginKey,
     "monitor-a"
+  );
+
+  const bookletDetail = await requestJson<{
+    studyMonitorBooklet: {
+      expectedParticipantCount: number;
+      rosterEntryCount: number;
+      participantSessionCount: number;
+      testRunCount: number;
+      notStartedCount: number;
+      rosterEntries: Array<{ loginKey: string; displayName: string | null }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/booklets/booklet%3Astarter`
+  );
+
+  assert.equal(bookletDetail.status, 200);
+  assert.equal(bookletDetail.body.studyMonitorBooklet.expectedParticipantCount, 2);
+  assert.equal(bookletDetail.body.studyMonitorBooklet.rosterEntryCount, 2);
+  assert.equal(bookletDetail.body.studyMonitorBooklet.participantSessionCount, 0);
+  assert.equal(bookletDetail.body.studyMonitorBooklet.testRunCount, 0);
+  assert.equal(bookletDetail.body.studyMonitorBooklet.notStartedCount, 2);
+  assert.deepEqual(
+    bookletDetail.body.studyMonitorBooklet.rosterEntries.map(entry => ({
+      loginKey: entry.loginKey,
+      displayName: entry.displayName
+    })),
+    [
+      { loginKey: "monitor-a", displayName: "Monitor Alpha" },
+      { loginKey: "monitor-b", displayName: "Monitor Beta" }
+    ]
   );
 });
 
