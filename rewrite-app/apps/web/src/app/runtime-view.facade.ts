@@ -188,6 +188,7 @@ export class RuntimeViewFacade {
     );
     return (
       payload?.items.map(entry => {
+        const validationWarnings = entry.validationWarnings ?? [];
         const link = {
           loginKey: entry.loginKey,
           groupKey: entry.groupKey,
@@ -196,11 +197,26 @@ export class RuntimeViewFacade {
         return {
           headline: entry.loginKey,
           subline: entry.displayName ?? entry.participantRosterEntryId,
-          badges: [entry.groupKey, entry.bookletKey ?? "default booklet"],
+          badges: [
+            entry.groupKey,
+            entry.bookletKey ?? "default booklet",
+            validationWarnings.length > 0
+              ? `${validationWarnings.length} warning${validationWarnings.length === 1 ? "" : "s"}`
+              : "validated"
+          ],
           rows: [
             { label: "Display Name", value: entry.displayName ?? "none" },
             { label: "Group", value: entry.groupKey },
             { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+            {
+              label: "Validation",
+              value:
+                validationWarnings.length > 0
+                  ? validationWarnings
+                      .map(warning => `${warning.code}: ${warning.message}`)
+                      .join(" | ")
+                  : "No roster warnings"
+            },
             { label: "Imported", value: this.formatDateTime(entry.importedAt) },
             {
               label: "Entry URL",

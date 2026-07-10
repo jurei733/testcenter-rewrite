@@ -3020,6 +3020,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       groupKey: string;
       bookletKey: string | null;
       displayName: string | null;
+      validationWarnings: Array<{ code: string; message: string }>;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
     method: "POST",
@@ -3040,6 +3041,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(initialImport.body.items[0]?.loginKey, "roster-a");
   assert.equal(initialImport.body.items[1]?.groupKey, "group:roster-b");
   assert.equal(initialImport.body.items[1]?.displayName, "Ben Default");
+  assert.deepEqual(
+    initialImport.body.items[0]?.validationWarnings.map(warning => warning.code),
+    ["active_content_release_missing"]
+  );
 
   const rosterAEntryId = initialImport.body.items[0]?.participantRosterEntryId;
   const updateImport = await requestJson<typeof initialImport.body>(
@@ -3063,6 +3068,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(updatedRosterA?.groupKey, "group:updated");
   assert.equal(updatedRosterA?.bookletKey, "booklet:updated");
   assert.equal(updatedRosterA?.displayName, "Ada Updated");
+  assert.deepEqual(
+    updatedRosterA?.validationWarnings.map(warning => warning.code),
+    ["active_content_release_missing"]
+  );
 
   const listedRoster = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
@@ -3137,15 +3146,34 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
     }
   );
 
-  await requestJson(
+  const validRosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      validationWarnings: Array<{ code: string; message: string }>;
+    }>;
+  }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       method: "POST",
       body: {
-        rosterText:
-          "roster-runtime-student,group:roster-runtime,booklet:beta,Roster Runtime"
+        rosterText: [
+          "roster-runtime-student,group:roster-runtime,booklet:beta,Roster Runtime",
+          "roster-runtime-invalid,group:roster-runtime,booklet:missing,Invalid Booklet"
+        ].join("\n")
       }
     }
+  );
+  assert.deepEqual(
+    validRosterImport.body.items.find(
+      item => item.loginKey === "roster-runtime-student"
+    )?.validationWarnings,
+    []
+  );
+  assert.deepEqual(
+    validRosterImport.body.items
+      .find(item => item.loginKey === "roster-runtime-invalid")
+      ?.validationWarnings.map(warning => warning.code),
+    ["booklet_not_found_in_active_release"]
   );
 
   const signIn = await requestJson<{

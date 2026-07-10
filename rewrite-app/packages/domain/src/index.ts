@@ -136,6 +136,15 @@ export type ParticipantRosterEntry = {
   importedAt: string;
 };
 
+export type ParticipantRosterValidationWarning = {
+  code: "active_content_release_missing" | "booklet_not_found_in_active_release";
+  message: string;
+};
+
+export type WorkspaceParticipantRosterItem = ParticipantRosterEntry & {
+  validationWarnings: ParticipantRosterValidationWarning[];
+};
+
 export type AdminUser = {
   adminUserId: string;
   username: string;

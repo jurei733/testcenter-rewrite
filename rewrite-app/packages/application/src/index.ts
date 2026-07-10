@@ -38,6 +38,7 @@ import type {
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
+  WorkspaceParticipantRosterItem,
   WorkspaceReview,
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
@@ -165,12 +166,12 @@ export type WorkspaceAdminReadPort = {
   }): Promise<{
     importedCount: number;
     updatedCount: number;
-    items: ParticipantRosterEntry[];
+    items: WorkspaceParticipantRosterItem[];
   }>;
   listParticipantRoster(input: {
     tenantKey: string;
     workspaceKey: string;
-  }): Promise<ParticipantRosterEntry[]>;
+  }): Promise<WorkspaceParticipantRosterItem[]>;
   getParticipantSessionDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1022,6 +1023,42 @@ const findParticipantRosterEntryByLoginKey = async (
     workspaceId
   );
   return entries.find(entry => entry.loginKey === loginKey) ?? null;
+};
+
+const buildParticipantRosterReadItems = (
+  entries: ParticipantRosterEntry[],
+  activeContentRelease: ContentRelease | undefined
+): WorkspaceParticipantRosterItem[] => {
+  const activeBookletKeys = new Set(
+    activeContentRelease?.runtimeSnapshot.bookletEntries.map(
+      booklet => booklet.bookletKey
+    ) ?? []
+  );
+
+  return entries
+    .map(entry => {
+      const validationWarnings: WorkspaceParticipantRosterItem["validationWarnings"] =
+        [];
+
+      if (entry.bookletKey && !activeContentRelease) {
+        validationWarnings.push({
+          code: "active_content_release_missing",
+          message:
+            "Booklet assignment cannot be validated because the workspace has no active content release."
+        });
+      } else if (entry.bookletKey && !activeBookletKeys.has(entry.bookletKey)) {
+        validationWarnings.push({
+          code: "booklet_not_found_in_active_release",
+          message: `Booklet '${entry.bookletKey}' is not part of the active content release.`
+        });
+      }
+
+      return {
+        ...entry,
+        validationWarnings
+      };
+    })
+    .sort((left, right) => left.loginKey.localeCompare(right.loginKey));
 };
 
 const resolveAdminRoleScope = async (
@@ -4279,8 +4316,13 @@ export const createFirstSliceServices = (
         return {
           importedCount,
           updatedCount,
-          items: Array.from(entriesByLoginKey.values()).sort((left, right) =>
-            left.loginKey.localeCompare(right.loginKey)
+          items: buildParticipantRosterReadItems(
+            Array.from(entriesByLoginKey.values()),
+            await getActiveWorkspaceRelease(
+              repository,
+              workspace.tenantId,
+              workspace.workspaceId
+            )
           )
         };
       },
@@ -4294,8 +4336,13 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        return entries.sort((left, right) =>
-          left.loginKey.localeCompare(right.loginKey)
+        return buildParticipantRosterReadItems(
+          entries,
+          await getActiveWorkspaceRelease(
+            repository,
+            workspace.tenantId,
+            workspace.workspaceId
+          )
         );
       },
       async getParticipantSessionDetail(input) {

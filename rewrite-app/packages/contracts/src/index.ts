@@ -13,7 +13,6 @@ import type {
   ImportJobStatus,
   OpenMonitorRun,
   ParticipantCurrentRunState,
-  ParticipantRosterEntry,
   ParticipantSession,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
@@ -31,6 +30,7 @@ import type {
   WorkspaceDetailedResponse,
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
+  WorkspaceParticipantRosterItem,
   WorkspaceParticipantSessionListItem,
   WorkspaceReviewListItem,
   WorkspaceActivityEventType,
@@ -452,11 +452,11 @@ export type GetParticipantSessionResponse = {
 export type ImportParticipantRosterResponse = {
   importedCount: number;
   updatedCount: number;
-  items: ParticipantRosterEntry[];
+  items: WorkspaceParticipantRosterItem[];
 };
 
 export type ListParticipantRosterResponse = {
-  items: ParticipantRosterEntry[];
+  items: WorkspaceParticipantRosterItem[];
 };
 
 export type ListDetailedResponsesResponse = {
