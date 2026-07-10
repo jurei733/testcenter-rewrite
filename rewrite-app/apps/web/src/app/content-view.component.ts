@@ -32,6 +32,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="sourceMediaType" name="sourceMediaType" [(ngModel)]="view.content.sourceMediaType" (change)="view.persistState()" />
           </label>
           <label>
+            Load Source Document File
+            <input id="sourceDocumentFile" name="sourceDocumentFile" type="file" accept=".xml,.json,application/xml,text/xml,application/json" (change)="view.loadSourceDocumentFile($event)" />
+          </label>
+          <label>
             Source Document
             <textarea id="sourceDocument" name="sourceDocument" [(ngModel)]="view.content.sourceDocument" (change)="view.persistState()"></textarea>
           </label>

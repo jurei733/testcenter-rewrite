@@ -1,4 +1,4 @@
-import { Injectable, inject } from "@angular/core";
+import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import type {
@@ -25,14 +25,17 @@ import {
 import type { RecordCollectionItem } from "./record-collection.component";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
+import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
 @Injectable({ providedIn: "root" })
 export class ContentViewFacade {
+  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly contentService = inject(RewriteAppContentService);
+  private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
@@ -56,6 +59,30 @@ export class ContentViewFacade {
     this.content.sourceMediaType = "application/xml";
     this.content.sourceDocument = DEFAULT_SOURCE_DOCUMENT;
     this.persistState();
+  }
+
+  async loadSourceDocumentFile(event: Event): Promise<void> {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const file = input.files?.[0] ?? null;
+    if (!file) {
+      return;
+    }
+
+    const sourceDocument = await file.text();
+    this.content.sourceFileName = file.name;
+    this.content.sourceMediaType = this.inferMediaTypeFromFile(file);
+    this.content.sourceDocument = sourceDocument;
+    this.persistState();
+    this.uiState.renderVersion.update(version => version + 1);
+    this.applicationRef.tick();
+    this.feedback.rememberActivity(
+      "Source Document Loaded",
+      `${file.name} loaded with ${sourceDocument.length} character(s).`
+    );
   }
 
   clearContentReadFilters(): void {
@@ -1374,6 +1401,17 @@ export class ContentViewFacade {
       return "XML source document";
     }
     return "Text source document";
+  }
+
+  private inferMediaTypeFromFile(file: File): string {
+    const normalizedName = file.name.toLowerCase();
+    if (normalizedName.endsWith(".json")) {
+      return "application/json";
+    }
+    if (normalizedName.endsWith(".xml")) {
+      return "application/xml";
+    }
+    return file.type || this.content.sourceMediaType.trim() || "text/plain";
   }
 
   private formatDateTime(value: string): string {

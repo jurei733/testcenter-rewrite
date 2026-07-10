@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -12,6 +12,8 @@ const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
+const uploadedSourceDocument =
+  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route" /><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 let smokeAdminSessionToken = "";
 
 const createSmokeFetchInit = () =>
@@ -757,6 +759,29 @@ try {
       has: page.getByRole("heading", { name: "Content Action Queue" })
     })
     .waitFor();
+  logStep("load-source-document-file");
+  const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.xml`;
+  const uploadedSourcePath = resolve(".data", uploadedSourceFileName);
+  await mkdir(dirname(uploadedSourcePath), { recursive: true });
+  await writeFile(uploadedSourcePath, uploadedSourceDocument, "utf8");
+  await page.locator("#sourceDocumentFile").setInputFiles(uploadedSourcePath);
+  await page.waitForFunction(
+    ([expectedFileName, expectedMediaType, expectedDocument]) => {
+      const sourceFileName = document.querySelector("#sourceFileName");
+      const sourceMediaType = document.querySelector("#sourceMediaType");
+      const sourceDocument = document.querySelector("#sourceDocument");
+      return (
+        sourceFileName instanceof HTMLInputElement &&
+        sourceFileName.value === expectedFileName &&
+        sourceMediaType instanceof HTMLInputElement &&
+        sourceMediaType.value === expectedMediaType &&
+        sourceDocument instanceof HTMLTextAreaElement &&
+        sourceDocument.value === expectedDocument
+      );
+    },
+    [uploadedSourceFileName, "application/xml", uploadedSourceDocument],
+    { timeout: 15_000 }
+  );
   logStep("import-and-activate-flow");
   await clickCardAction(
     "Content Action Queue",
