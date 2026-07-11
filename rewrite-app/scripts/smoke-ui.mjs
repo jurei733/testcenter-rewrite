@@ -1517,6 +1517,14 @@ try {
       const xmlEntryGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:xml-entry")
         : null;
+      const notStartedParticipants = Array.isArray(summary.notStartedParticipants)
+        ? summary.notStartedParticipants.map(entry => ({
+            loginKey: entry?.loginKey,
+            groupKey: entry?.groupKey,
+            bookletKey: entry?.bookletKey ?? null,
+            displayName: entry?.displayName ?? null
+          }))
+        : [];
       const pausedWorkUnit = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
         : null;
@@ -1532,6 +1540,27 @@ try {
         summary.participantSessionCount === 3 &&
         summary.testRunCount === 3 &&
         summary.notStartedCount === 3 &&
+        JSON.stringify(notStartedParticipants) ===
+          JSON.stringify([
+            {
+              loginKey: "entry-student-b",
+              groupKey: "group:entry-smoke",
+              bookletKey: null,
+              displayName: "Ben Entry"
+            },
+            {
+              loginKey: "entry-student-a",
+              groupKey: "group:entry-smoke",
+              bookletKey: "booklet:starter",
+              displayName: "Ada Entry"
+            },
+            {
+              loginKey: "entry-student-xml",
+              groupKey: "group:xml-entry",
+              bookletKey: null,
+              displayName: "Xml Entry"
+            }
+          ]) &&
         missingResponseCount === 9 &&
         Array.isArray(summary.groups) &&
         summary.groups.length === 5 &&
@@ -1584,6 +1613,33 @@ try {
     .filter({ hasText: "0 session(s)" })
     .filter({ hasText: "1 not started" })
     .filter({ hasText: "Roster Entries" })
+    .waitFor();
+  const notStartedParticipantsCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Not Started Participants",
+      exact: true
+    })
+  });
+  await notStartedParticipantsCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "group:entry-smoke" })
+    .filter({ hasText: "booklet:starter" })
+    .waitFor();
+  await notStartedParticipantsCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ben Entry" }) })
+    .filter({ hasText: "entry-student-b" })
+    .filter({ hasText: "group:entry-smoke" })
+    .filter({ hasText: "default booklet" })
+    .waitFor();
+  await notStartedParticipantsCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Xml Entry" }) })
+    .filter({ hasText: "entry-student-xml" })
+    .filter({ hasText: "group:xml-entry" })
+    .filter({ hasText: "default booklet" })
     .waitFor();
   await clickCardAction("Study Monitor", "Open Group Detail", "group:entry-smoke");
   await page.waitForFunction(
