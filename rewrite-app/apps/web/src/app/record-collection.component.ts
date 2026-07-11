@@ -53,6 +53,8 @@ export type RecordCollectionItem = {
                 <a
                   *ngIf="row.href; else plainRowValue"
                   [href]="row.href"
+                  [attr.aria-label]="row.label + ': ' + row.value"
+                  [attr.title]="row.value"
                   target="_blank"
                   rel="noreferrer"
                 >

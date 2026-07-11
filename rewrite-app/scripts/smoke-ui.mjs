@@ -244,6 +244,12 @@ try {
         `Expected participant entry link ${href} to include ${fragment}`
       );
     }
+    assert.equal(await link.getAttribute("target"), "_blank");
+    assert.equal(await link.getAttribute("rel"), "noreferrer");
+    assert.ok(
+      (await link.getAttribute("aria-label"))?.startsWith("Entry URL: "),
+      "Expected participant entry link to expose an Entry URL aria-label"
+    );
   };
   const waitForBusy = async stepLabel => {
     try {
