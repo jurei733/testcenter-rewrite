@@ -871,6 +871,17 @@ try {
     { waitUntil: "networkidle" }
   );
   await page.locator("#participantLoginKey").waitFor();
+  await page.getByRole("heading", { name: "Participant Test" }).waitFor();
+  assert.equal(
+    await page.locator('[data-view-nav="runtime"]').count(),
+    0,
+    "Participant route should not expose operator navigation."
+  );
+  assert.equal(
+    await page.locator("#rawDebugToggle").count(),
+    0,
+    "Participant route should not expose the raw debug toggle."
+  );
   await expectInputValue("#participantTenantKey", tenantKey);
   await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
