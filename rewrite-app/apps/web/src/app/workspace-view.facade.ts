@@ -201,6 +201,65 @@ export class WorkspaceViewFacade {
     ];
   }
 
+  get studyMonitorStatusItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
+      this.workspace.studyMonitorView
+    );
+    const summary = payload?.studyMonitorSummary;
+    if (!summary) {
+      return [];
+    }
+
+    const statusCounts = [
+      {
+        headline: "Not Started",
+        count: summary.notStartedCount,
+        badges: ["roster", "waiting"],
+        detail: "Expected participants without a launched run."
+      },
+      {
+        headline: "Running",
+        count: summary.runningCount,
+        badges: ["active", "in progress"],
+        detail: "Runs currently marked as running."
+      },
+      {
+        headline: "Paused",
+        count: summary.pausedCount,
+        badges: ["active", "paused"],
+        detail: "Runs saved as paused and resumable."
+      },
+      {
+        headline: "Completed",
+        count: summary.completedCount,
+        badges: ["closed", "complete"],
+        detail: "Runs completed by participants."
+      }
+    ];
+    const totalStatusCount = statusCounts.reduce(
+      (total, status) => total + status.count,
+      0
+    );
+
+    return statusCounts.map(status => ({
+      headline: status.headline,
+      subline: `${status.count} participant state${status.count === 1 ? "" : "s"}`,
+      badges: [
+        ...status.badges,
+        `${this.formatPercentage(status.count, totalStatusCount)}%`
+      ],
+      rows: [
+        { label: "Count", value: String(status.count) },
+        {
+          label: "Share",
+          value: `${this.formatPercentage(status.count, totalStatusCount)}%`
+        },
+        { label: "Total States", value: String(totalStatusCount) },
+        { label: "Meaning", value: status.detail }
+      ]
+    }));
+  }
+
   get studyMonitorNotStartedItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
@@ -1386,6 +1445,13 @@ export class WorkspaceViewFacade {
   private formatDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  private formatPercentage(count: number, total: number): string {
+    if (total <= 0) {
+      return "0";
+    }
+    return ((count / total) * 100).toFixed(1).replace(/\.0$/, "");
   }
 
   private buildParticipantEntryUrl(rosterEntry: {

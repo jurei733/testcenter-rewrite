@@ -133,6 +133,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Monitor Status Distribution"
+        subtitle="Fast operator split across not-started, running, paused, and completed participant states."
+        [items]="view.studyMonitorStatusItems"
+        emptyState="Refresh the study monitor to inspect participant state distribution."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Not Started Participants"
         subtitle="Expected roster participants that still have no launched run."
         [items]="view.studyMonitorNotStartedItems"

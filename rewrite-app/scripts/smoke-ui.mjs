@@ -1532,7 +1532,7 @@ try {
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await clickAction("Refresh Study Monitor");
-  await pollJsonWithPredicate(
+  const studyMonitorSummaryPayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`,
     payload => {
       const summary = payload?.studyMonitorSummary;
@@ -1613,6 +1613,30 @@ try {
       );
     }
   );
+  const studyMonitorSummary = studyMonitorSummaryPayload.studyMonitorSummary;
+  const monitorStatusTotal = [
+    studyMonitorSummary.notStartedCount,
+    studyMonitorSummary.runningCount,
+    studyMonitorSummary.pausedCount,
+    studyMonitorSummary.completedCount
+  ].reduce((total, count) => total + Number(count ?? 0), 0);
+  const formatMonitorStatusPercent = count =>
+    monitorStatusTotal <= 0
+      ? "0"
+      : ((Number(count ?? 0) / monitorStatusTotal) * 100)
+          .toFixed(1)
+          .replace(/\.0$/, "");
+  const expectMonitorStatusCard = async (headline, count, meaning) => {
+    await monitorStatusDistributionCard
+      .locator(".record-card")
+      .filter({ has: page.getByRole("heading", { name: headline }) })
+      .filter({
+        hasText: `${count} participant state${count === 1 ? "" : "s"}`
+      })
+      .filter({ hasText: `${formatMonitorStatusPercent(count)}%` })
+      .filter({ hasText: meaning })
+      .waitFor();
+  };
   const studyMonitorCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Study Monitor", exact: true })
   });
@@ -1629,6 +1653,32 @@ try {
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })
     .waitFor();
+  const monitorStatusDistributionCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Monitor Status Distribution",
+      exact: true
+    })
+  });
+  await expectMonitorStatusCard(
+    "Not Started",
+    studyMonitorSummary.notStartedCount,
+    "Expected participants without a launched run."
+  );
+  await expectMonitorStatusCard(
+    "Running",
+    studyMonitorSummary.runningCount,
+    "Runs currently marked as running."
+  );
+  await expectMonitorStatusCard(
+    "Paused",
+    studyMonitorSummary.pausedCount,
+    "Runs saved as paused and resumable."
+  );
+  await expectMonitorStatusCard(
+    "Completed",
+    studyMonitorSummary.completedCount,
+    "Runs completed by participants."
+  );
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
