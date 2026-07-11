@@ -11,9 +11,23 @@ import { ParticipantViewFacade } from "./participant-view.facade";
   imports: [CommonModule, FormsModule],
   template: `
     <div class="stack">
-      <article class="card">
-        <h2>Participant Entry</h2>
-        <p>Use this focused route to start or continue a participant session without opening operator tooling. Links with a workspace and login key start the session automatically.</p>
+      <article class="card participant-entry-card">
+        <header class="participant-entry-hero">
+          <div>
+            <span>Participant Entry</span>
+            <h2>Start or Resume Test</h2>
+            <p>Use a direct link or enter the assigned workspace and login key. The test starts without exposing operator tooling.</p>
+          </div>
+          <div class="participant-entry-status">
+            <span>Session Status</span>
+            <strong id="participantEntryStatus">{{ view.player.runStatus }}</strong>
+          </div>
+        </header>
+        <div class="participant-entry-context">
+          <span>{{ view.player.loginLabel }}</span>
+          <span>{{ view.player.groupLabel }}</span>
+          <span>{{ view.player.bookletLabel }}</span>
+        </div>
         <div class="form-grid">
           <label>
             Tenant Key

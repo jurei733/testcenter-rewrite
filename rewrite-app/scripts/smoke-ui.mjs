@@ -935,6 +935,8 @@ try {
     ([expectedLoginKey, expectedGroupKey, expectedSessionId]) =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "running" &&
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
+        "running" &&
       document.querySelector("#participantRouteLoginLabel")?.textContent?.trim() ===
         expectedLoginKey &&
       document.querySelector("#participantRouteGroupLabel")?.textContent?.trim() ===
@@ -1127,6 +1129,8 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "completed" &&
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "completed" &&
       document.querySelector("#participantRouteProgressLabel")?.textContent?.trim() ===
         "2 / 3 responses saved" &&
