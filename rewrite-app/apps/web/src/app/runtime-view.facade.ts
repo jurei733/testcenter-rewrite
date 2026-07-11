@@ -1,5 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 
+import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
@@ -49,228 +50,6 @@ type RuntimeEntryLink = {
   bookletKey: string;
   displayName?: string;
   url: string;
-};
-
-type RuntimeEntryLinkDraft = Omit<RuntimeEntryLink, "url">;
-
-const decodeXmlText = (value: string): string =>
-  value
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
-
-const parseXmlAttributes = (rawAttributes: string): Record<string, string> => {
-  const attributes: Record<string, string> = {};
-  for (const match of rawAttributes.matchAll(
-    /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
-  )) {
-    attributes[match[1]] = decodeXmlText(match[2] ?? match[3] ?? "");
-  }
-  return attributes;
-};
-
-const readXmlAttribute = (
-  attributes: Record<string, string>,
-  ...candidateNames: string[]
-): string | undefined => {
-  for (const candidateName of candidateNames) {
-    const exactValue = attributes[candidateName];
-    if (exactValue !== undefined) {
-      return exactValue;
-    }
-  }
-
-  const normalizedEntries = Object.entries(attributes).map(([key, value]) => [
-    key.toLowerCase(),
-    value
-  ]);
-  for (const candidateName of candidateNames) {
-    const normalizedName = candidateName.toLowerCase();
-    const match = normalizedEntries.find(([key]) => {
-      const localName = key.split(":").at(-1) ?? key;
-      return key === normalizedName || localName === normalizedName;
-    });
-    if (match) {
-      return match[1];
-    }
-  }
-
-  return undefined;
-};
-
-const readXmlChildText = (
-  content: string,
-  ...candidateTagNames: string[]
-): string | undefined => {
-  for (const tagName of candidateTagNames) {
-    const match = content.match(
-      new RegExp(
-        `<((?:[a-zA-Z_][\\w.-]*:)?${tagName})\\b[^>]*>([\\s\\S]*?)<\\/\\1>`,
-        "i"
-      )
-    );
-    const value = match?.[2]?.replace(/<[^>]+>/g, "").trim();
-    if (value) {
-      return decodeXmlText(value);
-    }
-  }
-  return undefined;
-};
-
-const readXmlChildAttribute = (
-  content: string,
-  tagNames: string,
-  ...candidateAttributeNames: string[]
-): string | undefined => {
-  const match = content.match(
-    new RegExp(
-      `<((?:[a-zA-Z_][\\w.-]*:)?(?:${tagNames}))\\b([^>]*?)(?:\\/?>|>[\\s\\S]*?<\\/\\1>)`,
-      "i"
-    )
-  );
-  if (!match) {
-    return undefined;
-  }
-
-  return readXmlAttribute(parseXmlAttributes(match[2] ?? ""), ...candidateAttributeNames);
-};
-
-const normalizeRosterTextValue = (value: string | undefined | null): string | undefined => {
-  const normalizedValue = value?.trim();
-  return normalizedValue ? normalizedValue : undefined;
-};
-
-const combineRosterDisplayName = (
-  displayName: string | undefined,
-  firstName: string | undefined,
-  lastName: string | undefined
-): string | undefined => {
-  if (displayName) {
-    return displayName;
-  }
-
-  const combinedName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  return combinedName || undefined;
-};
-
-const parseEntryRosterXmlText = (rosterText: string): RuntimeEntryLinkDraft[] => {
-  if (!rosterText.trim().startsWith("<")) {
-    return [];
-  }
-
-  const entries: RuntimeEntryLinkDraft[] = [];
-  for (const match of rosterText.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
-  )) {
-    const attributes = parseXmlAttributes(match[2] ?? "");
-    const content = match[3] ?? "";
-    const loginKey = normalizeRosterTextValue(
-      readXmlAttribute(
-        attributes,
-        "loginKey",
-        "login",
-        "username",
-        "userName",
-        "code",
-        "identifier",
-        "id"
-      ) ?? readXmlChildText(content, "loginKey", "login", "username", "code", "id")
-    );
-    if (!loginKey) {
-      continue;
-    }
-
-    const groupKey = normalizeRosterTextValue(
-      readXmlAttribute(
-        attributes,
-        "groupKey",
-        "group",
-        "groupId",
-        "groupName",
-        "class",
-        "className"
-      ) ??
-        readXmlChildAttribute(
-          content,
-          "group|groupRef|group-ref|class|classRef|class-ref",
-          "groupKey",
-          "key",
-          "id",
-          "identifier",
-          "ref",
-          "name"
-        ) ??
-        readXmlChildText(content, "groupKey", "group", "groupId", "groupName", "class")
-    );
-    const bookletKey =
-      normalizeRosterTextValue(
-        readXmlAttribute(
-          attributes,
-          "bookletKey",
-          "booklet",
-          "bookletId",
-          "testlet",
-          "testletId"
-        ) ??
-          readXmlChildAttribute(
-            content,
-            "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref",
-            "bookletKey",
-            "key",
-            "id",
-            "identifier",
-            "ref",
-            "name"
-          ) ??
-          readXmlChildText(
-            content,
-            "bookletKey",
-            "booklet",
-            "bookletId",
-            "testlet",
-            "testletId"
-          )
-      ) ?? "";
-    const displayName = combineRosterDisplayName(
-      normalizeRosterTextValue(
-        readXmlAttribute(
-          attributes,
-          "displayName",
-          "displayLabel",
-          "label",
-          "name",
-          "fullName"
-        ) ??
-          readXmlChildText(
-            content,
-            "displayName",
-            "displayLabel",
-            "label",
-            "name",
-            "fullName"
-          )
-      ),
-      normalizeRosterTextValue(
-        readXmlAttribute(attributes, "firstName", "firstname", "givenName") ??
-          readXmlChildText(content, "firstName", "firstname", "givenName")
-      ),
-      normalizeRosterTextValue(
-        readXmlAttribute(attributes, "lastName", "lastname", "familyName") ??
-          readXmlChildText(content, "lastName", "lastname", "familyName")
-      )
-    );
-
-    entries.push({
-      loginKey,
-      groupKey: groupKey || `group:${loginKey}`,
-      bookletKey,
-      displayName
-    });
-  }
-
-  return entries;
 };
 
 @Injectable({ providedIn: "root" })
@@ -1499,36 +1278,18 @@ export class RuntimeViewFacade {
 
   private parseEntryRosterRows(): RuntimeEntryLink[] {
     const workspaceKey = this.uiState.workspace.workspaceKey.trim();
-    const xmlLinks = parseEntryRosterXmlText(this.runtime.entryRosterText);
-    const rowLinks =
-      xmlLinks.length > 0
-        ? xmlLinks
-        : this.runtime.entryRosterText
-            .split(/\r?\n/)
-            .map(row => row.trim())
-            .filter(row => row && !row.startsWith("#"))
-            .map(row => this.parseEntryRosterRow(row))
-            .filter((link): link is RuntimeEntryLinkDraft => link != null);
-
-    return rowLinks.map(link => ({
-      ...link,
-      url: this.buildParticipantEntryUrl(workspaceKey, link)
-    }));
-  }
-
-  private parseEntryRosterRow(row: string): RuntimeEntryLinkDraft | null {
-    const [loginKey, groupKey, bookletKey = "", displayName = ""] = row
-      .split(/[,\t;]/)
-      .map(part => part.trim());
-    if (!loginKey || loginKey.toLowerCase() === "loginkey") {
-      return null;
-    }
-    return {
-      loginKey,
-      groupKey: groupKey || `group:${loginKey}`,
-      bookletKey,
-      displayName
-    };
+    return parseParticipantRosterText(this.runtime.entryRosterText).map(link => {
+      const entryLink = {
+        loginKey: link.loginKey,
+        groupKey: link.groupKey,
+        bookletKey: link.bookletKey ?? "",
+        displayName: link.displayName ?? ""
+      };
+      return {
+        ...entryLink,
+        url: this.buildParticipantEntryUrl(workspaceKey, entryLink)
+      };
+    });
   }
 
   private parseEntryLinksView(): RuntimeEntryLink[] {
