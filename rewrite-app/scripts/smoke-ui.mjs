@@ -454,6 +454,22 @@ try {
       has: page.getByRole("heading", { name: "Process Metrics", exact: true })
     })
     .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Manifest Capabilities", exact: true })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "Admin Control" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Manifest Route Groups", exact: true })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "Workspace" })
+    .waitFor();
 
   logStep("nav-workspace-bootstrap");
   await page.locator('[data-view-nav="workspace"]').click();
