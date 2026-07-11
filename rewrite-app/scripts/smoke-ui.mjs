@@ -932,10 +932,20 @@ try {
       payload.currentRunState.testRun.status === "running"
   );
   await page.waitForFunction(
-    () =>
+    ([expectedLoginKey, expectedGroupKey, expectedSessionId]) =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-      "running",
-    undefined,
+        "running" &&
+      document.querySelector("#participantRouteLoginLabel")?.textContent?.trim() ===
+        expectedLoginKey &&
+      document.querySelector("#participantRouteGroupLabel")?.textContent?.trim() ===
+        expectedGroupKey &&
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId,
+    [
+      participantRouteLoginKey,
+      participantRouteGroupKey,
+      participantRouteSessionId
+    ],
     { timeout: 15_000 }
   );
   await clickAction("Save Paused");

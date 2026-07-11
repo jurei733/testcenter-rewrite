@@ -690,6 +690,33 @@ pre {
   color: var(--ink);
 }
 
+.participant-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.participant-meta-grid div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(31, 92, 84, 0.08);
+  border: 1px solid rgba(31, 92, 84, 0.12);
+}
+
+.participant-meta-grid span {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-meta-grid strong {
+  overflow-wrap: anywhere;
+}
+
 .unit-rail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -760,6 +787,10 @@ pre {
   }
 
   .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .participant-meta-grid {
     grid-template-columns: 1fr;
   }
 

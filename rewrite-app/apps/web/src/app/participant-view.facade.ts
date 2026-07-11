@@ -23,6 +23,9 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 type ParticipantPlayerState = {
   headline: string;
   detail: string;
+  loginLabel: string;
+  groupLabel: string;
+  sessionLabel: string;
   bookletLabel: string;
   unitLabel: string;
   unitKey: string;
@@ -218,6 +221,9 @@ export class ParticipantViewFacade {
         detail: this.runtime.participantSessionId.trim()
           ? "Resume the session to launch or continue the current run."
           : "Enter your workspace and login key, then sign in.",
+        loginLabel: this.runtime.loginKey.trim() || "No login yet",
+        groupLabel: this.runtime.groupKey.trim() || "No group yet",
+        sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
         bookletLabel: "No booklet loaded",
         unitLabel: "No unit loaded",
         unitKey: "n/a",
@@ -267,6 +273,9 @@ export class ParticipantViewFacade {
     return {
       headline: unitLabel,
       detail: currentState.booklet.displayLabel,
+      loginLabel: currentState.participantSession.loginKey,
+      groupLabel: currentState.participantSession.groupKey,
+      sessionLabel: currentState.participantSession.participantSessionId,
       bookletLabel: currentState.booklet.displayLabel,
       unitLabel,
       unitKey: unitKey || "n/a",

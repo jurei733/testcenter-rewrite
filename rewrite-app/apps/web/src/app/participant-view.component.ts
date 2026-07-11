@@ -54,6 +54,20 @@ import { ParticipantViewFacade } from "./participant-view.facade";
       <article class="card" id="participantRoutePlayer">
         <h2>Current Test</h2>
         <div class="record-card" [class.is-selected]="view.player.runStatus !== 'idle'">
+          <div class="participant-meta-grid">
+            <div>
+              <span>Login</span>
+              <strong id="participantRouteLoginLabel">{{ view.player.loginLabel }}</strong>
+            </div>
+            <div>
+              <span>Group</span>
+              <strong id="participantRouteGroupLabel">{{ view.player.groupLabel }}</strong>
+            </div>
+            <div>
+              <span>Session</span>
+              <strong id="participantRouteSessionLabel">{{ view.player.sessionLabel }}</strong>
+            </div>
+          </div>
           <header>
             <div>
               <h3 id="participantRouteUnit">{{ view.player.headline }}</h3>
