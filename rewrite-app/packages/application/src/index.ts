@@ -1988,17 +1988,31 @@ const normalizeParsedJsonContentStructure = (
     }
     return [];
   };
-  const readBookletEntries = (value: Record<string, unknown>): unknown[] =>
+  const readExplicitBookletEntries = (value: Record<string, unknown>): unknown[] =>
     readEntries(
       value.bookletEntries,
       value.booklets,
       value.testlets,
       value.booklet,
-      value.testlet,
+      value.testlet
+    );
+  const readAssessmentTestEntries = (value: Record<string, unknown>): unknown[] =>
+    readEntries(
       value.assessmentTests,
       value.assessmentTest,
       value["assessment-tests"],
       value["assessment-test"]
+    );
+  const readAssessmentSectionEntries = (
+    value: Record<string, unknown>
+  ): unknown[] =>
+    readEntries(
+      value.assessmentSections,
+      value.assessmentSection,
+      value["assessment-sections"],
+      value["assessment-section"],
+      value.sections,
+      value.section
     );
   const readStringValue = (
     value: Record<string, unknown>,
@@ -2343,9 +2357,22 @@ const normalizeParsedJsonContentStructure = (
       return [];
     }
 
-    const directBooklets = readBookletEntries(objectValue);
-    if (directBooklets.length > 0) {
-      return directBooklets;
+    const explicitBooklets = readExplicitBookletEntries(objectValue);
+    const assessmentTests = readAssessmentTestEntries(objectValue);
+    if (explicitBooklets.length > 0) {
+      return [...explicitBooklets, ...assessmentTests];
+    }
+
+    const assessmentSections = readAssessmentSectionEntries(objectValue);
+    if (assessmentSections.length > 0) {
+      return assessmentSections;
+    }
+
+    if (assessmentTests.length > 0) {
+      const sectionBooklets = assessmentTests.flatMap(assessmentTest =>
+        collectBookletEntries(assessmentTest)
+      );
+      return sectionBooklets.length > 0 ? sectionBooklets : assessmentTests;
     }
 
     return readNestedManifestContainers(objectValue).flatMap(container =>
@@ -2393,6 +2420,14 @@ const normalizeParsedJsonContentStructure = (
           booklet.files,
           booklet.modules,
           booklet.tasks,
+          booklet.assessmentItemRefs,
+          booklet.assessmentItemRef,
+          booklet["assessment-item-refs"],
+          booklet["assessment-item-ref"],
+          booklet.itemRefs,
+          booklet.itemRef,
+          booklet["item-refs"],
+          booklet["item-ref"],
           booklet.unit,
           booklet.unitRef,
           booklet.unitReference,
@@ -2412,6 +2447,10 @@ const normalizeParsedJsonContentStructure = (
               booklet.testletId ??
               booklet.assessmentTestKey ??
               booklet.assessmentTestId ??
+              booklet.assessmentSectionKey ??
+              booklet.assessmentSectionId ??
+              booklet.sectionKey ??
+              booklet.sectionId ??
               booklet.identifier ??
               booklet.key ??
               booklet.id ??

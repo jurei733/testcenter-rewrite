@@ -3349,6 +3349,102 @@ test("source document import resolves JSON resource dependencies", async () => {
   );
 });
 
+test("source document import accepts JSON QTI assessment sections as booklets", async () => {
+  const tenantKey = "integration-tenant-json-qti-sections";
+  const workspaceKey = "integration-workspace-json-qti-sections";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "qti-assessment-section.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        assessmentTests: [
+          {
+            identifier: "test:qti-json-sections",
+            title: "QTI JSON Section Test",
+            assessmentSections: [
+              {
+                identifier: "section:listening",
+                title: "Listening Section",
+                assessmentItemRefs: [
+                  {
+                    identifier: "unit-listening-a",
+                    title: "Listening Item A"
+                  },
+                  {
+                    identifier: "unit-listening-b",
+                    title: "Listening Item B"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "section:listening",
+          displayLabel: "Listening Section",
+          unitEntries: [
+            { unitKey: "unit-listening-a", displayLabel: "Listening Item A" },
+            { unitKey: "unit-listening-b", displayLabel: "Listening Item B" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";
