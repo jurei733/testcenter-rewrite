@@ -1679,6 +1679,27 @@ try {
     studyMonitorSummary.completedCount,
     "Runs completed by participants."
   );
+  const monitorAttentionQueueCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Monitor Attention Queue",
+      exact: true
+    })
+  });
+  await monitorAttentionQueueCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
+    .filter({ hasText: "2 missing response(s)" })
+    .filter({ hasText: "2/4 answered" })
+    .filter({ hasText: "Missing Responses" })
+    .filter({ hasText: "Open Unit Detail" })
+    .waitFor();
+  await monitorAttentionQueueCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
+    .filter({ hasText: "2 waiting, 0 active run(s)" })
+    .filter({ hasText: "2 not started" })
+    .filter({ hasText: "Open Group Detail" })
+    .waitFor();
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })

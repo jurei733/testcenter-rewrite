@@ -140,6 +140,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Monitor Attention Queue"
+        subtitle="Prioritized unit, group, and booklet pressure from the latest study monitor summary."
+        [items]="view.studyMonitorAttentionItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="No monitor pressure is visible in the latest summary."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Not Started Participants"
         subtitle="Expected roster participants that still have no launched run."
         [items]="view.studyMonitorNotStartedItems"
