@@ -31,6 +31,11 @@ type ParticipantPlayerState = {
   unitKey: string;
   unitPosition: string;
   unitItems: ParticipantPlayerUnitItem[];
+  responseProgressLabel: string;
+  missingResponseLabel: string;
+  progressPercent: number;
+  completionLabel: string;
+  isComplete: boolean;
   previousUnitKey: string | null;
   nextUnitKey: string | null;
   runStatus: string;
@@ -229,6 +234,11 @@ export class ParticipantViewFacade {
         unitKey: "n/a",
         unitPosition: "n/a",
         unitItems: [],
+        responseProgressLabel: "0 / 0 responses saved",
+        missingResponseLabel: "No booklet loaded",
+        progressPercent: 0,
+        completionLabel: "Not started",
+        isComplete: false,
         previousUnitKey: null,
         nextUnitKey: null,
         runStatus: "idle",
@@ -266,9 +276,15 @@ export class ParticipantViewFacade {
       label: unit.displayLabel || unit.unitKey,
       position: `${index + 1}`,
       isCurrent: unit.unitKey === unitKey,
-      hasResponse: currentState.testRun.unitResponses[unit.unitKey] != null,
+      hasResponse: this.hasSavedResponse(currentState, unit.unitKey),
       canOpen: canNavigateUnits && unit.unitKey !== unitKey
     }));
+    const answeredUnitCount = unitItems.filter(unit => unit.hasResponse).length;
+    const totalUnitCount = bookletUnits.length;
+    const missingUnitCount = Math.max(totalUnitCount - answeredUnitCount, 0);
+    const progressPercent =
+      totalUnitCount > 0 ? Math.round((answeredUnitCount / totalUnitCount) * 100) : 0;
+    const isComplete = currentState.testRun.status === "completed";
 
     return {
       headline: unitLabel,
@@ -282,6 +298,18 @@ export class ParticipantViewFacade {
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
       unitItems,
+      responseProgressLabel: `${answeredUnitCount} / ${totalUnitCount} responses saved`,
+      missingResponseLabel:
+        missingUnitCount === 0
+          ? "All units have a saved response."
+          : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`,
+      progressPercent,
+      completionLabel: isComplete
+        ? currentState.testRun.completedAt
+          ? `Completed ${currentState.testRun.completedAt}`
+          : "Completed"
+        : "Not completed yet",
+      isComplete,
       previousUnitKey,
       nextUnitKey,
       runStatus: currentState.testRun.status,
@@ -543,6 +571,16 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitResponse = unitKey
       ? currentState.testRun.unitResponses[unitKey] ?? ""
       : "";
+  }
+
+  private hasSavedResponse(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"],
+    unitKey: string
+  ): boolean {
+    return Object.prototype.hasOwnProperty.call(
+      currentState.testRun.unitResponses,
+      unitKey
+    );
   }
 
   private readCurrentRunState():

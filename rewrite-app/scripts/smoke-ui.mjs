@@ -1124,6 +1124,20 @@ try {
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.status === "completed"
   );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "completed" &&
+      document.querySelector("#participantRouteProgressLabel")?.textContent?.trim() ===
+        "2 / 3 responses saved" &&
+      document.querySelector("#participantRouteMissingLabel")?.textContent?.trim() ===
+        "1 unit without a saved response." &&
+      document
+        .querySelector("#participantRouteCompletionLabel")
+        ?.textContent?.includes("Completed"),
+    undefined,
+    { timeout: 15_000 }
+  );
 
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });

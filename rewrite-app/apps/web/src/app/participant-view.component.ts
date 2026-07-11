@@ -97,6 +97,17 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               <dd id="participantRouteActions">{{ view.player.actions.join(", ") || "none" }}</dd>
             </div>
           </dl>
+          <section class="participant-progress" aria-label="Test progress">
+            <header>
+              <span>Progress</span>
+              <strong id="participantRouteProgressLabel">{{ view.player.responseProgressLabel }}</strong>
+            </header>
+            <div class="progress-track" aria-hidden="true">
+              <span [style.width.%]="view.player.progressPercent"></span>
+            </div>
+            <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
+            <p id="participantRouteCompletionLabel" [class.is-complete]="view.player.isComplete">{{ view.player.completionLabel }}</p>
+          </section>
           <label>
             Unit Response
             <textarea
