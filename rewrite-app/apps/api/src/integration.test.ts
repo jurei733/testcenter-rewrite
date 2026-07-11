@@ -936,6 +936,14 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedStudyMonitorUnit.status, 401);
     assert.equal(rejectedStudyMonitorUnit.body.error, "admin_session_missing");
 
+    const rejectedStudyMonitorCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/study-monitor.csv"
+    );
+
+    assert.equal(rejectedStudyMonitorCsv.status, 401);
+    assert.equal(rejectedStudyMonitorCsv.body.error, "admin_session_missing");
+
     const overview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
     }>(
