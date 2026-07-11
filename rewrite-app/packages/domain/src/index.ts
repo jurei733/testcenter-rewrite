@@ -639,38 +639,76 @@ export type FirstSliceCapability =
   | "admin_authentication"
   | "admin_session_lifecycle"
   | "admin_role_assignment"
+  | "admin_user_directory"
+  | "admin_audit_read"
   | "tenant_lifecycle"
   | "workspace_lifecycle"
   | "workspace_admin_read"
   | "workspace_activity_read"
   | "source_package_intake"
+  | "source_package_read"
+  | "source_package_retry"
   | "import_job_intake"
+  | "import_job_read"
+  | "content_release_read"
+  | "content_release_readiness"
   | "content_release_activation"
+  | "participant_roster_import"
+  | "participant_roster_read"
+  | "participant_session_read"
+  | "detailed_response_read"
+  | "response_csv_export"
+  | "review_workflow"
+  | "review_csv_export"
+  | "log_csv_export"
+  | "result_deletion"
+  | "study_monitor_read"
   | "participant_sign_in"
   | "participant_launch"
   | "participant_runtime_state"
   | "participant_current_run_state"
   | "test_run_progress"
   | "test_run_lifecycle"
-  | "monitor_open_runs";
+  | "monitor_open_runs"
+  | "system_diagnostics"
+  | "frontend_shell";
 
 export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_bootstrap",
   "admin_authentication",
   "admin_session_lifecycle",
   "admin_role_assignment",
+  "admin_user_directory",
+  "admin_audit_read",
   "tenant_lifecycle",
   "workspace_lifecycle",
   "workspace_admin_read",
   "workspace_activity_read",
   "source_package_intake",
+  "source_package_read",
+  "source_package_retry",
   "import_job_intake",
+  "import_job_read",
+  "content_release_read",
+  "content_release_readiness",
   "content_release_activation",
+  "participant_roster_import",
+  "participant_roster_read",
+  "participant_session_read",
+  "detailed_response_read",
+  "response_csv_export",
+  "review_workflow",
+  "review_csv_export",
+  "log_csv_export",
+  "result_deletion",
+  "study_monitor_read",
   "participant_sign_in",
   "participant_launch",
   "participant_runtime_state",
   "participant_current_run_state",
   "test_run_progress",
   "test_run_lifecycle",
-  "monitor_open_runs"
+  "monitor_open_runs",
+  "system_diagnostics",
+  "frontend_shell"
 ];

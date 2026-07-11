@@ -5329,6 +5329,71 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     typeof config.runtimeConfig.environment.firstSlicePostgresUrlPresent,
     "boolean"
   );
+
+  const manifestResponse = await fetch(`${baseUrl}/manifest`);
+  assert.equal(manifestResponse.status, 200);
+  const manifest = (await manifestResponse.json()) as {
+    capabilities: string[];
+    routes: {
+      workspace: {
+        importParticipantRoster: string;
+        listParticipantRoster: string;
+        listDetailedResponses: string;
+        exportResponseCsv: string;
+        exportLogCsv: string;
+        exportReviewCsv: string;
+        listReviews: string;
+        deleteGroupResults: string;
+        getContentReleaseActivationReadiness: string;
+      };
+      system: {
+        getRuntimeDiagnostics: string;
+        getRuntimeConfig: string;
+      };
+    };
+  };
+
+  for (const capability of [
+    "admin_user_directory",
+    "admin_audit_read",
+    "source_package_read",
+    "source_package_retry",
+    "import_job_read",
+    "content_release_read",
+    "content_release_readiness",
+    "participant_roster_import",
+    "participant_roster_read",
+    "participant_session_read",
+    "detailed_response_read",
+    "response_csv_export",
+    "review_workflow",
+    "review_csv_export",
+    "log_csv_export",
+    "result_deletion",
+    "study_monitor_read",
+    "system_diagnostics",
+    "frontend_shell"
+  ]) {
+    assert.ok(
+      manifest.capabilities.includes(capability),
+      `Expected manifest capability ${capability}`
+    );
+  }
+
+  assert.match(manifest.routes.workspace.importParticipantRoster, /participant-roster/);
+  assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
+  assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
+  assert.match(manifest.routes.workspace.exportResponseCsv, /responses\.csv/);
+  assert.match(manifest.routes.workspace.exportLogCsv, /logs\.csv/);
+  assert.match(manifest.routes.workspace.exportReviewCsv, /reviews\.csv/);
+  assert.match(manifest.routes.workspace.listReviews, /reviews/);
+  assert.match(manifest.routes.workspace.deleteGroupResults, /results\/groups/);
+  assert.match(
+    manifest.routes.workspace.getContentReleaseActivationReadiness,
+    /activation-readiness/
+  );
+  assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");
+  assert.equal(manifest.routes.system.getRuntimeConfig, "/diagnostics/config");
 });
 
 test("frontend shell exposes multi-view navigation and diagnostics entrypoints", async () => {
