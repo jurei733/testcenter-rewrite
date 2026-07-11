@@ -1,1 +1,49 @@
+.is-participant-page {
+  max-width: 980px;
+  padding-top: 22px;
+}
 
+.participant-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, rgba(255, 252, 246, 0.94), rgba(215, 235, 231, 0.7));
+  box-shadow: var(--shadow);
+}
+
+.participant-topbar h1 {
+  margin: 10px 0 0;
+  font-size: clamp(30px, 7vw, 52px);
+}
+
+.participant-topbar > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: white;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-stage {
+  display: grid;
+  gap: 18px;
+}
+
+@media (max-width: 720px) {
+  .participant-topbar {
+    display: grid;
+    align-items: start;
+  }
+}

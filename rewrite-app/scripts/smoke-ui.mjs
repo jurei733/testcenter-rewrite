@@ -1105,7 +1105,7 @@ try {
   );
 
   logStep("nav-runtime");
-  await page.locator('[data-view-nav="runtime"]').click();
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
   await page

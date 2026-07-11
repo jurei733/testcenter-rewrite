@@ -1,117 +1,149 @@
-<div class="page" [class.is-busy]="app.activeRequestLabel() !== null">
+<div
+  class="page"
+  [class.is-busy]="app.activeRequestLabel() !== null"
+  [class.is-participant-page]="isParticipantView"
+>
   <span hidden>{{ app.renderVersion() }}</span>
-  <section class="hero">
-    <div class="hero-panel">
-      <span class="eyebrow">Rewrite App Frontend Start</span>
-      <h1>Operate The First Slice Without Leaving The Browser.</h1>
-      <p class="lead">
-        This Angular app now runs as routed frontend surface for workspace setup,
-        content intake, participant runtime, and operator diagnostics.
-      </p>
-      <div class="actions hero-actions" *ngIf="app.localDemoBootstrapEnabled">
-        <a class="button-link primary" [href]="app.localDemoParticipantLink">Start Demo Participant</a>
-        <a class="button-link ghost" routerLink="/ops">Sign In Demo Admin</a>
+  <ng-container *ngIf="isParticipantView; else operatorShell">
+    <header class="participant-topbar">
+      <div>
+        <span class="eyebrow">Testcenter</span>
+        <h1>Participant Test</h1>
       </div>
-    </div>
-    <div class="hero-panel status-grid">
-      <div class="status-pill">
-        <strong>Storage</strong>
-        <span>{{ app.ops.storageKind }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Schema</strong>
-        <span>{{ app.ops.storageSchemaVersion }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Auth</strong>
-        <span id="authModeBadge">{{ app.ops.operatorAuthMode }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Port</strong>
-        <span id="runtimePortBadge">{{ app.ops.runtimePort }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Routes</strong>
-        <span id="routeCountBadge">{{ app.ops.routeCount }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Build</strong>
-        <span id="buildRefBadge">{{ app.ops.buildRef }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Shells</strong>
-        <span>{{ app.views.length }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>View</strong>
-        <span id="activeViewBadge">{{ app.activeView }}</span>
-      </div>
-      <div class="status-pill">
-        <strong>Readiness</strong>
-        <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
-      </div>
-      <div class="status-pill action-pill">
-        <strong>Raw Debug</strong>
-        <button
-          id="rawDebugToggle"
-          class="ghost"
-          type="button"
-          [attr.aria-pressed]="app.showRawDebug"
-          (click)="app.toggleRawDebug()"
-        >
-          {{ app.showRawDebug ? "Hide" : "Show" }}
-        </button>
-      </div>
-    </div>
-  </section>
+      <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
+    </header>
 
-  <section
-    class="status-banner"
-    *ngIf="app.activeRequestLabel() || app.errorMessage()"
-    [class.is-error]="!!app.errorMessage()"
-  >
-    <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
-    <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
-      {{ app.activeRequestLabel() }} is in progress.
-    </span>
-    <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
-  </section>
-
-  <nav class="view-nav" aria-label="Application Views">
-    <a
-      *ngFor="let view of app.views"
-      [routerLink]="view.link"
-      routerLinkActive="is-active"
-      class="nav-link"
-      [attr.data-view-nav]="view.id"
+    <section
+      class="status-banner"
+      *ngIf="app.activeRequestLabel() || app.errorMessage()"
+      [class.is-error]="!!app.errorMessage()"
     >
-      {{ view.label }}
-    </a>
-  </nav>
+      <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
+      <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
+        {{ app.activeRequestLabel() }} is in progress.
+      </span>
+      <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+    </section>
 
-  <section class="workspace app-layout">
-    <div class="stack">
-      <app-live-context [sections]="app.liveContextSections"></app-live-context>
-
+    <main class="participant-stage">
       <router-outlet></router-outlet>
-    </div>
+    </main>
+  </ng-container>
 
-    <div class="stack">
-      <article class="card result">
-        <header>
-          <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
-          <span id="responseMeta">{{ app.responseMeta() }}</span>
-        </header>
-        <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
-        <ng-template #lastResponsePreview>
-          <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
-        </ng-template>
-      </article>
+  <ng-template #operatorShell>
+    <section class="hero">
+      <div class="hero-panel">
+        <span class="eyebrow">Rewrite App Frontend Start</span>
+        <h1>Operate The First Slice Without Leaving The Browser.</h1>
+        <p class="lead">
+          This Angular app now runs as routed frontend surface for workspace setup,
+          content intake, participant runtime, and operator diagnostics.
+        </p>
+        <div class="actions hero-actions" *ngIf="app.localDemoBootstrapEnabled">
+          <a class="button-link primary" [href]="app.localDemoParticipantLink">Start Demo Participant</a>
+          <a class="button-link ghost" routerLink="/ops">Sign In Demo Admin</a>
+        </div>
+      </div>
+      <div class="hero-panel status-grid">
+        <div class="status-pill">
+          <strong>Storage</strong>
+          <span>{{ app.ops.storageKind }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Schema</strong>
+          <span>{{ app.ops.storageSchemaVersion }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Auth</strong>
+          <span id="authModeBadge">{{ app.ops.operatorAuthMode }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Port</strong>
+          <span id="runtimePortBadge">{{ app.ops.runtimePort }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Routes</strong>
+          <span id="routeCountBadge">{{ app.ops.routeCount }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Build</strong>
+          <span id="buildRefBadge">{{ app.ops.buildRef }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Shells</strong>
+          <span>{{ app.views.length }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>View</strong>
+          <span id="activeViewBadge">{{ app.activeView }}</span>
+        </div>
+        <div class="status-pill">
+          <strong>Readiness</strong>
+          <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
+        </div>
+        <div class="status-pill action-pill">
+          <strong>Raw Debug</strong>
+          <button
+            id="rawDebugToggle"
+            class="ghost"
+            type="button"
+            [attr.aria-pressed]="app.showRawDebug"
+            (click)="app.toggleRawDebug()"
+          >
+            {{ app.showRawDebug ? "Hide" : "Show" }}
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <article class="card view-grid">
-        <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
-        <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
-      </article>
-    </div>
-  </section>
+    <section
+      class="status-banner"
+      *ngIf="app.activeRequestLabel() || app.errorMessage()"
+      [class.is-error]="!!app.errorMessage()"
+    >
+      <strong>{{ app.errorMessage() ? "Last Error" : "Working" }}</strong>
+      <span *ngIf="app.activeRequestLabel() && !app.errorMessage()">
+        {{ app.activeRequestLabel() }} is in progress.
+      </span>
+      <span *ngIf="app.errorMessage()">{{ app.errorMessage() }}</span>
+    </section>
+
+    <nav class="view-nav" aria-label="Application Views">
+      <a
+        *ngFor="let view of app.views"
+        [routerLink]="view.link"
+        routerLinkActive="is-active"
+        class="nav-link"
+        [attr.data-view-nav]="view.id"
+      >
+        {{ view.label }}
+      </a>
+    </nav>
+
+    <section class="workspace app-layout">
+      <div class="stack">
+        <app-live-context [sections]="app.liveContextSections"></app-live-context>
+
+        <router-outlet></router-outlet>
+      </div>
+
+      <div class="stack">
+        <article class="card result">
+          <header>
+            <span>{{ app.showRawDebug ? "Last Raw Response" : "Last Result" }}</span>
+            <span id="responseMeta">{{ app.responseMeta() }}</span>
+          </header>
+          <pre id="lastResponse" *ngIf="app.showRawDebug; else lastResponsePreview">{{ app.lastResponse() }}</pre>
+          <ng-template #lastResponsePreview>
+            <p class="response-preview" id="lastResponsePreview">{{ app.lastResponsePreview }}</p>
+          </ng-template>
+        </article>
+
+        <article class="card view-grid">
+          <app-summary-cards [cards]="app.feedback.summaryCards"></app-summary-cards>
+          <app-activity-feed [items]="app.feedback.activityFeed"></app-activity-feed>
+        </article>
+      </div>
+    </section>
+  </ng-template>
 </div>

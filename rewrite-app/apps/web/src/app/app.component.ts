@@ -30,6 +30,10 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   private readonly router = inject(Router);
 
+  get isParticipantView(): boolean {
+    return this.app.activeView === "participant";
+  }
+
   async ngOnInit(): Promise<void> {
     const initialView = this.getInitialViewFromLocation();
     this.app.init(initialView);
