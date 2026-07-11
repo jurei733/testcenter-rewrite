@@ -220,6 +220,10 @@ export class WorkspaceViewFacade {
         { label: "Group", value: rosterEntry.groupKey },
         { label: "Booklet", value: rosterEntry.bookletKey ?? "none" },
         { label: "Display Name", value: rosterEntry.displayName ?? "none" },
+        {
+          label: "Entry URL",
+          value: this.buildParticipantEntryUrl(rosterEntry)
+        },
         { label: "Imported", value: this.formatDateTime(rosterEntry.importedAt) }
       ],
       actionLabel: "Open Group Detail",
@@ -1366,6 +1370,34 @@ export class WorkspaceViewFacade {
   private formatDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  private buildParticipantEntryUrl(rosterEntry: {
+    loginKey: string;
+    groupKey: string;
+    bookletKey: string | null;
+  }): string {
+    const query = new URLSearchParams();
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+    if (tenantKey) {
+      query.set("tenantKey", tenantKey);
+    }
+    query.set("workspaceKey", workspaceKey || "demo-workspace");
+    query.set("loginKey", rosterEntry.loginKey);
+    query.set("groupKey", rosterEntry.groupKey);
+    if (rosterEntry.bookletKey) {
+      query.set("bookletKey", rosterEntry.bookletKey);
+    }
+
+    const participantPath = `/participant?${query.toString()}`;
+    return this.browserOrigin
+      ? `${this.browserOrigin}${participantPath}`
+      : participantPath;
+  }
+
+  private get browserOrigin(): string {
+    return globalThis.location?.origin ?? "";
   }
 
   private humanizeKey(value: string): string {

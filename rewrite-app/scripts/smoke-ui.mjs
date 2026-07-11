@@ -1626,6 +1626,7 @@ try {
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "group:entry-smoke" })
     .filter({ hasText: "booklet:starter" })
+    .filter({ hasText: participantEntryUrlPrefix })
     .waitFor();
   await notStartedParticipantsCard
     .locator(".record-card")
@@ -1633,6 +1634,7 @@ try {
     .filter({ hasText: "entry-student-b" })
     .filter({ hasText: "group:entry-smoke" })
     .filter({ hasText: "default booklet" })
+    .filter({ hasText: participantEntryUrlPrefix })
     .waitFor();
   await notStartedParticipantsCard
     .locator(".record-card")
@@ -1640,6 +1642,7 @@ try {
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "group:xml-entry" })
     .filter({ hasText: "default booklet" })
+    .filter({ hasText: participantEntryUrlPrefix })
     .waitFor();
   await clickCardAction("Study Monitor", "Open Group Detail", "group:entry-smoke");
   await page.waitForFunction(
