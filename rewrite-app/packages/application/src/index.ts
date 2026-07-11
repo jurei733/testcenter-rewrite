@@ -2323,6 +2323,7 @@ const readXmlChildText = (
 type XmlManifestResource = {
   key: string;
   displayLabel: string;
+  dependencyReferences: string[];
 };
 
 const collectXmlManifestResources = (
@@ -2363,8 +2364,26 @@ const collectXmlManifestResources = (
       "Resource",
       key
     );
+    const dependencyReferences = [
+      ...resourceContent.matchAll(
+        /<((?:[a-zA-Z_][\w.-]*:)?dependency)\b([^>]*?)(?:\/>|>[\s\S]*?<\/\1>)/gi
+      )
+    ]
+      .map(dependencyMatch =>
+        normalizeManifestToken(
+          readXmlAttribute(
+            parseXmlAttributes(dependencyMatch[2] ?? ""),
+            "identifierref",
+            "identifierRef",
+            "ref"
+          )
+        )
+      )
+      .filter((dependencyReference): dependencyReference is string =>
+        Boolean(dependencyReference)
+      );
 
-    resources.set(identifier, { key, displayLabel });
+    resources.set(identifier, { key, displayLabel, dependencyReferences });
   }
 
   return resources;
@@ -2490,6 +2509,39 @@ const collectXmlOrganizationBookletEntries = (
     .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
 };
 
+const collectXmlResourceDependencyBookletEntries = (
+  sourceDocument: string
+): SourcePackageContentStructure["bookletEntries"] => {
+  const resources = collectXmlManifestResources(sourceDocument);
+  if (resources.size === 0) {
+    return [];
+  }
+
+  return [...resources.values()]
+    .map(resource => {
+      const unitEntries = resource.dependencyReferences
+        .map(dependencyReference => resources.get(dependencyReference))
+        .filter((dependencyResource): dependencyResource is XmlManifestResource =>
+          Boolean(dependencyResource)
+        )
+        .map(dependencyResource => ({
+          unitKey: dependencyResource.key,
+          displayLabel: dependencyResource.displayLabel
+        }));
+
+      if (unitEntries.length === 0) {
+        return null;
+      }
+
+      return {
+        bookletKey: resource.key,
+        displayLabel: resource.displayLabel,
+        unitEntries
+      };
+    })
+    .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
+};
+
 const collectXmlBookletEntries = (
   sourceDocument: string,
   bookletTagNames: string
@@ -2598,6 +2650,14 @@ const normalizeParsedXmlContentStructure = (
   if (organizationBookletEntries.length > 0) {
     return normalizeContentStructure({
       bookletEntries: organizationBookletEntries
+    });
+  }
+
+  const dependencyBookletEntries =
+    collectXmlResourceDependencyBookletEntries(sourceDocument);
+  if (dependencyBookletEntries.length > 0) {
+    return normalizeContentStructure({
+      bookletEntries: dependencyBookletEntries
     });
   }
 

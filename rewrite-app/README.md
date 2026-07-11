@@ -294,7 +294,7 @@ The added read side now makes the first slice inspectable:
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
 - source-package intake now rejects blank file names, blank media types, and non-string source documents before an import job is created
-- source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from JSON or XML/manifest content when no explicit `contentStructure` is given, including nested testcenter/package/test wrapper objects
+- source-package intake can now also carry a manifest-like `sourceDocument`; the import step derives booklet/unit structure from JSON or XML/manifest content when no explicit `contentStructure` is given, including nested testcenter/package/test wrapper objects and IMS resource dependency manifests
 - manifest-derived runtime structures are normalized during import: keys are trimmed, duplicate booklet/unit entries are collapsed, missing display labels fall back to readable key-derived labels, and common `bookletId`/`unitId`/`identifier`/`ref` fields plus resource/file/module/task and assessment-test/item-ref aliases are accepted
 - imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
 - guarded activation now returns explicit blocking details for open runs on the currently active release, so operators and the shell can see why a release switch was rejected
@@ -426,6 +426,6 @@ For runtime probes:
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
-- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, nested package/test wrapper objects, booklet/testlet/assessment-test/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
+- importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
 - monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, and open-run blockers, but still do not cover every original Testcenter monitor view

@@ -3365,6 +3365,95 @@ test("source document import resolves IMS organization item references", async (
   );
 });
 
+test("source document import resolves IMS resource dependencies", async () => {
+  const tenantKey = "integration-tenant-ims-dependencies";
+  const workspaceKey = "integration-workspace-ims-dependencies";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest-dependencies.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="RES-TEST" type="imsqti_test_xmlv2p1" href="tests/booklet-dep.xml" title="Dependency Booklet">
+              <dependency identifierref="RES-ITEM-1" />
+              <dependency identifierref="RES-ITEM-2" />
+            </resource>
+            <resource identifier="RES-ITEM-1" type="imsqti_item_xmlv2p1" href="items/item-one.xml" />
+            <resource identifier="RES-ITEM-2" type="imsqti_item_xmlv2p1" title="Item Two">
+              <file href="items/item-two.xml" />
+            </resource>
+          </resources>
+        </manifest>
+      `
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "tests/booklet-dep.xml",
+          displayLabel: "Dependency Booklet",
+          unitEntries: [
+            {
+              unitKey: "items/item-one.xml",
+              displayLabel: "Resource items/item one.xml"
+            },
+            { unitKey: "items/item-two.xml", displayLabel: "Item Two" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("participant sign-in reuses an open session for the active release", async () => {
   const tenantKey = "integration-tenant-session-reentry";
   const workspaceKey = "integration-workspace-session-reentry";
