@@ -236,7 +236,7 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() =>
       this.saveProgressInternal(
         this.player.runStatus === "paused" ? "running" : "paused",
-        this.runtime.currentUnitKey.trim() || null,
+        this.runtime.currentUnitKey.trim() || undefined,
         this.runtime.currentUnitResponse
       )
     );
@@ -303,7 +303,7 @@ export class ParticipantViewFacade {
 
   private async saveProgressInternal(
     status: "paused" | "running",
-    currentUnitKey = this.runtime.currentUnitKey.trim() || null,
+    currentUnitKey = this.runtime.currentUnitKey.trim() || undefined,
     unitResponse?: string | null
   ): Promise<void> {
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(

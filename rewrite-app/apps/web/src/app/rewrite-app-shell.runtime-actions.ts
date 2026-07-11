@@ -175,12 +175,13 @@ export async function saveProgressAction(
   host: ShellRuntimeActionsHost,
   status: "paused" | "running"
 ): Promise<void> {
+  const currentUnitKey = host.getCurrentUnitKey().trim();
   const payload = await host.request<SaveTestRunProgressResponse>(
     status === "paused" ? "Save Progress Paused" : "Save Progress Running",
     "POST",
     host.getSaveProgressPath(),
     {
-      currentUnitKey: host.getCurrentUnitKey().trim() || null,
+      currentUnitKey: currentUnitKey || undefined,
       status,
       unitResponse: host.getCurrentUnitResponse()
     } satisfies SaveTestRunProgressRequest
