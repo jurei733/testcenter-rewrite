@@ -665,6 +665,81 @@ pre {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
+.unit-rail {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(27, 36, 48, 0.1);
+  background: linear-gradient(135deg, rgba(31, 92, 84, 0.08), rgba(255, 255, 255, 0.72));
+}
+
+.unit-rail header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.unit-rail header strong {
+  color: var(--ink);
+}
+
+.unit-rail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.unit-chip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  border: 1px solid rgba(27, 36, 48, 0.12);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  text-align: left;
+}
+
+.unit-chip span {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  font-size: 12px;
+}
+
+.unit-chip strong {
+  overflow-wrap: anywhere;
+}
+
+.unit-chip.has-response span {
+  background: var(--secondary-soft);
+  color: var(--secondary);
+}
+
+.unit-chip.is-current {
+  border-color: rgba(196, 82, 47, 0.42);
+  background: rgba(241, 216, 195, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(196, 82, 47, 0.14);
+}
+
+.unit-chip.is-current span {
+  background: var(--accent);
+  color: white;
+}
+
 .record-card-actions {
   margin-top: 14px;
   display: flex;

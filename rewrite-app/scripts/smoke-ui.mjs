@@ -851,7 +851,9 @@ try {
   const participantRouteGroupKey = "group:participant-route-smoke";
   const participantRouteBookletKey = "booklet:starter";
   const participantRouteUnitKey = "unit-participant-route";
+  const participantRouteNextUnitKey = "unit-paused";
   const participantRouteUnitResponse = "Prefilled participant route response";
+  const participantRouteNextUnitResponse = "Second unit participant response";
   await page.goto(
     `${baseUrl}/participant?tenantKey=${encodeURIComponent(
       tenantKey
@@ -967,6 +969,81 @@ try {
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.status === "running"
+  );
+  await page.waitForFunction(
+    ([expectedUnitKey, expectedNextUnitKey]) =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        expectedUnitKey &&
+      document
+        .querySelector(
+          `#participantRouteUnitRail [data-unit-key="${expectedNextUnitKey}"]`
+        )
+        ?.textContent?.includes("Paused Work"),
+    [participantRouteUnitKey, participantRouteNextUnitKey],
+    { timeout: 15_000 }
+  );
+  logStep("participant-route-unit-next");
+  await clickAction("Next Unit");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running" &&
+      payload.currentRunState.testRun.currentUnitKey ===
+        participantRouteNextUnitKey &&
+      payload.currentRunState.testRun.unitResponses?.[participantRouteUnitKey] ===
+        participantRouteUnitResponse
+  );
+  await page.waitForFunction(
+    ([expectedUnitKey]) =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        expectedUnitKey &&
+      document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
+        "3 / 3" &&
+      document.querySelector("#participantRouteUnitResponse")?.value === "",
+    [participantRouteNextUnitKey],
+    { timeout: 15_000 }
+  );
+  await fillAndCommit(
+    "#participantRouteUnitResponse",
+    participantRouteNextUnitResponse
+  );
+  logStep("participant-route-unit-previous");
+  await clickAction("Previous Unit");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running" &&
+      payload.currentRunState.testRun.currentUnitKey === participantRouteUnitKey &&
+      payload.currentRunState.testRun.unitResponses?.[participantRouteUnitKey] ===
+        participantRouteUnitResponse &&
+      payload.currentRunState.testRun.unitResponses?.[
+        participantRouteNextUnitKey
+      ] === participantRouteNextUnitResponse
+  );
+  await page.waitForFunction(
+    ([expectedUnitKey, expectedResponse]) =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        expectedUnitKey &&
+      document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
+        "2 / 3" &&
+      document.querySelector("#participantRouteUnitResponse")?.value ===
+        expectedResponse,
+    [participantRouteUnitKey, participantRouteUnitResponse],
+    { timeout: 15_000 }
   );
   logStep("participant-entry-reentry");
   await page.goto(
@@ -1383,12 +1460,12 @@ try {
         summary.participantSessionCount === 3 &&
         summary.testRunCount === 3 &&
         summary.notStartedCount === 3 &&
-        missingResponseCount === 10 &&
+        missingResponseCount === 9 &&
         Array.isArray(summary.groups) &&
         summary.groups.length === 5 &&
         pausedWorkUnit?.rosterExpectedCount === 1 &&
         pausedWorkUnit?.expectedRunCount === 4 &&
-        pausedWorkUnit?.missingResponseCount === 3 &&
+        pausedWorkUnit?.missingResponseCount === 2 &&
         directXmlGroup?.expectedParticipantCount === 1 &&
         directXmlGroup?.participantSessionCount === 1 &&
         directXmlGroup?.testRunCount === 1 &&
@@ -1415,7 +1492,7 @@ try {
     .filter({ hasText: "3 run(s)" })
     .filter({ hasText: "5 group(s)" })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "10 missing response(s)" })
+    .filter({ hasText: "9 missing response(s)" })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })
@@ -1461,8 +1538,8 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
     .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "1/4 answered" })
-    .filter({ hasText: "3 missing" })
+    .filter({ hasText: "2/4 answered" })
+    .filter({ hasText: "2 missing" })
     .filter({ hasText: "Roster Expected" })
     .waitFor();
   await studyMonitorCard
@@ -1523,7 +1600,7 @@ try {
       );
       return (
         detailCard?.textContent?.includes("unit-paused") &&
-        detailCard.textContent.includes("3 missing") &&
+        detailCard.textContent.includes("2 missing") &&
         detailCard.textContent.includes("Roster Expected") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&

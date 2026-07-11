@@ -27,6 +27,7 @@ type ParticipantPlayerState = {
   unitLabel: string;
   unitKey: string;
   unitPosition: string;
+  unitItems: ParticipantPlayerUnitItem[];
   previousUnitKey: string | null;
   nextUnitKey: string | null;
   runStatus: string;
@@ -39,6 +40,15 @@ type ParticipantPlayerState = {
   canComplete: boolean;
   saveProgressLabel: string;
   unitResponse: string;
+};
+
+type ParticipantPlayerUnitItem = {
+  unitKey: string;
+  label: string;
+  position: string;
+  isCurrent: boolean;
+  hasResponse: boolean;
+  canOpen: boolean;
 };
 
 type ParticipantEntryParameters = {
@@ -212,6 +222,7 @@ export class ParticipantViewFacade {
         unitLabel: "No unit loaded",
         unitKey: "n/a",
         unitPosition: "n/a",
+        unitItems: [],
         previousUnitKey: null,
         nextUnitKey: null,
         runStatus: "idle",
@@ -244,6 +255,14 @@ export class ParticipantViewFacade {
     const canNavigateUnits =
       currentState.testRun.status === "running" &&
       availableActions.includes("save_progress");
+    const unitItems = bookletUnits.map((unit, index) => ({
+      unitKey: unit.unitKey,
+      label: unit.displayLabel || unit.unitKey,
+      position: `${index + 1}`,
+      isCurrent: unit.unitKey === unitKey,
+      hasResponse: currentState.testRun.unitResponses[unit.unitKey] != null,
+      canOpen: canNavigateUnits && unit.unitKey !== unitKey
+    }));
 
     return {
       headline: unitLabel,
@@ -253,6 +272,7 @@ export class ParticipantViewFacade {
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
+      unitItems,
       previousUnitKey,
       nextUnitKey,
       runStatus: currentState.testRun.status,
@@ -299,6 +319,10 @@ export class ParticipantViewFacade {
 
   goToNextUnit(): void {
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("next"));
+  }
+
+  goToUnit(unitKey: string): void {
+    this.viewState.onActionAsync(() => this.goToPlayerUnitInternal(unitKey));
   }
 
   resumeRun(): void {
@@ -380,11 +404,22 @@ export class ParticipantViewFacade {
     await this.refreshCurrentStateInternal(true);
   }
 
-  private async goToPlayerUnitInternal(direction: "previous" | "next"): Promise<void> {
+  private async goToPlayerUnitInternal(
+    target: "previous" | "next" | string
+  ): Promise<void> {
     const player = this.player;
     const targetUnitKey =
-      direction === "previous" ? player.previousUnitKey : player.nextUnitKey;
+      target === "previous"
+        ? player.previousUnitKey
+        : target === "next"
+          ? player.nextUnitKey
+          : target.trim();
     if (!targetUnitKey) {
+      return;
+    }
+
+    const targetUnit = player.unitItems.find(unit => unit.unitKey === targetUnitKey);
+    if (targetUnitKey === player.unitKey || !targetUnit?.canOpen) {
       return;
     }
 

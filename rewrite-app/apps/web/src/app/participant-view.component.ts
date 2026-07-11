@@ -94,6 +94,27 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               placeholder="Write the participant response for this unit."
             ></textarea>
           </label>
+          <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.unitItems.length > 0">
+            <header>
+              <span>Booklet Units</span>
+              <strong>{{ view.player.unitPosition }}</strong>
+            </header>
+            <div class="unit-rail-grid" id="participantRouteUnitRail">
+              <button
+                *ngFor="let unit of view.player.unitItems"
+                type="button"
+                class="unit-chip"
+                [class.is-current]="unit.isCurrent"
+                [class.has-response]="unit.hasResponse"
+                [disabled]="!unit.canOpen"
+                [attr.data-unit-key]="unit.unitKey"
+                (click)="view.goToUnit(unit.unitKey)"
+              >
+                <span>{{ unit.position }}</span>
+                <strong>{{ unit.label }}</strong>
+              </button>
+            </div>
+          </section>
           <div class="actions">
             <button id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
             <button id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
