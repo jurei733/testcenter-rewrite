@@ -2914,13 +2914,37 @@ const collectXmlBookletEntries = (
 const normalizeParsedXmlContentStructure = (
   sourceDocument: string
 ): ContentReleaseRuntimeSnapshot | null => {
-  const specificBookletEntries = collectXmlBookletEntries(
+  const explicitBookletEntries = collectXmlBookletEntries(
     sourceDocument,
-    "booklet|testlet|assessmentTest|assessment-test"
+    "booklet|testlet"
+  );
+  const assessmentTestBookletEntries = collectXmlBookletEntries(
+    sourceDocument,
+    "assessmentTest|assessment-test"
   );
 
-  if (specificBookletEntries.length > 0) {
-    return normalizeContentStructure({ bookletEntries: specificBookletEntries });
+  if (explicitBookletEntries.length > 0) {
+    return normalizeContentStructure({
+      bookletEntries: [
+        ...explicitBookletEntries,
+        ...assessmentTestBookletEntries
+      ]
+    });
+  }
+
+  const sectionBookletEntries = collectXmlBookletEntries(
+    sourceDocument,
+    "assessmentSection|assessment-section|section"
+  );
+
+  if (sectionBookletEntries.length > 0) {
+    return normalizeContentStructure({ bookletEntries: sectionBookletEntries });
+  }
+
+  if (assessmentTestBookletEntries.length > 0) {
+    return normalizeContentStructure({
+      bookletEntries: assessmentTestBookletEntries
+    });
   }
 
   const organizationBookletEntries =

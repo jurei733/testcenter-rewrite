@@ -3446,6 +3446,88 @@ test("source document import accepts testcenter-style XML aliases", async () => 
   );
 });
 
+test("source document import accepts QTI assessment sections as booklets", async () => {
+  const tenantKey = "integration-tenant-qti-sections";
+  const workspaceKey = "integration-workspace-qti-sections";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "qti-assessment-section.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <assessmentTest identifier="test:qti-sections" title="QTI Section Test">
+          <testPart identifier="part-1">
+            <assessmentSection identifier="section:reading" title="Reading Section">
+              <assessmentItemRef identifier="unit-reading-a" title="Reading Item A" />
+              <assessmentItemRef identifier="unit-reading-b" title="Reading Item B" />
+            </assessmentSection>
+          </testPart>
+        </assessmentTest>
+      `
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "section:reading",
+          displayLabel: "Reading Section",
+          unitEntries: [
+            { unitKey: "unit-reading-a", displayLabel: "Reading Item A" },
+            { unitKey: "unit-reading-b", displayLabel: "Reading Item B" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves IMS organization item references", async () => {
   const tenantKey = "integration-tenant-ims-organization";
   const workspaceKey = "integration-workspace-ims-organization";
