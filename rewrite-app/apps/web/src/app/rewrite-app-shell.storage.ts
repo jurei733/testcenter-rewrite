@@ -51,6 +51,7 @@ export type ShellPersistenceTarget = {
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
+  participantRosterExportView: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
   workspaceActivityEventType: string;
@@ -142,6 +143,7 @@ export const createPersistedShellState = (
   entryRosterText: target.entryRosterText,
   entryLinksView: target.entryLinksView,
   participantRosterView: target.participantRosterView,
+  participantRosterExportView: target.participantRosterExportView,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
   workspaceActivityEventType: target.workspaceActivityEventType,
@@ -374,6 +376,10 @@ export const applyHydratedShellState = (
   target.participantRosterView = hydrateString(
     snapshot.participantRosterView,
     target.participantRosterView
+  );
+  target.participantRosterExportView = hydrateString(
+    snapshot.participantRosterExportView,
+    target.participantRosterExportView
   );
   target.autoRefreshEnabled = snapshot.autoRefreshEnabled ?? target.autoRefreshEnabled;
   target.autoRefreshSeconds = snapshot.autoRefreshSeconds ?? target.autoRefreshSeconds;

@@ -1079,6 +1079,12 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantRoster());
   }
 
+  exportParticipantRosterCsv(): void {
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportParticipantRosterCsv()
+    );
+  }
+
   generateEntryLinksFromSavedRoster(): void {
     const links = this.parseParticipantRosterView().map(entry => ({
       loginKey: entry.loginKey,

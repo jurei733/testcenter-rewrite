@@ -256,6 +256,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="importParticipantRosterButton" class="primary" type="button" (click)="view.importParticipantRoster()">Import Saved Roster</button>
           <button id="loadParticipantRosterButton" class="secondary" type="button" (click)="view.loadParticipantRoster()">Load Saved Roster</button>
+          <button id="exportParticipantRosterCsvButton" class="secondary" type="button" (click)="view.exportParticipantRosterCsv()">Export Saved Roster CSV</button>
           <button id="generateEntryLinksButton" class="primary" type="button" (click)="view.generateEntryLinks()">Generate Entry Links</button>
           <button id="generateSavedRosterEntryLinksButton" class="secondary" type="button" (click)="view.generateEntryLinksFromSavedRoster()">Generate From Saved Roster</button>
           <button id="downloadEntryLinksCsvButton" class="secondary" type="button" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
@@ -418,6 +419,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <pre id="reviewExportPreview">{{ view.runtime.reviewExportView }}</pre>
       </article>
 
+      <article class="card">
+        <h2>Participant Roster CSV Export</h2>
+        <p>Saved participant roster rows in CSV format for operator handoff and entry-link audits.</p>
+        <pre id="participantRosterExportPreview">{{ view.runtime.participantRosterExportView }}</pre>
+      </article>
+
       <app-record-collection
         title="Runtime State Detail"
         subtitle="The current session-level runtime status and next action."
@@ -444,6 +451,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
       <app-json-panel title="Participant Roster" subtitle="Saved Entry Rows" viewId="participantRosterView" [content]="view.runtime.participantRosterView"></app-json-panel>
+      <app-json-panel title="Participant Roster CSV Export" subtitle="Saved Entry Rows" viewId="participantRosterExportView" [content]="view.runtime.participantRosterExportView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>
       <app-json-panel title="Runtime State" subtitle="Session Status" viewId="runtimeStateView" [content]="view.runtime.runtimeStateView"></app-json-panel>
       <app-json-panel title="Current Run State" subtitle="Booklet Context" viewId="currentRunStateView" [content]="view.runtime.currentRunStateView"></app-json-panel>

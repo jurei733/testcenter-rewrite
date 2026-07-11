@@ -136,6 +136,11 @@ export function createRuntimeReadsStateHost(args: {
       tenantKey: args.workspaceState.tenantKey.trim(),
       workspaceKey: args.workspaceState.workspaceKey.trim()
     });
+  const buildParticipantRosterCsvExportPath = (): string =>
+    resolveRoutePath(productionApiRoutes.workspace.exportParticipantRosterCsv, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
 
   const buildDetailedResponsesPath = (route: string): string => {
     const path = resolveRoutePath(route, {
@@ -195,6 +200,10 @@ export function createRuntimeReadsStateHost(args: {
     getParticipantRosterPath: buildParticipantRosterPath,
     setParticipantRosterView: nextValue => {
       args.runtimeState.participantRosterView = nextValue;
+    },
+    getParticipantRosterCsvExportPath: buildParticipantRosterCsvExportPath,
+    setParticipantRosterExportView: nextValue => {
+      args.runtimeState.participantRosterExportView = nextValue;
     },
     getRuntimeStatePath: () =>
       resolveRoutePath(productionApiRoutes.participant.getRuntimeState, {

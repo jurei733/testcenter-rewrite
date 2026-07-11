@@ -997,6 +997,9 @@ const participantSessionDetailPattern = createRoutePattern(
 const participantRosterPattern = createRoutePattern(
   productionApiRoutes.workspace.listParticipantRoster
 );
+const participantRosterCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportParticipantRosterCsv
+);
 const studyMonitorCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportStudyMonitorCsv
 );
@@ -1081,6 +1084,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantSessionDetailPattern],
   ["GET", participantRosterPattern],
   ["POST", participantRosterPattern],
+  ["GET", participantRosterCsvExportPattern],
   ["GET", studyMonitorCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", reviewListPattern],
@@ -1446,6 +1450,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "POST",
       participantRosterPattern,
       productionApiRoutes.workspace.importParticipantRoster
+    ],
+    [
+      "GET",
+      participantRosterCsvExportPattern,
+      productionApiRoutes.workspace.exportParticipantRosterCsv
     ],
     [
       "GET",
@@ -2684,6 +2693,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
       const participantRosterMatch = participantRosterPattern.exec(pathname);
+      const participantRosterCsvExportMatch =
+        participantRosterCsvExportPattern.exec(pathname);
       const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
       const reviewListMatch = reviewListPattern.exec(pathname);
       const reviewDetailMatch = reviewDetailPattern.exec(pathname);
@@ -3105,6 +3116,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendCsv(response, 200, `${workspaceKey}-study-monitor.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && participantRosterCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          participantRosterCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          participantRosterCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportParticipantRosterCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-participant-roster.csv`, csv);
         return;
       }
 

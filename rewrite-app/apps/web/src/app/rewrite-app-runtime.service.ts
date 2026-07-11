@@ -21,6 +21,7 @@ import {
   updateReviewAction
 } from "./rewrite-app-shell.runtime-actions";
 import {
+  exportParticipantRosterCsvAction,
   exportReviewsCsvAction,
   exportResponsesCsvAction,
   loadParticipantSessionsAction,
@@ -131,6 +132,23 @@ export class RewriteAppRuntimeService {
         `${payload.items.length} saved roster entr${payload.items.length === 1 ? "y" : "ies"} loaded.`
       );
     }
+  }
+
+  async exportParticipantRosterCsv(): Promise<string> {
+    const csv = await exportParticipantRosterCsvAction(
+      this.hosts.createRuntimeReadsHost()
+    );
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-participant-roster.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Participant Roster CSV Downloaded",
+      `Participant roster export saved as ${workspaceKey}-participant-roster.csv.`
+    );
+    return csv;
   }
 
   async loadParticipantSessionDetail(): Promise<GetParticipantSessionResponse> {

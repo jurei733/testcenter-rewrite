@@ -1248,6 +1248,19 @@ try {
     .filter({ hasText: "entry-student-b" })
     .filter({ hasText: "Ben Entry" })
     .waitFor();
+  await page.locator("#exportParticipantRosterCsvButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Roster CSV Export" })
+    })
+    .filter({ hasText: "participantRosterEntryId" })
+    .filter({ hasText: "loginKey" })
+    .filter({ hasText: "groupKey" })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "Ada Entry" })
+    .filter({ hasText: "booklet:starter" })
+    .waitFor();
   await page.locator("#generateSavedRosterEntryLinksButton").click();
   await page
     .locator("article.card")

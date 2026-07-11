@@ -944,6 +944,14 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedStudyMonitorCsv.status, 401);
     assert.equal(rejectedStudyMonitorCsv.body.error, "admin_session_missing");
 
+    const rejectedParticipantRosterCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/participant-roster.csv"
+    );
+
+    assert.equal(rejectedParticipantRosterCsv.status, 401);
+    assert.equal(rejectedParticipantRosterCsv.body.error, "admin_session_missing");
+
     const overview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
     }>(
@@ -4180,6 +4188,28 @@ test("workspace participant roster can be imported, updated, and listed", async 
     ["roster-a", "roster-b", "roster-c", "roster-d"]
   );
 
+  const rosterCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/participant-roster.csv`
+  );
+  assert.equal(rosterCsv.status, 200);
+  assert.equal(
+    rosterCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const rosterCsvText = await rosterCsv.text();
+  assert.match(
+    rosterCsvText,
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,importedAt,validationWarningCodes,validationWarningMessages\n/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","group:updated","booklet:updated","Ada Updated","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-c","group:xml","booklet:xml","Cara XML"/
+  );
+
   const metricsResponse = await requestJson<{
     requestCountsByRoute: Record<string, number>;
   }>("/metrics");
@@ -4192,6 +4222,11 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.ok(
     metricsResponse.body.requestCountsByRoute[
       "GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster"
+    ] >= 1
+  );
+  assert.ok(
+    metricsResponse.body.requestCountsByRoute[
+      "GET /api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/participant-roster.csv"
     ] >= 1
   );
 
@@ -5639,6 +5674,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       workspace: {
         importParticipantRoster: string;
         listParticipantRoster: string;
+        exportParticipantRosterCsv: string;
         listDetailedResponses: string;
         exportStudyMonitorCsv: string;
         exportResponseCsv: string;
@@ -5665,6 +5701,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "content_release_readiness",
     "participant_roster_import",
     "participant_roster_read",
+    "participant_roster_csv_export",
     "participant_session_read",
     "detailed_response_read",
     "response_csv_export",
@@ -5685,6 +5722,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
 
   assert.match(manifest.routes.workspace.importParticipantRoster, /participant-roster/);
   assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
+  assert.match(
+    manifest.routes.workspace.exportParticipantRosterCsv,
+    /participant-roster\.csv/
+  );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);
   assert.match(manifest.routes.workspace.exportResponseCsv, /responses\.csv/);

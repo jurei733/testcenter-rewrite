@@ -178,6 +178,10 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceParticipantRosterItem[]>;
+  exportParticipantRosterCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
   getParticipantSessionDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -459,6 +463,7 @@ export const firstSliceUseCases = {
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
+  exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
   listSourcePackages: "ListSourcePackages",
   createSourcePackage: "CreateSourcePackage",
@@ -1578,6 +1583,50 @@ const formatWorkspaceActivityCsv = (input: {
         activityEvent.occurredAt,
         activityEvent.summary,
         JSON.stringify(activityEvent.details)
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatParticipantRosterCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: WorkspaceParticipantRosterItem[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "participantRosterEntryId",
+    "loginKey",
+    "groupKey",
+    "bookletKey",
+    "displayName",
+    "importedAt",
+    "validationWarningCodes",
+    "validationWarningMessages"
+  ];
+  const rows = [...input.items].sort(
+    (left, right) =>
+      left.loginKey.localeCompare(right.loginKey) ||
+      left.participantRosterEntryId.localeCompare(right.participantRosterEntryId)
+  );
+
+  return [
+    header.join(","),
+    ...rows.map(item =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        item.participantRosterEntryId,
+        item.loginKey,
+        item.groupKey,
+        item.bookletKey ?? "",
+        item.displayName ?? "",
+        item.importedAt,
+        item.validationWarnings.map(warning => warning.code).join("|"),
+        item.validationWarnings.map(warning => warning.message).join("|")
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -5697,6 +5746,30 @@ export const createFirstSliceServices = (
             workspace.workspaceId
           )
         );
+      },
+      async exportParticipantRosterCsv(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const entries = await repository.listParticipantRosterEntriesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        );
+        const items = buildParticipantRosterReadItems(
+          entries,
+          await getActiveWorkspaceRelease(
+            repository,
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        );
+        return formatParticipantRosterCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       },
       async getParticipantSessionDetail(input) {
         const workspace = await requireWorkspace(

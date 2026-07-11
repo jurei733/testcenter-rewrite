@@ -30,6 +30,8 @@ export interface ShellRuntimeReadsHost {
   setParticipantSessionsView(nextValue: string): void;
   getParticipantRosterPath(): string;
   setParticipantRosterView(nextValue: string): void;
+  getParticipantRosterCsvExportPath(): string;
+  setParticipantRosterExportView(nextValue: string): void;
   getRuntimeStatePath(): string;
   getParticipantSessionDetailPath(): string;
   getDetailedResponsesPath(): string;
@@ -57,6 +59,18 @@ export async function loadParticipantRosterAction(
   );
   host.setParticipantRosterView(JSON.stringify(payload, null, 2));
   return payload;
+}
+
+export async function exportParticipantRosterCsvAction(
+  host: ShellRuntimeReadsHost
+): Promise<string> {
+  const csv = await host.request<string>(
+    "Participant Roster CSV Export",
+    "GET",
+    host.getParticipantRosterCsvExportPath()
+  );
+  host.setParticipantRosterExportView(csv);
+  return csv;
 }
 
 export async function refreshRuntimeReadsAction(
