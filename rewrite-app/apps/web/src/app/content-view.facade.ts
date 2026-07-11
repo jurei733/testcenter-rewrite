@@ -553,30 +553,38 @@ export class ContentViewFacade {
     ];
   }
 
-  get sourcePackageStructureItems(): RecordCollectionItem[] {
-    const payload = parseJsonDocument<GetSourcePackageResponse>(
-      this.content.sourcePackageDetailView
-    );
-    const structure = payload?.sourcePackageDetail.sourcePackage.contentStructure;
+	  get sourcePackageStructureItems(): RecordCollectionItem[] {
+	    const payload = parseJsonDocument<GetSourcePackageResponse>(
+	      this.content.sourcePackageDetailView
+	    );
+	    const structure = payload?.sourcePackageDetail.sourcePackage.contentStructure;
     return (
       structure?.bookletEntries.map(booklet => ({
         headline: booklet.displayLabel,
         subline: booklet.bookletKey,
         badges: [`${booklet.unitEntries.length} unit(s)`],
-        rows: [
-          {
-            label: "Unit Keys",
-            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
-          },
-          {
-            label: "Unit Labels",
-            value:
-              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
-          }
-        ],
-        selected: false
-      })) ?? []
-    );
+	        rows: [
+	          {
+	            label: "Unit Keys",
+	            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
+	          },
+	          {
+	            label: "Unit Labels",
+	            value:
+	              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
+	          },
+	          {
+	            label: "Prompt Coverage",
+	            value: this.formatUnitPromptCoverage(booklet.unitEntries)
+	          },
+	          {
+	            label: "Unit Prompts",
+	            value: this.formatUnitPromptPreview(booklet.unitEntries)
+	          }
+	        ],
+	        selected: false
+	      })) ?? []
+	    );
   }
 
   get draftSourceDocumentPreviewItems(): RecordCollectionItem[] {
@@ -1092,31 +1100,80 @@ export class ContentViewFacade {
     return items;
   }
 
-  get contentReleaseRuntimeSnapshotItems(): RecordCollectionItem[] {
-    const payload = parseJsonDocument<GetContentReleaseResponse>(
-      this.content.contentReleaseDetailView
-    );
-    const detail = payload?.contentReleaseDetail;
+	  get contentReleaseRuntimeSnapshotItems(): RecordCollectionItem[] {
+	    const payload = parseJsonDocument<GetContentReleaseResponse>(
+	      this.content.contentReleaseDetailView
+	    );
+	    const detail = payload?.contentReleaseDetail;
     return (
       detail?.contentRelease.runtimeSnapshot.bookletEntries.map(booklet => ({
         headline: booklet.displayLabel,
         subline: booklet.bookletKey,
         badges: [`${booklet.unitEntries.length} unit(s)`],
-        rows: [
-          {
-            label: "Unit Keys",
-            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
-          },
-          {
-            label: "Unit Labels",
-            value:
-              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
-          }
-        ],
-        selected: false
-      })) ?? []
-    );
-  }
+	        rows: [
+	          {
+	            label: "Unit Keys",
+	            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
+	          },
+	          {
+	            label: "Unit Labels",
+	            value:
+	              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
+	          },
+	          {
+	            label: "Prompt Coverage",
+	            value: this.formatUnitPromptCoverage(booklet.unitEntries)
+	          },
+	          {
+	            label: "Unit Prompts",
+	            value: this.formatUnitPromptPreview(booklet.unitEntries)
+	          }
+	        ],
+	        selected: false
+	      })) ?? []
+	    );
+	  }
+
+	  private formatUnitPromptCoverage(
+	    unitEntries: Array<{
+	      description?: string | null;
+	      content?: string | null;
+	    }>
+	  ): string {
+	    const describedCount = unitEntries.filter(unit => unit.description?.trim()).length;
+	    const promptCount = unitEntries.filter(unit => unit.content?.trim()).length;
+	    return `${promptCount} / ${unitEntries.length} prompt(s), ${describedCount} / ${unitEntries.length} description(s)`;
+	  }
+
+	  private formatUnitPromptPreview(
+	    unitEntries: Array<{
+	      unitKey: string;
+	      displayLabel?: string | null;
+	      description?: string | null;
+	      content?: string | null;
+	    }>
+	  ): string {
+	    const previews = unitEntries
+	      .map(unit => {
+	        const description = unit.description?.trim();
+	        const content = unit.content?.trim();
+	        if (!description && !content) {
+	          return "";
+	        }
+	        const label = unit.displayLabel?.trim() || unit.unitKey;
+	        const parts = [description, content].filter(Boolean).join(" - ");
+	        return `${label}: ${this.truncateText(parts, 120)}`;
+	      })
+	      .filter(Boolean);
+	    return previews.join(" | ") || "none";
+	  }
+
+	  private truncateText(value: string, maxLength: number): string {
+	    const normalized = value.replace(/\s+/g, " ").trim();
+	    return normalized.length > maxLength
+	      ? `${normalized.slice(0, Math.max(maxLength - 1, 0))}...`
+	      : normalized;
+	  }
 
   get contentReleaseHistoryItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetContentReleaseResponse>(

@@ -837,17 +837,33 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "staged")
   );
   await clickAction("Activate Release");
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
-    payload =>
-      typeof payload === "object" &&
-      payload != null &&
-      Array.isArray(payload.items) &&
-      payload.items.some(item => item?.contentRelease?.status === "active")
-  );
+	  await pollJsonWithPredicate(
+	    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
+	    payload =>
+	      typeof payload === "object" &&
+	      payload != null &&
+	      Array.isArray(payload.items) &&
+	      payload.items.some(item => item?.contentRelease?.status === "active")
+	  );
+	  logStep("content-prompt-read-model");
+	  await clickAction("Source Package Detail");
+	  await clickAction("Release Detail");
+	  await page.waitForFunction(
+	    () => {
+	      const bodyText = document.body.textContent ?? "";
+	      return (
+	        bodyText.includes("Prompt Coverage") &&
+	        bodyText.includes("1 / 3 prompt(s), 1 / 3 description(s)") &&
+	        bodyText.includes("Participant Route: Read the participant prompt.") &&
+	        bodyText.includes("Explain how the starter example works.")
+	      );
+	    },
+	    undefined,
+	    { timeout: 15_000 }
+	  );
 
-  logStep("participant-entry-url");
-  const participantRouteLoginKey = "student-participant-route";
+	  logStep("participant-entry-url");
+	  const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
   const participantRouteBookletKey = "booklet:starter";
   const participantRouteUnitKey = "unit-participant-route";
