@@ -133,6 +133,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Not Started Participants"
+        subtitle="Expected roster participants that still have no launched run."
+        [items]="view.studyMonitorNotStartedItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="No roster participant is waiting to start."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Study Monitor Group Detail"
         subtitle="Selected group sessions, runs, responses, and review pressure."
         [items]="view.studyMonitorGroupItems"

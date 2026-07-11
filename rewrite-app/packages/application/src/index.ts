@@ -3510,10 +3510,16 @@ const buildStudyMonitorSummary = (input: {
     }
     groupsByKey.set(groupKey, group);
   }
-  const sessionLoginKeys = new Set(
-    input.participantSessions.map(participantSession => participantSession.loginKey)
-  );
-  for (const rosterEntry of input.participantRosterEntries) {
+	  const sessionLoginKeys = new Set(
+	    input.participantSessions.map(participantSession => participantSession.loginKey)
+	  );
+	  const sessionsByLoginKey = new Map<string, ParticipantSession[]>();
+	  for (const participantSession of input.participantSessions) {
+	    const sessions = sessionsByLoginKey.get(participantSession.loginKey) ?? [];
+	    sessions.push(participantSession);
+	    sessionsByLoginKey.set(participantSession.loginKey, sessions);
+	  }
+	  for (const rosterEntry of input.participantRosterEntries) {
     const groupKey = rosterEntry.groupKey || "unknown-group";
     const group = groupsByKey.get(groupKey) ?? {
       groupKey,
@@ -3544,11 +3550,27 @@ const buildStudyMonitorSummary = (input: {
     groupsByKey.set(groupKey, group);
   }
 
-  const groups = Array.from(groupsByKey.values()).sort((left, right) =>
-    left.groupKey.localeCompare(right.groupKey)
-  );
+	  const groups = Array.from(groupsByKey.values()).sort((left, right) =>
+	    left.groupKey.localeCompare(right.groupKey)
+	  );
+	  const notStartedParticipants = input.participantRosterEntries
+	    .filter(rosterEntry => {
+	      const sessions = sessionsByLoginKey.get(rosterEntry.loginKey) ?? [];
+	      return (
+	        sessions.length === 0 ||
+	        sessions.every(
+	          session => !latestRunsBySessionId.has(session.participantSessionId)
+	        )
+	      );
+	    })
+	    .sort(
+	      (left, right) =>
+	        left.groupKey.localeCompare(right.groupKey) ||
+	        (left.bookletKey ?? "").localeCompare(right.bookletKey ?? "") ||
+	        left.loginKey.localeCompare(right.loginKey)
+	    );
 
-  return {
+	  return {
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
     generatedAt: input.generatedAt,
@@ -3562,10 +3584,11 @@ const buildStudyMonitorSummary = (input: {
     notStartedCount: groups.reduce((total, group) => total + group.notStartedCount, 0),
     runningCount: groups.reduce((total, group) => total + group.runningCount, 0),
     pausedCount: groups.reduce((total, group) => total + group.pausedCount, 0),
-    completedCount: groups.reduce((total, group) => total + group.completedCount, 0),
-    responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
-    reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
-    groups,
+	    completedCount: groups.reduce((total, group) => total + group.completedCount, 0),
+	    responseCount: groups.reduce((total, group) => total + group.responseCount, 0),
+	    reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
+	    notStartedParticipants,
+	    groups,
     bookletProgress: buildStudyMonitorBookletProgress({
       participantSessions: input.participantSessions,
       participantRosterEntries: input.participantRosterEntries,

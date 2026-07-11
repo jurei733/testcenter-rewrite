@@ -77,7 +77,7 @@ export class WorkspaceViewFacade {
     return this.uiState.workspace.workspaceLogExportView;
   }
 
-  get studyMonitorItems(): RecordCollectionItem[] {
+	  get studyMonitorItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
     );
@@ -198,10 +198,36 @@ export class WorkspaceViewFacade {
         actionLabel: "Open Unit Detail",
         actionPayload: { unitKey: unit.unitKey }
       }))
-    ];
-  }
+	    ];
+	  }
 
-  get studyMonitorBookletItems(): RecordCollectionItem[] {
+	  get studyMonitorNotStartedItems(): RecordCollectionItem[] {
+	    const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
+	      this.workspace.studyMonitorView
+	    );
+	    const notStartedParticipants =
+	      payload?.studyMonitorSummary.notStartedParticipants ?? [];
+	    return notStartedParticipants.map(rosterEntry => ({
+	      headline: rosterEntry.displayName ?? rosterEntry.loginKey,
+	      subline: rosterEntry.loginKey,
+	      badges: [
+	        "not started",
+	        rosterEntry.groupKey,
+	        rosterEntry.bookletKey ?? "default booklet"
+	      ],
+	      rows: [
+	        { label: "Login", value: rosterEntry.loginKey },
+	        { label: "Group", value: rosterEntry.groupKey },
+	        { label: "Booklet", value: rosterEntry.bookletKey ?? "none" },
+	        { label: "Display Name", value: rosterEntry.displayName ?? "none" },
+	        { label: "Imported", value: this.formatDateTime(rosterEntry.importedAt) }
+	      ],
+	      actionLabel: "Open Group Detail",
+	      actionPayload: { groupKey: rosterEntry.groupKey }
+	    }));
+	  }
+
+	  get studyMonitorBookletItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorBookletResponse>(
       this.workspace.studyMonitorBookletView
     );

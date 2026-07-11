@@ -510,6 +510,7 @@ export type WorkspaceStudyMonitorSummary = {
   completedCount: number;
   responseCount: number;
   reviewCount: number;
+  notStartedParticipants: ParticipantRosterEntry[];
   groups: WorkspaceStudyMonitorGroup[];
   bookletProgress: WorkspaceStudyMonitorBookletProgress[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
