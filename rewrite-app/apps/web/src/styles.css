@@ -651,6 +651,20 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.record-card-rows a {
+  color: var(--secondary);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration-color: rgba(31, 92, 84, 0.35);
+  text-underline-offset: 3px;
+}
+
+.record-card-rows a:hover {
+  color: var(--accent);
+  text-decoration-color: rgba(196, 82, 47, 0.6);
+}
+
 .record-card-selection {
   display: inline-flex;
   width: fit-content;

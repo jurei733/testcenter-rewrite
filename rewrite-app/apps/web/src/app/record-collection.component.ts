@@ -4,6 +4,7 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 export type RecordCollectionRow = {
   label: string;
   value: string;
+  href?: string;
 };
 
 export type RecordCollectionItem = {
@@ -48,7 +49,17 @@ export type RecordCollectionItem = {
           <dl class="record-card-rows">
             <div *ngFor="let row of item.rows">
               <dt>{{ row.label }}</dt>
-              <dd>{{ row.value }}</dd>
+              <dd>
+                <a
+                  *ngIf="row.href; else plainRowValue"
+                  [href]="row.href"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {{ row.value }}
+                </a>
+                <ng-template #plainRowValue>{{ row.value }}</ng-template>
+              </dd>
             </div>
           </dl>
 

@@ -154,7 +154,7 @@ try {
   const workspaceKey = `ui-workspace-${Date.now()}`;
   const participantEntryUrlPrefix = `${baseUrl}/participant?tenantKey=${encodeURIComponent(
     tenantKey
-  )}&workspaceKey=`;
+  )}&workspaceKey=${encodeURIComponent(workspaceKey)}`;
   const adminUsername = `ui-admin-${Date.now()}`;
   const adminPassword = "ui-smoke-admin-secret";
   let totalApiRequestCount = 0;
@@ -226,6 +226,24 @@ try {
       [selector, minLength],
       { timeout: 15_000 }
     );
+  };
+  const expectParticipantEntryAnchor = async (cardLocator, expectedFragments) => {
+    const link = cardLocator
+      .locator("a")
+      .filter({ hasText: participantEntryUrlPrefix })
+      .first();
+    await link.waitFor();
+    const href = await link.getAttribute("href");
+    assert.ok(
+      href?.startsWith(participantEntryUrlPrefix),
+      `Expected participant entry link to start with ${participantEntryUrlPrefix}, got ${href}`
+    );
+    for (const fragment of expectedFragments) {
+      assert.ok(
+        href.includes(fragment),
+        `Expected participant entry link ${href} to include ${fragment}`
+      );
+    }
   };
   const waitForBusy = async stepLabel => {
     try {
@@ -1183,14 +1201,21 @@ try {
     ].join("\n")
   );
   await page.locator("#importParticipantRosterButton").click();
-  await page
+  const savedAdaRosterCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Saved Participant Roster" })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "entry-student-a" }) })
     .filter({ hasText: "entry-student-a" })
-    .filter({ hasText: "Ada Entry" })
-    .waitFor();
+    .filter({ hasText: "Ada Entry" });
+  await savedAdaRosterCard.waitFor();
+  await expectParticipantEntryAnchor(savedAdaRosterCard, [
+    "loginKey=entry-student-a",
+    "groupKey=group%3Aentry-smoke",
+    "bookletKey=booklet%3Astarter"
+  ]);
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -1620,14 +1645,19 @@ try {
       exact: true
     })
   });
-  await notStartedParticipantsCard
+  const notStartedAdaCard = notStartedParticipantsCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "group:entry-smoke" })
     .filter({ hasText: "booklet:starter" })
-    .filter({ hasText: participantEntryUrlPrefix })
-    .waitFor();
+    .filter({ hasText: participantEntryUrlPrefix });
+  await notStartedAdaCard.waitFor();
+  await expectParticipantEntryAnchor(notStartedAdaCard, [
+    "loginKey=entry-student-a",
+    "groupKey=group%3Aentry-smoke",
+    "bookletKey=booklet%3Astarter"
+  ]);
   await notStartedParticipantsCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Ben Entry" }) })
@@ -1666,6 +1696,19 @@ try {
     participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
+  const groupDetailAdaCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Group Detail" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" });
+  await expectParticipantEntryAnchor(groupDetailAdaCard, [
+    "loginKey=entry-student-a",
+    "groupKey=group%3Aentry-smoke",
+    "bookletKey=booklet%3Astarter"
+  ]);
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
@@ -1703,6 +1746,19 @@ try {
     participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
+  const bookletDetailAdaCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Booklet Detail" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" });
+  await expectParticipantEntryAnchor(bookletDetailAdaCard, [
+    "loginKey=entry-student-a",
+    "groupKey=group%3Aentry-smoke",
+    "bookletKey=booklet%3Astarter"
+  ]);
   await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
   await page.waitForFunction(
     () => {
@@ -1745,6 +1801,19 @@ try {
     participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
+  const unitDetailAdaCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Unit Detail" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" });
+  await expectParticipantEntryAnchor(unitDetailAdaCard, [
+    "loginKey=entry-student-a",
+    "groupKey=group%3Aentry-smoke",
+    "bookletKey=booklet%3Astarter"
+  ]);
 
   logStep("nav-content-blocked-activation");
   await page.locator('[data-view-nav="content"]').click();

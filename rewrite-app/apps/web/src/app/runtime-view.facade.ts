@@ -297,6 +297,11 @@ export class RuntimeViewFacade {
                 this.uiState.workspace.tenantKey.trim(),
                 this.uiState.workspace.workspaceKey.trim(),
                 link
+              ),
+              href: this.buildParticipantEntryUrl(
+                this.uiState.workspace.tenantKey.trim(),
+                this.uiState.workspace.workspaceKey.trim(),
+                link
               )
             }
           ],

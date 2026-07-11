@@ -222,7 +222,8 @@ export class WorkspaceViewFacade {
         { label: "Display Name", value: rosterEntry.displayName ?? "none" },
         {
           label: "Entry URL",
-          value: this.buildParticipantEntryUrl(rosterEntry)
+          value: this.buildParticipantEntryUrl(rosterEntry),
+          href: this.buildParticipantEntryUrl(rosterEntry)
         },
         { label: "Imported", value: this.formatDateTime(rosterEntry.importedAt) }
       ],
@@ -289,7 +290,8 @@ export class WorkspaceViewFacade {
           },
           {
             label: "Entry URL",
-            value: this.buildParticipantEntryUrl(rosterEntry)
+            value: this.buildParticipantEntryUrl(rosterEntry),
+            href: this.buildParticipantEntryUrl(rosterEntry)
           },
           {
             label: "Imported",
@@ -438,7 +440,8 @@ export class WorkspaceViewFacade {
           },
           {
             label: "Entry URL",
-            value: this.buildParticipantEntryUrl(rosterEntry)
+            value: this.buildParticipantEntryUrl(rosterEntry),
+            href: this.buildParticipantEntryUrl(rosterEntry)
           },
           {
             label: "Imported",
@@ -597,7 +600,8 @@ export class WorkspaceViewFacade {
           },
           {
             label: "Entry URL",
-            value: this.buildParticipantEntryUrl(rosterEntry)
+            value: this.buildParticipantEntryUrl(rosterEntry),
+            href: this.buildParticipantEntryUrl(rosterEntry)
           },
           {
             label: "Imported",
