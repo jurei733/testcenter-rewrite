@@ -152,6 +152,9 @@ try {
   const baseUrl = `http://127.0.0.1:${port}`;
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
+  const participantEntryUrlPrefix = `${baseUrl}/participant?tenantKey=${encodeURIComponent(
+    tenantKey
+  )}&workspaceKey=`;
   const adminUsername = `ui-admin-${Date.now()}`;
   const adminPassword = "ui-smoke-admin-secret";
   let totalApiRequestCount = 0;
@@ -1086,8 +1089,7 @@ try {
     })
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "Ada Entry" })
-    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
-    .filter({ hasText: `tenantKey=${tenantKey}` })
+    .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
@@ -1098,16 +1100,14 @@ try {
     })
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "Xml Entry" })
-    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
-    .filter({ hasText: `tenantKey=${tenantKey}` })
+    .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: "group%3Axml-entry" })
     .waitFor();
   await page
     .locator("#entryLinksCsvPreview")
     .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
-    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
-    .filter({ hasText: `tenantKey=${tenantKey}` })
+    .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   await fillAndCommit(
@@ -1125,18 +1125,44 @@ try {
     ].join("\n")
   );
   await page.locator("#generateEntryLinksButton").click();
-  await page
+  const directEntryLinkCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Generated Entry Links" })
     })
     .filter({ hasText: "entry-student-direct-xml" })
     .filter({ hasText: "Direct Xml" })
-    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
-    .filter({ hasText: `tenantKey=${tenantKey}` })
+    .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: "group%3Adirect-xml" })
-    .filter({ hasText: "booklet%3Astarter" })
-    .waitFor();
+    .filter({ hasText: "booklet%3Astarter" });
+  await directEntryLinkCard.waitFor();
+  const participantEntryPopupPromise = page.waitForEvent("popup");
+  await directEntryLinkCard
+    .getByRole("button", { name: "Open Participant Entry", exact: true })
+    .click({ force: true });
+  const participantEntryPopup = await participantEntryPopupPromise;
+  await participantEntryPopup.locator("#participantLoginKey").waitFor();
+  await participantEntryPopup.waitForFunction(
+    ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey, expectedGroupKey, expectedBookletKey]) => {
+      const valueOf = selector => document.querySelector(selector)?.value;
+      return (
+        valueOf("#participantTenantKey") === expectedTenantKey &&
+        valueOf("#participantWorkspaceKey") === expectedWorkspaceKey &&
+        valueOf("#participantLoginKey") === expectedLoginKey &&
+        valueOf("#participantRouteGroupKey") === expectedGroupKey &&
+        valueOf("#participantRouteBookletKey") === expectedBookletKey
+      );
+    },
+    [
+      tenantKey,
+      workspaceKey,
+      "entry-student-direct-xml",
+      "group:direct-xml",
+      participantRouteBookletKey
+    ],
+    { timeout: 15_000 }
+  );
+  await participantEntryPopup.close();
   logStep("participant-sign-in");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
@@ -1336,6 +1362,9 @@ try {
       const entrySmokeGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:entry-smoke")
         : null;
+      const directXmlGroup = Array.isArray(summary.groups)
+        ? summary.groups.find(group => group?.groupKey === "group:direct-xml")
+        : null;
       const xmlEntryGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:xml-entry")
         : null;
@@ -1349,17 +1378,21 @@ try {
           )
         : 0;
       return (
-        summary.expectedParticipantCount === 5 &&
+        summary.expectedParticipantCount === 6 &&
         summary.rosterEntryCount === 3 &&
-        summary.participantSessionCount === 2 &&
-        summary.testRunCount === 2 &&
+        summary.participantSessionCount === 3 &&
+        summary.testRunCount === 3 &&
         summary.notStartedCount === 3 &&
-        missingResponseCount === 7 &&
+        missingResponseCount === 10 &&
         Array.isArray(summary.groups) &&
-        summary.groups.length === 4 &&
+        summary.groups.length === 5 &&
         pausedWorkUnit?.rosterExpectedCount === 1 &&
-        pausedWorkUnit?.expectedRunCount === 3 &&
-        pausedWorkUnit?.missingResponseCount === 2 &&
+        pausedWorkUnit?.expectedRunCount === 4 &&
+        pausedWorkUnit?.missingResponseCount === 3 &&
+        directXmlGroup?.expectedParticipantCount === 1 &&
+        directXmlGroup?.participantSessionCount === 1 &&
+        directXmlGroup?.testRunCount === 1 &&
+        directXmlGroup?.runningCount === 1 &&
         entrySmokeGroup?.expectedParticipantCount === 2 &&
         entrySmokeGroup?.rosterEntryCount === 2 &&
         entrySmokeGroup?.participantSessionCount === 0 &&
@@ -1377,12 +1410,12 @@ try {
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
-    .filter({ hasText: "5 expected participant(s)" })
-    .filter({ hasText: "2 session(s)" })
-    .filter({ hasText: "2 run(s)" })
-    .filter({ hasText: "4 group(s)" })
+    .filter({ hasText: "6 expected participant(s)" })
+    .filter({ hasText: "3 session(s)" })
+    .filter({ hasText: "3 run(s)" })
+    .filter({ hasText: "5 group(s)" })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "7 missing response(s)" })
+    .filter({ hasText: "10 missing response(s)" })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })
@@ -1428,8 +1461,8 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
     .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "1/3 answered" })
-    .filter({ hasText: "2 missing" })
+    .filter({ hasText: "1/4 answered" })
+    .filter({ hasText: "3 missing" })
     .filter({ hasText: "Roster Expected" })
     .waitFor();
   await studyMonitorCard
@@ -1447,7 +1480,7 @@ try {
       );
       return (
         detailCard?.textContent?.includes("booklet:starter") &&
-        detailCard.textContent.includes("3 expected") &&
+        detailCard.textContent.includes("4 expected") &&
         detailCard.textContent.includes("1 not started") &&
         detailCard.textContent.includes("Roster Entries") &&
         detailCard.textContent.includes("entry-student-a") &&
@@ -1490,7 +1523,7 @@ try {
       );
       return (
         detailCard?.textContent?.includes("unit-paused") &&
-        detailCard.textContent.includes("2 missing") &&
+        detailCard.textContent.includes("3 missing") &&
         detailCard.textContent.includes("Roster Expected") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&
@@ -1528,6 +1561,8 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Activation Blocking Runs" })
     })
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
     .getByRole("button", { name: "Open In Runtime" })
     .first()
     .click();

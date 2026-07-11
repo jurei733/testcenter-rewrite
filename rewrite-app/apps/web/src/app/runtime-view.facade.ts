@@ -205,7 +205,7 @@ export class RuntimeViewFacade {
         { label: "URL", value: link.url }
       ],
       selected: this.runtime.loginKey.trim() === link.loginKey,
-      actionLabel: "Use Link Scope",
+      actionLabel: "Open Participant Entry",
       actionPayload: {
         loginKey: link.loginKey,
         groupKey: link.groupKey,
@@ -1195,6 +1195,11 @@ export class RuntimeViewFacade {
     }
     this.runtime.bookletKey = item.actionPayload?.bookletKey ?? "";
     this.persistState();
+
+    const url = item.actionPayload?.url?.trim();
+    if (url) {
+      globalThis.window?.open(url, "_blank", "noopener,noreferrer");
+    }
   }
 
   selectParticipantSession(item: RecordCollectionItem): void {
@@ -1317,14 +1322,13 @@ export class RuntimeViewFacade {
     workspaceKey: string,
     link: Omit<RuntimeEntryLink, "url">
   ): string {
-    const query = new URLSearchParams({
-      workspaceKey: workspaceKey || "demo-workspace",
-      loginKey: link.loginKey,
-      groupKey: link.groupKey
-    });
+    const query = new URLSearchParams();
     if (tenantKey) {
       query.set("tenantKey", tenantKey);
     }
+    query.set("workspaceKey", workspaceKey || "demo-workspace");
+    query.set("loginKey", link.loginKey);
+    query.set("groupKey", link.groupKey);
     if (link.bookletKey) {
       query.set("bookletKey", link.bookletKey);
     }
