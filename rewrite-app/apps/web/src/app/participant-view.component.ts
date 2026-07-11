@@ -86,6 +86,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               name="participantRouteUnitResponse"
               [disabled]="!view.player.canSaveProgress"
               [(ngModel)]="view.runtime.currentUnitResponse"
+              (change)="view.persistState()"
               placeholder="Write the participant response for this unit."
             ></textarea>
           </label>
@@ -113,7 +114,8 @@ export class ParticipantViewComponent implements OnInit {
       groupKey: query.get("groupKey"),
       bookletKey: query.get("bookletKey"),
       participantSessionId: query.get("participantSessionId"),
-      currentUnitKey: query.get("currentUnitKey")
+      currentUnitKey: query.get("currentUnitKey"),
+      unitResponse: query.get("unitResponse")
     });
   }
 }

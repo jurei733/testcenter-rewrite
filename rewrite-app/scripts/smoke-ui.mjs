@@ -200,8 +200,12 @@ try {
   const expectInputValue = async (selector, expectedValue) => {
     await page.waitForFunction(
       ([targetSelector, targetValue]) => {
-        const input = document.querySelector(targetSelector);
-        return input instanceof HTMLInputElement && input.value === targetValue;
+        const field = document.querySelector(targetSelector);
+        return (
+          (field instanceof HTMLInputElement ||
+            field instanceof HTMLTextAreaElement) &&
+          field.value === targetValue
+        );
       },
       [selector, expectedValue],
       { timeout: 15_000 }
@@ -843,6 +847,8 @@ try {
   const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
   const participantRouteBookletKey = "booklet:starter";
+  const participantRouteUnitKey = "unit-participant-route";
+  const participantRouteUnitResponse = "Prefilled participant route response";
   await page.goto(
     `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
       workspaceKey
@@ -850,6 +856,10 @@ try {
       participantRouteGroupKey
     )}&bookletKey=${encodeURIComponent(
       participantRouteBookletKey
+    )}&currentUnitKey=${encodeURIComponent(
+      participantRouteUnitKey
+    )}&unitResponse=${encodeURIComponent(
+      participantRouteUnitResponse
     )}`,
     { waitUntil: "networkidle" }
   );
@@ -858,6 +868,11 @@ try {
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
   await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
   await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
+  await expectInputValue("#participantRouteCurrentUnitKey", participantRouteUnitKey);
+  await expectInputValue(
+    "#participantRouteUnitResponse",
+    participantRouteUnitResponse
+  );
   logStep("participant-route-auto-start");
   const participantRouteSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const participantRouteSessionsPayload = await pollJsonWithPredicate(
@@ -904,7 +919,6 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  await fillAndCommit("#participantRouteCurrentUnitKey", "unit-participant-route");
   await clickAction("Save Paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
@@ -917,18 +931,22 @@ try {
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.status === "paused" &&
-      payload.currentRunState.testRun.currentUnitKey === "unit-participant-route"
+      payload.currentRunState.testRun.currentUnitKey === participantRouteUnitKey &&
+      payload.currentRunState.testRun.unitResponses?.[participantRouteUnitKey] ===
+        participantRouteUnitResponse
   );
   await page.waitForFunction(
-    () =>
+    ([expectedUnitKey, expectedResponse]) =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "paused" &&
       document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
-        "unit-participant-route" &&
+        expectedUnitKey &&
+      document.querySelector("#participantRouteUnitResponse")?.value ===
+        expectedResponse &&
       document
         .querySelector("#participantRouteActions")
         ?.textContent?.includes("resume"),
-    undefined,
+    [participantRouteUnitKey, participantRouteUnitResponse],
     { timeout: 15_000 }
   );
   await clickAction("Resume Run");

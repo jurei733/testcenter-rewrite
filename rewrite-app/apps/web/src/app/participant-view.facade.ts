@@ -48,6 +48,7 @@ type ParticipantEntryParameters = {
   bookletKey?: string | null;
   participantSessionId?: string | null;
   currentUnitKey?: string | null;
+  unitResponse?: string | null;
 };
 
 type NormalizedParticipantEntryParameters = {
@@ -57,6 +58,8 @@ type NormalizedParticipantEntryParameters = {
   bookletKey: string;
   participantSessionId: string;
   currentUnitKey: string;
+  unitResponse: string;
+  hasUnitResponse: boolean;
 };
 
 @Injectable({ providedIn: "root" })
@@ -80,7 +83,10 @@ export class ParticipantViewFacade {
     const normalized = this.applyEntryParameters(parameters);
 
     if (normalized.participantSessionId) {
-      this.viewState.onActionAsync(() => this.resumeSessionInternal());
+      this.viewState.onActionAsync(async () => {
+        await this.resumeSessionInternal();
+        this.restoreEntryDraft(normalized);
+      });
       return;
     }
 
@@ -88,6 +94,7 @@ export class ParticipantViewFacade {
       this.viewState.onActionAsync(async () => {
         await this.signInInternal();
         await this.resumeSessionInternal();
+        this.restoreEntryDraft(normalized);
       });
     }
   }
@@ -101,7 +108,9 @@ export class ParticipantViewFacade {
       groupKey: parameters.groupKey?.trim() ?? "",
       bookletKey: parameters.bookletKey?.trim() ?? "",
       participantSessionId: parameters.participantSessionId?.trim() ?? "",
-      currentUnitKey: parameters.currentUnitKey?.trim() ?? ""
+      currentUnitKey: parameters.currentUnitKey?.trim() ?? "",
+      unitResponse: parameters.unitResponse ?? "",
+      hasUnitResponse: parameters.unitResponse != null
     };
 
     if (normalized.workspaceKey) {
@@ -132,6 +141,9 @@ export class ParticipantViewFacade {
     if (normalized.currentUnitKey) {
       this.runtime.currentUnitKey = normalized.currentUnitKey;
     }
+    if (normalized.hasUnitResponse) {
+      this.runtime.currentUnitResponse = normalized.unitResponse;
+    }
 
     if (
       normalized.workspaceKey ||
@@ -139,12 +151,37 @@ export class ParticipantViewFacade {
       normalized.groupKey ||
       normalized.bookletKey ||
       normalized.participantSessionId ||
-      normalized.currentUnitKey
+      normalized.currentUnitKey ||
+      normalized.hasUnitResponse
     ) {
       this.persistState();
     }
 
     return normalized;
+  }
+
+  private restoreEntryDraft(normalized: NormalizedParticipantEntryParameters): void {
+    let shouldPersist = false;
+
+    if (
+      normalized.currentUnitKey &&
+      this.runtime.currentUnitKey !== normalized.currentUnitKey
+    ) {
+      this.runtime.currentUnitKey = normalized.currentUnitKey;
+      shouldPersist = true;
+    }
+
+    if (
+      normalized.hasUnitResponse &&
+      this.runtime.currentUnitResponse !== normalized.unitResponse
+    ) {
+      this.runtime.currentUnitResponse = normalized.unitResponse;
+      shouldPersist = true;
+    }
+
+    if (shouldPersist) {
+      this.persistState();
+    }
   }
 
   get player(): ParticipantPlayerState {
