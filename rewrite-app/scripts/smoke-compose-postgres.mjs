@@ -171,6 +171,32 @@ const verifyBootstrappedDemo = async baseUrl => {
     throw new Error("Expected demo workspace to have an active content release.");
   }
 
+  const rosterCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-roster.csv`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo roster CSV status", rosterCsv.status, 200);
+  expectEqual(
+    "demo roster CSV content-type",
+    rosterCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const rosterCsvText = await rosterCsv.text();
+  if (
+    !rosterCsvText.startsWith(
+      "tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,importedAt,validationWarningCodes,validationWarningMessages\n"
+    ) ||
+    !/"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student"/.test(
+      rosterCsvText
+    )
+  ) {
+    throw new Error("Expected demo participant roster CSV to contain student-demo.");
+  }
+
   const participantSignIn = await requestJson(
     `${baseUrl}/api/v1/participant/auth/sign-in`,
     {
