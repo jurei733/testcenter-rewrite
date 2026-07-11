@@ -1866,6 +1866,7 @@ const normalizeParsedJsonContentStructure = (
   type JsonManifestResource = {
     key: string;
     displayLabel: string;
+    dependencyReferences: string[];
   };
   const collectJsonManifestResources = (
     value: unknown
@@ -1948,8 +1949,38 @@ const normalizeParsedJsonContentStructure = (
           "Resource",
           key
         );
+        const dependencyReferences = readEntries(
+          resource.dependencies,
+          resource.dependency,
+          resource.dependencyReferences,
+          resource.dependencyReference
+        )
+          .map(rawDependency => {
+            if (typeof rawDependency === "string") {
+              return normalizeManifestToken(rawDependency);
+            }
 
-        resources.set(identifier, { key, displayLabel });
+            const dependency = asObject(rawDependency);
+            if (!dependency) {
+              return "";
+            }
+
+            return readStringValue(
+              dependency,
+              "identifierref",
+              "identifierRef",
+              "ref",
+              "resourceId",
+              "resourceIdentifier",
+              "identifier",
+              "id"
+            );
+          })
+          .filter((dependencyReference): dependencyReference is string =>
+            Boolean(dependencyReference)
+          );
+
+        resources.set(identifier, { key, displayLabel, dependencyReferences });
       }
 
       for (const container of readNestedManifestContainers(objectValue)) {
@@ -2086,6 +2117,39 @@ const normalizeParsedJsonContentStructure = (
       })
       .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
   };
+  const collectJsonResourceDependencyBookletEntries = (
+    value: unknown
+  ): SourcePackageContentStructure["bookletEntries"] => {
+    const resources = collectJsonManifestResources(value);
+    if (resources.size === 0) {
+      return [];
+    }
+
+    return [...resources.values()]
+      .map(resource => {
+        const unitEntries = resource.dependencyReferences
+          .map(dependencyReference => resources.get(dependencyReference))
+          .filter(
+            (dependencyResource): dependencyResource is JsonManifestResource =>
+              Boolean(dependencyResource)
+          )
+          .map(dependencyResource => ({
+            unitKey: dependencyResource.key,
+            displayLabel: dependencyResource.displayLabel
+          }));
+
+        if (unitEntries.length === 0) {
+          return null;
+        }
+
+        return {
+          bookletKey: resource.key,
+          displayLabel: resource.displayLabel,
+          unitEntries
+        };
+      })
+      .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
+  };
   const readNestedManifestContainers = (
     value: Record<string, unknown>
   ): unknown[] =>
@@ -2131,13 +2195,21 @@ const normalizeParsedJsonContentStructure = (
   if (rawBooklets.length === 0) {
     const organizationBookletEntries =
       collectJsonOrganizationBookletEntries(parsed);
-    if (organizationBookletEntries.length === 0) {
-      return null;
+    if (organizationBookletEntries.length > 0) {
+      return normalizeContentStructure({
+        bookletEntries: organizationBookletEntries
+      });
     }
 
-    return normalizeContentStructure({
-      bookletEntries: organizationBookletEntries
-    });
+    const dependencyBookletEntries =
+      collectJsonResourceDependencyBookletEntries(parsed);
+    if (dependencyBookletEntries.length > 0) {
+      return normalizeContentStructure({
+        bookletEntries: dependencyBookletEntries
+      });
+    }
+
+    return null;
   }
 
   const contentStructure: SourcePackageContentStructure = {

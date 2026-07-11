@@ -3174,6 +3174,108 @@ test("source document import resolves JSON organization item references", async 
   );
 });
 
+test("source document import resolves JSON resource dependencies", async () => {
+  const tenantKey = "integration-tenant-json-dependencies";
+  const workspaceKey = "integration-workspace-json-dependencies";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest-dependencies.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          resources: [
+            {
+              identifier: "RES-TEST",
+              href: "tests/json-booklet.xml",
+              title: "JSON Dependency Booklet",
+              dependencies: [
+                { identifierref: "RES-ITEM-1" },
+                { ref: "RES-ITEM-2" }
+              ]
+            },
+            {
+              identifier: "RES-ITEM-1",
+              href: "items/json-item-one.xml"
+            },
+            {
+              identifier: "RES-ITEM-2",
+              title: "JSON Item Two",
+              files: [{ href: "items/json-item-two.xml" }]
+            }
+          ]
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "tests/json-booklet.xml",
+          displayLabel: "JSON Dependency Booklet",
+          unitEntries: [
+            {
+              unitKey: "items/json-item-one.xml",
+              displayLabel: "Resource items/json item one.xml"
+            },
+            {
+              unitKey: "items/json-item-two.xml",
+              displayLabel: "JSON Item Two"
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";
