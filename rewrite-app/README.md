@@ -93,6 +93,7 @@ That executes:
 
 - typecheck
 - build
+- focused unit tests for shared contracts helpers
 - memory + sqlite integration tests
 - a built-server startup smoke test against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
@@ -413,6 +414,7 @@ For runtime probes:
 
 - [.github/workflows/ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
   - Node 22 typecheck and production build
+  - focused unit tests for shared contracts helpers
   - memory + sqlite integration matrix
   - Postgres integration against a service database
   - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
