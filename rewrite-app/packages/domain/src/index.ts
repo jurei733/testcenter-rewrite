@@ -207,6 +207,8 @@ export type SourcePackageBookletEntry = {
 export type SourcePackageUnitEntry = {
   unitKey: string;
   displayLabel: string;
+  description?: string;
+  content?: string;
 };
 
 export type ImportJob = {
@@ -251,6 +253,8 @@ export type ContentReleaseBookletEntry = {
 export type ContentReleaseUnitEntry = {
   unitKey: string;
   displayLabel: string;
+  description?: string;
+  content?: string;
 };
 
 export type ParticipantSession = {
@@ -325,10 +329,14 @@ export type ParticipantCurrentRunState = {
   currentUnit: {
     unitKey: string | null;
     displayLabel: string | null;
+    description?: string | null;
+    content?: string | null;
   };
   bookletUnits: Array<{
     unitKey: string;
     displayLabel: string;
+    description?: string;
+    content?: string;
   }>;
   availableActions: Array<"save_progress" | "resume" | "complete">;
 };

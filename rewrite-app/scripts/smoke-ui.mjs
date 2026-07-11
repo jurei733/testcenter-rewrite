@@ -13,7 +13,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route" /><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
+  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 let smokeAdminSessionToken = "";
 
 const createSmokeFetchInit = () =>
@@ -942,7 +942,11 @@ try {
       document.querySelector("#participantRouteGroupLabel")?.textContent?.trim() ===
         expectedGroupKey &&
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
-        expectedSessionId,
+        expectedSessionId &&
+      document.querySelector("#participantRouteUnitDescription")?.textContent?.trim() ===
+        "Read the participant prompt." &&
+      document.querySelector("#participantRouteUnitContent")?.textContent?.trim() ===
+        "Explain how the starter example works.",
     [
       participantRouteLoginKey,
       participantRouteGroupKey,

@@ -859,6 +859,37 @@ pre {
   font-weight: 800;
 }
 
+.participant-unit-prompt {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(239, 177, 86, 0.22), transparent 30%),
+    rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(27, 36, 48, 0.12);
+}
+
+.participant-unit-prompt span {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-unit-prompt p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.participant-unit-prompt strong {
+  color: var(--ink);
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
 .progress-track {
   overflow: hidden;
   height: 10px;

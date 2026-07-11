@@ -122,6 +122,11 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
             <p id="participantRouteCompletionLabel" [class.is-complete]="view.player.isComplete">{{ view.player.completionLabel }}</p>
           </section>
+          <section class="participant-unit-prompt" aria-label="Current unit prompt">
+            <span>Unit Prompt</span>
+            <p id="participantRouteUnitDescription">{{ view.player.unitDescription }}</p>
+            <strong id="participantRouteUnitContent">{{ view.player.unitContent }}</strong>
+          </section>
           <label>
             Unit Response
             <textarea

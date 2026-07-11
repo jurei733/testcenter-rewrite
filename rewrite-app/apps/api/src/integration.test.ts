@@ -1313,7 +1313,17 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const currentState = await requestJsonAt<{
       currentRunState: {
-        bookletUnits: Array<{ unitKey: string; displayLabel: string }>;
+        currentUnit: {
+          unitKey: string | null;
+          displayLabel: string | null;
+          description?: string | null;
+          content?: string | null;
+        };
+        bookletUnits: Array<{
+          unitKey: string;
+          displayLabel: string;
+          content?: string;
+        }>;
       };
     }>(
       isolated.baseUrl,
@@ -1324,6 +1334,18 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.deepEqual(
       currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
       ["unit-intro", "unit-practice", "unit-finish"]
+    );
+    assert.equal(
+      currentState.body.currentRunState.currentUnit.description,
+      "Demo introduction task"
+    );
+    assert.equal(
+      currentState.body.currentRunState.currentUnit.content,
+      "Describe what you see in the demo introduction."
+    );
+    assert.equal(
+      currentState.body.currentRunState.bookletUnits[1]?.content,
+      "Save a practice response."
     );
 
     const saved = await requestJsonAt<{
@@ -2880,7 +2902,12 @@ test("source document import normalizes fallback labels and duplicate entries", 
             {
               bookletId: " booklet:alpha ",
               unitRefs: [
-                { unitId: " unit-alpha ", title: " Alpha Unit " },
+                {
+                  unitId: " unit-alpha ",
+                  title: " Alpha Unit ",
+                  description: "Alpha setup",
+                  prompt: "Solve the alpha prompt."
+                },
                 { unitId: "unit-alpha", title: "Duplicate Alpha Unit" },
                 { ref: "unit-beta" }
               ]
@@ -2936,7 +2963,12 @@ test("source document import normalizes fallback labels and duplicate entries", 
           bookletKey: "booklet:alpha",
           displayLabel: "Booklet booklet alpha",
           unitEntries: [
-            { unitKey: "unit-alpha", displayLabel: "Alpha Unit" },
+            {
+              unitKey: "unit-alpha",
+              displayLabel: "Alpha Unit",
+              description: "Alpha setup",
+              content: "Solve the alpha prompt."
+            },
             { unitKey: "unit-beta", displayLabel: "Unit unit beta" },
             { unitKey: "unit-gamma", displayLabel: "Gamma Unit" }
           ]

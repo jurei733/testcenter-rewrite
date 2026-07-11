@@ -28,6 +28,8 @@ type ParticipantPlayerState = {
   sessionLabel: string;
   bookletLabel: string;
   unitLabel: string;
+  unitDescription: string;
+  unitContent: string;
   unitKey: string;
   unitPosition: string;
   unitItems: ParticipantPlayerUnitItem[];
@@ -102,22 +104,22 @@ export class ParticipantViewFacade {
   startFromEntryParameters(parameters: ParticipantEntryParameters): void {
     const normalized = this.applyEntryParameters(parameters);
 
-    if (normalized.participantSessionId) {
-      this.viewState.onActionAsync(async () => {
-        await this.resumeSessionInternal();
-        this.restoreEntryDraft(normalized);
-      });
-      return;
-    }
+	    if (normalized.participantSessionId) {
+	      this.viewState.onActionAsync(async () => {
+	        await this.resumeSessionInternal();
+	        await this.applyEntryDraftAfterResume(normalized);
+	      });
+	      return;
+	    }
 
-    if (normalized.workspaceKey && normalized.loginKey) {
-      this.viewState.onActionAsync(async () => {
-        await this.signInInternal();
-        await this.resumeSessionInternal();
-        this.restoreEntryDraft(normalized);
-      });
-    }
-  }
+	    if (normalized.workspaceKey && normalized.loginKey) {
+	      this.viewState.onActionAsync(async () => {
+	        await this.signInInternal();
+	        await this.resumeSessionInternal();
+	        await this.applyEntryDraftAfterResume(normalized);
+	      });
+	    }
+	  }
 
   private applyEntryParameters(
     parameters: ParticipantEntryParameters
@@ -192,8 +194,8 @@ export class ParticipantViewFacade {
     return normalized;
   }
 
-  private restoreEntryDraft(normalized: NormalizedParticipantEntryParameters): void {
-    let shouldPersist = false;
+	  private restoreEntryDraft(normalized: NormalizedParticipantEntryParameters): void {
+	    let shouldPersist = false;
 
     if (
       normalized.currentUnitKey &&
@@ -211,10 +213,30 @@ export class ParticipantViewFacade {
       shouldPersist = true;
     }
 
-    if (shouldPersist) {
-      this.persistState();
-    }
-  }
+	    if (shouldPersist) {
+	      this.persistState();
+	    }
+	  }
+
+	  private async applyEntryDraftAfterResume(
+	    normalized: NormalizedParticipantEntryParameters
+	  ): Promise<void> {
+	    if (normalized.currentUnitKey && this.runtime.testRunId.trim()) {
+	      this.runtime.currentUnitKey = normalized.currentUnitKey;
+	      if (normalized.hasUnitResponse) {
+	        this.runtime.currentUnitResponse = normalized.unitResponse;
+	      }
+	      this.persistState();
+	      await this.saveProgressInternal(
+	        "running",
+	        normalized.currentUnitKey,
+	        normalized.hasUnitResponse ? normalized.unitResponse : undefined
+	      );
+	      return;
+	    }
+
+	    this.restoreEntryDraft(normalized);
+	  }
 
   get player(): ParticipantPlayerState {
     const currentState = this.readCurrentRunState();
@@ -231,6 +253,8 @@ export class ParticipantViewFacade {
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
         bookletLabel: "No booklet loaded",
         unitLabel: "No unit loaded",
+        unitDescription: "No unit description available yet.",
+        unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
         unitItems: [],
@@ -259,6 +283,12 @@ export class ParticipantViewFacade {
       currentState.currentUnit.displayLabel ??
       currentState.currentUnit.unitKey ??
       "Untitled unit";
+    const unitDescription =
+      currentState.currentUnit.description?.trim() ||
+      "No additional instructions for this unit.";
+    const unitContent =
+      currentState.currentUnit.content?.trim() ||
+      `Respond to ${unitLabel}.`;
     const unitKey = currentState.currentUnit.unitKey ?? "";
     const bookletUnits = currentState.bookletUnits ?? [];
     const unitIndex = bookletUnits.findIndex(unit => unit.unitKey === unitKey);
@@ -294,6 +324,8 @@ export class ParticipantViewFacade {
       sessionLabel: currentState.participantSession.participantSessionId,
       bookletLabel: currentState.booklet.displayLabel,
       unitLabel,
+      unitDescription,
+      unitContent,
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",

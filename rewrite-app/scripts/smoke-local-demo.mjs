@@ -135,15 +135,16 @@ try {
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
   await demoLink.waitFor({ timeout: 15_000 });
-  assert.equal(
-    await demoLink.getAttribute("href"),
-    [
-      "/participant?workspaceKey=demo-workspace",
-      "loginKey=student-demo",
-      "groupKey=group:student-demo",
-      "bookletKey=booklet:demo"
-    ].join("&")
-  );
+	assert.equal(
+		await demoLink.getAttribute("href"),
+		[
+			"/participant?tenantKey=demo-tenant",
+			"workspaceKey=demo-workspace",
+			"loginKey=student-demo",
+			"groupKey=group:student-demo",
+			"bookletKey=booklet:demo"
+		].join("&")
+	);
   await demoLink.click();
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(
@@ -165,6 +166,14 @@ try {
   assert.equal(
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"
+  );
+  assert.equal(
+    (await page.locator("#participantRouteUnitDescription").textContent())?.trim(),
+    "Demo introduction task"
+  );
+  assert.equal(
+    (await page.locator("#participantRouteUnitContent").textContent())?.trim(),
+    "Describe what you see in the demo introduction."
   );
   await page.locator("#participantRouteUnitResponse").fill("Intro answer from smoke");
 

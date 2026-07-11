@@ -1754,6 +1754,13 @@ const normalizeManifestLabel = (
   return label || toDisplayLabel(fallbackPrefix, key) || key;
 };
 
+const normalizeUnitContent = (value: unknown): string | undefined => {
+  const content = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return content || undefined;
+};
+
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
@@ -1792,13 +1799,17 @@ const normalizeContentStructure = (
         continue;
       }
 
+      const description = normalizeUnitContent(unitEntry.description);
+      const content = normalizeUnitContent(unitEntry.content);
       normalizedBooklet.unitEntries.push({
         unitKey,
         displayLabel: normalizeManifestLabel(
           unitEntry.displayLabel,
           "Unit",
           unitKey
-        )
+        ),
+        ...(description ? { description } : {}),
+        ...(content ? { content } : {})
       });
       unitKeys.add(unitKey);
     }
@@ -2298,6 +2309,19 @@ const normalizeParsedJsonContentStructure = (
               }
 
               const unit = rawUnit as Record<string, unknown>;
+              const description = normalizeUnitContent(
+                unit.description ?? unit.summary ?? unit.instructions
+              );
+              const content = normalizeUnitContent(
+                unit.content ??
+                  unit.prompt ??
+                  unit.question ??
+                  unit.body ??
+                  unit.text ??
+                  unit.stimulus ??
+                  unit.markdown ??
+                  unit.html
+              );
               return {
                 unitKey: String(
                   unit.unitKey ??
@@ -2329,7 +2353,9 @@ const normalizeParsedJsonContentStructure = (
                     unit.name ??
                     unit.displayName ??
                     ""
-                ).trim()
+                ).trim(),
+                ...(description ? { description } : {}),
+                ...(content ? { content } : {})
               };
             })
             .filter(Boolean) as SourcePackageContentStructure["bookletEntries"][number]["unitEntries"]
@@ -2650,6 +2676,33 @@ const collectXmlBookletEntries = (
       /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItemRef|assessment-item-ref|itemRef|item-ref|unitFile|unit-file|resource|file|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
+      const unitContent = unitMatch[3] ?? "";
+      const description = normalizeUnitContent(
+        readXmlAttribute(
+          unitAttributes,
+          "description",
+          "summary",
+          "instructions"
+        ) ?? readXmlChildText(unitContent, "description", "summary", "instructions")
+      );
+      const content = normalizeUnitContent(
+        readXmlAttribute(
+          unitAttributes,
+          "content",
+          "prompt",
+          "question",
+          "text",
+          "stimulus"
+        ) ??
+          readXmlChildText(
+            unitContent,
+            "content",
+            "prompt",
+            "question",
+            "text",
+            "stimulus"
+          )
+      );
       unitEntries.push({
         unitKey: String(
           readXmlAttribute(
@@ -2684,7 +2737,9 @@ const collectXmlBookletEntries = (
             "name",
             "displayName"
           ) ?? ""
-        ).trim()
+        ).trim(),
+        ...(description ? { description } : {}),
+        ...(content ? { content } : {})
       });
     }
 
@@ -2878,10 +2933,26 @@ const buildRuntimeSnapshot = (
           bookletKey: `booklet:${baseLabel}`,
           displayLabel: `${baseLabel} Booklet`,
           unitEntries: [
-            { unitKey: "unit-1", displayLabel: "Introduction Unit" },
-            { unitKey: "unit-2", displayLabel: "Practice Unit" },
-            { unitKey: "unit-3", displayLabel: "Assessment Unit" },
-            { unitKey: "unit-4", displayLabel: "Wrap-Up Unit" }
+            {
+              unitKey: "unit-1",
+              displayLabel: "Introduction Unit",
+              content: "Read the introduction and confirm that you are ready to begin."
+            },
+            {
+              unitKey: "unit-2",
+              displayLabel: "Practice Unit",
+              content: "Use this practice unit to check that responses can be saved."
+            },
+            {
+              unitKey: "unit-3",
+              displayLabel: "Assessment Unit",
+              content: "Enter the response for the assessment unit."
+            },
+            {
+              unitKey: "unit-4",
+              displayLabel: "Wrap-Up Unit",
+              content: "Review your work and complete the test when you are finished."
+            }
           ]
         }
       ]
@@ -2918,11 +2989,18 @@ const resolveRuntimeUnit = (
   contentRelease: ContentRelease,
   bookletKey: string,
   unitKey: string | null
-): { unitKey: string | null; displayLabel: string | null } => {
+): {
+  unitKey: string | null;
+  displayLabel: string | null;
+  description?: string | null;
+  content?: string | null;
+} => {
   if (!unitKey) {
     return {
       unitKey: null,
-      displayLabel: null
+      displayLabel: null,
+      description: null,
+      content: null
     };
   }
 
@@ -2936,14 +3014,21 @@ const resolveRuntimeUnit = (
 
   return {
     unitKey,
-    displayLabel: unitEntry?.displayLabel ?? toDisplayLabel("Unit", unitKey)
+    displayLabel: unitEntry?.displayLabel ?? toDisplayLabel("Unit", unitKey),
+    description: unitEntry?.description ?? null,
+    content: unitEntry?.content ?? null
   };
 };
 
 const resolveRuntimeBookletUnits = (
   contentRelease: ContentRelease,
   bookletKey: string
-): Array<{ unitKey: string; displayLabel: string }> => {
+): Array<{
+  unitKey: string;
+  displayLabel: string;
+  description?: string;
+  content?: string;
+}> => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
       candidate => candidate.bookletKey === bookletKey
@@ -2952,7 +3037,9 @@ const resolveRuntimeBookletUnits = (
   return (
     bookletEntry?.unitEntries.map(unitEntry => ({
       unitKey: unitEntry.unitKey,
-      displayLabel: unitEntry.displayLabel
+      displayLabel: unitEntry.displayLabel,
+      ...(unitEntry.description ? { description: unitEntry.description } : {}),
+      ...(unitEntry.content ? { content: unitEntry.content } : {})
     })) ?? []
   );
 };
