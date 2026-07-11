@@ -850,7 +850,9 @@ try {
   const participantRouteUnitKey = "unit-participant-route";
   const participantRouteUnitResponse = "Prefilled participant route response";
   await page.goto(
-    `${baseUrl}/participant?workspaceKey=${encodeURIComponent(
+    `${baseUrl}/participant?tenantKey=${encodeURIComponent(
+      tenantKey
+    )}&workspaceKey=${encodeURIComponent(
       workspaceKey
     )}&loginKey=${encodeURIComponent(participantRouteLoginKey)}&groupKey=${encodeURIComponent(
       participantRouteGroupKey
@@ -864,6 +866,7 @@ try {
     { waitUntil: "networkidle" }
   );
   await page.locator("#participantLoginKey").waitFor();
+  await expectInputValue("#participantTenantKey", tenantKey);
   await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
   await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
@@ -1084,6 +1087,7 @@ try {
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "Ada Entry" })
     .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
+    .filter({ hasText: `tenantKey=${tenantKey}` })
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
@@ -1095,6 +1099,7 @@ try {
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "Xml Entry" })
     .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
+    .filter({ hasText: `tenantKey=${tenantKey}` })
     .filter({ hasText: "group%3Axml-entry" })
     .waitFor();
   await page
@@ -1102,6 +1107,7 @@ try {
     .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
     .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
+    .filter({ hasText: `tenantKey=${tenantKey}` })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   await fillAndCommit(
@@ -1127,6 +1133,7 @@ try {
     .filter({ hasText: "entry-student-direct-xml" })
     .filter({ hasText: "Direct Xml" })
     .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
+    .filter({ hasText: `tenantKey=${tenantKey}` })
     .filter({ hasText: "group%3Adirect-xml" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();

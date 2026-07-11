@@ -87,7 +87,8 @@ const localDemoAccess = {
   workspaceKey: "demo-workspace",
   participantLoginKey: "student-demo",
   participantPath: [
-    "/participant?workspaceKey=demo-workspace",
+    "/participant?tenantKey=demo-tenant",
+    "workspaceKey=demo-workspace",
     "loginKey=student-demo",
     "groupKey=group:student-demo",
     "bookletKey=booklet:demo"

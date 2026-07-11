@@ -9,7 +9,8 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import type { LiveContextSection } from "./live-context.component";
 
 const localDemoParticipantLink = [
-  "/participant?workspaceKey=demo-workspace",
+  "/participant?tenantKey=demo-tenant",
+  "workspaceKey=demo-workspace",
   "loginKey=student-demo",
   "groupKey=group:student-demo",
   "bookletKey=booklet:demo"

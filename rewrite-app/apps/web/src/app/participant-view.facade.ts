@@ -42,6 +42,7 @@ type ParticipantPlayerState = {
 };
 
 type ParticipantEntryParameters = {
+  tenantKey?: string | null;
   workspaceKey?: string | null;
   loginKey?: string | null;
   groupKey?: string | null;
@@ -52,6 +53,7 @@ type ParticipantEntryParameters = {
 };
 
 type NormalizedParticipantEntryParameters = {
+  tenantKey: string;
   workspaceKey: string;
   loginKey: string;
   groupKey: string;
@@ -103,6 +105,7 @@ export class ParticipantViewFacade {
     parameters: ParticipantEntryParameters
   ): NormalizedParticipantEntryParameters {
     const normalized = {
+      tenantKey: parameters.tenantKey?.trim() ?? "",
       workspaceKey: parameters.workspaceKey?.trim() ?? "",
       loginKey: parameters.loginKey?.trim() ?? "",
       groupKey: parameters.groupKey?.trim() ?? "",
@@ -112,6 +115,16 @@ export class ParticipantViewFacade {
       unitResponse: parameters.unitResponse ?? "",
       hasUnitResponse: parameters.unitResponse != null
     };
+    const previousTenantKey = this.workspace.tenantKey.trim();
+    const previousWorkspaceKey = this.workspace.workspaceKey.trim();
+    const scopeChanged =
+      !normalized.participantSessionId &&
+      ((normalized.tenantKey && normalized.tenantKey !== previousTenantKey) ||
+        (normalized.workspaceKey && normalized.workspaceKey !== previousWorkspaceKey));
+
+    if (normalized.tenantKey) {
+      this.workspace.tenantKey = normalized.tenantKey;
+    }
 
     if (normalized.workspaceKey) {
       const loginChanged =
@@ -119,7 +132,7 @@ export class ParticipantViewFacade {
         normalized.loginKey !== this.runtime.loginKey.trim() &&
         !normalized.participantSessionId;
       this.workspace.workspaceKey = normalized.workspaceKey;
-      if (loginChanged) {
+      if (scopeChanged || loginChanged) {
         this.runtime.participantSessionId = "";
         this.runtime.testRunId = "";
         this.runtime.currentRunStateView = 'Use "Start Or Resume".';
@@ -146,6 +159,7 @@ export class ParticipantViewFacade {
     }
 
     if (
+      normalized.tenantKey ||
       normalized.workspaceKey ||
       normalized.loginKey ||
       normalized.groupKey ||
@@ -301,6 +315,7 @@ export class ParticipantViewFacade {
       "POST",
       productionApiRoutes.participant.signIn,
       {
+        tenantKey: this.workspace.tenantKey.trim() || undefined,
         workspaceKey: this.workspace.workspaceKey.trim(),
         loginKey: this.runtime.loginKey.trim(),
         groupKey: this.runtime.groupKey.trim() || undefined

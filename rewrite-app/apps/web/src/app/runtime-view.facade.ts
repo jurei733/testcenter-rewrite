@@ -254,6 +254,7 @@ export class RuntimeViewFacade {
             {
               label: "Entry URL",
               value: this.buildParticipantEntryUrl(
+                this.uiState.workspace.tenantKey.trim(),
                 this.uiState.workspace.workspaceKey.trim(),
                 link
               )
@@ -1039,11 +1040,15 @@ export class RuntimeViewFacade {
       groupKey: entry.groupKey,
       bookletKey: entry.bookletKey ?? "",
       displayName: entry.displayName ?? "",
-      url: this.buildParticipantEntryUrl(this.uiState.workspace.workspaceKey.trim(), {
-        loginKey: entry.loginKey,
-        groupKey: entry.groupKey,
-        bookletKey: entry.bookletKey ?? ""
-      })
+      url: this.buildParticipantEntryUrl(
+        this.uiState.workspace.tenantKey.trim(),
+        this.uiState.workspace.workspaceKey.trim(),
+        {
+          loginKey: entry.loginKey,
+          groupKey: entry.groupKey,
+          bookletKey: entry.bookletKey ?? ""
+        }
+      )
     }));
     this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
     this.persistState();
@@ -1277,6 +1282,7 @@ export class RuntimeViewFacade {
   }
 
   private parseEntryRosterRows(): RuntimeEntryLink[] {
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
     const workspaceKey = this.uiState.workspace.workspaceKey.trim();
     return parseParticipantRosterText(this.runtime.entryRosterText).map(link => {
       const entryLink = {
@@ -1287,7 +1293,7 @@ export class RuntimeViewFacade {
       };
       return {
         ...entryLink,
-        url: this.buildParticipantEntryUrl(workspaceKey, entryLink)
+        url: this.buildParticipantEntryUrl(tenantKey, workspaceKey, entryLink)
       };
     });
   }
@@ -1307,6 +1313,7 @@ export class RuntimeViewFacade {
   }
 
   private buildParticipantEntryUrl(
+    tenantKey: string,
     workspaceKey: string,
     link: Omit<RuntimeEntryLink, "url">
   ): string {
@@ -1315,6 +1322,9 @@ export class RuntimeViewFacade {
       loginKey: link.loginKey,
       groupKey: link.groupKey
     });
+    if (tenantKey) {
+      query.set("tenantKey", tenantKey);
+    }
     if (link.bookletKey) {
       query.set("bookletKey", link.bookletKey);
     }

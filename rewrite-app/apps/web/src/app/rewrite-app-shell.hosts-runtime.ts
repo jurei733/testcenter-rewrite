@@ -58,6 +58,7 @@ export function createRuntimeActionsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getTenantKey: () => args.workspaceState.tenantKey,
     getWorkspaceKey: () => args.workspaceState.workspaceKey,
     getEntryRosterText: () => args.runtimeState.entryRosterText,
     setParticipantRosterView: nextValue => {

@@ -3628,9 +3628,26 @@ test("participant sign-in reuses an open session for the active release", async 
     "participant_workspace_key_required"
   );
 
+  const invalidTenantSignIn = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        tenantKey: 123,
+        workspaceKey,
+        loginKey: "reentry-student"
+      }
+    }
+  );
+
+  assert.equal(invalidTenantSignIn.status, 400);
+  assert.equal(invalidTenantSignIn.body.error, "participant_tenant_key_invalid");
+
   const firstSignIn = await requestJson<{
     participantSession: {
       participantSessionId: string;
+      tenantId: string;
+      workspaceId: string;
       loginKey: string;
       groupKey: string;
       status: string;
@@ -3638,6 +3655,7 @@ test("participant sign-in reuses an open session for the active release", async 
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
     body: {
+      tenantKey: ` ${tenantKey} `,
       workspaceKey: ` ${workspaceKey} `,
       loginKey: " reentry-student ",
       groupKey: " group:custom-reentry "
@@ -3648,6 +3666,7 @@ test("participant sign-in reuses an open session for the active release", async 
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
     body: {
+      tenantKey,
       workspaceKey,
       loginKey: "reentry-student",
       groupKey: "group:custom-reentry"
@@ -3655,6 +3674,8 @@ test("participant sign-in reuses an open session for the active release", async 
   });
 
   assert.equal(secondSignIn.status, 200);
+  assert.ok(firstSignIn.body.participantSession.tenantId);
+  assert.ok(firstSignIn.body.participantSession.workspaceId);
   assert.equal(firstSignIn.body.participantSession.loginKey, "reentry-student");
   assert.equal(firstSignIn.body.participantSession.groupKey, "group:custom-reentry");
   assert.equal(
@@ -3673,6 +3694,7 @@ test("participant sign-in reuses an open session for the active release", async 
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
     body: {
+      tenantKey,
       workspaceKey,
       loginKey: "reentry-student",
       groupKey: "group:custom-reentry"

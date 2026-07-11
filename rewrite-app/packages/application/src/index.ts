@@ -289,6 +289,7 @@ export type WorkspaceReviewPort = {
 
 export type ParticipantRuntimePort = {
   signIn(input: {
+    tenantKey?: string | null;
     workspaceKey: string;
     loginKey: string;
     groupKey?: string;
@@ -717,6 +718,22 @@ const normalizeParticipantWorkspaceKey = (value: unknown): string => {
   }
 
   return workspaceKey;
+};
+
+const normalizeOptionalParticipantTenantKey = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "participant_tenant_key_invalid",
+      "Participant tenantKey must be a string when provided."
+    );
+  }
+
+  return value.trim() || null;
 };
 
 const normalizeParticipantSessionId = (value: unknown): string => {
@@ -6288,17 +6305,20 @@ export const createFirstSliceServices = (
     createImportJobWithRelease,
     participantRuntime: {
       async signIn(input) {
+        const tenantKey = normalizeOptionalParticipantTenantKey(input.tenantKey);
         const workspaceKey = normalizeParticipantWorkspaceKey(input.workspaceKey);
         const loginKey = normalizeParticipantLoginKey(input.loginKey);
-        const workspace = await repository.getWorkspaceByWorkspaceKey(
-          workspaceKey
-        );
+        const workspace = tenantKey
+          ? await repository.getWorkspaceByScope(tenantKey, workspaceKey)
+          : await repository.getWorkspaceByWorkspaceKey(workspaceKey);
 
         if (!workspace) {
           throw new FirstSliceError(
             404,
             "workspace_not_found",
-            `Workspace '${workspaceKey}' was not found.`
+            tenantKey
+              ? `Workspace '${workspaceKey}' was not found in tenant '${tenantKey}'.`
+              : `Workspace '${workspaceKey}' was not found.`
           );
         }
 

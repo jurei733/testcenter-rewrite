@@ -41,6 +41,7 @@ export interface ShellRuntimeActionsHost {
   getUpdateReviewPath(): string;
   getDeleteReviewPath(): string;
   getImportParticipantRosterPath(): string;
+  getTenantKey(): string;
   getWorkspaceKey(): string;
   getEntryRosterText(): string;
   setParticipantRosterView(nextValue: string): void;
@@ -144,6 +145,7 @@ export async function participantSignInAction(
     "POST",
     host.getParticipantSignInPath(),
     {
+      tenantKey: host.getTenantKey().trim() || undefined,
       workspaceKey: host.getWorkspaceKey().trim(),
       loginKey: host.getLoginKey().trim(),
       groupKey: host.getGroupKey().trim() || undefined
