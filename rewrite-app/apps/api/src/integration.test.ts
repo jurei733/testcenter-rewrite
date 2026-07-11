@@ -4433,14 +4433,14 @@ test("study monitor counts saved roster participants before sign-in", async () =
       expectedParticipantCount: number;
       rosterEntryCount: number;
       participantSessionCount: number;
-	      notStartedCount: number;
-	      notStartedParticipants: Array<{
-	        loginKey: string;
-	        groupKey: string;
-	        bookletKey: string | null;
-	        displayName: string | null;
-	      }>;
-	      groups: Array<{
+      notStartedCount: number;
+      notStartedParticipants: Array<{
+        loginKey: string;
+        groupKey: string;
+        bookletKey: string | null;
+        displayName: string | null;
+      }>;
+      groups: Array<{
         groupKey: string;
         expectedParticipantCount: number;
         rosterEntryCount: number;
@@ -4462,32 +4462,32 @@ test("study monitor counts saved roster participants before sign-in", async () =
 
   assert.equal(summary.status, 200);
   assert.equal(summary.body.studyMonitorSummary.expectedParticipantCount, 2);
-	  assert.equal(summary.body.studyMonitorSummary.rosterEntryCount, 2);
-	  assert.equal(summary.body.studyMonitorSummary.participantSessionCount, 0);
-	  assert.equal(summary.body.studyMonitorSummary.notStartedCount, 2);
-	  assert.deepEqual(
-	    summary.body.studyMonitorSummary.notStartedParticipants.map(entry => ({
-	      loginKey: entry.loginKey,
-	      groupKey: entry.groupKey,
-	      bookletKey: entry.bookletKey,
-	      displayName: entry.displayName
-	    })),
-	    [
-	      {
-	        loginKey: "monitor-a",
-	        groupKey: "group:monitor-alpha",
-	        bookletKey: "booklet:starter",
-	        displayName: "Monitor Alpha"
-	      },
-	      {
-	        loginKey: "monitor-b",
-	        groupKey: "group:monitor-beta",
-	        bookletKey: "booklet:starter",
-	        displayName: "Monitor Beta"
-	      }
-	    ]
-	  );
-	  assert.deepEqual(
+  assert.equal(summary.body.studyMonitorSummary.rosterEntryCount, 2);
+  assert.equal(summary.body.studyMonitorSummary.participantSessionCount, 0);
+  assert.equal(summary.body.studyMonitorSummary.notStartedCount, 2);
+  assert.deepEqual(
+    summary.body.studyMonitorSummary.notStartedParticipants.map(entry => ({
+      loginKey: entry.loginKey,
+      groupKey: entry.groupKey,
+      bookletKey: entry.bookletKey,
+      displayName: entry.displayName
+    })),
+    [
+      {
+        loginKey: "monitor-a",
+        groupKey: "group:monitor-alpha",
+        bookletKey: "booklet:starter",
+        displayName: "Monitor Alpha"
+      },
+      {
+        loginKey: "monitor-b",
+        groupKey: "group:monitor-beta",
+        bookletKey: "booklet:starter",
+        displayName: "Monitor Beta"
+      }
+    ]
+  );
+  assert.deepEqual(
     summary.body.studyMonitorSummary.groups.map(group => ({
       groupKey: group.groupKey,
       expectedParticipantCount: group.expectedParticipantCount,
