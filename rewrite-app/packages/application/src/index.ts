@@ -306,7 +306,7 @@ export type ParticipantRuntimePort = {
   }): Promise<TestRun>;
   saveProgress(input: {
     testRunId: string;
-    currentUnitKey: string | null;
+    currentUnitKey?: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
   }): Promise<TestRun>;
@@ -6520,9 +6520,10 @@ export const createFirstSliceServices = (
           );
         }
 
-        const nextCurrentUnitKey = normalizeOptionalCurrentUnitKey(
-          input.currentUnitKey
-        );
+        const hasCurrentUnitKeyInput = input.currentUnitKey !== undefined;
+        const nextCurrentUnitKey = hasCurrentUnitKeyInput
+          ? normalizeOptionalCurrentUnitKey(input.currentUnitKey)
+          : testRun.currentUnitKey;
         const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         if (nextCurrentUnitKey) {
           const contentRelease = await requireContentRelease(
@@ -6537,8 +6538,11 @@ export const createFirstSliceServices = (
         }
 
         const nextUnitResponses = { ...testRun.unitResponses };
-        if (nextCurrentUnitKey && nextUnitResponse != null) {
-          nextUnitResponses[nextCurrentUnitKey] = nextUnitResponse;
+        const responseUnitKey = hasCurrentUnitKeyInput
+          ? nextCurrentUnitKey
+          : testRun.currentUnitKey;
+        if (responseUnitKey && nextUnitResponse != null) {
+          nextUnitResponses[responseUnitKey] = nextUnitResponse;
         }
         const nextStatus = normalizeTestRunProgressStatus(input.status);
 

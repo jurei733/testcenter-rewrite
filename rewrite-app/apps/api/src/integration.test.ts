@@ -1348,6 +1348,74 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(saved.body.testRun.currentUnitKey, "unit-intro");
     assert.equal(saved.body.testRun.unitResponses["unit-intro"], "My first demo response");
 
+    const statusOnlySave = await requestJsonAt<{
+      testRun: {
+        currentUnitKey: string | null;
+        status: string;
+        unitResponses: Record<string, string>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          status: "paused"
+        }
+      }
+    );
+
+    assert.equal(statusOnlySave.status, 200);
+    assert.equal(statusOnlySave.body.testRun.status, "paused");
+    assert.equal(statusOnlySave.body.testRun.currentUnitKey, "unit-intro");
+    assert.equal(
+      statusOnlySave.body.testRun.unitResponses["unit-intro"],
+      "My first demo response"
+    );
+
+    const movedToPractice = await requestJsonAt<{
+      testRun: {
+        currentUnitKey: string | null;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "unit-practice",
+          status: "running"
+        }
+      }
+    );
+
+    assert.equal(movedToPractice.status, 200);
+    assert.equal(movedToPractice.body.testRun.currentUnitKey, "unit-practice");
+
+    const responseOnlySave = await requestJsonAt<{
+      testRun: {
+        currentUnitKey: string | null;
+        unitResponses: Record<string, string>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          status: "running",
+          unitResponse: "Practice response without repeated unit key"
+        }
+      }
+    );
+
+    assert.equal(responseOnlySave.status, 200);
+    assert.equal(responseOnlySave.body.testRun.currentUnitKey, "unit-practice");
+    assert.equal(
+      responseOnlySave.body.testRun.unitResponses["unit-practice"],
+      "Practice response without repeated unit key"
+    );
+
     const unknownUnitSave = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
@@ -1491,6 +1559,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       stateAfterResponse.body.currentRunState.testRun.unitResponses["unit-intro"],
       "My first demo response"
     );
+    assert.equal(
+      stateAfterResponse.body.currentRunState.testRun.unitResponses[
+        "unit-practice"
+      ],
+      "Practice response without repeated unit key"
+    );
 
     const detailedResponses = await requestJsonAt<{
       items: Array<{
@@ -1514,13 +1588,24 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(detailedResponses.status, 200);
     assert.deepEqual(detailedResponses.body.items.map(item => item.unitKey), [
-      "unit-intro"
+      "unit-intro",
+      "unit-practice"
     ]);
-    assert.equal(detailedResponses.body.items[0]?.loginKey, "student-demo");
-    assert.equal(detailedResponses.body.items[0]?.groupKey, "group:student-demo");
-    assert.equal(detailedResponses.body.items[0]?.bookletKey, "booklet:demo");
-    assert.equal(detailedResponses.body.items[0]?.response, "My first demo response");
-    assert.equal(detailedResponses.body.items[0]?.responseLength, 22);
+    const introResponse = detailedResponses.body.items.find(
+      item => item.unitKey === "unit-intro"
+    );
+    const practiceResponse = detailedResponses.body.items.find(
+      item => item.unitKey === "unit-practice"
+    );
+    assert.equal(introResponse?.loginKey, "student-demo");
+    assert.equal(introResponse?.groupKey, "group:student-demo");
+    assert.equal(introResponse?.bookletKey, "booklet:demo");
+    assert.equal(introResponse?.response, "My first demo response");
+    assert.equal(introResponse?.responseLength, 22);
+    assert.equal(
+      practiceResponse?.response,
+      "Practice response without repeated unit key"
+    );
 
     const filteredDetailedResponses = await requestJsonAt<{
       items: Array<{
@@ -1623,7 +1708,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitor.body.studyMonitorSummary.participantSessionCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.testRunCount, 1);
     assert.equal(studyMonitor.body.studyMonitorSummary.runningCount, 1);
-    assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 1);
+    assert.equal(studyMonitor.body.studyMonitorSummary.responseCount, 2);
     assert.equal(studyMonitor.body.studyMonitorSummary.reviewCount, 0);
     assert.deepEqual(
       studyMonitor.body.studyMonitorSummary.bookletProgress.map(booklet => ({
@@ -1642,7 +1727,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           participantSessionCount: 1,
           testRunCount: 1,
           runningCount: 1,
-          responseCount: 1,
+          responseCount: 2,
           unitCount: 3
         }
       ]
@@ -1673,8 +1758,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
-          responseCount: 0,
-          missingResponseCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0,
           unexpectedResponseCount: 0
         }
       ]
@@ -1933,7 +2018,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
 
     assert.equal(participantSessionDetail.status, 200);
-    assert.equal(participantSessionDetail.body.participantSessionDetail.responseCount, 1);
+    assert.equal(participantSessionDetail.body.participantSessionDetail.responseCount, 2);
     assert.equal(participantSessionDetail.body.participantSessionDetail.reviewCount, 1);
     assert.equal(
       participantSessionDetail.body.participantSessionDetail.runSummaries[0]?.testRun
@@ -1943,7 +2028,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(
       participantSessionDetail.body.participantSessionDetail.runSummaries[0]
         ?.responseCount,
-      1
+      2
     );
     assert.equal(
       participantSessionDetail.body.participantSessionDetail.runSummaries[0]
@@ -2004,7 +2089,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.runningCount, 1);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.pausedCount, 0);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.completedCount, 0);
-    assert.equal(studyMonitorGroup.body.studyMonitorGroup.responseCount, 1);
+    assert.equal(studyMonitorGroup.body.studyMonitorGroup.responseCount, 2);
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.reviewCount, 1);
     assert.equal(
       studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.participantSession.loginKey,
@@ -2016,7 +2101,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(
       studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.responseCount,
-      1
+      2
     );
     assert.equal(studyMonitorGroup.body.studyMonitorGroup.sessions[0]?.reviewCount, 1);
     assert.equal(
@@ -2050,8 +2135,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
-          responseCount: 0,
-          missingResponseCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0,
           unexpectedResponseCount: 0
         }
       ]
@@ -2106,7 +2191,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.testRunCount, 1);
     assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.runningCount, 1);
-    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.responseCount, 1);
+    assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.responseCount, 2);
     assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.reviewCount, 1);
     assert.equal(studyMonitorBooklet.body.studyMonitorBooklet.unitCount, 3);
     assert.equal(
@@ -2120,7 +2205,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(
       studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.responseCount,
-      1
+      2
     );
     assert.equal(
       studyMonitorBooklet.body.studyMonitorBooklet.testRuns[0]?.reviewCount,
@@ -2152,8 +2237,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         {
           unitKey: "unit-practice",
           expectedRunCount: 1,
-          responseCount: 0,
-          missingResponseCount: 1,
+          responseCount: 1,
+          missingResponseCount: 0,
           unexpectedResponseCount: 0
         }
       ]
@@ -2358,7 +2443,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(groupDeletion.status, 200);
     assert.equal(groupDeletion.body.deletion.groupKey, "group:student-demo");
     assert.equal(groupDeletion.body.deletion.deletedTestRunCount, 1);
-    assert.equal(groupDeletion.body.deletion.deletedResponseCount, 1);
+    assert.equal(groupDeletion.body.deletion.deletedResponseCount, 2);
     assert.equal(groupDeletion.body.deletion.deletedReviewCount, 1);
     assert.deepEqual(groupDeletion.body.deletion.affectedParticipantSessionIds, [
       participantSignIn.body.participantSession.participantSessionId
@@ -2458,7 +2543,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.deepEqual(deletionActivity.body.items[0]?.activityEvent.details, {
       groupKey: "group:student-demo",
       deletedTestRunCount: 1,
-      deletedResponseCount: 1,
+      deletedResponseCount: 2,
       deletedReviewCount: 1,
       affectedParticipantSessionIds: [
         participantSignIn.body.participantSession.participantSessionId

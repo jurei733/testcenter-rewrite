@@ -289,7 +289,7 @@ The added read side now makes the first slice inspectable:
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
 - participant launch/resume can now carry an explicit `bookletKey` so entry links and operator flows can start a specific booklet from the active release
-- participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses
+- participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses, and status/response-only saves retain the current unit for player clients that do not repeat the unit key on every save
 - study-monitor reads now include workspace summary, group drill-down, booklet drill-down, and unit drill-down with per-run answer/missing/review status plus saved-roster expected/missing unit coverage
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot

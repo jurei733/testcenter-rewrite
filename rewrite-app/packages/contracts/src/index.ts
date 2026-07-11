@@ -588,7 +588,7 @@ export type ResumeParticipantSessionRequest = {
 };
 
 export type SaveTestRunProgressRequest = {
-  currentUnitKey: string | null;
+  currentUnitKey?: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
 };
