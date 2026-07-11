@@ -305,6 +305,20 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Manifest Capabilities"
+        subtitle="Advertised operator, runtime, import, and production capabilities grouped from the live manifest."
+        [items]="view.manifestCapabilityItems"
+        emptyState="Refresh diagnostics to inspect manifest capabilities."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Manifest Route Groups"
+        subtitle="The live route surface grouped by API area, derived from the same manifest used by probes."
+        [items]="view.manifestRouteGroupItems"
+        emptyState="Refresh diagnostics to inspect manifest route groups."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Build Identity"
         subtitle="Current build and phase context without opening the manifest JSON."
         [items]="view.buildIdentityItems"

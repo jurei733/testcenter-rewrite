@@ -65,6 +65,13 @@ type RuntimeMetricsPayload = {
   errorCounts: Record<string, number>;
 };
 
+type RuntimeHealthPayload = {
+  manifest?: {
+    capabilities?: string[];
+    routes?: Record<string, unknown>;
+  };
+};
+
 type AdminSessionViewPayload = Partial<
   BootstrapAdminUserResponse &
     AdminSignInResponse &
@@ -702,6 +709,76 @@ export class OpsViewFacade {
     ];
   }
 
+  get manifestCapabilityItems(): RecordCollectionItem[] {
+    const manifest = parseJsonDocument<RuntimeHealthPayload>(
+      this.ops.runtimeHealthView
+    )?.manifest;
+    const capabilities = manifest?.capabilities ?? [];
+    if (capabilities.length === 0) {
+      return [];
+    }
+
+    const groupedCapabilities = capabilities.reduce<Record<string, string[]>>(
+      (groups, capability) => {
+        const groupName = this.capabilityGroupName(capability);
+        groups[groupName] = [...(groups[groupName] ?? []), capability];
+        return groups;
+      },
+      {}
+    );
+
+    return Object.entries(groupedCapabilities)
+      .sort(
+        (left, right) =>
+          right[1].length - left[1].length || left[0].localeCompare(right[0])
+      )
+      .map(([groupName, groupCapabilities]) => ({
+        headline: groupName,
+        subline: `${groupCapabilities.length} capability(s)`,
+        badges: groupCapabilities.slice(0, 3).map(capability =>
+          this.humanizeKey(capability)
+        ),
+        rows: [
+          {
+            label: "Capabilities",
+            value: groupCapabilities.map(capability => this.humanizeKey(capability)).join(", ")
+          },
+          {
+            label: "Manifest Coverage",
+            value: `${capabilities.length} total advertised capability(s)`
+          }
+        ]
+      }));
+  }
+
+  get manifestRouteGroupItems(): RecordCollectionItem[] {
+    const manifest = parseJsonDocument<RuntimeHealthPayload>(
+      this.ops.runtimeHealthView
+    )?.manifest;
+    const routeGroups = manifest?.routes ?? {};
+
+    return Object.entries(routeGroups)
+      .sort(([leftGroup], [rightGroup]) => leftGroup.localeCompare(rightGroup))
+      .map(([groupName, routes]) => {
+        const routeNames = this.flattenRouteNames(routes);
+        return {
+          headline: this.humanizeKey(groupName),
+          subline: `${this.countRouteLeaves(routes)} route(s)`,
+          badges: routeNames.slice(0, 3).map(routeName => this.humanizeKey(routeName)),
+          rows: [
+            {
+              label: "Route Names",
+              value: routeNames.slice(0, 8).map(routeName => this.humanizeKey(routeName)).join(", ")
+            },
+            {
+              label: "Raw Group",
+              value: groupName
+            }
+          ]
+        } satisfies RecordCollectionItem;
+      });
+  }
+
   get lifecycleItems(): RecordCollectionItem[] {
     const diagnostics = parseJsonDocument<GetRuntimeDiagnosticsResponse>(
       this.ops.runtimeDiagnosticsView
@@ -1050,6 +1127,66 @@ export class OpsViewFacade {
       .replace(/([A-Z])/g, " $1")
       .replace(/[_-]/g, " ")
       .replace(/^\w/, firstCharacter => firstCharacter.toUpperCase());
+  }
+
+  private capabilityGroupName(capability: string): string {
+    if (capability.startsWith("admin_")) {
+      return "Admin Control";
+    }
+    if (
+      capability.startsWith("source_") ||
+      capability.startsWith("import_") ||
+      capability.startsWith("content_")
+    ) {
+      return "Content Release";
+    }
+    if (
+      capability.startsWith("participant_") ||
+      capability.startsWith("test_run_")
+    ) {
+      return "Participant Runtime";
+    }
+    if (capability.startsWith("workspace_") || capability.startsWith("tenant_")) {
+      return "Workspace Setup";
+    }
+    if (capability.startsWith("study_") || capability.startsWith("monitor_")) {
+      return "Monitoring";
+    }
+    if (
+      capability.startsWith("response_") ||
+      capability.startsWith("review_") ||
+      capability.startsWith("log_") ||
+      capability.startsWith("result_") ||
+      capability.startsWith("detailed_")
+    ) {
+      return "Operator Reads";
+    }
+    if (capability.startsWith("system_") || capability.startsWith("frontend_")) {
+      return "Runtime Surface";
+    }
+    return "Other";
+  }
+
+  private countRouteLeaves(value: unknown): number {
+    if (typeof value === "string") {
+      return 1;
+    }
+    if (!value || typeof value !== "object") {
+      return 0;
+    }
+    return Object.values(value).reduce(
+      (total, child) => total + this.countRouteLeaves(child),
+      0
+    );
+  }
+
+  private flattenRouteNames(value: unknown): string[] {
+    if (!value || typeof value !== "object") {
+      return [];
+    }
+    return Object.entries(value).flatMap(([key, child]) =>
+      typeof child === "string" ? [key] : this.flattenRouteNames(child)
+    );
   }
 
   private stringifyValue(value: unknown): string {
