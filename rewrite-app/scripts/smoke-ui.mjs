@@ -1083,6 +1083,7 @@ try {
     })
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "Ada Entry" })
+    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
     .filter({ hasText: "group%3Aentry-smoke" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
@@ -1093,12 +1094,14 @@ try {
     })
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "Xml Entry" })
+    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
     .filter({ hasText: "group%3Axml-entry" })
     .waitFor();
   await page
     .locator("#entryLinksCsvPreview")
     .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
+    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   await fillAndCommit(
@@ -1123,6 +1126,7 @@ try {
     })
     .filter({ hasText: "entry-student-direct-xml" })
     .filter({ hasText: "Direct Xml" })
+    .filter({ hasText: `${baseUrl}/participant?workspaceKey=` })
     .filter({ hasText: "group%3Adirect-xml" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();

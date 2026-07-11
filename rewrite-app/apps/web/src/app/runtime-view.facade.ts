@@ -1318,7 +1318,14 @@ export class RuntimeViewFacade {
     if (link.bookletKey) {
       query.set("bookletKey", link.bookletKey);
     }
-    return `/participant?${query.toString()}`;
+    const participantPath = `/participant?${query.toString()}`;
+    return this.browserOrigin
+      ? `${this.browserOrigin}${participantPath}`
+      : participantPath;
+  }
+
+  private get browserOrigin(): string {
+    return globalThis.location?.origin ?? "";
   }
 
   private createEntryLinksCsv(links: RuntimeEntryLink[]): string {
