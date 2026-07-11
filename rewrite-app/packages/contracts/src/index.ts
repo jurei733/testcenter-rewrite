@@ -363,6 +363,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster",
     listParticipantRoster:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster",
+    exportStudyMonitorCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/study-monitor.csv",
     exportResponseCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
     exportLogCsv:

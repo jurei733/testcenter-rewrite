@@ -69,6 +69,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button class="ghost" type="button" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
+          <button class="ghost" type="button" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
           <button class="ghost" type="button" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
         </div>
       </article>
@@ -259,6 +260,12 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         <pre id="workspaceLogExportPreview">{{ view.workspaceLogExportView }}</pre>
       </article>
 
+      <article class="card">
+        <h2>Study Monitor CSV Export</h2>
+        <p>Flat monitor export with workspace, group, booklet, unit, and not-started participant rows.</p>
+        <pre id="studyMonitorExportPreview">{{ view.studyMonitorExportView }}</pre>
+      </article>
+
       <app-json-panel
         title="Workspace Overview"
         subtitle="Read Model"
@@ -306,6 +313,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Operator Timeline CSV"
         viewId="workspaceLogExportView"
         [content]="view.workspaceLogExportView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor CSV Export"
+        subtitle="Operator Monitor CSV"
+        viewId="studyMonitorExportView"
+        [content]="view.studyMonitorExportView"
       ></app-json-panel>
     </div>
   `

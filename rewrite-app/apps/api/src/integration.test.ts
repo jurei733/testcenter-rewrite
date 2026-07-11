@@ -5421,6 +5421,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         importParticipantRoster: string;
         listParticipantRoster: string;
         listDetailedResponses: string;
+        exportStudyMonitorCsv: string;
         exportResponseCsv: string;
         exportLogCsv: string;
         exportReviewCsv: string;
@@ -5451,6 +5452,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "review_workflow",
     "review_csv_export",
     "log_csv_export",
+    "study_monitor_csv_export",
     "result_deletion",
     "study_monitor_read",
     "system_diagnostics",
@@ -5465,6 +5467,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(manifest.routes.workspace.importParticipantRoster, /participant-roster/);
   assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
+  assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);
   assert.match(manifest.routes.workspace.exportResponseCsv, /responses\.csv/);
   assert.match(manifest.routes.workspace.exportLogCsv, /logs\.csv/);
   assert.match(manifest.routes.workspace.exportReviewCsv, /reviews\.csv/);

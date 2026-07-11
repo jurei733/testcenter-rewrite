@@ -670,6 +670,7 @@ export type FirstSliceCapability =
   | "review_workflow"
   | "review_csv_export"
   | "log_csv_export"
+  | "study_monitor_csv_export"
   | "result_deletion"
   | "study_monitor_read"
   | "participant_sign_in"
@@ -709,6 +710,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "review_workflow",
   "review_csv_export",
   "log_csv_export",
+  "study_monitor_csv_export",
   "result_deletion",
   "study_monitor_read",
   "participant_sign_in",

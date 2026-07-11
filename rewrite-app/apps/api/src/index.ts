@@ -997,6 +997,9 @@ const participantSessionDetailPattern = createRoutePattern(
 const participantRosterPattern = createRoutePattern(
   productionApiRoutes.workspace.listParticipantRoster
 );
+const studyMonitorCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportStudyMonitorCsv
+);
 const responseCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportResponseCsv
 );
@@ -1078,6 +1081,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantSessionDetailPattern],
   ["GET", participantRosterPattern],
   ["POST", participantRosterPattern],
+  ["GET", studyMonitorCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -1472,6 +1476,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "DELETE",
       deleteGroupResultsPattern,
       productionApiRoutes.workspace.deleteGroupResults
+    ],
+    [
+      "GET",
+      studyMonitorCsvExportPattern,
+      productionApiRoutes.workspace.exportStudyMonitorCsv
     ],
     [
       "GET",
@@ -2679,6 +2688,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const reviewListMatch = reviewListPattern.exec(pathname);
       const reviewDetailMatch = reviewDetailPattern.exec(pathname);
       const deleteGroupResultsMatch = deleteGroupResultsPattern.exec(pathname);
+      const studyMonitorCsvExportMatch =
+        studyMonitorCsvExportPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       const reviewCsvExportMatch = reviewCsvExportPattern.exec(pathname);
@@ -3069,6 +3080,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           groupKey
         });
         sendJson<DeleteGroupResultsResponse>(response, 200, { deletion });
+        return;
+      }
+
+      if (request.method === "GET" && studyMonitorCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          studyMonitorCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          studyMonitorCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportStudyMonitorCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-study-monitor.csv`, csv);
         return;
       }
 

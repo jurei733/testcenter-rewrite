@@ -230,6 +230,31 @@ export class RewriteAppWorkspaceService {
     return csv;
   }
 
+  async exportStudyMonitorCsv(): Promise<string> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Study Monitor CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportStudyMonitorCsv, {
+        tenantKey,
+        workspaceKey
+      })
+    );
+
+    this.workspaceState.studyMonitorExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-study-monitor.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Study Monitor Exported",
+      `CSV study monitor export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async bootstrapWorkspaceFlow(): Promise<void> {
     await runBootstrapWorkspaceFlow(createBootstrapWorkspaceFlowHost({
       createTenant: () => this.createTenant(),

@@ -133,6 +133,10 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<string>;
+  exportStudyMonitorCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
   getSourcePackageDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -454,6 +458,7 @@ export const firstSliceUseCases = {
   getStudyMonitorSummary: "GetStudyMonitorSummary",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
+  exportStudyMonitorCsv: "ExportStudyMonitorCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
   listSourcePackages: "ListSourcePackages",
   createSourcePackage: "CreateSourcePackage",
@@ -1575,6 +1580,135 @@ const formatWorkspaceActivityCsv = (input: {
         JSON.stringify(activityEvent.details)
       ]
         .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatStudyMonitorCsv = (
+  summary: WorkspaceStudyMonitorSummary
+): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "section",
+    "key",
+    "label",
+    "groupKey",
+    "bookletKey",
+    "unitKey",
+    "loginKey",
+    "expectedParticipantCount",
+    "rosterEntryCount",
+    "participantSessionCount",
+    "testRunCount",
+    "notStartedCount",
+    "runningCount",
+    "pausedCount",
+    "completedCount",
+    "responseCount",
+    "reviewCount",
+    "unitCount",
+    "expectedRunCount",
+    "rosterExpectedCount",
+    "missingResponseCount",
+    "unexpectedResponseCount",
+    "completedRunCount",
+    "latestActivityAt",
+    "generatedAt"
+  ];
+  const rows: Array<Record<string, string | number | null | undefined>> = [
+    {
+      section: "workspace",
+      key: summary.workspaceKey,
+      label: `${summary.workspaceKey} monitor`,
+      expectedParticipantCount: summary.expectedParticipantCount,
+      rosterEntryCount: summary.rosterEntryCount,
+      participantSessionCount: summary.participantSessionCount,
+      testRunCount: summary.testRunCount,
+      notStartedCount: summary.notStartedCount,
+      runningCount: summary.runningCount,
+      pausedCount: summary.pausedCount,
+      completedCount: summary.completedCount,
+      responseCount: summary.responseCount,
+      reviewCount: summary.reviewCount
+    },
+    ...summary.groups.map(group => ({
+      section: "group",
+      key: group.groupKey,
+      label: group.groupKey,
+      groupKey: group.groupKey,
+      expectedParticipantCount: group.expectedParticipantCount,
+      rosterEntryCount: group.rosterEntryCount,
+      participantSessionCount: group.participantSessionCount,
+      testRunCount: group.testRunCount,
+      notStartedCount: group.notStartedCount,
+      runningCount: group.runningCount,
+      pausedCount: group.pausedCount,
+      completedCount: group.completedCount,
+      responseCount: group.responseCount,
+      reviewCount: group.reviewCount,
+      latestActivityAt: group.latestActivityAt
+    })),
+    ...summary.bookletProgress.map(booklet => ({
+      section: "booklet",
+      key: booklet.bookletKey,
+      label: booklet.displayLabel,
+      bookletKey: booklet.bookletKey,
+      expectedParticipantCount: booklet.expectedParticipantCount,
+      rosterEntryCount: booklet.rosterEntryCount,
+      participantSessionCount: booklet.participantSessionCount,
+      testRunCount: booklet.testRunCount,
+      notStartedCount: booklet.notStartedCount,
+      runningCount: booklet.runningCount,
+      pausedCount: booklet.pausedCount,
+      completedCount: booklet.completedCount,
+      responseCount: booklet.responseCount,
+      reviewCount: booklet.reviewCount,
+      unitCount: booklet.unitCount,
+      latestActivityAt: booklet.latestActivityAt
+    })),
+    ...summary.unitProgress.map(unit => ({
+      section: "unit",
+      key: unit.unitKey,
+      label: unit.displayLabel,
+      unitKey: unit.unitKey,
+      responseCount: unit.responseCount,
+      expectedRunCount: unit.expectedRunCount,
+      rosterExpectedCount: unit.rosterExpectedCount,
+      missingResponseCount: unit.missingResponseCount,
+      unexpectedResponseCount: unit.unexpectedResponseCount,
+      completedRunCount: unit.completedRunCount,
+      latestActivityAt: unit.latestActivityAt
+    })),
+    ...summary.notStartedParticipants.map(participant => ({
+      section: "not_started_participant",
+      key: participant.loginKey,
+      label: participant.displayName ?? participant.loginKey,
+      groupKey: participant.groupKey,
+      bookletKey: participant.bookletKey,
+      loginKey: participant.loginKey,
+      notStartedCount: 1
+    }))
+  ];
+
+  return [
+    header.join(","),
+    ...rows.map(row =>
+      header
+        .map(column =>
+          escapeCsvCell(
+            column === "tenantKey"
+              ? summary.tenantKey
+              : column === "workspaceKey"
+                ? summary.workspaceKey
+                : column === "generatedAt"
+                  ? summary.generatedAt
+                  : row[column] == null
+                    ? ""
+                    : String(row[column])
+          )
+        )
         .join(",")
     )
   ].join("\n") + "\n";
@@ -5069,6 +5203,11 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           activityEvents
         });
+      },
+      async exportStudyMonitorCsv(input) {
+        const summary = await this.getStudyMonitorSummary(input);
+
+        return formatStudyMonitorCsv(summary);
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(

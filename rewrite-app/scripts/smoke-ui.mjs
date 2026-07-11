@@ -1700,6 +1700,13 @@ try {
     .filter({ hasText: "2 not started" })
     .filter({ hasText: "Open Group Detail" })
     .waitFor();
+  await clickAction("Export Study Monitor CSV");
+  await page
+    .locator("#studyMonitorExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,section" })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "not_started_participant" })
+    .waitFor();
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })

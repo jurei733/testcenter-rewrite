@@ -221,6 +221,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/booklets/{bookletKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/study-monitor.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
@@ -267,6 +268,7 @@ The added read side now makes the first slice inspectable:
 - study monitor summary returns workspace-wide group, booklet, and unit progress with participant sessions, saved-roster expected/not-started participants for groups and booklets, roster-derived missing unit expectations, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, saved roster entries, status counts, latest runs, response counts, review counts, and per-run context for operator follow-up
 - study monitor booklet detail drills into one booklet with saved roster entries, attached runs, status pressure, unit coverage, response counts, and review counts
+- study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
 - source-package listing shows uploaded packages together with their latest import attempt, filterable by status, media type, file name, latest import status, and limit
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
@@ -305,7 +307,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, and study-monitor booklet/unit progress, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation, study-monitor booklet/unit progress, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation, study-monitor booklet/unit progress/export, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -372,7 +374,7 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
-- study-monitor summary, group drill-down, booklet drill-down, and unit-progress cards
+- study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, and study-monitor CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
@@ -428,4 +430,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, or SQLite-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
-- monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, and open-run blockers, but still do not cover every original Testcenter monitor view
+- monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, CSV export, and open-run blockers, but still do not cover every original Testcenter monitor view
