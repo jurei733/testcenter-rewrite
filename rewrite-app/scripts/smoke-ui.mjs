@@ -1226,6 +1226,13 @@ try {
     .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
+  await page
+    .locator("#entryLinkSummary")
+    .filter({ hasText: "Entry Links" })
+    .filter({ hasText: "3" })
+    .filter({ hasText: workspaceKey })
+    .filter({ hasText: "Ready" })
+    .waitFor();
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -1252,6 +1259,12 @@ try {
     .filter({ hasText: "group%3Adirect-xml" })
     .filter({ hasText: "booklet%3Astarter" });
   await directEntryLinkCard.waitFor();
+  await page
+    .locator("#entryLinkSummary")
+    .filter({ hasText: "Entry Links" })
+    .filter({ hasText: "1" })
+    .filter({ hasText: "Ready" })
+    .waitFor();
   const participantEntryPopupPromise = page.waitForEvent("popup");
   await directEntryLinkCard
     .getByRole("button", { name: "Open Participant Entry", exact: true })

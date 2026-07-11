@@ -215,6 +215,46 @@ export class RuntimeViewFacade {
     }));
   }
 
+  get entryLinkCards(): SummaryCard[] {
+    const links = this.parseEntryLinksView();
+    const explicitBookletCount = links.filter(link => link.bookletKey.trim()).length;
+    const defaultBookletCount = Math.max(links.length - explicitBookletCount, 0);
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+
+    return [
+      {
+        label: "Entry Links",
+        headline: String(links.length),
+        detail:
+          links.length > 0
+            ? "Participant start links are generated for this workspace."
+            : "Generate links from roster rows or saved roster entries."
+      },
+      {
+        label: "Scope",
+        headline: workspaceKey || "No workspace",
+        detail: tenantKey || "No tenant selected"
+      },
+      {
+        label: "Booklets",
+        headline: `${explicitBookletCount} explicit`,
+        detail:
+          defaultBookletCount > 0
+            ? `${defaultBookletCount} use the active release default.`
+            : "Every link carries an explicit booklet key."
+      },
+      {
+        label: "CSV",
+        headline: links.length > 0 ? "Ready" : "Not ready",
+        detail:
+          links.length > 0
+            ? "Preview and download contain the current link set."
+            : "CSV export will be populated after link generation."
+      }
+    ];
+  }
+
   get participantRosterItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListParticipantRosterResponse>(
       this.runtime.participantRosterView

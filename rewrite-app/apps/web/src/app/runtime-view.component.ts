@@ -261,6 +261,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="downloadEntryLinksCsvButton" class="secondary" type="button" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
           <button class="ghost" type="button" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
         </div>
+        <div class="entry-link-summary-grid" id="entryLinkSummary">
+          <div *ngFor="let card of view.entryLinkCards">
+            <span>{{ card.label }}</span>
+            <strong>{{ card.headline }}</strong>
+            <p>{{ card.detail }}</p>
+          </div>
+        </div>
         <pre id="entryLinksCsvPreview">{{ view.entryLinksCsvPreview }}</pre>
       </article>
 
