@@ -228,6 +228,22 @@ try {
   );
   await page.locator(".status-banner").waitFor({ state: "hidden", timeout: 15_000 });
 
+  const rosterDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Saved Roster CSV" }).click();
+  const rosterDownload = await rosterDownloadPromise;
+  assert.equal(rosterDownload.suggestedFilename(), "demo-workspace-participant-roster.csv");
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#participantRosterExportPreview")
+        ?.textContent?.includes("Demo Student") &&
+      document
+        .querySelector("#participantRosterExportPreview")
+        ?.textContent?.includes("student-demo"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   await page.locator("#runtimeUnitResponse").fill("Operator adjusted smoke response");
   await page.locator("#runtimeUnitResponse").dispatchEvent("input");
   await page.locator("#runtimeUnitResponse").dispatchEvent("change");
@@ -247,7 +263,8 @@ try {
   await page.waitForFunction(
     () =>
       document.body.textContent?.includes("Operator adjusted smoke response") &&
-      document.body.textContent?.includes("student-demo · unit-intro"),
+      document.body.textContent?.includes("student-demo") &&
+      document.body.textContent?.includes("unit-intro"),
     undefined,
     { timeout: 15_000 }
   );
@@ -260,7 +277,8 @@ try {
     () =>
       document.body.textContent?.includes("Smoke review for adjusted response") &&
       document.body.textContent?.includes("operator-ui") &&
-      document.body.textContent?.includes("note · student-demo") &&
+      document.body.textContent?.includes("Demo Student") &&
+      document.body.textContent?.includes("student-demo") &&
       document.querySelector("#reviewId")?.value?.trim().length > 0,
     undefined,
     { timeout: 15_000 }

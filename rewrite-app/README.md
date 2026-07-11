@@ -375,6 +375,7 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
+- participant roster export through the runtime shell
 - study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, and study-monitor CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity

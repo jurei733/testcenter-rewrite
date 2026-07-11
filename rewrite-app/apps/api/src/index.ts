@@ -244,6 +244,15 @@ const bootstrapLocalDemoState = async (input: {
     });
   }
 
+  await services.workspaceAdminRead.importParticipantRoster({
+    tenantKey: localDemoBootstrap.tenantKey,
+    workspaceKey: localDemoBootstrap.workspaceKey,
+    rosterText: [
+      "loginKey,groupKey,bookletKey,displayName",
+      `${localDemoBootstrap.participantLoginKey},group:student-demo,booklet:demo,Demo Student`
+    ].join("\n")
+  });
+
   const existingReleases = await repository.listContentReleasesByWorkspace(
     tenant.tenantId,
     workspace.workspaceId

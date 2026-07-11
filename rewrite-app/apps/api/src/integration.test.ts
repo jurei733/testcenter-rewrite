@@ -1296,6 +1296,29 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(typeof overview.body.workspaceOverview.activeContentReleaseId, "string");
     assert.ok(overview.body.workspaceOverview.contentReleaseCount >= 1);
 
+    const rosterCsv = await fetch(
+      `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-roster.csv`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(rosterCsv.status, 200);
+    assert.equal(
+      rosterCsv.headers.get("content-type"),
+      "text/csv; charset=utf-8"
+    );
+    const rosterCsvText = await rosterCsv.text();
+    assert.match(
+      rosterCsvText,
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,importedAt,validationWarningCodes,validationWarningMessages\n/
+    );
+    assert.match(
+      rosterCsvText,
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student"/
+    );
+
     const participantSignIn = await requestJsonAt<{
       participantSession: { participantSessionId: string; loginKey: string };
     }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
