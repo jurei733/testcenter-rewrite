@@ -1646,7 +1646,7 @@ try {
     .waitFor();
   await clickCardAction("Study Monitor", "Open Group Detail", "group:entry-smoke");
   await page.waitForFunction(
-    () => {
+    participantEntryUrlPrefix => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(
         card =>
           card.querySelector("h3")?.textContent?.trim() ===
@@ -1659,10 +1659,11 @@ try {
         detailCard.textContent.includes("entry-student-b") &&
         detailCard.textContent.includes("Ben Entry") &&
         detailCard.textContent.includes("not signed in") &&
-        detailCard.textContent.includes("booklet:starter")
+        detailCard.textContent.includes("booklet:starter") &&
+        detailCard.textContent.includes(participantEntryUrlPrefix)
       );
     },
-    undefined,
+    participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
   await studyMonitorCard
@@ -1680,7 +1681,7 @@ try {
     .waitFor();
   await clickCardAction("Study Monitor", "Open Booklet Detail", "Starter");
   await page.waitForFunction(
-    () => {
+    participantEntryUrlPrefix => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(
         card =>
           card.querySelector("h3")?.textContent?.trim() ===
@@ -1693,12 +1694,13 @@ try {
         detailCard.textContent.includes("Roster Entries") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&
+        detailCard.textContent.includes(participantEntryUrlPrefix) &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("unit-paused") &&
         detailCard.textContent.includes("run(s)")
       );
     },
-    undefined,
+    participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
   await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
@@ -1723,7 +1725,7 @@ try {
   );
   await clickCardAction("Study Monitor", "Open Unit Detail", "Paused Work");
   await page.waitForFunction(
-    () => {
+    participantEntryUrlPrefix => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(
         card =>
           card.querySelector("h3")?.textContent?.trim() ===
@@ -1735,11 +1737,12 @@ try {
         detailCard.textContent.includes("Roster Expected") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&
+        detailCard.textContent.includes(participantEntryUrlPrefix) &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("answered")
       );
     },
-    undefined,
+    participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
 

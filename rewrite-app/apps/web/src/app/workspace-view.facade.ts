@@ -288,6 +288,10 @@ export class WorkspaceViewFacade {
             value: rosterEntry.displayName ?? "none"
           },
           {
+            label: "Entry URL",
+            value: this.buildParticipantEntryUrl(rosterEntry)
+          },
+          {
             label: "Imported",
             value: this.formatDateTime(rosterEntry.importedAt)
           }
@@ -431,6 +435,10 @@ export class WorkspaceViewFacade {
           {
             label: "Display Name",
             value: rosterEntry.displayName ?? "none"
+          },
+          {
+            label: "Entry URL",
+            value: this.buildParticipantEntryUrl(rosterEntry)
           },
           {
             label: "Imported",
@@ -586,6 +594,10 @@ export class WorkspaceViewFacade {
           {
             label: "Booklet",
             value: rosterEntry.bookletKey ?? "none"
+          },
+          {
+            label: "Entry URL",
+            value: this.buildParticipantEntryUrl(rosterEntry)
           },
           {
             label: "Imported",
