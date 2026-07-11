@@ -1804,6 +1804,39 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(studyMonitor.body.studyMonitorSummary.groups[0]?.reviewCount, 0);
 
+    const studyMonitorCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitorCsv.status, 200);
+    assert.equal(studyMonitorCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(
+      studyMonitorCsv.body,
+      /^tenantKey,workspaceKey,section,key,label,groupKey,bookletKey,unitKey,loginKey,expectedParticipantCount,rosterEntryCount,participantSessionCount,testRunCount,notStartedCount,runningCount,pausedCount,completedCount,responseCount,reviewCount,unitCount,expectedRunCount,rosterExpectedCount,missingResponseCount,unexpectedResponseCount,completedRunCount,latestActivityAt,generatedAt\n/
+    );
+    assert.match(
+      studyMonitorCsv.body,
+      /"demo-tenant","demo-workspace","workspace","demo-workspace","demo-workspace monitor"/
+    );
+    assert.match(
+      studyMonitorCsv.body,
+      /"demo-tenant","demo-workspace","group","group:student-demo","group:student-demo","group:student-demo"/
+    );
+    assert.match(
+      studyMonitorCsv.body,
+      /"demo-tenant","demo-workspace","booklet","booklet:demo","Demo Booklet","","booklet:demo"/
+    );
+    assert.match(
+      studyMonitorCsv.body,
+      /"demo-tenant","demo-workspace","unit","unit-finish","Finish","","","unit-finish"/
+    );
+
     const responseCsv = await requestTextAt(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv",
