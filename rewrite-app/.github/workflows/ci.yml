@@ -95,8 +95,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
+      - name: Run Postgres migration command
+        run: FIRST_SLICE_STORE=postgres npm run db:migrate:built
+
+      - name: Run Postgres storage doctor
+        run: FIRST_SLICE_STORE=postgres npm run db:doctor:built
+
       - name: Run Postgres integration tests
-        run: npm run test:integration:postgres
+        run: npm run test:integration:postgres:built
 
   sqlite-smoke:
     name: SQLite smoke tests
