@@ -139,6 +139,16 @@ const expectEqual = (label, actual, expected) => {
   }
 };
 
+const expectRedactedPostgresLocation = (label, location) => {
+  if (typeof location !== "string" || !/^postgres(?:ql)?:\/\//.test(location)) {
+    throw new Error(`Expected ${label} to expose a redacted Postgres URL.`);
+  }
+
+  const url = new URL(location);
+  expectEqual(`${label}.username`, url.username, "REDACTED");
+  expectEqual(`${label}.password`, url.password, "REDACTED");
+};
+
 const requestJson = async (url, options = {}) => {
   const response = await fetch(url, {
     ...options,
@@ -330,6 +340,10 @@ try {
     manifest.storage?.schemaVersion,
     expectedSchemaVersion
   );
+  expectRedactedPostgresLocation(
+    "manifest.storage.location",
+    manifest.storage?.location
+  );
   expectEqual("manifest.build.commitSha", manifest.build?.commitSha, buildSha);
   expectEqual("manifest.build.builtAt", manifest.build?.builtAt, buildTimestamp);
   expectEqual(
@@ -341,6 +355,10 @@ try {
     "runtimeConfig.storage.schemaVersion",
     config.runtimeConfig?.storage?.schemaVersion,
     expectedSchemaVersion
+  );
+  expectRedactedPostgresLocation(
+    "runtimeConfig.storage.location",
+    config.runtimeConfig?.storage?.location
   );
   expectEqual(
     "runtimeConfig.operatorAuthRequired",

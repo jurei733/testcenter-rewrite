@@ -406,6 +406,7 @@ That verifies:
 - API readiness
 - non-root API container user
 - Postgres schema-version propagation through readiness, manifest, and config
+- redacted Postgres storage locations in manifest and config
 - build metadata propagation into the running API manifest
 - production-like operator auth configuration in the composed API service
 
