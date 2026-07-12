@@ -4403,6 +4403,7 @@ test("source document import accepts QTI assessment sections as booklets", async
               <assessmentItemRef identifier="unit-reading-a" title="Reading Item A" />
               <assessmentItemRef title="Reading Item B">
                 <identifier>unit-reading-b</identifier>
+                <body>Read the passage and answer the question.</body>
               </assessmentItemRef>
             </assessmentSection>
           </testPart>
@@ -4452,7 +4453,11 @@ test("source document import accepts QTI assessment sections as booklets", async
           displayLabel: "Reading Section",
           unitEntries: [
             { unitKey: "unit-reading-a", displayLabel: "Reading Item A" },
-            { unitKey: "unit-reading-b", displayLabel: "Reading Item B" }
+            {
+              unitKey: "unit-reading-b",
+              displayLabel: "Reading Item B",
+              content: "Read the passage and answer the question."
+            }
           ]
         }
       ]

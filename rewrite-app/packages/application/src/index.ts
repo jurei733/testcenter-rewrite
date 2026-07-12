@@ -3169,16 +3169,22 @@ const collectXmlBookletEntries = (
           "content",
           "prompt",
           "question",
+          "body",
           "text",
-          "stimulus"
+          "stimulus",
+          "markdown",
+          "html"
         ) ??
           readXmlChildText(
             unitContent,
             "content",
             "prompt",
             "question",
+            "body",
             "text",
-            "stimulus"
+            "stimulus",
+            "markdown",
+            "html"
           )
       );
       unitEntries.push({
