@@ -8,6 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
+const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
@@ -15,6 +16,14 @@ const repairedImportSourceDocument =
 const uploadedSourceDocument =
   '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 let smokeAdminSessionToken = "";
+
+class UiSmokeEarlyExit extends Error {
+  constructor(step) {
+    super(`UI smoke stopped after requested step: ${step}`);
+    this.name = "UiSmokeEarlyExit";
+    this.step = step;
+  }
+}
 
 const createSmokeFetchInit = () =>
   smokeAdminSessionToken
@@ -160,6 +169,16 @@ try {
   let totalApiRequestCount = 0;
   const logStep = step => {
     process.stdout.write(`ui_smoke_step=${step}\n`);
+  };
+  const stopAfter = step => {
+    if (stopAfterStep !== step) {
+      return;
+    }
+
+    process.stdout.write(
+      `UI smoke stopped after requested step=${step} for store=${store} at ${baseUrl}/app\n`
+    );
+    throw new UiSmokeEarlyExit(step);
   };
   page.on("request", request => {
     const url = request.url();
@@ -988,6 +1007,7 @@ try {
 	    undefined,
 	    { timeout: 15_000 }
 	  );
+	  stopAfter("content-prompt-read-model");
 
 	  logStep("participant-entry-url");
 	  const participantRouteLoginKey = "student-participant-route";
@@ -2543,6 +2563,10 @@ try {
   process.stdout.write(
     `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
   );
+} catch (error) {
+  if (!(error instanceof UiSmokeEarlyExit)) {
+    throw error;
+  }
 } finally {
   process.stdout.write("ui_smoke_step=teardown-browser\n");
   await browser?.close().catch(() => undefined);
