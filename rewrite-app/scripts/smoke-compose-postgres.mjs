@@ -10,14 +10,53 @@ const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED ?? "true";
 const bootstrapDemo = process.env.FIRST_SLICE_BOOTSTRAP_DEMO ?? "false";
 
+const parsePositiveInteger = (value, label) => {
+  const parsedValue = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${label} must be a positive integer, got '${value}'.`);
+  }
+  return parsedValue;
+};
+
+const composeUpTimeoutMs = parsePositiveInteger(
+  process.env.SMOKE_COMPOSE_UP_TIMEOUT_MS ?? "180000",
+  "SMOKE_COMPOSE_UP_TIMEOUT_MS"
+);
+
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, {
       stdio: "inherit",
       env: options.env ?? process.env
     });
+    let timedOut = false;
+    let timeout = null;
+    let killTimeout = null;
+    if (options.timeoutMs) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        child.kill("SIGTERM");
+        killTimeout = setTimeout(() => {
+          child.kill("SIGKILL");
+        }, 5_000);
+      }, options.timeoutMs);
+    }
     child.once("error", reject);
     child.once("exit", code => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      if (killTimeout) {
+        clearTimeout(killTimeout);
+      }
+      if (timedOut) {
+        reject(
+          new Error(
+            `${command} ${args.join(" ")} timed out after ${options.timeoutMs}ms`
+          )
+        );
+        return;
+      }
       if (code === 0) {
         resolvePromise(undefined);
         return;
@@ -236,6 +275,9 @@ try {
   const expectedSchemaVersion = await readExpectedPostgresSchemaVersion();
   const baseUrl = "http://127.0.0.1:4310";
 
+  process.stdout.write(
+    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms bootstrapDemo=${bootstrapDemo}\n`
+  );
   await run("docker", [
     ...composeArgs,
     "up",
@@ -248,7 +290,8 @@ try {
       APP_BUILD_TIMESTAMP: buildTimestamp,
       FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
       FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo
-    }
+    },
+    timeoutMs: composeUpTimeoutMs
   });
 
   const readiness = await pollJson(`${baseUrl}/readyz`);
