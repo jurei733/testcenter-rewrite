@@ -500,6 +500,13 @@ const textHeaders = {
   "content-type": "text/plain; version=0.0.4; charset=utf-8"
 };
 
+const securityHeaders = {
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "x-frame-options": "SAMEORIGIN",
+  "permissions-policy": "camera=(), geolocation=(), microphone=()"
+};
+
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
@@ -739,7 +746,10 @@ const sendJson = <T>(
   statusCode: number,
   body: T
 ): void => {
-  response.writeHead(statusCode, jsonHeaders);
+  response.writeHead(statusCode, {
+    ...securityHeaders,
+    ...jsonHeaders
+  });
   endResponse(response, JSON.stringify(body, null, 2));
 };
 
@@ -759,7 +769,10 @@ const sendHtml = (
   statusCode: number,
   html: string
 ): void => {
-  response.writeHead(statusCode, htmlHeaders);
+  response.writeHead(statusCode, {
+    ...securityHeaders,
+    ...htmlHeaders
+  });
   endResponse(response, html);
 };
 
@@ -768,7 +781,10 @@ const sendText = (
   statusCode: number,
   text: string
 ): void => {
-  response.writeHead(statusCode, textHeaders);
+  response.writeHead(statusCode, {
+    ...securityHeaders,
+    ...textHeaders
+  });
   endResponse(response, text);
 };
 
@@ -779,6 +795,7 @@ const sendCsv = (
   text: string
 ): void => {
   response.writeHead(statusCode, {
+    ...securityHeaders,
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": `attachment; filename="${filename}"`,
     "cache-control": "no-cache"
@@ -793,6 +810,7 @@ const sendAsset = (
   body: Buffer
 ): void => {
   response.writeHead(statusCode, {
+    ...securityHeaders,
     "content-type": contentType,
     "cache-control": "no-cache"
   });
@@ -805,6 +823,7 @@ const sendRedirect = (
   location: string
 ): void => {
   response.writeHead(statusCode, {
+    ...securityHeaders,
     location,
     "cache-control": "no-cache"
   });

@@ -423,6 +423,7 @@ For runtime probes:
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
 - `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, and whether operator auth is required
 - `/manifest` exposes the active storage mode, schema version, routes, use-case surface, and operator/production capability list
+- JSON, HTML, text, CSV, asset, and redirect responses include baseline security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and `Permissions-Policy`)
 - `db:doctor` reports storage reachability plus current vs. target schema version where applicable
 - `db:migrate` applies the adapter-managed schema migrations without going through the HTTP server boot path
 

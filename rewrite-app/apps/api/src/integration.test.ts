@@ -108,6 +108,16 @@ const assertPostgresLocationRedacted = (
   }
 };
 
+const assertSecurityHeaders = (response: Response): void => {
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(
+    response.headers.get("permissions-policy"),
+    "camera=(), geolocation=(), microphone=()"
+  );
+};
+
 const closeServer = async (
   targetServer: Awaited<ReturnType<typeof createProductionApiServer>>
 ): Promise<void> => {
@@ -5660,15 +5670,18 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   const healthResponse = await fetch(`${baseUrl}/healthz`);
   assert.equal(healthResponse.status, 200);
   assert.ok(healthResponse.headers.get("x-request-id"));
+  assertSecurityHeaders(healthResponse);
 
   const headHealthResponse = await fetch(`${baseUrl}/healthz`, { method: "HEAD" });
   assert.equal(headHealthResponse.status, 200);
   assert.ok(headHealthResponse.headers.get("x-request-id"));
+  assertSecurityHeaders(headHealthResponse);
   assert.equal(await headHealthResponse.text(), "");
 
   const metricsResponse = await fetch(`${baseUrl}/metrics`);
   assert.equal(metricsResponse.status, 200);
   assert.ok(metricsResponse.headers.get("x-request-id"));
+  assertSecurityHeaders(metricsResponse);
 
   const metrics = (await metricsResponse.json()) as {
     phase: string;
@@ -5719,6 +5732,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
 
   const prometheusResponse = await fetch(`${baseUrl}/metrics/prometheus`);
   assert.equal(prometheusResponse.status, 200);
+  assertSecurityHeaders(prometheusResponse);
   assert.match(
     prometheusResponse.headers.get("content-type") ?? "",
     /text\/plain/
@@ -5733,6 +5747,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
 
   const diagnosticsResponse = await fetch(`${baseUrl}/diagnostics/runtime`);
   assert.equal(diagnosticsResponse.status, 200);
+  assertSecurityHeaders(diagnosticsResponse);
   const diagnostics = (await diagnosticsResponse.json()) as {
     storage: { kind: string; location: string | null };
     recentEvents: Array<{ event: string; details: { route?: string } }>;
@@ -5879,6 +5894,8 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.equal(appHeadResponse.status, 200);
   assert.match(appHeadResponse.contentType ?? "", /text\/html/);
   assert.equal(appHeadResponse.body, "");
+  const appHeadFetchResponse = await fetch(`${baseUrl}/app`, { method: "HEAD" });
+  assertSecurityHeaders(appHeadFetchResponse);
 
   const appResponse = await requestText("/app");
 
@@ -5887,12 +5904,15 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.match(appResponse.body, /<app-root><\/app-root>/);
   assert.match(appResponse.body, /<base href="\/app\/"\s*\/?>/);
   assert.match(appResponse.body, /<title>Testcenter Rewrite App<\/title>/);
+  const appFetchResponse = await fetch(`${baseUrl}/app`);
+  assertSecurityHeaders(appFetchResponse);
 
   const participantEntryResponse = await fetch(
     `${baseUrl}/participant?workspaceKey=demo-workspace`,
     { redirect: "manual" }
   );
   assert.equal(participantEntryResponse.status, 302);
+  assertSecurityHeaders(participantEntryResponse);
   assert.equal(
     participantEntryResponse.headers.get("location"),
     "/app/participant?workspaceKey=demo-workspace"
@@ -5903,6 +5923,7 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
     { method: "HEAD", redirect: "manual" }
   );
   assert.equal(participantEntryHeadResponse.status, 302);
+  assertSecurityHeaders(participantEntryHeadResponse);
   assert.equal(
     participantEntryHeadResponse.headers.get("location"),
     "/app/participant?workspaceKey=demo-workspace"
@@ -5924,9 +5945,11 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
 
   const scriptResponse = await fetch(`${baseUrl}/app/${scriptMatch[1]}`);
   assert.equal(scriptResponse.status, 200);
+  assertSecurityHeaders(scriptResponse);
   assert.match(scriptResponse.headers.get("content-type") ?? "", /javascript/);
 
   const stylesheetResponse = await fetch(`${baseUrl}/app/${stylesheetMatch[1]}`);
   assert.equal(stylesheetResponse.status, 200);
+  assertSecurityHeaders(stylesheetResponse);
   assert.match(stylesheetResponse.headers.get("content-type") ?? "", /text\/css/);
 });
