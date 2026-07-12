@@ -434,7 +434,7 @@ For runtime probes:
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
   - Docker compose release smoke with explicit migrate + api roles
-- [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck
+- [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
 

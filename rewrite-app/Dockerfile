@@ -53,6 +53,6 @@ USER node
 EXPOSE 4310
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=10 \
-  CMD wget -qO- http://127.0.0.1:4310/readyz >/dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-4310}/readyz" >/dev/null || exit 1
 
 CMD ["node", "apps/api/dist/apps/api/src/index.js"]
