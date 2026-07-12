@@ -156,6 +156,27 @@ export class RewriteAppOpsService {
     );
   }
 
+  async exportAdminUsersCsv(): Promise<void> {
+    const csv = await this.requestState.request<string>(
+      "Admin Users CSV",
+      "GET",
+      this.buildAdminUsersExportPath(),
+      undefined,
+      {
+        headers: {
+          ...this.createAdminHeaders(),
+          Accept: "text/csv"
+        }
+      }
+    );
+
+    this.opsState.adminUsersExportView = csv;
+    this.feedback.rememberActivity(
+      "Admin Users CSV Exported",
+      "Filtered admin users were exported to the operator preview."
+    );
+  }
+
   async refreshAdminAuditEvents(): Promise<void> {
     const payload = await this.requestState.request<ListAdminAuditEventsResponse>(
       "Admin Audit Events",
@@ -332,6 +353,17 @@ export class RewriteAppOpsService {
 
   private buildAdminUsersPath(): string {
     return this.appendQuery(productionApiRoutes.admin.listUsers, [
+      ["username", this.opsState.adminUserUsernameFilter],
+      ["status", this.opsState.adminUserStatusFilter],
+      ["role", this.opsState.adminUserRoleFilter],
+      ["tenantKey", this.opsState.adminUserTenantFilter],
+      ["workspaceKey", this.opsState.adminUserWorkspaceFilter],
+      ["limit", this.opsState.adminUserLimit]
+    ]);
+  }
+
+  private buildAdminUsersExportPath(): string {
+    return this.appendQuery(productionApiRoutes.admin.exportUsersCsv, [
       ["username", this.opsState.adminUserUsernameFilter],
       ["status", this.opsState.adminUserStatusFilter],
       ["role", this.opsState.adminUserRoleFilter],

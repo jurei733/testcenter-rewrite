@@ -211,6 +211,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `POST /api/v1/admin/users/{adminUserId}/password`
 - `POST /api/v1/admin/users/{adminUserId}/role-assignments`
 - `DELETE /api/v1/admin/users/{adminUserId}/role-assignments/{roleAssignmentId}`
+- `GET /api/v1/admin/users.csv`
 - `GET /api/v1/admin/audit-events`
 - `GET /api/v1/admin/audit-events.csv`
 - `GET /api/v1/platform/tenants`
@@ -262,7 +263,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 The added read side now makes the first slice inspectable:
 
 - admin bootstrap creates the first platform admin, bearer sessions can be checked/revoked, and the protected admin directory can create users, reset passwords, assign/revoke platform/tenant/workspace roles, update status, and prevent self-disable or self platform-role revoke lockouts
-- protected admin directory reads are filterable by username, status, role, tenant/workspace scope, and limit so platform operators can narrow user-management follow-up without leaving the shell
+- protected admin directory reads are filterable by username, status, role, tenant/workspace scope, and limit so platform operators can narrow user-management follow-up without leaving the shell, with a matching CSV export for access reviews
 - admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, user management, password reset, and role assignment/revocation, filterable by event type, actor admin id, subject admin id, and limit, with a matching CSV export endpoint
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
@@ -309,7 +310,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus audit CSV export, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, filtered workspace activity reads plus log CSV export, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, study-monitor booklet/unit progress/export, admin audit CSV export, response/review/log CSV export, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, filtered workspace activity reads plus log CSV export, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, study-monitor booklet/unit progress/export, admin-user/audit CSV export, response/review/log CSV export, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 

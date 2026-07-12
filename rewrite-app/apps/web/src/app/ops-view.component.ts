@@ -218,6 +218,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button class="primary" type="button" (click)="view.applyAdminUserFilters()">Apply User Filters</button>
           <button class="secondary" type="button" (click)="view.useAdminManagementScopeAsUserFilters()">Use Role Scope</button>
+          <button id="exportAdminUsersCsvButton" class="secondary" type="button" (click)="view.exportAdminUsersCsv()">Export Users CSV</button>
           <button class="ghost" type="button" (click)="view.clearAdminUserFilters()">Clear User Filters</button>
         </div>
       </article>
@@ -229,6 +230,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         (itemAction)="view.selectAdminUser($event)"
         emptyState="Sign in as platform admin, then refresh admin users."
       ></app-record-collection>
+
+      <article class="card">
+        <h2>Admin Users CSV Export</h2>
+        <p>Preview the filtered admin directory as CSV for access reviews, account handoff, or operator archiving.</p>
+        <pre id="adminUsersExportPreview">{{ view.ops.adminUsersExportView }}</pre>
+      </article>
 
       <app-record-collection
         title="Admin Role Assignments"

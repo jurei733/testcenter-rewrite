@@ -841,6 +841,63 @@ const sendError = (
   sendJson<ApiErrorResponse>(response, statusCode, { error, message, details });
 };
 
+const parseAdminUserListQuery = (
+  url: URL,
+  response: ServerResponse
+): AdminUserListQuery | null => {
+  const username = url.searchParams.get("username")?.trim() || undefined;
+  const status = url.searchParams.get("status")?.trim() || undefined;
+  if (status && status !== "active" && status !== "disabled") {
+    sendError(
+      response,
+      400,
+      "admin_user_status_invalid",
+      `Admin user status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const role = url.searchParams.get("role")?.trim() || undefined;
+  if (
+    role &&
+    role !== "platform_admin" &&
+    role !== "tenant_admin" &&
+    role !== "workspace_admin"
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_role_invalid",
+      `Admin role '${role}' is not supported.`
+    );
+    return null;
+  }
+
+  const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+  const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
+  if (
+    limitRawValue &&
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_user_limit_invalid",
+      "Admin user limit must be an integer between 1 and 500."
+    );
+    return null;
+  }
+
+  return {
+    username,
+    status: status as AdminUserStatus | undefined,
+    role: role as AdminRole | undefined,
+    tenantKey: url.searchParams.get("tenantKey")?.trim() || undefined,
+    workspaceKey: url.searchParams.get("workspaceKey")?.trim() || undefined,
+    limit
+  };
+};
+
 const parseAdminAuditEventListQuery = (
   url: URL,
   response: ServerResponse
@@ -912,6 +969,32 @@ const formatAdminAuditEventsCsv = (items: AdminAuditEvent[]): string => {
       item.subjectAdminUserId ?? "",
       item.summary,
       item.details
+    ]);
+  }
+
+  return `${rows.map(row => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
+};
+
+const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
+  const rows: unknown[][] = [
+    [
+      "adminUserId",
+      "username",
+      "displayName",
+      "status",
+      "createdAt",
+      "roleAssignments"
+    ]
+  ];
+
+  for (const item of items) {
+    rows.push([
+      item.adminUser.adminUserId,
+      item.adminUser.username,
+      item.adminUser.displayName,
+      item.adminUser.status,
+      item.adminUser.createdAt,
+      item.roleAssignments
     ]);
   }
 
@@ -1499,6 +1582,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.admin.listUsers) {
     return `GET ${productionApiRoutes.admin.listUsers}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.admin.exportUsersCsv) {
+    return `GET ${productionApiRoutes.admin.exportUsersCsv}`;
   }
 
   if (method === "POST" && pathname === productionApiRoutes.admin.createUser) {
@@ -2104,59 +2191,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const username = url.searchParams.get("username")?.trim() || undefined;
-        const status = url.searchParams.get("status")?.trim() || undefined;
-        if (status && status !== "active" && status !== "disabled") {
-          sendError(
-            response,
-            400,
-            "admin_user_status_invalid",
-            `Admin user status '${status}' is not supported.`
-          );
+        const query = parseAdminUserListQuery(url, response);
+        if (!query) {
           return;
         }
 
-        const role = url.searchParams.get("role")?.trim() || undefined;
-        if (
-          role &&
-          role !== "platform_admin" &&
-          role !== "tenant_admin" &&
-          role !== "workspace_admin"
-        ) {
-          sendError(
-            response,
-            400,
-            "admin_role_invalid",
-            `Admin role '${role}' is not supported.`
-          );
-          return;
-        }
-
-        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
-        const limit = limitRawValue
-          ? Number.parseInt(limitRawValue, 10)
-          : undefined;
-        if (
-          limitRawValue &&
-          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
-        ) {
-          sendError(
-            response,
-            400,
-            "admin_user_limit_invalid",
-            "Admin user limit must be an integer between 1 and 500."
-          );
-          return;
-        }
-
-        const query: AdminUserListQuery = {
-          username,
-          status: status as AdminUserStatus | undefined,
-          role: role as AdminRole | undefined,
-          tenantKey: url.searchParams.get("tenantKey")?.trim() || undefined,
-          workspaceKey: url.searchParams.get("workspaceKey")?.trim() || undefined,
-          limit
-        };
         const items = await services.adminDirectory.listAdminUsers({
           sessionToken,
           ...query
@@ -2164,6 +2203,33 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<ListAdminUsersResponse>(response, 200, {
           items: items.map(toAdminUserDirectoryItem)
         });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.exportUsersCsv
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const query = parseAdminUserListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const items = await services.adminDirectory.listAdminUsers({
+          sessionToken,
+          ...query
+        });
+        sendCsv(
+          response,
+          200,
+          "admin-users.csv",
+          formatAdminUsersCsv(items.map(toAdminUserDirectoryItem))
+        );
         return;
       }
 

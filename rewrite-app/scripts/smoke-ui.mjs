@@ -755,6 +755,13 @@ try {
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: "disabled" })
     .waitFor();
+  await page.locator("#exportAdminUsersCsvButton").click();
+  await page
+    .locator("#adminUsersExportPreview")
+    .filter({ hasText: "adminUserId" })
+    .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: "workspace_admin" })
+    .waitFor({ timeout: 15_000 });
 
   logStep("admin-audit-events");
   await pollJsonWithPredicate(
