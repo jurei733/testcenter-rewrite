@@ -283,6 +283,35 @@ const verifyBootstrappedDemo = async baseUrl => {
   expectEqual("demo test run status", resumed.payload?.testRun?.status, "running");
   expectEqual("demo booklet key", resumed.payload?.testRun?.bookletKey, "booklet:demo");
   expectEqual("demo current unit key", resumed.payload?.testRun?.currentUnitKey, "unit-intro");
+
+  const participantSessionsCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-sessions.csv?loginKey=student-demo&groupKey=${encodeURIComponent("group:student-demo")}&limit=1`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo participant sessions CSV status", participantSessionsCsv.status, 200);
+  expectEqual(
+    "demo participant sessions CSV content-type",
+    participantSessionsCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const participantSessionsCsvText = await participantSessionsCsv.text();
+  if (
+    !participantSessionsCsvText.startsWith(
+      "tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,"
+    ) ||
+    !participantSessionsCsvText.includes('"student-demo"') ||
+    !participantSessionsCsvText.includes('"group:student-demo"') ||
+    !participantSessionsCsvText.includes('"booklet:demo"') ||
+    !participantSessionsCsvText.includes('"unit-intro"')
+  ) {
+    throw new Error(
+      "Expected demo participant sessions CSV to contain student-demo run context."
+    );
+  }
 };
 
 try {

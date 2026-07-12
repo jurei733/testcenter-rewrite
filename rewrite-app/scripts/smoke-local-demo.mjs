@@ -244,6 +244,25 @@ try {
     { timeout: 15_000 }
   );
 
+  const participantSessionsDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Sessions CSV" }).click();
+  const participantSessionsDownload = await participantSessionsDownloadPromise;
+  assert.equal(
+    participantSessionsDownload.suggestedFilename(),
+    "demo-workspace-participant-sessions.csv"
+  );
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#participantSessionsExportPreview")
+        ?.textContent?.includes("student-demo") &&
+      document
+        .querySelector("#participantSessionsExportPreview")
+        ?.textContent?.includes("group:student-demo"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   await page.locator("#runtimeUnitResponse").fill("Operator adjusted smoke response");
   await page.locator("#runtimeUnitResponse").dispatchEvent("input");
   await page.locator("#runtimeUnitResponse").dispatchEvent("change");
