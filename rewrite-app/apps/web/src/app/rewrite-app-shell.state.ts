@@ -25,6 +25,7 @@ export interface ShellOpsState {
   adminSessionToken: string;
   adminSessionView: string;
   adminSessionsView: string;
+  adminSessionsExportView: string;
   adminSessionUserFilter: string;
   adminSessionStatusFilter: "" | AdminSessionStatus;
   adminSessionLimit: string;
@@ -188,6 +189,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminSessionToken: "",
     adminSessionView: "Use admin bootstrap or sign-in.",
     adminSessionsView: 'Use "Admin Sessions".',
+    adminSessionsExportView: "Export admin sessions CSV to preview it here.",
     adminSessionUserFilter: "",
     adminSessionStatusFilter: "",
     adminSessionLimit: "100",

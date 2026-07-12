@@ -179,6 +179,27 @@ export class RewriteAppOpsService {
     await this.refreshAdminSessions();
   }
 
+  async exportAdminSessionsCsv(): Promise<void> {
+    const csv = await this.requestState.request<string>(
+      "Admin Sessions CSV",
+      "GET",
+      this.buildAdminSessionsExportPath(),
+      undefined,
+      {
+        headers: {
+          ...this.createAdminHeaders(),
+          Accept: "text/csv"
+        }
+      }
+    );
+
+    this.opsState.adminSessionsExportView = csv;
+    this.feedback.rememberActivity(
+      "Admin Sessions CSV Exported",
+      `${csv.split(/\r?\n/).filter(Boolean).length - 1} admin session row(s) exported.`
+    );
+  }
+
   async refreshAdminUsers(): Promise<void> {
     const payload = await this.requestState.request<ListAdminUsersResponse>(
       "Admin Users",
@@ -406,6 +427,14 @@ export class RewriteAppOpsService {
 
   private buildAdminSessionsPath(): string {
     return this.appendQuery(productionApiRoutes.admin.listSessions, [
+      ["adminUserId", this.opsState.adminSessionUserFilter],
+      ["status", this.opsState.adminSessionStatusFilter],
+      ["limit", this.opsState.adminSessionLimit]
+    ]);
+  }
+
+  private buildAdminSessionsExportPath(): string {
+    return this.appendQuery(productionApiRoutes.admin.exportSessionsCsv, [
       ["adminUserId", this.opsState.adminSessionUserFilter],
       ["status", this.opsState.adminSessionStatusFilter],
       ["limit", this.opsState.adminSessionLimit]

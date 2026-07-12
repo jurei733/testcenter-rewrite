@@ -321,6 +321,7 @@ export const productionApiRoutes = {
     currentSession: "/api/v1/admin/auth/current-session",
     listSessions: "/api/v1/admin/auth/sessions",
     revokeSession: "/api/v1/admin/auth/sessions/:adminSessionId",
+    exportSessionsCsv: "/api/v1/admin/auth/sessions.csv",
     listUsers: "/api/v1/admin/users",
     createUser: "/api/v1/admin/users",
     updateUser: "/api/v1/admin/users/:adminUserId",

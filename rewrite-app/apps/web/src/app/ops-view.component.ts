@@ -103,6 +103,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <div class="actions">
           <button class="primary" type="button" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
+          <button id="exportAdminSessionsCsvButton" class="secondary" type="button" (click)="view.exportAdminSessionsCsv()">Export Sessions CSV</button>
           <button class="secondary" type="button" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
           <button id="adminRevokeSessionButton" class="danger" type="button" (click)="view.revokeAdminSession()">Revoke Selected Session</button>
           <button class="ghost" type="button" (click)="view.clearAdminSessionFilters()">Clear Session Filters</button>
@@ -116,6 +117,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         (itemAction)="view.selectAdminSession($event)"
         emptyState="Sign in as platform admin, then refresh admin sessions."
       ></app-record-collection>
+
+      <article class="card">
+        <h2>Admin Sessions CSV Export</h2>
+        <p>CSV preview for the current session filters, excluding bearer tokens.</p>
+        <pre id="adminSessionsExportPreview">{{ view.ops.adminSessionsExportView }}</pre>
+      </article>
 
       <article class="card">
         <h2>Admin User Management</h2>

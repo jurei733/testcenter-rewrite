@@ -1047,6 +1047,40 @@ const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
   return `${rows.map(row => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
 };
 
+const formatAdminSessionsCsv = (
+  items: ListAdminSessionsResponse["items"]
+): string => {
+  const rows: unknown[][] = [
+    [
+      "adminSessionId",
+      "adminUserId",
+      "username",
+      "displayName",
+      "userStatus",
+      "sessionStatus",
+      "createdAt",
+      "expiresAt",
+      "revokedAt"
+    ]
+  ];
+
+  for (const item of items) {
+    rows.push([
+      item.adminSession.adminSessionId,
+      item.adminSession.adminUserId,
+      item.adminUser.username,
+      item.adminUser.displayName,
+      item.adminUser.status,
+      item.status,
+      item.adminSession.createdAt,
+      item.adminSession.expiresAt,
+      item.adminSession.revokedAt
+    ]);
+  }
+
+  return `${rows.map(row => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
+};
+
 const toPublicAdminUser = (adminUser: AdminUser): PublicAdminUser => {
   return {
     adminUserId: adminUser.adminUserId,
@@ -1622,6 +1656,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.admin.listSessions) {
     return `GET ${productionApiRoutes.admin.listSessions}`;
+  }
+
+  if (
+    method === "GET" &&
+    pathname === productionApiRoutes.admin.exportSessionsCsv
+  ) {
+    return `GET ${productionApiRoutes.admin.exportSessionsCsv}`;
   }
 
   if (method === "DELETE" && adminSessionRevokePattern.test(pathname)) {
@@ -2221,6 +2262,33 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<ListAdminSessionsResponse>(response, 200, {
           items: items.map(toAdminSessionDirectoryItem)
         });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.exportSessionsCsv
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const query = parseAdminSessionListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const items = await services.adminAuth.listAdminSessions({
+          sessionToken,
+          ...query
+        });
+        sendCsv(
+          response,
+          200,
+          "admin-sessions.csv",
+          formatAdminSessionsCsv(items.map(toAdminSessionDirectoryItem))
+        );
         return;
       }
 

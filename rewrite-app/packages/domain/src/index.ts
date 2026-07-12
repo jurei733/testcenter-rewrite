@@ -653,6 +653,7 @@ export type FirstSliceCapability =
   | "admin_session_lifecycle"
   | "admin_session_read"
   | "admin_session_revoke"
+  | "admin_session_csv_export"
   | "admin_role_assignment"
   | "admin_user_directory"
   | "admin_user_csv_export"
@@ -698,6 +699,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_session_lifecycle",
   "admin_session_read",
   "admin_session_revoke",
+  "admin_session_csv_export",
   "admin_role_assignment",
   "admin_user_directory",
   "admin_user_csv_export",

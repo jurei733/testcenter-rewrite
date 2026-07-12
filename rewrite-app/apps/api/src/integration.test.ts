@@ -413,6 +413,41 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     true
   );
 
+  const adminSessionsCsvResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sessions.csv?status=revoked`,
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`,
+        accept: "text/csv"
+      }
+    }
+  );
+  const adminSessionsCsvBody = await adminSessionsCsvResponse.text();
+
+  assert.equal(adminSessionsCsvResponse.status, 200);
+  assertSecurityHeaders(adminSessionsCsvResponse);
+  assert.match(
+    adminSessionsCsvResponse.headers.get("content-type") ?? "",
+    /text\/csv/
+  );
+  assert.match(
+    adminSessionsCsvResponse.headers.get("content-disposition") ?? "",
+    /admin-sessions\.csv/
+  );
+  assert.match(
+    adminSessionsCsvBody,
+    /^"adminSessionId","adminUserId","username","displayName","userStatus","sessionStatus","createdAt","expiresAt","revokedAt"/
+  );
+  assert.match(adminSessionsCsvBody, /"revoked"/);
+  assert.equal(adminSessionsCsvBody.includes(secondSignIn.body.sessionToken), false);
+
+  const missingAdminSessionsCsvSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions.csv"
+  );
+
+  assert.equal(missingAdminSessionsCsvSession.status, 401);
+  assert.equal(missingAdminSessionsCsvSession.body.error, "admin_session_missing");
+
   const missingAdminSessionRevokeTarget = await requestJson<{ error: string }>(
     "/api/v1/admin/auth/sessions/missing-session",
     {
@@ -6074,6 +6109,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       admin: {
         listSessions: string;
         revokeSession: string;
+        exportSessionsCsv: string;
         exportUsersCsv: string;
         exportAuditEventsCsv: string;
       };
@@ -6086,6 +6122,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "admin_session_read",
     "admin_user_directory",
     "admin_session_revoke",
+    "admin_session_csv_export",
     "admin_user_csv_export",
     "admin_audit_read",
     "admin_audit_csv_export",
@@ -6134,6 +6171,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.admin.listSessions, /auth\/sessions/);
   assert.match(manifest.routes.admin.revokeSession, /auth\/sessions\/:adminSessionId/);
+  assert.match(manifest.routes.admin.exportSessionsCsv, /sessions\.csv/);
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
   assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");

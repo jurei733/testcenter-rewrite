@@ -149,6 +149,10 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminSessions());
   }
 
+  exportAdminSessionsCsv(): void {
+    this.viewState.onActionAsync(() => this.opsService.exportAdminSessionsCsv());
+  }
+
   signOutAdmin(): void {
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }

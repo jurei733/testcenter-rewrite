@@ -500,6 +500,13 @@ try {
   await waitForInputMinLength("#adminSessionRevokeTargetId", 20);
   await clickAction("Revoke Selected Session");
   await expectInputValue("#adminSessionRevokeTargetId", "");
+  await clickAction("Export Sessions CSV");
+  await page
+    .locator("#adminSessionsExportPreview")
+    .filter({ hasText: "adminSessionId" })
+    .filter({ hasText: "username" })
+    .filter({ hasText: "revoked" })
+    .waitFor();
   logStep("refresh-diagnostics");
   await clickAction("Refresh Diagnostics");
   await page
