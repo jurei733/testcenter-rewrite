@@ -97,7 +97,7 @@ That executes:
 - memory + sqlite integration tests
 - a built-server startup smoke test against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
-- browser-driven Angular UI smokes against SQLite in open and protected operator modes
+- browser-driven Angular UI smokes against SQLite in open and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
 
 For explicit storage administration, run:
 
@@ -372,9 +372,10 @@ For browser-level frontend verification, run:
 npm run install:browsers
 npm run smoke:ui
 npm run smoke:ui:operator-auth
+FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:ui:postgres
 ```
 
-That builds the Angular frontend, boots the built API process on SQLite, and drives a real browser through:
+The SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
@@ -388,7 +389,7 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - retrying that failed import on the same package identity
 - diagnostics and config reads
 
-The `smoke:ui:operator-auth` variant repeats the browser flow with `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, verifying that the shell can carry the admin bearer session into protected operator routes.
+The `smoke:ui:operator-auth` variant repeats the browser flow with `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, verifying that the shell can carry the admin bearer session into protected operator routes. The `smoke:ui:postgres` variant migrates the configured Postgres database first, then runs the protected browser flow against the Postgres-backed API.
 
 For the full containerized release path, run:
 
@@ -439,6 +440,7 @@ For runtime probes:
   - focused unit tests for shared contracts helpers
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
+  - protected browser-driven Angular UI smoke against a Postgres service database
   - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
   - Docker compose release smoke with explicit migrate + api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
