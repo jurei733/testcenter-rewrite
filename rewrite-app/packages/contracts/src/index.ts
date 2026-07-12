@@ -780,8 +780,16 @@ export type GetContentReleaseActivationReadinessResponse = {
   activationReadiness: ContentReleaseActivationReadiness;
 };
 
+export type ContentReleaseActivationSummary = {
+  forced: boolean;
+  previousActiveContentReleaseId: string | null;
+  supersededOpenRunCount: number;
+  supersededOpenRuns: OpenMonitorRun[];
+};
+
 export type ActivateContentReleaseResponse = {
   contentRelease: ContentRelease;
+  activation: ContentReleaseActivationSummary;
 };
 
 export type ParticipantSignInResponse = {

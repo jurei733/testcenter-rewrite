@@ -3405,15 +3405,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
 
         const body = await readRequestJsonBody<ActivateContentReleaseRequest>();
-        const contentRelease = await services.contentIntake.activateContentRelease({
+        const activationResult = await services.contentIntake.activateContentRelease({
           tenantKey,
           workspaceKey,
           contentReleaseId,
-          activatedByActorId: body.activatedByActorId
-          ,
+          activatedByActorId: body.activatedByActorId,
           forceActivation: body.forceActivation
         });
-        sendJson<ActivateContentReleaseResponse>(response, 200, { contentRelease });
+        sendJson<ActivateContentReleaseResponse>(response, 200, activationResult);
         return;
       }
 

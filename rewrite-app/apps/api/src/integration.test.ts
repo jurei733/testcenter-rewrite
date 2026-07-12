@@ -5158,6 +5158,15 @@ test("activation guard returns blocking open-run details", async () => {
       contentReleaseId: string;
       status: string;
     };
+    activation: {
+      forced: boolean;
+      previousActiveContentReleaseId: string | null;
+      supersededOpenRunCount: number;
+      supersededOpenRuns: Array<{
+        loginKey: string;
+        participantRosterEntry: { displayName: string | null } | null;
+      }>;
+    };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondImport.body.stagedContentRelease.contentReleaseId}/activate`,
     {
@@ -5175,6 +5184,21 @@ test("activation guard returns blocking open-run details", async () => {
     secondImport.body.stagedContentRelease.contentReleaseId
   );
   assert.equal(forcedActivation.body.contentRelease.status, "active");
+  assert.equal(forcedActivation.body.activation.forced, true);
+  assert.equal(
+    forcedActivation.body.activation.previousActiveContentReleaseId,
+    firstReleaseId
+  );
+  assert.equal(forcedActivation.body.activation.supersededOpenRunCount, 1);
+  assert.equal(
+    forcedActivation.body.activation.supersededOpenRuns[0]?.loginKey,
+    "activation-student"
+  );
+  assert.equal(
+    forcedActivation.body.activation.supersededOpenRuns[0]?.participantRosterEntry
+      ?.displayName,
+    "Activation Student"
+  );
 
   const firstReleaseAfterForce = await requestJson<{
     contentReleaseDetail: {

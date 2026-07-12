@@ -94,7 +94,7 @@ export type ContentIntakePort = {
     contentReleaseId: string;
     activatedByActorId: string;
     forceActivation?: boolean;
-  }): Promise<ContentRelease>;
+  }): Promise<ActivateContentReleaseResult>;
 };
 
 export type WorkspaceAdminReadPort = {
@@ -499,6 +499,18 @@ export const firstSliceUseCases = {
 export type CreateImportJobResult = {
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+};
+
+export type ContentReleaseActivationSummary = {
+  forced: boolean;
+  previousActiveContentReleaseId: string | null;
+  supersededOpenRunCount: number;
+  supersededOpenRuns: OpenMonitorRun[];
+};
+
+export type ActivateContentReleaseResult = {
+  contentRelease: ContentRelease;
+  activation: ContentReleaseActivationSummary;
 };
 
 export type ActivateContentReleaseBlockedDetails = {
@@ -6669,6 +6681,12 @@ export const createFirstSliceServices = (
           activatedAt
         };
         await repository.saveContentRelease(activatedRelease);
+        const activation: ContentReleaseActivationSummary = {
+          forced: Boolean(input.forceActivation),
+          previousActiveContentReleaseId: activeRelease?.contentReleaseId ?? null,
+          supersededOpenRunCount: supersededOpenRuns.length,
+          supersededOpenRuns
+        };
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
@@ -6677,14 +6695,12 @@ export const createFirstSliceServices = (
           subjectType: "content_release",
           subjectId: activatedRelease.contentReleaseId,
           summary: `Content release '${activatedRelease.contentReleaseId}' activated.`,
-          details: {
-            forced: Boolean(input.forceActivation),
-            previousActiveContentReleaseId: activeRelease?.contentReleaseId ?? null,
-            supersededOpenRunCount: supersededOpenRuns.length,
-            supersededOpenRuns
-          }
+          details: activation
         });
-        return activatedRelease;
+        return {
+          contentRelease: activatedRelease,
+          activation
+        };
       }
     },
     createImportJobWithRelease,
