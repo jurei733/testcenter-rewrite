@@ -365,6 +365,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions",
     getParticipantSession:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions/:participantSessionId",
+    exportParticipantSessionsCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/participant-sessions.csv",
     importParticipantRoster:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-roster",
     listParticipantRoster:

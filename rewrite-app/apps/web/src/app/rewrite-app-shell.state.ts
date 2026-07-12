@@ -98,6 +98,7 @@ export interface ShellRuntimeState {
   reviewCategory: string;
   reviewComment: string;
   participantSessionsView: string;
+  participantSessionsExportView: string;
   participantSessionDetailView: string;
   runtimeStateView: string;
   currentRunStateView: string;
@@ -268,6 +269,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     reviewCategory: "note",
     reviewComment: "",
     participantSessionsView: 'Use "Refresh Runtime Reads".',
+    participantSessionsExportView: 'Use "Export Sessions CSV".',
     participantSessionDetailView: 'Use "Participant Session Detail".',
     runtimeStateView: 'Use "Refresh Runtime Reads".',
     currentRunStateView: 'Use "Refresh Runtime Reads".',

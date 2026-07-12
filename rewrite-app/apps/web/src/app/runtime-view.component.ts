@@ -218,6 +218,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <div class="actions">
           <button id="refreshParticipantSessionsButton" class="primary" type="button" (click)="view.refreshParticipantSessions()">Refresh Sessions</button>
+          <button class="ghost" type="button" (click)="view.exportParticipantSessionsCsv()">Export Sessions CSV</button>
           <button class="ghost" type="button" (click)="view.clearParticipantSessionFilters()">Clear Filters</button>
         </div>
       </article>
@@ -408,6 +409,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <article class="card">
+        <h2>Participant Sessions CSV Export</h2>
+        <p>Filtered participant session rows in CSV format with latest run, release, and roster context.</p>
+        <pre id="participantSessionsExportPreview">{{ view.runtime.participantSessionsExportView }}</pre>
+      </article>
+
+      <article class="card">
         <h2>Response CSV Export</h2>
         <p>Workspace-wide participant responses in CSV format, ready for operator download or inspection.</p>
         <pre id="responseExportPreview">{{ view.runtime.responseExportView }}</pre>
@@ -450,6 +457,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
+      <app-json-panel title="Participant Sessions CSV Export" subtitle="Filtered Sessions" viewId="participantSessionsExportView" [content]="view.runtime.participantSessionsExportView"></app-json-panel>
       <app-json-panel title="Participant Roster" subtitle="Saved Entry Rows" viewId="participantRosterView" [content]="view.runtime.participantRosterView"></app-json-panel>
       <app-json-panel title="Participant Roster CSV Export" subtitle="Saved Entry Rows" viewId="participantRosterExportView" [content]="view.runtime.participantRosterExportView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>

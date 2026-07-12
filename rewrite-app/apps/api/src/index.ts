@@ -1290,6 +1290,9 @@ const importJobListPattern = createRoutePattern(
 const participantSessionListPattern = createRoutePattern(
   productionApiRoutes.workspace.listParticipantSessions
 );
+const participantSessionCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportParticipantSessionsCsv
+);
 const participantSessionDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getParticipantSession
 );
@@ -1380,6 +1383,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", importJobListPattern],
   ["GET", importJobDetailPattern],
   ["GET", participantSessionListPattern],
+  ["GET", participantSessionCsvExportPattern],
   ["GET", participantSessionDetailPattern],
   ["GET", participantRosterPattern],
   ["POST", participantRosterPattern],
@@ -1760,6 +1764,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       participantSessionListPattern,
       productionApiRoutes.workspace.listParticipantSessions
+    ],
+    [
+      "GET",
+      participantSessionCsvExportPattern,
+      productionApiRoutes.workspace.exportParticipantSessionsCsv
     ],
     [
       "GET",
@@ -3070,6 +3079,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantSessionListMatch = participantSessionListPattern.exec(pathname);
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
+      const participantSessionCsvExportMatch =
+        participantSessionCsvExportPattern.exec(pathname);
       const participantRosterMatch = participantRosterPattern.exec(pathname);
       const participantRosterCsvExportMatch =
         participantRosterCsvExportPattern.exec(pathname);
@@ -3219,6 +3230,71 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           limit
         });
         sendJson<ListParticipantSessionsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && participantSessionCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          participantSessionCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          participantSessionCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const status = url.searchParams.get("status")?.trim() || undefined;
+        if (
+          status &&
+          !participantSessionStatuses.includes(status as ParticipantSessionStatus)
+        ) {
+          sendError(
+            response,
+            400,
+            "participant_session_status_invalid",
+            `Participant session status '${status}' is not supported.`
+          );
+          return;
+        }
+
+        const groupKey = url.searchParams.get("groupKey")?.trim() || undefined;
+        const loginKey = url.searchParams.get("loginKey")?.trim() || undefined;
+        const contentReleaseId =
+          url.searchParams.get("contentReleaseId")?.trim() || undefined;
+        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+        const limit = limitRawValue
+          ? Number.parseInt(limitRawValue, 10)
+          : undefined;
+        if (
+          limitRawValue &&
+          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "participant_session_limit_invalid",
+            "Participant session limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportParticipantSessionsCsv({
+          tenantKey,
+          workspaceKey,
+          status: status as ParticipantSessionStatus | undefined,
+          groupKey,
+          loginKey,
+          contentReleaseId,
+          limit
+        });
+        sendCsv(response, 200, `${workspaceKey}-participant-sessions.csv`, csv);
         return;
       }
 

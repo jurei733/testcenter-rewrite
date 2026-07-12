@@ -1461,6 +1461,7 @@ try {
   );
   logStep("filter-participant-sessions");
   await selectAndCommit("#participantSessionStatusFilter", "signed_in");
+  await fillAndCommit("#participantSessionGroupFilter", participantGroupKey);
   await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
   await fillAndCommit("#participantSessionLimit", "1");
   await clickAction("Refresh Sessions");
@@ -1472,6 +1473,14 @@ try {
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
     .first()
+    .waitFor();
+  logStep("export-participant-sessions-csv");
+  await clickAction("Export Sessions CSV");
+  await page
+    .locator("#participantSessionsExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,participantSessionId,loginKey" })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantGroupKey })
     .waitFor();
   await fillAndCommit("#participantSessionId", participantSessionId);
   logStep("resume-session");

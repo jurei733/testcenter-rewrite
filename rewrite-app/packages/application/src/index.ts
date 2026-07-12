@@ -166,6 +166,15 @@ export type WorkspaceAdminReadPort = {
     contentReleaseId?: string;
     limit?: number;
   }): Promise<WorkspaceParticipantSessionListItem[]>;
+  exportParticipantSessionsCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    status?: ParticipantSessionStatus;
+    groupKey?: string;
+    loginKey?: string;
+    contentReleaseId?: string;
+    limit?: number;
+  }): Promise<string>;
   importParticipantRoster(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1672,6 +1681,57 @@ const formatParticipantRosterCsv = (input: {
         item.importedAt,
         item.validationWarnings.map(warning => warning.code).join("|"),
         item.validationWarnings.map(warning => warning.message).join("|")
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatParticipantSessionsCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: WorkspaceParticipantSessionListItem[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "participantSessionId",
+    "loginKey",
+    "groupKey",
+    "sessionStatus",
+    "createdAt",
+    "contentReleaseId",
+    "releaseLabel",
+    "latestTestRunId",
+    "latestBookletKey",
+    "latestRunStatus",
+    "latestCurrentUnitKey",
+    "latestRunUpdatedAt",
+    "rosterBookletKey",
+    "rosterDisplayName"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(item =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        item.participantSession.participantSessionId,
+        item.participantSession.loginKey,
+        item.participantSession.groupKey,
+        item.participantSession.status,
+        item.participantSession.createdAt,
+        item.participantSession.contentReleaseId,
+        item.contentRelease?.releaseLabel ?? "",
+        item.latestTestRun?.testRunId ?? "",
+        item.latestTestRun?.bookletKey ?? "",
+        item.latestTestRun?.status ?? "",
+        item.latestTestRun?.currentUnitKey ?? "",
+        item.latestTestRun?.updatedAt ?? "",
+        item.participantRosterEntry?.bookletKey ?? "",
+        item.participantRosterEntry?.displayName ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -5800,6 +5860,14 @@ export const createFirstSliceServices = (
                 ) ?? null
             };
           });
+      },
+      async exportParticipantSessionsCsv(input) {
+        const items = await this.listParticipantSessions(input);
+        return formatParticipantSessionsCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       },
       async importParticipantRoster(input) {
         const workspace = await requireWorkspace(

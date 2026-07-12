@@ -2049,6 +2049,29 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredDetailedResponses.body.items[0]?.unitKey, "unit-intro");
     assert.equal(filteredDetailedResponses.body.items[0]?.status, "running");
 
+    const participantSessionsCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-sessions.csv?loginKey=student-demo&groupKey=group%3Astudent-demo&limit=1",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(participantSessionsCsv.status, 200);
+    assert.equal(participantSessionsCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(
+      participantSessionsCsv.body,
+      /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,/
+    );
+    assert.match(
+      participantSessionsCsv.body,
+      new RegExp(
+        `"demo-tenant","demo-workspace","${participantSignIn.body.participantSession.participantSessionId}","student-demo","group:student-demo"`
+      )
+    );
+
     const invalidDetailedResponseStatus = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?status=unknown",

@@ -21,6 +21,7 @@ import {
   updateReviewAction
 } from "./rewrite-app-shell.runtime-actions";
 import {
+  exportParticipantSessionsCsvAction,
   exportParticipantRosterCsvAction,
   exportReviewsCsvAction,
   exportResponsesCsvAction,
@@ -107,6 +108,23 @@ export class RewriteAppRuntimeService {
         `${payload.items.length} session(s) loaded with the current filters.`
       );
     }
+  }
+
+  async exportParticipantSessionsCsv(): Promise<string> {
+    const csv = await exportParticipantSessionsCsvAction(
+      this.hosts.createRuntimeReadsHost()
+    );
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-participant-sessions.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Participant Sessions CSV Downloaded",
+      `Participant sessions export saved as ${workspaceKey}-participant-sessions.csv.`
+    );
+    return csv;
   }
 
   async importParticipantRoster(): Promise<void> {

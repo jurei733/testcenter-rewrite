@@ -675,6 +675,7 @@ export type FirstSliceCapability =
   | "participant_roster_read"
   | "participant_roster_csv_export"
   | "participant_session_read"
+  | "participant_session_csv_export"
   | "detailed_response_read"
   | "response_csv_export"
   | "review_workflow"
@@ -721,6 +722,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "participant_roster_read",
   "participant_roster_csv_export",
   "participant_session_read",
+  "participant_session_csv_export",
   "detailed_response_read",
   "response_csv_export",
   "review_workflow",

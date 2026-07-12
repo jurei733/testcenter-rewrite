@@ -112,8 +112,10 @@ export function createRuntimeReadsStateHost(args: {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  const buildParticipantSessionsPath = (): string => {
-    const path = resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
+  const buildParticipantSessionsPath = (
+    route: string = productionApiRoutes.workspace.listParticipantSessions
+  ): string => {
+    const path = resolveRoutePath(route, {
       tenantKey: args.workspaceState.tenantKey.trim(),
       workspaceKey: args.workspaceState.workspaceKey.trim()
     });
@@ -196,6 +198,13 @@ export function createRuntimeReadsStateHost(args: {
     getParticipantSessionsPath: buildParticipantSessionsPath,
     setParticipantSessionsView: nextValue => {
       args.runtimeState.participantSessionsView = nextValue;
+    },
+    getParticipantSessionsCsvExportPath: () =>
+      buildParticipantSessionsPath(
+        productionApiRoutes.workspace.exportParticipantSessionsCsv
+      ),
+    setParticipantSessionsExportView: nextValue => {
+      args.runtimeState.participantSessionsExportView = nextValue;
     },
     getParticipantRosterPath: buildParticipantRosterPath,
     setParticipantRosterView: nextValue => {

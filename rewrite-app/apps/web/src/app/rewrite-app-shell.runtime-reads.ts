@@ -28,6 +28,8 @@ export interface ShellRuntimeReadsHost {
   getOpenRunsPath(): string;
   getParticipantSessionsPath(): string;
   setParticipantSessionsView(nextValue: string): void;
+  getParticipantSessionsCsvExportPath(): string;
+  setParticipantSessionsExportView(nextValue: string): void;
   getParticipantRosterPath(): string;
   setParticipantRosterView(nextValue: string): void;
   getParticipantRosterCsvExportPath(): string;
@@ -155,6 +157,18 @@ export async function loadParticipantSessionsAction(
   );
   host.setParticipantSessionsView(JSON.stringify(payload, null, 2));
   return payload;
+}
+
+export async function exportParticipantSessionsCsvAction(
+  host: ShellRuntimeReadsHost
+): Promise<string> {
+  const csv = await host.request<string>(
+    "Participant Sessions CSV Export",
+    "GET",
+    host.getParticipantSessionsCsvExportPath()
+  );
+  host.setParticipantSessionsExportView(csv);
+  return csv;
 }
 
 export async function exportResponsesCsvAction(

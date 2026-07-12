@@ -1191,6 +1191,12 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantSessionDetail());
   }
 
+  exportParticipantSessionsCsv(): void {
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportParticipantSessionsCsv()
+    );
+  }
+
   exportResponsesCsv(): void {
     this.viewState.onActionAsync(() => this.runtimeService.exportResponsesCsv());
   }
