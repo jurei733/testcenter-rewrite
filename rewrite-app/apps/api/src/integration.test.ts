@@ -4405,6 +4405,10 @@ test("source document import accepts QTI assessment sections as booklets", async
                 <identifier>unit-reading-b</identifier>
                 <body><![CDATA[<p>Read the passage and answer the question.</p>]]></body>
               </assessmentItemRef>
+              <assessmentItem identifier="unit-reading-c">
+                <title>Reading Item C</title>
+                <itemBody>Use the embedded item body.</itemBody>
+              </assessmentItem>
             </assessmentSection>
           </testPart>
         </assessmentTest>
@@ -4457,6 +4461,11 @@ test("source document import accepts QTI assessment sections as booklets", async
               unitKey: "unit-reading-b",
               displayLabel: "Reading Item B",
               content: "Read the passage and answer the question."
+            },
+            {
+              unitKey: "unit-reading-c",
+              displayLabel: "Reading Item C",
+              content: "Use the embedded item body."
             }
           ]
         }

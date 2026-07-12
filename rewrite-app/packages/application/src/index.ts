@@ -3160,7 +3160,7 @@ const collectXmlBookletEntries = (
     const unitEntries: SourcePackageContentStructure["bookletEntries"][number]["unitEntries"] = [];
 
     for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
-      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItemRef|assessment-item-ref|itemRef|item-ref|unitFile|unit-file|resource|file|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItem|assessment-item|assessmentItemRef|assessment-item-ref|itemRef|item-ref|unitFile|unit-file|resource|file|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       const unitContent = unitMatch[3] ?? "";
@@ -3179,6 +3179,8 @@ const collectXmlBookletEntries = (
           "prompt",
           "question",
           "body",
+          "itemBody",
+          "item-body",
           "text",
           "stimulus",
           "markdown",
@@ -3190,6 +3192,8 @@ const collectXmlBookletEntries = (
             "prompt",
             "question",
             "body",
+            "itemBody",
+            "item-body",
             "text",
             "stimulus",
             "markdown",
