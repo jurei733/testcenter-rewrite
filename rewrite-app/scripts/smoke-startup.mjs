@@ -182,6 +182,8 @@ try {
   const readiness = await pollJson(`${baseUrl}/readyz`);
   const manifest = await pollJson(`${baseUrl}/manifest`);
   const config = await pollJson(`${baseUrl}/diagnostics/config`);
+  const metrics = await pollJson(`${baseUrl}/metrics`);
+  const prometheusResponse = await fetch(`${baseUrl}/metrics/prometheus`);
 
   await expectHead(`${baseUrl}/healthz`);
   await expectHead(`${baseUrl}/readyz`);
@@ -221,12 +223,56 @@ try {
 
   expectBuildMetadata("manifest.build", manifest.build);
   expectBuildMetadata("runtimeConfig.build", config.build);
+  expectBuildMetadata("metrics.build", metrics.build);
 
   expectRedactedPostgresLocation("manifest.storage.location", manifest.storage?.location);
   expectRedactedPostgresLocation(
     "runtimeConfig.storage.location",
     config.runtimeConfig?.storage?.location
   );
+
+  if (metrics.storage?.kind !== store) {
+    throw new Error(
+      `Expected metrics storage.kind=${store} but got ${metrics.storage?.kind ?? "unknown"}.`
+    );
+  }
+
+  if (metrics.storage?.schemaVersion !== manifest.storage?.schemaVersion) {
+    throw new Error(
+      `Expected metrics schemaVersion to match manifest schemaVersion ${manifest.storage?.schemaVersion ?? "unknown"}.`
+    );
+  }
+
+  if (typeof metrics.runtime?.completedRequests !== "number") {
+    throw new Error("Startup smoke expected runtime metrics completedRequests.");
+  }
+
+  if (!prometheusResponse.ok) {
+    throw new Error(
+      `Startup smoke expected Prometheus metrics to load, got ${prometheusResponse.status}.`
+    );
+  }
+
+  const prometheusBody = await prometheusResponse.text();
+  if (!prometheusBody.includes("rewrite_app_build_info{")) {
+    throw new Error("Startup smoke expected Prometheus build info.");
+  }
+
+  if (
+    process.env.APP_BUILD_SHA &&
+    !prometheusBody.includes(`build_sha="${process.env.APP_BUILD_SHA}"`)
+  ) {
+    throw new Error("Startup smoke expected Prometheus build_sha label.");
+  }
+
+  if (
+    process.env.APP_BUILD_TIMESTAMP &&
+    !prometheusBody.includes(
+      `build_timestamp="${process.env.APP_BUILD_TIMESTAMP}"`
+    )
+  ) {
+    throw new Error("Startup smoke expected Prometheus build_timestamp label.");
+  }
 
   const expectedOperatorAuthRequired = parseBooleanFlag(
     process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED
