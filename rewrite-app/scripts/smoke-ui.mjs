@@ -795,6 +795,13 @@ try {
     .filter({ hasText: "admin_user_updated" })
     .filter({ hasText: workspaceAdminUserId })
     .waitFor();
+  await page.locator("#exportAdminAuditCsvButton").click();
+  await page
+    .locator("#adminAuditExportPreview")
+    .filter({ hasText: "adminAuditEventId" })
+    .filter({ hasText: "admin_user_updated" })
+    .filter({ hasText: workspaceAdminUserId })
+    .waitFor({ timeout: 15_000 });
 
   logStep("nav-content");
   await page.locator('[data-view-nav="content"]').click();

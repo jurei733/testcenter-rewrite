@@ -102,6 +102,7 @@ import {
   type AdminSession,
   type AdminUser,
   type AdminUserStatus,
+  type AdminAuditEvent,
   type AdminAuditEventType,
   type ContentReleaseStatus,
   type ImportJobStatus,
@@ -840,6 +841,83 @@ const sendError = (
   sendJson<ApiErrorResponse>(response, statusCode, { error, message, details });
 };
 
+const parseAdminAuditEventListQuery = (
+  url: URL,
+  response: ServerResponse
+): AdminAuditEventListQuery | null => {
+  const eventType = url.searchParams.get("eventType")?.trim() || undefined;
+  if (eventType && !adminAuditEventTypes.includes(eventType as AdminAuditEventType)) {
+    sendError(
+      response,
+      400,
+      "admin_audit_event_type_invalid",
+      `Admin audit event type '${eventType}' is not supported.`
+    );
+    return null;
+  }
+
+  const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+  const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
+  if (
+    limitRawValue &&
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_audit_limit_invalid",
+      "Admin audit limit must be an integer between 1 and 500."
+    );
+    return null;
+  }
+
+  return {
+    eventType: eventType as AdminAuditEventType | undefined,
+    actorAdminUserId:
+      url.searchParams.get("actorAdminUserId")?.trim() || undefined,
+    subjectAdminUserId:
+      url.searchParams.get("subjectAdminUserId")?.trim() || undefined,
+    limit
+  };
+};
+
+const escapeCsvCell = (value: unknown): string => {
+  if (value == null) {
+    return "";
+  }
+
+  const text = typeof value === "string" ? value : JSON.stringify(value) ?? "";
+  return `"${text.replace(/"/g, "\"\"")}"`;
+};
+
+const formatAdminAuditEventsCsv = (items: AdminAuditEvent[]): string => {
+  const rows: unknown[][] = [
+    [
+      "adminAuditEventId",
+      "eventType",
+      "occurredAt",
+      "actorAdminUserId",
+      "subjectAdminUserId",
+      "summary",
+      "details"
+    ]
+  ];
+
+  for (const item of items) {
+    rows.push([
+      item.adminAuditEventId,
+      item.eventType,
+      item.occurredAt,
+      item.actorAdminUserId ?? "",
+      item.subjectAdminUserId ?? "",
+      item.summary,
+      item.details
+    ]);
+  }
+
+  return `${rows.map(row => row.map(escapeCsvCell).join(",")).join("\n")}\n`;
+};
+
 const toPublicAdminUser = (adminUser: AdminUser): PublicAdminUser => {
   return {
     adminUserId: adminUser.adminUserId,
@@ -1408,6 +1486,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.admin.listAuditEvents}`;
   }
 
+  if (
+    method === "GET" &&
+    pathname === productionApiRoutes.admin.exportAuditEventsCsv
+  ) {
+    return `GET ${productionApiRoutes.admin.exportAuditEventsCsv}`;
+  }
+
   if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
     return `GET ${productionApiRoutes.platform.listTenants}`;
   }
@@ -1970,50 +2055,43 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const eventType = url.searchParams.get("eventType")?.trim() || undefined;
-        if (
-          eventType &&
-          !adminAuditEventTypes.includes(eventType as AdminAuditEventType)
-        ) {
-          sendError(
-            response,
-            400,
-            "admin_audit_event_type_invalid",
-            `Admin audit event type '${eventType}' is not supported.`
-          );
+        const query = parseAdminAuditEventListQuery(url, response);
+        if (!query) {
           return;
         }
 
-        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
-        const limit = limitRawValue
-          ? Number.parseInt(limitRawValue, 10)
-          : undefined;
-        if (
-          limitRawValue &&
-          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
-        ) {
-          sendError(
-            response,
-            400,
-            "admin_audit_limit_invalid",
-            "Admin audit limit must be an integer between 1 and 500."
-          );
-          return;
-        }
-
-        const query: AdminAuditEventListQuery = {
-          eventType: eventType as AdminAuditEventType | undefined,
-          actorAdminUserId:
-            url.searchParams.get("actorAdminUserId")?.trim() || undefined,
-          subjectAdminUserId:
-            url.searchParams.get("subjectAdminUserId")?.trim() || undefined,
-          limit
-        };
         const items = await services.adminDirectory.listAdminAuditEvents({
           sessionToken,
           ...query
         });
         sendJson<ListAdminAuditEventsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.exportAuditEventsCsv
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const query = parseAdminAuditEventListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const items = await services.adminDirectory.listAdminAuditEvents({
+          sessionToken,
+          ...query
+        });
+        sendCsv(
+          response,
+          200,
+          "admin-audit-events.csv",
+          formatAdminAuditEventsCsv(items)
+        );
         return;
       }
 

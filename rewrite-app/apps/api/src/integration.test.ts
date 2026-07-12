@@ -768,6 +768,42 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(limitedAuditEvents.status, 200);
   assert.equal(limitedAuditEvents.body.items.length, 1);
 
+  const auditCsvResponse = await fetch(
+    `${baseUrl}/api/v1/admin/audit-events.csv?eventType=admin_user_updated&subjectAdminUserId=${createdAdminUser.body.adminUser.adminUserId}&limit=1`,
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`,
+        accept: "text/csv"
+      }
+    }
+  );
+  const auditCsvBody = await auditCsvResponse.text();
+
+  assert.equal(auditCsvResponse.status, 200);
+  assertSecurityHeaders(auditCsvResponse);
+  assert.match(
+    auditCsvResponse.headers.get("content-type") ?? "",
+    /text\/csv/
+  );
+  assert.match(
+    auditCsvResponse.headers.get("content-disposition") ?? "",
+    /admin-audit-events\.csv/
+  );
+  assert.match(
+    auditCsvBody,
+    /^"adminAuditEventId","eventType","occurredAt","actorAdminUserId","subjectAdminUserId","summary","details"/
+  );
+  assert.match(auditCsvBody, /"admin_user_updated"/);
+  assert.match(auditCsvBody, new RegExp(createdAdminUser.body.adminUser.adminUserId));
+  assert.equal(auditCsvBody.includes("workspace-secret"), false);
+
+  const missingAuditCsvSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/audit-events.csv"
+  );
+
+  assert.equal(missingAuditCsvSession.status, 401);
+  assert.equal(missingAuditCsvSession.body.error, "admin_session_missing");
+
   const invalidAuditEventType = await requestJson<{ error: string }>(
     "/api/v1/admin/audit-events?eventType=unsupported",
     {
@@ -5834,6 +5870,9 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         getRuntimeDiagnostics: string;
         getRuntimeConfig: string;
       };
+      admin: {
+        exportAuditEventsCsv: string;
+      };
     };
   };
 
@@ -5842,6 +5881,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   for (const capability of [
     "admin_user_directory",
     "admin_audit_read",
+    "admin_audit_csv_export",
     "source_package_read",
     "source_package_retry",
     "import_job_read",
@@ -5885,6 +5925,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     manifest.routes.workspace.getContentReleaseActivationReadiness,
     /activation-readiness/
   );
+  assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
   assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");
   assert.equal(manifest.routes.system.getRuntimeConfig, "/diagnostics/config");
 });

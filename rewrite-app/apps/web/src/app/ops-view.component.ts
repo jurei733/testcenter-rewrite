@@ -265,6 +265,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button class="primary" type="button" (click)="view.applyAdminAuditFilters()">Apply Audit Filters</button>
           <button class="secondary" type="button" (click)="view.useSelectedAdminUserAsAuditSubject()">Use Selected User As Subject</button>
+          <button id="exportAdminAuditCsvButton" class="secondary" type="button" (click)="view.exportAdminAuditEventsCsv()">Export Audit CSV</button>
           <button class="ghost" type="button" (click)="view.clearAdminAuditFilters()">Clear Audit Filters</button>
         </div>
       </article>
@@ -275,6 +276,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         [items]="view.adminAuditItems"
         emptyState="Sign in as platform admin, then refresh admin audit events."
       ></app-record-collection>
+
+      <article class="card">
+        <h2>Admin Audit CSV Export</h2>
+        <p>Preview the filtered audit trail as CSV for platform handoff, incident review, or external archiving.</p>
+        <pre id="adminAuditExportPreview">{{ view.ops.adminAuditExportView }}</pre>
+      </article>
 
       <article class="card">
         <h2>Operational Snapshot</h2>

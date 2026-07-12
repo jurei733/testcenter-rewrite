@@ -325,7 +325,8 @@ export const productionApiRoutes = {
     assignRole: "/api/v1/admin/users/:adminUserId/role-assignments",
     revokeRole:
       "/api/v1/admin/users/:adminUserId/role-assignments/:roleAssignmentId",
-    listAuditEvents: "/api/v1/admin/audit-events"
+    listAuditEvents: "/api/v1/admin/audit-events",
+    exportAuditEventsCsv: "/api/v1/admin/audit-events.csv"
   },
   platform: {
     listTenants: "/api/v1/platform/tenants",

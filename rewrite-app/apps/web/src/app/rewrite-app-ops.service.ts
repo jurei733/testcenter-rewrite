@@ -175,6 +175,27 @@ export class RewriteAppOpsService {
     );
   }
 
+  async exportAdminAuditEventsCsv(): Promise<void> {
+    const csv = await this.requestState.request<string>(
+      "Admin Audit Events CSV",
+      "GET",
+      this.buildAdminAuditEventsExportPath(),
+      undefined,
+      {
+        headers: {
+          ...this.createAdminHeaders(),
+          Accept: "text/csv"
+        }
+      }
+    );
+
+    this.opsState.adminAuditExportView = csv;
+    this.feedback.rememberActivity(
+      "Admin Audit CSV Exported",
+      "Filtered admin audit events were exported to the operator preview."
+    );
+  }
+
   async createAdminUser(): Promise<void> {
     const payload = await this.requestState.request<CreateAdminUserResponse>(
       "Create Admin User",
@@ -322,6 +343,15 @@ export class RewriteAppOpsService {
 
   private buildAdminAuditEventsPath(): string {
     return this.appendQuery(productionApiRoutes.admin.listAuditEvents, [
+      ["eventType", this.opsState.adminAuditEventTypeFilter],
+      ["actorAdminUserId", this.opsState.adminAuditActorFilter],
+      ["subjectAdminUserId", this.opsState.adminAuditSubjectFilter],
+      ["limit", this.opsState.adminAuditLimit]
+    ]);
+  }
+
+  private buildAdminAuditEventsExportPath(): string {
+    return this.appendQuery(productionApiRoutes.admin.exportAuditEventsCsv, [
       ["eventType", this.opsState.adminAuditEventTypeFilter],
       ["actorAdminUserId", this.opsState.adminAuditActorFilter],
       ["subjectAdminUserId", this.opsState.adminAuditSubjectFilter],

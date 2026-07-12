@@ -150,6 +150,12 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminAuditEvents());
   }
 
+  exportAdminAuditEventsCsv(): void {
+    this.viewState.onActionAsync(() =>
+      this.opsService.exportAdminAuditEventsCsv()
+    );
+  }
+
   createAdminUser(): void {
     this.viewState.onActionAsync(() => this.opsService.createAdminUser());
   }
