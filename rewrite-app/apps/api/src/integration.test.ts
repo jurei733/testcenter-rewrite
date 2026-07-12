@@ -327,6 +327,108 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(adminSessions.body.items[0]?.adminUser.passwordHash, undefined);
   assert.equal(adminSessions.body.items[0]?.status, "active");
 
+  const secondSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string; token?: string; revokedAt: string | null };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+
+  assert.equal(secondSignIn.status, 200);
+  assert.notEqual(secondSignIn.body.sessionToken, signIn.body.sessionToken);
+
+  const missingAdminSessionRevokeSession = await requestJson<{ error: string }>(
+    `/api/v1/admin/auth/sessions/${secondSignIn.body.adminSession.adminSessionId}`,
+    { method: "DELETE" }
+  );
+
+  assert.equal(missingAdminSessionRevokeSession.status, 401);
+  assert.equal(missingAdminSessionRevokeSession.body.error, "admin_session_missing");
+
+  const selfSessionRevoke = await requestJson<{ error: string }>(
+    `/api/v1/admin/auth/sessions/${signIn.body.adminSession.adminSessionId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(selfSessionRevoke.status, 409);
+  assert.equal(
+    selfSessionRevoke.body.error,
+    "admin_self_session_revoke_forbidden"
+  );
+
+  const revokedOtherSession = await requestJson<{
+    adminSession: { adminSessionId: string; token?: string; revokedAt: string | null };
+  }>(`/api/v1/admin/auth/sessions/${secondSignIn.body.adminSession.adminSessionId}`, {
+    method: "DELETE",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(revokedOtherSession.status, 200);
+  assert.equal(
+    revokedOtherSession.body.adminSession.adminSessionId,
+    secondSignIn.body.adminSession.adminSessionId
+  );
+  assert.equal(revokedOtherSession.body.adminSession.token, undefined);
+  assert.equal(typeof revokedOtherSession.body.adminSession.revokedAt, "string");
+
+  const revokedOtherSessionCurrent = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session",
+    {
+      headers: {
+        authorization: `Bearer ${secondSignIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(revokedOtherSessionCurrent.status, 401);
+  assert.equal(revokedOtherSessionCurrent.body.error, "admin_session_invalid");
+
+  const revokedAdminSessions = await requestJson<{
+    items: Array<{ adminSession: { adminSessionId: string }; status: string }>;
+  }>("/api/v1/admin/auth/sessions?status=revoked", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(revokedAdminSessions.status, 200);
+  assert.equal(
+    revokedAdminSessions.body.items.some(
+      item =>
+        item.adminSession.adminSessionId ===
+          secondSignIn.body.adminSession.adminSessionId &&
+        item.status === "revoked"
+    ),
+    true
+  );
+
+  const missingAdminSessionRevokeTarget = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions/missing-session",
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(missingAdminSessionRevokeTarget.status, 404);
+  assert.equal(
+    missingAdminSessionRevokeTarget.body.error,
+    "admin_session_not_found"
+  );
+
   const invalidAdminSessionStatus = await requestJson<{ error: string }>(
     "/api/v1/admin/auth/sessions?status=unsupported",
     {
@@ -808,6 +910,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(adminAuditEventTypes.has("admin_user_bootstrapped"), true);
   assert.equal(adminAuditEventTypes.has("admin_sign_in_failed"), true);
   assert.equal(adminAuditEventTypes.has("admin_sign_in_succeeded"), true);
+  assert.equal(adminAuditEventTypes.has("admin_session_revoked"), true);
   assert.equal(adminAuditEventTypes.has("admin_user_created"), true);
   assert.equal(adminAuditEventTypes.has("admin_role_assigned"), true);
   assert.equal(adminAuditEventTypes.has("admin_role_revoked"), true);
@@ -5970,6 +6073,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       };
       admin: {
         listSessions: string;
+        revokeSession: string;
         exportUsersCsv: string;
         exportAuditEventsCsv: string;
       };
@@ -5981,6 +6085,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   for (const capability of [
     "admin_session_read",
     "admin_user_directory",
+    "admin_session_revoke",
     "admin_user_csv_export",
     "admin_audit_read",
     "admin_audit_csv_export",
@@ -6028,6 +6133,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     /activation-readiness/
   );
   assert.match(manifest.routes.admin.listSessions, /auth\/sessions/);
+  assert.match(manifest.routes.admin.revokeSession, /auth\/sessions\/:adminSessionId/);
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
   assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");

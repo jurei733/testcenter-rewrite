@@ -487,6 +487,19 @@ try {
   await waitForInputMinLength("#adminSessionToken", 20);
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
   assert.notEqual(smokeAdminSessionToken.length, 0);
+  logStep("admin-revoke-session");
+  await clickAction("Admin Sessions");
+  const revokedAdminSessionCard = page
+    .locator("article.record-card")
+    .filter({ hasText: adminUsername })
+    .filter({
+      has: page.locator("p", { hasText: /^revoked session / })
+    });
+  await revokedAdminSessionCard.waitFor();
+  await revokedAdminSessionCard.getByRole("button", { name: "Select Session" }).click();
+  await waitForInputMinLength("#adminSessionRevokeTargetId", 20);
+  await clickAction("Revoke Selected Session");
+  await expectInputValue("#adminSessionRevokeTargetId", "");
   logStep("refresh-diagnostics");
   await clickAction("Refresh Diagnostics");
   await page

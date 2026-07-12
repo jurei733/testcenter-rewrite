@@ -28,6 +28,7 @@ export interface ShellOpsState {
   adminSessionUserFilter: string;
   adminSessionStatusFilter: "" | AdminSessionStatus;
   adminSessionLimit: string;
+  adminSessionRevokeTargetId: string;
   adminUsersView: string;
   adminUsersExportView: string;
   adminAuditView: string;
@@ -190,6 +191,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminSessionUserFilter: "",
     adminSessionStatusFilter: "",
     adminSessionLimit: "100",
+    adminSessionRevokeTargetId: "",
     adminUsersView: 'Use "Admin Users".',
     adminUsersExportView: "Export admin users CSV to preview it here.",
     adminAuditView: 'Use "Admin Audit Events".',

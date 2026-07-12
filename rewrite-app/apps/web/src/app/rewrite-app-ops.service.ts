@@ -17,6 +17,7 @@ import type {
   ResetAdminUserPasswordRequest,
   ResetAdminUserPasswordResponse,
   RevokeAdminRoleResponse,
+  RevokeAdminSessionResponse,
   UpdateAdminUserRequest,
   UpdateAdminUserResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -155,6 +156,27 @@ export class RewriteAppOpsService {
       `Session ${payload.adminSession.adminSessionId} was revoked.`
     );
     this.persistence.persistShellState();
+  }
+
+  async revokeAdminSession(): Promise<void> {
+    const adminSessionId = this.opsState.adminSessionRevokeTargetId.trim();
+    const payload = await this.requestState.request<RevokeAdminSessionResponse>(
+      "Revoke Admin Session",
+      "DELETE",
+      resolveRoutePath(productionApiRoutes.admin.revokeSession, {
+        adminSessionId
+      }),
+      undefined,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.opsState.adminSessionRevokeTargetId = "";
+    this.feedback.rememberActivity(
+      "Admin Session Revoked",
+      `Session ${payload.adminSession.adminSessionId} was revoked.`
+    );
+    this.persistence.persistShellState();
+    await this.refreshAdminSessions();
   }
 
   async refreshAdminUsers(): Promise<void> {

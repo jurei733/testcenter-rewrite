@@ -82,6 +82,7 @@ import {
   type ResetAdminUserPasswordRequest,
   type ResetAdminUserPasswordResponse,
   type RevokeAdminRoleResponse,
+  type RevokeAdminSessionResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
   type ParticipantSignInRequest,
@@ -1210,6 +1211,9 @@ const adminUserAssignRolePattern = createRoutePattern(
 const adminUserRevokeRolePattern = createRoutePattern(
   productionApiRoutes.admin.revokeRole
 );
+const adminSessionRevokePattern = createRoutePattern(
+  productionApiRoutes.admin.revokeSession
+);
 const workspaceCreatePattern = createRoutePattern(
   productionApiRoutes.workspace.createWorkspace
 );
@@ -1618,6 +1622,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.admin.listSessions) {
     return `GET ${productionApiRoutes.admin.listSessions}`;
+  }
+
+  if (method === "DELETE" && adminSessionRevokePattern.test(pathname)) {
+    return `DELETE ${productionApiRoutes.admin.revokeSession}`;
   }
 
   if (method === "POST" && pathname === productionApiRoutes.admin.signOut) {
@@ -2212,6 +2220,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         sendJson<ListAdminSessionsResponse>(response, 200, {
           items: items.map(toAdminSessionDirectoryItem)
+        });
+        return;
+      }
+
+      const adminSessionRevokeMatch = adminSessionRevokePattern.exec(pathname);
+      if (request.method === "DELETE" && adminSessionRevokeMatch?.groups) {
+        const adminSessionId = decodeRouteGroup(
+          adminSessionRevokeMatch.groups.adminSessionId
+        );
+        if (!adminSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_admin_session_id",
+            "adminSessionId is required."
+          );
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const adminSession = await services.adminAuth.revokeAdminSession({
+          sessionToken,
+          adminSessionId
+        });
+        sendJson<RevokeAdminSessionResponse>(response, 200, {
+          adminSession: toPublicAdminSession(adminSession)
         });
         return;
       }

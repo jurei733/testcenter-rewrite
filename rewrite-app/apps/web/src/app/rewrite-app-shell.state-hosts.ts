@@ -470,6 +470,12 @@ export function createShellPersistenceStateHost(args: {
     set adminSessionLimit(nextValue) {
       args.opsState.adminSessionLimit = nextValue;
     },
+    get adminSessionRevokeTargetId() {
+      return args.opsState.adminSessionRevokeTargetId;
+    },
+    set adminSessionRevokeTargetId(nextValue) {
+      args.opsState.adminSessionRevokeTargetId = nextValue;
+    },
     get adminUserUsernameFilter() {
       return args.opsState.adminUserUsernameFilter;
     },

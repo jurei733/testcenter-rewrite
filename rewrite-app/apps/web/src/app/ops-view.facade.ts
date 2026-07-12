@@ -153,6 +153,10 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
+  revokeAdminSession(): void {
+    this.viewState.onActionAsync(() => this.opsService.revokeAdminSession());
+  }
+
   refreshAdminUsers(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminUsers());
   }
@@ -215,6 +219,7 @@ export class OpsViewFacade {
     this.ops.adminSessionUserFilter = "";
     this.ops.adminSessionStatusFilter = "";
     this.ops.adminSessionLimit = "100";
+    this.ops.adminSessionRevokeTargetId = "";
     this.persistState();
   }
 
@@ -300,11 +305,13 @@ export class OpsViewFacade {
 
   selectAdminSession(item: RecordCollectionItem): void {
     const adminUserId = item.actionPayload?.adminUserId;
-    if (!adminUserId) {
+    const adminSessionId = item.actionPayload?.adminSessionId;
+    if (!adminUserId || !adminSessionId) {
       return;
     }
 
     this.ops.adminSessionUserFilter = adminUserId;
+    this.ops.adminSessionRevokeTargetId = adminSessionId;
     this.persistState();
   }
 
@@ -401,8 +408,9 @@ export class OpsViewFacade {
             : "no"
         }
       ],
-      actionLabel: "Filter By User",
+      actionLabel: "Select Session",
       actionPayload: {
+        adminSessionId: item.adminSession.adminSessionId,
         adminUserId: item.adminUser.adminUserId
       }
     }));

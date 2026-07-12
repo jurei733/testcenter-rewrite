@@ -364,6 +364,10 @@ export type AdminAuthPort = {
       status: AdminSessionStatus;
     }>
   >;
+  revokeAdminSession(input: {
+    sessionToken: string;
+    adminSessionId: string;
+  }): Promise<AdminSession>;
   signOut(input: { sessionToken: string }): Promise<AdminSession>;
 };
 
@@ -460,6 +464,7 @@ export const firstSliceUseCases = {
   adminSignIn: "AdminSignIn",
   getAdminCurrentSession: "GetAdminCurrentSession",
   listAdminSessions: "ListAdminSessions",
+  revokeAdminSession: "RevokeAdminSession",
   adminSignOut: "AdminSignOut",
   listAdminUsers: "ListAdminUsers",
   createAdminUser: "CreateAdminUser",
@@ -4647,6 +4652,59 @@ export const createFirstSliceServices = (
         }
 
         return items;
+      },
+      async revokeAdminSession(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const adminSessionId = input.adminSessionId.trim();
+        const targetSession = (await repository.listAdminSessions()).find(
+          adminSession => adminSession.adminSessionId === adminSessionId
+        );
+        if (!targetSession) {
+          throw new FirstSliceError(
+            404,
+            "admin_session_not_found",
+            "Admin session was not found."
+          );
+        }
+        if (targetSession.adminSessionId === currentSession.adminSession.adminSessionId) {
+          throw new FirstSliceError(
+            409,
+            "admin_self_session_revoke_forbidden",
+            "Use sign-out for the active admin session."
+          );
+        }
+        if (targetSession.revokedAt !== null) {
+          return targetSession;
+        }
+
+        const revokedSession: AdminSession = {
+          ...targetSession,
+          revokedAt: now()
+        };
+        const targetAdminUser = await repository.getAdminUserById(
+          targetSession.adminUserId
+        );
+
+        await repository.saveAdminSession(revokedSession);
+        await recordAdminAuditEvent({
+          eventType: "admin_session_revoked",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: targetSession.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' revoked session '${targetSession.adminSessionId}'.`,
+          details: {
+            targetAdminSessionId: targetSession.adminSessionId,
+            targetAdminUserId: targetSession.adminUserId,
+            targetUsername: targetAdminUser?.username ?? null,
+            actorAdminSessionId: currentSession.adminSession.adminSessionId
+          }
+        });
+        return revokedSession;
       },
       async signOut(input) {
         const { adminUser, adminSession } = await requireActiveAdminSession(

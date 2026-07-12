@@ -96,10 +96,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Session Limit
             <input id="adminSessionLimit" name="adminSessionLimit" inputmode="numeric" [(ngModel)]="view.ops.adminSessionLimit" (change)="view.persistState()" />
           </label>
+          <label>
+            Revoke Session ID
+            <input id="adminSessionRevokeTargetId" name="adminSessionRevokeTargetId" placeholder="select a session below" [(ngModel)]="view.ops.adminSessionRevokeTargetId" (change)="view.persistState()" />
+          </label>
         </div>
         <div class="actions">
           <button class="primary" type="button" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
           <button class="secondary" type="button" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
+          <button id="adminRevokeSessionButton" class="danger" type="button" (click)="view.revokeAdminSession()">Revoke Selected Session</button>
           <button class="ghost" type="button" (click)="view.clearAdminSessionFilters()">Clear Session Filters</button>
         </div>
       </article>

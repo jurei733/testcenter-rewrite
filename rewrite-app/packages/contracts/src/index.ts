@@ -320,6 +320,7 @@ export const productionApiRoutes = {
     signOut: "/api/v1/admin/auth/sign-out",
     currentSession: "/api/v1/admin/auth/current-session",
     listSessions: "/api/v1/admin/auth/sessions",
+    revokeSession: "/api/v1/admin/auth/sessions/:adminSessionId",
     listUsers: "/api/v1/admin/users",
     createUser: "/api/v1/admin/users",
     updateUser: "/api/v1/admin/users/:adminUserId",
@@ -654,6 +655,10 @@ export type AdminSessionDirectoryItem = {
 
 export type ListAdminSessionsResponse = {
   items: AdminSessionDirectoryItem[];
+};
+
+export type RevokeAdminSessionResponse = {
+  adminSession: PublicAdminSession;
 };
 
 export type AdminUserDirectoryItem = {

@@ -7,6 +7,7 @@ export type AdminAuditEventType =
   | "admin_sign_in_failed"
   | "admin_sign_in_succeeded"
   | "admin_sign_out"
+  | "admin_session_revoked"
   | "admin_user_created"
   | "admin_user_updated"
   | "admin_password_reset"
@@ -49,6 +50,7 @@ export const adminAuditEventTypes = [
   "admin_sign_in_failed",
   "admin_sign_in_succeeded",
   "admin_sign_out",
+  "admin_session_revoked",
   "admin_user_created",
   "admin_user_updated",
   "admin_password_reset",
@@ -650,6 +652,7 @@ export type FirstSliceCapability =
   | "admin_authentication"
   | "admin_session_lifecycle"
   | "admin_session_read"
+  | "admin_session_revoke"
   | "admin_role_assignment"
   | "admin_user_directory"
   | "admin_user_csv_export"
@@ -694,6 +697,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_authentication",
   "admin_session_lifecycle",
   "admin_session_read",
+  "admin_session_revoke",
   "admin_role_assignment",
   "admin_user_directory",
   "admin_user_csv_export",
