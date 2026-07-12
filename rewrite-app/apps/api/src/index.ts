@@ -1305,6 +1305,9 @@ const participantRosterCsvExportPattern = createRoutePattern(
 const studyMonitorCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportStudyMonitorCsv
 );
+const openRunsCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportOpenRunsCsv
+);
 const responseCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportResponseCsv
 );
@@ -1389,6 +1392,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", participantRosterPattern],
   ["GET", participantRosterCsvExportPattern],
   ["GET", studyMonitorCsvExportPattern],
+  ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
@@ -1824,6 +1828,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       studyMonitorCsvExportPattern,
       productionApiRoutes.workspace.exportStudyMonitorCsv
+    ],
+    [
+      "GET",
+      openRunsCsvExportPattern,
+      productionApiRoutes.workspace.exportOpenRunsCsv
     ],
     [
       "GET",
@@ -3090,6 +3099,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const deleteGroupResultsMatch = deleteGroupResultsPattern.exec(pathname);
       const studyMonitorCsvExportMatch =
         studyMonitorCsvExportPattern.exec(pathname);
+      const openRunsCsvExportMatch = openRunsCsvExportPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       const reviewCsvExportMatch = reviewCsvExportPattern.exec(pathname);
@@ -3570,6 +3580,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendCsv(response, 200, `${workspaceKey}-study-monitor.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && openRunsCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          openRunsCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          openRunsCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.monitorRead.exportOpenRunsCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-open-runs.csv`, csv);
         return;
       }
 

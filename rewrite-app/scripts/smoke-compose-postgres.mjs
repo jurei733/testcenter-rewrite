@@ -312,6 +312,33 @@ const verifyBootstrappedDemo = async baseUrl => {
       "Expected demo participant sessions CSV to contain student-demo run context."
     );
   }
+
+  const openRunsCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/open-runs.csv`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo open runs CSV status", openRunsCsv.status, 200);
+  expectEqual(
+    "demo open runs CSV content-type",
+    openRunsCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const openRunsCsvText = await openRunsCsv.text();
+  if (
+    !openRunsCsvText.startsWith(
+      "tenantKey,workspaceKey,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,"
+    ) ||
+    !openRunsCsvText.includes('"student-demo"') ||
+    !openRunsCsvText.includes('"group:student-demo"') ||
+    !openRunsCsvText.includes('"booklet:demo"') ||
+    !openRunsCsvText.includes('"unit-intro"')
+  ) {
+    throw new Error("Expected demo open runs CSV to contain student-demo run context.");
+  }
 };
 
 try {

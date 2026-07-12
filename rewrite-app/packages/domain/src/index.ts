@@ -684,6 +684,7 @@ export type FirstSliceCapability =
   | "study_monitor_csv_export"
   | "result_deletion"
   | "study_monitor_read"
+  | "monitor_open_runs_csv_export"
   | "participant_sign_in"
   | "participant_launch"
   | "participant_runtime_state"
@@ -731,6 +732,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "study_monitor_csv_export",
   "result_deletion",
   "study_monitor_read",
+  "monitor_open_runs_csv_export",
   "participant_sign_in",
   "participant_launch",
   "participant_runtime_state",

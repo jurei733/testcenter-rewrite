@@ -21,6 +21,7 @@ import {
   updateReviewAction
 } from "./rewrite-app-shell.runtime-actions";
 import {
+  exportOpenRunsCsvAction,
   exportParticipantSessionsCsvAction,
   exportParticipantRosterCsvAction,
   exportReviewsCsvAction,
@@ -108,6 +109,21 @@ export class RewriteAppRuntimeService {
         `${payload.items.length} session(s) loaded with the current filters.`
       );
     }
+  }
+
+  async exportOpenRunsCsv(): Promise<string> {
+    const csv = await exportOpenRunsCsvAction(this.hosts.createRuntimeReadsHost());
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-open-runs.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Open Runs CSV Downloaded",
+      `Open-run monitor export saved as ${workspaceKey}-open-runs.csv.`
+    );
+    return csv;
   }
 
   async exportParticipantSessionsCsv(): Promise<string> {

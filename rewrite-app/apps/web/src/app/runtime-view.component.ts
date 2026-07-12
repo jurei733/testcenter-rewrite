@@ -73,6 +73,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.resumeRun()">Resume Run</button>
           <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
+          <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
           <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
           <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
@@ -415,6 +416,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       </article>
 
       <article class="card">
+        <h2>Open Runs CSV Export</h2>
+        <p>Activation-blocking open test runs in CSV format with participant and roster context.</p>
+        <pre id="openRunsExportPreview">{{ view.runtime.openRunsExportView }}</pre>
+      </article>
+
+      <article class="card">
         <h2>Response CSV Export</h2>
         <p>Workspace-wide participant responses in CSV format, ready for operator download or inspection.</p>
         <pre id="responseExportPreview">{{ view.runtime.responseExportView }}</pre>
@@ -458,6 +465,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
       <app-json-panel title="Participant Sessions CSV Export" subtitle="Filtered Sessions" viewId="participantSessionsExportView" [content]="view.runtime.participantSessionsExportView"></app-json-panel>
+      <app-json-panel title="Open Runs CSV Export" subtitle="Activation Guard Export" viewId="openRunsExportView" [content]="view.runtime.openRunsExportView"></app-json-panel>
       <app-json-panel title="Participant Roster" subtitle="Saved Entry Rows" viewId="participantRosterView" [content]="view.runtime.participantRosterView"></app-json-panel>
       <app-json-panel title="Participant Roster CSV Export" subtitle="Saved Entry Rows" viewId="participantRosterExportView" [content]="view.runtime.participantRosterExportView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>

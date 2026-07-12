@@ -1159,6 +1159,10 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
   }
 
+  exportOpenRunsCsv(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.exportOpenRunsCsv());
+  }
+
   runRuntimeSuggestion(item: RecordCollectionItem): void {
     switch (item.actionPayload?.runtimeCommand) {
       case "resumeSession":

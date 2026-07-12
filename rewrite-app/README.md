@@ -238,6 +238,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/booklets/{bookletKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/study-monitor.csv`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/open-runs.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/activity-events`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
@@ -287,6 +288,7 @@ The added read side now makes the first slice inspectable:
 - study monitor group detail drills into one group with participant sessions, saved roster entries, status counts, latest runs, response counts, review counts, and per-run context for operator follow-up
 - study monitor booklet detail drills into one booklet with saved roster entries, attached runs, status pressure, unit coverage, response counts, and review counts
 - study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
+- open-run CSV export flattens the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff
 - source-package listing shows uploaded packages together with their latest import attempt, filterable by status, media type, file name, latest import status, and limit
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
@@ -393,9 +395,9 @@ The SQLite variants build the Angular frontend, boot the built API process on SQ
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
-- participant roster and participant-session export through the runtime shell
+- participant roster, participant-session, and open-run export through the runtime shell
 - response and review CSV export through the runtime shell
-- study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, and study-monitor CSV export
+- study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, study-monitor CSV export, and open-run CSV export
 - workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
@@ -465,4 +467,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/assessment-section/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
-- monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, CSV export, and open-run blockers, but still do not cover every original Testcenter monitor view
+- monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, CSV exports, and open-run blockers, but still do not cover every original Testcenter monitor view

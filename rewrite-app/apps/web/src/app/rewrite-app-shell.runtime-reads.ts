@@ -26,6 +26,8 @@ export interface ShellRuntimeReadsHost {
   ): Promise<T>;
   isCurrentRunMissingError(error: unknown): boolean;
   getOpenRunsPath(): string;
+  getOpenRunsCsvExportPath(): string;
+  setOpenRunsExportView(nextValue: string): void;
   getParticipantSessionsPath(): string;
   setParticipantSessionsView(nextValue: string): void;
   getParticipantSessionsCsvExportPath(): string;
@@ -72,6 +74,18 @@ export async function exportParticipantRosterCsvAction(
     host.getParticipantRosterCsvExportPath()
   );
   host.setParticipantRosterExportView(csv);
+  return csv;
+}
+
+export async function exportOpenRunsCsvAction(
+  host: ShellRuntimeReadsHost
+): Promise<string> {
+  const csv = await host.request<string>(
+    "Open Runs CSV Export",
+    "GET",
+    host.getOpenRunsCsvExportPath()
+  );
+  host.setOpenRunsExportView(csv);
   return csv;
 }
 

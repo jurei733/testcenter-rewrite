@@ -195,6 +195,14 @@ export function createRuntimeReadsStateHost(args: {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
+    getOpenRunsCsvExportPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.exportOpenRunsCsv, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
+    setOpenRunsExportView: nextValue => {
+      args.runtimeState.openRunsExportView = nextValue;
+    },
     getParticipantSessionsPath: buildParticipantSessionsPath,
     setParticipantSessionsView: nextValue => {
       args.runtimeState.participantSessionsView = nextValue;

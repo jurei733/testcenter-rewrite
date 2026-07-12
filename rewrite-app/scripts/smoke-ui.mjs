@@ -1627,6 +1627,22 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
+  logStep("export-open-runs-csv");
+  const openRunsDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Open Runs CSV");
+  const openRunsDownload = await openRunsDownloadPromise;
+  assert.equal(
+    openRunsDownload.suggestedFilename(),
+    `${workspaceKey}-open-runs.csv`
+  );
+  await page
+    .locator("#openRunsExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,testRunId,loginKey" })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantGroupKey })
+    .filter({ hasText: participantBookletKey })
+    .filter({ hasText: "running" })
+    .waitFor();
 
   logStep("study-monitor-group-detail");
   await page.locator('[data-view-nav="workspace"]').click();

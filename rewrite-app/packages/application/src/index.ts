@@ -338,6 +338,10 @@ export type MonitorReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<OpenMonitorRun[]>;
+  exportOpenRunsCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
 };
 
 export type AdminAuthPort = {
@@ -491,6 +495,7 @@ export const firstSliceUseCases = {
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
+  exportOpenRunsCsv: "ExportOpenRunsCsv",
   exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
   listSourcePackages: "ListSourcePackages",
@@ -1863,6 +1868,47 @@ const formatStudyMonitorCsv = (
                     : String(row[column])
           )
         )
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatOpenMonitorRunsCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: OpenMonitorRun[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "testRunId",
+    "loginKey",
+    "groupKey",
+    "bookletKey",
+    "status",
+    "currentUnitKey",
+    "updatedAt",
+    "rosterBookletKey",
+    "rosterDisplayName"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(item =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        item.testRunId,
+        item.loginKey,
+        item.groupKey,
+        item.bookletKey,
+        item.status,
+        item.currentUnitKey ?? "",
+        item.updatedAt,
+        item.participantRosterEntry?.bookletKey ?? "",
+        item.participantRosterEntry?.displayName ?? ""
+      ]
+        .map(escapeCsvCell)
         .join(",")
     )
   ].join("\n") + "\n";
@@ -7464,6 +7510,14 @@ export const createFirstSliceServices = (
               updatedAt: testRun.updatedAt
             };
           });
+      },
+      async exportOpenRunsCsv(input) {
+        const items = await this.listOpenRuns(input);
+        return formatOpenMonitorRunsCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       }
     }
   };

@@ -263,6 +263,22 @@ try {
     { timeout: 15_000 }
   );
 
+  const openRunsDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Open Runs CSV" }).click();
+  const openRunsDownload = await openRunsDownloadPromise;
+  assert.equal(openRunsDownload.suggestedFilename(), "demo-workspace-open-runs.csv");
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#openRunsExportPreview")
+        ?.textContent?.includes("student-demo") &&
+      document
+        .querySelector("#openRunsExportPreview")
+        ?.textContent?.includes("unit-intro"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   await page.locator("#runtimeUnitResponse").fill("Operator adjusted smoke response");
   await page.locator("#runtimeUnitResponse").dispatchEvent("input");
   await page.locator("#runtimeUnitResponse").dispatchEvent("change");
