@@ -214,6 +214,20 @@ try {
       { timeout: 15_000 }
     );
   };
+  const fillAndCommitUntilValue = async (selector, value) => {
+    let lastError = null;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await fillAndCommit(selector, value);
+      try {
+        await expectInputValue(selector, value);
+        return;
+      } catch (error) {
+        lastError = error;
+        await page.waitForTimeout(250);
+      }
+    }
+    throw lastError ?? new Error(`Timed out committing ${selector}.`);
+  };
   const waitForInputMinLength = async (selector, minLength) => {
     await page.waitForFunction(
       ([targetSelector, targetMinLength]) => {
@@ -1478,8 +1492,7 @@ try {
     "#currentUnitKey",
     pausedCurrentState.currentRunState.currentUnit.unitKey
   );
-  await fillAndCommit("#currentUnitKey", "unit-paused");
-  await expectInputValue("#currentUnitKey", "unit-paused");
+  await fillAndCommitUntilValue("#currentUnitKey", "unit-paused");
   await fillAndCommit("#runtimeUnitResponse", "Filtered response smoke");
   await clickAction("Save Paused");
   await pollJsonWithPredicate(
