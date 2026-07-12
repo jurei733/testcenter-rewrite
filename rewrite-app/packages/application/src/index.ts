@@ -2807,6 +2807,8 @@ const normalizeParsedJsonContentStructure = (
                     unit.id ??
                     unit.unitRef ??
                     unit.ref ??
+                    unit.identifierref ??
+                    unit.identifierRef ??
                     unit.alias ??
                     unit.code ??
                     unit.path ??
@@ -3189,6 +3191,8 @@ const collectXmlBookletEntries = (
             "key",
             "id",
             "ref",
+            "identifierref",
+            "identifierRef",
             "alias",
             "code",
             "path",

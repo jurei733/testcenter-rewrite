@@ -4207,6 +4207,10 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
                   {
                     identifier: "unit-listening-b",
                     title: "Listening Item B"
+                  },
+                  {
+                    identifierRef: "unit-listening-c",
+                    title: "Listening Item C"
                   }
                 ]
               }
@@ -4258,7 +4262,8 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
           displayLabel: "Listening Section",
           unitEntries: [
             { unitKey: "unit-listening-a", displayLabel: "Listening Item A" },
-            { unitKey: "unit-listening-b", displayLabel: "Listening Item B" }
+            { unitKey: "unit-listening-b", displayLabel: "Listening Item B" },
+            { unitKey: "unit-listening-c", displayLabel: "Listening Item C" }
           ]
         }
       ]
@@ -4297,6 +4302,7 @@ test("source document import accepts testcenter-style XML aliases", async () => 
             </tc:testlet>
             <tc:assessmentTest tc:identifier="booklet:qti" tc:title="QTI Booklet">
               <tc:assessmentItemRef tc:identifier="unit-reading" tc:title="Reading Unit" />
+              <tc:assessmentItemRef tc:identifierref="unit-listening" tc:title="Listening Unit" />
               <item-ref identifier="unit-writing" title="Writing Unit" />
             </tc:assessmentTest>
           </tc:test>
@@ -4355,6 +4361,7 @@ test("source document import accepts testcenter-style XML aliases", async () => 
           displayLabel: "QTI Booklet",
           unitEntries: [
             { unitKey: "unit-reading", displayLabel: "Reading Unit" },
+            { unitKey: "unit-listening", displayLabel: "Listening Unit" },
             { unitKey: "unit-writing", displayLabel: "Writing Unit" }
           ]
         }
