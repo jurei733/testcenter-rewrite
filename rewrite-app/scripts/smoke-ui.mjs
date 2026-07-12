@@ -2240,6 +2240,53 @@ try {
       payload.runtimeState.latestTestRun?.status === "completed"
   );
 
+  logStep("delete-group-results");
+  await fillAndCommit("#groupKey", participantGroupKey);
+  const deleteGroupResultsDialog = new Promise((resolvePromise, reject) => {
+    page.once("dialog", async dialog => {
+      try {
+        assert.match(dialog.message(), new RegExp(participantGroupKey));
+        await dialog.accept();
+        resolvePromise(undefined);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+  await clickAction("Delete Group Results");
+  await deleteGroupResultsDialog;
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 0
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 0
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=group_results_deleted&subjectType=workspace&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item => item?.activityEvent?.details?.groupKey === participantGroupKey
+      )
+  );
+  await page
+    .locator(".activity-feed")
+    .filter({ hasText: "Group Results Deleted" })
+    .filter({ hasText: participantGroupKey })
+    .waitFor();
+
   process.stdout.write(
     `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
   );
