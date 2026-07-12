@@ -2358,9 +2358,16 @@ try {
     )?.importJobId;
   const retriedSourcePackageFileName =
     retriedSourcePackagePayload.sourcePackageDetail.sourcePackage.fileName;
+  const retriedContentReleaseId =
+    retriedSourcePackagePayload.sourcePackageDetail.contentReleases.at(-1)
+      ?.contentReleaseId;
   assert.ok(
     completedRetryImportJobId,
     "UI smoke expected the retried import to expose a completed import job id."
+  );
+  assert.ok(
+    retriedContentReleaseId,
+    "UI smoke expected the retried import to expose a staged content release id."
   );
   assert.equal(typeof retriedSourcePackageFileName, "string");
   logStep("content-read-filters");
@@ -2440,6 +2447,52 @@ try {
       payload.runtimeState.latestTestRun?.status === "completed"
   );
 
+  logStep("force-activate-after-complete");
+  await page.locator('[data-view-nav="content"]').click();
+  await page.waitForURL(/\/app\/content$/);
+  await fillAndCommit("#contentReleaseId", retriedContentReleaseId);
+  await page.locator("#forceActivation").check({ force: true });
+  await page.locator("#forceActivation").dispatchEvent("change");
+  const forceActivationDialog = acceptNextDialog(
+    new RegExp(
+      `Force activate release '${retriedContentReleaseId}' and supersede open participant runs\\?`
+    )
+  );
+  await clickAction("Activate Release");
+  await forceActivationDialog;
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.contentRelease?.contentReleaseId === retriedContentReleaseId &&
+          item?.contentRelease?.status === "active"
+      )
+  );
+  await page
+    .locator("#activityFeed")
+    .filter({ hasText: "Release Activated" })
+    .filter({ hasText: retriedContentReleaseId })
+    .filter({ hasText: /Force activation/ })
+    .waitFor();
+  await page.locator("#rawDebugToggle").click();
+  await page.locator(".raw-debug-panel").first().waitFor();
+  await page
+    .locator("app-json-panel")
+    .filter({ hasText: "Activation Guard" })
+    .getByRole("button", { name: "Show Raw Debug" })
+    .click();
+  await page
+    .locator("#activationGuardView")
+    .filter({ hasText: "ready" })
+    .filter({ hasText: retriedContentReleaseId })
+    .waitFor();
+
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
   logStep("delete-group-results");
   await fillAndCommit("#groupKey", participantGroupKey);
   const deleteGroupResultsDialog = new Promise((resolvePromise, reject) => {
