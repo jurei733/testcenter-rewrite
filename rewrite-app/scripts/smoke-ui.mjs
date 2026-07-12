@@ -1518,6 +1518,27 @@ try {
     .filter({ hasText: "Filtered review smoke" })
     .filter({ hasText: "operator-ui" })
     .waitFor();
+  logStep("export-response-csv");
+  await clickAction("Export Responses CSV");
+  await page
+    .locator("#responseExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,loginKey,groupKey" })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "Filtered response smoke" })
+    .waitFor();
+  logStep("export-review-csv");
+  await clickAction("Export Review CSV");
+  await page
+    .locator("#reviewExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,reviewId,loginKey" })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "operator-ui" })
+    .filter({ hasText: "Filtered review smoke" })
+    .waitFor();
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(
