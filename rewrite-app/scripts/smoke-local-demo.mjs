@@ -318,11 +318,28 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  const reviewActionQueue = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Review Action Queue", exact: true })
+  });
+  const updateReviewSuggestion = reviewActionQueue
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Update selected review" })
+    });
+  const deleteReviewSuggestion = reviewActionQueue
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Delete selected review" })
+    });
+  await updateReviewSuggestion.waitFor({ timeout: 15_000 });
+  await deleteReviewSuggestion.waitFor({ timeout: 15_000 });
 
   await page.locator("#reviewComment").fill("Updated smoke review note");
   await page.locator("#reviewComment").dispatchEvent("input");
   await page.locator("#reviewComment").dispatchEvent("change");
-  await page.getByRole("button", { name: "Update Review" }).click();
+  await updateReviewSuggestion
+    .getByRole("button", { name: "Apply Suggestion" })
+    .click();
   await page.waitForFunction(
     () =>
       document.body.textContent?.includes("Updated smoke review note") &&
@@ -361,7 +378,9 @@ try {
     { timeout: 15_000 }
   );
 
-  await page.getByRole("button", { name: "Delete Review" }).click();
+  await deleteReviewSuggestion
+    .getByRole("button", { name: "Apply Suggestion" })
+    .click();
   await page
     .getByText("Create or load reviews to inspect operator notes.")
     .waitFor({ timeout: 15_000 });
