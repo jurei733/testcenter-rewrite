@@ -104,22 +104,22 @@ export class ParticipantViewFacade {
   startFromEntryParameters(parameters: ParticipantEntryParameters): void {
     const normalized = this.applyEntryParameters(parameters);
 
-	    if (normalized.participantSessionId) {
-	      this.viewState.onActionAsync(async () => {
-	        await this.resumeSessionInternal();
-	        await this.applyEntryDraftAfterResume(normalized);
-	      });
-	      return;
-	    }
+    if (normalized.participantSessionId) {
+      this.viewState.onActionAsync(async () => {
+        await this.resumeSessionInternal();
+        await this.applyEntryDraftAfterResume(normalized);
+      });
+      return;
+    }
 
-	    if (normalized.workspaceKey && normalized.loginKey) {
-	      this.viewState.onActionAsync(async () => {
-	        await this.signInInternal();
-	        await this.resumeSessionInternal();
-	        await this.applyEntryDraftAfterResume(normalized);
-	      });
-	    }
-	  }
+    if (normalized.workspaceKey && normalized.loginKey) {
+      this.viewState.onActionAsync(async () => {
+        await this.signInInternal();
+        await this.resumeSessionInternal();
+        await this.applyEntryDraftAfterResume(normalized);
+      });
+    }
+  }
 
   private applyEntryParameters(
     parameters: ParticipantEntryParameters
@@ -194,8 +194,8 @@ export class ParticipantViewFacade {
     return normalized;
   }
 
-	  private restoreEntryDraft(normalized: NormalizedParticipantEntryParameters): void {
-	    let shouldPersist = false;
+  private restoreEntryDraft(normalized: NormalizedParticipantEntryParameters): void {
+    let shouldPersist = false;
 
     if (
       normalized.currentUnitKey &&
@@ -213,30 +213,30 @@ export class ParticipantViewFacade {
       shouldPersist = true;
     }
 
-	    if (shouldPersist) {
-	      this.persistState();
-	    }
-	  }
+    if (shouldPersist) {
+      this.persistState();
+    }
+  }
 
-	  private async applyEntryDraftAfterResume(
-	    normalized: NormalizedParticipantEntryParameters
-	  ): Promise<void> {
-	    if (normalized.currentUnitKey && this.runtime.testRunId.trim()) {
-	      this.runtime.currentUnitKey = normalized.currentUnitKey;
-	      if (normalized.hasUnitResponse) {
-	        this.runtime.currentUnitResponse = normalized.unitResponse;
-	      }
-	      this.persistState();
-	      await this.saveProgressInternal(
-	        "running",
-	        normalized.currentUnitKey,
-	        normalized.hasUnitResponse ? normalized.unitResponse : undefined
-	      );
-	      return;
-	    }
+  private async applyEntryDraftAfterResume(
+    normalized: NormalizedParticipantEntryParameters
+  ): Promise<void> {
+    if (normalized.currentUnitKey && this.runtime.testRunId.trim()) {
+      this.runtime.currentUnitKey = normalized.currentUnitKey;
+      if (normalized.hasUnitResponse) {
+        this.runtime.currentUnitResponse = normalized.unitResponse;
+      }
+      this.persistState();
+      await this.saveProgressInternal(
+        "running",
+        normalized.currentUnitKey,
+        normalized.hasUnitResponse ? normalized.unitResponse : undefined
+      );
+      return;
+    }
 
-	    this.restoreEntryDraft(normalized);
-	  }
+    this.restoreEntryDraft(normalized);
+  }
 
   get player(): ParticipantPlayerState {
     const currentState = this.readCurrentRunState();
