@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import type {
   GetStudyMonitorBookletResponse,
   GetStudyMonitorGroupResponse,
+  GetStudyMonitorParticipantMatrixResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
   ListWorkspaceActivityEventsResponse,
@@ -56,25 +57,44 @@ export class RewriteAppWorkspaceService {
   async refreshStudyMonitor(quiet = false): Promise<void> {
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
-    const payload = await this.requestState.request<GetStudyMonitorSummaryResponse>(
-      "Study Monitor Summary",
-      "GET",
-      resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorSummary, {
-        tenantKey,
-        workspaceKey
-      }),
-      undefined,
-      { quiet }
-    );
+    const [payload, participantMatrixPayload] = await Promise.all([
+      this.requestState.request<GetStudyMonitorSummaryResponse>(
+        "Study Monitor Summary",
+        "GET",
+        resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorSummary, {
+          tenantKey,
+          workspaceKey
+        }),
+        undefined,
+        { quiet }
+      ),
+      this.requestState.request<GetStudyMonitorParticipantMatrixResponse>(
+        "Study Monitor Participant Matrix",
+        "GET",
+        resolveRoutePath(
+          productionApiRoutes.workspace.getStudyMonitorParticipantMatrix,
+          {
+            tenantKey,
+            workspaceKey
+          }
+        ),
+        undefined,
+        { quiet }
+      )
+    ]);
 
     this.workspaceState.studyMonitorView = prettyPrintJson(
       payload,
       this.workspaceState.studyMonitorView
     );
+    this.workspaceState.studyMonitorParticipantMatrixView = prettyPrintJson(
+      participantMatrixPayload,
+      this.workspaceState.studyMonitorParticipantMatrixView
+    );
     if (!quiet) {
       this.feedback.rememberActivity(
         "Study Monitor Refreshed",
-        `${payload.studyMonitorSummary.groups.length} group(s), ${payload.studyMonitorSummary.participantSessionCount} participant session(s).`
+        `${payload.studyMonitorSummary.groups.length} group(s), ${participantMatrixPayload.studyMonitorParticipantMatrix.rows.length} participant-unit row(s).`
       );
     }
   }

@@ -1227,6 +1227,18 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedStudyMonitorSummary.status, 401);
     assert.equal(rejectedStudyMonitorSummary.body.error, "admin_session_missing");
 
+    const rejectedStudyMonitorParticipantMatrix =
+      await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/participants"
+      );
+
+    assert.equal(rejectedStudyMonitorParticipantMatrix.status, 401);
+    assert.equal(
+      rejectedStudyMonitorParticipantMatrix.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedStudyMonitorBooklet = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/booklets/booklet%3Aauth"
@@ -2242,6 +2254,52 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       1
     );
     assert.equal(studyMonitor.body.studyMonitorSummary.groups[0]?.reviewCount, 0);
+
+    const participantMatrix = await requestJsonAt<{
+      studyMonitorParticipantMatrix: {
+        rows: Array<{
+          loginKey: string;
+          groupKey: string;
+          displayName: string | null;
+          testRunStatus: string;
+          unitKey: string;
+          unitLabel: string;
+          answered: boolean;
+          responseLength: number;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/participants",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(participantMatrix.status, 200);
+    const introMatrixRow =
+      participantMatrix.body.studyMonitorParticipantMatrix.rows.find(
+        row => row.loginKey === "student-demo" && row.unitKey === "unit-intro"
+      );
+    assert.deepEqual(
+      {
+        groupKey: introMatrixRow?.groupKey,
+        displayName: introMatrixRow?.displayName,
+        testRunStatus: introMatrixRow?.testRunStatus,
+        unitLabel: introMatrixRow?.unitLabel,
+        answered: introMatrixRow?.answered
+      },
+      {
+        groupKey: "group:student-demo",
+        displayName: "Demo Student",
+        testRunStatus: "running",
+        unitLabel: "Introduction",
+        answered: true
+      }
+    );
+    assert.ok((introMatrixRow?.responseLength ?? 0) > 0);
 
     const studyMonitorCsv = await requestTextAt(
       isolated.baseUrl,
@@ -6196,6 +6254,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportParticipantSessionsCsv: string;
         listDetailedResponses: string;
         exportStudyMonitorCsv: string;
+        getStudyMonitorParticipantMatrix: string;
         exportStudyMonitorParticipantMatrixCsv: string;
         exportOpenRunsCsv: string;
         exportResponseCsv: string;
@@ -6270,6 +6329,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);
+  assert.match(
+    manifest.routes.workspace.getStudyMonitorParticipantMatrix,
+    /study-monitor\/participants/
+  );
   assert.match(
     manifest.routes.workspace.exportStudyMonitorParticipantMatrixCsv,
     /study-monitor-participants\.csv/

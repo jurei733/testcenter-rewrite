@@ -284,6 +284,24 @@ const verifyBootstrappedDemo = async baseUrl => {
   expectEqual("demo booklet key", resumed.payload?.testRun?.bookletKey, "booklet:demo");
   expectEqual("demo current unit key", resumed.payload?.testRun?.currentUnitKey, "unit-intro");
 
+  const saved = await requestJson(
+    `${baseUrl}/api/v1/participant/test-runs/${resumed.payload?.testRun?.testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        currentUnitKey: "unit-intro",
+        status: "running",
+        unitResponse: "My first demo response"
+      }
+    }
+  );
+  expectEqual("demo participant save-progress status", saved.response.status, 200);
+  expectEqual(
+    "demo saved unit-intro response",
+    saved.payload?.testRun?.unitResponses?.["unit-intro"],
+    "My first demo response"
+  );
+
   const participantSessionsCsv = await fetch(
     `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-sessions.csv?loginKey=student-demo&groupKey=${encodeURIComponent("group:student-demo")}&limit=1`,
     {
@@ -310,6 +328,31 @@ const verifyBootstrappedDemo = async baseUrl => {
   ) {
     throw new Error(
       "Expected demo participant sessions CSV to contain student-demo run context."
+    );
+  }
+
+  const participantMatrix = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/participants`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo participant matrix status", participantMatrix.status, 200);
+  const participantMatrixBody = await participantMatrix.json();
+  const participantMatrixRows =
+    participantMatrixBody.studyMonitorParticipantMatrix?.rows ?? [];
+  const participantIntroRow = participantMatrixRows.find(
+    row => row.loginKey === "student-demo" && row.unitKey === "unit-intro"
+  );
+  if (
+    participantIntroRow?.groupKey !== "group:student-demo" ||
+    participantIntroRow?.testRunStatus !== "running" ||
+    participantIntroRow?.answered !== true
+  ) {
+    throw new Error(
+      "Expected demo participant matrix read model to contain answered unit-intro."
     );
   }
 

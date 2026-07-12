@@ -234,6 +234,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `POST /api/v1/tenants/{tenantKey}/workspaces`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/participants`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/booklets/{bookletKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
@@ -288,6 +289,7 @@ The added read side now makes the first slice inspectable:
 - study monitor summary returns workspace-wide group, booklet, and unit progress with participant sessions, saved-roster expected/not-started participants for groups and booklets, roster-derived missing unit expectations, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, saved roster entries, status counts, latest runs, response counts, review counts, and per-run context for operator follow-up
 - study monitor booklet detail drills into one booklet with saved roster entries, attached runs, status pressure, unit coverage, response counts, and review counts
+- study monitor participant matrix read model exposes participant-by-unit session/run/answer/review status directly for the operator shell
 - study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
 - study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context
 - open-run CSV export flattens the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff

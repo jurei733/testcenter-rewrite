@@ -150,6 +150,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Participant Unit Matrix"
+        subtitle="Participant-by-unit operator read model with session, run, answer, and review status."
+        [items]="view.studyMonitorParticipantMatrixItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="Refresh the study monitor to inspect participant-unit rows."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Not Started Participants"
         subtitle="Expected roster participants that still have no launched run."
         [items]="view.studyMonitorNotStartedItems"
@@ -285,6 +293,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Group Progress"
         viewId="studyMonitorView"
         [content]="view.workspace.studyMonitorView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Participant Unit Matrix"
+        subtitle="Participant Unit Read Model"
+        viewId="studyMonitorParticipantMatrixView"
+        [content]="view.workspace.studyMonitorParticipantMatrixView"
       ></app-json-panel>
 
       <app-json-panel

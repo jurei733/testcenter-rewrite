@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import type {
   GetStudyMonitorBookletResponse,
   GetStudyMonitorGroupResponse,
+  GetStudyMonitorParticipantMatrixResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
   GetWorkspaceOverviewResponse,
@@ -83,6 +84,72 @@ export class WorkspaceViewFacade {
 
   get studyMonitorParticipantMatrixExportView(): string {
     return this.uiState.workspace.studyMonitorParticipantMatrixExportView;
+  }
+
+  get studyMonitorParticipantMatrixItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorParticipantMatrixResponse>(
+      this.workspace.studyMonitorParticipantMatrixView
+    );
+    const matrix = payload?.studyMonitorParticipantMatrix;
+    if (!matrix) {
+      return [];
+    }
+
+    const waitingRows = matrix.rows.filter(row => row.testRunStatus === "not_started");
+    const activeRows = matrix.rows.filter(row =>
+      ["running", "paused"].includes(row.testRunStatus)
+    );
+    const missingRows = matrix.rows.filter(row => row.expected && !row.answered);
+
+    return [
+      {
+        headline: `${matrix.workspaceKey} participant matrix`,
+        subline: `${matrix.rows.length} participant-unit row(s) generated ${this.formatDateTime(matrix.generatedAt)}`,
+        badges: [
+          `${waitingRows.length} not started`,
+          `${activeRows.length} active`,
+          `${missingRows.length} missing answer(s)`
+        ],
+        rows: [
+          { label: "Tenant", value: matrix.tenantKey },
+          { label: "Workspace", value: matrix.workspaceKey },
+          { label: "Generated", value: this.formatDateTime(matrix.generatedAt) }
+        ]
+      },
+      ...matrix.rows.slice(0, 25).map(row => ({
+        headline: row.displayName ?? row.loginKey,
+        subline: `${row.unitLabel || row.unitKey || "No unit"} in ${row.bookletKey ?? "no booklet"}`,
+        badges: [
+          row.participantSessionStatus,
+          row.testRunStatus,
+          row.answered ? "answered" : "missing",
+          `${row.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Login", value: row.loginKey },
+          { label: "Group", value: row.groupKey },
+          { label: "Roster Booklet", value: row.rosterBookletKey ?? "none" },
+          { label: "Unit", value: row.unitKey || "none" },
+          { label: "Expected", value: row.expected ? "yes" : "no" },
+          { label: "Response Length", value: String(row.responseLength) },
+          {
+            label: "Latest Activity",
+            value: row.latestActivityAt
+              ? this.formatDateTime(row.latestActivityAt)
+              : "none"
+          }
+        ],
+        actionLabel: row.unitKey ? "Open Unit Detail" : undefined,
+        actionPayload: {
+          unitKey: row.unitKey,
+          participantSessionId: row.participantSessionId ?? "",
+          testRunId: row.testRunId ?? "",
+          loginKey: row.loginKey,
+          groupKey: row.groupKey,
+          currentUnitKey: row.unitKey
+        }
+      }))
+    ];
   }
 
   get studyMonitorItems(): RecordCollectionItem[] {

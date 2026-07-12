@@ -1730,6 +1730,13 @@ try {
     }
   );
   const studyMonitorSummary = studyMonitorSummaryPayload.studyMonitorSummary;
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Participant Unit Matrix" })
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "missing" })
+    .waitFor({ state: "visible", timeout: 15_000 });
   const monitorStatusTotal = [
     studyMonitorSummary.notStartedCount,
     studyMonitorSummary.runningCount,

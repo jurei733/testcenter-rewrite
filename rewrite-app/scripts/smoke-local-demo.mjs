@@ -435,6 +435,12 @@ try {
     participantMatrixDownload.suggestedFilename(),
     "demo-workspace-study-monitor-participants.csv"
   );
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Participant Unit Matrix" })
+    .filter({ hasText: "student-demo" })
+    .filter({ hasText: "unit-intro" })
+    .waitFor({ state: "visible", timeout: 15_000 });
   await page.waitForFunction(
     () =>
       document

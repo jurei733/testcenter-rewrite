@@ -158,6 +158,7 @@ export interface ShellWorkspaceState {
   workspaceOverviewView: string;
   workspaceActivityView: string;
   studyMonitorView: string;
+  studyMonitorParticipantMatrixView: string;
   studyMonitorGroupView: string;
   studyMonitorBookletView: string;
   studyMonitorUnitView: string;
@@ -338,6 +339,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
     studyMonitorView: 'Use "Refresh Study Monitor".',
+    studyMonitorParticipantMatrixView: 'Use "Refresh Study Monitor".',
     studyMonitorGroupView: "Select a group from the study monitor.",
     studyMonitorBookletView: "Select a booklet from the study monitor.",
     studyMonitorUnitView: "Select a unit from the study monitor.",

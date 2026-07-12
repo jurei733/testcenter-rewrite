@@ -108,6 +108,10 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceStudyMonitorSummary>;
+  getStudyMonitorParticipantMatrix(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceStudyMonitorParticipantMatrix>;
   getStudyMonitorGroupDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -497,6 +501,7 @@ export const firstSliceUseCases = {
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
   getStudyMonitorSummary: "GetStudyMonitorSummary",
+  getStudyMonitorParticipantMatrix: "GetStudyMonitorParticipantMatrix",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
@@ -5598,6 +5603,53 @@ export const createFirstSliceServices = (
           reviews
         });
       },
+      async getStudyMonitorParticipantMatrix(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+
+        return buildStudyMonitorParticipantMatrix({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          generatedAt: now(),
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+      },
       async getStudyMonitorGroupDetail(input) {
         const workspace = await requireWorkspace(
           repository,
@@ -5809,50 +5861,7 @@ export const createFirstSliceServices = (
         return formatStudyMonitorCsv(summary);
       },
       async exportStudyMonitorParticipantMatrixCsv(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
-        const [
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
-          contentReleases,
-          reviews
-        ] =
-          await Promise.all([
-            repository.listParticipantSessionsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listParticipantRosterEntriesByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listTestRunsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listContentReleasesByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            ),
-            repository.listWorkspaceReviewsByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            )
-          ]);
-        const matrix = buildStudyMonitorParticipantMatrix({
-          tenantKey: input.tenantKey,
-          workspaceKey: input.workspaceKey,
-          generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
-          contentReleases,
-          reviews
-        });
+        const matrix = await this.getStudyMonitorParticipantMatrix(input);
 
         return formatStudyMonitorParticipantMatrixCsv(matrix);
       },
