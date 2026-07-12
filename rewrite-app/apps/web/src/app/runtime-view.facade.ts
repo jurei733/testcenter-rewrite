@@ -1305,7 +1305,7 @@ export class RuntimeViewFacade {
         this.updateReview();
         break;
       case "deleteReview":
-        this.deleteReview();
+        this.confirmDeleteReview();
         break;
       case "loadSelectedScope":
         this.useSelectedRuntimeAsReviewFilters();
@@ -1350,7 +1350,21 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.updateReview());
   }
 
-  deleteReview(): void {
+  confirmDeleteReview(): void {
+    const reviewId = this.runtime.reviewId.trim();
+    if (!reviewId) {
+      this.deleteReview();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Delete review '${reviewId}' from this workspace?`
+    );
+    if (confirmed) {
+      this.deleteReview();
+    }
+  }
+
+  private deleteReview(): void {
     this.viewState.onActionAsync(() => this.runtimeService.deleteReview());
   }
 

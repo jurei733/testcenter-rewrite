@@ -77,7 +77,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
           <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
           <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
-          <button class="ghost" type="button" (click)="view.deleteReview()">Delete Review</button>
+          <button class="ghost" type="button" (click)="view.confirmDeleteReview()">Delete Review</button>
           <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
           <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
           <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>

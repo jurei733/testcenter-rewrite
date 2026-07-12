@@ -131,6 +131,28 @@ try {
 
   browser = await chromium.launch();
   const page = await browser.newPage();
+  const clickCardAction = async (cardTitle, buttonName, itemHeadline) => {
+    const card = page.locator("article.card").filter({
+      has: page.getByRole("heading", { name: cardTitle, exact: true })
+    });
+    const actionScope = card.locator(".record-card").filter({
+      has: page.getByRole("heading", { name: itemHeadline, exact: true })
+    });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await actionScope
+          .getByRole("button", { name: buttonName, exact: true })
+          .first()
+          .click({ force: true });
+        return;
+      } catch (error) {
+        if (attempt === 3 || !String(error?.message).includes("not attached")) {
+          throw error;
+        }
+        await page.waitForTimeout(250);
+      }
+    }
+  };
 
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
@@ -337,9 +359,11 @@ try {
   await page.locator("#reviewComment").fill("Updated smoke review note");
   await page.locator("#reviewComment").dispatchEvent("input");
   await page.locator("#reviewComment").dispatchEvent("change");
-  await updateReviewSuggestion
-    .getByRole("button", { name: "Apply Suggestion" })
-    .click();
+  await clickCardAction(
+    "Review Action Queue",
+    "Apply Suggestion",
+    "Update selected review"
+  );
   await page.waitForFunction(
     () =>
       document.body.textContent?.includes("Updated smoke review note") &&
@@ -378,9 +402,23 @@ try {
     { timeout: 15_000 }
   );
 
-  await deleteReviewSuggestion
-    .getByRole("button", { name: "Apply Suggestion" })
-    .click();
+  const deleteReviewDialog = new Promise((resolvePromise, reject) => {
+    page.once("dialog", async dialog => {
+      try {
+        assert.match(dialog.message(), /Delete review '.+' from this workspace\?/);
+        await dialog.accept();
+        resolvePromise(undefined);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+  await clickCardAction(
+    "Review Action Queue",
+    "Apply Suggestion",
+    "Delete selected review"
+  );
+  await deleteReviewDialog;
   await page
     .getByText("Create or load reviews to inspect operator notes.")
     .waitFor({ timeout: 15_000 });
