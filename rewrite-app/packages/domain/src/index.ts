@@ -467,6 +467,32 @@ export type WorkspaceStudyMonitorParticipantMatrix = {
   rows: WorkspaceStudyMonitorParticipantMatrixRow[];
 };
 
+export type WorkspaceStudyMonitorParticipantRun = {
+  testRun: TestRun;
+  participantSession: ParticipantSession | null;
+  responseCount: number;
+  reviewCount: number;
+};
+
+export type WorkspaceStudyMonitorParticipantDetail = {
+  tenantKey: string;
+  workspaceKey: string;
+  loginKey: string;
+  groupKey: string | null;
+  displayName: string | null;
+  rosterBookletKey: string | null;
+  generatedAt: string;
+  rosterEntry: ParticipantRosterEntry | null;
+  participantSessionCount: number;
+  testRunCount: number;
+  responseCount: number;
+  reviewCount: number;
+  latestActivityAt: string | null;
+  sessions: ParticipantSession[];
+  testRuns: WorkspaceStudyMonitorParticipantRun[];
+  unitRows: WorkspaceStudyMonitorParticipantMatrixRow[];
+};
+
 export type WorkspaceStudyMonitorGroupDetail = {
   tenantKey: string;
   workspaceKey: string;

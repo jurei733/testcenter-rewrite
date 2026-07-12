@@ -51,6 +51,7 @@ import {
   type GetSourcePackageResponse,
   type GetStudyMonitorBookletResponse,
   type GetStudyMonitorGroupResponse,
+  type GetStudyMonitorParticipantResponse,
   type GetStudyMonitorParticipantMatrixResponse,
   type GetStudyMonitorUnitResponse,
   type GetStudyMonitorSummaryResponse,
@@ -1261,6 +1262,9 @@ const studyMonitorSummaryPattern = createRoutePattern(
 const studyMonitorParticipantMatrixPattern = createRoutePattern(
   productionApiRoutes.workspace.getStudyMonitorParticipantMatrix
 );
+const studyMonitorParticipantPattern = createRoutePattern(
+  productionApiRoutes.workspace.getStudyMonitorParticipant
+);
 const studyMonitorGroupPattern = createRoutePattern(
   productionApiRoutes.workspace.getStudyMonitorGroup
 );
@@ -1382,6 +1386,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", workspaceOverviewPattern],
   ["GET", studyMonitorSummaryPattern],
   ["GET", studyMonitorParticipantMatrixPattern],
+  ["GET", studyMonitorParticipantPattern],
   ["GET", studyMonitorGroupPattern],
   ["GET", studyMonitorBookletPattern],
   ["GET", studyMonitorUnitPattern],
@@ -1746,6 +1751,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       studyMonitorParticipantMatrixPattern,
       productionApiRoutes.workspace.getStudyMonitorParticipantMatrix
+    ],
+    [
+      "GET",
+      studyMonitorParticipantPattern,
+      productionApiRoutes.workspace.getStudyMonitorParticipant
     ],
     [
       "GET",
@@ -2712,6 +2722,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const studyMonitorSummaryMatch = studyMonitorSummaryPattern.exec(pathname);
       const studyMonitorParticipantMatrixMatch =
         studyMonitorParticipantMatrixPattern.exec(pathname);
+      const studyMonitorParticipantMatch =
+        studyMonitorParticipantPattern.exec(pathname);
       const studyMonitorGroupMatch = studyMonitorGroupPattern.exec(pathname);
       const studyMonitorBookletMatch = studyMonitorBookletPattern.exec(pathname);
       const studyMonitorUnitMatch = studyMonitorUnitPattern.exec(pathname);
@@ -2796,6 +2808,38 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
         sendJson<GetStudyMonitorParticipantMatrixResponse>(response, 200, {
           studyMonitorParticipantMatrix
+        });
+        return;
+      }
+
+      if (request.method === "GET" && studyMonitorParticipantMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          studyMonitorParticipantMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          studyMonitorParticipantMatch.groups.workspaceKey
+        );
+        const loginKey = decodeRouteGroup(
+          studyMonitorParticipantMatch.groups.loginKey
+        );
+        if (!tenantKey || !workspaceKey || !loginKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and loginKey are required."
+          );
+          return;
+        }
+
+        const studyMonitorParticipant =
+          await services.workspaceAdminRead.getStudyMonitorParticipantDetail({
+            tenantKey,
+            workspaceKey,
+            loginKey
+          });
+        sendJson<GetStudyMonitorParticipantResponse>(response, 200, {
+          studyMonitorParticipant
         });
         return;
       }

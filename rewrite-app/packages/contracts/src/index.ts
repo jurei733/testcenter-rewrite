@@ -40,6 +40,7 @@ import type {
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorParticipantDetail,
   WorkspaceStudyMonitorParticipantMatrix,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorSummary,
@@ -346,6 +347,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/summary",
     getStudyMonitorParticipantMatrix:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/participants",
+    getStudyMonitorParticipant:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/participants/:loginKey",
     getStudyMonitorGroup:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/groups/:groupKey",
     getStudyMonitorBooklet:
@@ -704,6 +707,10 @@ export type GetStudyMonitorSummaryResponse = {
 
 export type GetStudyMonitorParticipantMatrixResponse = {
   studyMonitorParticipantMatrix: WorkspaceStudyMonitorParticipantMatrix;
+};
+
+export type GetStudyMonitorParticipantResponse = {
+  studyMonitorParticipant: WorkspaceStudyMonitorParticipantDetail;
 };
 
 export type GetStudyMonitorGroupResponse = {

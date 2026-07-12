@@ -441,6 +441,21 @@ try {
     .filter({ hasText: "student-demo" })
     .filter({ hasText: "unit-intro" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Participant Unit Matrix" })
+    .locator(".record-card")
+    .filter({ hasText: "student-demo" })
+    .filter({ hasText: "unit-intro" })
+    .getByRole("button", { name: "Open Participant Detail" })
+    .first()
+    .click();
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Participant Detail" })
+    .filter({ hasText: "student-demo" })
+    .filter({ hasText: "unit-intro" })
+    .waitFor({ state: "visible", timeout: 15_000 });
   await page.waitForFunction(
     () =>
       document

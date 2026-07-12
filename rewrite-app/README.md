@@ -236,6 +236,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/participants`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/groups/{groupKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/participants/{loginKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/booklets/{bookletKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/study-monitor.csv`
@@ -289,6 +290,7 @@ The added read side now makes the first slice inspectable:
 - study monitor summary returns workspace-wide group, booklet, and unit progress with participant sessions, saved-roster expected/not-started participants for groups and booklets, roster-derived missing unit expectations, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, saved roster entries, status counts, latest runs, response counts, review counts, and per-run context for operator follow-up
 - study monitor booklet detail drills into one booklet with saved roster entries, attached runs, status pressure, unit coverage, response counts, and review counts
+- study monitor participant detail drills into one login with saved roster context, sessions, runs, unit answer status, response counts, and review counts
 - study monitor participant matrix read model exposes participant-by-unit session/run/answer/review status directly for the operator shell
 - study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
 - study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context
@@ -471,4 +473,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/assessment-section/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
-- monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, participant-by-unit matrix export, saved-roster expected/not-started participants, CSV exports, and open-run blockers, but still do not cover every original Testcenter monitor view
+- monitor reads now include workspace summary, group drill-down, participant drill-down, booklet drill-down, unit drill-down, unit-progress coverage, participant-by-unit matrix export, saved-roster expected/not-started participants, CSV exports, and open-run blockers, but still do not cover every original Testcenter monitor view

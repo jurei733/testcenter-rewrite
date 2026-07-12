@@ -356,6 +356,31 @@ const verifyBootstrappedDemo = async baseUrl => {
     );
   }
 
+  const participantDetail = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/participants/student-demo`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo participant detail status", participantDetail.status, 200);
+  const participantDetailBody = await participantDetail.json();
+  const participantDetailIntroRow =
+    participantDetailBody.studyMonitorParticipant?.unitRows?.find(
+      row => row.unitKey === "unit-intro"
+    );
+  if (
+    participantDetailBody.studyMonitorParticipant?.loginKey !== "student-demo" ||
+    participantDetailBody.studyMonitorParticipant?.testRunCount !== 1 ||
+    participantDetailIntroRow?.answered !== true ||
+    participantDetailIntroRow?.testRunStatus !== "running"
+  ) {
+    throw new Error(
+      "Expected demo participant detail read model to contain answered unit-intro."
+    );
+  }
+
   const participantMatrixCsv = await fetch(
     `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor-participants.csv`,
     {

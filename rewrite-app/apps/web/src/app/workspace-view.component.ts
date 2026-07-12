@@ -166,6 +166,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Study Monitor Participant Detail"
+        subtitle="Selected participant roster, session, run, unit, answer, and review context."
+        [items]="view.studyMonitorParticipantItems"
+        (itemAction)="view.openActivitySubject($event)"
+        emptyState="Open a participant from the matrix or not-started list to inspect detail."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Study Monitor Group Detail"
         subtitle="Selected group sessions, runs, responses, and review pressure."
         [items]="view.studyMonitorGroupItems"
@@ -300,6 +308,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Participant Unit Read Model"
         viewId="studyMonitorParticipantMatrixView"
         [content]="view.workspace.studyMonitorParticipantMatrixView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor Participant Detail"
+        subtitle="Selected Participant Read Model"
+        viewId="studyMonitorParticipantView"
+        [content]="view.workspace.studyMonitorParticipantView"
       ></app-json-panel>
 
       <app-json-panel

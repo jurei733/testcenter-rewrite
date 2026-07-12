@@ -1737,6 +1737,22 @@ try {
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "missing" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Participant Unit Matrix" })
+    .locator(".record-card")
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: "unit-paused" })
+    .getByRole("button", { name: "Open Participant Detail" })
+    .first()
+    .click();
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Participant Detail" })
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "missing" })
+    .waitFor({ state: "visible", timeout: 15_000 });
   const monitorStatusTotal = [
     studyMonitorSummary.notStartedCount,
     studyMonitorSummary.runningCount,

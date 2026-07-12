@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import type {
   GetStudyMonitorBookletResponse,
   GetStudyMonitorGroupResponse,
+  GetStudyMonitorParticipantResponse,
   GetStudyMonitorParticipantMatrixResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
@@ -141,6 +142,30 @@ export class RewriteAppWorkspaceService {
     this.feedback.rememberActivity(
       "Study Monitor Group Loaded",
       `${payload.studyMonitorGroup.groupKey}: ${payload.studyMonitorGroup.participantSessionCount} session(s), ${payload.studyMonitorGroup.testRunCount} run(s).`
+    );
+  }
+
+  async loadStudyMonitorParticipant(loginKey: string): Promise<void> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload =
+      await this.requestState.request<GetStudyMonitorParticipantResponse>(
+        "Study Monitor Participant",
+        "GET",
+        resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorParticipant, {
+          tenantKey,
+          workspaceKey,
+          loginKey
+        })
+      );
+
+    this.workspaceState.studyMonitorParticipantView = prettyPrintJson(
+      payload,
+      this.workspaceState.studyMonitorParticipantView
+    );
+    this.feedback.rememberActivity(
+      "Study Monitor Participant Loaded",
+      `${payload.studyMonitorParticipant.loginKey}: ${payload.studyMonitorParticipant.testRunCount} run(s), ${payload.studyMonitorParticipant.responseCount} response(s).`
     );
   }
 

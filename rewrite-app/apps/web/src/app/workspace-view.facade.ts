@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import type {
   GetStudyMonitorBookletResponse,
   GetStudyMonitorGroupResponse,
+  GetStudyMonitorParticipantResponse,
   GetStudyMonitorParticipantMatrixResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
@@ -139,14 +140,117 @@ export class WorkspaceViewFacade {
               : "none"
           }
         ],
-        actionLabel: row.unitKey ? "Open Unit Detail" : undefined,
+        actionLabel: "Open Participant Detail",
         actionPayload: {
+          participantLoginKey: row.loginKey,
           unitKey: row.unitKey,
           participantSessionId: row.participantSessionId ?? "",
           testRunId: row.testRunId ?? "",
           loginKey: row.loginKey,
           groupKey: row.groupKey,
           currentUnitKey: row.unitKey
+        }
+      }))
+    ];
+  }
+
+  get studyMonitorParticipantItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorParticipantResponse>(
+      this.workspace.studyMonitorParticipantView
+    );
+    const detail = payload?.studyMonitorParticipant;
+    if (!detail) {
+      return [];
+    }
+
+    return [
+      {
+        headline: detail.displayName ?? detail.loginKey,
+        subline: `${detail.groupKey ?? "no group"} in ${detail.rosterBookletKey ?? "no assigned booklet"}`,
+        badges: [
+          `${detail.participantSessionCount} session(s)`,
+          `${detail.testRunCount} run(s)`,
+          `${detail.responseCount} response(s)`,
+          `${detail.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Login", value: detail.loginKey },
+          { label: "Group", value: detail.groupKey ?? "none" },
+          { label: "Display Name", value: detail.displayName ?? "none" },
+          { label: "Roster Booklet", value: detail.rosterBookletKey ?? "none" },
+          {
+            label: "Latest Activity",
+            value: detail.latestActivityAt
+              ? this.formatDateTime(detail.latestActivityAt)
+              : "none"
+          },
+          {
+            label: "Generated",
+            value: this.formatDateTime(detail.generatedAt)
+          }
+        ]
+      },
+      ...detail.unitRows.map(row => ({
+        headline: row.unitLabel || row.unitKey || "No unit",
+        subline: `${row.bookletKey ?? "no booklet"} / ${row.testRunStatus}`,
+        badges: [
+          row.expected ? "expected" : "unexpected",
+          row.answered ? "answered" : "missing",
+          row.participantSessionStatus,
+          `${row.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Unit", value: row.unitKey || "none" },
+          { label: "Booklet", value: row.bookletKey ?? "none" },
+          { label: "Test Run", value: row.testRunId ?? "none" },
+          { label: "Response Length", value: String(row.responseLength) },
+          {
+            label: "Latest Activity",
+            value: row.latestActivityAt
+              ? this.formatDateTime(row.latestActivityAt)
+              : "none"
+          }
+        ],
+        actionLabel: row.testRunId ? "Open Run" : undefined,
+        actionPayload: {
+          subjectType: "test_run",
+          subjectId: row.testRunId ?? "",
+          participantSessionId: row.participantSessionId ?? "",
+          loginKey: row.loginKey,
+          currentUnitKey: row.unitKey
+        }
+      })),
+      ...detail.testRuns.map(item => ({
+        headline: item.testRun.bookletKey,
+        subline: item.testRun.testRunId,
+        badges: [
+          item.testRun.status,
+          `${item.responseCount} response(s)`,
+          `${item.reviewCount} review(s)`
+        ],
+        rows: [
+          {
+            label: "Participant Session",
+            value: item.participantSession?.participantSessionId ?? "none"
+          },
+          { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
+          {
+            label: "Started",
+            value: this.formatDateTime(item.testRun.createdAt)
+          },
+          {
+            label: "Updated",
+            value: this.formatDateTime(item.testRun.updatedAt)
+          }
+        ],
+        actionLabel: "Open Run",
+        actionPayload: {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: detail.loginKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
         }
       }))
     ];
@@ -489,8 +593,11 @@ export class WorkspaceViewFacade {
         },
         { label: "Imported", value: this.formatDateTime(rosterEntry.importedAt) }
       ],
-      actionLabel: "Open Group Detail",
-      actionPayload: { groupKey: rosterEntry.groupKey }
+      actionLabel: "Open Participant Detail",
+      actionPayload: {
+        participantLoginKey: rosterEntry.loginKey,
+        groupKey: rosterEntry.groupKey
+      }
     }));
   }
 
@@ -1362,6 +1469,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantLoginKey?.trim()) {
+      this.openStudyMonitorParticipant(item);
+      return;
+    }
+
     if (item.actionPayload?.bookletKey?.trim()) {
       this.openStudyMonitorBooklet(item);
       return;
@@ -1373,6 +1485,17 @@ export class WorkspaceViewFacade {
     }
 
     this.openStudyMonitorGroup(item);
+  }
+
+  openStudyMonitorParticipant(item: RecordCollectionItem): void {
+    const loginKey = item.actionPayload?.participantLoginKey?.trim();
+    if (!loginKey) {
+      return;
+    }
+
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.loadStudyMonitorParticipant(loginKey)
+    );
   }
 
   openStudyMonitorBookletDetailItem(item: RecordCollectionItem): void {

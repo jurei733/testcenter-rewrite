@@ -49,6 +49,7 @@ import type {
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorParticipantDetail,
   WorkspaceStudyMonitorParticipantMatrix,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorUnitProgress,
@@ -112,6 +113,11 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceStudyMonitorParticipantMatrix>;
+  getStudyMonitorParticipantDetail(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    loginKey: string;
+  }): Promise<WorkspaceStudyMonitorParticipantDetail>;
   getStudyMonitorGroupDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -502,6 +508,7 @@ export const firstSliceUseCases = {
   getWorkspaceOverview: "GetWorkspaceOverview",
   getStudyMonitorSummary: "GetStudyMonitorSummary",
   getStudyMonitorParticipantMatrix: "GetStudyMonitorParticipantMatrix",
+  getStudyMonitorParticipantDetail: "GetStudyMonitorParticipantDetail",
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
@@ -4244,6 +4251,93 @@ const buildStudyMonitorParticipantMatrix = (input: {
   };
 };
 
+const buildStudyMonitorParticipantDetail = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  loginKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorParticipantDetail => {
+  const loginKey = input.loginKey.trim();
+  const rosterEntry =
+    input.participantRosterEntries.find(entry => entry.loginKey === loginKey) ??
+    null;
+  const sessions = input.participantSessions
+    .filter(participantSession => participantSession.loginKey === loginKey)
+    .sort(
+      (left, right) =>
+        right.createdAt.localeCompare(left.createdAt) ||
+        right.participantSessionId.localeCompare(left.participantSessionId)
+    );
+  const participantSessionIds = new Set(
+    sessions.map(participantSession => participantSession.participantSessionId)
+  );
+  const testRuns = input.testRuns
+    .map(normalizeTestRun)
+    .filter(testRun => participantSessionIds.has(testRun.participantSessionId))
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.testRunId.localeCompare(left.testRunId)
+    );
+  const testRunIds = new Set(testRuns.map(testRun => testRun.testRunId));
+  const reviews = input.reviews.filter(review => testRunIds.has(review.testRunId));
+  const sessionsById = new Map(
+    sessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const matrix = buildStudyMonitorParticipantMatrix({
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    generatedAt: input.generatedAt,
+    participantSessions: sessions,
+    participantRosterEntries: rosterEntry ? [rosterEntry] : [],
+    testRuns,
+    contentReleases: input.contentReleases,
+    reviews
+  });
+  const latestActivityAt =
+    testRuns.map(testRun => testRun.updatedAt).sort().at(-1) ??
+    sessions.map(participantSession => participantSession.createdAt).sort().at(-1) ??
+    rosterEntry?.importedAt ??
+    null;
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    loginKey,
+    groupKey: rosterEntry?.groupKey ?? sessions[0]?.groupKey ?? null,
+    displayName: rosterEntry?.displayName ?? null,
+    rosterBookletKey: rosterEntry?.bookletKey ?? null,
+    generatedAt: input.generatedAt,
+    rosterEntry,
+    participantSessionCount: sessions.length,
+    testRunCount: testRuns.length,
+    responseCount: testRuns.reduce(
+      (total, testRun) => total + Object.keys(testRun.unitResponses).length,
+      0
+    ),
+    reviewCount: reviews.length,
+    latestActivityAt,
+    sessions,
+    testRuns: testRuns.map(testRun => ({
+      testRun,
+      participantSession:
+        sessionsById.get(testRun.participantSessionId) ?? null,
+      responseCount: Object.keys(testRun.unitResponses).length,
+      reviewCount: reviews.filter(review => review.testRunId === testRun.testRunId)
+        .length
+    })),
+    unitRows: matrix.rows
+  };
+};
+
 const buildStudyMonitorGroupDetail = (input: {
   tenantKey: string;
   workspaceKey: string;
@@ -5649,6 +5743,71 @@ export const createFirstSliceServices = (
           contentReleases,
           reviews
         });
+      },
+      async getStudyMonitorParticipantDetail(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const loginKey = input.loginKey.trim();
+        if (!loginKey) {
+          throw new FirstSliceError(
+            400,
+            "login_key_required",
+            "loginKey is required."
+          );
+        }
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const detail = buildStudyMonitorParticipantDetail({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          loginKey,
+          generatedAt: now(),
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+
+        if (!detail.rosterEntry && detail.participantSessionCount === 0) {
+          throw new FirstSliceError(
+            404,
+            "study_monitor_participant_not_found",
+            `Study monitor participant '${loginKey}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        return detail;
       },
       async getStudyMonitorGroupDetail(input) {
         const workspace = await requireWorkspace(
