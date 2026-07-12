@@ -11,6 +11,7 @@ import type {
   CreateAdminUserRequest,
   CreateAdminUserResponse,
   GetAdminCurrentSessionResponse,
+  ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
   ResetAdminUserPasswordRequest,
@@ -114,6 +115,25 @@ export class RewriteAppOpsService {
       `${payload.adminUser.username} is authenticated.`
     );
     this.persistence.persistShellState();
+  }
+
+  async refreshAdminSessions(): Promise<void> {
+    const payload = await this.requestState.request<ListAdminSessionsResponse>(
+      "Admin Sessions",
+      "GET",
+      this.buildAdminSessionsPath(),
+      undefined,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.opsState.adminSessionsView = prettyPrintJson(
+      payload,
+      this.opsState.adminSessionsView
+    );
+    this.feedback.rememberActivity(
+      "Admin Sessions Refreshed",
+      `${payload.items.length} admin session(s) loaded from persistent storage.`
+    );
   }
 
   async signOutAdmin(): Promise<void> {
@@ -359,6 +379,14 @@ export class RewriteAppOpsService {
       ["tenantKey", this.opsState.adminUserTenantFilter],
       ["workspaceKey", this.opsState.adminUserWorkspaceFilter],
       ["limit", this.opsState.adminUserLimit]
+    ]);
+  }
+
+  private buildAdminSessionsPath(): string {
+    return this.appendQuery(productionApiRoutes.admin.listSessions, [
+      ["adminUserId", this.opsState.adminSessionUserFilter],
+      ["status", this.opsState.adminSessionStatusFilter],
+      ["limit", this.opsState.adminSessionLimit]
     ]);
   }
 

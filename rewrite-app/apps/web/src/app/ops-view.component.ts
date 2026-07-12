@@ -63,6 +63,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="adminBootstrapButton" class="ghost" type="button" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
           <button id="adminSignInButton" class="ghost" type="button" (click)="view.signInAdmin()">Sign In</button>
           <button id="adminCurrentSessionButton" class="ghost" type="button" (click)="view.refreshAdminSession()">Current Session</button>
+          <button id="adminSessionsButton" class="ghost" type="button" (click)="view.refreshAdminSessions()">Admin Sessions</button>
           <button id="adminUsersButton" class="ghost" type="button" (click)="view.refreshAdminUsers()">Admin Users</button>
           <button id="adminAuditEventsButton" class="ghost" type="button" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
           <button id="adminSignOutButton" class="ghost" type="button" (click)="view.signOutAdmin()">Sign Out</button>
@@ -74,6 +75,41 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         subtitle="The currently known admin identity, role assignment, and session lifecycle."
         [items]="view.adminSessionItems"
         emptyState="Bootstrap or sign in to inspect the admin session."
+      ></app-record-collection>
+
+      <article class="card">
+        <h2>Admin Session Filters</h2>
+        <p>Narrow persisted admin bearer sessions by user, lifecycle status, or a bounded result limit.</p>
+        <div class="form-grid">
+          <label>
+            Admin User ID
+            <input id="adminSessionUserFilter" name="adminSessionUserFilter" placeholder="admin user id" [(ngModel)]="view.ops.adminSessionUserFilter" (change)="view.persistState()" />
+          </label>
+          <label>
+            Status
+            <select id="adminSessionStatusFilter" name="adminSessionStatusFilter" [(ngModel)]="view.ops.adminSessionStatusFilter" (change)="view.persistState()">
+              <option value="">All session statuses</option>
+              <option *ngFor="let status of view.adminSessionStatusOptions" [ngValue]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Session Limit
+            <input id="adminSessionLimit" name="adminSessionLimit" inputmode="numeric" [(ngModel)]="view.ops.adminSessionLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
+          <button class="secondary" type="button" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
+          <button class="ghost" type="button" (click)="view.clearAdminSessionFilters()">Clear Session Filters</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Admin Sessions"
+        subtitle="Protected platform-admin read model for issued admin bearer sessions without exposing tokens."
+        [items]="view.adminSessionDirectoryItems"
+        (itemAction)="view.selectAdminSession($event)"
+        emptyState="Sign in as platform admin, then refresh admin sessions."
       ></app-record-collection>
 
       <article class="card">

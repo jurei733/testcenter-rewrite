@@ -163,6 +163,8 @@ export type AdminSession = {
   revokedAt: string | null;
 };
 
+export type AdminSessionStatus = "active" | "expired" | "revoked";
+
 export type AdminRoleAssignment = {
   roleAssignmentId: string;
   adminUserId: string;
@@ -647,6 +649,7 @@ export type FirstSliceCapability =
   | "admin_bootstrap"
   | "admin_authentication"
   | "admin_session_lifecycle"
+  | "admin_session_read"
   | "admin_role_assignment"
   | "admin_user_directory"
   | "admin_user_csv_export"
@@ -690,6 +693,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_bootstrap",
   "admin_authentication",
   "admin_session_lifecycle",
+  "admin_session_read",
   "admin_role_assignment",
   "admin_user_directory",
   "admin_user_csv_export",

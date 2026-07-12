@@ -1,4 +1,8 @@
-import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+import type {
+  AdminRole,
+  AdminSessionStatus,
+  AdminUserStatus
+} from "@testcenter-rewrite-app/domain";
 
 import type { ActivityFeedItem, SummaryCard } from "./rewrite-app-shell.types";
 
@@ -20,6 +24,10 @@ export interface ShellOpsState {
   adminPassword: string;
   adminSessionToken: string;
   adminSessionView: string;
+  adminSessionsView: string;
+  adminSessionUserFilter: string;
+  adminSessionStatusFilter: "" | AdminSessionStatus;
+  adminSessionLimit: string;
   adminUsersView: string;
   adminUsersExportView: string;
   adminAuditView: string;
@@ -178,6 +186,10 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminPassword: "",
     adminSessionToken: "",
     adminSessionView: "Use admin bootstrap or sign-in.",
+    adminSessionsView: 'Use "Admin Sessions".',
+    adminSessionUserFilter: "",
+    adminSessionStatusFilter: "",
+    adminSessionLimit: "100",
     adminUsersView: 'Use "Admin Users".',
     adminUsersExportView: "Export admin users CSV to preview it here.",
     adminAuditView: 'Use "Admin Audit Events".',

@@ -57,6 +57,7 @@ import {
   type ImportParticipantRosterRequest,
   type ImportParticipantRosterResponse,
   type ListAdminAuditEventsResponse,
+  type ListAdminSessionsResponse,
   type ListWorkspaceActivityEventsResponse,
   type ListImportJobsResponse,
   type ListAdminUsersResponse,
@@ -87,6 +88,7 @@ import {
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
+  type AdminSessionListQuery,
   type AdminUserListQuery,
   type UpdateReviewRequest,
   type WorkspaceReviewListQuery,
@@ -100,6 +102,7 @@ import {
   type AdminRoleAssignment,
   type AdminRole,
   type AdminSession,
+  type AdminSessionStatus,
   type AdminUser,
   type AdminUserStatus,
   type AdminAuditEvent,
@@ -898,6 +901,48 @@ const parseAdminUserListQuery = (
   };
 };
 
+const parseAdminSessionListQuery = (
+  url: URL,
+  response: ServerResponse
+): AdminSessionListQuery | null => {
+  const status = url.searchParams.get("status")?.trim() || undefined;
+  if (
+    status &&
+    status !== "active" &&
+    status !== "expired" &&
+    status !== "revoked"
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_session_status_invalid",
+      `Admin session status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+  const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
+  if (
+    limitRawValue &&
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_session_limit_invalid",
+      "Admin session limit must be an integer between 1 and 500."
+    );
+    return null;
+  }
+
+  return {
+    adminUserId: url.searchParams.get("adminUserId")?.trim() || undefined,
+    status: status as AdminSessionStatus | undefined,
+    limit
+  };
+};
+
 const parseAdminAuditEventListQuery = (
   url: URL,
   response: ServerResponse
@@ -1029,6 +1074,16 @@ const toAdminUserDirectoryItem = (item: {
 }): AdminUserDirectoryItem => ({
   adminUser: toPublicAdminUser(item.adminUser),
   roleAssignments: item.roleAssignments
+});
+
+const toAdminSessionDirectoryItem = (item: {
+  adminSession: AdminSession;
+  adminUser: AdminUser;
+  status: AdminSessionStatus;
+}) => ({
+  adminSession: toPublicAdminSession(item.adminSession),
+  adminUser: toPublicAdminUser(item.adminUser),
+  status: item.status
 });
 
 const readBearerToken = (request: IncomingMessage): string | null => {
@@ -1559,6 +1614,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.admin.currentSession) {
     return `GET ${productionApiRoutes.admin.currentSession}`;
+  }
+
+  if (method === "GET" && pathname === productionApiRoutes.admin.listSessions) {
+    return `GET ${productionApiRoutes.admin.listSessions}`;
   }
 
   if (method === "POST" && pathname === productionApiRoutes.admin.signOut) {
@@ -2129,6 +2188,30 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const adminSession = await services.adminAuth.signOut({ sessionToken });
         sendJson<AdminSignOutResponse>(response, 200, {
           adminSession: toPublicAdminSession(adminSession)
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.admin.listSessions
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const query = parseAdminSessionListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const items = await services.adminAuth.listAdminSessions({
+          sessionToken,
+          ...query
+        });
+        sendJson<ListAdminSessionsResponse>(response, 200, {
+          items: items.map(toAdminSessionDirectoryItem)
         });
         return;
       }

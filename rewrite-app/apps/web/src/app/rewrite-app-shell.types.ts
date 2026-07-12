@@ -1,4 +1,8 @@
-import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+import type {
+  AdminRole,
+  AdminSessionStatus,
+  AdminUserStatus
+} from "@testcenter-rewrite-app/domain";
 
 export type AppView = "workspace" | "content" | "runtime" | "participant" | "ops";
 
@@ -74,6 +78,9 @@ export type PersistedShellState = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminSessionUserFilter: string;
+  adminSessionStatusFilter: "" | AdminSessionStatus;
+  adminSessionLimit: string;
   adminUserUsernameFilter: string;
   adminUserStatusFilter: string;
   adminUserRoleFilter: string;

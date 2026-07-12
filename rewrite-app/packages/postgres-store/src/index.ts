@@ -753,6 +753,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         ]
       );
     },
+    async listAdminSessions() {
+      const { rows } = await pool.query(
+        `SELECT admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+         FROM admin_sessions`
+      );
+      return rows.flatMap(row => {
+        const adminSession = mapAdminSession(row);
+        return adminSession ? [adminSession] : [];
+      });
+    },
     async getAdminSessionByToken(token) {
       return one(
         `SELECT admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at

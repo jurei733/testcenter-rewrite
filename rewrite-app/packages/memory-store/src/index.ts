@@ -91,6 +91,9 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async saveAdminAuditEvent(auditEvent) {
       state.adminAuditEvents.set(auditEvent.adminAuditEventId, auditEvent);
     },
+    async listAdminSessions() {
+      return Array.from(state.adminSessionsByToken.values());
+    },
     async getAdminSessionByToken(token) {
       return state.adminSessionsByToken.get(token) ?? null;
     },

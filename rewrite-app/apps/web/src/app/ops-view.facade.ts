@@ -5,6 +5,7 @@ import type {
   AdminSignOutResponse,
   BootstrapAdminUserResponse,
   GetAdminCurrentSessionResponse,
+  ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
   GetRuntimeConfigResponse,
@@ -13,6 +14,7 @@ import type {
 import {
   adminAuditEventTypes,
   type AdminRole,
+  type AdminSessionStatus,
   type AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
 
@@ -108,6 +110,11 @@ export class OpsViewFacade {
     "platform_admin"
   ];
   readonly adminStatusOptions: AdminUserStatus[] = ["active", "disabled"];
+  readonly adminSessionStatusOptions: AdminSessionStatus[] = [
+    "active",
+    "expired",
+    "revoked"
+  ];
   readonly adminAuditEventTypeOptions = adminAuditEventTypes;
 
   init(): void {
@@ -136,6 +143,10 @@ export class OpsViewFacade {
 
   refreshAdminSession(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshAdminSession());
+  }
+
+  refreshAdminSessions(): void {
+    this.viewState.onActionAsync(() => this.opsService.refreshAdminSessions());
   }
 
   signOutAdmin(): void {
@@ -192,6 +203,31 @@ export class OpsViewFacade {
     this.ops.adminUserTenantFilter = "";
     this.ops.adminUserWorkspaceFilter = "";
     this.ops.adminUserLimit = "100";
+    this.persistState();
+  }
+
+  applyAdminSessionFilters(): void {
+    this.persistState();
+    this.refreshAdminSessions();
+  }
+
+  clearAdminSessionFilters(): void {
+    this.ops.adminSessionUserFilter = "";
+    this.ops.adminSessionStatusFilter = "";
+    this.ops.adminSessionLimit = "100";
+    this.persistState();
+  }
+
+  useCurrentAdminUserAsSessionFilter(): void {
+    const payload = parseJsonDocument<AdminSessionViewPayload>(
+      this.ops.adminSessionView
+    );
+    const adminUserId = payload?.adminUser?.adminUserId;
+    if (!adminUserId) {
+      return;
+    }
+
+    this.ops.adminSessionUserFilter = adminUserId;
     this.persistState();
   }
 
@@ -262,6 +298,16 @@ export class OpsViewFacade {
     this.persistState();
   }
 
+  selectAdminSession(item: RecordCollectionItem): void {
+    const adminUserId = item.actionPayload?.adminUserId;
+    if (!adminUserId) {
+      return;
+    }
+
+    this.ops.adminSessionUserFilter = adminUserId;
+    this.persistState();
+  }
+
   selectAdminRoleAssignment(item: RecordCollectionItem): void {
     const adminUserId = item.actionPayload?.adminUserId;
     const roleAssignmentId = item.actionPayload?.roleAssignmentId;
@@ -328,6 +374,38 @@ export class OpsViewFacade {
         ]
       }
     ];
+  }
+
+  get adminSessionDirectoryItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListAdminSessionsResponse>(
+      this.ops.adminSessionsView
+    );
+    return (payload?.items ?? []).map(item => ({
+      headline: item.adminUser.username,
+      subline: `${item.status} session ${item.adminSession.adminSessionId}`,
+      badges: [item.status, item.adminUser.status],
+      rows: [
+        { label: "Admin User ID", value: item.adminUser.adminUserId },
+        {
+          label: "Created",
+          value: this.formatDateTime(item.adminSession.createdAt)
+        },
+        {
+          label: "Expires",
+          value: this.formatDateTime(item.adminSession.expiresAt)
+        },
+        {
+          label: "Revoked",
+          value: item.adminSession.revokedAt
+            ? this.formatDateTime(item.adminSession.revokedAt)
+            : "no"
+        }
+      ],
+      actionLabel: "Filter By User",
+      actionPayload: {
+        adminUserId: item.adminUser.adminUserId
+      }
+    }));
   }
 
   get adminUserItems(): RecordCollectionItem[] {

@@ -293,6 +293,67 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(currentSession.body.adminSession.revokedAt, null);
   assert.equal(currentSession.body.roleAssignments[0]?.role, "platform_admin");
 
+  const missingSessionListSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions"
+  );
+
+  assert.equal(missingSessionListSession.status, 401);
+  assert.equal(missingSessionListSession.body.error, "admin_session_missing");
+
+  const adminSessions = await requestJson<{
+    items: Array<{
+      adminSession: {
+        adminSessionId: string;
+        adminUserId: string;
+        token?: string;
+        revokedAt: string | null;
+      };
+      adminUser: { adminUserId: string; username: string; passwordHash?: string };
+      status: string;
+    }>;
+  }>("/api/v1/admin/auth/sessions?status=active&limit=1", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(adminSessions.status, 200);
+  assert.equal(adminSessions.body.items.length, 1);
+  assert.equal(
+    adminSessions.body.items[0]?.adminSession.adminSessionId,
+    signIn.body.adminSession.adminSessionId
+  );
+  assert.equal(adminSessions.body.items[0]?.adminSession.token, undefined);
+  assert.equal(adminSessions.body.items[0]?.adminUser.passwordHash, undefined);
+  assert.equal(adminSessions.body.items[0]?.status, "active");
+
+  const invalidAdminSessionStatus = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions?status=unsupported",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAdminSessionStatus.status, 400);
+  assert.equal(
+    invalidAdminSessionStatus.body.error,
+    "admin_session_status_invalid"
+  );
+
+  const invalidAdminSessionLimit = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions?limit=0",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(invalidAdminSessionLimit.status, 400);
+  assert.equal(invalidAdminSessionLimit.body.error, "admin_session_limit_invalid");
+
   const missingDirectorySession = await requestJson<{ error: string }>(
     "/api/v1/admin/users"
   );
@@ -5908,6 +5969,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         getRuntimeConfig: string;
       };
       admin: {
+        listSessions: string;
         exportUsersCsv: string;
         exportAuditEventsCsv: string;
       };
@@ -5917,6 +5979,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assertPostgresLocationRedacted("manifest.storage.location", manifest.storage.location);
 
   for (const capability of [
+    "admin_session_read",
     "admin_user_directory",
     "admin_user_csv_export",
     "admin_audit_read",
@@ -5964,6 +6027,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     manifest.routes.workspace.getContentReleaseActivationReadiness,
     /activation-readiness/
   );
+  assert.match(manifest.routes.admin.listSessions, /auth\/sessions/);
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
   assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");

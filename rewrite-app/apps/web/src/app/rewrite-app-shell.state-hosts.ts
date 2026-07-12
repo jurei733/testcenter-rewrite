@@ -452,6 +452,24 @@ export function createShellPersistenceStateHost(args: {
     set adminSessionToken(nextValue) {
       args.opsState.adminSessionToken = nextValue;
     },
+    get adminSessionUserFilter() {
+      return args.opsState.adminSessionUserFilter;
+    },
+    set adminSessionUserFilter(nextValue) {
+      args.opsState.adminSessionUserFilter = nextValue;
+    },
+    get adminSessionStatusFilter() {
+      return args.opsState.adminSessionStatusFilter;
+    },
+    set adminSessionStatusFilter(nextValue) {
+      args.opsState.adminSessionStatusFilter = nextValue;
+    },
+    get adminSessionLimit() {
+      return args.opsState.adminSessionLimit;
+    },
+    set adminSessionLimit(nextValue) {
+      args.opsState.adminSessionLimit = nextValue;
+    },
     get adminUserUsernameFilter() {
       return args.opsState.adminUserUsernameFilter;
     },

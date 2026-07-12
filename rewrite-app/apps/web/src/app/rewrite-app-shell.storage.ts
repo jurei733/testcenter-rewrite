@@ -1,5 +1,9 @@
 import type { AppView, PersistedShellState } from "./rewrite-app-shell.types";
-import type { AdminRole, AdminUserStatus } from "@testcenter-rewrite-app/domain";
+import type {
+  AdminRole,
+  AdminSessionStatus,
+  AdminUserStatus
+} from "@testcenter-rewrite-app/domain";
 
 export type ShellPersistenceTarget = {
   tenantKey: string;
@@ -62,6 +66,9 @@ export type ShellPersistenceTarget = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminSessionUserFilter: string;
+  adminSessionStatusFilter: "" | AdminSessionStatus;
+  adminSessionLimit: string;
   adminUserUsernameFilter: string;
   adminUserStatusFilter: string;
   adminUserRoleFilter: string;
@@ -154,6 +161,9 @@ export const createPersistedShellState = (
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
   adminSessionToken: target.adminSessionToken,
+  adminSessionUserFilter: target.adminSessionUserFilter,
+  adminSessionStatusFilter: target.adminSessionStatusFilter,
+  adminSessionLimit: target.adminSessionLimit,
   adminUserUsernameFilter: target.adminUserUsernameFilter,
   adminUserStatusFilter: target.adminUserStatusFilter,
   adminUserRoleFilter: target.adminUserRoleFilter,
@@ -412,6 +422,16 @@ export const applyHydratedShellState = (
   target.adminSessionToken = hydrateString(
     snapshot.adminSessionToken,
     target.adminSessionToken
+  );
+  target.adminSessionUserFilter = hydrateString(
+    snapshot.adminSessionUserFilter,
+    target.adminSessionUserFilter
+  );
+  target.adminSessionStatusFilter =
+    snapshot.adminSessionStatusFilter ?? target.adminSessionStatusFilter;
+  target.adminSessionLimit = hydrateString(
+    snapshot.adminSessionLimit,
+    target.adminSessionLimit
   );
   target.adminUserUsernameFilter = hydrateString(
     snapshot.adminUserUsernameFilter,

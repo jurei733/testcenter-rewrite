@@ -7,6 +7,7 @@ import type {
   AdminRole,
   AdminRoleAssignment,
   AdminSession,
+  AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
   ContentReleaseActivationReadiness,
@@ -351,6 +352,18 @@ export type AdminAuthPort = {
     adminSession: AdminSession;
     roleAssignments: AdminRoleAssignment[];
   }>;
+  listAdminSessions(input: {
+    sessionToken: string;
+    adminUserId?: string;
+    status?: AdminSessionStatus;
+    limit?: number;
+  }): Promise<
+    Array<{
+      adminSession: AdminSession;
+      adminUser: AdminUser;
+      status: AdminSessionStatus;
+    }>
+  >;
   signOut(input: { sessionToken: string }): Promise<AdminSession>;
 };
 
@@ -446,6 +459,7 @@ export const firstSliceUseCases = {
   bootstrapAdminUser: "BootstrapAdminUser",
   adminSignIn: "AdminSignIn",
   getAdminCurrentSession: "GetAdminCurrentSession",
+  listAdminSessions: "ListAdminSessions",
   adminSignOut: "AdminSignOut",
   listAdminUsers: "ListAdminUsers",
   createAdminUser: "CreateAdminUser",
@@ -538,6 +552,7 @@ export type FirstSliceRepository = {
   deleteAdminRoleAssignment(roleAssignmentId: string): Promise<void>;
   listAdminAuditEvents(): Promise<AdminAuditEvent[]>;
   saveAdminAuditEvent(auditEvent: AdminAuditEvent): Promise<void>;
+  listAdminSessions(): Promise<AdminSession[]>;
   getAdminSessionByToken(token: string): Promise<AdminSession | null>;
   saveAdminSession(adminSession: AdminSession): Promise<void>;
   getTenantByKey(tenantKey: string): Promise<Tenant | null>;
@@ -1005,6 +1020,19 @@ const calculateAdminSessionExpiry = (
   createdAt: string,
   sessionTtlMs: number
 ): string => new Date(Date.parse(createdAt) + sessionTtlMs).toISOString();
+
+const resolveAdminSessionStatus = (
+  adminSession: AdminSession,
+  nowIso: string
+): AdminSessionStatus => {
+  if (adminSession.revokedAt !== null) {
+    return "revoked";
+  }
+
+  return Date.parse(adminSession.expiresAt) <= Date.parse(nowIso)
+    ? "expired"
+    : "active";
+};
 
 const listAdminRoleAssignmentsForUser = async (
   repository: FirstSliceRepository,
@@ -4573,6 +4601,52 @@ export const createFirstSliceServices = (
       },
       async getCurrentSession(input) {
         return requireActiveAdminSession(repository, input.sessionToken, now());
+      },
+      async listAdminSessions(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+
+        const nowIso = now();
+        const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+        const adminUserIdFilter = input.adminUserId?.trim() || undefined;
+        const sessions = (await repository.listAdminSessions()).sort(
+          (left, right) =>
+            right.createdAt.localeCompare(left.createdAt) ||
+            left.adminSessionId.localeCompare(right.adminSessionId)
+        );
+        const items: Array<{
+          adminSession: AdminSession;
+          adminUser: AdminUser;
+          status: AdminSessionStatus;
+        }> = [];
+
+        for (const adminSession of sessions) {
+          const status = resolveAdminSessionStatus(adminSession, nowIso);
+          if (adminUserIdFilter && adminSession.adminUserId !== adminUserIdFilter) {
+            continue;
+          }
+          if (input.status && status !== input.status) {
+            continue;
+          }
+
+          const adminUser = await repository.getAdminUserById(
+            adminSession.adminUserId
+          );
+          if (!adminUser) {
+            continue;
+          }
+
+          items.push({ adminSession, adminUser, status });
+          if (items.length >= limit) {
+            break;
+          }
+        }
+
+        return items;
       },
       async signOut(input) {
         const { adminUser, adminSession } = await requireActiveAdminSession(

@@ -4,6 +4,7 @@ import type {
   AdminRole,
   AdminRoleAssignment,
   AdminSession,
+  AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
   ContentReleaseActivationReadiness,
@@ -318,6 +319,7 @@ export const productionApiRoutes = {
     signIn: "/api/v1/admin/auth/sign-in",
     signOut: "/api/v1/admin/auth/sign-out",
     currentSession: "/api/v1/admin/auth/current-session",
+    listSessions: "/api/v1/admin/auth/sessions",
     listUsers: "/api/v1/admin/users",
     createUser: "/api/v1/admin/users",
     updateUser: "/api/v1/admin/users/:adminUserId",
@@ -526,6 +528,12 @@ export type AdminUserListQuery = {
   limit?: number;
 };
 
+export type AdminSessionListQuery = {
+  adminUserId?: string;
+  status?: AdminSessionStatus;
+  limit?: number;
+};
+
 export type AdminAuditEventListQuery = {
   eventType?: AdminAuditEventType;
   actorAdminUserId?: string;
@@ -636,6 +644,16 @@ export type GetAdminCurrentSessionResponse = {
 
 export type AdminSignOutResponse = {
   adminSession: PublicAdminSession;
+};
+
+export type AdminSessionDirectoryItem = {
+  adminSession: PublicAdminSession;
+  adminUser: PublicAdminUser;
+  status: AdminSessionStatus;
+};
+
+export type ListAdminSessionsResponse = {
+  items: AdminSessionDirectoryItem[];
 };
 
 export type AdminUserDirectoryItem = {

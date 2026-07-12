@@ -174,6 +174,10 @@ export const createFileFirstSliceRepository = (
         state.adminAuditEvents[auditEvent.adminAuditEventId] = auditEvent;
       });
     },
+    async listAdminSessions() {
+      const state = await getState();
+      return Object.values(state.adminSessions);
+    },
     async getAdminSessionByToken(token) {
       const state = await getState();
       return (

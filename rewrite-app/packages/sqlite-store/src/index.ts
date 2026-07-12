@@ -820,6 +820,18 @@ export const createSqliteFirstSliceRepository = (
           JSON.stringify(auditEvent.details)
         );
     },
+    async listAdminSessions() {
+      const rows = database
+        .prepare(
+          `SELECT admin_session_id, admin_user_id, session_token, created_at, expires_at, revoked_at
+           FROM admin_sessions`
+        )
+        .all() as Record<string, unknown>[];
+      return rows.flatMap(row => {
+        const adminSession = mapAdminSession(row);
+        return adminSession ? [adminSession] : [];
+      });
+    },
     async getAdminSessionByToken(token) {
       const row = database
         .prepare(

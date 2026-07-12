@@ -457,6 +457,16 @@ try {
     })
     .filter({ hasText: "platform_admin" })
     .waitFor();
+  logStep("admin-sessions");
+  await clickAction("Admin Sessions");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Sessions", exact: true })
+    })
+    .filter({ hasText: adminUsername })
+    .filter({ hasText: "active" })
+    .waitFor();
   logStep("admin-users");
   await clickAction("Admin Users");
   await page
