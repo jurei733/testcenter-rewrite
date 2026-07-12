@@ -4303,6 +4303,9 @@ test("source document import accepts testcenter-style XML aliases", async () => 
             <tc:assessmentTest tc:identifier="booklet:qti" tc:title="QTI Booklet">
               <tc:assessmentItemRef tc:identifier="unit-reading" tc:title="Reading Unit" />
               <tc:assessmentItemRef tc:identifierref="unit-listening" tc:title="Listening Unit" />
+              <item-ref identifier="unit-speaking">
+                <title>Speaking Unit</title>
+              </item-ref>
               <item-ref identifier="unit-writing" title="Writing Unit" />
             </tc:assessmentTest>
           </tc:test>
@@ -4362,6 +4365,7 @@ test("source document import accepts testcenter-style XML aliases", async () => 
           unitEntries: [
             { unitKey: "unit-reading", displayLabel: "Reading Unit" },
             { unitKey: "unit-listening", displayLabel: "Listening Unit" },
+            { unitKey: "unit-speaking", displayLabel: "Speaking Unit" },
             { unitKey: "unit-writing", displayLabel: "Writing Unit" }
           ]
         }

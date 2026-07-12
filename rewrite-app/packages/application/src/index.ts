@@ -3216,7 +3216,15 @@ const collectXmlBookletEntries = (
             "title",
             "name",
             "displayName"
-          ) ?? ""
+          ) ??
+            readXmlChildText(
+              unitContent,
+              "title",
+              "label",
+              "name",
+              "displayName"
+            ) ??
+            ""
         ).trim(),
         ...(description ? { description } : {}),
         ...(content ? { content } : {})
