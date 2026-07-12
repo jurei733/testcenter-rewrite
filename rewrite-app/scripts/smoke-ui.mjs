@@ -9,6 +9,13 @@ import { chromium } from "playwright";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
+const busyStartTimeoutMs = Number.parseInt(
+  process.env.UI_SMOKE_BUSY_START_TIMEOUT_MS ?? "750",
+  10
+);
+const logBusyStartTimeouts = ["1", "true", "yes", "on"].includes(
+  String(process.env.UI_SMOKE_LOG_BUSY_START_TIMEOUTS ?? "").toLowerCase()
+);
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
@@ -188,6 +195,9 @@ try {
 
     totalApiRequestCount += 1;
   });
+  if (!Number.isFinite(busyStartTimeoutMs) || busyStartTimeoutMs < 0) {
+    throw new Error("UI_SMOKE_BUSY_START_TIMEOUT_MS must be a non-negative integer.");
+  }
   const fillAndCommit = async (selector, value) => {
     const locator = page.locator(selector);
     await locator.waitFor({ state: "attached" });
@@ -292,10 +302,14 @@ try {
           return root != null && root.classList.contains("is-busy");
         },
         undefined,
-        { timeout: 5_000 }
+        { timeout: busyStartTimeoutMs }
       );
       return true;
     } catch {
+      if (!logBusyStartTimeouts) {
+        return false;
+      }
+
       const statusBanner = await page
         .locator(".status-banner")
         .textContent()
