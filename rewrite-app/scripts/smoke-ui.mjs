@@ -1013,8 +1013,10 @@ try {
 	  const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
   const participantRouteBookletKey = "booklet:starter";
+  const participantRouteFirstUnitKey = "unit-1";
   const participantRouteUnitKey = "unit-participant-route";
   const participantRouteNextUnitKey = "unit-paused";
+  const participantRouteFirstUnitResponse = "Final unit response before complete";
   const participantRouteUnitResponse = "Prefilled participant route response";
   const participantRouteNextUnitResponse = "Second unit participant response";
   await page.goto(
@@ -1280,11 +1282,21 @@ try {
     participantRouteSessionId,
     "UI smoke expected participant re-entry to reuse the open session."
   );
-  const participantIncompleteCompleteDialog = acceptNextDialog(
-    /Complete this test with 1 unit without a saved response\./
+  logStep("participant-route-complete-autosaves-current-draft");
+  await clickAction("Previous Unit");
+  await page.waitForFunction(
+    ([expectedUnitKey]) =>
+      document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
+        expectedUnitKey &&
+      document.querySelector("#participantRouteUnitResponse")?.value === "",
+    [participantRouteFirstUnitKey],
+    { timeout: 15_000 }
+  );
+  await fillAndCommit(
+    "#participantRouteUnitResponse",
+    participantRouteFirstUnitResponse
   );
   await clickAction("Complete Test");
-  await participantIncompleteCompleteDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
@@ -1295,7 +1307,10 @@ try {
       payload.currentRunState != null &&
       typeof payload.currentRunState.testRun === "object" &&
       payload.currentRunState.testRun != null &&
-      payload.currentRunState.testRun.status === "completed"
+      payload.currentRunState.testRun.status === "completed" &&
+      payload.currentRunState.testRun.unitResponses?.[
+        participantRouteFirstUnitKey
+      ] === participantRouteFirstUnitResponse
   );
   await page.waitForFunction(
     () =>
@@ -1304,9 +1319,9 @@ try {
       document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
         "completed" &&
       document.querySelector("#participantRouteProgressLabel")?.textContent?.trim() ===
-        "2 / 3 responses saved" &&
+        "3 / 3 responses saved" &&
       document.querySelector("#participantRouteMissingLabel")?.textContent?.trim() ===
-        "1 unit without a saved response." &&
+        "All units have a saved response." &&
       document
         .querySelector("#participantRouteCompletionLabel")
         ?.textContent?.includes("Completed"),
@@ -1847,7 +1862,7 @@ try {
               displayName: "Xml Entry"
             }
           ]) &&
-        missingResponseCount === 9 &&
+        missingResponseCount === 8 &&
         Array.isArray(summary.groups) &&
         summary.groups.length === 5 &&
         pausedWorkUnit?.rosterExpectedCount === 1 &&
@@ -1954,7 +1969,7 @@ try {
     .filter({ hasText: "3 run(s)" })
     .filter({ hasText: "5 group(s)" })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "9 missing response(s)" })
+    .filter({ hasText: "8 missing response(s)" })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })

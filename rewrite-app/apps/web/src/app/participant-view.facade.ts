@@ -400,12 +400,13 @@ export class ParticipantViewFacade {
 
   completeRun(): void {
     const player = this.player;
+    const effectiveCompletionState = this.getEffectiveCompletionState(player);
     if (
       player.canComplete &&
       !player.isComplete &&
-      player.progressPercent < 100 &&
+      effectiveCompletionState.progressPercent < 100 &&
       !globalThis.window?.confirm(
-        `Complete this test with ${player.missingResponseLabel.toLowerCase()}`
+        `Complete this test with ${effectiveCompletionState.missingResponseLabel.toLowerCase()}`
       )
     ) {
       return;
@@ -533,6 +534,8 @@ export class ParticipantViewFacade {
   }
 
   private async completeRunInternal(): Promise<void> {
+    await this.saveCurrentDraftBeforeCompleteInternal();
+
     const payload = await this.requestState.request<{
       testRun: {
         testRunId: string;
@@ -555,6 +558,24 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+  }
+
+  private async saveCurrentDraftBeforeCompleteInternal(): Promise<void> {
+    const player = this.player;
+    const currentUnitKey = this.runtime.currentUnitKey.trim();
+    if (
+      !player.canSaveProgress ||
+      !this.runtime.testRunId.trim() ||
+      !currentUnitKey
+    ) {
+      return;
+    }
+
+    await this.saveProgressInternal(
+      player.runStatus === "paused" ? "paused" : "running",
+      currentUnitKey,
+      this.runtime.currentUnitResponse
+    );
   }
 
   private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {
@@ -624,6 +645,38 @@ export class ParticipantViewFacade {
       currentState.testRun.unitResponses,
       unitKey
     );
+  }
+
+  private getEffectiveCompletionState(player: ParticipantPlayerState): {
+    progressPercent: number;
+    missingResponseLabel: string;
+  } {
+    const currentState = this.readCurrentRunState();
+    const currentUnitKey = this.runtime.currentUnitKey.trim();
+    const draftAddsCurrentResponse =
+      currentState != null &&
+      currentUnitKey.length > 0 &&
+      this.runtime.currentUnitResponse.length > 0 &&
+      !this.hasSavedResponse(currentState, currentUnitKey);
+    if (!draftAddsCurrentResponse || player.unitItems.length === 0) {
+      return {
+        progressPercent: player.progressPercent,
+        missingResponseLabel: player.missingResponseLabel
+      };
+    }
+
+    const answeredUnitCount =
+      player.unitItems.filter(unit => unit.hasResponse).length + 1;
+    const totalUnitCount = player.unitItems.length;
+    const missingUnitCount = Math.max(totalUnitCount - answeredUnitCount, 0);
+
+    return {
+      progressPercent: Math.round((answeredUnitCount / totalUnitCount) * 100),
+      missingResponseLabel:
+        missingUnitCount === 0
+          ? "All units have a saved response."
+          : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
+    };
   }
 
   private readCurrentRunState():
