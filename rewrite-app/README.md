@@ -390,12 +390,13 @@ For browser-level frontend verification, run:
 
 ```bash
 npm run install:browsers
+npm run smoke:ui:content
 npm run smoke:ui
 npm run smoke:ui:operator-auth
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:ui:postgres
 ```
 
-The SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
+The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
@@ -462,7 +463,7 @@ For runtime probes:
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
-  - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
+  - SQLite startup, shutdown, fast content-browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
   - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks

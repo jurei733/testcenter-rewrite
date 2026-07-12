@@ -175,8 +175,30 @@ jobs:
         run: npm run smoke:ui:postgres:built
 
   sqlite-smoke:
-    name: SQLite smoke tests
+    name: SQLite smoke (${{ matrix.smoke }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - smoke: startup
+            command: npm run smoke:startup:sqlite
+            playwright: false
+          - smoke: shutdown
+            command: npm run smoke:shutdown:sqlite
+            playwright: false
+          - smoke: ui-content
+            command: npm run smoke:ui:content
+            playwright: true
+          - smoke: ui-full
+            command: npm run smoke:ui
+            playwright: true
+          - smoke: ui-operator-auth
+            command: npm run smoke:ui:operator-auth
+            playwright: true
+          - smoke: local-demo
+            command: npm run smoke:local-demo
+            playwright: false
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -191,22 +213,11 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
+        if: ${{ matrix.playwright }}
         run: npm run install:browsers
 
-      - name: Startup smoke
-        run: npm run smoke:startup:sqlite
-
-      - name: Shutdown smoke
-        run: npm run smoke:shutdown:sqlite
-
-      - name: UI smoke
-        run: npm run smoke:ui
-
-      - name: Protected operator UI smoke
-        run: npm run smoke:ui:operator-auth
-
-      - name: Local demo smoke
-        run: npm run smoke:local-demo
+      - name: Run SQLite smoke
+        run: ${{ matrix.command }}
 
   compose-postgres-smoke:
     name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
