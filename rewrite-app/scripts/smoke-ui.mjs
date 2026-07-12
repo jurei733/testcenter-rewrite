@@ -1823,6 +1823,20 @@ try {
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "not_started_participant" })
     .waitFor();
+  const participantMatrixDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Participant Matrix CSV");
+  const participantMatrixDownload = await participantMatrixDownloadPromise;
+  assert.equal(
+    participantMatrixDownload.suggestedFilename(),
+    `${workspaceKey}-study-monitor-participants.csv`
+  );
+  await page
+    .locator("#studyMonitorParticipantMatrixExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,generatedAt,loginKey" })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "running" })
+    .waitFor();
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })

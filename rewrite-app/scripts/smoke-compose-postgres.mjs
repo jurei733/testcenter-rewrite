@@ -313,6 +313,36 @@ const verifyBootstrappedDemo = async baseUrl => {
     );
   }
 
+  const participantMatrixCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor-participants.csv`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual("demo participant matrix CSV status", participantMatrixCsv.status, 200);
+  expectEqual(
+    "demo participant matrix CSV content-type",
+    participantMatrixCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const participantMatrixCsvText = await participantMatrixCsv.text();
+  if (
+    !participantMatrixCsvText.startsWith(
+      "tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,"
+    ) ||
+    !participantMatrixCsvText.includes('"student-demo"') ||
+    !participantMatrixCsvText.includes('"group:student-demo"') ||
+    !participantMatrixCsvText.includes('"booklet:demo"') ||
+    !participantMatrixCsvText.includes('"unit-intro"') ||
+    !participantMatrixCsvText.includes('"running"')
+  ) {
+    throw new Error(
+      "Expected demo participant matrix CSV to contain student-demo unit context."
+    );
+  }
+
   const openRunsCsv = await fetch(
     `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/open-runs.csv`,
     {

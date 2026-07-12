@@ -81,6 +81,10 @@ export class WorkspaceViewFacade {
     return this.uiState.workspace.studyMonitorExportView;
   }
 
+  get studyMonitorParticipantMatrixExportView(): string {
+    return this.uiState.workspace.studyMonitorParticipantMatrixExportView;
+  }
+
   get studyMonitorItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
@@ -1362,6 +1366,12 @@ export class WorkspaceViewFacade {
 
   exportStudyMonitorCsv(): void {
     this.viewState.onActionAsync(() => this.workspaceService.exportStudyMonitorCsv());
+  }
+
+  exportStudyMonitorParticipantMatrixCsv(): void {
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportStudyMonitorParticipantMatrixCsv()
+    );
   }
 
   selectTenant(item: RecordCollectionItem): void {

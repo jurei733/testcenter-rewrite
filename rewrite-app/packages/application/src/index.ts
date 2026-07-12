@@ -49,6 +49,7 @@ import type {
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
   WorkspaceStudyMonitorGroupDetail,
+  WorkspaceStudyMonitorParticipantMatrix,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorUnitProgress,
   WorkspaceStudyMonitorSummary,
@@ -135,6 +136,10 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
   }): Promise<string>;
   exportStudyMonitorCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
+  exportStudyMonitorParticipantMatrixCsv(input: {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<string>;
@@ -495,6 +500,7 @@ export const firstSliceUseCases = {
   listWorkspaceActivityEvents: "ListWorkspaceActivityEvents",
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
+  exportStudyMonitorParticipantMatrixCsv: "ExportStudyMonitorParticipantMatrixCsv",
   exportOpenRunsCsv: "ExportOpenRunsCsv",
   exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
@@ -1868,6 +1874,61 @@ const formatStudyMonitorCsv = (
                     : String(row[column])
           )
         )
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatStudyMonitorParticipantMatrixCsv = (
+  matrix: WorkspaceStudyMonitorParticipantMatrix
+): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "generatedAt",
+    "loginKey",
+    "groupKey",
+    "displayName",
+    "rosterBookletKey",
+    "participantSessionId",
+    "participantSessionStatus",
+    "testRunId",
+    "testRunStatus",
+    "bookletKey",
+    "unitKey",
+    "unitLabel",
+    "expected",
+    "answered",
+    "responseLength",
+    "reviewCount",
+    "latestActivityAt"
+  ];
+
+  return [
+    header.join(","),
+    ...matrix.rows.map(row =>
+      [
+        row.tenantKey,
+        row.workspaceKey,
+        matrix.generatedAt,
+        row.loginKey,
+        row.groupKey,
+        row.displayName ?? "",
+        row.rosterBookletKey ?? "",
+        row.participantSessionId ?? "",
+        row.participantSessionStatus,
+        row.testRunId ?? "",
+        row.testRunStatus,
+        row.bookletKey ?? "",
+        row.unitKey,
+        row.unitLabel,
+        String(row.expected),
+        String(row.answered),
+        String(row.responseLength),
+        String(row.reviewCount),
+        row.latestActivityAt ?? ""
+      ]
+        .map(escapeCsvCell)
         .join(",")
     )
   ].join("\n") + "\n";
@@ -4002,6 +4063,182 @@ const buildStudyMonitorSummary = (input: {
   };
 };
 
+const buildStudyMonitorParticipantMatrix = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorParticipantMatrix => {
+  const latestRunsBySessionId = getLatestTestRunByParticipantSessionId(input.testRuns);
+  const rosterEntriesByLoginKey = new Map(
+    input.participantRosterEntries.map(rosterEntry => [
+      rosterEntry.loginKey,
+      rosterEntry
+    ])
+  );
+  const contentReleasesById = new Map(
+    input.contentReleases.map(contentRelease => [
+      contentRelease.contentReleaseId,
+      contentRelease
+    ])
+  );
+  const reviewsByRunAndUnit = new Map<string, number>();
+  for (const review of input.reviews) {
+    const key = `${review.testRunId}\u0000${review.unitKey ?? ""}`;
+    reviewsByRunAndUnit.set(key, (reviewsByRunAndUnit.get(key) ?? 0) + 1);
+  }
+
+  const findBooklet = (
+    bookletKey: string | null | undefined,
+    preferredContentRelease?: ContentRelease | null
+  ): ContentReleaseRuntimeSnapshot["bookletEntries"][number] | null => {
+    const normalizedBookletKey = bookletKey?.trim();
+    if (!normalizedBookletKey) {
+      return null;
+    }
+
+    return (
+      preferredContentRelease?.runtimeSnapshot.bookletEntries.find(
+        bookletEntry => bookletEntry.bookletKey === normalizedBookletKey
+      ) ??
+      input.contentReleases
+        .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+        .find(bookletEntry => bookletEntry.bookletKey === normalizedBookletKey) ??
+      null
+    );
+  };
+
+  const createRows = (inputRow: {
+    loginKey: string;
+    groupKey: string;
+    displayName: string | null;
+    rosterBookletKey: string | null;
+    participantSession: ParticipantSession | null;
+    testRun: TestRun | null;
+    booklet: ContentReleaseRuntimeSnapshot["bookletEntries"][number] | null;
+    latestActivityAt: string | null;
+  }): WorkspaceStudyMonitorParticipantMatrix["rows"] => {
+    const expectedUnits = inputRow.booklet?.unitEntries ?? [];
+    const responseUnitKeys = Object.keys(inputRow.testRun?.unitResponses ?? {});
+    const unitEntries =
+      expectedUnits.length > 0
+        ? expectedUnits
+        : responseUnitKeys.map(unitKey => ({
+            unitKey,
+            displayLabel: unitKey
+          }));
+    const expectedUnitKeys = new Set(expectedUnits.map(unit => unit.unitKey));
+    const units =
+      unitEntries.length > 0
+        ? unitEntries
+        : [
+            {
+              unitKey: "",
+              displayLabel: ""
+            }
+          ];
+
+    return units.map(unit => {
+      const response =
+        inputRow.testRun?.unitResponses[unit.unitKey] ?? null;
+      const reviewCount = inputRow.testRun
+        ? reviewsByRunAndUnit.get(`${inputRow.testRun.testRunId}\u0000${unit.unitKey}`) ??
+          0
+        : 0;
+
+      return {
+        tenantKey: input.tenantKey,
+        workspaceKey: input.workspaceKey,
+        loginKey: inputRow.loginKey,
+        groupKey: inputRow.groupKey,
+        displayName: inputRow.displayName,
+        rosterBookletKey: inputRow.rosterBookletKey,
+        participantSessionId:
+          inputRow.participantSession?.participantSessionId ?? null,
+        participantSessionStatus:
+          inputRow.participantSession?.status ?? "not_started",
+        testRunId: inputRow.testRun?.testRunId ?? null,
+        testRunStatus: inputRow.testRun?.status ?? "not_started",
+        bookletKey:
+          inputRow.testRun?.bookletKey ??
+          inputRow.rosterBookletKey ??
+          inputRow.booklet?.bookletKey ??
+          null,
+        unitKey: unit.unitKey,
+        unitLabel: unit.displayLabel,
+        expected:
+          expectedUnitKeys.size === 0 ? inputRow.booklet == null : expectedUnitKeys.has(unit.unitKey),
+        answered: response != null,
+        responseLength: response?.length ?? 0,
+        reviewCount,
+        latestActivityAt: inputRow.latestActivityAt
+      };
+    });
+  };
+
+  const sessionRows = input.participantSessions.flatMap(participantSession => {
+    const rosterEntry = rosterEntriesByLoginKey.get(participantSession.loginKey) ?? null;
+    const latestRun =
+      latestRunsBySessionId.get(participantSession.participantSessionId) ?? null;
+    const contentRelease =
+      (latestRun ? contentReleasesById.get(latestRun.contentReleaseId) : null) ??
+      contentReleasesById.get(participantSession.contentReleaseId) ??
+      null;
+    const booklet = findBooklet(
+      latestRun?.bookletKey ?? rosterEntry?.bookletKey,
+      contentRelease
+    );
+
+    return createRows({
+      loginKey: participantSession.loginKey,
+      groupKey: participantSession.groupKey,
+      displayName: rosterEntry?.displayName ?? null,
+      rosterBookletKey: rosterEntry?.bookletKey ?? null,
+      participantSession,
+      testRun: latestRun,
+      booklet,
+      latestActivityAt: latestRun?.updatedAt ?? participantSession.createdAt
+    });
+  });
+  const sessionLoginKeys = new Set(
+    input.participantSessions.map(participantSession => participantSession.loginKey)
+  );
+  const rosterOnlyRows = input.participantRosterEntries
+    .filter(rosterEntry => !sessionLoginKeys.has(rosterEntry.loginKey))
+    .flatMap(rosterEntry => {
+      const booklet = findBooklet(rosterEntry.bookletKey, null);
+      return createRows({
+        loginKey: rosterEntry.loginKey,
+        groupKey: rosterEntry.groupKey,
+        displayName: rosterEntry.displayName,
+        rosterBookletKey: rosterEntry.bookletKey,
+        participantSession: null,
+        testRun: null,
+        booklet,
+        latestActivityAt: rosterEntry.importedAt
+      });
+    });
+
+  const rows = [...sessionRows, ...rosterOnlyRows].sort(
+    (left, right) =>
+      left.groupKey.localeCompare(right.groupKey) ||
+      left.loginKey.localeCompare(right.loginKey) ||
+      (left.bookletKey ?? "").localeCompare(right.bookletKey ?? "") ||
+      left.unitKey.localeCompare(right.unitKey)
+  );
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    generatedAt: input.generatedAt,
+    rows
+  };
+};
+
 const buildStudyMonitorGroupDetail = (input: {
   tenantKey: string;
   workspaceKey: string;
@@ -5570,6 +5807,54 @@ export const createFirstSliceServices = (
         const summary = await this.getStudyMonitorSummary(input);
 
         return formatStudyMonitorCsv(summary);
+      },
+      async exportStudyMonitorParticipantMatrixCsv(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const matrix = buildStudyMonitorParticipantMatrix({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          generatedAt: now(),
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+
+        return formatStudyMonitorParticipantMatrixCsv(matrix);
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(

@@ -428,6 +428,28 @@ try {
   assert.equal(demoGroup?.testRunCount ?? 0, 0);
   assert.equal(demoGroup?.responseCount ?? 0, 0);
 
+  const participantMatrixDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Participant Matrix CSV" }).click();
+  const participantMatrixDownload = await participantMatrixDownloadPromise;
+  assert.equal(
+    participantMatrixDownload.suggestedFilename(),
+    "demo-workspace-study-monitor-participants.csv"
+  );
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#studyMonitorParticipantMatrixExportPreview")
+        ?.textContent?.includes("student-demo") &&
+      document
+        .querySelector("#studyMonitorParticipantMatrixExportPreview")
+        ?.textContent?.includes("unit-intro") &&
+      document
+        .querySelector("#studyMonitorParticipantMatrixExportPreview")
+        ?.textContent?.includes("not_started"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   const logDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Workspace Logs CSV" }).click();
   const logDownload = await logDownloadPromise;

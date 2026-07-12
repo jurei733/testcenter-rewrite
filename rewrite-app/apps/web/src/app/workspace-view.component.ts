@@ -70,6 +70,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
           <button class="ghost" type="button" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
+          <button class="ghost" type="button" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
           <button class="ghost" type="button" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
         </div>
       </article>
@@ -266,6 +267,12 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         <pre id="studyMonitorExportPreview">{{ view.studyMonitorExportView }}</pre>
       </article>
 
+      <article class="card">
+        <h2>Participant Matrix CSV Export</h2>
+        <p>Participant-by-unit monitor export with run status, response coverage, and review counts.</p>
+        <pre id="studyMonitorParticipantMatrixExportPreview">{{ view.studyMonitorParticipantMatrixExportView }}</pre>
+      </article>
+
       <app-json-panel
         title="Workspace Overview"
         subtitle="Read Model"
@@ -320,6 +327,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Operator Monitor CSV"
         viewId="studyMonitorExportView"
         [content]="view.studyMonitorExportView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Participant Matrix CSV Export"
+        subtitle="Participant Unit Matrix"
+        viewId="studyMonitorParticipantMatrixExportView"
+        [content]="view.studyMonitorParticipantMatrixExportView"
       ></app-json-panel>
     </div>
   `

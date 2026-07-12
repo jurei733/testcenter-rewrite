@@ -255,6 +255,34 @@ export class RewriteAppWorkspaceService {
     return csv;
   }
 
+  async exportStudyMonitorParticipantMatrixCsv(): Promise<string> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Study Monitor Participant Matrix CSV Export",
+      "GET",
+      resolveRoutePath(
+        productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv,
+        {
+          tenantKey,
+          workspaceKey
+        }
+      )
+    );
+
+    this.workspaceState.studyMonitorParticipantMatrixExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-study-monitor-participants.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Participant Matrix Exported",
+      `CSV participant monitor matrix loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async bootstrapWorkspaceFlow(): Promise<void> {
     await runBootstrapWorkspaceFlow(createBootstrapWorkspaceFlowHost({
       createTenant: () => this.createTenant(),

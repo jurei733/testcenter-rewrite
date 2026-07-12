@@ -1251,6 +1251,18 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedStudyMonitorCsv.status, 401);
     assert.equal(rejectedStudyMonitorCsv.body.error, "admin_session_missing");
 
+    const rejectedStudyMonitorParticipantMatrixCsv =
+      await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/study-monitor-participants.csv"
+      );
+
+    assert.equal(rejectedStudyMonitorParticipantMatrixCsv.status, 401);
+    assert.equal(
+      rejectedStudyMonitorParticipantMatrixCsv.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedOpenRunsCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/open-runs.csv"
@@ -2258,6 +2270,34 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(
       studyMonitorCsv.body,
       /"demo-tenant","demo-workspace","booklet","booklet:demo","Demo Booklet","","booklet:demo"/
+    );
+
+    const studyMonitorParticipantMatrixCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor-participants.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(studyMonitorParticipantMatrixCsv.status, 200);
+    assert.equal(
+      studyMonitorParticipantMatrixCsv.contentType,
+      "text/csv; charset=utf-8"
+    );
+    assert.match(
+      studyMonitorParticipantMatrixCsv.body,
+      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
+    );
+    assert.match(
+      studyMonitorParticipantMatrixCsv.body,
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-intro","Introduction","true","true","[^"]+","0","[^"]+"/
+    );
+    assert.match(
+      studyMonitorParticipantMatrixCsv.body,
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-finish","Finish","true","false","0","0","[^"]+"/
     );
 
     const openRunsCsv = await requestTextAt(
@@ -6156,6 +6196,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportParticipantSessionsCsv: string;
         listDetailedResponses: string;
         exportStudyMonitorCsv: string;
+        exportStudyMonitorParticipantMatrixCsv: string;
         exportOpenRunsCsv: string;
         exportResponseCsv: string;
         exportLogCsv: string;
@@ -6204,6 +6245,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "review_csv_export",
     "log_csv_export",
     "study_monitor_csv_export",
+    "study_monitor_participant_matrix_csv_export",
     "result_deletion",
     "study_monitor_read",
     "monitor_open_runs_csv_export",
@@ -6228,6 +6270,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);
+  assert.match(
+    manifest.routes.workspace.exportStudyMonitorParticipantMatrixCsv,
+    /study-monitor-participants\.csv/
+  );
   assert.match(manifest.routes.workspace.exportOpenRunsCsv, /open-runs\.csv/);
   assert.match(manifest.routes.workspace.exportResponseCsv, /responses\.csv/);
   assert.match(manifest.routes.workspace.exportLogCsv, /logs\.csv/);

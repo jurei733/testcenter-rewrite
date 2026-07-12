@@ -439,6 +439,34 @@ export type WorkspaceStudyMonitorBookletRun = {
   reviewCount: number;
 };
 
+export type WorkspaceStudyMonitorParticipantMatrixRow = {
+  tenantKey: string;
+  workspaceKey: string;
+  loginKey: string;
+  groupKey: string;
+  displayName: string | null;
+  rosterBookletKey: string | null;
+  participantSessionId: string | null;
+  participantSessionStatus: ParticipantSessionStatus | "not_started";
+  testRunId: string | null;
+  testRunStatus: TestRunStatus | "not_started";
+  bookletKey: string | null;
+  unitKey: string;
+  unitLabel: string;
+  expected: boolean;
+  answered: boolean;
+  responseLength: number;
+  reviewCount: number;
+  latestActivityAt: string | null;
+};
+
+export type WorkspaceStudyMonitorParticipantMatrix = {
+  tenantKey: string;
+  workspaceKey: string;
+  generatedAt: string;
+  rows: WorkspaceStudyMonitorParticipantMatrixRow[];
+};
+
 export type WorkspaceStudyMonitorGroupDetail = {
   tenantKey: string;
   workspaceKey: string;
@@ -682,6 +710,7 @@ export type FirstSliceCapability =
   | "review_csv_export"
   | "log_csv_export"
   | "study_monitor_csv_export"
+  | "study_monitor_participant_matrix_csv_export"
   | "result_deletion"
   | "study_monitor_read"
   | "monitor_open_runs_csv_export"
@@ -730,6 +759,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "review_csv_export",
   "log_csv_export",
   "study_monitor_csv_export",
+  "study_monitor_participant_matrix_csv_export",
   "result_deletion",
   "study_monitor_read",
   "monitor_open_runs_csv_export",
