@@ -3362,6 +3362,22 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
     assert.equal(completeCommand.body.command.participantSession.status, "closed");
 
+    const repeatCommand = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "resume",
+          actorId: "operator-demo"
+        }
+      }
+    );
+
+    assert.equal(repeatCommand.status, 409);
+    assert.equal(repeatCommand.body.error, "test_run_already_completed");
+
     const openRunsAfterComplete = await requestJsonAt<{
       items: Array<{ testRunId: string; status: string; loginKey: string }>;
     }>(
