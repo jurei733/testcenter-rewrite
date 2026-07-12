@@ -74,6 +74,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
           <button class="ghost" type="button" (click)="view.issueMonitorPause()">Monitor Pause</button>
           <button class="ghost" type="button" (click)="view.issueMonitorResume()">Monitor Resume</button>
+          <button class="ghost" type="button" (click)="view.issueMonitorComplete()">Monitor Complete</button>
           <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
           <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
           <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>

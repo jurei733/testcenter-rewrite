@@ -91,7 +91,9 @@ export class RewriteAppRuntimeService {
     );
   }
 
-  async issueMonitorRunCommand(commandType: "pause" | "resume"): Promise<void> {
+  async issueMonitorRunCommand(
+    commandType: "pause" | "resume" | "complete"
+  ): Promise<void> {
     await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
@@ -99,7 +101,11 @@ export class RewriteAppRuntimeService {
       commandType
     );
     this.feedback.rememberActivity(
-      commandType === "pause" ? "Monitor Pause Issued" : "Monitor Resume Issued",
+      commandType === "pause"
+        ? "Monitor Pause Issued"
+        : commandType === "resume"
+          ? "Monitor Resume Issued"
+          : "Monitor Complete Issued",
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );
   }

@@ -8,6 +8,8 @@ let server: Awaited<ReturnType<typeof createProductionApiServer>>;
 
 let baseUrl = "";
 
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
 type JsonResponse<T> = {
   status: number;
   body: T;
@@ -3336,6 +3338,46 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(resumeCommand.body.command.previousStatus, "paused");
     assert.equal(resumeCommand.body.command.testRun.status, "running");
 
+    const completeCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousStatus: string;
+        testRun: { status: string; currentUnitKey: string | null; completedAt: string | null };
+        participantSession: { status: string };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "complete",
+        actorId: "operator-demo"
+      }
+    });
+
+    assert.equal(completeCommand.status, 200);
+    assert.equal(completeCommand.body.command.commandType, "complete");
+    assert.equal(completeCommand.body.command.previousStatus, "running");
+    assert.equal(completeCommand.body.command.testRun.status, "completed");
+    assert.equal(completeCommand.body.command.testRun.currentUnitKey, null);
+    assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
+    assert.equal(completeCommand.body.command.participantSession.status, "closed");
+
+    const openRunsAfterComplete = await requestJsonAt<{
+      items: Array<{ testRunId: string; status: string; loginKey: string }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs",
+      { headers: { authorization } }
+    );
+
+    assert.equal(openRunsAfterComplete.status, 200);
+    assert.equal(
+      openRunsAfterComplete.body.items.some(
+        item => item.testRunId === resumed.body.testRun.testRunId
+      ),
+      false
+    );
+
     const commandActivity = await requestJsonAt<{
       items: Array<{
         activityEvent: {
@@ -3347,29 +3389,34 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             commandType?: string;
             previousStatus?: string;
             nextStatus?: string;
+            completedAt?: string | null;
             loginKey?: string;
           };
         };
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=2",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=3",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
-    assert.equal(commandActivity.body.items.length, 2);
+    assert.equal(commandActivity.body.items.length, 3);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
-      ["resume", "pause"]
+      ["complete", "resume", "pause"]
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
     assert.equal(
       commandActivity.body.items[0]?.activityEvent.subjectId,
       resumed.body.testRun.testRunId
     );
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "paused");
-    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "running");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "running");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "completed");
+    assert.match(
+      String(commandActivity.body.items[0]?.activityEvent.details.completedAt ?? ""),
+      ISO_DATE_REGEX
+    );
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.loginKey, "student-demo");
   } finally {
     await closeServer(isolated.server);

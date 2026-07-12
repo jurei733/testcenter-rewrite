@@ -334,7 +334,7 @@ The added read side now makes the first slice inspectable:
 - imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
 - guarded activation now returns explicit blocking details for open runs on the currently active release, so operators and the shell can see why a release switch was rejected
 - runtime now supports `running -> paused -> running -> completed` on test-runs
-- monitor controls let authorized operators pause or resume an open run from the operator shell, persist a `monitor_run_command_issued` workspace activity event, and keep the open-run/read-model state in sync
+- monitor controls let authorized operators pause, resume, or complete an open run from the operator shell, persist a `monitor_run_command_issued` workspace activity event, and keep the open-run/read-model state in sync
 - completed test-runs now leave the monitor queue and persist their completion timestamp
 
 ## Frontend Shell
@@ -482,4 +482,4 @@ It is still intentionally lightweight:
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/assessment-section/unit/resource/file/item-ref aliases, and flat or nested Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
-- monitor reads now include workspace summary, group drill-down, participant drill-down, booklet drill-down, unit drill-down, unit-progress coverage, participant-by-unit matrix export, saved-roster expected/not-started participants, CSV exports, open-run blockers, and open-run pause/resume controls, but still do not cover every original Testcenter monitor view
+- monitor reads now include workspace summary, group drill-down, participant drill-down, booklet drill-down, unit drill-down, unit-progress coverage, participant-by-unit matrix export, saved-roster expected/not-started participants, CSV exports, open-run blockers, and open-run pause/resume/complete controls, but still do not cover every original Testcenter monitor view

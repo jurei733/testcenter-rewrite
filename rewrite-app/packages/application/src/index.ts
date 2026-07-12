@@ -791,7 +791,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause' or 'resume'."
+      "Monitor run command type must be 'pause', 'resume', or 'complete'."
     );
   }
 
@@ -8050,20 +8050,42 @@ export const createFirstSliceServices = (
           repository,
           testRun.participantSessionId
         );
-        const nextStatus: TestRunStatus =
-          commandType === "pause" ? "paused" : "running";
         const issuedAt = now();
+        const nextStatus: TestRunStatus =
+          commandType === "pause"
+            ? "paused"
+            : commandType === "resume"
+              ? "running"
+              : "completed";
         const nextTestRun: TestRun =
-          testRun.status === nextStatus
-            ? testRun
-            : {
+          commandType === "complete"
+            ? {
                 ...testRun,
-                status: nextStatus,
-                updatedAt: issuedAt
-              };
+                status: "completed",
+                currentUnitKey: null,
+                updatedAt: issuedAt,
+                completedAt: issuedAt
+              }
+            : testRun.status === nextStatus
+              ? testRun
+              : {
+                  ...testRun,
+                  status: nextStatus,
+                  updatedAt: issuedAt
+                };
+        const nextParticipantSession =
+          commandType === "complete" && participantSession.status !== "closed"
+            ? {
+                ...participantSession,
+                status: "closed" as const
+              }
+            : participantSession;
 
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
+        }
+        if (nextParticipantSession !== participantSession) {
+          await repository.saveParticipantSession(nextParticipantSession);
         }
 
         const commandId = idGenerator();
@@ -8080,6 +8102,7 @@ export const createFirstSliceServices = (
             commandType,
             previousStatus: testRun.status,
             nextStatus: nextTestRun.status,
+            completedAt: nextTestRun.completedAt ?? null,
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey
@@ -8093,7 +8116,7 @@ export const createFirstSliceServices = (
           issuedAt,
           previousStatus: testRun.status,
           testRun: nextTestRun,
-          participantSession
+          participantSession: nextParticipantSession
         };
       }
     }

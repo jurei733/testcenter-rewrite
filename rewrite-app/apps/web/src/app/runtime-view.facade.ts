@@ -1072,6 +1072,30 @@ export class RuntimeViewFacade {
           actionPayload: { runtimeCommand: "completeRun" }
         });
       }
+
+      if (["paused", "running"].includes(currentRunState.testRun.status)) {
+        items.push({
+          headline: "Monitor complete selected run",
+          subline: currentRunState.testRun.testRunId,
+          badges: [currentRunState.testRun.status, "monitor", "complete"],
+          rows: [
+            {
+              label: "Session",
+              value: currentRunState.participantSession.participantSessionId
+            },
+            {
+              label: "Current Unit",
+              value: currentUnitLabel
+            },
+            {
+              label: "Expected Result",
+              value: "Operator command closes the session and clears the monitor blocker"
+            }
+          ],
+          actionLabel: "Apply Suggestion",
+          actionPayload: { runtimeCommand: "monitorComplete" }
+        });
+      }
     }
 
     if (openRuns.length > 0) {
@@ -1324,6 +1348,12 @@ export class RuntimeViewFacade {
     );
   }
 
+  issueMonitorComplete(): void {
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("complete")
+    );
+  }
+
   openRuns(): void {
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
   }
@@ -1354,6 +1384,9 @@ export class RuntimeViewFacade {
         break;
       case "monitorResume":
         this.issueMonitorResume();
+        break;
+      case "monitorComplete":
+        this.issueMonitorComplete();
         break;
       case "refreshRuntimeReads":
       default:

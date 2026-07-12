@@ -2490,8 +2490,8 @@ try {
       payload.currentRunState.testRun.status === "running"
   );
   await fillAndCommit("#testRunId", pausedTestRunId);
-  logStep("complete-run");
-  await clickAction("Complete Run");
+  logStep("monitor-complete-run");
+  await clickAction("Monitor Complete");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -2514,6 +2514,14 @@ try {
       payload.runtimeState != null &&
       payload.runtimeState.runtimeStatus === "completed" &&
       payload.runtimeState.latestTestRun?.status === "completed"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.every(item => item?.testRunId !== pausedTestRunId)
   );
 
   logStep("force-activate-after-complete");

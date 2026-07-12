@@ -45,10 +45,11 @@ export const testRunStatuses = [
   "paused",
   "completed"
 ] as const satisfies readonly TestRunStatus[];
-export type MonitorRunCommandType = "pause" | "resume";
+export type MonitorRunCommandType = "pause" | "resume" | "complete";
 export const monitorRunCommandTypes = [
   "pause",
-  "resume"
+  "resume",
+  "complete"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
