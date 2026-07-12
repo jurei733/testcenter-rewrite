@@ -83,6 +83,31 @@ const requestTextAt = async (
   };
 };
 
+const assertPostgresLocationRedacted = (
+  label: string,
+  location: string | null
+): void => {
+  if (!location || !/^postgres(?:ql)?:\/\//.test(location)) {
+    return;
+  }
+
+  const source = process.env.FIRST_SLICE_POSTGRES_URL;
+  if (!source) {
+    return;
+  }
+
+  const sourceUrl = new URL(source);
+  const redactedUrl = new URL(location);
+
+  if (sourceUrl.username) {
+    assert.equal(redactedUrl.username, "REDACTED", `${label} must redact username.`);
+  }
+
+  if (sourceUrl.password) {
+    assert.equal(redactedUrl.password, "REDACTED", `${label} must redact password.`);
+  }
+};
+
 const closeServer = async (
   targetServer: Awaited<ReturnType<typeof createProductionApiServer>>
 ): Promise<void> => {
@@ -5664,6 +5689,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   };
 
   assert.equal(typeof diagnostics.storage.kind, "string");
+  assertPostgresLocationRedacted(
+    "diagnostics.storage.location",
+    diagnostics.storage.location
+  );
   assert.equal(Array.isArray(diagnostics.recentEvents), true);
   assert.equal(
     diagnostics.recentEvents.some(
@@ -5712,10 +5741,15 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     typeof config.runtimeConfig.environment.firstSlicePostgresUrlPresent,
     "boolean"
   );
+  assertPostgresLocationRedacted(
+    "runtimeConfig.storage.location",
+    config.runtimeConfig.storage.location
+  );
 
   const manifestResponse = await fetch(`${baseUrl}/manifest`);
   assert.equal(manifestResponse.status, 200);
   const manifest = (await manifestResponse.json()) as {
+    storage: { kind: string; location: string | null };
     capabilities: string[];
     routes: {
       workspace: {
@@ -5737,6 +5771,8 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       };
     };
   };
+
+  assertPostgresLocationRedacted("manifest.storage.location", manifest.storage.location);
 
   for (const capability of [
     "admin_user_directory",
