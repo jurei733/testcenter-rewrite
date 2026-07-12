@@ -1569,6 +1569,27 @@ try {
   await fillAndCommit("#reviewComment", "Filtered review smoke");
   logStep("create-filtered-review");
   await clickAction("Create Review");
+  const reviewActionQueue = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Review Action Queue", exact: true })
+  });
+  await reviewActionQueue
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Update selected review" })
+    })
+    .filter({ hasText: "Filtered review smoke" })
+    .waitFor();
+  await reviewActionQueue
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Delete selected review" })
+    })
+    .waitFor();
+  await clickCardAction(
+    "Review Action Queue",
+    "Apply Suggestion",
+    "Load reviews for selected scope"
+  );
   logStep("filter-reviews");
   await fillAndCommit("#reviewLoginFilter", participantLoginKey);
   await fillAndCommit("#reviewGroupFilter", participantGroupKey);

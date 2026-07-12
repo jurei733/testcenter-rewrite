@@ -649,6 +649,115 @@ export class RuntimeViewFacade {
     );
   }
 
+  get reviewActionItems(): RecordCollectionItem[] {
+    const reviewId = this.runtime.reviewId.trim();
+    const testRunId = this.runtime.testRunId.trim();
+    const participantSessionId = this.runtime.participantSessionId.trim();
+    const currentUnitKey = this.runtime.currentUnitKey.trim();
+    const reviewerId = this.runtime.reviewerId.trim();
+    const category = this.runtime.reviewCategory.trim();
+    const comment = this.runtime.reviewComment.trim();
+    const items: RecordCollectionItem[] = [];
+
+    if (testRunId && participantSessionId) {
+      items.push({
+        headline: "Create review for selected run",
+        subline: currentUnitKey || "whole run",
+        badges: ["review", "create", reviewerId || "no reviewer"],
+        rows: [
+          { label: "Run", value: testRunId },
+          { label: "Session", value: participantSessionId },
+          { label: "Reviewer", value: reviewerId || "enter reviewer id" },
+          { label: "Category", value: category || "enter category" },
+          {
+            label: "Comment",
+            value: comment ? this.formatResponsePreview(comment) : "enter comment"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { reviewCommand: "createReview" }
+      });
+    }
+
+    if (reviewId) {
+      items.push({
+        headline: "Update selected review",
+        subline: reviewId,
+        badges: ["review", "update", category || "no category"],
+        rows: [
+          { label: "Review", value: reviewId },
+          { label: "Run", value: testRunId || "unknown run" },
+          { label: "Reviewer", value: reviewerId || "unchanged reviewer" },
+          {
+            label: "Comment",
+            value: comment ? this.formatResponsePreview(comment) : "unchanged comment"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { reviewCommand: "updateReview" }
+      });
+      items.push({
+        headline: "Delete selected review",
+        subline: reviewId,
+        badges: ["review", "delete"],
+        rows: [
+          { label: "Review", value: reviewId },
+          { label: "Run", value: testRunId || "unknown run" },
+          {
+            label: "Expected Result",
+            value: "Remove the review and refresh review read models"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { reviewCommand: "deleteReview" }
+      });
+    }
+
+    if (
+      this.runtime.loginKey.trim() ||
+      this.runtime.groupKey.trim() ||
+      participantSessionId ||
+      testRunId ||
+      currentUnitKey ||
+      reviewerId ||
+      category
+    ) {
+      items.push({
+        headline: "Load reviews for selected scope",
+        subline: testRunId || participantSessionId || this.runtime.loginKey.trim(),
+        badges: ["review", "filter"],
+        rows: [
+          { label: "Login", value: this.runtime.loginKey.trim() || "any" },
+          { label: "Group", value: this.runtime.groupKey.trim() || "any" },
+          { label: "Run", value: testRunId || "any" },
+          { label: "Unit", value: currentUnitKey || "any" }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { reviewCommand: "loadSelectedScope" }
+      });
+    }
+
+    if (items.length === 0) {
+      items.push({
+        headline: "Select a runtime run before reviewing",
+        subline: "No active review scope",
+        badges: ["review", "needs run"],
+        rows: [
+          {
+            label: "Expected Input",
+            value: "Select a participant session and run, then add a review comment"
+          },
+          {
+            label: "Shortcut",
+            value: "Use Participant Sessions, Open Runs, or Detailed Responses"
+          }
+        ]
+      });
+    }
+
+    return items;
+  }
+
   get openRunItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView);
     return (
@@ -1183,6 +1292,26 @@ export class RuntimeViewFacade {
       case "refreshRuntimeReads":
       default:
         this.refreshRuntimeReads();
+        break;
+    }
+  }
+
+  runReviewSuggestion(item: RecordCollectionItem): void {
+    switch (item.actionPayload?.reviewCommand) {
+      case "createReview":
+        this.createReview();
+        break;
+      case "updateReview":
+        this.updateReview();
+        break;
+      case "deleteReview":
+        this.deleteReview();
+        break;
+      case "loadSelectedScope":
+        this.useSelectedRuntimeAsReviewFilters();
+        break;
+      default:
+        this.loadReviews();
         break;
     }
   }

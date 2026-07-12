@@ -299,6 +299,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Review Action Queue"
+        subtitle="Suggested review actions derived from the selected session, run, unit, and review form."
+        [items]="view.reviewActionItems"
+        (itemAction)="view.runReviewSuggestion($event)"
+        emptyState="Select a runtime run to derive review actions."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Unit Responses"
         subtitle="Saved participant responses for the selected run."
         [items]="view.unitResponseItems"
