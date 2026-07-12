@@ -389,6 +389,13 @@ For the full containerized release path, run:
 APP_BUILD_SHA=$(git rev-parse --short HEAD) npm run smoke:compose:postgres
 ```
 
+If another local API already uses port `4310`, run the compose smoke on an
+alternate host port:
+
+```bash
+REWRITE_APP_PORT=4311 APP_BUILD_SHA=$(git rev-parse --short HEAD) npm run smoke:compose:postgres
+```
+
 That verifies:
 
 - compose build

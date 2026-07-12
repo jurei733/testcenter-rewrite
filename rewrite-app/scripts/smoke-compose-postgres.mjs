@@ -22,6 +22,10 @@ const composeUpTimeoutMs = parsePositiveInteger(
   process.env.SMOKE_COMPOSE_UP_TIMEOUT_MS ?? "180000",
   "SMOKE_COMPOSE_UP_TIMEOUT_MS"
 );
+const rewriteAppPort = parsePositiveInteger(
+  process.env.REWRITE_APP_PORT ?? "4310",
+  "REWRITE_APP_PORT"
+);
 
 const run = (command, args, options = {}) =>
   new Promise((resolvePromise, reject) => {
@@ -273,10 +277,10 @@ const verifyBootstrappedDemo = async baseUrl => {
 
 try {
   const expectedSchemaVersion = await readExpectedPostgresSchemaVersion();
-  const baseUrl = "http://127.0.0.1:4310";
+  const baseUrl = `http://127.0.0.1:${rewriteAppPort}`;
 
   process.stdout.write(
-    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms bootstrapDemo=${bootstrapDemo}\n`
+    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms port=${rewriteAppPort} bootstrapDemo=${bootstrapDemo}\n`
   );
   await run("docker", [
     ...composeArgs,
@@ -289,7 +293,8 @@ try {
       APP_BUILD_SHA: buildSha,
       APP_BUILD_TIMESTAMP: buildTimestamp,
       FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
-      FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo
+      FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo,
+      REWRITE_APP_PORT: String(rewriteAppPort)
     },
     timeoutMs: composeUpTimeoutMs
   });
