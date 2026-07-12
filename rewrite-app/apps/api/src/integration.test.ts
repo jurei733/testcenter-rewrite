@@ -6051,6 +6051,163 @@ test("activation guard returns blocking open-run details", async () => {
   );
 });
 
+test("activation guard clears after monitor completes blocking run", async () => {
+  const tenantKey = "integration-tenant-activation-monitor";
+  const workspaceKey = "integration-workspace-activation-monitor";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const firstPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "alpha-monitor.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+        "<assessment><booklet key=\"booklet:alpha\" label=\"Alpha\"><unit key=\"unit-alpha\" label=\"Alpha Unit\" /></booklet></assessment>"
+    }
+  });
+  const firstImport = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: firstPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  const firstReleaseId = firstImport.body.stagedContentRelease.contentReleaseId;
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${firstReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "integration-test" }
+    }
+  );
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "activation-monitor-student"
+    }
+  });
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; status: string };
+  }>(
+    `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST" }
+  );
+
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.status, "running");
+
+  const secondPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "beta-monitor.xml",
+      mediaType: "application/xml",
+      sourceDocument:
+        "<assessment><booklet key=\"booklet:beta\" label=\"Beta\"><unit key=\"unit-beta\" label=\"Beta Unit\" /></booklet></assessment>"
+    }
+  });
+  const secondImport = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: secondPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  const secondReleaseId = secondImport.body.stagedContentRelease.contentReleaseId;
+
+  const blockedReadiness = await requestJson<{
+    activationReadiness: {
+      canActivate: boolean;
+      blockingOpenRuns: Array<{ testRunId: string; status: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondReleaseId}/activation-readiness`
+  );
+
+  assert.equal(blockedReadiness.status, 200);
+  assert.equal(blockedReadiness.body.activationReadiness.canActivate, false);
+  assert.equal(
+    blockedReadiness.body.activationReadiness.blockingOpenRuns[0]?.testRunId,
+    resumed.body.testRun.testRunId
+  );
+
+  const completeCommand = await requestJson<{
+    command: {
+      commandType: string;
+      testRun: { status: string; completedAt: string | null };
+      participantSession: { status: string };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "complete",
+        actorId: "activation-operator"
+      }
+    }
+  );
+
+  assert.equal(completeCommand.status, 200);
+  assert.equal(completeCommand.body.command.commandType, "complete");
+  assert.equal(completeCommand.body.command.testRun.status, "completed");
+  assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
+  assert.equal(completeCommand.body.command.participantSession.status, "closed");
+
+  const clearReadiness = await requestJson<{
+    activationReadiness: {
+      canActivate: boolean;
+      blockingOpenRuns: Array<unknown>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondReleaseId}/activation-readiness`
+  );
+
+  assert.equal(clearReadiness.status, 200);
+  assert.equal(clearReadiness.body.activationReadiness.canActivate, true);
+  assert.equal(clearReadiness.body.activationReadiness.blockingOpenRuns.length, 0);
+
+  const activation = await requestJson<{
+    contentRelease: { contentReleaseId: string; status: string };
+    activation: {
+      forced: boolean;
+      previousActiveContentReleaseId: string | null;
+      supersededOpenRunCount: number;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${secondReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "activation-operator" }
+    }
+  );
+
+  assert.equal(activation.status, 200);
+  assert.equal(activation.body.contentRelease.contentReleaseId, secondReleaseId);
+  assert.equal(activation.body.contentRelease.status, "active");
+  assert.equal(activation.body.activation.forced, false);
+  assert.equal(activation.body.activation.previousActiveContentReleaseId, firstReleaseId);
+  assert.equal(activation.body.activation.supersededOpenRunCount, 0);
+});
+
 test("workspace participant-session list shows latest run and active release", async () => {
   const tenantKey = "integration-tenant-sessions";
   const workspaceKey = "integration-workspace-sessions";
