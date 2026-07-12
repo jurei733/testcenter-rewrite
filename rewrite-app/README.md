@@ -169,6 +169,7 @@ npm run start:compose:postgres
 ```
 
 The container image and compose stack default `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, so the operator surface starts in a production-like protected mode. Set `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=false` only for an intentionally open local sandbox.
+The npm compose scripts also fill `APP_BUILD_SHA` from Git and `APP_BUILD_TIMESTAMP` from the current UTC time when they are not already set, so the runtime preflight can require release metadata without extra local shell setup.
 
 To start the same Postgres-backed stack with the local demo tenant, admin, active release, and participant link pre-seeded, run:
 
