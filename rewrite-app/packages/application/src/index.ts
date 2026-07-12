@@ -3256,7 +3256,15 @@ const collectXmlBookletEntries = (
           "title",
           "name",
           "displayName"
-        ) ?? ""
+        ) ??
+          readXmlChildText(
+            bookletMatch[3] ?? "",
+            "title",
+            "label",
+            "name",
+            "displayName"
+          ) ??
+          ""
       ).trim(),
       unitEntries
     });
