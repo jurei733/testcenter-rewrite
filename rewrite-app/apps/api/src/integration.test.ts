@@ -4212,6 +4212,13 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
                     identifierRef: "unit-listening-c",
                     title: "Listening Item C"
                   }
+                ],
+                assessmentItems: [
+                  {
+                    identifier: "unit-listening-d",
+                    title: "Listening Item D",
+                    itemBody: "Use the JSON embedded item body."
+                  }
                 ]
               }
             ]
@@ -4243,7 +4250,11 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
-            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              content?: string;
+            }>;
           }>;
         };
       };
@@ -4263,7 +4274,12 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
           unitEntries: [
             { unitKey: "unit-listening-a", displayLabel: "Listening Item A" },
             { unitKey: "unit-listening-b", displayLabel: "Listening Item B" },
-            { unitKey: "unit-listening-c", displayLabel: "Listening Item C" }
+            { unitKey: "unit-listening-c", displayLabel: "Listening Item C" },
+            {
+              unitKey: "unit-listening-d",
+              displayLabel: "Listening Item D",
+              content: "Use the JSON embedded item body."
+            }
           ]
         }
       ]

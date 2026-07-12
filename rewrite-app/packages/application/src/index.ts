@@ -2712,35 +2712,39 @@ const normalizeParsedJsonContentStructure = (
         }
 
         const booklet = rawBooklet as Record<string, unknown>;
-        const rawUnits = readEntries(
-          booklet.unitEntries,
-          booklet.units,
-          booklet.unitRefs,
-          booklet.unitReferences,
-          booklet.unitFiles,
-          booklet.items,
-          booklet.resources,
-          booklet.files,
-          booklet.modules,
-          booklet.tasks,
-          booklet.assessmentItemRefs,
-          booklet.assessmentItemRef,
-          booklet["assessment-item-refs"],
-          booklet["assessment-item-ref"],
-          booklet.itemRefs,
-          booklet.itemRef,
-          booklet["item-refs"],
-          booklet["item-ref"],
-          booklet.unit,
-          booklet.unitRef,
-          booklet.unitReference,
-          booklet.unitFile,
-          booklet.item,
-          booklet.resource,
-          booklet.file,
-          booklet.module,
-          booklet.task
-        );
+        const rawUnits = [
+          ...readEntries(booklet.unitEntries),
+          ...readEntries(booklet.units),
+          ...readEntries(booklet.unitRefs),
+          ...readEntries(booklet.unitReferences),
+          ...readEntries(booklet.unitFiles),
+          ...readEntries(booklet.items),
+          ...readEntries(booklet.resources),
+          ...readEntries(booklet.files),
+          ...readEntries(booklet.modules),
+          ...readEntries(booklet.tasks),
+          ...readEntries(booklet.assessmentItemRefs),
+          ...readEntries(booklet.assessmentItemRef),
+          ...readEntries(booklet.assessmentItems),
+          ...readEntries(booklet.assessmentItem),
+          ...readEntries(booklet["assessment-items"]),
+          ...readEntries(booklet["assessment-item"]),
+          ...readEntries(booklet["assessment-item-refs"]),
+          ...readEntries(booklet["assessment-item-ref"]),
+          ...readEntries(booklet.itemRefs),
+          ...readEntries(booklet.itemRef),
+          ...readEntries(booklet["item-refs"]),
+          ...readEntries(booklet["item-ref"]),
+          ...readEntries(booklet.unit),
+          ...readEntries(booklet.unitRef),
+          ...readEntries(booklet.unitReference),
+          ...readEntries(booklet.unitFile),
+          ...readEntries(booklet.item),
+          ...readEntries(booklet.resource),
+          ...readEntries(booklet.file),
+          ...readEntries(booklet.module),
+          ...readEntries(booklet.task)
+        ];
 
         return {
           bookletKey: String(
@@ -2793,6 +2797,8 @@ const normalizeParsedJsonContentStructure = (
                   unit.prompt ??
                   unit.question ??
                   unit.body ??
+                  unit.itemBody ??
+                  unit["item-body"] ??
                   unit.text ??
                   unit.stimulus ??
                   unit.markdown ??
