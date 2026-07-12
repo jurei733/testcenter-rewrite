@@ -248,6 +248,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs/{importJobId}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-sessions/{participantSessionId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/participant-sessions.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-roster`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/participant-roster`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/participant-roster.csv`
@@ -290,7 +291,7 @@ The added read side now makes the first slice inspectable:
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
-- participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit
+- participant-session listing now gives operators a workspace-wide view of signed-in sessions together with each session's latest run and linked content release, filterable by status, group, login, content release, and limit, with a matching CSV export for operator handoff
 - participant-session detail now resolves one session together with its content release, full run history, response counts, review counts, and attached review context
 - participant roster import now persists operator-managed login/group/booklet/display-name rows from CSV/TSV/semicolon text or Testtaker/Participant-style XML, uses the same roster formats for direct participant-entry-link generation, upserts repeated logins within a workspace, records roster import activity, returns validation warnings when assigned booklets cannot be checked against the active release or are missing from it, and exports saved roster rows as CSV
 - detailed response inspection returns workspace-wide saved answers with participant, run, unit, and status context, filterable by login, group, session, run, unit, status, and limit
@@ -392,7 +393,7 @@ The SQLite variants build the Angular frontend, boot the built API process on SQ
 - workspace bootstrap
 - source-package import and release activation
 - participant sign-in and session resume
-- participant roster export through the runtime shell
+- participant roster and participant-session export through the runtime shell
 - response and review CSV export through the runtime shell
 - study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, and study-monitor CSV export
 - workspace activity filtering and workspace log CSV export
