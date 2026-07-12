@@ -341,7 +341,7 @@ And there is an optional Postgres-backed run:
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run test:integration:postgres
 ```
 
-If `FIRST_SLICE_POSTGRES_URL` is not set, the optional Postgres test runner skips cleanly outside CI and fails in CI so a misconfigured Postgres matrix cannot pass silently. CI builds once, then uses the `:built` migration, doctor, integration, and startup scripts against the same compiled artifacts.
+If `FIRST_SLICE_POSTGRES_URL` is not set, the optional Postgres test runner skips cleanly outside CI and fails in CI so a misconfigured Postgres matrix cannot pass silently. When it does run, it validates the Postgres URL shape and logs only a credential-redacted target. CI builds once, then uses the `:built` migration, doctor, integration, and startup scripts against the same compiled artifacts.
 
 There are also built-process startup smoke checks:
 

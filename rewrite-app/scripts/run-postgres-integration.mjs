@@ -2,9 +2,29 @@ import { spawn } from "node:child_process";
 
 const connectionString = process.env.FIRST_SLICE_POSTGRES_URL;
 
+const fail = message => {
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
+};
+
+const redactConnectionString = input => {
+  try {
+    const url = new URL(input);
+    if (url.username) {
+      url.username = "REDACTED";
+    }
+    if (url.password) {
+      url.password = "REDACTED";
+    }
+    return url.toString();
+  } catch {
+    return input.replace(/\/\/([^:@/]+)(?::[^@/]+)?@/, "//REDACTED:REDACTED@");
+  }
+};
+
 if (!connectionString) {
   if (process.env.CI === "true") {
-    throw new Error(
+    fail(
       "FIRST_SLICE_POSTGRES_URL is required for Postgres integration tests in CI."
     );
   }
@@ -13,6 +33,16 @@ if (!connectionString) {
   );
   process.exit(0);
 }
+
+if (!/^postgres(?:ql)?:\/\//.test(connectionString)) {
+  fail(
+    "FIRST_SLICE_POSTGRES_URL must be a postgres:// or postgresql:// connection string."
+  );
+}
+
+process.stdout.write(
+  `Running Postgres integration tests against ${redactConnectionString(connectionString)}\n`
+);
 
 const child = spawn(
   process.execPath,
@@ -26,6 +56,19 @@ const child = spawn(
     }
   }
 );
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.once(signal, () => {
+    child.kill(signal);
+  });
+}
+
+child.on("error", error => {
+  process.stderr.write(
+    `Could not start Postgres integration test runner: ${error.message}\n`
+  );
+  process.exit(1);
+});
 
 child.on("exit", code => {
   process.exit(code ?? 1);
