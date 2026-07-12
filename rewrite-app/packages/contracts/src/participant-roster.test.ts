@@ -70,6 +70,37 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("inherits XML group and booklet context from parent blocks", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          "<Testtakers>",
+          "  <Group id=\"group:parent\">",
+          "    <Booklet id=\"booklet:parent\">",
+          "      <Testtaker login=\"nested-a\" name=\"Nested A\" />",
+          "      <Testtaker login=\"nested-b\" booklet=\"booklet:override\" name=\"Nested B\" />",
+          "    </Booklet>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      ),
+      [
+        {
+          loginKey: "nested-a",
+          groupKey: "group:parent",
+          bookletKey: "booklet:parent",
+          displayName: "Nested A"
+        },
+        {
+          loginKey: "nested-b",
+          groupKey: "group:parent",
+          bookletKey: "booklet:override",
+          displayName: "Nested B"
+        }
+      ]
+    );
+  });
+
   it("defaults missing groups from login keys", () => {
     assert.deepEqual(parseParticipantRosterText("solo-login"), [
       {

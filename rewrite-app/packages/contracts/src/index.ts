@@ -169,6 +169,103 @@ const combineRosterDisplayName = (
   return combinedName || null;
 };
 
+type XmlRosterContextRange = {
+  start: number;
+  end: number;
+  value: string;
+};
+
+const collectXmlRosterContextRanges = (
+  rosterText: string,
+  tagNames: string,
+  ...candidateAttributeNames: string[]
+): XmlRosterContextRange[] => {
+  const ranges: XmlRosterContextRange[] = [];
+  const stack: Array<{
+    tagName: string;
+    start: number;
+    value: string | null;
+  }> = [];
+
+  for (const match of rosterText.matchAll(
+    new RegExp(
+      `<(/?)((?:[a-zA-Z_][\\w.-]*:)?(?:${tagNames}))\\b([^>]*?)(/?)>`,
+      "gi"
+    )
+  )) {
+    const offset = match.index;
+    if (offset === undefined) {
+      continue;
+    }
+
+    const isClosingTag = Boolean(match[1]);
+    const tagName = (match[2] ?? "").split(":").at(-1)?.toLowerCase() ?? "";
+    const rawAttributes = match[3] ?? "";
+    const isSelfClosingTag = Boolean(match[4]) || rawAttributes.trimEnd().endsWith("/");
+
+    if (!isClosingTag && !isSelfClosingTag) {
+      stack.push({
+        tagName,
+        start: offset,
+        value: normalizeRosterTextValue(
+          readXmlAttribute(
+            parseXmlAttributes(rawAttributes),
+            ...candidateAttributeNames
+          )
+        )
+      });
+      continue;
+    }
+
+    if (!isClosingTag) {
+      continue;
+    }
+
+    let stackIndex = -1;
+    for (let index = stack.length - 1; index >= 0; index -= 1) {
+      if (stack[index]?.tagName === tagName) {
+        stackIndex = index;
+        break;
+      }
+    }
+    if (stackIndex < 0) {
+      continue;
+    }
+
+    const entry = stack.splice(stackIndex, 1)[0];
+    if (!entry?.value) {
+      continue;
+    }
+
+    const end = offset + match[0].length;
+    const content = rosterText.slice(entry.start, end);
+    if (
+      content.match(/<(?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee)\b/i)
+    ) {
+      ranges.push({
+        start: entry.start,
+        end,
+        value: entry.value
+      });
+    }
+  }
+
+  return ranges;
+};
+
+const findNearestXmlRosterContextValue = (
+  ranges: XmlRosterContextRange[],
+  offset: number
+): string | null => {
+  const matchingRanges = ranges
+    .filter(range => range.start < offset && range.end > offset)
+    .sort(
+      (left, right) =>
+        left.end - left.start - (right.end - right.start)
+    );
+  return matchingRanges[0]?.value ?? null;
+};
+
 const parseParticipantRosterXmlText = (
   rosterText: string
 ): ParsedParticipantRosterEntry[] => {
@@ -177,9 +274,32 @@ const parseParticipantRosterXmlText = (
   }
 
   const entries: ParsedParticipantRosterEntry[] = [];
+  const groupContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "groupKey",
+    "key",
+    "id",
+    "identifier",
+    "ref",
+    "name",
+    "label"
+  );
+  const bookletContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref",
+    "bookletKey",
+    "key",
+    "id",
+    "identifier",
+    "ref",
+    "name",
+    "label"
+  );
   for (const match of rosterText.matchAll(
     /<((?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
   )) {
+    const entryOffset = match.index ?? 0;
     const attributes = parseXmlAttributes(match[2] ?? "");
     const content = match[3] ?? "";
     const loginKey = normalizeRosterTextValue(
@@ -219,7 +339,7 @@ const parseParticipantRosterXmlText = (
           "name"
         ) ??
         readXmlChildText(content, "groupKey", "group", "groupId", "groupName", "class")
-    );
+    ) ?? findNearestXmlRosterContextValue(groupContextRanges, entryOffset);
     const bookletKey = normalizeRosterTextValue(
       readXmlAttribute(
         attributes,
@@ -247,7 +367,7 @@ const parseParticipantRosterXmlText = (
           "testlet",
           "testletId"
         )
-    );
+    ) ?? findNearestXmlRosterContextValue(bookletContextRanges, entryOffset);
     const displayName = combineRosterDisplayName(
       normalizeRosterTextValue(
         readXmlAttribute(
