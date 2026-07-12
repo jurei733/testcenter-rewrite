@@ -146,9 +146,26 @@ const parseIntegerEnvironmentValue = (
     return fallbackValue;
   }
 
-  const parsedValue = Number.parseInt(rawValue, 10);
-  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+  const normalizedValue = rawValue.trim();
+  if (!/^\d+$/.test(normalizedValue)) {
     throw new Error(`${envKey} must be a non-negative integer.`);
+  }
+
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+  if (!Number.isSafeInteger(parsedValue)) {
+    throw new Error(`${envKey} must be a non-negative integer.`);
+  }
+
+  return parsedValue;
+};
+
+const parsePortEnvironmentValue = (
+  envKey: string,
+  fallbackValue: number
+): number => {
+  const parsedValue = parsePositiveIntegerEnvironmentValue(envKey, fallbackValue);
+  if (parsedValue > 65_535) {
+    throw new Error(`${envKey} must be between 1 and 65535.`);
   }
 
   return parsedValue;
@@ -347,7 +364,7 @@ const createRepositoryFromEnvironment = async () => {
 
 const createApiRuntime = async () => {
   const store = resolveStoreKind();
-  const configuredPort = parseIntegerEnvironmentValue("PORT", 4310);
+  const configuredPort = parsePortEnvironmentValue("PORT", 4310);
   const shutdownDrainDelayMs = parseIntegerEnvironmentValue(
     "SHUTDOWN_DRAIN_DELAY_MS",
     DEFAULT_SHUTDOWN_DRAIN_DELAY_MS

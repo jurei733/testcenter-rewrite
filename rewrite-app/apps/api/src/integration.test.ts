@@ -1267,6 +1267,56 @@ test("HTTP server timeouts are configurable and exposed", async () => {
   }
 });
 
+test("runtime port and shutdown drain settings are validated and exposed", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    PORT: "4510",
+    SHUTDOWN_DRAIN_DELAY_MS: "250"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        port: number;
+        shutdownDrainDelayMs: number;
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+
+    assert.equal(config.status, 200);
+    assert.equal(config.body.runtimeConfig.port, 4510);
+    assert.equal(config.body.runtimeConfig.shutdownDrainDelayMs, 250);
+  } finally {
+    await closeServer(isolated.server);
+  }
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        PORT: "0"
+      }),
+    /PORT must be a positive integer/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        PORT: "70000"
+      }),
+    /PORT must be between 1 and 65535/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        SHUTDOWN_DRAIN_DELAY_MS: "250ms"
+      }),
+    /SHUTDOWN_DRAIN_DELAY_MS must be a non-negative integer/
+  );
+});
+
 test("local demo bootstrap seeds a directly usable app state", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",

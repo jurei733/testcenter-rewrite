@@ -184,7 +184,7 @@ The Docker build context excludes local `.env`, `.env.local`, data, cache, and b
 
 `FIRST_SLICE_MAX_JSON_BODY_BYTES` defaults to `1048576` and limits JSON command payloads before they are accumulated in memory. Oversized requests return `413 request_body_too_large`.
 
-`HTTP_HEADERS_TIMEOUT_MS`, `HTTP_REQUEST_TIMEOUT_MS`, and `HTTP_KEEP_ALIVE_TIMEOUT_MS` default to `60000`, `120000`, and `5000`, respectively. They are applied to the Node HTTP server and exposed through `/diagnostics/config`.
+`PORT` must be between `1` and `65535`. `SHUTDOWN_DRAIN_DELAY_MS` must be a non-negative integer. `HTTP_HEADERS_TIMEOUT_MS`, `HTTP_REQUEST_TIMEOUT_MS`, and `HTTP_KEEP_ALIVE_TIMEOUT_MS` default to `60000`, `120000`, and `5000`, respectively. They are applied to the Node HTTP server and exposed through `/diagnostics/config`.
 
 `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` are optional and surface through the API manifest, metrics, and startup banner for release identification.
 
