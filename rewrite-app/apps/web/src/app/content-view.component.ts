@@ -62,7 +62,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button class="primary" type="button" (click)="view.createSourcePackage()">Create Source Package</button>
           <button class="secondary" type="button" (click)="view.createImportJob()">Create Import Job</button>
-          <button class="ghost" type="button" (click)="view.activateContentRelease()">Activate Release</button>
+          <button class="ghost" type="button" (click)="view.confirmActivateContentRelease()">Activate Release</button>
           <button class="ghost" type="button" (click)="view.refreshContentReads()">Refresh Content Reads</button>
           <button class="ghost" type="button" (click)="view.restoreDemoSource()">Restore Demo Source</button>
         </div>

@@ -1455,7 +1455,21 @@ export class ContentViewFacade {
     this.viewState.onActionAsync(() => this.contentService.createImportJob());
   }
 
-  activateContentRelease(): void {
+  confirmActivateContentRelease(): void {
+    const releaseId = this.content.contentReleaseId.trim();
+    if (!this.content.forceActivation) {
+      this.activateContentRelease();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Force activate release '${releaseId || "selected release"}' and supersede open participant runs?`
+    );
+    if (confirmed) {
+      this.activateContentRelease();
+    }
+  }
+
+  private activateContentRelease(): void {
     this.viewState.onActionAsync(() => this.contentService.activateContentRelease());
   }
 
@@ -1498,7 +1512,7 @@ export class ContentViewFacade {
         this.createImportJob();
         break;
       case "activateContentRelease":
-        this.activateContentRelease();
+        this.confirmActivateContentRelease();
         break;
       case "loadSourcePackageDetail":
         this.getSourcePackageDetail();
