@@ -1971,6 +1971,15 @@ try {
   await fillAndCommit("#workspaceActivitySubjectId", pausedTestRunId);
   await fillAndCommit("#workspaceActivityLimit", "5");
   await clickAction("Refresh Activity");
+  logStep("export-workspace-log-csv");
+  await clickAction("Export Workspace Logs CSV");
+  await page
+    .locator("#workspaceLogExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,activityEventId,eventType" })
+    .filter({ hasText: "participant_session_resumed" })
+    .filter({ hasText: "test_run_progress_saved" })
+    .filter({ hasText: pausedTestRunId })
+    .waitFor();
   logStep("open-activity-subject");
   await page
     .locator("article.card")

@@ -438,7 +438,7 @@ For runtime probes:
 
 It is still intentionally lightweight:
 
-- persistence can be in-memory, JSON-file-backed, or SQLite-backed
+- persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/assessment-section/unit/resource/file/item-ref aliases, and Testtaker/Participant-style XML rosters
 - participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
 - monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, unit-progress coverage, saved-roster expected/not-started participants, CSV export, and open-run blockers, but still do not cover every original Testcenter monitor view
