@@ -399,6 +399,17 @@ export class ParticipantViewFacade {
   }
 
   completeRun(): void {
+    const player = this.player;
+    if (
+      player.canComplete &&
+      !player.isComplete &&
+      player.progressPercent < 100 &&
+      !globalThis.window?.confirm(
+        `Complete this test with ${player.missingResponseLabel.toLowerCase()}`
+      )
+    ) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.completeRunInternal());
   }
 

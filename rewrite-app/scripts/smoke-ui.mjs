@@ -1260,7 +1260,11 @@ try {
     participantRouteSessionId,
     "UI smoke expected participant re-entry to reuse the open session."
   );
+  const participantIncompleteCompleteDialog = acceptNextDialog(
+    /Complete this test with 1 unit without a saved response\./
+  );
   await clickAction("Complete Test");
+  await participantIncompleteCompleteDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
