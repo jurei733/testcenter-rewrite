@@ -308,7 +308,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads, filtered workspace activity reads, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, study-monitor booklet/unit progress/export, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin user management with selectable role-assignment cards and filtered admin-user/audit reads, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings and CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, filtered workspace activity reads plus log CSV export, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, study-monitor booklet/unit progress/export, response/review/log CSV export, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -376,7 +376,9 @@ That builds the Angular frontend, boots the built API process on SQLite, and dri
 - source-package import and release activation
 - participant sign-in and session resume
 - participant roster export through the runtime shell
+- response and review CSV export through the runtime shell
 - study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, and study-monitor CSV export
+- workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity
 - diagnostics and config reads
