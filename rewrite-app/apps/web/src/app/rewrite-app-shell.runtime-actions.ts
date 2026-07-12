@@ -5,6 +5,8 @@ import type {
   DeleteGroupResultsResponse,
   ImportParticipantRosterRequest,
   ImportParticipantRosterResponse,
+  IssueMonitorRunCommandRequest,
+  IssueMonitorRunCommandResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -36,6 +38,7 @@ export interface ShellRuntimeActionsHost {
   getSaveProgressPath(): string;
   getResumeRunPath(): string;
   getCompleteRunPath(): string;
+  getMonitorRunCommandPath(): string;
   getDeleteGroupResultsPath(): string;
   getCreateReviewPath(): string;
   getUpdateReviewPath(): string;
@@ -212,4 +215,34 @@ export async function completeRunAction(
   }>("Complete Run", "POST", host.getCompleteRunPath());
   applyCompleteRunResult(host.createRuntimePresentationHost(), payload);
   await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function issueMonitorRunCommandAction(
+  host: ShellRuntimeActionsHost,
+  commandType: "pause" | "resume"
+): Promise<IssueMonitorRunCommandResponse> {
+  const payload = await host.request<IssueMonitorRunCommandResponse>(
+    commandType === "pause" ? "Monitor Pause Run" : "Monitor Resume Run",
+    "POST",
+    host.getMonitorRunCommandPath(),
+    {
+      commandType,
+      actorId: host.getReviewerId().trim() || undefined
+    } satisfies IssueMonitorRunCommandRequest
+  );
+
+  if (commandType === "pause") {
+    applySaveProgressResult(
+      host.createRuntimePresentationHost(),
+      { testRun: payload.command.testRun },
+      "paused"
+    );
+  } else {
+    applyResumeRunResult(host.createRuntimePresentationHost(), {
+      testRun: payload.command.testRun
+    });
+  }
+
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
 }

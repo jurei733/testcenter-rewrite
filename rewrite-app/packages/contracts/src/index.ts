@@ -12,6 +12,8 @@ import type {
   ContentReleaseStatus,
   ImportJob,
   ImportJobStatus,
+  MonitorRunCommandResult,
+  MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantSession,
@@ -424,7 +426,9 @@ export const productionApiRoutes = {
     completeRun: "/api/v1/participant/test-runs/:testRunId/complete"
   },
   monitor: {
-    openRuns: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs"
+    openRuns: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs",
+    issueRunCommand:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/:testRunId/commands"
   },
   system: {
     getRuntimeDiagnostics: "/diagnostics/runtime",
@@ -872,6 +876,15 @@ export type CompleteTestRunResponse = {
 
 export type MonitorOpenRunsResponse = {
   items: OpenMonitorRun[];
+};
+
+export type IssueMonitorRunCommandRequest = {
+  commandType: MonitorRunCommandType;
+  actorId?: string | null;
+};
+
+export type IssueMonitorRunCommandResponse = {
+  command: MonitorRunCommandResult;
 };
 
 export type RuntimeOperationalEvent = {

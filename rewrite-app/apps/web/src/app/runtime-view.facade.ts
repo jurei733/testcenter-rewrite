@@ -1264,6 +1264,18 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.completeRun());
   }
 
+  issueMonitorPause(): void {
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("pause")
+    );
+  }
+
+  issueMonitorResume(): void {
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("resume")
+    );
+  }
+
   openRuns(): void {
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
   }

@@ -3230,6 +3230,152 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
   }
 });
 
+test("monitor command endpoint pauses and resumes an open run", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
+  });
+
+  try {
+    const signIn = await requestJsonAt<{
+      sessionToken: string;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "demo-admin",
+        password: "demo-admin-password"
+      }
+    });
+
+    assert.equal(signIn.status, 200);
+    const authorization = `Bearer ${signIn.body.sessionToken}`;
+
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string; loginKey: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    });
+
+    assert.equal(participantSignIn.status, 200);
+
+    const resumed = await requestJsonAt<{
+      testRun: { testRunId: string; status: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+
+    assert.equal(resumed.status, 200);
+    assert.equal(resumed.body.testRun.status, "running");
+
+    const commandPath = `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`;
+    const pauseCommand = await requestJsonAt<{
+      command: {
+        commandId: string;
+        commandType: string;
+        actorId: string | null;
+        previousStatus: string;
+        testRun: { testRunId: string; status: string };
+        participantSession: { participantSessionId: string; loginKey: string };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "pause",
+        actorId: "operator-demo"
+      }
+    });
+
+    assert.equal(pauseCommand.status, 200);
+    assert.equal(pauseCommand.body.command.commandType, "pause");
+    assert.equal(pauseCommand.body.command.actorId, "operator-demo");
+    assert.equal(pauseCommand.body.command.previousStatus, "running");
+    assert.equal(pauseCommand.body.command.testRun.status, "paused");
+    assert.equal(
+      pauseCommand.body.command.participantSession.participantSessionId,
+      participantSignIn.body.participantSession.participantSessionId
+    );
+
+    const openRunsAfterPause = await requestJsonAt<{
+      items: Array<{ testRunId: string; status: string; loginKey: string }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs",
+      { headers: { authorization } }
+    );
+
+    assert.equal(openRunsAfterPause.status, 200);
+    assert.equal(openRunsAfterPause.body.items[0]?.testRunId, resumed.body.testRun.testRunId);
+    assert.equal(openRunsAfterPause.body.items[0]?.status, "paused");
+    assert.equal(openRunsAfterPause.body.items[0]?.loginKey, "student-demo");
+
+    const resumeCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousStatus: string;
+        testRun: { status: string };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "resume",
+        actorId: "operator-demo"
+      }
+    });
+
+    assert.equal(resumeCommand.status, 200);
+    assert.equal(resumeCommand.body.command.commandType, "resume");
+    assert.equal(resumeCommand.body.command.previousStatus, "paused");
+    assert.equal(resumeCommand.body.command.testRun.status, "running");
+
+    const commandActivity = await requestJsonAt<{
+      items: Array<{
+        activityEvent: {
+          eventType: string;
+          actorId: string | null;
+          subjectId: string;
+          details: {
+            commandId?: string;
+            commandType?: string;
+            previousStatus?: string;
+            nextStatus?: string;
+            loginKey?: string;
+          };
+        };
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=2",
+      { headers: { authorization } }
+    );
+
+    assert.equal(commandActivity.status, 200);
+    assert.equal(commandActivity.body.items.length, 2);
+    assert.deepEqual(
+      commandActivity.body.items.map(item => item.activityEvent.details.commandType),
+      ["resume", "pause"]
+    );
+    assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.subjectId,
+      resumed.body.testRun.testRunId
+    );
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "paused");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "running");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.loginKey, "student-demo");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("failed import can be retried on the same source package", async () => {
   const tenantKey = "integration-tenant-retry";
   const workspaceKey = "integration-workspace-retry";
@@ -6342,6 +6488,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportUsersCsv: string;
         exportAuditEventsCsv: string;
       };
+      monitor: {
+        openRuns: string;
+        issueRunCommand: string;
+      };
     };
   };
 
@@ -6375,6 +6525,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "result_deletion",
     "study_monitor_read",
     "monitor_open_runs_csv_export",
+    "monitor_run_control",
     "system_diagnostics",
     "frontend_shell"
   ]) {
@@ -6423,6 +6574,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(manifest.routes.admin.exportSessionsCsv, /sessions\.csv/);
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
+  assert.match(manifest.routes.monitor.openRuns, /monitor\/open-runs/);
+  assert.match(
+    manifest.routes.monitor.issueRunCommand,
+    /monitor\/open-runs\/:testRunId\/commands/
+  );
   assert.equal(manifest.routes.system.getRuntimeDiagnostics, "/diagnostics/runtime");
   assert.equal(manifest.routes.system.getRuntimeConfig, "/diagnostics/config");
 });

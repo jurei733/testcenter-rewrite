@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
+import { monitorRunCommandTypes } from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
   AdminAuditEventType,
@@ -17,6 +18,8 @@ import type {
   ImportJob,
   ImportJobStatus,
   ImportJobDiagnostic,
+  MonitorRunCommandResult,
+  MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
@@ -359,6 +362,16 @@ export type MonitorReadPort = {
   }): Promise<string>;
 };
 
+export type MonitorControlPort = {
+  issueRunCommand(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    testRunId: string;
+    commandType: MonitorRunCommandType;
+    actorId?: string | null;
+  }): Promise<MonitorRunCommandResult>;
+};
+
 export type AdminAuthPort = {
   bootstrapAdminUser(input: {
     username: string;
@@ -467,6 +480,7 @@ export type FirstSlicePorts = {
   workspaceReview: WorkspaceReviewPort;
   participantRuntime: ParticipantRuntimePort;
   monitorRead: MonitorReadPort;
+  monitorControl: MonitorControlPort;
 };
 
 export class FirstSliceError extends Error {
@@ -544,7 +558,8 @@ export const firstSliceUseCases = {
   saveTestRunProgress: "SaveTestRunProgress",
   resumeTestRun: "ResumeTestRun",
   completeTestRun: "CompleteTestRun",
-  listOpenMonitorRuns: "ListOpenMonitorRuns"
+  listOpenMonitorRuns: "ListOpenMonitorRuns",
+  issueMonitorRunCommand: "IssueMonitorRunCommand"
 } as const;
 
 export type CreateImportJobResult = {
@@ -766,6 +781,21 @@ const normalizeTestRunProgressStatus = (value: unknown): TestRunStatus => {
   }
 
   return value as TestRunStatus;
+};
+
+const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType => {
+  if (
+    typeof value !== "string" ||
+    !monitorRunCommandTypes.includes(value as MonitorRunCommandType)
+  ) {
+    throw new FirstSliceError(
+      400,
+      "monitor_run_command_type_invalid",
+      "Monitor run command type must be 'pause' or 'resume'."
+    );
+  }
+
+  return value as MonitorRunCommandType;
 };
 
 const normalizeParticipantLoginKey = (value: unknown): string => {
@@ -7971,6 +8001,100 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           items
         });
+      }
+    },
+    monitorControl: {
+      async issueRunCommand(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const commandType = normalizeMonitorRunCommandType(input.commandType);
+        const actorId =
+          typeof input.actorId === "string" && input.actorId.trim()
+            ? input.actorId.trim()
+            : null;
+        const storedTestRun = await repository.getTestRunById(testRunId);
+
+        if (!storedTestRun) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found.`
+          );
+        }
+
+        const testRun = normalizeTestRun(storedTestRun);
+        if (
+          testRun.tenantId !== workspace.tenantId ||
+          testRun.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        if (testRun.status === "completed") {
+          throw new FirstSliceError(
+            409,
+            "test_run_already_completed",
+            `Test run '${testRunId}' is already completed.`
+          );
+        }
+
+        const participantSession = await requireParticipantSession(
+          repository,
+          testRun.participantSessionId
+        );
+        const nextStatus: TestRunStatus =
+          commandType === "pause" ? "paused" : "running";
+        const issuedAt = now();
+        const nextTestRun: TestRun =
+          testRun.status === nextStatus
+            ? testRun
+            : {
+                ...testRun,
+                status: nextStatus,
+                updatedAt: issuedAt
+              };
+
+        if (nextTestRun !== testRun) {
+          await repository.saveTestRun(nextTestRun);
+        }
+
+        const commandId = idGenerator();
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "monitor_run_command_issued",
+          actorId,
+          subjectType: "test_run",
+          subjectId: testRunId,
+          summary: `Monitor command '${commandType}' issued for run '${testRunId}'.`,
+          details: {
+            commandId,
+            commandType,
+            previousStatus: testRun.status,
+            nextStatus: nextTestRun.status,
+            participantSessionId: participantSession.participantSessionId,
+            loginKey: participantSession.loginKey,
+            groupKey: participantSession.groupKey
+          }
+        });
+
+        return {
+          commandId,
+          commandType,
+          actorId,
+          issuedAt,
+          previousStatus: testRun.status,
+          testRun: nextTestRun,
+          participantSession
+        };
       }
     }
   };

@@ -1695,6 +1695,51 @@ try {
     .filter({ hasText: "operator-ui" })
     .filter({ hasText: "Filtered review smoke" })
     .waitFor();
+  logStep("monitor-resume-run");
+  await clickAction("Monitor Resume");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#playerPreviewStatus")?.textContent?.trim() ===
+      "running",
+    undefined,
+    { timeout: 15_000 }
+  );
+  logStep("monitor-pause-run");
+  await clickAction("Monitor Pause");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "paused"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#playerPreviewStatus")?.textContent?.trim() ===
+        "paused" &&
+      document
+        .querySelector("#playerPreviewActions")
+        ?.textContent?.includes("resume"),
+    undefined,
+    { timeout: 15_000 }
+  );
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(

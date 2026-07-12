@@ -45,6 +45,11 @@ export const testRunStatuses = [
   "paused",
   "completed"
 ] as const satisfies readonly TestRunStatus[];
+export type MonitorRunCommandType = "pause" | "resume";
+export const monitorRunCommandTypes = [
+  "pause",
+  "resume"
+] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
   "admin_sign_in_failed",
@@ -71,6 +76,7 @@ export type WorkspaceActivityEventType =
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
+  | "monitor_run_command_issued"
   | "group_results_deleted"
   | "review_created"
   | "review_updated"
@@ -89,6 +95,7 @@ export const workspaceActivityEventTypes = [
   "test_run_progress_saved",
   "test_run_resumed",
   "test_run_completed",
+  "monitor_run_command_issued",
   "group_results_deleted",
   "review_created",
   "review_updated",
@@ -309,6 +316,16 @@ export type OpenMonitorRun = {
   status: TestRunStatus;
   currentUnitKey: string | null;
   updatedAt: string;
+};
+
+export type MonitorRunCommandResult = {
+  commandId: string;
+  commandType: MonitorRunCommandType;
+  actorId: string | null;
+  issuedAt: string;
+  previousStatus: TestRunStatus;
+  testRun: TestRun;
+  participantSession: ParticipantSession;
 };
 
 export type ParticipantRuntimeStateStatus =
@@ -740,6 +757,7 @@ export type FirstSliceCapability =
   | "result_deletion"
   | "study_monitor_read"
   | "monitor_open_runs_csv_export"
+  | "monitor_run_control"
   | "participant_sign_in"
   | "participant_launch"
   | "participant_runtime_state"
@@ -789,6 +807,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "result_deletion",
   "study_monitor_read",
   "monitor_open_runs_csv_export",
+  "monitor_run_control",
   "participant_sign_in",
   "participant_launch",
   "participant_runtime_state",

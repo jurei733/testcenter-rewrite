@@ -58,6 +58,8 @@ import {
   type GetWorkspaceOverviewResponse,
   type ImportParticipantRosterRequest,
   type ImportParticipantRosterResponse,
+  type IssueMonitorRunCommandRequest,
+  type IssueMonitorRunCommandResponse,
   type ListAdminAuditEventsResponse,
   type ListAdminSessionsResponse,
   type ListWorkspaceActivityEventsResponse,
@@ -1376,6 +1378,9 @@ const completeRunPattern = createRoutePattern(
 const monitorOpenRunsPattern = createRoutePattern(
   productionApiRoutes.monitor.openRuns
 );
+const monitorRunCommandPattern = createRoutePattern(
+  productionApiRoutes.monitor.issueRunCommand
+);
 
 type OperatorAccessScope =
   | { kind: "platform" }
@@ -1420,7 +1425,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", contentReleaseDetailPattern],
   ["GET", contentReleaseActivationReadinessPattern],
   ["POST", contentReleaseActivatePattern],
-  ["GET", monitorOpenRunsPattern]
+  ["GET", monitorOpenRunsPattern],
+  ["POST", monitorRunCommandPattern]
 ];
 
 const isOperatorApiRequest = (method: string, pathname: string): boolean => {
@@ -1904,7 +1910,8 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
-    ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns]
+    ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
+    ["POST", monitorRunCommandPattern, productionApiRoutes.monitor.issueRunCommand]
   ];
 
   for (const [expectedMethod, pattern, template] of routeChecks) {
@@ -4191,6 +4198,37 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey
         });
         sendJson<MonitorOpenRunsResponse>(response, 200, { items });
+        return;
+      }
+
+      const monitorRunCommandMatch = monitorRunCommandPattern.exec(pathname);
+      if (request.method === "POST" && monitorRunCommandMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          monitorRunCommandMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          monitorRunCommandMatch.groups.workspaceKey
+        );
+        const testRunId = decodeRouteGroup(monitorRunCommandMatch.groups.testRunId);
+        if (!tenantKey || !workspaceKey || !testRunId) {
+          sendError(
+            response,
+            400,
+            "invalid_monitor_command_scope",
+            "tenantKey, workspaceKey, and testRunId are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<IssueMonitorRunCommandRequest>();
+        const command = await services.monitorControl.issueRunCommand({
+          tenantKey,
+          workspaceKey,
+          testRunId,
+          commandType: body.commandType,
+          actorId: body.actorId
+        });
+        sendJson<IssueMonitorRunCommandResponse>(response, 200, { command });
         return;
       }
 

@@ -14,6 +14,7 @@ import {
   deleteGroupResultsAction,
   deleteReviewAction,
   importParticipantRosterAction,
+  issueMonitorRunCommandAction,
   participantSignInAction,
   resumeParticipantSessionAction,
   resumeRunAction,
@@ -87,6 +88,19 @@ export class RewriteAppRuntimeService {
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       )
+    );
+  }
+
+  async issueMonitorRunCommand(commandType: "pause" | "resume"): Promise<void> {
+    await issueMonitorRunCommandAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      ),
+      commandType
+    );
+    this.feedback.rememberActivity(
+      commandType === "pause" ? "Monitor Pause Issued" : "Monitor Resume Issued",
+      `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );
   }
 
