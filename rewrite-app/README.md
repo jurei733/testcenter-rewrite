@@ -89,7 +89,13 @@ For the local production-like verification path, run:
 npm run ci
 ```
 
-That executes:
+For a quicker pre-push signal that builds once, reuses built artifacts, and stops the browser flow after the content import/activation read model, run:
+
+```bash
+npm run ci:fast
+```
+
+The full CI command executes:
 
 - typecheck
 - build
