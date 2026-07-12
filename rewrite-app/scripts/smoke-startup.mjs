@@ -90,6 +90,8 @@ const expectHead = async (url, expectedStatus = 200, expectedLocation = null) =>
     );
   }
 
+  expectSecurityHeaders(`HEAD ${url}`, response);
+
   if (expectedLocation !== null && response.headers.get("location") !== expectedLocation) {
     throw new Error(
       `Expected HEAD ${url} location ${expectedLocation} but got ${response.headers.get("location") ?? "none"}.`
@@ -98,6 +100,22 @@ const expectHead = async (url, expectedStatus = 200, expectedLocation = null) =>
 
   if ((await response.text()) !== "") {
     throw new Error(`Expected HEAD ${url} to return an empty response body.`);
+  }
+};
+
+const expectSecurityHeaders = (label, response) => {
+  for (const [header, expectedValue] of [
+    ["x-content-type-options", "nosniff"],
+    ["referrer-policy", "no-referrer"],
+    ["x-frame-options", "SAMEORIGIN"],
+    ["permissions-policy", "camera=(), geolocation=(), microphone=()"]
+  ]) {
+    const actualValue = response.headers.get(header);
+    if (actualValue !== expectedValue) {
+      throw new Error(
+        `Expected ${label} header ${header}=${expectedValue} but got ${actualValue ?? "missing"}.`
+      );
+    }
   }
 };
 
@@ -184,6 +202,7 @@ try {
   const config = await pollJson(`${baseUrl}/diagnostics/config`);
   const metrics = await pollJson(`${baseUrl}/metrics`);
   const prometheusResponse = await fetch(`${baseUrl}/metrics/prometheus`);
+  expectSecurityHeaders(`${baseUrl}/metrics/prometheus`, prometheusResponse);
 
   await expectHead(`${baseUrl}/healthz`);
   await expectHead(`${baseUrl}/readyz`);
@@ -198,6 +217,7 @@ try {
     if (!response.ok) {
       throw new Error(`Unexpected status ${response.status} for /app.`);
     }
+    expectSecurityHeaders(`${baseUrl}/app`, response);
     return response.text();
   });
 
@@ -337,6 +357,7 @@ try {
       `Startup smoke expected Angular main bundle to load, got ${mainBundleResponse.status}.`
     );
   }
+  expectSecurityHeaders("Angular main bundle", mainBundleResponse);
 
   const stylesheetBundleResponse = await fetch(
     `${baseUrl}/app/${stylesheetBundleMatch[1]}`
@@ -346,6 +367,7 @@ try {
       `Startup smoke expected Angular stylesheet bundle to load, got ${stylesheetBundleResponse.status}.`
     );
   }
+  expectSecurityHeaders("Angular stylesheet bundle", stylesheetBundleResponse);
 
   process.stdout.write(
     `Startup smoke passed for store=${store} schemaVersion=${manifest.storage?.schemaVersion ?? "n/a"}\n`
