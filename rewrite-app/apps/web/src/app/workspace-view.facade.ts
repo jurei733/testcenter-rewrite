@@ -211,7 +211,7 @@ export class WorkspaceViewFacade {
               : "none"
           }
         ],
-        actionLabel: row.testRunId ? "Open Run" : undefined,
+        actionLabel: row.testRunId ? "Open In Runtime" : undefined,
         actionPayload: {
           subjectType: "test_run",
           subjectId: row.testRunId ?? "",
@@ -243,7 +243,7 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open Run",
+        actionLabel: "Open In Runtime",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
@@ -722,7 +722,7 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open Run",
+        actionLabel: "Open In Runtime",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
@@ -915,7 +915,7 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open Run",
+        actionLabel: "Open In Runtime",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
@@ -1024,7 +1024,7 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open Run",
+        actionLabel: "Open In Runtime",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,

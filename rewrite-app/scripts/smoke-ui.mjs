@@ -1776,6 +1776,21 @@ try {
     }
     await collection.waitFor({ state: "visible", timeout: 15_000 });
   };
+  logStep("participant-detail-open-runtime");
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Participant Detail" })
+    .locator(".record-card")
+    .filter({ hasText: "unit-paused" })
+    .getByRole("button", { name: "Open In Runtime" })
+    .first()
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
   const monitorStatusTotal = [
     studyMonitorSummary.notStartedCount,
     studyMonitorSummary.runningCount,
