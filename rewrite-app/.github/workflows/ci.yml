@@ -36,6 +36,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run SQLite runtime preflight
+        run: |
+          FIRST_SLICE_STORE=sqlite \
+          FIRST_SLICE_SQLITE_FILE=./.data/preflight-ci.sqlite \
+          npm run db:migrate:sqlite:built
+          FIRST_SLICE_STORE=sqlite \
+          FIRST_SLICE_SQLITE_FILE=./.data/preflight-ci.sqlite \
+          RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=false \
+          npm run preflight:runtime:built
+
   integration:
     name: Integration (${{ matrix.store }})
     runs-on: ubuntu-latest
@@ -103,6 +113,14 @@ jobs:
 
       - name: Run Postgres storage doctor
         run: FIRST_SLICE_STORE=postgres npm run db:doctor:built
+
+      - name: Run Postgres runtime preflight
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_STORE=postgres \
+          RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true \
+          npm run preflight:runtime:built
 
       - name: Run Postgres startup smoke
         run: |

@@ -96,6 +96,7 @@ That executes:
 - focused unit tests for shared contracts helpers
 - memory + sqlite integration tests
 - a built-server startup smoke test against SQLite
+- a built runtime preflight against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
 - browser-driven Angular UI smokes against SQLite in open and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
 
@@ -111,6 +112,16 @@ FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app
 ```
 
 These commands use the built storage adapters directly and do not require the API process to be running.
+
+Before starting a built runtime, you can run a deployability preflight that verifies compiled API/store artifacts, the Angular browser bundle, optional build metadata, and storage readiness:
+
+```bash
+FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm run db:migrate:sqlite:built
+FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm run preflight:runtime:built
+FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run preflight:runtime:built
+```
+
+Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` must be present. Set `RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true` only for image-only checks where the backing store is intentionally unavailable.
 
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 
@@ -438,13 +449,14 @@ For runtime probes:
 - [.github/workflows/ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts helpers
+  - built runtime preflight against SQLite and Postgres
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
   - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
-  - Docker compose release smoke with explicit migrate + api roles
+  - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
-- [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate and api services, restart policies, and service healthchecks
+- [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
 
 It is still intentionally lightweight:

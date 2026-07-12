@@ -41,6 +41,27 @@ services:
         condition: service_healthy
       rewrite-app-migrate:
         condition: service_completed_successfully
+      rewrite-app-preflight:
+        condition: service_completed_successfully
+
+  rewrite-app-preflight:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_BUILD_SHA: ${APP_BUILD_SHA:-local-compose}
+        APP_BUILD_TIMESTAMP: ${APP_BUILD_TIMESTAMP:-unknown}
+    restart: "no"
+    command: ["npm", "run", "preflight:runtime:built"]
+    environment:
+      FIRST_SLICE_STORE: postgres
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@rewrite-app-postgres:5432/rewrite_app
+      RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA: ${RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA:-true}
+    depends_on:
+      rewrite-app-postgres:
+        condition: service_healthy
+      rewrite-app-migrate:
+        condition: service_completed_successfully
 
   rewrite-app-postgres:
     image: postgres:16-alpine

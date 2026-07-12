@@ -37,7 +37,7 @@ COPY apps ./apps
 COPY packages ./packages
 COPY scripts ./scripts
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/web/dist ./apps/web/dist
+COPY --from=build /app/dist/apps/web ./dist/apps/web
 COPY --from=build /app/packages/domain/dist ./packages/domain/dist
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/packages/application/dist ./packages/application/dist

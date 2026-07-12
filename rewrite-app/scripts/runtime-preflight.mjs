@@ -1,0 +1,187 @@
+import { access, readdir, readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
+import { spawn } from "node:child_process";
+
+const store = process.env.FIRST_SLICE_STORE ?? "memory";
+
+const requiredBuiltFiles = [
+  "apps/api/dist/apps/api/src/index.js",
+  "packages/domain/dist/packages/domain/src/index.js",
+  "packages/contracts/dist/packages/contracts/src/index.js",
+  "packages/application/dist/packages/application/src/index.js",
+  "packages/memory-store/dist/packages/memory-store/src/index.js",
+  "packages/file-store/dist/packages/file-store/src/index.js",
+  "packages/sqlite-store/dist/packages/sqlite-store/src/index.js",
+  "packages/postgres-store/dist/packages/postgres-store/src/index.js",
+  "dist/apps/web/browser/index.html"
+];
+
+const frontendBuildDirectory = resolve("dist/apps/web/browser");
+const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
+
+const parseBooleanFlag = (value, defaultValue = false) => {
+  const normalizedValue = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalizedValue === "") {
+    return defaultValue;
+  }
+  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "optional"].includes(normalizedValue)) {
+    return false;
+  }
+  throw new Error(`Unsupported boolean flag '${value}'.`);
+};
+
+const redactStorageLocation = input => {
+  if (!input || !/^postgres(?:ql)?:\/\//.test(input)) {
+    return input ?? null;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.username) {
+      url.username = "REDACTED";
+    }
+    if (url.password) {
+      url.password = "REDACTED";
+    }
+    return url.toString();
+  } catch {
+    return input.replace(/\/\/([^:@/]+)(?::[^@/]+)?@/, "//REDACTED:REDACTED@");
+  }
+};
+
+const ensureFile = async filePath => {
+  const absolutePath = resolve(filePath);
+  try {
+    const fileStat = await stat(absolutePath);
+    if (!fileStat.isFile()) {
+      throw new Error(`${filePath} exists but is not a file.`);
+    }
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`Missing built runtime artifact: ${filePath}`);
+    }
+    throw error;
+  }
+};
+
+const runStorageDoctor = () =>
+  new Promise((resolvePromise, reject) => {
+    const child = spawn(
+      process.execPath,
+      ["./scripts/storage-admin.mjs", "doctor"],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          FIRST_SLICE_STORE: store
+        }
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", chunk => {
+      stderr += chunk;
+    });
+    child.once("error", reject);
+    child.once("exit", code => {
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Storage doctor failed with exit code ${code ?? "unknown"}.\n${stderr}${stdout}`
+          )
+        );
+        return;
+      }
+
+      try {
+        resolvePromise(JSON.parse(stdout));
+      } catch (error) {
+        reject(
+          new Error(
+            `Storage doctor returned invalid JSON: ${error.message}\n${stdout}`
+          )
+        );
+      }
+    });
+  });
+
+for (const filePath of requiredBuiltFiles) {
+  await ensureFile(filePath);
+}
+
+const appHtml = await readFile(frontendIndexPath, "utf8");
+for (const marker of [
+  "<app-root></app-root>",
+  '<base href="/app/">',
+  "<title>Testcenter Rewrite App</title>"
+]) {
+  if (!appHtml.includes(marker)) {
+    throw new Error(`Frontend index is missing required marker ${marker}.`);
+  }
+}
+
+const frontendFiles = await readdir(frontendBuildDirectory);
+const mainBundle = frontendFiles.find(fileName => /^main-.*\.js$/.test(fileName));
+const stylesheetBundle = frontendFiles.find(fileName =>
+  /^styles-.*\.css$/.test(fileName)
+);
+if (!mainBundle) {
+  throw new Error("Frontend build is missing a hashed main JavaScript bundle.");
+}
+if (!stylesheetBundle) {
+  throw new Error("Frontend build is missing a hashed stylesheet bundle.");
+}
+await access(resolve(frontendBuildDirectory, mainBundle));
+await access(resolve(frontendBuildDirectory, stylesheetBundle));
+
+let storageDoctor = null;
+if (!parseBooleanFlag(process.env.RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR)) {
+  storageDoctor = await runStorageDoctor();
+}
+
+if (
+  parseBooleanFlag(process.env.RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA) &&
+  (!process.env.APP_BUILD_SHA ||
+    process.env.APP_BUILD_SHA === "unknown" ||
+    !process.env.APP_BUILD_TIMESTAMP ||
+    process.env.APP_BUILD_TIMESTAMP === "unknown")
+) {
+  throw new Error(
+    "Runtime preflight requires APP_BUILD_SHA and APP_BUILD_TIMESTAMP to be set."
+  );
+}
+
+process.stdout.write(
+  JSON.stringify(
+    {
+      status: "ready",
+      store,
+      storage: storageDoctor
+        ? {
+            ...storageDoctor,
+            location: redactStorageLocation(storageDoctor.location)
+          }
+        : null,
+      build: {
+        commitSha: process.env.APP_BUILD_SHA ?? null,
+        builtAt: process.env.APP_BUILD_TIMESTAMP ?? null
+      },
+      artifacts: {
+        apiEntry: requiredBuiltFiles[0],
+        frontendIndex: "dist/apps/web/browser/index.html",
+        frontendMainBundle: mainBundle,
+        frontendStylesheetBundle: stylesheetBundle
+      }
+    },
+    null,
+    2
+  ) + "\n"
+);
