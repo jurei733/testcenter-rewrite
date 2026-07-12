@@ -104,6 +104,13 @@ jobs:
       - name: Run Postgres storage doctor
         run: FIRST_SLICE_STORE=postgres npm run db:doctor:built
 
+      - name: Run Postgres startup smoke
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true \
+          npm run smoke:startup:postgres:built
+
       - name: Run Postgres integration tests
         run: npm run test:integration:postgres:built
 

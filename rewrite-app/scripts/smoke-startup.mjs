@@ -7,6 +7,19 @@ import { setTimeout as delay } from "node:timers/promises";
 const store = process.env.FIRST_SLICE_STORE ?? "memory";
 const serverEntry = resolve("apps/api/dist/apps/api/src/index.js");
 
+const parseBooleanFlag = value => {
+  const normalizedValue = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (["1", "true", "yes", "on", "required"].includes(normalizedValue)) {
+    return true;
+  }
+  if (["0", "false", "no", "off", "optional", ""].includes(normalizedValue)) {
+    return false;
+  }
+  throw new Error(`Unsupported boolean flag '${value}'.`);
+};
+
 const allocatePort = () =>
   new Promise((resolvePromise, reject) => {
     const server = createNetServer();
@@ -88,6 +101,45 @@ const expectHead = async (url, expectedStatus = 200, expectedLocation = null) =>
   }
 };
 
+const expectBuildMetadata = (label, build) => {
+  if (process.env.APP_BUILD_SHA && build?.commitSha !== process.env.APP_BUILD_SHA) {
+    throw new Error(
+      `Expected ${label}.commitSha=${process.env.APP_BUILD_SHA} but got ${build?.commitSha ?? "missing"}.`
+    );
+  }
+
+  if (
+    process.env.APP_BUILD_TIMESTAMP &&
+    build?.builtAt !== process.env.APP_BUILD_TIMESTAMP
+  ) {
+    throw new Error(
+      `Expected ${label}.builtAt=${process.env.APP_BUILD_TIMESTAMP} but got ${build?.builtAt ?? "missing"}.`
+    );
+  }
+};
+
+const expectRedactedPostgresLocation = (label, location) => {
+  if (store !== "postgres") {
+    return;
+  }
+
+  if (typeof location !== "string" || !/^postgres(?:ql)?:\/\//.test(location)) {
+    throw new Error(`Expected ${label} to expose a redacted Postgres URL.`);
+  }
+
+  const source = process.env.FIRST_SLICE_POSTGRES_URL;
+  if (!source) {
+    return;
+  }
+
+  const sourceUrl = new URL(source);
+  for (const secretPart of [sourceUrl.username, sourceUrl.password]) {
+    if (secretPart && location.includes(secretPart)) {
+      throw new Error(`Expected ${label} to redact Postgres credentials.`);
+    }
+  }
+};
+
 const stopChild = child =>
   new Promise(async (resolvePromise, reject) => {
     if (child.exitCode !== null) {
@@ -164,6 +216,33 @@ try {
   if (config.runtimeConfig?.storage?.kind !== store) {
     throw new Error(
       `Expected runtime config storage.kind=${store} but got ${config.runtimeConfig?.storage?.kind ?? "unknown"}.`
+    );
+  }
+
+  expectBuildMetadata("manifest.build", manifest.build);
+  expectBuildMetadata("runtimeConfig.build", config.build);
+
+  expectRedactedPostgresLocation("manifest.storage.location", manifest.storage?.location);
+  expectRedactedPostgresLocation(
+    "runtimeConfig.storage.location",
+    config.runtimeConfig?.storage?.location
+  );
+
+  const expectedOperatorAuthRequired = parseBooleanFlag(
+    process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED
+  );
+  if (config.runtimeConfig?.operatorAuthRequired !== expectedOperatorAuthRequired) {
+    throw new Error(
+      `Expected runtime config operatorAuthRequired=${expectedOperatorAuthRequired} but got ${config.runtimeConfig?.operatorAuthRequired ?? "missing"}.`
+    );
+  }
+
+  if (
+    config.runtimeConfig?.environment?.firstSliceOperatorAuthRequired !==
+    expectedOperatorAuthRequired
+  ) {
+    throw new Error(
+      "Expected runtime config environment to mirror FIRST_SLICE_OPERATOR_AUTH_REQUIRED."
     );
   }
 

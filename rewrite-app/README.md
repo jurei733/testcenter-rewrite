@@ -351,7 +351,7 @@ npm run smoke:startup:sqlite
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:startup:postgres
 ```
 
-Those boot the built API process, poll `/healthz`, `/readyz`, `/manifest`, and `/diagnostics/config`, verify `HEAD` compatibility for health/readiness/shell/participant entrypoints, then stop the process again.
+Those boot the built API process, poll `/healthz`, `/readyz`, `/manifest`, and `/diagnostics/config`, verify `HEAD` compatibility for health/readiness/shell/participant entrypoints, confirm the effective operator-auth flag, verify build metadata when `APP_BUILD_SHA`/`APP_BUILD_TIMESTAMP` are set, assert Postgres credentials stay redacted in diagnostics, then stop the process again.
 
 For graceful rollout verification, run:
 
@@ -431,7 +431,7 @@ For runtime probes:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts helpers
   - memory + sqlite integration matrix
-  - Postgres integration against a service database
+  - Postgres migration, doctor, startup smoke, and integration against a service database
   - SQLite startup, shutdown, browser, protected-operator, and local-demo smokes
   - Docker compose release smoke with explicit migrate + api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck
