@@ -151,10 +151,13 @@ const expectRedactedPostgresLocation = (label, location) => {
   }
 
   const sourceUrl = new URL(source);
-  for (const secretPart of [sourceUrl.username, sourceUrl.password]) {
-    if (secretPart && location.includes(secretPart)) {
-      throw new Error(`Expected ${label} to redact Postgres credentials.`);
-    }
+
+  const redactedUrl = new URL(location);
+  if (sourceUrl.username && redactedUrl.username !== "REDACTED") {
+    throw new Error(`Expected ${label} to redact Postgres username.`);
+  }
+  if (sourceUrl.password && redactedUrl.password !== "REDACTED") {
+    throw new Error(`Expected ${label} to redact Postgres password.`);
   }
 };
 

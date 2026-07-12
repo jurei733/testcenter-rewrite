@@ -190,7 +190,7 @@ try {
   });
   const fillAndCommit = async (selector, value) => {
     const locator = page.locator(selector);
-    await locator.click({ force: true });
+    await locator.waitFor({ state: "attached" });
     await locator.evaluate((element, nextValue) => {
       const value = String(nextValue);
       if (element instanceof HTMLInputElement) {

@@ -462,7 +462,7 @@ For runtime probes:
 
 ## CI / Deployability
 
-- [.github/workflows/ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
+- [rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) now verifies:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts helpers
   - built runtime preflight against SQLite and Postgres

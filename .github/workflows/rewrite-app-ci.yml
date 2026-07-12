@@ -12,10 +12,45 @@ on:
 
 jobs:
   verify-memory-sqlite:
+    name: verify-memory-sqlite (${{ matrix.check }})
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: rewrite-app
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: typecheck
+            command: npm run typecheck
+            playwright: false
+          - check: unit
+            command: npm run test:unit
+            playwright: false
+          - check: integration-memory
+            command: npm run test:integration:memory
+            playwright: false
+          - check: integration-sqlite
+            command: npm run test:integration:sqlite
+            playwright: false
+          - check: startup
+            command: npm run smoke:startup:sqlite
+            playwright: false
+          - check: shutdown
+            command: npm run smoke:shutdown:sqlite
+            playwright: false
+          - check: ui-content
+            command: npm run smoke:ui:content
+            playwright: true
+          - check: ui-full
+            command: npm run smoke:ui
+            playwright: true
+          - check: ui-operator-auth
+            command: npm run smoke:ui:operator-auth
+            playwright: true
+          - check: local-demo
+            command: npm run smoke:local-demo
+            playwright: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,9 +59,10 @@ jobs:
           cache: npm
           cache-dependency-path: rewrite-app/package-lock.json
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - name: Run full SQLite and browser verification
-        run: npm run ci
+      - if: ${{ matrix.playwright }}
+        run: npx playwright install --with-deps chromium
+      - name: Run ${{ matrix.check }}
+        run: ${{ matrix.command }}
 
   verify-postgres:
     runs-on: ubuntu-latest
