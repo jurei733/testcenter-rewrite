@@ -322,6 +322,18 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const acceptNextDialog = expectedMessagePattern =>
+    new Promise((resolvePromise, reject) => {
+      page.once("dialog", async dialog => {
+        try {
+          assert.match(dialog.message(), expectedMessagePattern);
+          await dialog.accept();
+          resolvePromise(undefined);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
   const clickContentFilterApply = async () => {
     const requestCountBeforeClick = totalApiRequestCount;
     await clickAction("Apply Content Filters");
@@ -522,7 +534,14 @@ try {
   await revokedAdminSessionCard.waitFor();
   await revokedAdminSessionCard.getByRole("button", { name: "Select Session" }).click();
   await waitForInputMinLength("#adminSessionRevokeTargetId", 20);
+  const revokeAdminSessionTargetId = await page
+    .locator("#adminSessionRevokeTargetId")
+    .inputValue();
+  const revokeAdminSessionDialog = acceptNextDialog(
+    new RegExp(`Revoke admin session '${revokeAdminSessionTargetId}'\\?`)
+  );
   await clickAction("Revoke Selected Session");
+  await revokeAdminSessionDialog;
   await expectInputValue("#adminSessionRevokeTargetId", "");
   await clickAction("Export Sessions CSV");
   await page
@@ -702,7 +721,13 @@ try {
   await expectInputValue("#adminRevokeTargetUserId", workspaceAdminUserId);
   await expectInputValue("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
   logStep("revoke-tenant-admin-role");
+  const revokeAdminRoleDialog = acceptNextDialog(
+    new RegExp(
+      `Revoke role assignment '${tenantRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
+    )
+  );
   await clickAction("Revoke Role");
+  await revokeAdminRoleDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/users`,
     payload =>
@@ -725,7 +750,11 @@ try {
   await fillAndCommit("#adminResetTargetUserId", workspaceAdminUserId);
   await fillAndCommit("#adminResetPassword", workspaceAdminResetPassword);
   logStep("reset-workspace-admin-password");
+  const resetAdminPasswordDialog = acceptNextDialog(
+    new RegExp(`Reset password for admin user '${workspaceAdminUserId}'\\?`)
+  );
   await clickAction("Reset Password");
+  await resetAdminPasswordDialog;
   const oldWorkspaceAdminPasswordSignIn = await fetch(
     `${baseUrl}/api/v1/admin/auth/sign-in`,
     {
@@ -754,7 +783,13 @@ try {
   await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminStatusValue", "disabled");
   logStep("disable-workspace-admin");
+  const updateAdminStatusDialog = acceptNextDialog(
+    new RegExp(
+      `Change admin user '${workspaceAdminUserId}' status to 'disabled'\\?`
+    )
+  );
   await clickAction("Update Status");
+  await updateAdminStatusDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/users`,
     payload =>

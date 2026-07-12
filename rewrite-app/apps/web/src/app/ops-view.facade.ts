@@ -157,7 +157,21 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
-  revokeAdminSession(): void {
+  confirmRevokeAdminSession(): void {
+    const adminSessionId = this.ops.adminSessionRevokeTargetId.trim();
+    if (!adminSessionId) {
+      this.revokeAdminSession();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Revoke admin session '${adminSessionId}'?`
+    );
+    if (confirmed) {
+      this.revokeAdminSession();
+    }
+  }
+
+  private revokeAdminSession(): void {
     this.viewState.onActionAsync(() => this.opsService.revokeAdminSession());
   }
 
@@ -187,15 +201,59 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(() => this.opsService.assignAdminRole());
   }
 
-  revokeAdminRole(): void {
+  confirmRevokeAdminRole(): void {
+    const adminUserId = this.ops.adminRevokeTargetUserId.trim();
+    const roleAssignmentId = this.ops.adminRevokeRoleAssignmentId.trim();
+    if (!adminUserId || !roleAssignmentId) {
+      this.revokeAdminRole();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Revoke role assignment '${roleAssignmentId}' from admin user '${adminUserId}'?`
+    );
+    if (confirmed) {
+      this.revokeAdminRole();
+    }
+  }
+
+  private revokeAdminRole(): void {
     this.viewState.onActionAsync(() => this.opsService.revokeAdminRole());
   }
 
-  updateAdminUserStatus(): void {
+  confirmUpdateAdminUserStatus(): void {
+    const adminUserId = this.ops.adminStatusTargetUserId.trim();
+    const status = this.ops.adminStatusValue;
+    if (!adminUserId) {
+      this.updateAdminUserStatus();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Change admin user '${adminUserId}' status to '${status}'?`
+    );
+    if (confirmed) {
+      this.updateAdminUserStatus();
+    }
+  }
+
+  private updateAdminUserStatus(): void {
     this.viewState.onActionAsync(() => this.opsService.updateAdminUserStatus());
   }
 
-  resetAdminUserPassword(): void {
+  confirmResetAdminUserPassword(): void {
+    const adminUserId = this.ops.adminResetTargetUserId.trim();
+    if (!adminUserId) {
+      this.resetAdminUserPassword();
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Reset password for admin user '${adminUserId}'?`
+    );
+    if (confirmed) {
+      this.resetAdminUserPassword();
+    }
+  }
+
+  private resetAdminUserPassword(): void {
     this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
   }
 
