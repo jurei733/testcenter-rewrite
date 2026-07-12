@@ -4397,10 +4397,13 @@ test("source document import accepts QTI assessment sections as booklets", async
       sourceDocument: `
         <assessmentTest identifier="test:qti-sections" title="QTI Section Test">
           <testPart identifier="part-1">
-            <assessmentSection identifier="section:reading">
+            <assessmentSection>
+              <identifier>section:reading</identifier>
               <title>Reading Section</title>
               <assessmentItemRef identifier="unit-reading-a" title="Reading Item A" />
-              <assessmentItemRef identifier="unit-reading-b" title="Reading Item B" />
+              <assessmentItemRef title="Reading Item B">
+                <identifier>unit-reading-b</identifier>
+              </assessmentItemRef>
             </assessmentSection>
           </testPart>
         </assessmentTest>

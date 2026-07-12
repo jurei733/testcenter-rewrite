@@ -3206,7 +3206,32 @@ const collectXmlBookletEntries = (
             "taskId",
             "href",
             "name"
-          ) ?? ""
+          ) ??
+            readXmlChildText(
+              unitContent,
+              "unitKey",
+              "unitId",
+              "identifier",
+              "key",
+              "id",
+              "ref",
+              "identifierref",
+              "identifierRef",
+              "alias",
+              "code",
+              "path",
+              "src",
+              "uri",
+              "file",
+              "fileName",
+              "filename",
+              "resourceId",
+              "moduleId",
+              "taskId",
+              "href",
+              "name"
+            ) ??
+            ""
         ).trim(),
         displayLabel: String(
           readXmlAttribute(
@@ -3246,7 +3271,26 @@ const collectXmlBookletEntries = (
           "id",
           "alias",
           "code"
-        ) ?? ""
+        ) ??
+          readXmlChildText(
+            bookletMatch[3] ?? "",
+            "bookletKey",
+            "bookletId",
+            "testletKey",
+            "testletId",
+            "assessmentTestKey",
+            "assessmentTestId",
+            "assessmentSectionKey",
+            "assessmentSectionId",
+            "sectionKey",
+            "sectionId",
+            "identifier",
+            "key",
+            "id",
+            "alias",
+            "code"
+          ) ??
+          ""
       ).trim(),
       displayLabel: String(
         readXmlAttribute(
