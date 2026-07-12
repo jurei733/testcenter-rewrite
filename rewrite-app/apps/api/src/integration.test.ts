@@ -4403,7 +4403,7 @@ test("source document import accepts QTI assessment sections as booklets", async
               <assessmentItemRef identifier="unit-reading-a" title="Reading Item A" />
               <assessmentItemRef title="Reading Item B">
                 <identifier>unit-reading-b</identifier>
-                <body>Read the passage and answer the question.</body>
+                <body><![CDATA[<p>Read the passage and answer the question.</p>]]></body>
               </assessmentItemRef>
             </assessmentSection>
           </testPart>

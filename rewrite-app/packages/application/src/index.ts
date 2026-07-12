@@ -2853,6 +2853,14 @@ const decodeXmlAttributeValue = (value: string): string =>
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");
 
+const decodeXmlTextContent = (value: string): string =>
+  decodeXmlAttributeValue(
+    value
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+      .replace(/<[^>]+>/g, "")
+      .trim()
+  );
+
 const parseXmlAttributes = (rawAttributes: string): Record<string, string> => {
   const attributes: Record<string, string> = {};
 
@@ -2905,9 +2913,10 @@ const readXmlChildText = (
         "i"
       )
     );
-    const value = match?.[2]?.replace(/<[^>]+>/g, "").trim();
+    const value =
+      match?.[2] === undefined ? undefined : decodeXmlTextContent(match[2]);
     if (value) {
-      return decodeXmlAttributeValue(value);
+      return value;
     }
   }
   return undefined;
