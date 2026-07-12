@@ -666,7 +666,12 @@ export class WorkspaceViewFacade {
             label: "Imported",
             value: this.formatDateTime(rosterEntry.importedAt)
           }
-        ]
+        ],
+        actionLabel: "Open Participant Detail",
+        actionPayload: {
+          participantLoginKey: rosterEntry.loginKey,
+          groupKey: rosterEntry.groupKey
+        }
       })),
       ...detail.unitProgress.map(unit => ({
         headline: unit.displayLabel,
@@ -816,7 +821,12 @@ export class WorkspaceViewFacade {
             label: "Imported",
             value: this.formatDateTime(rosterEntry.importedAt)
           }
-        ]
+        ],
+        actionLabel: "Open Participant Detail",
+        actionPayload: {
+          participantLoginKey: rosterEntry.loginKey,
+          groupKey: rosterEntry.groupKey
+        }
       })),
       ...detail.sessions.map(session => ({
         headline: this.monitorParticipantLabel(session),
@@ -849,8 +859,9 @@ export class WorkspaceViewFacade {
               : "none"
           }
         ],
-        actionLabel: "Open Runtime",
+        actionLabel: "Open Participant Detail",
         actionPayload: {
+          participantLoginKey: session.participantSession.loginKey,
           subjectType: "participant_session",
           subjectId: session.participantSession.participantSessionId,
           loginKey: session.participantSession.loginKey
@@ -976,7 +987,12 @@ export class WorkspaceViewFacade {
             label: "Imported",
             value: this.formatDateTime(rosterEntry.importedAt)
           }
-        ]
+        ],
+        actionLabel: "Open Participant Detail",
+        actionPayload: {
+          participantLoginKey: rosterEntry.loginKey,
+          groupKey: rosterEntry.groupKey
+        }
       })),
       ...detail.testRuns.map(item => ({
         headline: this.monitorParticipantLabel(item),
@@ -1499,6 +1515,25 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorBookletDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.unitKey?.trim()) {
+      this.openStudyMonitorUnit(item);
+      return;
+    }
+
+    if (item.actionPayload?.participantLoginKey?.trim()) {
+      this.openStudyMonitorParticipant(item);
+      return;
+    }
+
+    this.openActivitySubject(item);
+  }
+
+  openStudyMonitorDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantLoginKey?.trim()) {
+      this.openStudyMonitorParticipant(item);
+      return;
+    }
+
     if (item.actionPayload?.unitKey?.trim()) {
       this.openStudyMonitorUnit(item);
       return;

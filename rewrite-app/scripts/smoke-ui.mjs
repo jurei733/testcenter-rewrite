@@ -347,19 +347,29 @@ try {
       .toLowerCase();
     logStep(`action-${stepName}-start`);
     await waitForNotBusy(`${stepName}-before-click`);
-    const card = page.locator("article.card").filter({
-      has: page.getByRole("heading", { name: cardTitle, exact: true })
-    });
-    const actionScope = itemHeadline
-      ? card.locator(".record-card").filter({
-          has: page.getByRole("heading", { name: itemHeadline, exact: true })
-        })
-      : card;
-    const button = actionScope
-      .getByRole("button", { name: buttonName, exact: true })
-      .first();
-    await button.scrollIntoViewIfNeeded();
-    await button.click({ force: true });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const card = page.locator("article.card").filter({
+          has: page.getByRole("heading", { name: cardTitle, exact: true })
+        });
+        const actionScope = itemHeadline
+          ? card.locator(".record-card").filter({
+              has: page.getByRole("heading", { name: itemHeadline, exact: true })
+            })
+          : card;
+        await actionScope
+          .getByRole("button", { name: buttonName, exact: true })
+          .first()
+          .click({ force: true });
+        break;
+      } catch (error) {
+        if (attempt === 3 || !String(error?.message).includes("not attached")) {
+          throw error;
+        }
+        await page.waitForTimeout(250);
+        await waitForNotBusy(`${stepName}-retry-${attempt}`);
+      }
+    }
     const startedBusy = await waitForBusy(`${stepName}-after-click`);
     if (!startedBusy) {
       await page.waitForTimeout(150);
@@ -1753,6 +1763,19 @@ try {
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "missing" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  const expectStudyMonitorParticipantDetail = async (
+    loginKey,
+    expectedTexts = []
+  ) => {
+    let collection = page
+      .locator("app-record-collection")
+      .filter({ hasText: "Study Monitor Participant Detail" })
+      .filter({ hasText: loginKey });
+    for (const expectedText of expectedTexts) {
+      collection = collection.filter({ hasText: expectedText });
+    }
+    await collection.waitFor({ state: "visible", timeout: 15_000 });
+  };
   const monitorStatusTotal = [
     studyMonitorSummary.notStartedCount,
     studyMonitorSummary.runningCount,
@@ -1946,6 +1969,15 @@ try {
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
   ]);
+  await groupDetailAdaCard
+    .getByRole("button", { name: "Open Participant Detail" })
+    .click();
+  await expectStudyMonitorParticipantDetail("entry-student-a", [
+    "group:entry-smoke",
+    "Ada Entry",
+    "booklet:starter",
+    "missing"
+  ]);
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
@@ -1995,6 +2027,15 @@ try {
     "loginKey=entry-student-a",
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
+  ]);
+  await bookletDetailAdaCard
+    .getByRole("button", { name: "Open Participant Detail" })
+    .click();
+  await expectStudyMonitorParticipantDetail("entry-student-a", [
+    "group:entry-smoke",
+    "Ada Entry",
+    "booklet:starter",
+    "missing"
   ]);
   await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
   await page.waitForFunction(
@@ -2050,6 +2091,15 @@ try {
     "loginKey=entry-student-a",
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
+  ]);
+  await unitDetailAdaCard
+    .getByRole("button", { name: "Open Participant Detail" })
+    .click();
+  await expectStudyMonitorParticipantDetail("entry-student-a", [
+    "group:entry-smoke",
+    "Ada Entry",
+    "booklet:starter",
+    "missing"
   ]);
 
   logStep("nav-content-blocked-activation");

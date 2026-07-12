@@ -177,7 +177,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Study Monitor Group Detail"
         subtitle="Selected group sessions, runs, responses, and review pressure."
         [items]="view.studyMonitorGroupItems"
-        (itemAction)="view.openActivitySubject($event)"
+        (itemAction)="view.openStudyMonitorDetailItem($event)"
         emptyState="Open a group from the study monitor to inspect participant detail."
       ></app-record-collection>
 
@@ -193,7 +193,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Study Monitor Unit Detail"
         subtitle="Selected unit runs, missing responses, answers, and review pressure."
         [items]="view.studyMonitorUnitItems"
-        (itemAction)="view.openActivitySubject($event)"
+        (itemAction)="view.openStudyMonitorDetailItem($event)"
         emptyState="Open a unit from the study monitor to inspect run detail."
       ></app-record-collection>
 
