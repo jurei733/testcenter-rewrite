@@ -50,7 +50,7 @@ jobs:
             playwright: true
           - check: local-demo
             command: npm run smoke:local-demo
-            playwright: false
+            playwright: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
