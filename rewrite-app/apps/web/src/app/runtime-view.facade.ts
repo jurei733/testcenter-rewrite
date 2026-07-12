@@ -974,6 +974,30 @@ export class RuntimeViewFacade {
         });
       }
 
+      if (currentRunState.testRun.status === "paused") {
+        items.push({
+          headline: "Monitor resume selected run",
+          subline: currentRunState.testRun.testRunId,
+          badges: [currentRunState.testRun.status, "monitor", "resume"],
+          rows: [
+            {
+              label: "Current Unit",
+              value: currentUnitLabel
+            },
+            {
+              label: "Booklet",
+              value: currentRunState.booklet.displayLabel
+            },
+            {
+              label: "Expected Result",
+              value: "Operator command records activity and returns the run to running"
+            }
+          ],
+          actionLabel: "Apply Suggestion",
+          actionPayload: { runtimeCommand: "monitorResume" }
+        });
+      }
+
       if (currentRunState.availableActions.includes("save_progress")) {
         const isPaused = currentRunState.testRun.status === "paused";
         items.push({
@@ -998,6 +1022,30 @@ export class RuntimeViewFacade {
           actionPayload: {
             runtimeCommand: isPaused ? "saveRunning" : "savePaused"
           }
+        });
+      }
+
+      if (currentRunState.testRun.status === "running") {
+        items.push({
+          headline: "Monitor pause selected run",
+          subline: currentRunState.testRun.testRunId,
+          badges: [currentRunState.testRun.status, "monitor", "pause"],
+          rows: [
+            {
+              label: "Current Unit",
+              value: currentUnitLabel
+            },
+            {
+              label: "Booklet",
+              value: currentRunState.booklet.displayLabel
+            },
+            {
+              label: "Expected Result",
+              value: "Operator command records activity and moves the run to paused"
+            }
+          ],
+          actionLabel: "Apply Suggestion",
+          actionPayload: { runtimeCommand: "monitorPause" }
         });
       }
 
@@ -1300,6 +1348,12 @@ export class RuntimeViewFacade {
         break;
       case "completeRun":
         this.completeRun();
+        break;
+      case "monitorPause":
+        this.issueMonitorPause();
+        break;
+      case "monitorResume":
+        this.issueMonitorResume();
         break;
       case "refreshRuntimeReads":
       default:

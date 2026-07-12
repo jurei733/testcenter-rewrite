@@ -1695,8 +1695,12 @@ try {
     .filter({ hasText: "operator-ui" })
     .filter({ hasText: "Filtered review smoke" })
     .waitFor();
-  logStep("monitor-resume-run");
-  await clickAction("Monitor Resume");
+  logStep("monitor-resume-run-suggestion");
+  await clickCardAction(
+    "Runtime Action Queue",
+    "Apply Suggestion",
+    "Monitor resume selected run"
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -1712,7 +1716,7 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelector("#playerPreviewStatus")?.textContent?.trim() ===
-      "running",
+        "running",
     undefined,
     { timeout: 15_000 }
   );
