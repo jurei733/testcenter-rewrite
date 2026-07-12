@@ -104,6 +104,40 @@ jobs:
       - run: npm run test:integration:postgres:built
       - run: npm run smoke:startup:postgres:built
 
+  verify-postgres-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rewrite-app
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: rewrite_app
+          POSTGRES_USER: rewrite
+          POSTGRES_PASSWORD: rewrite
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rewrite -d rewrite_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FIRST_SLICE_POSTGRES_URL: postgresql://rewrite:rewrite@127.0.0.1:5432/rewrite_app
+      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rewrite-app/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run smoke:ui:postgres:built
+
   docker-compose-release-smoke:
     runs-on: ubuntu-latest
     defaults:
