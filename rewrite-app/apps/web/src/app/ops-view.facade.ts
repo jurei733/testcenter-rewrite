@@ -125,8 +125,20 @@ export class OpsViewFacade {
     this.viewState.setActiveView("ops");
   }
 
+  get canUseAdminCredentials(): boolean {
+    return (
+      this.ops.adminUsername.trim() !== "" &&
+      this.ops.adminPassword !== ""
+    );
+  }
+
+  get canUseAdminSession(): boolean {
+    return this.ops.adminSessionToken.trim() !== "";
+  }
+
   get canCreateAdminUser(): boolean {
     return (
+      this.canUseAdminSession &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.ops.adminCreatePassword !== "" &&
       this.isScopedAdminRoleInputComplete(
@@ -138,11 +150,15 @@ export class OpsViewFacade {
   }
 
   get canRevokeAdminSession(): boolean {
-    return this.ops.adminSessionRevokeTargetId.trim() !== "";
+    return (
+      this.canUseAdminSession &&
+      this.ops.adminSessionRevokeTargetId.trim() !== ""
+    );
   }
 
   get canAssignAdminRole(): boolean {
     return (
+      this.canUseAdminSession &&
       this.ops.adminRoleTargetUserId.trim() !== "" &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminRoleRole,
@@ -154,6 +170,7 @@ export class OpsViewFacade {
 
   get canRevokeAdminRole(): boolean {
     return (
+      this.canUseAdminSession &&
       this.ops.adminRevokeTargetUserId.trim() !== "" &&
       this.ops.adminRevokeRoleAssignmentId.trim() !== ""
     );
@@ -161,6 +178,7 @@ export class OpsViewFacade {
 
   get canResetAdminUserPassword(): boolean {
     return (
+      this.canUseAdminSession &&
       this.ops.adminResetTargetUserId.trim() !== "" &&
       this.ops.adminResetPassword !== ""
     );
@@ -168,6 +186,7 @@ export class OpsViewFacade {
 
   get canUpdateAdminUserStatus(): boolean {
     return (
+      this.canUseAdminSession &&
       this.ops.adminStatusTargetUserId.trim() !== "" &&
       this.adminStatusOptions.includes(this.ops.adminStatusValue)
     );
@@ -182,36 +201,57 @@ export class OpsViewFacade {
   }
 
   bootstrapOrSignInAdmin(): void {
+    if (!this.canUseAdminCredentials) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.bootstrapOrSignInAdmin());
   }
 
   bootstrapAdmin(): void {
+    if (!this.canUseAdminCredentials) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.bootstrapAdmin());
   }
 
   signInAdmin(): void {
+    if (!this.canUseAdminCredentials) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.signInAdmin());
   }
 
   refreshAdminSession(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.refreshAdminSession());
   }
 
   refreshAdminSessions(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.refreshAdminSessions());
   }
 
   exportAdminSessionsCsv(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.exportAdminSessionsCsv());
   }
 
   signOutAdmin(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
   confirmRevokeAdminSession(): void {
     const adminSessionId = this.ops.adminSessionRevokeTargetId.trim();
-    if (!adminSessionId) {
+    if (!this.canRevokeAdminSession || !adminSessionId) {
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -223,39 +263,60 @@ export class OpsViewFacade {
   }
 
   private revokeAdminSession(): void {
+    if (!this.canRevokeAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.revokeAdminSession());
   }
 
   refreshAdminUsers(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.refreshAdminUsers());
   }
 
   exportAdminUsersCsv(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.exportAdminUsersCsv());
   }
 
   refreshAdminAuditEvents(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.refreshAdminAuditEvents());
   }
 
   exportAdminAuditEventsCsv(): void {
+    if (!this.canUseAdminSession) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.opsService.exportAdminAuditEventsCsv()
     );
   }
 
   createAdminUser(): void {
+    if (!this.canCreateAdminUser) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.createAdminUser());
   }
 
   assignAdminRole(): void {
+    if (!this.canAssignAdminRole) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.assignAdminRole());
   }
 
   confirmRevokeAdminRole(): void {
     const adminUserId = this.ops.adminRevokeTargetUserId.trim();
     const roleAssignmentId = this.ops.adminRevokeRoleAssignmentId.trim();
-    if (!adminUserId || !roleAssignmentId) {
+    if (!this.canRevokeAdminRole || !adminUserId || !roleAssignmentId) {
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -267,13 +328,16 @@ export class OpsViewFacade {
   }
 
   private revokeAdminRole(): void {
+    if (!this.canRevokeAdminRole) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.revokeAdminRole());
   }
 
   confirmUpdateAdminUserStatus(): void {
     const adminUserId = this.ops.adminStatusTargetUserId.trim();
     const status = this.ops.adminStatusValue;
-    if (!adminUserId) {
+    if (!this.canUpdateAdminUserStatus || !adminUserId) {
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -285,12 +349,15 @@ export class OpsViewFacade {
   }
 
   private updateAdminUserStatus(): void {
+    if (!this.canUpdateAdminUserStatus) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.updateAdminUserStatus());
   }
 
   confirmResetAdminUserPassword(): void {
     const adminUserId = this.ops.adminResetTargetUserId.trim();
-    if (!adminUserId || !this.ops.adminResetPassword) {
+    if (!this.canResetAdminUserPassword || !adminUserId) {
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -302,6 +369,9 @@ export class OpsViewFacade {
   }
 
   private resetAdminUserPassword(): void {
+    if (!this.canResetAdminUserPassword) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
   }
 

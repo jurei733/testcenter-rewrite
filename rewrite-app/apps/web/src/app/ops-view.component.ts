@@ -60,14 +60,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminBootstrapOrSignInButton" class="primary" type="button" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-          <button id="adminBootstrapButton" class="ghost" type="button" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
-          <button id="adminSignInButton" class="ghost" type="button" (click)="view.signInAdmin()">Sign In</button>
-          <button id="adminCurrentSessionButton" class="ghost" type="button" (click)="view.refreshAdminSession()">Current Session</button>
-          <button id="adminSessionsButton" class="ghost" type="button" (click)="view.refreshAdminSessions()">Admin Sessions</button>
-          <button id="adminUsersButton" class="ghost" type="button" (click)="view.refreshAdminUsers()">Admin Users</button>
-          <button id="adminAuditEventsButton" class="ghost" type="button" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
-          <button id="adminSignOutButton" class="ghost" type="button" (click)="view.signOutAdmin()">Sign Out</button>
+          <button id="adminBootstrapOrSignInButton" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
+          <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
+          <button id="adminSignInButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.signInAdmin()">Sign In</button>
+          <button id="adminCurrentSessionButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSession()">Current Session</button>
+          <button id="adminSessionsButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
+          <button id="adminUsersButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminUsers()">Admin Users</button>
+          <button id="adminAuditEventsButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
+          <button id="adminSignOutButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.signOutAdmin()">Sign Out</button>
         </div>
       </article>
 
@@ -103,9 +103,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
-          <button id="exportAdminSessionsCsvButton" class="secondary" type="button" (click)="view.exportAdminSessionsCsv()">Export Sessions CSV</button>
-          <button class="secondary" type="button" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
+          <button id="applyAdminSessionFiltersButton" class="primary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
+          <button id="exportAdminSessionsCsvButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.exportAdminSessionsCsv()">Export Sessions CSV</button>
+          <button id="useCurrentAdminUserAsSessionFilterButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
           <button id="adminRevokeSessionButton" class="danger" type="button" [disabled]="!view.canRevokeAdminSession" (click)="view.confirmRevokeAdminSession()">Revoke Selected Session</button>
           <button class="ghost" type="button" (click)="view.clearAdminSessionFilters()">Clear Session Filters</button>
         </div>
@@ -265,9 +265,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyAdminUserFilters()">Apply User Filters</button>
-          <button class="secondary" type="button" (click)="view.useAdminManagementScopeAsUserFilters()">Use Role Scope</button>
-          <button id="exportAdminUsersCsvButton" class="secondary" type="button" (click)="view.exportAdminUsersCsv()">Export Users CSV</button>
+          <button id="applyAdminUserFiltersButton" class="primary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.applyAdminUserFilters()">Apply User Filters</button>
+          <button id="useAdminManagementScopeAsUserFiltersButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.useAdminManagementScopeAsUserFilters()">Use Role Scope</button>
+          <button id="exportAdminUsersCsvButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.exportAdminUsersCsv()">Export Users CSV</button>
           <button class="ghost" type="button" (click)="view.clearAdminUserFilters()">Clear User Filters</button>
         </div>
       </article>
@@ -319,9 +319,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyAdminAuditFilters()">Apply Audit Filters</button>
-          <button class="secondary" type="button" (click)="view.useSelectedAdminUserAsAuditSubject()">Use Selected User As Subject</button>
-          <button id="exportAdminAuditCsvButton" class="secondary" type="button" (click)="view.exportAdminAuditEventsCsv()">Export Audit CSV</button>
+          <button id="applyAdminAuditFiltersButton" class="primary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.applyAdminAuditFilters()">Apply Audit Filters</button>
+          <button id="useSelectedAdminUserAsAuditSubjectButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.useSelectedAdminUserAsAuditSubject()">Use Selected User As Subject</button>
+          <button id="exportAdminAuditCsvButton" class="secondary" type="button" [disabled]="!view.canUseAdminSession" (click)="view.exportAdminAuditEventsCsv()">Export Audit CSV</button>
           <button class="ghost" type="button" (click)="view.clearAdminAuditFilters()">Clear Audit Filters</button>
         </div>
       </article>
