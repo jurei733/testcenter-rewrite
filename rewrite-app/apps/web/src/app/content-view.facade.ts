@@ -24,7 +24,10 @@ import {
 } from "./rewrite-app-shell.readers";
 import { downloadTextFile } from "./download-text-file";
 import type { RecordCollectionItem } from "./record-collection.component";
-import { participantSessionLinkRows } from "./participant-session-links";
+import {
+  type ParticipantSessionEntryLinkContext,
+  participantSessionLinkRows as buildParticipantSessionLinkRows
+} from "./participant-session-links";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
@@ -47,6 +50,16 @@ export class ContentViewFacade {
   readonly sourcePackageStatusOptions = sourcePackageStatuses;
   readonly importJobStatusOptions = importJobStatuses;
   readonly contentReleaseStatusOptions = contentReleaseStatuses;
+
+  private readonly participantSessionLinkRows = (
+    participantSessionId?: string | null,
+    context: ParticipantSessionEntryLinkContext = {}
+  ): ReturnType<typeof buildParticipantSessionLinkRows> =>
+    buildParticipantSessionLinkRows(participantSessionId, {
+      tenantKey: this.uiState.workspace.tenantKey,
+      workspaceKey: this.uiState.workspace.workspaceKey,
+      ...context
+    });
 
   init(): void {
     this.viewState.setActiveView("content");
@@ -936,7 +949,11 @@ export class ContentViewFacade {
           ],
           rows: [
             { label: "Run", value: openRun.testRunId },
-            ...participantSessionLinkRows(participantSessionId),
+            ...this.participantSessionLinkRows(participantSessionId, {
+              loginKey: openRun.loginKey,
+              groupKey: openRun.groupKey,
+              bookletKey: openRun.bookletKey
+            }),
             { label: "Booklet", value: openRun.bookletKey },
             {
               label: "Current Unit",
@@ -1233,8 +1250,13 @@ export class ContentViewFacade {
               label: "Session",
               value: participantSession.participantSessionId
             },
-            ...participantSessionLinkRows(
-              participantSession.participantSessionId
+            ...this.participantSessionLinkRows(
+              participantSession.participantSessionId,
+              {
+                loginKey: participantSession.loginKey,
+                groupKey: participantSession.groupKey,
+                bookletKey: rosterEntry?.bookletKey
+              }
             ),
             {
               label: "Booklet",
@@ -1299,7 +1321,11 @@ export class ContentViewFacade {
               label: "Participant Session",
               value: testRun.participantSessionId
             },
-            ...participantSessionLinkRows(testRun.participantSessionId),
+            ...this.participantSessionLinkRows(testRun.participantSessionId, {
+              loginKey: matchingParticipantSession?.loginKey,
+              groupKey: matchingParticipantSession?.groupKey,
+              bookletKey: testRun.bookletKey
+            }),
             {
               label: "Current Unit",
               value: testRun.currentUnitKey ?? "none"

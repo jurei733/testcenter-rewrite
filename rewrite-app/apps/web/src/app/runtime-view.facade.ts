@@ -93,7 +93,16 @@ export class RuntimeViewFacade {
               value: item.participantSession.participantSessionId
             },
             ...participantSessionLinkRows(
-              item.participantSession.participantSessionId
+              item.participantSession.participantSessionId,
+              {
+                tenantKey: this.uiState.workspace.tenantKey,
+                workspaceKey: this.uiState.workspace.workspaceKey,
+                loginKey: item.participantSession.loginKey,
+                groupKey: item.participantSession.groupKey,
+                bookletKey:
+                  item.participantRosterEntry?.bookletKey ??
+                  item.latestTestRun?.bookletKey
+              }
             ),
             {
               label: "Group",
@@ -157,7 +166,16 @@ export class RuntimeViewFacade {
             value: detail.participantSession.participantSessionId
           },
           ...participantSessionLinkRows(
-            detail.participantSession.participantSessionId
+            detail.participantSession.participantSessionId,
+            {
+              tenantKey: this.uiState.workspace.tenantKey,
+              workspaceKey: this.uiState.workspace.workspaceKey,
+              loginKey: detail.participantSession.loginKey,
+              groupKey: detail.participantSession.groupKey,
+              bookletKey:
+                detail.participantRosterEntry?.bookletKey ??
+                detail.testRuns[0]?.bookletKey
+            }
           ),
           {
             label: "Group",
@@ -903,7 +921,13 @@ export class RuntimeViewFacade {
               label: "Session",
               value: openRun.participantSessionId
             },
-            ...participantSessionLinkRows(openRun.participantSessionId),
+            ...participantSessionLinkRows(openRun.participantSessionId, {
+              tenantKey: this.uiState.workspace.tenantKey,
+              workspaceKey: this.uiState.workspace.workspaceKey,
+              loginKey: openRun.loginKey,
+              groupKey: openRun.groupKey,
+              bookletKey: openRun.bookletKey
+            }),
             {
               label: "Run",
               value: openRun.testRunId

@@ -26,7 +26,10 @@ import {
   readStringValue
 } from "./rewrite-app-shell.readers";
 import type { RecordCollectionItem } from "./record-collection.component";
-import { participantSessionLinkRows } from "./participant-session-links";
+import {
+  type ParticipantSessionEntryLinkContext,
+  participantSessionLinkRows as buildParticipantSessionLinkRows
+} from "./participant-session-links";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -71,6 +74,16 @@ export class WorkspaceViewFacade {
     item.participantSession?.loginKey ??
     item.participantRosterEntry?.loginKey ??
     "unknown participant";
+
+  private readonly participantSessionLinkRows = (
+    participantSessionId?: string | null,
+    context: ParticipantSessionEntryLinkContext = {}
+  ): ReturnType<typeof buildParticipantSessionLinkRows> =>
+    buildParticipantSessionLinkRows(participantSessionId, {
+      tenantKey: this.uiState.workspace.tenantKey,
+      workspaceKey: this.uiState.workspace.workspaceKey,
+      ...context
+    });
 
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
@@ -204,7 +217,10 @@ export class WorkspaceViewFacade {
           { label: "Unit", value: row.unitKey || "none" },
           { label: "Booklet", value: row.bookletKey ?? "none" },
           { label: "Test Run", value: row.testRunId ?? "none" },
-          ...participantSessionLinkRows(row.participantSessionId),
+          ...this.participantSessionLinkRows(row.participantSessionId, {
+            loginKey: row.loginKey,
+            bookletKey: row.bookletKey
+          }),
           { label: "Response Length", value: String(row.responseLength) },
           {
             label: "Latest Activity",
@@ -235,8 +251,13 @@ export class WorkspaceViewFacade {
             label: "Participant Session",
             value: item.participantSession?.participantSessionId ?? "none"
           },
-          ...participantSessionLinkRows(
-            item.participantSession?.participantSessionId
+          ...this.participantSessionLinkRows(
+            item.participantSession?.participantSessionId,
+            {
+              loginKey: item.participantSession?.loginKey,
+              groupKey: item.participantSession?.groupKey,
+              bookletKey: item.testRun.bookletKey
+            }
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
           {
@@ -736,8 +757,13 @@ export class WorkspaceViewFacade {
             value: item.participantRosterEntry?.displayName ?? "none"
           },
           { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
-          ...participantSessionLinkRows(
-            item.participantSession?.participantSessionId
+          ...this.participantSessionLinkRows(
+            item.participantSession?.participantSessionId,
+            {
+              loginKey: this.monitorParticipantLogin(item),
+              groupKey: item.participantSession?.groupKey,
+              bookletKey: item.testRun.bookletKey
+            }
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
           { label: "Responses", value: String(item.responseCount) },
@@ -870,8 +896,15 @@ export class WorkspaceViewFacade {
             label: "Session",
             value: session.participantSession.participantSessionId
           },
-          ...participantSessionLinkRows(
-            session.participantSession.participantSessionId
+          ...this.participantSessionLinkRows(
+            session.participantSession.participantSessionId,
+            {
+              loginKey: session.participantSession.loginKey,
+              groupKey: session.participantSession.groupKey,
+              bookletKey:
+                session.participantRosterEntry?.bookletKey ??
+                session.latestTestRun?.bookletKey
+            }
           ),
           {
             label: "Booklet",
@@ -935,8 +968,13 @@ export class WorkspaceViewFacade {
             label: "Display Name",
             value: item.participantRosterEntry?.displayName ?? "none"
           },
-          ...participantSessionLinkRows(
-            item.participantSession?.participantSessionId
+          ...this.participantSessionLinkRows(
+            item.participantSession?.participantSessionId,
+            {
+              loginKey: this.monitorParticipantLogin(item),
+              groupKey: item.participantSession?.groupKey,
+              bookletKey: item.testRun.bookletKey
+            }
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
           { label: "Responses", value: String(item.responseCount) },
@@ -1047,8 +1085,13 @@ export class WorkspaceViewFacade {
             label: "Group",
             value: item.participantSession?.groupKey ?? "unknown group"
           },
-          ...participantSessionLinkRows(
-            item.participantSession?.participantSessionId
+          ...this.participantSessionLinkRows(
+            item.participantSession?.participantSessionId,
+            {
+              loginKey: this.monitorParticipantLogin(item),
+              groupKey: item.participantSession?.groupKey,
+              bookletKey: item.testRun.bookletKey
+            }
           ),
           { label: "Booklet", value: item.testRun.bookletKey },
           { label: "Expected", value: item.expected ? "yes" : "no" },
@@ -1412,12 +1455,17 @@ export class WorkspaceViewFacade {
       ],
       rows: [
         { label: "Subject", value: item.activityEvent.subjectId },
-        ...participantSessionLinkRows(
+        ...this.participantSessionLinkRows(
           this.getActivityParticipantSessionId(
             item.activityEvent.subjectType,
             item.activityEvent.subjectId,
             readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
-          )
+          ),
+          {
+            loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
+            groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
+            bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
+          }
         ),
         { label: "Event Id", value: item.activityEvent.activityEventId }
       ],
@@ -1461,12 +1509,17 @@ export class WorkspaceViewFacade {
           rows: [
             { label: "Summary", value: item.activityEvent.summary },
             { label: "Subject Id", value: item.activityEvent.subjectId },
-            ...participantSessionLinkRows(
+            ...this.participantSessionLinkRows(
               this.getActivityParticipantSessionId(
                 item.activityEvent.subjectType,
                 item.activityEvent.subjectId,
                 readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
-              )
+              ),
+              {
+                loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
+                groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
+                bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
+              }
             ),
             ...detailRows
           ],

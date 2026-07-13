@@ -1808,9 +1808,14 @@ try {
   await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
   await fillAndCommit("#participantSessionLimit", "1");
   await clickAction("Refresh Sessions");
-  const operatorParticipantSessionLink = `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
-    participantSessionId
-  )}`;
+  const operatorParticipantSessionLink = `${baseUrl}/participant?${new URLSearchParams({
+    participantSessionId,
+    tenantKey,
+    workspaceKey,
+    loginKey: participantLoginKey,
+    groupKey: participantGroupKey,
+    bookletKey: participantBookletKey
+  }).toString()}`;
   const participantSessionCard = page
     .locator("article.card")
     .filter({
@@ -2726,7 +2731,11 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Workspace Activity" })
     })
-    .locator(`a[href="${baseUrl}/participant?participantSessionId=${participantSessionId}"]`)
+    .locator(
+      `a[href^="${baseUrl}/participant?"][href*="participantSessionId=${encodeURIComponent(
+        participantSessionId
+      )}"]`
+    )
     .first()
     .waitFor();
   logStep("export-workspace-log-csv");
