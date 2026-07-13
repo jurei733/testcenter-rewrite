@@ -2652,7 +2652,7 @@ try {
     page.once("dialog", async dialog => {
       try {
         assert.match(dialog.message(), new RegExp(participantGroupKey));
-        await dialog.accept();
+        await dialog.accept(participantGroupKey);
         resolvePromise(undefined);
       } catch (error) {
         reject(error);

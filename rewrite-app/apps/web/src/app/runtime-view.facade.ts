@@ -1613,13 +1613,12 @@ export class RuntimeViewFacade {
   confirmDeleteGroupResults(): void {
     const groupKey = this.runtime.groupKey.trim();
     if (!groupKey) {
-      this.deleteGroupResults();
       return;
     }
-    const confirmed = globalThis.window?.confirm(
-      `Delete all collected test runs for group '${groupKey}' in this workspace?`
+    const confirmedGroupKey = globalThis.window?.prompt(
+      `Type '${groupKey}' to delete all collected test runs for this group.`
     );
-    if (confirmed) {
+    if (confirmedGroupKey === groupKey) {
       this.deleteGroupResults();
     }
   }
