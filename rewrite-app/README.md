@@ -89,7 +89,7 @@ For the local production-like verification path, run:
 npm run ci
 ```
 
-For a quicker pre-push signal that builds once, reuses built artifacts, and stops the browser flow after the content import/activation read model, run:
+For a quicker pre-push signal that builds once, reuses built artifacts, includes the SQLite runtime preflight, and stops the browser flow after the content import/activation read model, run:
 
 ```bash
 npm run ci:fast
