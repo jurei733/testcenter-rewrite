@@ -1266,6 +1266,19 @@ pre {
 }
 
 @media (max-width: 720px) {
+  .page {
+    padding: 22px 14px 42px;
+  }
+
+  .hero-panel {
+    padding: 20px;
+  }
+
+  .status-grid,
+  .local-demo-startup dl {
+    grid-template-columns: 1fr;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
