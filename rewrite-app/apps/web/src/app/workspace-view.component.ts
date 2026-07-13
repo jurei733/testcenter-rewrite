@@ -151,7 +151,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
 
       <article class="card">
         <h2>Participant Matrix Filters</h2>
-        <p>Keep large monitor matrices focused by participant, group, unit, run status, answer state, and visible-row limit.</p>
+        <p>Keep large monitor matrices focused by participant, group, unit, run status, answer state, and visible-row limit. The participant-matrix CSV export uses the same filters.</p>
         <div class="form-grid">
           <label>
             Login
@@ -338,7 +338,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
 
       <article class="card">
         <h2>Participant Matrix CSV Export</h2>
-        <p>Participant-by-unit monitor export with run status, response coverage, and review counts.</p>
+        <p>Participant-by-unit monitor export with run status, response coverage, and review counts, narrowed by the current matrix filters and visible-row limit.</p>
         <pre id="studyMonitorParticipantMatrixExportPreview">{{ view.studyMonitorParticipantMatrixExportView }}</pre>
       </article>
 

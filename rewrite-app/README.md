@@ -318,7 +318,7 @@ The added read side now makes the first slice inspectable:
 - study monitor participant detail drills into one login with saved roster context, sessions, runs, unit answer status, response counts, and review counts
 - study monitor participant matrix read model exposes participant-by-unit session/run/answer/review status directly for the operator shell
 - study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
-- study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context
+- study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context, and can be narrowed by the same login/group/unit/status/answer/limit filters used by the operator matrix
 - open-run CSV export flattens the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff
 - source-package listing shows uploaded packages together with their latest import attempt, filterable by status, media type, file name, latest import status, and limit
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
@@ -430,7 +430,7 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - participant sign-in and session resume
 - participant roster, participant-session, and open-run export through the runtime shell
 - response and review CSV export through the runtime shell
-- study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, run drill-down, study-monitor CSV export, and open-run CSV export
+- study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, run drill-down, study-monitor CSV export, filtered participant-matrix CSV export, and open-run CSV export
 - workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity

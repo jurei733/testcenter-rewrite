@@ -535,6 +535,22 @@ try {
     participantMatrixDownload.suggestedFilename(),
     "demo-workspace-study-monitor-participants.csv"
   );
+  const filteredParticipantMatrixCsvResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor-participants.csv?loginKey=student-demo&unitKey=unit-intro&testRunStatus=not_started&answerState=missing&limit=1`,
+    {
+      headers: {
+        authorization: `Bearer ${adminSessionToken}`
+      }
+    }
+  );
+  assert.equal(filteredParticipantMatrixCsvResponse.status, 200);
+  const filteredParticipantMatrixCsv =
+    await filteredParticipantMatrixCsvResponse.text();
+  assert.match(filteredParticipantMatrixCsv, /tenantKey,workspaceKey,generatedAt,loginKey/);
+  assert.match(filteredParticipantMatrixCsv, /student-demo/);
+  assert.match(filteredParticipantMatrixCsv, /unit-intro/);
+  assert.match(filteredParticipantMatrixCsv, /not_started/);
+  assert.equal(filteredParticipantMatrixCsv.trim().split("\n").length, 2);
   await page
     .locator("app-record-collection")
     .filter({ hasText: "Participant Unit Matrix" })
