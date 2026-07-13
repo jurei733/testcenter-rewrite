@@ -63,6 +63,36 @@ export class AppShellFacade {
     return localDemoParticipantLink;
   }
 
+  get localDemoStartupHeadline(): string {
+    if (this.ops.readinessBadge === "ready") {
+      return "Local demo is ready to use";
+    }
+    return `Local demo detected, readiness ${this.ops.readinessBadge}`;
+  }
+
+  get localDemoScopeLabel(): string {
+    return "demo-tenant / demo-workspace";
+  }
+
+  get localDemoAdminCredential(): string {
+    return "demo-admin / demo-admin-password";
+  }
+
+  get localDemoParticipantCredential(): string {
+    return "student-demo";
+  }
+
+  get localDemoRuntimeDetail(): string {
+    const storage = this.displayValue(this.ops.storageKind);
+    const schema = this.displayValue(this.ops.storageSchemaVersion);
+    const auth = this.displayValue(this.ops.operatorAuthMode);
+    return `Storage ${storage}, schema ${schema}, auth ${auth}`;
+  }
+
+  get localDemoBuildDetail(): string {
+    return `Build ${this.displayValue(this.ops.buildRef)}`;
+  }
+
   get lastResponsePreview(): string {
     const normalized = this.uiState.lastResponse().replace(/\s+/g, " ").trim();
     if (!normalized || normalized === "No request sent yet.") {

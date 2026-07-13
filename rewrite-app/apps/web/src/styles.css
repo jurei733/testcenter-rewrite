@@ -393,6 +393,61 @@ button:disabled {
   margin-top: 20px;
 }
 
+.local-demo-startup {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid rgba(31, 92, 84, 0.18);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top right, rgba(31, 92, 84, 0.16), transparent 38%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(215, 235, 231, 0.58));
+}
+
+.local-demo-startup h2 {
+  margin: 12px 0 6px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.local-demo-startup p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.local-demo-startup dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.local-demo-startup dl div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(27, 36, 48, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.local-demo-startup dt {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.local-demo-startup dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 700;
+}
+
 .primary {
   background: var(--accent);
   color: white;

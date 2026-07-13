@@ -165,6 +165,27 @@ try {
   }).toString()}`;
   await demoLink.waitFor({ timeout: 15_000 });
   assert.equal(await demoLink.getAttribute("href"), demoParticipantPath);
+  await page.locator("#localDemoStartupCard").waitFor({ timeout: 15_000 });
+  assert.equal(
+    (await page.locator("#localDemoStartupStatus").textContent())?.trim(),
+    "Local demo is ready to use"
+  );
+  assert.equal(
+    (await page.locator("#localDemoAdminCredential").textContent())?.trim(),
+    "demo-admin / demo-admin-password"
+  );
+  assert.equal(
+    (await page.locator("#localDemoParticipantCredential").textContent())?.trim(),
+    "student-demo"
+  );
+  assert.match(
+    (await page.locator("#localDemoRuntimeDetail").textContent())?.trim() ?? "",
+    /Storage sqlite, schema \d+, auth required/
+  );
+  assert.match(
+    (await page.locator("#localDemoBuildDetail").textContent())?.trim() ?? "",
+    /^Build .+/
+  );
   await demoLink.click();
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(
@@ -235,7 +256,9 @@ try {
   );
 
   await page.goto(`${baseUrl}/app/ops`, { waitUntil: "networkidle" });
-  await page.getByText("Local demo is ready").waitFor({ timeout: 15_000 });
+  await page
+    .getByRole("heading", { name: "Local demo is ready", exact: true })
+    .waitFor({ timeout: 15_000 });
   const localDemoAccessCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Local Demo Access", exact: true })
   });
