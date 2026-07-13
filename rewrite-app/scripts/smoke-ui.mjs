@@ -1586,7 +1586,13 @@ try {
     .filter({ hasText: "entry-student-b" })
     .filter({ hasText: "Ben Entry" })
     .waitFor();
+  const participantRosterDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportParticipantRosterCsvButton").click();
+  const participantRosterDownload = await participantRosterDownloadPromise;
+  assert.equal(
+    participantRosterDownload.suggestedFilename(),
+    `${workspaceKey}-participant-roster.csv`
+  );
   await page
     .locator("article.card")
     .filter({
@@ -1797,7 +1803,13 @@ try {
   );
   stopAfter("filter-participant-sessions");
   logStep("export-participant-sessions-csv");
+  const participantSessionsDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Sessions CSV");
+  const participantSessionsDownload = await participantSessionsDownloadPromise;
+  assert.equal(
+    participantSessionsDownload.suggestedFilename(),
+    `${workspaceKey}-participant-sessions.csv`
+  );
   await page
     .locator("#participantSessionsExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,participantSessionId,loginKey" })
@@ -1927,7 +1939,10 @@ try {
     .filter({ hasText: "operator-ui" })
     .waitFor();
   logStep("export-response-csv");
+  const responseDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Responses CSV");
+  const responseDownload = await responseDownloadPromise;
+  assert.equal(responseDownload.suggestedFilename(), `${workspaceKey}-responses.csv`);
   await page
     .locator("#responseExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,loginKey,groupKey" })
@@ -1937,7 +1952,10 @@ try {
     .filter({ hasText: "Filtered response smoke" })
     .waitFor();
   logStep("export-review-csv");
+  const reviewDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Review CSV");
+  const reviewDownload = await reviewDownloadPromise;
+  assert.equal(reviewDownload.suggestedFilename(), `${workspaceKey}-reviews.csv`);
   await page
     .locator("#reviewExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,reviewId,loginKey" })
@@ -2336,7 +2354,13 @@ try {
     .filter({ hasText: "60" })
     .filter({ hasText: "Open Group Detail" })
     .waitFor();
+  const studyMonitorDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Study Monitor CSV");
+  const studyMonitorDownload = await studyMonitorDownloadPromise;
+  assert.equal(
+    studyMonitorDownload.suggestedFilename(),
+    `${workspaceKey}-study-monitor.csv`
+  );
   await page
     .locator("#studyMonitorExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,section" })
@@ -2677,7 +2701,10 @@ try {
     .first()
     .waitFor();
   logStep("export-workspace-log-csv");
+  const workspaceLogDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Workspace Logs CSV");
+  const workspaceLogDownload = await workspaceLogDownloadPromise;
+  assert.equal(workspaceLogDownload.suggestedFilename(), `${workspaceKey}-logs.csv`);
   await page
     .locator("#workspaceLogExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,activityEventId,eventType" })
