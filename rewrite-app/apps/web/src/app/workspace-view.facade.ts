@@ -1332,40 +1332,73 @@ export class WorkspaceViewFacade {
     const payload = parseJsonDocument<ListTenantsResponse>(
       this.workspace.tenantsView
     );
-    return (payload?.items ?? []).map(tenant => ({
-      headline: tenant.displayName,
-      subline: tenant.tenantKey,
-      badges: [tenant.status],
-      rows: [
-        { label: "Tenant ID", value: tenant.tenantId },
-        { label: "Created", value: this.formatDateTime(tenant.createdAt) }
-      ],
-      selected: tenant.tenantKey === this.workspace.tenantKey,
-      actionLabel: "Use Tenant",
-      actionPayload: { tenantKey: tenant.tenantKey }
-    }));
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildDirectoryWindowItem(
+        "Tenant directory window",
+        "tenant",
+        payload.items.length,
+        [
+          { label: "Scope", value: "platform" },
+          { label: "Selected Tenant", value: this.workspace.tenantKey || "none" }
+        ]
+      ),
+      ...payload.items.map(tenant => ({
+        headline: tenant.displayName,
+        subline: tenant.tenantKey,
+        badges: [tenant.status],
+        rows: [
+          { label: "Tenant ID", value: tenant.tenantId },
+          { label: "Created", value: this.formatDateTime(tenant.createdAt) }
+        ],
+        selected: tenant.tenantKey === this.workspace.tenantKey,
+        actionLabel: "Use Tenant",
+        actionPayload: { tenantKey: tenant.tenantKey }
+      }))
+    ];
   }
 
   get workspaceDirectoryItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListWorkspacesResponse>(
       this.workspace.workspacesView
     );
-    return (payload?.items ?? []).map(workspace => ({
-      headline: workspace.displayName,
-      subline: workspace.workspaceKey,
-      badges: [workspace.status],
-      rows: [
-        { label: "Workspace ID", value: workspace.workspaceId },
-        { label: "Tenant ID", value: workspace.tenantId },
-        { label: "Created", value: this.formatDateTime(workspace.createdAt) }
-      ],
-      selected: workspace.workspaceKey === this.workspace.workspaceKey,
-      actionLabel: "Use Workspace",
-      actionPayload: {
-        tenantKey: this.workspace.tenantKey,
-        workspaceKey: workspace.workspaceKey
-      }
-    }));
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildDirectoryWindowItem(
+        "Workspace directory window",
+        "workspace",
+        payload.items.length,
+        [
+          { label: "Tenant Scope", value: this.workspace.tenantKey || "none" },
+          {
+            label: "Selected Workspace",
+            value: this.workspace.workspaceKey || "none"
+          }
+        ]
+      ),
+      ...payload.items.map(workspace => ({
+        headline: workspace.displayName,
+        subline: workspace.workspaceKey,
+        badges: [workspace.status],
+        rows: [
+          { label: "Workspace ID", value: workspace.workspaceId },
+          { label: "Tenant ID", value: workspace.tenantId },
+          { label: "Created", value: this.formatDateTime(workspace.createdAt) }
+        ],
+        selected: workspace.workspaceKey === this.workspace.workspaceKey,
+        actionLabel: "Use Workspace",
+        actionPayload: {
+          tenantKey: this.workspace.tenantKey,
+          workspaceKey: workspace.workspaceKey
+        }
+      }))
+    ];
   }
 
   get workspacePressureItems(): RecordCollectionItem[] {
@@ -1982,6 +2015,23 @@ export class WorkspaceViewFacade {
   private formatDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  private buildDirectoryWindowItem(
+    headline: string,
+    recordLabel: string,
+    loadedCount: number,
+    scopeRows: Array<{ label: string; value: string }>
+  ): RecordCollectionItem {
+    return {
+      headline,
+      subline: `${loadedCount} ${recordLabel} row(s) loaded for the current directory`,
+      badges: [`${loadedCount} loaded`, "directory"],
+      rows: [
+        { label: "Loaded Records", value: String(loadedCount) },
+        ...scopeRows
+      ]
+    };
   }
 
   private formatPercentage(count: number, total: number): string {

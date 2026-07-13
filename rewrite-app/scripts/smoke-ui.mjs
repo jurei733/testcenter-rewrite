@@ -719,6 +719,20 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Tenant Directory", exact: true })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Tenant directory window" }) })
+    .filter({ hasText: "1 tenant row(s) loaded for the current directory" })
+    .filter({ hasText: "1 loaded" })
+    .filter({ hasText: "directory" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "Selected Tenant" })
+    .filter({ hasText: tenantKey })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Tenant Directory", exact: true })
+    })
     .filter({ hasText: tenantKey })
     .waitFor();
   await clickAction("Refresh Workspace Directory");
@@ -727,8 +741,25 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Workspace directory window" }) })
+    .filter({ hasText: "1 workspace row(s) loaded for the current directory" })
+    .filter({ hasText: "1 loaded" })
+    .filter({ hasText: "directory" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "Tenant Scope" })
+    .filter({ hasText: tenantKey })
+    .filter({ hasText: "Selected Workspace" })
     .filter({ hasText: workspaceKey })
     .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
+  stopAfter("workspace-directory-reads");
 
   logStep("nav-ops-admin-management");
   await page.locator('[data-view-nav="ops"]').click();
