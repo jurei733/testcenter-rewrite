@@ -1318,6 +1318,39 @@ try {
     .waitFor();
   stopAfter("participant-entry-ambiguous-workspace-guidance");
 
+  logStep("participant-entry-invalid-booklet-guidance");
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.locator("#participantLoginKey").waitFor();
+  await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
+  await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
+  await fillAndCommitUntilValue(
+    "#participantLoginKey",
+    "invalid-booklet-entry-student"
+  );
+  await fillAndCommitUntilValue(
+    "#participantRouteGroupKey",
+    "group:invalid-booklet-entry"
+  );
+  await fillAndCommitUntilValue("#participantRouteBookletKey", "booklet:missing");
+  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page
+    .locator("#participantEntryIssueTitle")
+    .filter({ hasText: "Assigned booklet unavailable" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantEntryIssueDetail")
+    .filter({ hasText: "booklet:missing" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueAction")
+    .filter({ hasText: "update the roster assignment" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueCode")
+    .filter({ hasText: "booklet_not_found" })
+    .waitFor();
+  stopAfter("participant-entry-invalid-booklet-guidance");
+
   logStep("participant-entry-sign-in");
   const participantEntrySignInLoginKey = "student-entry-sign-in";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
