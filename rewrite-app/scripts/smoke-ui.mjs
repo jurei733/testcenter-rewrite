@@ -391,6 +391,19 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const clickSelectorAction = async (name, selector) => {
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-start`);
+    await waitForNotBusy(`${name}-before-click`);
+    const button = page.locator(selector);
+    await button.scrollIntoViewIfNeeded();
+    await button.click();
+    const startedBusy = await waitForBusy(`${name}-after-click`);
+    if (!startedBusy) {
+      await page.waitForTimeout(150);
+    }
+    await waitForNotBusy(`${name}-after-click`);
+    logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
+  };
   const acceptNextDialog = expectedMessagePattern =>
     new Promise((resolvePromise, reject) => {
       page.once("dialog", async dialog => {
@@ -2476,7 +2489,15 @@ try {
     const responseDownloadPromise = page
       .waitForEvent("download", { timeout: 5_000 })
       .catch(() => null);
-    await clickAction("Export Responses CSV");
+    const responseCsvResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes("/exports/responses.csv") && response.status() === 200
+    );
+    await clickSelectorAction(
+      "Export Responses CSV",
+      "#runtimeExportResponsesCsvButton"
+    );
+    await responseCsvResponsePromise;
     const responseDownload = await responseDownloadPromise;
     if (responseDownload) {
       assert.equal(responseDownload.suggestedFilename(), `${workspaceKey}-responses.csv`);
@@ -2493,7 +2514,12 @@ try {
     const reviewDownloadPromise = page
       .waitForEvent("download", { timeout: 5_000 })
       .catch(() => null);
-    await clickAction("Export Review CSV");
+    const reviewCsvResponsePromise = page.waitForResponse(
+      response =>
+        response.url().includes("/exports/reviews.csv") && response.status() === 200
+    );
+    await clickSelectorAction("Export Review CSV", "#runtimeExportReviewsCsvButton");
+    await reviewCsvResponsePromise;
     const reviewDownload = await reviewDownloadPromise;
     if (reviewDownload) {
       assert.equal(reviewDownload.suggestedFilename(), `${workspaceKey}-reviews.csv`);
