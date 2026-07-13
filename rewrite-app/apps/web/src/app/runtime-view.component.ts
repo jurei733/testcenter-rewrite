@@ -68,27 +68,27 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <section class="action-group">
             <span>Participant Setup</span>
             <div class="actions">
-              <button class="primary" type="button" (click)="view.participantSignIn()">Sign In</button>
-              <button class="primary" type="button" (click)="view.participantLaunch()">Start Participant</button>
-              <button class="secondary" type="button" (click)="view.resumeSession()">Resume Session</button>
+              <button class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantSignIn()">Sign In</button>
+              <button class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantLaunch()">Start Participant</button>
+              <button class="secondary" type="button" [disabled]="!view.canUseParticipantSessionActions" (click)="view.resumeSession()">Resume Session</button>
               <button class="ghost" type="button" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
             </div>
           </section>
           <section class="action-group">
             <span>Run Lifecycle</span>
             <div class="actions">
-              <button class="ghost" type="button" (click)="view.saveProgressPaused()">Save Paused</button>
-              <button class="ghost" type="button" (click)="view.saveProgressRunning()">Save Running</button>
-              <button class="ghost" type="button" (click)="view.resumeRun()">Resume Run</button>
-              <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
+              <button class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.saveProgressPaused()">Save Paused</button>
+              <button class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.saveProgressRunning()">Save Running</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.resumeRun()">Resume Run</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.completeRun()">Complete Run</button>
             </div>
           </section>
           <section class="action-group">
             <span>Monitor Control</span>
             <div class="actions">
-              <button class="ghost" type="button" (click)="view.issueMonitorPause()">Monitor Pause</button>
-              <button class="ghost" type="button" (click)="view.issueMonitorResume()">Monitor Resume</button>
-              <button class="ghost" type="button" (click)="view.issueMonitorComplete()">Monitor Complete</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
               <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
               <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
             </div>
@@ -97,11 +97,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <span>Review And Export</span>
             <div class="actions">
               <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
-              <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
-              <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
-              <button class="ghost" type="button" (click)="view.confirmDeleteReview()">Delete Review</button>
+              <button class="ghost" type="button" [disabled]="!view.canCreateReviewAction" (click)="view.createReview()">Create Review</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.updateReview()">Update Review</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.confirmDeleteReview()">Delete Review</button>
               <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
-              <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
+              <button class="ghost" type="button" [disabled]="!view.canDeleteGroupResultsAction" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
               <button id="runtimeExportResponsesCsvButton" class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
               <button id="runtimeExportReviewsCsvButton" class="ghost" type="button" (click)="view.exportReviewsCsv()">Export Review CSV</button>
             </div>

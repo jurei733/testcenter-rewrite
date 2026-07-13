@@ -1800,6 +1800,38 @@ export class RuntimeViewFacade {
     this.viewState.persistShellState();
   }
 
+  get canUseParticipantLoginActions(): boolean {
+    return this.runtime.loginKey.trim().length > 0;
+  }
+
+  get canUseParticipantSessionActions(): boolean {
+    return this.runtime.participantSessionId.trim().length > 0;
+  }
+
+  get canUseRunActions(): boolean {
+    return this.runtime.testRunId.trim().length > 0;
+  }
+
+  get canSaveProgressActions(): boolean {
+    return this.canUseRunActions && this.runtime.currentUnitKey.trim().length > 0;
+  }
+
+  get canCreateReviewAction(): boolean {
+    return (
+      this.canUseRunActions &&
+      this.runtime.reviewComment.trim().length > 0 &&
+      this.runtime.reviewerId.trim().length > 0
+    );
+  }
+
+  get canUseSelectedReviewActions(): boolean {
+    return this.runtime.reviewId.trim().length > 0;
+  }
+
+  get canDeleteGroupResultsAction(): boolean {
+    return this.runtime.groupKey.trim().length > 0;
+  }
+
   participantSignIn(): void {
     this.viewState.onActionAsync(() => this.runtimeService.participantSignIn());
   }

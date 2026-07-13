@@ -131,6 +131,16 @@ try {
 
   browser = await chromium.launch();
   const page = await browser.newPage();
+  const expectButtonEnabled = async (pageObject, name) => {
+    const button = pageObject.getByRole("button", { name, exact: true });
+    await button.waitFor({ timeout: 15_000 });
+    assert.equal(await button.isEnabled(), true);
+  };
+  const expectButtonDisabled = async (pageObject, name) => {
+    const button = pageObject.getByRole("button", { name, exact: true });
+    await button.waitFor({ timeout: 15_000 });
+    assert.equal(await button.isDisabled(), true);
+  };
   const clickCardAction = async (cardTitle, buttonName, itemHeadline) => {
     const card = page.locator("article.card").filter({
       has: page.getByRole("heading", { name: cardTitle, exact: true })
@@ -367,6 +377,18 @@ try {
   await firstSummaryCard.waitFor({ timeout: 15_000 });
   assert.equal(await firstSummaryCard.getAttribute("role"), "listitem");
   assert.match(await firstSummaryCard.getAttribute("aria-label"), /.+: .+\. .+/);
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantSessionId")?.value?.trim().length > 0 &&
+      document.querySelector("#testRunId")?.value?.trim().length > 0 &&
+      document.querySelector("#currentUnitKey")?.value?.trim().length > 0,
+    undefined,
+    { timeout: 15_000 }
+  );
+  await expectButtonEnabled(page, "Resume Session");
+  await expectButtonEnabled(page, "Save Paused");
+  await expectButtonEnabled(page, "Monitor Pause");
+  await expectButtonDisabled(page, "Update Review");
   await page.getByRole("button", { name: "Refresh Runtime Reads" }).click();
   await page.waitForFunction(
     () =>
