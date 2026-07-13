@@ -1211,10 +1211,17 @@ try {
   }).toString()}`;
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
+  const participantRouteSessionAnchor = page.locator("#participantRouteSessionAnchor");
   assert.equal(
-    await page.locator("#participantRouteSessionAnchor").getAttribute("href"),
+    await participantRouteSessionAnchor.getAttribute("href"),
     participantRouteSessionLink,
     "Participant route should expose a direct session re-entry link."
+  );
+  assert.equal(await participantRouteSessionAnchor.getAttribute("target"), "_blank");
+  assert.equal(await participantRouteSessionAnchor.getAttribute("rel"), "noreferrer");
+  assert.equal(
+    await participantRouteSessionAnchor.getAttribute("aria-label"),
+    `Session Re-Entry: ${participantRouteSessionLink}`
   );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,

@@ -37,7 +37,17 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <strong>Bookmark this session link</strong>
             <p>Use it to reopen the same running or completed test without starting a duplicate session.</p>
           </div>
-          <a id="participantRouteSessionAnchor" class="button-link secondary" [href]="view.player.sessionEntryLink">Open Session</a>
+          <a
+            id="participantRouteSessionAnchor"
+            class="button-link secondary"
+            [href]="view.player.sessionEntryLink"
+            [attr.aria-label]="'Session Re-Entry: ' + view.player.sessionEntryLink"
+            [attr.title]="view.player.sessionEntryLink"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open Session
+          </a>
           <input id="participantRouteSessionLink" name="participantRouteSessionLink" readonly [value]="view.player.sessionEntryLink" />
         </section>
         <div class="form-grid">
