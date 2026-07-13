@@ -1843,6 +1843,18 @@ try {
       const pausedWorkUnit = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
         : null;
+      const pausedWorkAttention = Array.isArray(summary.attentionItems)
+        ? summary.attentionItems.find(
+            item => item?.subjectType === "unit" && item?.key === "unit-paused"
+          )
+        : null;
+      const entrySmokeAttention = Array.isArray(summary.attentionItems)
+        ? summary.attentionItems.find(
+            item =>
+              item?.subjectType === "group" &&
+              item?.key === "group:entry-smoke"
+          )
+        : null;
       const missingResponseCount = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.reduce(
             (total, unit) => total + Number(unit?.missingResponseCount ?? 0),
@@ -1882,6 +1894,10 @@ try {
         pausedWorkUnit?.rosterExpectedCount === 1 &&
         pausedWorkUnit?.expectedRunCount === 4 &&
         pausedWorkUnit?.missingResponseCount === 2 &&
+        pausedWorkAttention?.score === 200 &&
+        pausedWorkAttention?.missingResponseCount === 2 &&
+        entrySmokeAttention?.score === 60 &&
+        entrySmokeAttention?.notStartedCount === 2 &&
         directXmlGroup?.expectedParticipantCount === 1 &&
         directXmlGroup?.participantSessionCount === 1 &&
         directXmlGroup?.testRunCount === 1 &&
@@ -2026,6 +2042,8 @@ try {
     .filter({ hasText: "2 missing response(s)" })
     .filter({ hasText: "2/4 answered" })
     .filter({ hasText: "Missing Responses" })
+    .filter({ hasText: "Attention Score" })
+    .filter({ hasText: "200" })
     .filter({ hasText: "Open Unit Detail" })
     .waitFor();
   await monitorAttentionQueueCard
@@ -2033,6 +2051,8 @@ try {
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
     .filter({ hasText: "2 waiting, 0 active run(s)" })
     .filter({ hasText: "2 not started" })
+    .filter({ hasText: "Attention Score" })
+    .filter({ hasText: "60" })
     .filter({ hasText: "Open Group Detail" })
     .waitFor();
   await clickAction("Export Study Monitor CSV");
