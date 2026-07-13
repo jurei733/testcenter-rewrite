@@ -1182,7 +1182,16 @@ try {
     participantRouteSessionId,
     "UI smoke expected a participant route session id after opening the entry URL."
   );
+  const participantRouteSessionLink = `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+    participantRouteSessionId
+  )}`;
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
+  await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
+  assert.equal(
+    await page.locator("#participantRouteSessionAnchor").getAttribute("href"),
+    participantRouteSessionLink,
+    "Participant route should expose a direct session re-entry link."
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
     payload =>
@@ -1448,6 +1457,7 @@ try {
   );
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
+  await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
   await page.waitForFunction(
     expectedSessionId =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===

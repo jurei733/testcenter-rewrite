@@ -28,6 +28,7 @@ type ParticipantPlayerState = {
   loginLabel: string;
   groupLabel: string;
   sessionLabel: string;
+  sessionEntryLink: string;
   bookletLabel: string;
   unitLabel: string;
   unitDescription: string;
@@ -263,6 +264,7 @@ export class ParticipantViewFacade {
         loginLabel: this.runtime.loginKey.trim() || "No login yet",
         groupLabel: this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
+        sessionEntryLink: this.createParticipantSessionEntryLink(),
         bookletLabel: "No booklet loaded",
         unitLabel: "No unit loaded",
         unitDescription: "No unit description available yet.",
@@ -359,6 +361,7 @@ export class ParticipantViewFacade {
       loginLabel: currentState.participantSession.loginKey,
       groupLabel: currentState.participantSession.groupKey,
       sessionLabel: currentState.participantSession.participantSessionId,
+      sessionEntryLink: this.createParticipantSessionEntryLink(),
       bookletLabel: currentState.booklet.displayLabel,
       unitLabel,
       unitDescription,
@@ -781,6 +784,17 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitResponse = unitKey
       ? currentState.testRun.unitResponses[unitKey] ?? ""
       : "";
+  }
+
+  private createParticipantSessionEntryLink(): string {
+    const participantSessionId = this.runtime.participantSessionId.trim();
+    if (!participantSessionId) {
+      return "";
+    }
+
+    const query = new URLSearchParams({ participantSessionId });
+    const origin = globalThis.window?.location?.origin ?? "";
+    return `${origin}/participant?${query.toString()}`;
   }
 
   private hasSavedResponse(
