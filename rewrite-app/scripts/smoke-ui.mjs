@@ -1511,6 +1511,18 @@ try {
     ],
     { timeout: 15_000 }
   );
+  await participantEntryPopup.waitForFunction(
+    () => {
+      const status = document
+        .querySelector("#participantRouteStatus")
+        ?.textContent?.trim();
+      const session =
+        document.querySelector("#participantRouteSessionId")?.value ?? "";
+      return status === "running" && session.trim().length > 0;
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
   await participantEntryPopup.close();
   logStep("participant-start");
   const participantLoginKey = "student-ui";

@@ -4,8 +4,6 @@ import type {
   ParticipantCurrentRunStateResponse,
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
-  ParticipantSignInRequest,
-  ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
@@ -116,11 +114,7 @@ export class ParticipantViewFacade {
 
     if (normalized.workspaceKey && normalized.loginKey) {
       this.viewState.onActionAsync(async () => {
-        if (this.runtime.participantSessionId.trim()) {
-          await this.resumeSessionInternal();
-        } else {
-          await this.starterLaunchInternal();
-        }
+        await this.starterLaunchInternal();
         await this.applyEntryDraftAfterResume(normalized);
       });
     }
@@ -371,10 +365,6 @@ export class ParticipantViewFacade {
     };
   }
 
-  signIn(): void {
-    this.viewState.onActionAsync(() => this.signInInternal());
-  }
-
   resumeSession(): void {
     this.viewState.onActionAsync(() => this.startOrResumeInternal());
   }
@@ -425,36 +415,42 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() => this.completeRunInternal());
   }
 
-  private async signInInternal(): Promise<void> {
-    const payload = await this.requestState.request<ParticipantSignInResponse>(
-      "Participant Sign In",
-      "POST",
-      productionApiRoutes.participant.signIn,
-      {
-        tenantKey: this.workspace.tenantKey.trim() || undefined,
-        workspaceKey: this.workspace.workspaceKey.trim(),
-        loginKey: this.runtime.loginKey.trim(),
-        groupKey: this.runtime.groupKey.trim() || undefined
-      } satisfies ParticipantSignInRequest
-    );
-
-    this.runtime.participantSessionId =
-      payload.participantSession.participantSessionId;
-    this.runtime.runtimeMonitorView = prettyPrintJson(
-      payload,
-      this.runtime.runtimeMonitorView
-    );
-    this.persistState();
-    await this.refreshCurrentStateInternal(true);
-  }
-
   private async startOrResumeInternal(): Promise<void> {
     if (this.runtime.participantSessionId.trim()) {
-      await this.resumeSessionInternal();
-      return;
+      try {
+        await this.resumeSessionInternal({ quiet: true });
+        return;
+      } catch (error) {
+        if (!this.isStoredParticipantSessionMissing(error)) {
+          throw error;
+        }
+        this.clearStoredParticipantSession();
+      }
     }
 
     await this.starterLaunchInternal();
+  }
+
+  private clearStoredParticipantSession(): void {
+    if (
+      !this.runtime.participantSessionId.trim() &&
+      !this.runtime.testRunId.trim()
+    ) {
+      return;
+    }
+
+    this.runtime.participantSessionId = "";
+    this.runtime.testRunId = "";
+    this.runtime.currentRunStateView =
+      'Stored participant session is gone. Use "Start Or Resume".';
+    this.persistState();
+  }
+
+  private isStoredParticipantSessionMissing(error: unknown): boolean {
+    return (
+      this.requestState.isApiError(error) &&
+      error.error === "participant_session_not_found"
+    );
   }
 
   private async starterLaunchInternal(): Promise<void> {
@@ -482,7 +478,7 @@ export class ParticipantViewFacade {
     await this.refreshCurrentStateInternal(true);
   }
 
-  private async resumeSessionInternal(): Promise<void> {
+  private async resumeSessionInternal(options: { quiet?: boolean } = {}): Promise<void> {
     const payload = await this.requestState.request<ResumeParticipantSessionResponse>(
       "Participant Resume Session",
       "POST",
@@ -491,7 +487,8 @@ export class ParticipantViewFacade {
       }),
       {
         bookletKey: this.runtime.bookletKey.trim() || undefined
-      } satisfies ResumeParticipantSessionRequest
+      } satisfies ResumeParticipantSessionRequest,
+      { quiet: options.quiet ?? false }
     );
 
     this.syncRun(payload.testRun);

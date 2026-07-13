@@ -554,6 +554,37 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  const staleParticipantSessionId = "00000000-0000-4000-8000-000000000000";
+  await page.evaluate(staleSessionId => {
+    const storageKey = "testcenter-rewrite-app-shell";
+    const snapshot = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}");
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...snapshot,
+        participantSessionId: staleSessionId,
+        testRunId: "",
+        currentUnitKey: ""
+      })
+    );
+  }, staleParticipantSessionId);
+  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
+  await page.waitForFunction(
+    staleSessionId => {
+      const status = document
+        .querySelector("#participantRouteStatus")
+        ?.textContent?.trim();
+      const session =
+        document.querySelector("#participantRouteSessionId")?.value ?? "";
+      return (
+        status === "running" &&
+        session.trim().length > 0 &&
+        session !== staleSessionId
+      );
+    },
+    staleParticipantSessionId,
+    { timeout: 15_000 }
+  );
 
   process.stdout.write(`Local demo smoke passed at ${baseUrl}/app\n`);
 } finally {

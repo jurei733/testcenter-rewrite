@@ -16,7 +16,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           <div>
             <span>Participant Entry</span>
             <h2>Start or Resume Test</h2>
-            <p>Use a direct link or enter the assigned workspace and login key. The test starts without exposing operator tooling.</p>
+            <p>Use a direct link or enter the assigned workspace and login key. The test opens the assigned booklet directly.</p>
           </div>
           <div class="participant-entry-status">
             <span>Session Status</span>
@@ -51,7 +51,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </label>
           <label>
             Session Id
-            <input id="participantRouteSessionId" name="participantRouteSessionId" placeholder="Filled after sign-in" [(ngModel)]="view.runtime.participantSessionId" (change)="view.persistState()" />
+            <input id="participantRouteSessionId" name="participantRouteSessionId" placeholder="Filled after start" readonly [(ngModel)]="view.runtime.participantSessionId" />
           </label>
           <label>
             Current Unit Key
@@ -59,8 +59,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.signIn()">Participant Sign In</button>
-          <button class="secondary" type="button" (click)="view.resumeSession()">Start Or Resume</button>
+          <button class="primary" type="button" (click)="view.resumeSession()">Start Or Resume</button>
           <button class="ghost" type="button" (click)="view.refreshCurrentState()">Refresh Current State</button>
         </div>
       </article>
