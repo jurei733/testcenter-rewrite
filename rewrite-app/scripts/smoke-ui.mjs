@@ -2297,6 +2297,14 @@ try {
     operatorParticipantSessionLink,
     "Operator participant-session card should expose the participant re-entry link."
   );
+  await fillAndCommit("#bookletKey", "");
+  await waitForNotBusy("participant-session-select-before-click");
+  await participantSessionCard
+    .getByRole("button", { name: "Select + Load", exact: true })
+    .click();
+  await waitForBusy("participant-session-select-after-click");
+  await waitForNotBusy("participant-session-select-after-click");
+  await expectInputValue("#bookletKey", participantBookletKey);
   stopAfter("filter-participant-sessions");
   logStep("export-participant-sessions-csv");
   const participantSessionsDownloadPromise = page.waitForEvent("download");

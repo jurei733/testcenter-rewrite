@@ -161,7 +161,11 @@ export class RuntimeViewFacade {
           actionPayload: {
             participantSessionId: item.participantSession.participantSessionId,
             loginKey: item.participantSession.loginKey,
-            groupKey: item.participantSession.groupKey
+            groupKey: item.participantSession.groupKey,
+            bookletKey:
+              item.participantRosterEntry?.bookletKey ??
+              item.latestTestRun?.bookletKey ??
+              ""
           }
         };
       })
@@ -244,7 +248,11 @@ export class RuntimeViewFacade {
         actionPayload: {
           participantSessionId: detail.participantSession.participantSessionId,
           loginKey: detail.participantSession.loginKey,
-          groupKey: detail.participantSession.groupKey
+          groupKey: detail.participantSession.groupKey,
+          bookletKey:
+            detail.participantRosterEntry?.bookletKey ??
+            detail.testRuns[0]?.bookletKey ??
+            ""
         }
       }
     ];
@@ -670,7 +678,9 @@ export class RuntimeViewFacade {
         actionLabel: "Select + Load",
         actionPayload: {
           participantSessionId: detail.participantSession.participantSessionId,
-          loginKey: detail.participantSession.loginKey
+          loginKey: detail.participantSession.loginKey,
+          groupKey: detail.participantSession.groupKey,
+          bookletKey: detail.latestTestRun?.bookletKey ?? ""
         }
       }
     ];
@@ -735,6 +745,9 @@ export class RuntimeViewFacade {
         actionLabel: "Select + Sync",
         actionPayload: {
           participantSessionId: detail.participantSession.participantSessionId,
+          loginKey: detail.participantSession.loginKey,
+          groupKey: detail.participantSession.groupKey,
+          bookletKey: detail.testRun.bookletKey,
           testRunId: detail.testRun.testRunId,
           currentUnitKey: detail.testRun.currentUnitKey ?? ""
         }
@@ -2186,6 +2199,9 @@ export class RuntimeViewFacade {
     if (item.actionPayload?.groupKey) {
       this.runtime.groupKey = item.actionPayload.groupKey;
     }
+    if (item.actionPayload?.bookletKey != null) {
+      this.runtime.bookletKey = item.actionPayload.bookletKey;
+    }
     this.persistState();
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.loadParticipantSessionDetail();
@@ -2208,6 +2224,9 @@ export class RuntimeViewFacade {
     }
     if (item.actionPayload?.groupKey) {
       this.runtime.groupKey = item.actionPayload.groupKey;
+    }
+    if (item.actionPayload?.bookletKey != null) {
+      this.runtime.bookletKey = item.actionPayload.bookletKey;
     }
     if (item.actionPayload?.participantSessionId) {
       this.runtime.participantSessionId = item.actionPayload.participantSessionId;
