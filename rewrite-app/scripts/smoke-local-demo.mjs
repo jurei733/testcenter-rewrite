@@ -165,6 +165,8 @@ try {
   }).toString()}`;
   await demoLink.waitFor({ timeout: 15_000 });
   assert.equal(await demoLink.getAttribute("href"), demoParticipantPath);
+  const demoAdminLink = page.getByRole("link", { name: "Sign In Demo Admin" });
+  assert.equal(await demoAdminLink.getAttribute("href"), "/app/ops?demoAdmin=sign-in");
   await page.locator("#localDemoStartupCard").waitFor({ timeout: 15_000 });
   assert.equal(
     (await page.locator("#localDemoStartupStatus").textContent())?.trim(),
@@ -186,7 +188,18 @@ try {
     (await page.locator("#localDemoBuildDetail").textContent())?.trim() ?? "",
     /^Build .+/
   );
-  await demoLink.click();
+  await demoAdminLink.click();
+  await page.waitForURL(/\/app\/ops\?demoAdmin=sign-in$/);
+  await page.waitForFunction(
+    () => {
+      const token = document.querySelector("#adminSessionToken")?.value ?? "";
+      return token.trim().length > 0;
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+  assert.equal(await page.locator("#adminUsername").inputValue(), "demo-admin");
+  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(
     () => {
