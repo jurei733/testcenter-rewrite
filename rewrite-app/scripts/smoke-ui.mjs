@@ -1220,6 +1220,14 @@ try {
     "#participantRouteUnitResponse",
     participantRouteNextUnitResponse
   );
+  await page
+    .locator("#participantRouteDraftLabel")
+    .filter({ hasText: "Unsaved draft" })
+    .waitFor();
+  await page
+    .locator("#participantRouteDraftDetail")
+    .filter({ hasText: "save, navigation, or complete" })
+    .waitFor();
   logStep("participant-route-unit-previous");
   await clickAction("Previous Unit");
   await pollJsonWithPredicate(

@@ -137,6 +137,15 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               placeholder="Write the participant response for this unit."
             ></textarea>
           </label>
+          <section
+            class="participant-draft-state"
+            [class.has-unsaved-response]="view.player.hasUnsavedResponse"
+            aria-live="polite"
+          >
+            <span>Answer Status</span>
+            <strong id="participantRouteDraftLabel">{{ view.player.draftStateLabel }}</strong>
+            <p id="participantRouteDraftDetail">{{ view.player.draftStateDetail }}</p>
+          </section>
           <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.unitItems.length > 0">
             <header>
               <span>Booklet Units</span>

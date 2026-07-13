@@ -50,6 +50,9 @@ type ParticipantPlayerState = {
   canComplete: boolean;
   saveProgressLabel: string;
   unitResponse: string;
+  draftStateLabel: string;
+  draftStateDetail: string;
+  hasUnsavedResponse: boolean;
 };
 
 type ParticipantPlayerUnitItem = {
@@ -279,7 +282,10 @@ export class ParticipantViewFacade {
         canResumeRun: false,
         canComplete: false,
         saveProgressLabel: "Save Progress",
-        unitResponse: ""
+        unitResponse: "",
+        draftStateLabel: "No response loaded",
+        draftStateDetail: "Start or resume a test before writing an answer.",
+        hasUnsavedResponse: false
       };
     }
 
@@ -320,6 +326,24 @@ export class ParticipantViewFacade {
     const progressPercent =
       totalUnitCount > 0 ? Math.round((answeredUnitCount / totalUnitCount) * 100) : 0;
     const isComplete = currentState.testRun.status === "completed";
+    const savedUnitResponse = unitKey
+      ? currentState.testRun.unitResponses[unitKey] ?? ""
+      : "";
+    const currentDraft = this.runtime.currentUnitResponse;
+    const hasUnsavedResponse =
+      currentState.testRun.status !== "completed" && currentDraft !== savedUnitResponse;
+    const draftStateLabel = this.getDraftStateLabel({
+      canSaveProgress: availableActions.includes("save_progress"),
+      hasSavedResponse: savedUnitResponse.length > 0,
+      hasUnsavedResponse,
+      isComplete
+    });
+    const draftStateDetail = this.getDraftStateDetail({
+      hasUnsavedResponse,
+      savedUnitResponse,
+      currentDraft,
+      isComplete
+    });
 
     return {
       headline: unitLabel,
@@ -361,7 +385,10 @@ export class ParticipantViewFacade {
         currentState.testRun.status === "paused"
           ? "Save Running"
           : "Save Paused",
-      unitResponse: unitKey ? currentState.testRun.unitResponses[unitKey] ?? "" : ""
+      unitResponse: savedUnitResponse,
+      draftStateLabel,
+      draftStateDetail,
+      hasUnsavedResponse
     };
   }
 
@@ -719,6 +746,45 @@ export class ParticipantViewFacade {
           ? "All units have a saved response."
           : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
     };
+  }
+
+  private getDraftStateLabel(args: {
+    canSaveProgress: boolean;
+    hasSavedResponse: boolean;
+    hasUnsavedResponse: boolean;
+    isComplete: boolean;
+  }): string {
+    if (args.isComplete) {
+      return "Completed";
+    }
+    if (!args.canSaveProgress) {
+      return "Read only";
+    }
+    if (args.hasUnsavedResponse) {
+      return "Unsaved draft";
+    }
+    return args.hasSavedResponse ? "Saved" : "No response yet";
+  }
+
+  private getDraftStateDetail(args: {
+    hasUnsavedResponse: boolean;
+    savedUnitResponse: string;
+    currentDraft: string;
+    isComplete: boolean;
+  }): string {
+    if (args.isComplete) {
+      return "This test is complete; responses are no longer editable.";
+    }
+    if (args.hasUnsavedResponse) {
+      return "Use the save, navigation, or complete action to store this answer.";
+    }
+    if (args.savedUnitResponse.length > 0) {
+      return "The answer shown here matches the saved response for this unit.";
+    }
+    if (args.currentDraft.length > 0) {
+      return "The current answer is ready to save.";
+    }
+    return "Write an answer, then save or move to another unit.";
   }
 
   private readCurrentRunState():
