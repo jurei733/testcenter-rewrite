@@ -1348,6 +1348,13 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
   await page
+    .locator(".action-groups")
+    .filter({ hasText: "Participant Setup" })
+    .filter({ hasText: "Run Lifecycle" })
+    .filter({ hasText: "Monitor Control" })
+    .filter({ hasText: "Review And Export" })
+    .waitFor();
+  await page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Runtime Action Queue" })

@@ -64,28 +64,48 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           Review Comment
           <textarea id="reviewComment" name="reviewComment" [(ngModel)]="view.runtime.reviewComment" (change)="view.persistState()" placeholder="Operator note for the selected run or unit."></textarea>
         </label>
-        <div class="actions">
-          <button class="primary" type="button" (click)="view.participantSignIn()">Sign In</button>
-          <button class="primary" type="button" (click)="view.participantLaunch()">Start Participant</button>
-          <button class="secondary" type="button" (click)="view.resumeSession()">Resume Session</button>
-          <button class="ghost" type="button" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
-          <button class="ghost" type="button" (click)="view.saveProgressPaused()">Save Paused</button>
-          <button class="ghost" type="button" (click)="view.saveProgressRunning()">Save Running</button>
-          <button class="ghost" type="button" (click)="view.resumeRun()">Resume Run</button>
-          <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
-          <button class="ghost" type="button" (click)="view.issueMonitorPause()">Monitor Pause</button>
-          <button class="ghost" type="button" (click)="view.issueMonitorResume()">Monitor Resume</button>
-          <button class="ghost" type="button" (click)="view.issueMonitorComplete()">Monitor Complete</button>
-          <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
-          <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
-          <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
-          <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
-          <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
-          <button class="ghost" type="button" (click)="view.confirmDeleteReview()">Delete Review</button>
-          <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
-          <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
-          <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
-          <button class="ghost" type="button" (click)="view.exportReviewsCsv()">Export Review CSV</button>
+        <div class="action-groups" aria-label="Participant runtime operator actions">
+          <section class="action-group">
+            <span>Participant Setup</span>
+            <div class="actions">
+              <button class="primary" type="button" (click)="view.participantSignIn()">Sign In</button>
+              <button class="primary" type="button" (click)="view.participantLaunch()">Start Participant</button>
+              <button class="secondary" type="button" (click)="view.resumeSession()">Resume Session</button>
+              <button class="ghost" type="button" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
+            </div>
+          </section>
+          <section class="action-group">
+            <span>Run Lifecycle</span>
+            <div class="actions">
+              <button class="ghost" type="button" (click)="view.saveProgressPaused()">Save Paused</button>
+              <button class="ghost" type="button" (click)="view.saveProgressRunning()">Save Running</button>
+              <button class="ghost" type="button" (click)="view.resumeRun()">Resume Run</button>
+              <button class="ghost" type="button" (click)="view.completeRun()">Complete Run</button>
+            </div>
+          </section>
+          <section class="action-group">
+            <span>Monitor Control</span>
+            <div class="actions">
+              <button class="ghost" type="button" (click)="view.issueMonitorPause()">Monitor Pause</button>
+              <button class="ghost" type="button" (click)="view.issueMonitorResume()">Monitor Resume</button>
+              <button class="ghost" type="button" (click)="view.issueMonitorComplete()">Monitor Complete</button>
+              <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
+              <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
+            </div>
+          </section>
+          <section class="action-group">
+            <span>Review And Export</span>
+            <div class="actions">
+              <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
+              <button class="ghost" type="button" (click)="view.createReview()">Create Review</button>
+              <button class="ghost" type="button" (click)="view.updateReview()">Update Review</button>
+              <button class="ghost" type="button" (click)="view.confirmDeleteReview()">Delete Review</button>
+              <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
+              <button class="ghost" type="button" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
+              <button class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
+              <button class="ghost" type="button" (click)="view.exportReviewsCsv()">Export Review CSV</button>
+            </div>
+          </section>
         </div>
       </article>
 

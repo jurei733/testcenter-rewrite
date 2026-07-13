@@ -262,6 +262,30 @@ textarea {
   gap: 10px;
 }
 
+.action-groups {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.action-group {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.action-group > span {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 button {
   border: 0;
   border-radius: 999px;
