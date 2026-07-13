@@ -430,6 +430,62 @@ export class RuntimeViewFacade {
     return items;
   }
 
+  get participantLaunchStatusItems(): RecordCollectionItem[] {
+    const links = this.parseEntryLinksView();
+    if (links.length === 0) {
+      return [];
+    }
+
+    const sessionsByLogin = new Map(
+      this.parseParticipantSessionListView().map(item => [
+        item.participantSession.loginKey,
+        item
+      ])
+    );
+
+    return links.map(link => {
+      const sessionItem = sessionsByLogin.get(link.loginKey);
+      const session = sessionItem?.participantSession;
+      const latestRun = sessionItem?.latestTestRun;
+      const launchStatus = session ? session.status : "not_started";
+
+      return {
+        headline: link.displayName || link.loginKey,
+        subline: link.displayName ? link.loginKey : link.groupKey,
+        badges: [
+          launchStatus,
+          latestRun?.status ?? "no run",
+          link.bookletKey || "default booklet"
+        ],
+        rows: [
+          { label: "Login", value: link.loginKey },
+          { label: "Group", value: link.groupKey },
+          { label: "Session", value: session?.participantSessionId ?? "not started" },
+          { label: "Latest Run", value: latestRun?.testRunId ?? "none" },
+          {
+            label: "Entry URL",
+            value: link.url,
+            href: link.url
+          }
+        ],
+        selected:
+          this.runtime.loginKey.trim() === link.loginKey ||
+          (session?.participantSessionId != null &&
+            this.runtime.participantSessionId.trim() === session.participantSessionId),
+        actionLabel: session ? "Select + Load" : "Open Participant Entry",
+        actionPayload: {
+          loginKey: link.loginKey,
+          groupKey: link.groupKey,
+          bookletKey: link.bookletKey,
+          url: link.url,
+          participantSessionId: session?.participantSessionId ?? "",
+          testRunId: latestRun?.testRunId ?? "",
+          currentUnitKey: latestRun?.currentUnitKey ?? ""
+        }
+      };
+    });
+  }
+
   get participantRosterItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListParticipantRosterResponse>(
       this.runtime.participantRosterView
@@ -2031,6 +2087,16 @@ export class RuntimeViewFacade {
     if (url) {
       globalThis.window?.open(url, "_blank", "noopener,noreferrer");
     }
+  }
+
+  selectParticipantLaunchStatus(item: RecordCollectionItem): void {
+    const participantSessionId = item.actionPayload?.participantSessionId?.trim();
+    if (participantSessionId) {
+      this.selectParticipantSession(item);
+      return;
+    }
+
+    this.selectEntryLink(item);
   }
 
   selectParticipantSession(item: RecordCollectionItem): void {

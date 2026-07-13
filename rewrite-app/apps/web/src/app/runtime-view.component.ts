@@ -286,6 +286,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Launchpad actions appear after roster or session data is loaded."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Participant Launch Status"
+        subtitle="Generated links joined with loaded participant sessions so operators can spot missing starts."
+        [items]="view.participantLaunchStatusItems"
+        (itemAction)="view.selectParticipantLaunchStatus($event)"
+        emptyState="Generate entry links and refresh participant sessions to inspect launch status."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Participant Entry Links</h2>
         <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML rosters are accepted too.</p>

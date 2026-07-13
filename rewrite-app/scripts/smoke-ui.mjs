@@ -1873,6 +1873,18 @@ try {
   await page
     .locator("article.card")
     .filter({
+      has: page.getByRole("heading", { name: "Participant Launch Status" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "not_started" })
+    .filter({ hasText: "no run" })
+    .filter({ hasText: participantEntryUrlPrefix })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
       has: page.getByRole("heading", { name: "Participant Launchpad Actions" })
     })
     .filter({ hasText: "Download participant entry links" })
@@ -2004,6 +2016,19 @@ try {
     { timeout: 15_000 }
   );
   await participantEntryPopup.close();
+  await clickAction("Refresh Sessions");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Launch Status" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Direct Xml" }) })
+    .filter({ hasText: "entry-student-direct-xml" })
+    .filter({ hasText: "launched" })
+    .filter({ hasText: "running" })
+    .filter({ hasText: "group:direct-xml" })
+    .waitFor();
   logStep("participant-start");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
