@@ -9,6 +9,8 @@ const buildTimestamp =
 const operatorAuthRequired =
   process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED ?? "true";
 const bootstrapDemo = process.env.FIRST_SLICE_BOOTSTRAP_DEMO ?? "false";
+const composeProjectName =
+  process.env.COMPOSE_PROJECT_NAME ?? `rewrite-app-smoke-${process.pid}`;
 
 const parsePositiveInteger = (value, label) => {
   const parsedValue = Number.parseInt(value, 10);
@@ -178,8 +180,18 @@ const parseBooleanFlag = (value, label = "boolean flag") => {
   );
 };
 
-const dumpComposeLogs = async () => {
-  await run("docker", [...composeArgs, "logs"]).catch(() => undefined);
+const createComposeEnvironment = () => ({
+  ...process.env,
+  COMPOSE_PROJECT_NAME: composeProjectName,
+  APP_BUILD_SHA: buildSha,
+  APP_BUILD_TIMESTAMP: buildTimestamp,
+  FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
+  FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo,
+  REWRITE_APP_PORT: String(rewriteAppPort)
+});
+
+const dumpComposeLogs = async env => {
+  await run("docker", [...composeArgs, "logs"], { env }).catch(() => undefined);
 };
 
 const verifyBootstrappedDemo = async baseUrl => {
@@ -442,9 +454,10 @@ const verifyBootstrappedDemo = async baseUrl => {
 try {
   const expectedSchemaVersion = await readExpectedPostgresSchemaVersion();
   const baseUrl = `http://127.0.0.1:${rewriteAppPort}`;
+  const composeEnvironment = createComposeEnvironment();
 
   process.stdout.write(
-    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms port=${rewriteAppPort} bootstrapDemo=${bootstrapDemo}\n`
+    `Starting Compose Postgres smoke build/start timeout=${composeUpTimeoutMs}ms port=${rewriteAppPort} project=${composeProjectName} bootstrapDemo=${bootstrapDemo}\n`
   );
   await run("docker", [
     ...composeArgs,
@@ -452,14 +465,7 @@ try {
     "-d",
     "--build"
   ], {
-    env: {
-      ...process.env,
-      APP_BUILD_SHA: buildSha,
-      APP_BUILD_TIMESTAMP: buildTimestamp,
-      FIRST_SLICE_OPERATOR_AUTH_REQUIRED: operatorAuthRequired,
-      FIRST_SLICE_BOOTSTRAP_DEMO: bootstrapDemo,
-      REWRITE_APP_PORT: String(rewriteAppPort)
-    },
+    env: composeEnvironment,
     timeoutMs: composeUpTimeoutMs
   });
 
@@ -471,7 +477,7 @@ try {
     "ps",
     "-q",
     "rewrite-app-api"
-  ]);
+  ], { env: composeEnvironment });
   if (!apiContainerId) {
     throw new Error("Could not resolve rewrite-app-api container id.");
   }
@@ -480,7 +486,7 @@ try {
     apiContainerId,
     "--format",
     "{{.Config.User}}"
-  ]);
+  ], { env: composeEnvironment });
 
   expectEqual("readiness.storage.kind", readiness.storage?.kind, "postgres");
   expectEqual(
@@ -539,8 +545,10 @@ try {
     `Compose Postgres smoke passed for build ${buildSha} schema=${expectedSchemaVersion} operatorAuthRequired=${operatorAuthRequired} bootstrapDemo=${bootstrapDemo}\n`
   );
 } catch (error) {
-  await dumpComposeLogs();
+  await dumpComposeLogs(createComposeEnvironment());
   throw error;
 } finally {
-  await run("docker", [...composeArgs, "down", "-v"]).catch(() => undefined);
+  await run("docker", [...composeArgs, "down", "-v"], {
+    env: createComposeEnvironment()
+  }).catch(() => undefined);
 }

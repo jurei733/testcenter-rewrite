@@ -183,6 +183,16 @@ Stop the compose stack with:
 npm run stop:compose:postgres
 ```
 
+For local smoke runs alongside another app or Postgres instance, override the
+host ports and Compose project name:
+
+```bash
+COMPOSE_PROJECT_NAME=rewrite-app-smoke-local \
+REWRITE_APP_PORT=4311 \
+POSTGRES_PORT=55433 \
+npm run smoke:compose:postgres
+```
+
 That stack now runs in two explicit application roles:
 
 - `rewrite-app-migrate`: one-shot schema migration role
