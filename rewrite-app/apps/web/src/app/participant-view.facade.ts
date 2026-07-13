@@ -2,6 +2,8 @@ import { Injectable, inject } from "@angular/core";
 
 import type {
   ParticipantCurrentRunStateResponse,
+  ParticipantLaunchRequest,
+  ParticipantLaunchResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -114,8 +116,7 @@ export class ParticipantViewFacade {
 
     if (normalized.workspaceKey && normalized.loginKey) {
       this.viewState.onActionAsync(async () => {
-        await this.signInInternal();
-        await this.resumeSessionInternal();
+        await this.starterLaunchInternal();
         await this.applyEntryDraftAfterResume(normalized);
       });
     }
@@ -365,7 +366,7 @@ export class ParticipantViewFacade {
   }
 
   resumeSession(): void {
-    this.viewState.onActionAsync(() => this.resumeSessionInternal());
+    this.viewState.onActionAsync(() => this.startOrResumeInternal());
   }
 
   refreshCurrentState(): void {
@@ -429,6 +430,40 @@ export class ParticipantViewFacade {
 
     this.runtime.participantSessionId =
       payload.participantSession.participantSessionId;
+    this.runtime.runtimeMonitorView = prettyPrintJson(
+      payload,
+      this.runtime.runtimeMonitorView
+    );
+    this.persistState();
+    await this.refreshCurrentStateInternal(true);
+  }
+
+  private async startOrResumeInternal(): Promise<void> {
+    if (this.runtime.participantSessionId.trim()) {
+      await this.resumeSessionInternal();
+      return;
+    }
+
+    await this.starterLaunchInternal();
+  }
+
+  private async starterLaunchInternal(): Promise<void> {
+    const payload = await this.requestState.request<ParticipantLaunchResponse>(
+      "Participant Starter Launch",
+      "POST",
+      productionApiRoutes.participant.launch,
+      {
+        tenantKey: this.workspace.tenantKey.trim() || undefined,
+        workspaceKey: this.workspace.workspaceKey.trim(),
+        loginKey: this.runtime.loginKey.trim(),
+        groupKey: this.runtime.groupKey.trim() || undefined,
+        bookletKey: this.runtime.bookletKey.trim() || undefined
+      } satisfies ParticipantLaunchRequest
+    );
+
+    this.runtime.participantSessionId =
+      payload.participantSession.participantSessionId;
+    this.syncRun(payload.testRun);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView
