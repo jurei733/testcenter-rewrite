@@ -156,6 +156,12 @@ export interface ShellWorkspaceState {
   workspaceActivitySubjectType: string;
   workspaceActivitySubjectId: string;
   workspaceActivityLimit: string;
+  studyMonitorMatrixLoginFilter: string;
+  studyMonitorMatrixGroupFilter: string;
+  studyMonitorMatrixUnitFilter: string;
+  studyMonitorMatrixStatusFilter: string;
+  studyMonitorMatrixAnswerFilter: string;
+  studyMonitorMatrixLimit: string;
   tenantsView: string;
   workspacesView: string;
   workspaceOverviewView: string;
@@ -342,6 +348,12 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceActivitySubjectType: "",
     workspaceActivitySubjectId: "",
     workspaceActivityLimit: "100",
+    studyMonitorMatrixLoginFilter: "",
+    studyMonitorMatrixGroupFilter: "",
+    studyMonitorMatrixUnitFilter: "",
+    studyMonitorMatrixStatusFilter: "",
+    studyMonitorMatrixAnswerFilter: "",
+    studyMonitorMatrixLimit: "25",
     tenantsView: 'Use "Refresh Tenant Directory".',
     workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',

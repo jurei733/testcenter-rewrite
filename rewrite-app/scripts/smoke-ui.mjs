@@ -2693,6 +2693,40 @@ try {
     .filter({ hasText: "Hidden Rows" })
     .filter({ hasText: String(hiddenParticipantMatrixRows) })
     .waitFor();
+  await fillAndCommit("#studyMonitorMatrixLoginFilter", participantLoginKey);
+  await fillAndCommit("#studyMonitorMatrixUnitFilter", "unit-paused");
+  await page.selectOption("#studyMonitorMatrixStatusFilter", "running");
+  await page.selectOption("#studyMonitorMatrixAnswerFilter", "answered");
+  await fillAndCommit("#studyMonitorMatrixLimit", "5");
+  await participantUnitMatrixCard
+    .locator(".record-collection-summary")
+    .filter({ hasText: "2 visible records" })
+    .waitFor();
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: `${workspaceKey} participant matrix`
+      })
+    })
+    .filter({ hasText: "Filtered Rows" })
+    .filter({ hasText: "1" })
+    .filter({ hasText: "Visible Limit" })
+    .filter({ hasText: "5" })
+    .waitFor();
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "running" })
+    .filter({ hasText: "answered" })
+    .filter({ hasText: "Open Run Detail" })
+    .waitFor();
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await participantUnitMatrixCard
+    .locator(".record-collection-summary")
+    .filter({ hasText: `${visibleParticipantMatrixRecords} visible records` })
+    .waitFor();
   const monitorStatusDistributionCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Status Distribution",

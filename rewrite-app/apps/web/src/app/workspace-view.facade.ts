@@ -112,18 +112,66 @@ export class WorkspaceViewFacade {
       return [];
     }
 
-    const waitingRows = matrix.rows.filter(row => row.testRunStatus === "not_started");
-    const activeRows = matrix.rows.filter(row =>
+    const loginFilter = this.workspace.studyMonitorMatrixLoginFilter
+      .trim()
+      .toLowerCase();
+    const groupFilter = this.workspace.studyMonitorMatrixGroupFilter
+      .trim()
+      .toLowerCase();
+    const unitFilter = this.workspace.studyMonitorMatrixUnitFilter
+      .trim()
+      .toLowerCase();
+    const statusFilter = this.workspace.studyMonitorMatrixStatusFilter.trim();
+    const answerFilter = this.workspace.studyMonitorMatrixAnswerFilter.trim();
+    const limitValue = Number.parseInt(
+      this.workspace.studyMonitorMatrixLimit,
+      10
+    );
+    const visibleLimit = Number.isFinite(limitValue)
+      ? Math.max(1, Math.min(limitValue, 200))
+      : 25;
+    const filteredRows = matrix.rows.filter(row => {
+      if (
+        loginFilter &&
+        !`${row.loginKey} ${row.displayName ?? ""}`.toLowerCase().includes(loginFilter)
+      ) {
+        return false;
+      }
+      if (groupFilter && !row.groupKey.toLowerCase().includes(groupFilter)) {
+        return false;
+      }
+      if (
+        unitFilter &&
+        !`${row.unitKey} ${row.unitLabel}`.toLowerCase().includes(unitFilter)
+      ) {
+        return false;
+      }
+      if (statusFilter && row.testRunStatus !== statusFilter) {
+        return false;
+      }
+      if (answerFilter === "answered" && !row.answered) {
+        return false;
+      }
+      if (answerFilter === "missing" && row.answered) {
+        return false;
+      }
+      return true;
+    });
+
+    const waitingRows = filteredRows.filter(
+      row => row.testRunStatus === "not_started"
+    );
+    const activeRows = filteredRows.filter(row =>
       ["running", "paused"].includes(row.testRunStatus)
     );
-    const missingRows = matrix.rows.filter(row => row.expected && !row.answered);
-    const displayedRows = matrix.rows.slice(0, 25);
-    const hiddenRowCount = Math.max(matrix.rows.length - displayedRows.length, 0);
+    const missingRows = filteredRows.filter(row => row.expected && !row.answered);
+    const displayedRows = filteredRows.slice(0, visibleLimit);
+    const hiddenRowCount = Math.max(filteredRows.length - displayedRows.length, 0);
 
     return [
       {
         headline: `${matrix.workspaceKey} participant matrix`,
-        subline: `${matrix.rows.length} participant-unit row(s) generated ${this.formatDateTime(matrix.generatedAt)}`,
+        subline: `${matrix.rows.length} participant-unit row(s), ${filteredRows.length} after filters, generated ${this.formatDateTime(matrix.generatedAt)}`,
         badges: [
           `${waitingRows.length} not started`,
           `${activeRows.length} active`,
@@ -134,8 +182,10 @@ export class WorkspaceViewFacade {
           { label: "Tenant", value: matrix.tenantKey },
           { label: "Workspace", value: matrix.workspaceKey },
           { label: "Total Rows", value: String(matrix.rows.length) },
+          { label: "Filtered Rows", value: String(filteredRows.length) },
           { label: "Displayed Rows", value: String(displayedRows.length) },
           { label: "Hidden Rows", value: String(hiddenRowCount) },
+          { label: "Visible Limit", value: String(visibleLimit) },
           { label: "Generated", value: this.formatDateTime(matrix.generatedAt) }
         ]
       },
@@ -1762,6 +1812,16 @@ export class WorkspaceViewFacade {
     this.workspace.workspaceActivitySubjectId = "";
     this.workspace.workspaceActivityLimit = "100";
     this.refreshWorkspaceActivity();
+  }
+
+  clearStudyMonitorMatrixFilters(): void {
+    this.workspace.studyMonitorMatrixLoginFilter = "";
+    this.workspace.studyMonitorMatrixGroupFilter = "";
+    this.workspace.studyMonitorMatrixUnitFilter = "";
+    this.workspace.studyMonitorMatrixStatusFilter = "";
+    this.workspace.studyMonitorMatrixAnswerFilter = "";
+    this.workspace.studyMonitorMatrixLimit = "25";
+    this.persistState();
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {

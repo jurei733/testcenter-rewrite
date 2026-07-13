@@ -149,6 +149,51 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="No monitor pressure is visible in the latest summary."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Participant Matrix Filters</h2>
+        <p>Keep large monitor matrices focused by participant, group, unit, run status, answer state, and visible-row limit.</p>
+        <div class="form-grid">
+          <label>
+            Login
+            <input id="studyMonitorMatrixLoginFilter" name="studyMonitorMatrixLoginFilter" [(ngModel)]="view.workspace.studyMonitorMatrixLoginFilter" (change)="view.persistState()" placeholder="Optional login" />
+          </label>
+          <label>
+            Group
+            <input id="studyMonitorMatrixGroupFilter" name="studyMonitorMatrixGroupFilter" [(ngModel)]="view.workspace.studyMonitorMatrixGroupFilter" (change)="view.persistState()" placeholder="Optional group" />
+          </label>
+          <label>
+            Unit
+            <input id="studyMonitorMatrixUnitFilter" name="studyMonitorMatrixUnitFilter" [(ngModel)]="view.workspace.studyMonitorMatrixUnitFilter" (change)="view.persistState()" placeholder="Optional unit" />
+          </label>
+          <label>
+            Run Status
+            <select id="studyMonitorMatrixStatusFilter" name="studyMonitorMatrixStatusFilter" [(ngModel)]="view.workspace.studyMonitorMatrixStatusFilter" (change)="view.persistState()">
+              <option value="">All statuses</option>
+              <option value="not_started">not_started</option>
+              <option value="created">created</option>
+              <option value="running">running</option>
+              <option value="paused">paused</option>
+              <option value="completed">completed</option>
+            </select>
+          </label>
+          <label>
+            Answer State
+            <select id="studyMonitorMatrixAnswerFilter" name="studyMonitorMatrixAnswerFilter" [(ngModel)]="view.workspace.studyMonitorMatrixAnswerFilter" (change)="view.persistState()">
+              <option value="">All answers</option>
+              <option value="answered">answered</option>
+              <option value="missing">missing</option>
+            </select>
+          </label>
+          <label>
+            Visible Rows
+            <input id="studyMonitorMatrixLimit" name="studyMonitorMatrixLimit" type="number" min="1" max="200" step="1" [(ngModel)]="view.workspace.studyMonitorMatrixLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="ghost" type="button" (click)="view.clearStudyMonitorMatrixFilters()">Clear Matrix Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Participant Unit Matrix"
         subtitle="Participant-by-unit operator read model with session, run, answer, and review status."
