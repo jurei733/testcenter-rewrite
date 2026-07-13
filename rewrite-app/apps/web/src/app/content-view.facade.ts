@@ -19,6 +19,7 @@ import {
 import { DEFAULT_SOURCE_DOCUMENT, type SummaryCard } from "./rewrite-app-shell.types";
 import {
   parseJsonDocument,
+  readNumberValue,
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
@@ -1072,6 +1073,62 @@ export class ContentViewFacade {
         };
       }) ?? []
     );
+  }
+
+  get activationGuardItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument(this.content.activationGuardView);
+    const status = readStringValue(payload, ["status"]);
+    if (!payload || !status) {
+      return [];
+    }
+
+    const contentReleaseId =
+      readStringValue(payload, ["contentReleaseId"]) ??
+      readStringValue(payload, ["attemptedContentReleaseId"]) ??
+      "unknown release";
+    const activeContentReleaseId =
+      readStringValue(payload, ["activeContentReleaseId"]) ?? "none";
+    const previousActiveContentReleaseId =
+      readStringValue(payload, ["previousActiveContentReleaseId"]) ?? "none";
+    const supersededOpenRunCount =
+      readNumberValue(payload, ["supersededOpenRunCount"]) ??
+      readNumberValue(payload, ["openRunCount"]) ??
+      0;
+    const forceActivation = readUnknownValue(payload, ["forceActivation"]) === true;
+
+    return [
+      {
+        headline:
+          status === "activated"
+            ? "Activation completed"
+            : status === "blocked"
+              ? "Activation blocked"
+              : "Activation readiness",
+        subline: contentReleaseId,
+        badges: [
+          status,
+          forceActivation ? "force" : "guarded",
+          `${supersededOpenRunCount} open run(s)`
+        ],
+        rows: [
+          { label: "Content Release", value: contentReleaseId },
+          { label: "Active Release", value: activeContentReleaseId },
+          { label: "Previous Active", value: previousActiveContentReleaseId },
+          {
+            label: "Open Runs",
+            value: String(supersededOpenRunCount)
+          },
+          {
+            label: "Force Activation",
+            value: forceActivation ? "enabled" : "disabled"
+          }
+        ],
+        selected: this.content.contentReleaseId.trim() === contentReleaseId,
+        actionLabel: contentReleaseId === "unknown release" ? undefined : "Select Release",
+        actionPayload:
+          contentReleaseId === "unknown release" ? undefined : { contentReleaseId }
+      }
+    ];
   }
 
   get contentReleaseDetailItems(): RecordCollectionItem[] {

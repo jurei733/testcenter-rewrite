@@ -285,6 +285,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Activation Guard Result"
+        subtitle="Latest activation, blocked guard, or readiness outcome as an operator card."
+        [items]="view.activationGuardItems"
+        (itemAction)="view.selectContentRelease($event)"
+        emptyState="No activation guard result has been loaded yet."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Selected Release Detail"
         subtitle="The chosen release with participant and lifecycle context."
         [items]="view.contentReleaseDetailItems"

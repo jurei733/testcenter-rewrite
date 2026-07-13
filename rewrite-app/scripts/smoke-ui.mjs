@@ -1198,6 +1198,13 @@ try {
       Array.isArray(payload.items) &&
       payload.items.some(item => item?.contentRelease?.status === "active")
   );
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Activation Guard Result" }) })
+    .filter({ hasText: "Activation readiness" })
+    .filter({ hasText: "ready" })
+    .filter({ hasText: "guarded" })
+    .waitFor();
   logStep("content-prompt-read-model");
   await clickAction("Source Package Detail");
   await clickAction("Release Detail");
