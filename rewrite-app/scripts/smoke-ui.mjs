@@ -1453,6 +1453,22 @@ try {
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
+  await page
+    .locator("#participantLaunchpad")
+    .filter({ hasText: "Roster Entries" })
+    .filter({ hasText: "3" })
+    .filter({ hasText: "Generated Links" })
+    .filter({ hasText: "Link CSV" })
+    .filter({ hasText: "Ready" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Launchpad Actions" })
+    })
+    .filter({ hasText: "Download participant entry links" })
+    .filter({ hasText: "Refresh participant sessions" })
+    .waitFor();
   await fillAndCommit(
     "#entryRosterText",
     [

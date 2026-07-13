@@ -255,6 +255,123 @@ export class RuntimeViewFacade {
     ];
   }
 
+  get participantLaunchpadCards(): SummaryCard[] {
+    const rosterEntries = this.parseParticipantRosterView();
+    const links = this.parseEntryLinksView();
+    const sessions = this.parseParticipantSessionListView();
+    const linkLogins = new Set(links.map(link => link.loginKey));
+    const startedLinkedSessions = sessions.filter(item =>
+      linkLogins.has(item.participantSession.loginKey)
+    ).length;
+    const notStartedLinks = Math.max(links.length - startedLinkedSessions, 0);
+
+    return [
+      {
+        label: "Roster Entries",
+        headline: String(rosterEntries.length),
+        detail:
+          rosterEntries.length > 0
+            ? "Saved participants are available for entry-link generation."
+            : "Load or import a roster before handing out links."
+      },
+      {
+        label: "Generated Links",
+        headline: String(links.length),
+        detail:
+          links.length > 0
+            ? "Entry links are ready to open or export."
+            : "Generate links from pasted rows or the saved roster."
+      },
+      {
+        label: "Started Sessions",
+        headline: String(startedLinkedSessions),
+        detail:
+          links.length > 0
+            ? `${notStartedLinks} generated link(s) have no loaded session yet.`
+            : "Refresh sessions after participants start."
+      },
+      {
+        label: "Link CSV",
+        headline: links.length > 0 ? "Ready" : "Pending",
+        detail:
+          links.length > 0
+            ? "Download the current link set for distribution."
+            : "CSV becomes available once links are generated."
+      }
+    ];
+  }
+
+  get participantLaunchpadActionItems(): RecordCollectionItem[] {
+    const rosterEntries = this.parseParticipantRosterView();
+    const links = this.parseEntryLinksView();
+    const sessions = this.parseParticipantSessionListView();
+    const items: RecordCollectionItem[] = [];
+
+    if (rosterEntries.length === 0) {
+      items.push({
+        headline: "Load saved participant roster",
+        subline: "Use persisted roster rows for this workspace",
+        badges: ["roster", "read"],
+        rows: [
+          {
+            label: "Expected Result",
+            value: "Saved participants appear and can be turned into entry links"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { launchpadCommand: "loadRoster" }
+      });
+    }
+
+    if (rosterEntries.length > 0 && links.length !== rosterEntries.length) {
+      items.push({
+        headline: "Generate links from saved roster",
+        subline: `${rosterEntries.length} roster entr${rosterEntries.length === 1 ? "y" : "ies"}`,
+        badges: ["entry links", "generate"],
+        rows: [
+          {
+            label: "Expected Result",
+            value: "Every saved participant receives a direct start URL"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { launchpadCommand: "generateSavedRosterLinks" }
+      });
+    }
+
+    if (links.length > 0) {
+      items.push({
+        headline: "Download participant entry links",
+        subline: `${links.length} generated link${links.length === 1 ? "" : "s"}`,
+        badges: ["csv", "handoff"],
+        rows: [
+          {
+            label: "Expected Result",
+            value: "Download a CSV that can be distributed to participants"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { launchpadCommand: "downloadEntryLinks" }
+      });
+    }
+
+    items.push({
+      headline: "Refresh participant sessions",
+      subline: `${sessions.length} loaded session${sessions.length === 1 ? "" : "s"}`,
+      badges: ["sessions", "read"],
+      rows: [
+        {
+          label: "Expected Result",
+          value: "Started participants are reflected in the launchpad"
+        }
+      ],
+      actionLabel: "Apply Suggestion",
+      actionPayload: { launchpadCommand: "refreshSessions" }
+    });
+
+    return items;
+  }
+
   get participantRosterItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListParticipantRosterResponse>(
       this.runtime.participantRosterView
@@ -1419,6 +1536,24 @@ export class RuntimeViewFacade {
     }
   }
 
+  runParticipantLaunchpadSuggestion(item: RecordCollectionItem): void {
+    switch (item.actionPayload?.launchpadCommand) {
+      case "loadRoster":
+        this.loadParticipantRoster();
+        break;
+      case "generateSavedRosterLinks":
+        this.generateEntryLinksFromSavedRoster();
+        break;
+      case "downloadEntryLinks":
+        this.downloadEntryLinksCsv();
+        break;
+      case "refreshSessions":
+      default:
+        this.refreshParticipantSessions();
+        break;
+    }
+  }
+
   participantHappyPathFlow(): void {
     this.viewState.onActionAsync(() => this.runtimeService.participantHappyPathFlow());
   }
@@ -1620,6 +1755,13 @@ export class RuntimeViewFacade {
   private parseParticipantRosterView(): ListParticipantRosterResponse["items"] {
     const payload = parseJsonDocument<ListParticipantRosterResponse>(
       this.runtime.participantRosterView
+    );
+    return Array.isArray(payload?.items) ? payload.items : [];
+  }
+
+  private parseParticipantSessionListView(): ListParticipantSessionsResponse["items"] {
+    const payload = parseJsonDocument<ListParticipantSessionsResponse>(
+      this.runtime.participantSessionsView
     );
     return Array.isArray(payload?.items) ? payload.items : [];
   }

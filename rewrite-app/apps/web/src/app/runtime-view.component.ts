@@ -252,6 +252,20 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No session run history loaded yet."
       ></app-record-collection>
 
+      <article class="card" id="participantLaunchpad">
+        <h2>Participant Launchpad</h2>
+        <p>Prepare participant handoff from one place: saved roster, generated entry links, started sessions, and the CSV that can be distributed.</p>
+        <app-summary-cards [cards]="view.participantLaunchpadCards"></app-summary-cards>
+      </article>
+
+      <app-record-collection
+        title="Participant Launchpad Actions"
+        subtitle="Suggested next steps for handing out links and checking whether participants have started."
+        [items]="view.participantLaunchpadActionItems"
+        (itemAction)="view.runParticipantLaunchpadSuggestion($event)"
+        emptyState="Launchpad actions appear after roster or session data is loaded."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Participant Entry Links</h2>
         <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML rosters are accepted too.</p>
