@@ -256,6 +256,15 @@ textarea {
   resize: vertical;
 }
 
+.participant-entry-status small {
+  display: block;
+  margin-top: 6px;
+  max-width: 220px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

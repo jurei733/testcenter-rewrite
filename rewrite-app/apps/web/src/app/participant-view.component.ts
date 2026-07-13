@@ -21,6 +21,9 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           <div class="participant-entry-status">
             <span>Session Status</span>
             <strong id="participantEntryStatus">{{ view.player.runStatus }}</strong>
+            <small id="participantEntryNextStep">
+              {{ view.player.nextStepLabel }} · {{ view.player.nextStepDetail }}
+            </small>
           </div>
         </header>
         <div class="participant-entry-context">

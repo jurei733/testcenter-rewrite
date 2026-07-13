@@ -44,6 +44,8 @@ type ParticipantPlayerState = {
   nextUnitKey: string | null;
   runStatus: string;
   runId: string;
+  nextStepLabel: string;
+  nextStepDetail: string;
   actions: string[];
   canSaveProgress: boolean;
   canGoPreviousUnit: boolean;
@@ -278,6 +280,10 @@ export class ParticipantViewFacade {
         nextUnitKey: null,
         runStatus: hasParticipantSession ? "signed_in" : "idle",
         runId: this.runtime.testRunId.trim() || "no run yet",
+        nextStepLabel: hasParticipantSession ? "Start test" : "Sign in",
+        nextStepDetail: hasParticipantSession
+          ? 'Use "Start Or Resume" to open the assigned booklet.'
+          : "Enter the assigned workspace and login key first.",
         actions: [],
         canSaveProgress: false,
         canGoPreviousUnit: false,
@@ -378,6 +384,15 @@ export class ParticipantViewFacade {
       nextUnitKey,
       runStatus: currentState.testRun.status,
       runId: currentState.testRun.testRunId,
+      nextStepLabel: this.getNextStepLabel(currentState.testRun.status),
+      nextStepDetail: this.getNextStepDetail({
+        availableActions,
+        isComplete,
+        missingResponseLabel:
+          missingUnitCount === 0
+            ? "All units have a saved response."
+            : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
+      }),
       actions: availableActions,
       canSaveProgress: availableActions.includes("save_progress"),
       canGoPreviousUnit: canNavigateUnits && previousUnitKey != null,
@@ -826,6 +841,33 @@ export class ParticipantViewFacade {
       return "The current answer is ready to save.";
     }
     return "Write an answer, then save or move to another unit.";
+  }
+
+  private getNextStepLabel(status: string): string {
+    if (status === "completed") {
+      return "Completed";
+    }
+    if (status === "paused") {
+      return "Resume test";
+    }
+    return "Answer current unit";
+  }
+
+  private getNextStepDetail(args: {
+    availableActions: string[];
+    isComplete: boolean;
+    missingResponseLabel: string;
+  }): string {
+    if (args.isComplete) {
+      return "This test run is closed and ready for operator review.";
+    }
+    if (args.availableActions.includes("resume")) {
+      return 'Use "Resume Run" or save a running answer to continue.';
+    }
+    if (args.availableActions.includes("save_progress")) {
+      return `${args.missingResponseLabel} Save, navigate, or complete when ready.`;
+    }
+    return "No participant action is available for this run.";
   }
 
   private readCurrentRunState():

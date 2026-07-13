@@ -1068,11 +1068,45 @@ try {
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "signed_in" &&
       document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-        "no run yet",
+        "no run yet" &&
+      document.querySelector("#participantEntryNextStep")?.textContent?.includes(
+        "Start test"
+      ),
     participantEntrySignInSessionId,
     { timeout: 15_000 }
   );
   stopAfter("participant-entry-sign-in");
+  logStep("participant-entry-start-after-sign-in");
+  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  const participantEntryStartedPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantEntrySignInSessionId}/current-state`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      "currentRunState" in payload &&
+      typeof payload.currentRunState === "object" &&
+      payload.currentRunState != null &&
+      typeof payload.currentRunState.testRun === "object" &&
+      payload.currentRunState.testRun != null &&
+      payload.currentRunState.testRun.status === "running"
+  );
+  const participantEntryStartedRunId =
+    participantEntryStartedPayload.currentRunState.testRun.testRunId;
+  await page.waitForFunction(
+    ([expectedSessionId, expectedRunId]) =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantEntryNextStep")?.textContent?.includes(
+        "Answer current unit"
+      ),
+    [participantEntrySignInSessionId, participantEntryStartedRunId],
+    { timeout: 15_000 }
+  );
+  stopAfter("participant-entry-start-after-sign-in");
 
   logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
