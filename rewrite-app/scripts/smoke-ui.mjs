@@ -1962,6 +1962,18 @@ try {
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Detailed Responses" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Detailed response window" }) })
+    .filter({ hasText: "1 response row(s) loaded for the current filters" })
+    .filter({ hasText: "6 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Responses" })
+    .filter({ hasText: "Active Filters" })
+    .filter({ hasText: "login, group, session, run, unit, status" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Detailed Responses" }) })
     .filter({ hasText: "Filtered response smoke" })
     .filter({ hasText: "unit-paused" })
     .waitFor();
@@ -2011,9 +2023,22 @@ try {
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Reviews", exact: true }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Review window" }) })
+    .filter({ hasText: "1 review row(s) loaded for the current filters" })
+    .filter({ hasText: "7 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Reviews" })
+    .filter({ hasText: "Active Filters" })
+    .filter({ hasText: "login, group, session, run, unit, reviewer, category" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Reviews", exact: true }) })
     .filter({ hasText: "Filtered review smoke" })
     .filter({ hasText: "operator-ui" })
     .waitFor();
+  stopAfter("filter-reviews");
   logStep("export-response-csv");
   const responseDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Responses CSV");

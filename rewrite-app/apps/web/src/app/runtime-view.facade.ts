@@ -663,8 +663,37 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<ListDetailedResponsesResponse>(
       this.runtime.detailedResponsesView
     );
-    return (
-      payload?.items.map(item => {
+    if (!payload) {
+      return [];
+    }
+
+    const activeFilters = [
+      this.runtime.detailedResponseLoginFilter.trim() ? "login" : "",
+      this.runtime.detailedResponseGroupFilter.trim() ? "group" : "",
+      this.runtime.detailedResponseSessionFilter.trim() ? "session" : "",
+      this.runtime.detailedResponseRunFilter.trim() ? "run" : "",
+      this.runtime.detailedResponseUnitFilter.trim() ? "unit" : "",
+      this.runtime.detailedResponseStatusFilter.trim() ? "status" : ""
+    ].filter(Boolean);
+
+    return [
+      {
+        headline: "Detailed response window",
+        subline: `${payload.items.length} response row(s) loaded for the current filters`,
+        badges: [
+          `${activeFilters.length} active filter(s)`,
+          `limit ${this.runtime.detailedResponseLimit}`
+        ],
+        rows: [
+          { label: "Loaded Responses", value: String(payload.items.length) },
+          { label: "Limit", value: this.runtime.detailedResponseLimit },
+          {
+            label: "Active Filters",
+            value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
+          }
+        ]
+      },
+      ...payload.items.map(item => {
         const displayName = item.participantRosterEntry?.displayName;
 
         return {
@@ -695,8 +724,8 @@ export class RuntimeViewFacade {
             groupKey: item.groupKey
           }
         };
-      }) ?? []
-    );
+      })
+    ];
   }
 
   get selectedSessionReviewItems(): RecordCollectionItem[] {
@@ -744,8 +773,38 @@ export class RuntimeViewFacade {
 
   get reviewItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListReviewsResponse>(this.runtime.reviewsView);
-    return (
-      payload?.items.map(item => {
+    if (!payload) {
+      return [];
+    }
+
+    const activeFilters = [
+      this.runtime.reviewLoginFilter.trim() ? "login" : "",
+      this.runtime.reviewGroupFilter.trim() ? "group" : "",
+      this.runtime.reviewSessionFilter.trim() ? "session" : "",
+      this.runtime.reviewRunFilter.trim() ? "run" : "",
+      this.runtime.reviewUnitFilter.trim() ? "unit" : "",
+      this.runtime.reviewReviewerFilter.trim() ? "reviewer" : "",
+      this.runtime.reviewCategoryFilter.trim() ? "category" : ""
+    ].filter(Boolean);
+
+    return [
+      {
+        headline: "Review window",
+        subline: `${payload.items.length} review row(s) loaded for the current filters`,
+        badges: [
+          `${activeFilters.length} active filter(s)`,
+          `limit ${this.runtime.reviewLimit}`
+        ],
+        rows: [
+          { label: "Loaded Reviews", value: String(payload.items.length) },
+          { label: "Limit", value: this.runtime.reviewLimit },
+          {
+            label: "Active Filters",
+            value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
+          }
+        ]
+      },
+      ...payload.items.map(item => {
         const displayName = item.participantRosterEntry?.displayName;
         const loginKey = item.participantSession?.loginKey ?? "unknown";
 
@@ -792,8 +851,8 @@ export class RuntimeViewFacade {
             reviewComment: item.review.comment
           }
         };
-      }) ?? []
-    );
+      })
+    ];
   }
 
   get reviewActionItems(): RecordCollectionItem[] {
