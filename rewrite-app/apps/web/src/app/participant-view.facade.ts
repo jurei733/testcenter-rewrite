@@ -528,9 +528,7 @@ export class ParticipantViewFacade {
       } satisfies ParticipantSignInRequest
     );
 
-    this.runtime.participantSessionId =
-      payload.participantSession.participantSessionId;
-    this.runtime.groupKey = payload.participantSession.groupKey;
+    this.syncParticipantSessionFields(payload.participantSession);
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
@@ -592,8 +590,7 @@ export class ParticipantViewFacade {
       } satisfies ParticipantLaunchRequest
     );
 
-    this.runtime.participantSessionId =
-      payload.participantSession.participantSessionId;
+    this.syncParticipantSessionFields(payload.participantSession);
     this.syncRun(payload.testRun);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
@@ -765,7 +762,7 @@ export class ParticipantViewFacade {
         payload,
         this.runtime.currentRunStateView
       );
-      this.syncRun(payload.currentRunState.testRun);
+      this.syncCurrentRunState(payload.currentRunState);
       this.syncCurrentUnitResponse(payload.currentRunState);
       this.persistState();
     } catch (error) {
@@ -788,11 +785,32 @@ export class ParticipantViewFacade {
     testRunId: string;
     status?: string;
     currentUnitKey?: string | null;
+    bookletKey?: string;
   }): void {
     this.runtime.testRunId = testRun.testRunId;
+    if (testRun.bookletKey) {
+      this.runtime.bookletKey = testRun.bookletKey;
+    }
     if (testRun.currentUnitKey != null) {
       this.runtime.currentUnitKey = testRun.currentUnitKey;
     }
+  }
+
+  private syncParticipantSessionFields(participantSession: {
+    participantSessionId: string;
+    loginKey: string;
+    groupKey: string;
+  }): void {
+    this.runtime.participantSessionId = participantSession.participantSessionId;
+    this.runtime.loginKey = participantSession.loginKey;
+    this.runtime.groupKey = participantSession.groupKey;
+  }
+
+  private syncCurrentRunState(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"]
+  ): void {
+    this.syncParticipantSessionFields(currentState.participantSession);
+    this.syncRun(currentState.testRun);
   }
 
   private syncCurrentUnitResponse(
@@ -811,8 +829,41 @@ export class ParticipantViewFacade {
     }
 
     const query = new URLSearchParams({ participantSessionId });
+    const currentState = this.readCurrentRunState();
+    this.appendParticipantEntryLinkParam(query, "tenantKey", this.workspace.tenantKey);
+    this.appendParticipantEntryLinkParam(
+      query,
+      "workspaceKey",
+      this.workspace.workspaceKey
+    );
+    this.appendParticipantEntryLinkParam(
+      query,
+      "loginKey",
+      currentState?.participantSession.loginKey ?? this.runtime.loginKey
+    );
+    this.appendParticipantEntryLinkParam(
+      query,
+      "groupKey",
+      currentState?.participantSession.groupKey ?? this.runtime.groupKey
+    );
+    this.appendParticipantEntryLinkParam(
+      query,
+      "bookletKey",
+      currentState?.testRun.bookletKey ?? this.runtime.bookletKey
+    );
     const origin = globalThis.window?.location?.origin ?? "";
     return `${origin}/participant?${query.toString()}`;
+  }
+
+  private appendParticipantEntryLinkParam(
+    query: URLSearchParams,
+    key: string,
+    value?: string | null
+  ): void {
+    const normalizedValue = value?.trim();
+    if (normalizedValue) {
+      query.set(key, normalizedValue);
+    }
   }
 
   private hasSavedResponse(

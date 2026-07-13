@@ -1201,9 +1201,14 @@ try {
     participantRouteSessionId,
     "UI smoke expected a participant route session id after opening the entry URL."
   );
-  const participantRouteSessionLink = `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
-    participantRouteSessionId
-  )}`;
+  const participantRouteSessionLink = `${baseUrl}/participant?${new URLSearchParams({
+    participantSessionId: participantRouteSessionId,
+    tenantKey,
+    workspaceKey,
+    loginKey: participantRouteLoginKey,
+    groupKey: participantRouteGroupKey,
+    bookletKey: participantRouteBookletKey
+  }).toString()}`;
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
   assert.equal(
@@ -1484,6 +1489,19 @@ try {
     { timeout: 15_000 }
   );
   logStep("participant-entry-completed-session-reentry");
+  await page.evaluate(() => {
+    const storageKey = "testcenter-rewrite-app-shell";
+    const snapshot = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}");
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...snapshot,
+        loginKey: "stale-login-before-reentry",
+        groupKey: "stale-group-before-reentry",
+        bookletKey: "stale-booklet-before-reentry"
+      })
+    );
+  });
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       participantRouteSessionId
@@ -1493,6 +1511,9 @@ try {
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
+  await expectInputValue("#participantLoginKey", participantRouteLoginKey);
+  await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
+  await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);
   await page.waitForFunction(
     expectedSessionId =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
