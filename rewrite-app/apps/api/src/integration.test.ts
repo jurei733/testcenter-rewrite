@@ -1731,7 +1731,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
 
     const participantSignIn = await requestJsonAt<{
-      participantSession: { participantSessionId: string; loginKey: string };
+      participantSession: {
+        participantSessionId: string;
+        loginKey: string;
+        groupKey: string;
+      };
     }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
       method: "POST",
       body: {
@@ -3329,7 +3333,11 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     const authorization = `Bearer ${signIn.body.sessionToken}`;
 
     const participantSignIn = await requestJsonAt<{
-      participantSession: { participantSessionId: string; loginKey: string };
+      participantSession: {
+        participantSessionId: string;
+        loginKey: string;
+        groupKey: string;
+      };
     }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
       method: "POST",
       body: {
@@ -3341,7 +3349,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(participantSignIn.status, 200);
 
     const resumed = await requestJsonAt<{
-      testRun: { testRunId: string; status: string };
+      testRun: { testRunId: string; status: string; bookletKey: string };
     }>(
       isolated.baseUrl,
       `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
@@ -3350,6 +3358,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
 
     assert.equal(resumed.status, 200);
     assert.equal(resumed.body.testRun.status, "running");
+    assert.equal(resumed.body.testRun.bookletKey, "booklet:demo");
 
     const commandPath = `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`;
     const pauseCommand = await requestJsonAt<{
@@ -3490,7 +3499,10 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             previousStatus?: string;
             nextStatus?: string;
             completedAt?: string | null;
+            participantSessionId?: string;
             loginKey?: string;
+            groupKey?: string;
+            bookletKey?: string;
           };
         };
       }>;
@@ -3518,6 +3530,22 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       ISO_DATE_REGEX
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.loginKey, "student-demo");
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.details.participantSessionId,
+      participantSignIn.body.participantSession.participantSessionId
+    );
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.details.groupKey,
+      participantSignIn.body.participantSession.groupKey
+    );
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.details.bookletKey,
+      resumed.body.testRun.bookletKey
+    );
+    assert.deepEqual(
+      commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),
+      ["booklet:demo", "booklet:demo", "booklet:demo"]
+    );
   } finally {
     await closeServer(isolated.server);
   }
