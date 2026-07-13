@@ -193,6 +193,12 @@ POSTGRES_PORT=55433 \
 npm run smoke:compose:postgres
 ```
 
+To run the same Compose smoke with demo bootstrap enabled, use:
+
+```bash
+npm run smoke:compose:postgres:demo
+```
+
 That stack now runs in two explicit application roles:
 
 - `rewrite-app-migrate`: one-shot schema migration role

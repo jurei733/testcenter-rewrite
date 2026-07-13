@@ -34,6 +34,7 @@
     "smoke:startup": "npm run build && node ./scripts/smoke-startup.mjs",
     "smoke:startup:built": "node ./scripts/smoke-startup.mjs",
     "smoke:compose:postgres": "npm run build && node ./scripts/smoke-compose-postgres.mjs",
+    "smoke:compose:postgres:demo": "FIRST_SLICE_BOOTSTRAP_DEMO=true npm run smoke:compose:postgres",
     "smoke:shutdown": "npm run build && node ./scripts/smoke-shutdown.mjs",
     "smoke:shutdown:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-shutdown.sqlite SHUTDOWN_DRAIN_DELAY_MS=2000 node ./scripts/smoke-shutdown.mjs",
     "smoke:startup:sqlite": "npm run build && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup.sqlite node ./scripts/smoke-startup.mjs",
