@@ -27,6 +27,7 @@ import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { participantSessionLinkRows } from "./participant-session-links";
 
 type RuntimePlayerPreview = {
   hasRun: boolean;
@@ -73,10 +74,6 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(item => {
         const displayName = item.participantRosterEntry?.displayName;
-        const participantSessionLink = this.buildParticipantSessionEntryUrl(
-          item.participantSession.participantSessionId
-        );
-
         return {
           headline: displayName ?? item.participantSession.loginKey,
           subline: displayName
@@ -92,11 +89,9 @@ export class RuntimeViewFacade {
               label: "Session",
               value: item.participantSession.participantSessionId
             },
-            {
-              label: "Participant Link",
-              value: participantSessionLink,
-              href: participantSessionLink
-            },
+            ...participantSessionLinkRows(
+              item.participantSession.participantSessionId
+            ),
             {
               label: "Group",
               value: item.participantSession.groupKey
@@ -139,10 +134,6 @@ export class RuntimeViewFacade {
       return [];
     }
 
-    const participantSessionLink = this.buildParticipantSessionEntryUrl(
-      detail.participantSession.participantSessionId
-    );
-
     return [
       {
         headline:
@@ -162,11 +153,9 @@ export class RuntimeViewFacade {
             label: "Session",
             value: detail.participantSession.participantSessionId
           },
-          {
-            label: "Participant Link",
-            value: participantSessionLink,
-            href: participantSessionLink
-          },
+          ...participantSessionLinkRows(
+            detail.participantSession.participantSessionId
+          ),
           {
             label: "Group",
             value: detail.participantSession.groupKey
@@ -1797,14 +1786,6 @@ export class RuntimeViewFacade {
     if (link.bookletKey) {
       query.set("bookletKey", link.bookletKey);
     }
-    const participantPath = `/participant?${query.toString()}`;
-    return this.browserOrigin
-      ? `${this.browserOrigin}${participantPath}`
-      : participantPath;
-  }
-
-  private buildParticipantSessionEntryUrl(participantSessionId: string): string {
-    const query = new URLSearchParams({ participantSessionId });
     const participantPath = `/participant?${query.toString()}`;
     return this.browserOrigin
       ? `${this.browserOrigin}${participantPath}`

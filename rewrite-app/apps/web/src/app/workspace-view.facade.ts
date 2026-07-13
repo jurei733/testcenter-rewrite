@@ -25,10 +25,8 @@ import {
   readNumberValue,
   readStringValue
 } from "./rewrite-app-shell.readers";
-import type {
-  RecordCollectionItem,
-  RecordCollectionRow
-} from "./record-collection.component";
+import type { RecordCollectionItem } from "./record-collection.component";
+import { participantSessionLinkRows } from "./participant-session-links";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -206,7 +204,7 @@ export class WorkspaceViewFacade {
           { label: "Unit", value: row.unitKey || "none" },
           { label: "Booklet", value: row.bookletKey ?? "none" },
           { label: "Test Run", value: row.testRunId ?? "none" },
-          ...this.participantSessionLinkRows(row.participantSessionId),
+          ...participantSessionLinkRows(row.participantSessionId),
           { label: "Response Length", value: String(row.responseLength) },
           {
             label: "Latest Activity",
@@ -237,7 +235,7 @@ export class WorkspaceViewFacade {
             label: "Participant Session",
             value: item.participantSession?.participantSessionId ?? "none"
           },
-          ...this.participantSessionLinkRows(
+          ...participantSessionLinkRows(
             item.participantSession?.participantSessionId
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -738,7 +736,7 @@ export class WorkspaceViewFacade {
             value: item.participantRosterEntry?.displayName ?? "none"
           },
           { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
-          ...this.participantSessionLinkRows(
+          ...participantSessionLinkRows(
             item.participantSession?.participantSessionId
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -872,7 +870,7 @@ export class WorkspaceViewFacade {
             label: "Session",
             value: session.participantSession.participantSessionId
           },
-          ...this.participantSessionLinkRows(
+          ...participantSessionLinkRows(
             session.participantSession.participantSessionId
           ),
           {
@@ -937,7 +935,7 @@ export class WorkspaceViewFacade {
             label: "Display Name",
             value: item.participantRosterEntry?.displayName ?? "none"
           },
-          ...this.participantSessionLinkRows(
+          ...participantSessionLinkRows(
             item.participantSession?.participantSessionId
           ),
           { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
@@ -1049,7 +1047,7 @@ export class WorkspaceViewFacade {
             label: "Group",
             value: item.participantSession?.groupKey ?? "unknown group"
           },
-          ...this.participantSessionLinkRows(
+          ...participantSessionLinkRows(
             item.participantSession?.participantSessionId
           ),
           { label: "Booklet", value: item.testRun.bookletKey },
@@ -1879,26 +1877,6 @@ export class WorkspaceViewFacade {
       query.set("bookletKey", rosterEntry.bookletKey);
     }
 
-    const participantPath = `/participant?${query.toString()}`;
-    return this.browserOrigin
-      ? `${this.browserOrigin}${participantPath}`
-      : participantPath;
-  }
-
-  private participantSessionLinkRows(
-    participantSessionId?: string | null
-  ): RecordCollectionRow[] {
-    const normalizedParticipantSessionId = participantSessionId?.trim();
-    if (!normalizedParticipantSessionId) {
-      return [];
-    }
-
-    const url = this.buildParticipantSessionEntryUrl(normalizedParticipantSessionId);
-    return [{ label: "Participant Link", value: url, href: url }];
-  }
-
-  private buildParticipantSessionEntryUrl(participantSessionId: string): string {
-    const query = new URLSearchParams({ participantSessionId });
     const participantPath = `/participant?${query.toString()}`;
     return this.browserOrigin
       ? `${this.browserOrigin}${participantPath}`
