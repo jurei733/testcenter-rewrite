@@ -5,6 +5,7 @@ import type {
   GetStudyMonitorGroupResponse,
   GetStudyMonitorParticipantResponse,
   GetStudyMonitorParticipantMatrixResponse,
+  GetStudyMonitorRunResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
   ListWorkspaceActivityEventsResponse,
@@ -212,6 +213,29 @@ export class RewriteAppWorkspaceService {
     this.feedback.rememberActivity(
       "Study Monitor Unit Loaded",
       `${payload.studyMonitorUnit.unitKey}: ${payload.studyMonitorUnit.responseCount}/${payload.studyMonitorUnit.expectedRunCount} answered.`
+    );
+  }
+
+  async loadStudyMonitorRun(testRunId: string): Promise<void> {
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<GetStudyMonitorRunResponse>(
+      "Study Monitor Run",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.getStudyMonitorRun, {
+        tenantKey,
+        workspaceKey,
+        testRunId
+      })
+    );
+
+    this.workspaceState.studyMonitorRunView = prettyPrintJson(
+      payload,
+      this.workspaceState.studyMonitorRunView
+    );
+    this.feedback.rememberActivity(
+      "Study Monitor Run Loaded",
+      `${payload.studyMonitorRun.testRun.testRunId}: ${payload.studyMonitorRun.responseCount}/${payload.studyMonitorRun.expectedUnitCount} response(s), ${payload.studyMonitorRun.reviewCount} review(s).`
     );
   }
 

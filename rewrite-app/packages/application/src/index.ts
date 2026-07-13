@@ -56,6 +56,7 @@ import type {
   WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorParticipantDetail,
   WorkspaceStudyMonitorParticipantMatrix,
+  WorkspaceStudyMonitorRunDetail,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorUnitProgress,
   WorkspaceStudyMonitorSummary,
@@ -138,6 +139,11 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     unitKey: string;
   }): Promise<WorkspaceStudyMonitorUnitDetail>;
+  getStudyMonitorRunDetail(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    testRunId: string;
+  }): Promise<WorkspaceStudyMonitorRunDetail>;
   listWorkspaceActivityEvents(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -5018,6 +5024,120 @@ const buildStudyMonitorUnitDetail = (input: {
   };
 };
 
+const buildStudyMonitorRunDetail = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  testRunId: string;
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  reviews: WorkspaceReview[];
+}): WorkspaceStudyMonitorRunDetail | null => {
+  const testRun =
+    input.testRuns
+      .map(normalizeTestRun)
+      .find(candidate => candidate.testRunId === input.testRunId.trim()) ?? null;
+  if (!testRun) {
+    return null;
+  }
+
+  const participantSession =
+    input.participantSessions.find(
+      candidate =>
+        candidate.participantSessionId === testRun.participantSessionId
+    ) ?? null;
+  const participantRosterEntry = participantSession
+    ? input.participantRosterEntries.find(
+        candidate => candidate.loginKey === participantSession.loginKey
+      ) ?? null
+    : null;
+  const contentRelease =
+    input.contentReleases.find(
+      candidate => candidate.contentReleaseId === testRun.contentReleaseId
+    ) ??
+    (participantSession
+      ? input.contentReleases.find(
+          candidate =>
+            candidate.contentReleaseId === participantSession.contentReleaseId
+        )
+      : null) ??
+    null;
+  const booklet =
+    contentRelease?.runtimeSnapshot.bookletEntries.find(
+      candidate => candidate.bookletKey === testRun.bookletKey
+    ) ??
+    input.contentReleases
+      .flatMap(candidate => candidate.runtimeSnapshot.bookletEntries)
+      .find(candidate => candidate.bookletKey === testRun.bookletKey) ??
+    null;
+  const expectedUnits = booklet?.unitEntries ?? [];
+  const expectedUnitKeys = new Set(expectedUnits.map(unit => unit.unitKey));
+  const responseUnitKeys = Object.keys(testRun.unitResponses);
+  const unexpectedUnitKeys = responseUnitKeys.filter(
+    unitKey => !expectedUnitKeys.has(unitKey)
+  );
+  const unitEntries = [
+    ...expectedUnits,
+    ...unexpectedUnitKeys.map(unitKey => ({
+      unitKey,
+      displayLabel: unitKey
+    }))
+  ];
+  const runReviews = input.reviews
+    .filter(review => review.testRunId === testRun.testRunId)
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.reviewId.localeCompare(left.reviewId)
+    );
+  const reviewCountByUnitKey = new Map<string, number>();
+  for (const review of runReviews) {
+    const unitKey = review.unitKey ?? "";
+    reviewCountByUnitKey.set(unitKey, (reviewCountByUnitKey.get(unitKey) ?? 0) + 1);
+  }
+  const units = unitEntries.map(unit => {
+    const response = testRun.unitResponses[unit.unitKey] ?? null;
+
+    return {
+      unitKey: unit.unitKey,
+      displayLabel: unit.displayLabel,
+      expected: expectedUnitKeys.has(unit.unitKey),
+      answered: response != null,
+      response,
+      responseLength: response?.length ?? 0,
+      reviewCount: reviewCountByUnitKey.get(unit.unitKey) ?? 0,
+      current: testRun.currentUnitKey === unit.unitKey
+    };
+  });
+  const answeredExpectedUnitCount = units.filter(
+    unit => unit.expected && unit.answered
+  ).length;
+
+  return {
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    generatedAt: input.generatedAt,
+    testRun,
+    participantSession,
+    participantRosterEntry,
+    bookletKey: testRun.bookletKey,
+    bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
+    responseCount: responseUnitKeys.length,
+    reviewCount: runReviews.length,
+    expectedUnitCount: expectedUnits.length,
+    answeredExpectedUnitCount,
+    missingExpectedUnitCount: Math.max(
+      expectedUnits.length - answeredExpectedUnitCount,
+      0
+    ),
+    unexpectedResponseCount: unexpectedUnitKeys.length,
+    units,
+    reviews: runReviews
+  };
+};
+
 export const createFirstSliceServices = (
   dependencies: FirstSliceDependencies
 ): FirstSliceServices => {
@@ -6222,6 +6342,71 @@ export const createFirstSliceServices = (
             404,
             "study_monitor_unit_not_found",
             `Study monitor unit '${unitKey}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        return detail;
+      },
+      async getStudyMonitorRunDetail(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const testRunId = input.testRunId.trim();
+        if (!testRunId) {
+          throw new FirstSliceError(
+            400,
+            "test_run_id_required",
+            "testRunId is required."
+          );
+        }
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        ] =
+          await Promise.all([
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantRosterEntriesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listWorkspaceReviewsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const detail = buildStudyMonitorRunDetail({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          testRunId,
+          generatedAt: now(),
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          contentReleases,
+          reviews
+        });
+
+        if (!detail) {
+          throw new FirstSliceError(
+            404,
+            "study_monitor_run_not_found",
+            `Study monitor run '${testRunId}' was not found in workspace '${input.workspaceKey}'.`
           );
         }
 

@@ -169,7 +169,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Study Monitor Participant Detail"
         subtitle="Selected participant roster, session, run, unit, answer, and review context."
         [items]="view.studyMonitorParticipantItems"
-        (itemAction)="view.openActivitySubject($event)"
+        (itemAction)="view.openStudyMonitorDetailItem($event)"
         emptyState="Open a participant from the matrix or not-started list to inspect detail."
       ></app-record-collection>
 
@@ -195,6 +195,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         [items]="view.studyMonitorUnitItems"
         (itemAction)="view.openStudyMonitorDetailItem($event)"
         emptyState="Open a unit from the study monitor to inspect run detail."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Study Monitor Run Detail"
+        subtitle="Selected test run with participant, booklet, unit response, and review context."
+        [items]="view.studyMonitorRunItems"
+        (itemAction)="view.openStudyMonitorDetailItem($event)"
+        emptyState="Open a run from the study monitor matrix or detail views to inspect it."
       ></app-record-collection>
 
       <article class="card">
@@ -336,6 +344,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Selected Unit Read Model"
         viewId="studyMonitorUnitView"
         [content]="view.workspace.studyMonitorUnitView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Study Monitor Run Detail"
+        subtitle="Selected Run Read Model"
+        viewId="studyMonitorRunView"
+        [content]="view.workspace.studyMonitorRunView"
       ></app-json-panel>
 
       <app-json-panel

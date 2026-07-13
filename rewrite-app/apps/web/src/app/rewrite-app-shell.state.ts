@@ -166,6 +166,7 @@ export interface ShellWorkspaceState {
   studyMonitorGroupView: string;
   studyMonitorBookletView: string;
   studyMonitorUnitView: string;
+  studyMonitorRunView: string;
   studyMonitorExportView: string;
   studyMonitorParticipantMatrixExportView: string;
   workspaceLogExportView: string;
@@ -351,6 +352,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     studyMonitorGroupView: "Select a group from the study monitor.",
     studyMonitorBookletView: "Select a booklet from the study monitor.",
     studyMonitorUnitView: "Select a unit from the study monitor.",
+    studyMonitorRunView: "Select a run from the study monitor.",
     studyMonitorExportView: 'Use "Export Study Monitor CSV".',
     studyMonitorParticipantMatrixExportView:
       'Use "Export Participant Matrix CSV".',

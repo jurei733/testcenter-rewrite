@@ -262,6 +262,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/participants/{loginKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/booklets/{bookletKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/units/{unitKey}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/runs/{testRunId}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/study-monitor.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/study-monitor-participants.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/open-runs.csv`
@@ -342,7 +343,7 @@ The added read side now makes the first slice inspectable:
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
 - participant launch/resume can now carry an explicit `tenantKey` and `bookletKey`, and `POST /api/v1/participant/starter:launch` can sign in by tenant/workspace/login/group and start the selected booklet in one request
 - participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses, and status/response-only saves retain the current unit for player clients that do not repeat the unit key on every save
-- study-monitor reads now include workspace summary, group drill-down, booklet drill-down, and unit drill-down with per-run answer/missing/review status plus saved-roster expected/missing unit coverage
+- study-monitor reads now include workspace summary, group drill-down, booklet drill-down, unit drill-down, and run drill-down with per-unit answer/missing/current/review status plus saved-roster expected/missing unit coverage
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
 - source-package intake can now optionally carry a small structured `contentStructure` or JSON/XML source document with booklet/testlet and unit/unitRef entries, which the import step turns into the release runtime snapshot
 - source-package intake now rejects blank file names, blank media types, and non-string source documents before an import job is created
@@ -358,7 +359,7 @@ The added read side now makes the first slice inspectable:
 
 - `GET /` and `GET /app` now serve a production-facing Angular shell from [apps/web/src/app/app.component.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.component.ts)
 - the frontend is now split into routed views for workspace, content, runtime, and diagnostics via [apps/web/src/app/app.routes.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/apps/web/src/app/app.routes.ts)
-- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin-session reads, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings, a participant launchpad for roster/link/session handoff, CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, filtered workspace activity reads plus log CSV export, study-monitor booklet/unit progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, participant launchpad state, typed group-result deletion confirmation, study-monitor booklet/unit progress/export, admin-session reads, admin-user/audit CSV export, response/review/log CSV export, and operator timeline/session/content/runtime filters
+- the shell persists form context locally, exposes guided flows for admin bootstrap/sign-in, admin-session reads, admin user management with selectable role-assignment cards and filtered admin-user/audit reads plus admin-user/audit CSV export, tenant/workspace directory selection, workspace bootstrap, file-backed source-document loading with draft preview for XML/JSON/manifest files, import, runtime, persisted participant roster import/listing/export with validation warnings, a participant launchpad for roster/link/session handoff, CSV/XML entry-link preview/download, filtered content reads, filtered participant-session/response/review reads and CSV exports, filtered workspace activity reads plus log CSV export, study-monitor booklet/unit/run progress, and study-monitor CSV export, surfaces operational summaries plus an activity feed, and now has repo-native browser smoke coverage for the runtime lifecycle, blocked activation guard, failed-import retry flow, protected admin directory, file-backed manifest loading, participant roster entry-link generation/export, participant launchpad state, typed group-result deletion confirmation, study-monitor booklet/unit/run progress/export, admin-session reads, admin-user/audit CSV export, response/review/log CSV export, and operator timeline/session/content/runtime filters
 
 ## Current Persistence Boundary
 
@@ -429,7 +430,7 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - participant sign-in and session resume
 - participant roster, participant-session, and open-run export through the runtime shell
 - response and review CSV export through the runtime shell
-- study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, study-monitor CSV export, and open-run CSV export
+- study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, run drill-down, study-monitor CSV export, and open-run CSV export
 - workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity

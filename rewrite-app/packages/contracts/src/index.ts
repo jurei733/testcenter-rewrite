@@ -44,6 +44,7 @@ import type {
   WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorParticipantDetail,
   WorkspaceStudyMonitorParticipantMatrix,
+  WorkspaceStudyMonitorRunDetail,
   WorkspaceStudyMonitorUnitDetail,
   WorkspaceStudyMonitorSummary,
   WorkspaceOverview
@@ -477,6 +478,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/booklets/:bookletKey",
     getStudyMonitorUnit:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/units/:unitKey",
+    getStudyMonitorRun:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/runs/:testRunId",
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
     createSourcePackage: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
@@ -851,6 +854,10 @@ export type GetStudyMonitorBookletResponse = {
 
 export type GetStudyMonitorUnitResponse = {
   studyMonitorUnit: WorkspaceStudyMonitorUnitDetail;
+};
+
+export type GetStudyMonitorRunResponse = {
+  studyMonitorRun: WorkspaceStudyMonitorRunDetail;
 };
 
 export type ListWorkspaceActivityEventsResponse = {

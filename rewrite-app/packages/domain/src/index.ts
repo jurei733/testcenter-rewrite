@@ -465,6 +465,36 @@ export type WorkspaceStudyMonitorBookletRun = {
   reviewCount: number;
 };
 
+export type WorkspaceStudyMonitorRunUnit = {
+  unitKey: string;
+  displayLabel: string;
+  expected: boolean;
+  answered: boolean;
+  response: string | null;
+  responseLength: number;
+  reviewCount: number;
+  current: boolean;
+};
+
+export type WorkspaceStudyMonitorRunDetail = {
+  tenantKey: string;
+  workspaceKey: string;
+  generatedAt: string;
+  testRun: TestRun;
+  participantSession: ParticipantSession | null;
+  participantRosterEntry: ParticipantRosterEntry | null;
+  bookletKey: string;
+  bookletLabel: string;
+  responseCount: number;
+  reviewCount: number;
+  expectedUnitCount: number;
+  answeredExpectedUnitCount: number;
+  missingExpectedUnitCount: number;
+  unexpectedResponseCount: number;
+  units: WorkspaceStudyMonitorRunUnit[];
+  reviews: WorkspaceReview[];
+};
+
 export type WorkspaceStudyMonitorParticipantMatrixRow = {
   tenantKey: string;
   workspaceKey: string;

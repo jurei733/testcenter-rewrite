@@ -2505,6 +2505,34 @@ try {
   );
   const studyMonitorParticipantMatrix =
     studyMonitorParticipantMatrixPayload.studyMonitorParticipantMatrix;
+  const studyMonitorRunDetailPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${pausedTestRunId}`,
+    payload => {
+      const detail = payload?.studyMonitorRun;
+      if (typeof detail !== "object" || detail == null) {
+        return false;
+      }
+      const pausedUnit = Array.isArray(detail.units)
+        ? detail.units.find(unit => unit?.unitKey === "unit-paused")
+        : null;
+      return (
+        detail.testRun?.testRunId === pausedTestRunId &&
+        detail.testRun?.status === "running" &&
+        detail.participantSession?.participantSessionId === participantSessionId &&
+        detail.participantSession?.loginKey === participantLoginKey &&
+        detail.bookletKey === participantBookletKey &&
+        detail.responseCount >= 1 &&
+        detail.reviewCount === 1 &&
+        detail.expectedUnitCount === 3 &&
+        detail.missingExpectedUnitCount >= 2 &&
+        pausedUnit?.expected === true &&
+        pausedUnit?.answered === true &&
+        pausedUnit?.current === true &&
+        pausedUnit?.reviewCount === 1
+      );
+    }
+  );
+  const studyMonitorRunDetail = studyMonitorRunDetailPayload.studyMonitorRun;
   const displayedParticipantMatrixRows = Math.min(
     studyMonitorParticipantMatrix.rows.length,
     25
@@ -2549,22 +2577,6 @@ try {
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "missing" })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await page
-    .locator("app-record-collection")
-    .filter({ hasText: "Participant Unit Matrix" })
-    .locator(".record-card")
-    .filter({ hasText: "student-ui" })
-    .filter({ hasText: "unit-paused" })
-    .getByRole("button", { name: "Open Participant Detail" })
-    .first()
-    .click();
-  await page
-    .locator("app-record-collection")
-    .filter({ hasText: "Study Monitor Participant Detail" })
-    .filter({ hasText: "student-ui" })
-    .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "missing" })
-    .waitFor({ state: "visible", timeout: 15_000 });
   const expectStudyMonitorParticipantDetail = async (
     loginKey,
     expectedTexts = []
@@ -2578,12 +2590,32 @@ try {
     }
     await collection.waitFor({ state: "visible", timeout: 15_000 });
   };
-  logStep("participant-detail-open-runtime");
   await page
     .locator("app-record-collection")
-    .filter({ hasText: "Study Monitor Participant Detail" })
+    .filter({ hasText: "Participant Unit Matrix" })
     .locator(".record-card")
+    .filter({ hasText: "student-ui" })
     .filter({ hasText: "unit-paused" })
+    .getByRole("button", { name: "Open Run Detail" })
+    .first()
+    .click();
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Run Detail" })
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: participantBookletKey })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "current" })
+    .filter({ hasText: `${studyMonitorRunDetail.missingExpectedUnitCount} missing` })
+    .filter({ hasText: "1 review(s)" })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  logStep("run-detail-open-runtime");
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Run Detail" })
+    .locator(".record-card")
+    .filter({ hasText: pausedTestRunId })
     .getByRole("button", { name: "Open In Runtime" })
     .first()
     .click();

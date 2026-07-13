@@ -6,6 +6,7 @@ import type {
   GetStudyMonitorGroupResponse,
   GetStudyMonitorParticipantResponse,
   GetStudyMonitorParticipantMatrixResponse,
+  GetStudyMonitorRunResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
   GetWorkspaceOverviewResponse,
@@ -161,7 +162,7 @@ export class WorkspaceViewFacade {
               : "none"
           }
         ],
-        actionLabel: "Open Participant Detail",
+        actionLabel: row.testRunId ? "Open Run Detail" : "Open Participant Detail",
         actionPayload: {
           participantLoginKey: row.loginKey,
           unitKey: row.unitKey,
@@ -236,10 +237,11 @@ export class WorkspaceViewFacade {
               : "none"
           }
         ],
-        actionLabel: row.testRunId ? "Open In Runtime" : undefined,
+        actionLabel: row.testRunId ? "Open Run Detail" : undefined,
         actionPayload: {
           subjectType: "test_run",
           subjectId: row.testRunId ?? "",
+          testRunId: row.testRunId ?? "",
           participantSessionId: row.participantSessionId ?? "",
           loginKey: row.loginKey,
           currentUnitKey: row.unitKey
@@ -276,10 +278,11 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open In Runtime",
+        actionLabel: "Open Run Detail",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: detail.loginKey,
@@ -780,10 +783,11 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open In Runtime",
+        actionLabel: "Open Run Detail",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
@@ -991,10 +995,11 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open In Runtime",
+        actionLabel: "Open Run Detail",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
@@ -1108,15 +1113,103 @@ export class WorkspaceViewFacade {
             value: this.formatDateTime(item.testRun.updatedAt)
           }
         ],
-        actionLabel: "Open In Runtime",
+        actionLabel: "Open Run Detail",
         actionPayload: {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
           currentUnitKey: detail.unitKey
         }
+      }))
+    ];
+  }
+
+  get studyMonitorRunItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorRunResponse>(
+      this.workspace.studyMonitorRunView
+    );
+    const detail = payload?.studyMonitorRun;
+    if (!detail) {
+      return [];
+    }
+
+    const participantLogin =
+      detail.participantSession?.loginKey ??
+      detail.participantRosterEntry?.loginKey ??
+      "unknown participant";
+
+    return [
+      {
+        headline: detail.bookletLabel,
+        subline: detail.testRun.testRunId,
+        badges: [
+          detail.testRun.status,
+          `${detail.responseCount}/${detail.expectedUnitCount} response(s)`,
+          `${detail.missingExpectedUnitCount} missing`,
+          `${detail.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Tenant", value: detail.tenantKey },
+          { label: "Workspace", value: detail.workspaceKey },
+          { label: "Login", value: participantLogin },
+          { label: "Group", value: detail.participantSession?.groupKey ?? "none" },
+          { label: "Booklet", value: detail.bookletKey },
+          { label: "Current Unit", value: detail.testRun.currentUnitKey ?? "none" },
+          { label: "Unexpected Responses", value: String(detail.unexpectedResponseCount) },
+          { label: "Updated", value: this.formatDateTime(detail.testRun.updatedAt) },
+          { label: "Generated", value: this.formatDateTime(detail.generatedAt) }
+        ],
+        actionLabel: "Open In Runtime",
+        actionPayload: {
+          subjectType: "test_run",
+          subjectId: detail.testRun.testRunId,
+          participantSessionId:
+            detail.participantSession?.participantSessionId ?? "",
+          loginKey: participantLogin,
+          currentUnitKey: detail.testRun.currentUnitKey ?? ""
+        }
+      },
+      ...detail.units.map(unit => ({
+        headline: unit.displayLabel,
+        subline: unit.unitKey,
+        badges: [
+          unit.expected ? "expected" : "unexpected",
+          unit.answered ? "answered" : "missing",
+          unit.current ? "current" : "not current",
+          `${unit.reviewCount} review(s)`
+        ],
+        rows: [
+          { label: "Expected", value: unit.expected ? "yes" : "no" },
+          { label: "Answered", value: unit.answered ? "yes" : "no" },
+          { label: "Response Length", value: String(unit.responseLength) },
+          { label: "Reviews", value: String(unit.reviewCount) },
+          { label: "Current Unit", value: unit.current ? "yes" : "no" }
+        ],
+        actionLabel: "Open Unit Detail",
+        actionPayload: {
+          unitKey: unit.unitKey,
+          subjectType: "test_run",
+          subjectId: detail.testRun.testRunId,
+          participantSessionId:
+            detail.participantSession?.participantSessionId ?? "",
+          loginKey: participantLogin,
+          currentUnitKey: unit.unitKey
+        }
+      })),
+      ...detail.reviews.map(review => ({
+        headline: `${review.category} by ${review.reviewerId}`,
+        subline: review.unitKey ?? "whole run",
+        badges: ["review", review.category],
+        rows: [
+          { label: "Review", value: review.reviewId },
+          { label: "Unit", value: review.unitKey ?? "whole run" },
+          { label: "Comment", value: review.comment },
+          { label: "Created", value: this.formatDateTime(review.createdAt) },
+          { label: "Updated", value: this.formatDateTime(review.updatedAt) }
+        ]
       }))
     ];
   }
@@ -1672,6 +1765,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.testRunId?.trim()) {
+      this.openStudyMonitorRun(item);
+      return;
+    }
+
     if (item.actionPayload?.participantLoginKey?.trim()) {
       this.openStudyMonitorParticipant(item);
       return;
@@ -1702,6 +1800,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorBookletDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.testRunId?.trim()) {
+      this.openStudyMonitorRun(item);
+      return;
+    }
+
     if (item.actionPayload?.unitKey?.trim()) {
       this.openStudyMonitorUnit(item);
       return;
@@ -1716,6 +1819,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.testRunId?.trim()) {
+      this.openStudyMonitorRun(item);
+      return;
+    }
+
     if (item.actionPayload?.participantLoginKey?.trim()) {
       this.openStudyMonitorParticipant(item);
       return;
@@ -1759,6 +1867,17 @@ export class WorkspaceViewFacade {
 
     this.viewState.onActionAsync(() =>
       this.workspaceService.loadStudyMonitorUnit(unitKey)
+    );
+  }
+
+  openStudyMonitorRun(item: RecordCollectionItem): void {
+    const testRunId = item.actionPayload?.testRunId?.trim();
+    if (!testRunId) {
+      return;
+    }
+
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.loadStudyMonitorRun(testRunId)
     );
   }
 
