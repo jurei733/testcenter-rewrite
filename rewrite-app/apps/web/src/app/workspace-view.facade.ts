@@ -220,6 +220,7 @@ export class WorkspaceViewFacade {
           testRunId: row.testRunId ?? "",
           loginKey: row.loginKey,
           groupKey: row.groupKey,
+          bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
         }
       }))
@@ -294,6 +295,8 @@ export class WorkspaceViewFacade {
           testRunId: row.testRunId ?? "",
           participantSessionId: row.participantSessionId ?? "",
           loginKey: row.loginKey,
+          groupKey: detail.groupKey ?? "",
+          bookletKey: row.bookletKey ?? detail.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
         }
       })),
@@ -336,6 +339,8 @@ export class WorkspaceViewFacade {
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: detail.loginKey,
+          groupKey: item.participantSession?.groupKey ?? detail.groupKey ?? "",
+          bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
         }
       }))
@@ -843,6 +848,11 @@ export class WorkspaceViewFacade {
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
         }
       }))
@@ -988,7 +998,12 @@ export class WorkspaceViewFacade {
           participantLoginKey: session.participantSession.loginKey,
           subjectType: "participant_session",
           subjectId: session.participantSession.participantSessionId,
-          loginKey: session.participantSession.loginKey
+          loginKey: session.participantSession.loginKey,
+          groupKey: session.participantSession.groupKey,
+          bookletKey:
+            session.participantRosterEntry?.bookletKey ??
+            session.latestTestRun?.bookletKey ??
+            ""
         }
       })),
       ...detail.unitProgress.map(unit => ({
@@ -1055,6 +1070,11 @@ export class WorkspaceViewFacade {
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
         }
       }))
@@ -1173,6 +1193,11 @@ export class WorkspaceViewFacade {
           participantSessionId:
             item.participantSession?.participantSessionId ?? "",
           loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
           currentUnitKey: detail.unitKey
         }
       }))
@@ -1221,6 +1246,8 @@ export class WorkspaceViewFacade {
           participantSessionId:
             detail.participantSession?.participantSessionId ?? "",
           loginKey: participantLogin,
+          groupKey: detail.participantSession?.groupKey ?? "",
+          bookletKey: detail.bookletKey,
           currentUnitKey: detail.testRun.currentUnitKey ?? ""
         }
       },
@@ -1688,6 +1715,9 @@ export class WorkspaceViewFacade {
           participantSessionId:
             readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
           loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
+          groupKey: readStringValue(item.activityEvent.details, ["groupKey"]) ?? "",
+          bookletKey:
+            readStringValue(item.activityEvent.details, ["bookletKey"]) ?? "",
           currentUnitKey:
             readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
         }
@@ -1765,6 +1795,9 @@ export class WorkspaceViewFacade {
             participantSessionId:
               readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
             loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
+            groupKey: readStringValue(item.activityEvent.details, ["groupKey"]) ?? "",
+            bookletKey:
+              readStringValue(item.activityEvent.details, ["bookletKey"]) ?? "",
             currentUnitKey:
               readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
           }
@@ -2068,7 +2101,9 @@ export class WorkspaceViewFacade {
       case "participant_session":
         this.openParticipantSessionInRuntime(
           subjectId,
-          item.actionPayload?.loginKey?.trim() ?? ""
+          item.actionPayload?.loginKey?.trim() ?? "",
+          item.actionPayload?.groupKey?.trim() ?? "",
+          item.actionPayload?.bookletKey ?? ""
         );
         return;
       case "test_run":
@@ -2076,6 +2111,8 @@ export class WorkspaceViewFacade {
           subjectId,
           item.actionPayload?.participantSessionId?.trim() ?? "",
           item.actionPayload?.loginKey?.trim() ?? "",
+          item.actionPayload?.groupKey?.trim() ?? "",
+          item.actionPayload?.bookletKey ?? "",
           item.actionPayload?.currentUnitKey ?? ""
         );
         return;
@@ -2113,7 +2150,9 @@ export class WorkspaceViewFacade {
 
   private openParticipantSessionInRuntime(
     participantSessionId: string,
-    loginKey: string
+    loginKey: string,
+    groupKey: string,
+    bookletKey: string
   ): void {
     const runtime = this.uiState.runtime;
     runtime.participantSessionId = participantSessionId;
@@ -2121,6 +2160,12 @@ export class WorkspaceViewFacade {
     runtime.currentUnitKey = "";
     if (loginKey) {
       runtime.loginKey = loginKey;
+    }
+    if (groupKey) {
+      runtime.groupKey = groupKey;
+    }
+    if (bookletKey != null) {
+      runtime.bookletKey = bookletKey;
     }
 
     this.persistState();
@@ -2135,6 +2180,8 @@ export class WorkspaceViewFacade {
     testRunId: string,
     participantSessionId: string,
     loginKey: string,
+    groupKey: string,
+    bookletKey: string,
     currentUnitKey: string
   ): void {
     const runtime = this.uiState.runtime;
@@ -2142,6 +2189,7 @@ export class WorkspaceViewFacade {
     const resolvedSession =
       participantSessionId || matchingParticipantSession?.participantSessionId || "";
     const resolvedLoginKey = loginKey || matchingParticipantSession?.loginKey || "";
+    const resolvedGroupKey = groupKey || matchingParticipantSession?.groupKey || "";
 
     runtime.testRunId = testRunId;
     runtime.currentUnitKey = currentUnitKey;
@@ -2150,6 +2198,12 @@ export class WorkspaceViewFacade {
     }
     if (resolvedLoginKey) {
       runtime.loginKey = resolvedLoginKey;
+    }
+    if (resolvedGroupKey) {
+      runtime.groupKey = resolvedGroupKey;
+    }
+    if (bookletKey != null) {
+      runtime.bookletKey = bookletKey;
     }
 
     this.persistState();
@@ -2206,7 +2260,7 @@ export class WorkspaceViewFacade {
 
   private findParticipantSessionByTestRunId(
     testRunId: string
-  ): { participantSessionId: string; loginKey: string } | null {
+  ): { participantSessionId: string; loginKey: string; groupKey: string } | null {
     const payload = parseJsonDocument<ListParticipantSessionsResponse>(
       this.uiState.runtime.participantSessionsView
     );
@@ -2219,7 +2273,8 @@ export class WorkspaceViewFacade {
 
     return {
       participantSessionId: matchingItem.participantSession.participantSessionId,
-      loginKey: matchingItem.participantSession.loginKey
+      loginKey: matchingItem.participantSession.loginKey,
+      groupKey: matchingItem.participantSession.groupKey
     };
   }
 

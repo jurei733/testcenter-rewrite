@@ -2987,6 +2987,8 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   await expectInputValue("#participantSessionId", participantSessionId);
   await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
   await expectInputValue("#currentUnitKey", "unit-paused");
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
@@ -3539,6 +3541,8 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   await expectInputValue("#participantSessionId", participantSessionId);
   await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
@@ -3673,6 +3677,8 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   await expectInputValue("#participantSessionId", participantSessionId);
   await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>

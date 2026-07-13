@@ -389,6 +389,9 @@ export class ContentViewFacade {
           actionPayload: {
             contentCommand: "openBlockingRunInRuntime",
             loginKey: firstBlockingRun.loginKey,
+            groupKey: firstBlockingRun.groupKey,
+            bookletKey: firstBlockingRun.bookletKey,
+            participantSessionId: firstBlockingRun.participantSessionId,
             testRunId: firstBlockingRun.testRunId,
             currentUnitKey: firstBlockingRun.currentUnitKey ?? ""
           }
@@ -1066,6 +1069,8 @@ export class ContentViewFacade {
           actionLabel: "Open In Runtime",
           actionPayload: {
             loginKey: openRun.loginKey,
+            groupKey: openRun.groupKey,
+            bookletKey: openRun.bookletKey,
             participantSessionId,
             testRunId: openRun.testRunId,
             currentUnitKey: openRun.currentUnitKey ?? ""
@@ -1435,7 +1440,11 @@ export class ContentViewFacade {
           actionLabel: "Open In Runtime",
           actionPayload: {
             participantSessionId: participantSession.participantSessionId,
-            loginKey: participantSession.loginKey
+            loginKey: participantSession.loginKey,
+            groupKey: participantSession.groupKey,
+            bookletKey: detail.participantRosterEntries.find(
+              entry => entry.loginKey === participantSession.loginKey
+            )?.bookletKey ?? ""
           }
         };
       }) ?? []
@@ -1498,6 +1507,8 @@ export class ContentViewFacade {
           actionPayload: {
             participantSessionId: testRun.participantSessionId,
             loginKey: matchingParticipantSession?.loginKey ?? "",
+            groupKey: matchingParticipantSession?.groupKey ?? "",
+            bookletKey: testRun.bookletKey,
             testRunId: testRun.testRunId,
             currentUnitKey: testRun.currentUnitKey ?? ""
           }
@@ -1601,6 +1612,12 @@ export class ContentViewFacade {
 
     const runtime = this.uiState.runtime;
     runtime.loginKey = loginKey;
+    if (item.actionPayload?.groupKey?.trim()) {
+      runtime.groupKey = item.actionPayload.groupKey.trim();
+    }
+    if (item.actionPayload?.bookletKey != null) {
+      runtime.bookletKey = item.actionPayload.bookletKey;
+    }
     runtime.testRunId = testRunId;
     runtime.currentUnitKey = item.actionPayload?.currentUnitKey ?? "";
 
@@ -1636,6 +1653,12 @@ export class ContentViewFacade {
     if (item.actionPayload?.loginKey?.trim()) {
       runtime.loginKey = item.actionPayload.loginKey.trim();
     }
+    if (item.actionPayload?.groupKey?.trim()) {
+      runtime.groupKey = item.actionPayload.groupKey.trim();
+    }
+    if (item.actionPayload?.bookletKey != null) {
+      runtime.bookletKey = item.actionPayload.bookletKey;
+    }
 
     this.persistState();
     void this.router.navigateByUrl("/runtime");
@@ -1658,6 +1681,12 @@ export class ContentViewFacade {
     runtime.currentUnitKey = item.actionPayload?.currentUnitKey ?? "";
     if (item.actionPayload?.loginKey?.trim()) {
       runtime.loginKey = item.actionPayload.loginKey.trim();
+    }
+    if (item.actionPayload?.groupKey?.trim()) {
+      runtime.groupKey = item.actionPayload.groupKey.trim();
+    }
+    if (item.actionPayload?.bookletKey != null) {
+      runtime.bookletKey = item.actionPayload.bookletKey;
     }
 
     this.persistState();
