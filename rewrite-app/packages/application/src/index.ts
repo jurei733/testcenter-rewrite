@@ -8803,7 +8803,8 @@ export const createFirstSliceServices = (
             completedAt: nextTestRun.completedAt ?? null,
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
-            groupKey: participantSession.groupKey
+            groupKey: participantSession.groupKey,
+            bookletKey: testRun.bookletKey
           }
         });
 

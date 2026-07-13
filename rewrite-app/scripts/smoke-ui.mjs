@@ -486,6 +486,7 @@ try {
     actorId = "operator-ui",
     commandType,
     groupKey,
+    bookletKey = "",
     loginKey,
     participantSessionId,
     testRunId,
@@ -512,6 +513,9 @@ try {
       .filter({ hasText: participantSessionId })
       .filter({ hasText: loginKey })
       .filter({ hasText: groupKey })
+      .filter(
+        bookletKey ? { hasText: bookletKey } : { hasText: participantSessionId }
+      )
       .waitFor({ timeout: 15_000 });
   };
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
@@ -2422,8 +2426,23 @@ try {
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Detailed Responses" }) })
     .filter({ hasText: "Filtered response smoke" })
+    .filter({ hasText: participantBookletKey })
     .filter({ hasText: "unit-paused" })
     .waitFor();
+  await fillAndCommit("#bookletKey", "");
+  const detailedResponseCard = page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Detailed Responses" }) })
+    .locator(".record-card")
+    .filter({ hasText: "Filtered response smoke" })
+    .filter({ hasText: participantBookletKey })
+    .filter({ hasText: "unit-paused" });
+  await detailedResponseCard
+    .getByRole("button", { name: "Select Response", exact: true })
+    .click();
+  await waitForBusy("detailed-response-select-after-click");
+  await waitForNotBusy("detailed-response-select-after-click");
+  await expectInputValue("#bookletKey", participantBookletKey);
   await fillAndCommit("#reviewComment", "Filtered review smoke");
   logStep("create-filtered-review");
   await clickAction("Create Review");
@@ -2595,6 +2614,7 @@ try {
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
     commandType: "resume",
+    bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
     loginKey: participantLoginKey,
     participantSessionId,
@@ -2628,6 +2648,7 @@ try {
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
     commandType: "pause",
+    bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
     loginKey: participantLoginKey,
     participantSessionId,
@@ -2652,6 +2673,7 @@ try {
   await clickAction("Apply Command Filters");
   await expectMonitorCommandHistoryCard({
     commandType: "pause",
+    bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
     loginKey: participantLoginKey,
     participantSessionId,
@@ -2660,6 +2682,7 @@ try {
   });
   await expectMonitorCommandHistoryCard({
     commandType: "resume",
+    bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
     loginKey: participantLoginKey,
     participantSessionId,
@@ -3882,6 +3905,7 @@ try {
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
     commandType: "complete",
+    bookletKey: participantBookletKey,
     groupKey: participantGroupKey,
     loginKey: participantLoginKey,
     participantSessionId,

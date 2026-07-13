@@ -576,62 +576,68 @@ export class RuntimeViewFacade {
       this.runtime.participantSessionDetailView
     );
     const detail = payload?.participantSessionDetail;
+    if (!detail) {
+      return [];
+    }
+
     const runSummaries =
-      detail?.runSummaries ??
-      detail?.testRuns.map(testRun => ({
+      detail.runSummaries ??
+      detail.testRuns.map(testRun => ({
         testRun,
         responseCount: Object.keys(testRun.unitResponses ?? {}).length,
         reviewCount: 0
       }));
 
-    return (
-      runSummaries?.map(summary => {
-        const testRun = summary.testRun;
-        return {
-          headline: testRun.testRunId,
-          subline: testRun.status,
-          badges: [
-            testRun.bookletKey,
-            `${summary.responseCount} response(s)`,
-            `${summary.reviewCount} review(s)`
-          ],
-          rows: [
-            {
-              label: "Current Unit",
-              value: testRun.currentUnitKey ?? "none"
-            },
-            {
-              label: "Unit Responses",
-              value: String(summary.responseCount)
-            },
-            {
-              label: "Reviews",
-              value: String(summary.reviewCount)
-            },
-            {
-              label: "Created",
-              value: this.formatDateTime(testRun.createdAt)
-            },
-            {
-              label: "Updated",
-              value: this.formatDateTime(testRun.updatedAt)
-            },
-            {
-              label: "Completed",
-              value: testRun.completedAt
-                ? this.formatDateTime(testRun.completedAt)
-                : "not completed"
-            }
-          ],
-          selected: this.runtime.testRunId.trim() === testRun.testRunId,
-          actionLabel: "Select + Sync",
-          actionPayload: {
-            testRunId: testRun.testRunId,
-            currentUnitKey: testRun.currentUnitKey ?? ""
+    return runSummaries.map(summary => {
+      const testRun = summary.testRun;
+      return {
+        headline: testRun.testRunId,
+        subline: testRun.status,
+        badges: [
+          testRun.bookletKey,
+          `${summary.responseCount} response(s)`,
+          `${summary.reviewCount} review(s)`
+        ],
+        rows: [
+          {
+            label: "Current Unit",
+            value: testRun.currentUnitKey ?? "none"
+          },
+          {
+            label: "Unit Responses",
+            value: String(summary.responseCount)
+          },
+          {
+            label: "Reviews",
+            value: String(summary.reviewCount)
+          },
+          {
+            label: "Created",
+            value: this.formatDateTime(testRun.createdAt)
+          },
+          {
+            label: "Updated",
+            value: this.formatDateTime(testRun.updatedAt)
+          },
+          {
+            label: "Completed",
+            value: testRun.completedAt
+              ? this.formatDateTime(testRun.completedAt)
+              : "not completed"
           }
-        };
-      }) ?? []
-    );
+        ],
+        selected: this.runtime.testRunId.trim() === testRun.testRunId,
+        actionLabel: "Select + Sync",
+        actionPayload: {
+          testRunId: testRun.testRunId,
+          currentUnitKey: testRun.currentUnitKey ?? "",
+          participantSessionId: detail.participantSession.participantSessionId,
+          loginKey: detail.participantSession.loginKey,
+          groupKey: detail.participantSession.groupKey,
+          bookletKey: testRun.bookletKey
+        }
+      };
+    });
   }
 
   get runtimeStateItems(): RecordCollectionItem[] {
@@ -841,6 +847,10 @@ export class RuntimeViewFacade {
       currentRunState?.participantSession.loginKey ??
       sessionDetail?.participantSession.loginKey ??
       (this.runtime.loginKey.trim() || "selected participant");
+    const selectedParticipantSession =
+      currentRunState?.testRun.testRunId === selectedRun.testRunId
+        ? currentRunState.participantSession
+        : sessionDetail?.participantSession ?? null;
     const latestReview = reviews
       .slice()
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
@@ -875,7 +885,10 @@ export class RuntimeViewFacade {
         actionPayload: {
           testRunId: selectedRun.testRunId,
           currentUnitKey: selectedRun.currentUnitKey ?? "",
-          participantSessionId: selectedRun.participantSessionId
+          participantSessionId: selectedRun.participantSessionId,
+          loginKey: selectedParticipantSession?.loginKey ?? "",
+          groupKey: selectedParticipantSession?.groupKey ?? "",
+          bookletKey: selectedRun.bookletKey
         }
       }
     ];
@@ -923,6 +936,9 @@ export class RuntimeViewFacade {
             testRunId: selectedRun.testRunId,
             currentUnitKey: unitKey,
             participantSessionId: selectedRun.participantSessionId,
+            loginKey: selectedParticipantSession?.loginKey ?? "",
+            groupKey: selectedParticipantSession?.groupKey ?? "",
+            bookletKey: selectedRun.bookletKey,
             reviewId: latestUnitReview?.reviewId ?? "",
             reviewerId: latestUnitReview?.reviewerId ?? "",
             reviewCategory: latestUnitReview?.category ?? "",
@@ -950,6 +966,9 @@ export class RuntimeViewFacade {
             testRunId: review.testRunId,
             currentUnitKey: "",
             participantSessionId: review.participantSessionId,
+            loginKey: selectedParticipantSession?.loginKey ?? "",
+            groupKey: selectedParticipantSession?.groupKey ?? "",
+            bookletKey: selectedRun.bookletKey,
             reviewerId: review.reviewerId,
             reviewCategory: review.category,
             reviewComment: review.comment
@@ -1023,7 +1042,8 @@ export class RuntimeViewFacade {
             currentUnitKey: item.unitKey,
             participantSessionId: item.participantSessionId,
             loginKey: item.loginKey,
-            groupKey: item.groupKey
+            groupKey: item.groupKey,
+            bookletKey: item.bookletKey
           }
         };
       })
@@ -1038,39 +1058,45 @@ export class RuntimeViewFacade {
       return [];
     }
 
-    return detail.reviews.map(review => ({
-      headline: `${review.category} · ${review.unitKey ?? "whole run"}`,
-      subline: review.reviewId,
-      badges: [review.reviewerId, review.testRunId],
-      rows: [
-        { label: "Comment", value: this.formatResponsePreview(review.comment) },
-        {
-          label: "Participant",
-          value:
-            detail.participantRosterEntry?.displayName ??
-            detail.participantSession.loginKey
-        },
-        { label: "Login", value: detail.participantSession.loginKey },
-        { label: "Run", value: review.testRunId },
-        { label: "Updated", value: this.formatDateTime(review.updatedAt) }
-      ],
-      selected:
-        this.runtime.testRunId.trim() === review.testRunId &&
-        (review.unitKey === null ||
-          this.runtime.currentUnitKey.trim() === review.unitKey),
-      actionLabel: "Select Review",
-      actionPayload: {
-        reviewId: review.reviewId,
-        testRunId: review.testRunId,
-        currentUnitKey: review.unitKey ?? "",
-        participantSessionId: review.participantSessionId,
-        loginKey: detail.participantSession.loginKey,
-        groupKey: detail.participantSession.groupKey,
-        reviewerId: review.reviewerId,
-        reviewCategory: review.category,
-        reviewComment: review.comment
-      }
-    }));
+    return detail.reviews.map(review => {
+      const testRun = detail.testRuns.find(
+        candidate => candidate.testRunId === review.testRunId
+      );
+      return {
+        headline: `${review.category} · ${review.unitKey ?? "whole run"}`,
+        subline: review.reviewId,
+        badges: [review.reviewerId, review.testRunId],
+        rows: [
+          { label: "Comment", value: this.formatResponsePreview(review.comment) },
+          {
+            label: "Participant",
+            value:
+              detail.participantRosterEntry?.displayName ??
+              detail.participantSession.loginKey
+          },
+          { label: "Login", value: detail.participantSession.loginKey },
+          { label: "Run", value: review.testRunId },
+          { label: "Updated", value: this.formatDateTime(review.updatedAt) }
+        ],
+        selected:
+          this.runtime.testRunId.trim() === review.testRunId &&
+          (review.unitKey === null ||
+            this.runtime.currentUnitKey.trim() === review.unitKey),
+        actionLabel: "Select Review",
+        actionPayload: {
+          reviewId: review.reviewId,
+          testRunId: review.testRunId,
+          currentUnitKey: review.unitKey ?? "",
+          participantSessionId: review.participantSessionId,
+          loginKey: detail.participantSession.loginKey,
+          groupKey: detail.participantSession.groupKey,
+          bookletKey: testRun?.bookletKey ?? "",
+          reviewerId: review.reviewerId,
+          reviewCategory: review.category,
+          reviewComment: review.comment
+        }
+      };
+    });
   }
 
   get reviewItems(): RecordCollectionItem[] {
@@ -1148,6 +1174,7 @@ export class RuntimeViewFacade {
             participantSessionId: item.review.participantSessionId,
             loginKey: item.participantSession?.loginKey ?? "",
             groupKey: item.participantSession?.groupKey ?? "",
+            bookletKey: item.testRun?.bookletKey ?? "",
             reviewerId: item.review.reviewerId,
             reviewCategory: item.review.category,
             reviewComment: item.review.comment
@@ -1316,7 +1343,8 @@ export class RuntimeViewFacade {
             participantSessionId: openRun.participantSessionId,
             currentUnitKey: openRun.currentUnitKey ?? "",
             loginKey: openRun.loginKey,
-            groupKey: openRun.groupKey
+            groupKey: openRun.groupKey,
+            bookletKey: openRun.bookletKey
           }
         };
       }) ?? []
@@ -1337,6 +1365,7 @@ export class RuntimeViewFacade {
         const participantSessionId = String(details.participantSessionId ?? "");
         const loginKey = String(details.loginKey ?? "");
         const groupKey = String(details.groupKey ?? "");
+        const bookletKey = String(details.bookletKey ?? "");
         const commandId = String(details.commandId ?? event.activityEventId);
 
         return {
@@ -1352,6 +1381,7 @@ export class RuntimeViewFacade {
             { label: "Session", value: participantSessionId || "unknown" },
             { label: "Login", value: loginKey || "unknown" },
             { label: "Group", value: groupKey || "unknown" },
+            { label: "Booklet", value: bookletKey || "unknown" },
             { label: "Actor", value: event.actorId ?? "system" },
             { label: "Occurred", value: this.formatDateTime(event.occurredAt) },
             { label: "Summary", value: event.summary }
@@ -1362,7 +1392,8 @@ export class RuntimeViewFacade {
             testRunId: event.subjectId,
             participantSessionId,
             loginKey,
-            groupKey
+            groupKey,
+            bookletKey
           }
         };
       }) ?? []
@@ -2294,6 +2325,15 @@ export class RuntimeViewFacade {
     this.runtime.currentUnitKey = currentUnitKey;
     if (participantSessionId) {
       this.runtime.participantSessionId = participantSessionId;
+    }
+    if (item.actionPayload?.loginKey) {
+      this.runtime.loginKey = item.actionPayload.loginKey;
+    }
+    if (item.actionPayload?.groupKey) {
+      this.runtime.groupKey = item.actionPayload.groupKey;
+    }
+    if (item.actionPayload?.bookletKey != null) {
+      this.runtime.bookletKey = item.actionPayload.bookletKey;
     }
     this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
     this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
