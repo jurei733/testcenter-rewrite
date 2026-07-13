@@ -327,16 +327,33 @@ export class RewriteAppWorkspaceService {
   async exportStudyMonitorParticipantMatrixCsv(): Promise<string> {
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const path = resolveRoutePath(
+      productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv,
+      {
+        tenantKey,
+        workspaceKey
+      }
+    );
+    const query = new URLSearchParams();
+    const matrixFilters: Array<[string, string]> = [
+      ["loginKey", this.workspaceState.studyMonitorMatrixLoginFilter],
+      ["groupKey", this.workspaceState.studyMonitorMatrixGroupFilter],
+      ["unitKey", this.workspaceState.studyMonitorMatrixUnitFilter],
+      ["testRunStatus", this.workspaceState.studyMonitorMatrixStatusFilter],
+      ["answerState", this.workspaceState.studyMonitorMatrixAnswerFilter],
+      ["limit", this.workspaceState.studyMonitorMatrixLimit]
+    ];
+    for (const [key, value] of matrixFilters) {
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        query.set(key, trimmedValue);
+      }
+    }
+    const exportPath = query.toString() ? `${path}?${query.toString()}` : path;
     const csv = await this.requestState.request<string>(
       "Study Monitor Participant Matrix CSV Export",
       "GET",
-      resolveRoutePath(
-        productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv,
-        {
-          tenantKey,
-          workspaceKey
-        }
-      )
+      exportPath
     );
 
     this.workspaceState.studyMonitorParticipantMatrixExportView = csv;

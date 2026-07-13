@@ -2722,6 +2722,18 @@ try {
     .filter({ hasText: "answered" })
     .filter({ hasText: "Open Run Detail" })
     .waitFor();
+  const filteredParticipantMatrixCsvResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-participants.csv?loginKey=${encodeURIComponent(participantLoginKey)}&unitKey=unit-paused&testRunStatus=running&answerState=answered&limit=5`,
+    createSmokeFetchInit()
+  );
+  assert.equal(filteredParticipantMatrixCsvResponse.status, 200);
+  const filteredParticipantMatrixCsv =
+    await filteredParticipantMatrixCsvResponse.text();
+  assert.match(filteredParticipantMatrixCsv, /tenantKey,workspaceKey,generatedAt,loginKey/);
+  assert.match(filteredParticipantMatrixCsv, new RegExp(participantLoginKey));
+  assert.match(filteredParticipantMatrixCsv, /unit-paused/);
+  assert.match(filteredParticipantMatrixCsv, /running/);
+  assert.equal(filteredParticipantMatrixCsv.trim().split("\n").length, 2);
   await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
   await participantUnitMatrixCard
     .locator(".record-collection-summary")

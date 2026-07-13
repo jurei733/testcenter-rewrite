@@ -3748,12 +3748,57 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
+        const testRunStatus =
+          url.searchParams.get("testRunStatus")?.trim() || undefined;
+        if (
+          testRunStatus &&
+          testRunStatus !== "not_started" &&
+          !testRunStatuses.includes(testRunStatus as TestRunStatus)
+        ) {
+          sendError(
+            response,
+            400,
+            "invalid_study_monitor_matrix_status_filter",
+            "testRunStatus must be one of not_started, created, running, paused, or completed."
+          );
+          return;
+        }
+        const answerState =
+          url.searchParams.get("answerState")?.trim() || undefined;
+        if (
+          answerState &&
+          answerState !== "answered" &&
+          answerState !== "missing"
+        ) {
+          sendError(
+            response,
+            400,
+            "invalid_study_monitor_matrix_answer_filter",
+            "answerState must be answered or missing."
+          );
+          return;
+        }
+        const limitResult = parseOperatorReadLimit(
+          url,
+          response,
+          "invalid_study_monitor_matrix_limit",
+          "limit must be an integer from 1 to 500."
+        );
+        if (!limitResult.ok) {
+          return;
+        }
 
         const csv =
           await services.workspaceAdminRead.exportStudyMonitorParticipantMatrixCsv(
             {
               tenantKey,
-              workspaceKey
+              workspaceKey,
+              loginKey: readOptionalQueryValue(url, "loginKey"),
+              groupKey: readOptionalQueryValue(url, "groupKey"),
+              unitKey: readOptionalQueryValue(url, "unitKey"),
+              testRunStatus: testRunStatus as TestRunStatus | "not_started" | undefined,
+              answerState: answerState as "answered" | "missing" | undefined,
+              limit: limitResult.limit
             }
           );
         sendCsv(

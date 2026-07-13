@@ -163,6 +163,12 @@ export type WorkspaceAdminReadPort = {
   exportStudyMonitorParticipantMatrixCsv(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    unitKey?: string;
+    testRunStatus?: TestRunStatus | "not_started";
+    answerState?: "answered" | "missing";
+    limit?: number;
   }): Promise<string>;
   getSourcePackageDetail(input: {
     tenantKey: string;
@@ -2012,6 +2018,54 @@ const formatStudyMonitorParticipantMatrixCsv = (
         .join(",")
     )
   ].join("\n") + "\n";
+};
+
+const filterStudyMonitorParticipantMatrix = (
+  matrix: WorkspaceStudyMonitorParticipantMatrix,
+  input: {
+    loginKey?: string;
+    groupKey?: string;
+    unitKey?: string;
+    testRunStatus?: TestRunStatus | "not_started";
+    answerState?: "answered" | "missing";
+    limit?: number;
+  }
+): WorkspaceStudyMonitorParticipantMatrix => {
+  const loginKey = input.loginKey?.trim().toLowerCase() ?? "";
+  const groupKey = input.groupKey?.trim().toLowerCase() ?? "";
+  const unitKey = input.unitKey?.trim().toLowerCase() ?? "";
+  const filteredRows = matrix.rows.filter(row => {
+    if (
+      loginKey &&
+      !`${row.loginKey} ${row.displayName ?? ""}`.toLowerCase().includes(loginKey)
+    ) {
+      return false;
+    }
+    if (groupKey && !row.groupKey.toLowerCase().includes(groupKey)) {
+      return false;
+    }
+    if (
+      unitKey &&
+      !`${row.unitKey} ${row.unitLabel}`.toLowerCase().includes(unitKey)
+    ) {
+      return false;
+    }
+    if (input.testRunStatus && row.testRunStatus !== input.testRunStatus) {
+      return false;
+    }
+    if (input.answerState === "answered" && !row.answered) {
+      return false;
+    }
+    if (input.answerState === "missing" && row.answered) {
+      return false;
+    }
+    return true;
+  });
+
+  return {
+    ...matrix,
+    rows: input.limit ? filteredRows.slice(0, input.limit) : filteredRows
+  };
 };
 
 const formatOpenMonitorRunsCsv = (input: {
@@ -6467,7 +6521,9 @@ export const createFirstSliceServices = (
       async exportStudyMonitorParticipantMatrixCsv(input) {
         const matrix = await this.getStudyMonitorParticipantMatrix(input);
 
-        return formatStudyMonitorParticipantMatrixCsv(matrix);
+        return formatStudyMonitorParticipantMatrixCsv(
+          filterStudyMonitorParticipantMatrix(matrix, input)
+        );
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(
