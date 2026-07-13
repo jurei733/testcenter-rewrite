@@ -119,7 +119,7 @@ FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app
 
 These commands use the built storage adapters directly and do not require the API process to be running.
 
-Before starting a built runtime, you can run a deployability preflight that verifies compiled API/store artifacts, the Angular browser bundle, optional build metadata, and storage readiness:
+Before starting a built runtime, you can run a deployability preflight that verifies compiled API/store artifacts, the Angular browser bundle, the frontend index-to-asset references, optional build metadata, and storage readiness:
 
 ```bash
 FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm run db:migrate:sqlite:built

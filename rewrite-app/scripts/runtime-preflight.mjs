@@ -69,6 +69,42 @@ const ensureFile = async filePath => {
   }
 };
 
+const isFrontendAssetReference = reference => {
+  const normalizedReference = reference.trim();
+  return (
+    normalizedReference !== "" &&
+    !normalizedReference.startsWith("#") &&
+    !/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(normalizedReference) &&
+    !/^(?:data|blob|mailto|javascript):/i.test(normalizedReference)
+  );
+};
+
+const normalizeFrontendAssetReference = reference => {
+  const normalizedReference = reference.trim().split(/[?#]/, 1)[0];
+  if (normalizedReference.startsWith("/app/")) {
+    return normalizedReference.slice("/app/".length);
+  }
+  if (normalizedReference.startsWith("/")) {
+    throw new Error(
+      `Frontend index references an asset outside the /app base path: ${reference}`
+    );
+  }
+  return normalizedReference.replace(/^\.\//, "");
+};
+
+const extractFrontendAssetReferences = html => {
+  const references = [];
+  for (const match of html.matchAll(
+    /<(?:script|link)\b[^>]*\s(?:src|href)="([^"]+)"[^>]*>/gi
+  )) {
+    const reference = match[1] ?? "";
+    if (isFrontendAssetReference(reference)) {
+      references.push(normalizeFrontendAssetReference(reference));
+    }
+  }
+  return [...new Set(references)];
+};
+
 const runStorageDoctor = () =>
   new Promise((resolvePromise, reject) => {
     const child = spawn(
@@ -128,6 +164,11 @@ for (const marker of [
   }
 }
 
+const frontendAssetReferences = extractFrontendAssetReferences(appHtml);
+for (const assetReference of frontendAssetReferences) {
+  await ensureFile(resolve(frontendBuildDirectory, assetReference));
+}
+
 const frontendFiles = await readdir(frontendBuildDirectory);
 const mainBundle = frontendFiles.find(fileName => /^main-.*\.js$/.test(fileName));
 const stylesheetBundle = frontendFiles.find(fileName =>
@@ -178,7 +219,8 @@ process.stdout.write(
         apiEntry: requiredBuiltFiles[0],
         frontendIndex: "dist/apps/web/browser/index.html",
         frontendMainBundle: mainBundle,
-        frontendStylesheetBundle: stylesheetBundle
+        frontendStylesheetBundle: stylesheetBundle,
+        referencedAssetCount: frontendAssetReferences.length
       }
     },
     null,
