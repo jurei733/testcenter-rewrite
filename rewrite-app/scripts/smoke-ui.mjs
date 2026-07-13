@@ -1435,6 +1435,33 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  logStep("participant-entry-completed-session-reentry");
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      participantRouteSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page.locator("#participantLoginKey").waitFor();
+  await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
+  await page.waitForFunction(
+    expectedSessionId =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "completed" &&
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
+        "completed" &&
+      document.querySelector("#participantEntryNextStep")?.textContent?.includes(
+        "Completed"
+      ) &&
+      document
+        .querySelector("#participantRouteCompletionLabel")
+        ?.textContent?.includes("Completed"),
+    participantRouteSessionId,
+    { timeout: 15_000 }
+  );
+  stopAfter("participant-entry-completed-session-reentry");
 
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });

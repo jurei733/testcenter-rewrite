@@ -113,8 +113,7 @@ export class ParticipantViewFacade {
 
     if (normalized.participantSessionId) {
       this.viewState.onActionAsync(async () => {
-        await this.resumeSessionInternal();
-        await this.applyEntryDraftAfterResume(normalized);
+        await this.resumeEntrySessionInternal(normalized);
       });
       return;
     }
@@ -480,6 +479,21 @@ export class ParticipantViewFacade {
     await this.starterLaunchInternal();
   }
 
+  private async resumeEntrySessionInternal(
+    normalized: NormalizedParticipantEntryParameters
+  ): Promise<void> {
+    try {
+      await this.resumeSessionInternal();
+      await this.applyEntryDraftAfterResume(normalized);
+    } catch (error) {
+      if (!this.isParticipantSessionNoLongerResumable(error)) {
+        throw error;
+      }
+
+      await this.refreshCurrentStateInternal(true);
+    }
+  }
+
   private async signInInternal(): Promise<void> {
     const payload = await this.requestState.request<ParticipantSignInResponse>(
       "Participant Sign In",
@@ -533,6 +547,13 @@ export class ParticipantViewFacade {
     return (
       this.requestState.isApiError(error) &&
       error.error === "participant_session_not_found"
+    );
+  }
+
+  private isParticipantSessionNoLongerResumable(error: unknown): boolean {
+    return (
+      this.requestState.isApiError(error) &&
+      error.error === "participant_session_has_no_resumable_run"
     );
   }
 
