@@ -26,6 +26,10 @@ export type RecordCollectionItem = {
       <h3>{{ title }}</h3>
       <p>{{ subtitle }}</p>
 
+      <div class="record-collection-summary" *ngIf="items.length > 0">
+        {{ items.length }} visible record{{ items.length === 1 ? "" : "s" }}
+      </div>
+
       <div class="record-collection-empty" *ngIf="items.length === 0">
         {{ emptyState }}
       </div>

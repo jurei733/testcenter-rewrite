@@ -2244,6 +2244,7 @@ try {
     studyMonitorParticipantMatrix.rows.length - displayedParticipantMatrixRows,
     0
   );
+  const visibleParticipantMatrixRecords = displayedParticipantMatrixRows + 1;
   const studyMonitorMissingResponseCount = Array.isArray(
     studyMonitorSummary.unitProgress
   )
@@ -2370,6 +2371,10 @@ try {
       exact: true
     })
   });
+  await participantUnitMatrixCard
+    .locator(".record-collection-summary")
+    .filter({ hasText: `${visibleParticipantMatrixRecords} visible records` })
+    .waitFor();
   await participantUnitMatrixCard
     .locator(".record-card")
     .filter({
