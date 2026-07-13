@@ -2222,6 +2222,28 @@ try {
     }
   );
   const studyMonitorSummary = studyMonitorSummaryPayload.studyMonitorSummary;
+  const studyMonitorParticipantMatrixPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/participants`,
+    payload => {
+      const matrix = payload?.studyMonitorParticipantMatrix;
+      return (
+        typeof matrix === "object" &&
+        matrix != null &&
+        Array.isArray(matrix.rows) &&
+        matrix.rows.length > 0
+      );
+    }
+  );
+  const studyMonitorParticipantMatrix =
+    studyMonitorParticipantMatrixPayload.studyMonitorParticipantMatrix;
+  const displayedParticipantMatrixRows = Math.min(
+    studyMonitorParticipantMatrix.rows.length,
+    25
+  );
+  const hiddenParticipantMatrixRows = Math.max(
+    studyMonitorParticipantMatrix.rows.length - displayedParticipantMatrixRows,
+    0
+  );
   const studyMonitorMissingResponseCount = Array.isArray(
     studyMonitorSummary.unitProgress
   )
@@ -2341,6 +2363,29 @@ try {
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })
+    .waitFor();
+  const participantUnitMatrixCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Participant Unit Matrix",
+      exact: true
+    })
+  });
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: `${workspaceKey} participant matrix`
+      })
+    })
+    .filter({
+      hasText: `${studyMonitorParticipantMatrix.rows.length} participant-unit row(s)`
+    })
+    .filter({ hasText: "Total Rows" })
+    .filter({ hasText: String(studyMonitorParticipantMatrix.rows.length) })
+    .filter({ hasText: "Displayed Rows" })
+    .filter({ hasText: String(displayedParticipantMatrixRows) })
+    .filter({ hasText: "Hidden Rows" })
+    .filter({ hasText: String(hiddenParticipantMatrixRows) })
     .waitFor();
   const monitorStatusDistributionCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {

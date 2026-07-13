@@ -116,6 +116,8 @@ export class WorkspaceViewFacade {
       ["running", "paused"].includes(row.testRunStatus)
     );
     const missingRows = matrix.rows.filter(row => row.expected && !row.answered);
+    const displayedRows = matrix.rows.slice(0, 25);
+    const hiddenRowCount = Math.max(matrix.rows.length - displayedRows.length, 0);
 
     return [
       {
@@ -124,15 +126,19 @@ export class WorkspaceViewFacade {
         badges: [
           `${waitingRows.length} not started`,
           `${activeRows.length} active`,
-          `${missingRows.length} missing answer(s)`
+          `${missingRows.length} missing answer(s)`,
+          ...(hiddenRowCount > 0 ? [`${hiddenRowCount} more row(s)`] : [])
         ],
         rows: [
           { label: "Tenant", value: matrix.tenantKey },
           { label: "Workspace", value: matrix.workspaceKey },
+          { label: "Total Rows", value: String(matrix.rows.length) },
+          { label: "Displayed Rows", value: String(displayedRows.length) },
+          { label: "Hidden Rows", value: String(hiddenRowCount) },
           { label: "Generated", value: this.formatDateTime(matrix.generatedAt) }
         ]
       },
-      ...matrix.rows.slice(0, 25).map(row => ({
+      ...displayedRows.map(row => ({
         headline: row.displayName ?? row.loginKey,
         subline: `${row.unitLabel || row.unitKey || "No unit"} in ${row.bookletKey ?? "no booklet"}`,
         badges: [
