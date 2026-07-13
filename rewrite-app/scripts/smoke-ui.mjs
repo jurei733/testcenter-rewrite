@@ -2196,7 +2196,13 @@ try {
     .filter({ hasText: "launched" })
     .filter({ hasText: "running" })
     .filter({ hasText: "group:direct-xml" })
+    .filter({ hasText: "Participant Link" })
+    .filter({ hasText: "participantSessionId=" })
+    .filter({ hasText: "loginKey=entry-student-direct-xml" })
+    .filter({ hasText: "groupKey=group%3Adirect-xml" })
+    .filter({ hasText: "bookletKey=booklet%3Astarter" })
     .waitFor();
+  stopAfter("participant-launch-status-session-link");
   logStep("participant-start");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";

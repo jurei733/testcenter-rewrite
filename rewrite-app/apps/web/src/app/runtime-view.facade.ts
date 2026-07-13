@@ -462,6 +462,13 @@ export class RuntimeViewFacade {
           { label: "Group", value: link.groupKey },
           { label: "Session", value: session?.participantSessionId ?? "not started" },
           { label: "Latest Run", value: latestRun?.testRunId ?? "none" },
+          ...participantSessionLinkRows(session?.participantSessionId, {
+            tenantKey: this.uiState.workspace.tenantKey.trim(),
+            workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+            loginKey: link.loginKey,
+            groupKey: link.groupKey,
+            bookletKey: link.bookletKey
+          }),
           {
             label: "Entry URL",
             value: link.url,
