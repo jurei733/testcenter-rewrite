@@ -156,17 +156,15 @@ try {
 
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
+  const demoParticipantPath = [
+    "/participant?tenantKey=demo-tenant",
+    "workspaceKey=demo-workspace",
+    "loginKey=student-demo",
+    "groupKey=group:student-demo",
+    "bookletKey=booklet:demo"
+  ].join("&");
   await demoLink.waitFor({ timeout: 15_000 });
-	assert.equal(
-		await demoLink.getAttribute("href"),
-		[
-			"/participant?tenantKey=demo-tenant",
-			"workspaceKey=demo-workspace",
-			"loginKey=student-demo",
-			"groupKey=group:student-demo",
-			"bookletKey=booklet:demo"
-		].join("&")
-	);
+  assert.equal(await demoLink.getAttribute("href"), demoParticipantPath);
   await demoLink.click();
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(
@@ -181,10 +179,26 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  const firstParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
   assert.equal(await page.locator("#participantWorkspaceKey").inputValue(), "demo-workspace");
   assert.equal(await page.locator("#participantLoginKey").inputValue(), "student-demo");
   assert.equal(await page.locator("#participantRouteGroupKey").inputValue(), "group:student-demo");
   assert.equal(await page.locator("#participantRouteBookletKey").inputValue(), "booklet:demo");
+  await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
+  await page.waitForFunction(
+    expectedSessionId => {
+      const status = document
+        .querySelector("#participantRouteStatus")
+        ?.textContent?.trim();
+      const session =
+        document.querySelector("#participantRouteSessionId")?.value ?? "";
+      return status === "running" && session === expectedSessionId;
+    },
+    firstParticipantSessionId,
+    { timeout: 15_000 }
+  );
   assert.equal(
     (await page.locator("#participantRouteUnitPosition").textContent())?.trim(),
     "1 / 3"

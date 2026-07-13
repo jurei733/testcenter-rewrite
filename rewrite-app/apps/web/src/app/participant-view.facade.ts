@@ -116,7 +116,11 @@ export class ParticipantViewFacade {
 
     if (normalized.workspaceKey && normalized.loginKey) {
       this.viewState.onActionAsync(async () => {
-        await this.starterLaunchInternal();
+        if (this.runtime.participantSessionId.trim()) {
+          await this.resumeSessionInternal();
+        } else {
+          await this.starterLaunchInternal();
+        }
         await this.applyEntryDraftAfterResume(normalized);
       });
     }
@@ -152,8 +156,14 @@ export class ParticipantViewFacade {
         normalized.loginKey &&
         normalized.loginKey !== this.runtime.loginKey.trim() &&
         !normalized.participantSessionId;
+      const assignmentChanged =
+        !normalized.participantSessionId &&
+        ((normalized.groupKey &&
+          normalized.groupKey !== this.runtime.groupKey.trim()) ||
+          (normalized.bookletKey &&
+            normalized.bookletKey !== this.runtime.bookletKey.trim()));
       this.workspace.workspaceKey = normalized.workspaceKey;
-      if (scopeChanged || loginChanged) {
+      if (scopeChanged || loginChanged || assignmentChanged) {
         this.runtime.participantSessionId = "";
         this.runtime.testRunId = "";
         this.runtime.currentRunStateView = 'Use "Start Or Resume".';
