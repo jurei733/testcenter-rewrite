@@ -4668,6 +4668,95 @@ test("source document import resolves IMS organization item references", async (
   );
 });
 
+test("source document import sniffs manifest text from package media types", async () => {
+  const tenantKey = "integration-tenant-package-sniffing";
+  const workspaceKey = "integration-workspace-package-sniffing";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <organizations default="ORG-1">
+            <organization identifier="ORG-1">
+              <item identifier="BOOKLET-ITEM" identifierref="RES-BOOKLET">
+                <title>Sniffed Booklet</title>
+                <item identifier="UNIT-ITEM" identifierref="RES-UNIT">
+                  <title>Sniffed Unit</title>
+                </item>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-BOOKLET" type="imsqti_test_xmlv2p1" href="booklets/sniffed.xml" />
+            <resource identifier="RES-UNIT" type="imsqti_item_xmlv2p1" href="units/sniffed-item.xml" />
+          </resources>
+        </manifest>
+      `
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/sniffed.xml",
+          displayLabel: "Sniffed Booklet",
+          unitEntries: [
+            { unitKey: "units/sniffed-item.xml", displayLabel: "Sniffed Unit" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves IMS resource dependencies", async () => {
   const tenantKey = "integration-tenant-ims-dependencies";
   const workspaceKey = "integration-workspace-ims-dependencies";

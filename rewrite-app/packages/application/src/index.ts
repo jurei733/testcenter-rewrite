@@ -3508,10 +3508,15 @@ const deriveRuntimeSnapshotFromSourceDocument = (
 
   const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
   const normalizedFileName = sourcePackage.fileName.toLowerCase();
+  const sourceDocumentText = sourcePackage.sourceDocument.trimStart();
+  const looksLikeJsonDocument =
+    sourceDocumentText.startsWith("{") || sourceDocumentText.startsWith("[");
+  const looksLikeXmlDocument = sourceDocumentText.startsWith("<");
 
   if (
     normalizedMediaType.includes("json") ||
-    normalizedFileName.endsWith(".json")
+    normalizedFileName.endsWith(".json") ||
+    looksLikeJsonDocument
   ) {
     try {
       return {
@@ -3537,7 +3542,8 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     normalizedMediaType.includes("xml") ||
     normalizedFileName.endsWith(".xml") ||
     normalizedFileName.endsWith(".imsmanifest") ||
-    normalizedFileName.endsWith(".manifest")
+    normalizedFileName.endsWith(".manifest") ||
+    looksLikeXmlDocument
   ) {
     return {
       runtimeSnapshot: normalizeParsedXmlContentStructure(sourcePackage.sourceDocument),
