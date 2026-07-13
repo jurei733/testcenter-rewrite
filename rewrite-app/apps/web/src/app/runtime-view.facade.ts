@@ -1,4 +1,4 @@
-import { Injectable, inject } from "@angular/core";
+import { ApplicationRef, Injectable, inject } from "@angular/core";
 
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -26,6 +26,7 @@ import {
 import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
+import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { participantSessionLinkRows } from "./participant-session-links";
 
@@ -55,8 +56,10 @@ type RuntimeEntryLink = {
 
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
+  private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly viewState = inject(RewriteAppViewStateService);
 
   readonly runtime = this.uiState.runtime;
@@ -1400,6 +1403,28 @@ export class RuntimeViewFacade {
   exportParticipantRosterCsv(): void {
     this.viewState.onActionAsync(() =>
       this.runtimeService.exportParticipantRosterCsv()
+    );
+  }
+
+  async loadEntryRosterFile(event: Event): Promise<void> {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const file = input.files?.[0] ?? null;
+    if (!file) {
+      return;
+    }
+
+    const rosterText = await file.text();
+    this.runtime.entryRosterText = rosterText;
+    this.persistState();
+    this.uiState.renderVersion.update(version => version + 1);
+    this.applicationRef.tick();
+    this.feedback.rememberActivity(
+      "Participant Roster Loaded",
+      `${file.name} loaded with ${rosterText.length} character(s).`
     );
   }
 

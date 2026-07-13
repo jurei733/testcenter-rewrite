@@ -1517,13 +1517,20 @@ try {
     })
     .waitFor();
   logStep("generate-entry-links");
-  await fillAndCommit(
-    "#entryRosterText",
-    [
-      "loginKey,groupKey,bookletKey,displayName",
-      `entry-student-a,group:entry-smoke,${participantRouteBookletKey},Ada Entry`,
-      "entry-student-b;group:entry-smoke;;Ben Entry"
-    ].join("\n")
+  const uploadedRosterText = [
+    "loginKey\tgroupKey\tbookletKey\tdisplayName",
+    `entry-student-a\tgroup:entry-smoke\t${participantRouteBookletKey}\tAda Entry`,
+    "entry-student-b\tgroup:entry-smoke\t\tBen Entry"
+  ].join("\n");
+  const uploadedRosterFileName = `ui-smoke-roster-${Date.now()}.tsv`;
+  const uploadedRosterPath = resolve(".data", uploadedRosterFileName);
+  await writeFile(uploadedRosterPath, uploadedRosterText);
+  await page.locator("#entryRosterFile").setInputFiles(uploadedRosterPath);
+  await page.waitForFunction(
+    expectedRosterText =>
+      document.querySelector("#entryRosterText")?.value === expectedRosterText,
+    uploadedRosterText,
+    { timeout: 15_000 }
   );
   await page.locator("#importParticipantRosterButton").click();
   const savedAdaRosterCard = page
