@@ -1412,6 +1412,13 @@ export class WorkspaceViewFacade {
       ],
       rows: [
         { label: "Subject", value: item.activityEvent.subjectId },
+        ...participantSessionLinkRows(
+          this.getActivityParticipantSessionId(
+            item.activityEvent.subjectType,
+            item.activityEvent.subjectId,
+            readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
+          )
+        ),
         { label: "Event Id", value: item.activityEvent.activityEventId }
       ],
       selected: this.isActivitySubjectSelected(
@@ -1454,6 +1461,13 @@ export class WorkspaceViewFacade {
           rows: [
             { label: "Summary", value: item.activityEvent.summary },
             { label: "Subject Id", value: item.activityEvent.subjectId },
+            ...participantSessionLinkRows(
+              this.getActivityParticipantSessionId(
+                item.activityEvent.subjectType,
+                item.activityEvent.subjectId,
+                readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
+              )
+            ),
             ...detailRows
           ],
           selected: this.isActivitySubjectSelected(
@@ -1807,6 +1821,18 @@ export class WorkspaceViewFacade {
       return "Refresh Scope";
     }
     return "Open Subject";
+  }
+
+  private getActivityParticipantSessionId(
+    subjectType: string,
+    subjectId: string,
+    detailParticipantSessionId: string
+  ): string {
+    if (subjectType === "participant_session") {
+      return subjectId;
+    }
+
+    return detailParticipantSessionId;
   }
 
   private isActivitySubjectSelected(subjectType: string, subjectId: string): boolean {

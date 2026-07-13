@@ -2649,6 +2649,14 @@ try {
   await fillAndCommit("#workspaceActivitySubjectId", pausedTestRunId);
   await fillAndCommit("#workspaceActivityLimit", "5");
   await clickAction("Refresh Activity");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Activity" })
+    })
+    .locator(`a[href="${baseUrl}/participant?participantSessionId=${participantSessionId}"]`)
+    .first()
+    .waitFor();
   logStep("export-workspace-log-csv");
   await clickAction("Export Workspace Logs CSV");
   await page

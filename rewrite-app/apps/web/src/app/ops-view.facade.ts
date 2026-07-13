@@ -782,7 +782,8 @@ export class OpsViewFacade {
           },
           {
             label: "Participant",
-            value: localDemoAccess.participantPath
+            value: localDemoAccess.participantPath,
+            href: localDemoAccess.participantPath
           },
           {
             label: "Login Key",
