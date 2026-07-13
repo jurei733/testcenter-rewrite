@@ -1810,6 +1810,14 @@ export class WorkspaceViewFacade {
     this.viewState.setActiveView("workspace");
   }
 
+  get canUseTenantScope(): boolean {
+    return this.workspace.tenantKey.trim() !== "";
+  }
+
+  get canUseWorkspaceScope(): boolean {
+    return this.canUseTenantScope && this.workspace.workspaceKey.trim() !== "";
+  }
+
   persistState(): void {
     this.viewState.persistShellState();
   }
@@ -1819,22 +1827,37 @@ export class WorkspaceViewFacade {
   }
 
   createTenant(): void {
+    if (!this.canUseTenantScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.createTenant());
   }
 
   createWorkspace(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.createWorkspace());
   }
 
   refreshWorkspaceOverview(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.refreshWorkspaceOverview());
   }
 
   refreshStudyMonitor(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.refreshStudyMonitor());
   }
 
   refreshWorkspaceActivity(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.persistState();
     this.viewState.onActionAsync(() =>
       this.workspaceService.refreshWorkspaceActivity()
@@ -2011,20 +2034,32 @@ export class WorkspaceViewFacade {
   }
 
   refreshWorkspaceDirectory(): void {
+    if (!this.canUseTenantScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.workspaceService.refreshWorkspaceDirectory()
     );
   }
 
   exportWorkspaceLogCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.exportWorkspaceLogCsv());
   }
 
   exportStudyMonitorCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.exportStudyMonitorCsv());
   }
 
   exportStudyMonitorParticipantMatrixCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.workspaceService.exportStudyMonitorParticipantMatrixCsv()
     );
@@ -2060,6 +2095,9 @@ export class WorkspaceViewFacade {
   runWorkspaceSuggestion(item: RecordCollectionItem): void {
     switch (item.actionPayload?.workspaceCommand) {
       case "bootstrapWorkspace":
+        if (!this.canUseWorkspaceScope) {
+          return;
+        }
         this.viewState.onActionAsync(() => this.workspaceService.bootstrapWorkspaceFlow());
         break;
       case "openContent":

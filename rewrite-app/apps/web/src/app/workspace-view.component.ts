@@ -63,15 +63,15 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       <article class="card">
         <h2>Workspace Setup</h2>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.createTenant()">Create Tenant</button>
-          <button class="secondary" type="button" (click)="view.createWorkspace()">Create Workspace</button>
-          <button class="ghost" type="button" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
-          <button class="ghost" type="button" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
+          <button id="createTenantButton" class="primary" type="button" [disabled]="!view.canUseTenantScope" (click)="view.createTenant()">Create Tenant</button>
+          <button id="createWorkspaceButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.createWorkspace()">Create Workspace</button>
+          <button id="refreshWorkspaceOverviewButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
+          <button id="refreshStudyMonitorButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
-          <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
-          <button class="ghost" type="button" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
-          <button class="ghost" type="button" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
-          <button class="ghost" type="button" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
+          <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
+          <button id="exportStudyMonitorCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
+          <button id="exportParticipantMatrixCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
+          <button id="exportWorkspaceLogCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
         </div>
       </article>
 
@@ -303,7 +303,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           </label>
         </div>
         <div class="actions">
-          <button id="refreshWorkspaceActivityButton" class="primary" type="button" (click)="view.refreshWorkspaceActivity()">Refresh Activity</button>
+          <button id="refreshWorkspaceActivityButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshWorkspaceActivity()">Refresh Activity</button>
           <button class="ghost" type="button" (click)="view.clearWorkspaceActivityFilters()">Clear Filters</button>
         </div>
       </article>

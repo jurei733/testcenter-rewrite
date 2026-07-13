@@ -778,8 +778,29 @@ try {
     })
     .waitFor();
   logStep("fill-workspace-scope");
+  await fillAndCommit("#tenantKey", "");
+  await fillAndCommit("#workspaceKey", "");
+  await expectButtonSelectorDisabled("#createTenantButton");
+  await expectButtonSelectorDisabled("#createWorkspaceButton");
+  await expectButtonSelectorDisabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorDisabled("#refreshStudyMonitorButton");
+  await expectButtonSelectorEnabled("#refreshTenantDirectoryButton");
+  await expectButtonSelectorDisabled("#refreshWorkspaceDirectoryButton");
+  await expectButtonSelectorDisabled("#exportStudyMonitorCsvButton");
+  await expectButtonSelectorDisabled("#exportParticipantMatrixCsvButton");
+  await expectButtonSelectorDisabled("#exportWorkspaceLogCsvButton");
   await fillAndCommit("#tenantKey", tenantKey);
+  await expectButtonSelectorEnabled("#createTenantButton");
+  await expectButtonSelectorDisabled("#createWorkspaceButton");
+  await expectButtonSelectorDisabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorEnabled("#refreshWorkspaceDirectoryButton");
   await fillAndCommit("#workspaceKey", workspaceKey);
+  await expectButtonSelectorEnabled("#createWorkspaceButton");
+  await expectButtonSelectorEnabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorEnabled("#refreshStudyMonitorButton");
+  await expectButtonSelectorEnabled("#exportStudyMonitorCsvButton");
+  await expectButtonSelectorEnabled("#exportParticipantMatrixCsvButton");
+  await expectButtonSelectorEnabled("#exportWorkspaceLogCsvButton");
   logStep("bootstrap-workspace-flow");
   await clickCardAction(
     "Workspace Action Queue",
