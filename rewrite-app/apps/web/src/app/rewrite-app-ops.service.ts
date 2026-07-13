@@ -29,6 +29,7 @@ import {
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
+import { downloadTextFile } from "./download-text-file";
 import {
   refreshMetricsOnlyAction,
   refreshOperationalDiagnosticsAction
@@ -194,9 +195,14 @@ export class RewriteAppOpsService {
     );
 
     this.opsState.adminSessionsExportView = csv;
+    downloadTextFile({
+      filename: "admin-sessions.csv",
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
     this.feedback.rememberActivity(
-      "Admin Sessions CSV Exported",
-      `${csv.split(/\r?\n/).filter(Boolean).length - 1} admin session row(s) exported.`
+      "Admin Sessions CSV Downloaded",
+      `${csv.split(/\r?\n/).filter(Boolean).length - 1} admin session row(s) exported to admin-sessions.csv.`
     );
   }
 
@@ -234,9 +240,14 @@ export class RewriteAppOpsService {
     );
 
     this.opsState.adminUsersExportView = csv;
+    downloadTextFile({
+      filename: "admin-users.csv",
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
     this.feedback.rememberActivity(
-      "Admin Users CSV Exported",
-      "Filtered admin users were exported to the operator preview."
+      "Admin Users CSV Downloaded",
+      "Filtered admin users were exported to admin-users.csv."
     );
   }
 
@@ -274,9 +285,14 @@ export class RewriteAppOpsService {
     );
 
     this.opsState.adminAuditExportView = csv;
+    downloadTextFile({
+      filename: "admin-audit-events.csv",
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
     this.feedback.rememberActivity(
-      "Admin Audit CSV Exported",
-      "Filtered admin audit events were exported to the operator preview."
+      "Admin Audit CSV Downloaded",
+      "Filtered admin audit events were exported to admin-audit-events.csv."
     );
   }
 

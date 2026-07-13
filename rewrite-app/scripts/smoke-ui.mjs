@@ -576,7 +576,10 @@ try {
   await clickAction("Revoke Selected Session");
   await revokeAdminSessionDialog;
   await expectInputValue("#adminSessionRevokeTargetId", "");
+  const adminSessionsDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Sessions CSV");
+  const adminSessionsDownload = await adminSessionsDownloadPromise;
+  assert.equal(adminSessionsDownload.suggestedFilename(), "admin-sessions.csv");
   await page
     .locator("#adminSessionsExportPreview")
     .filter({ hasText: "adminSessionId" })
@@ -877,7 +880,10 @@ try {
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: "disabled" })
     .waitFor();
+  const adminUsersDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportAdminUsersCsvButton").click();
+  const adminUsersDownload = await adminUsersDownloadPromise;
+  assert.equal(adminUsersDownload.suggestedFilename(), "admin-users.csv");
   await page
     .locator("#adminUsersExportPreview")
     .filter({ hasText: "adminUserId" })
@@ -927,7 +933,13 @@ try {
   await clickCardAction("Admin Audit Events", "Use Audit Scope", "admin_user_updated");
   await expectInputValue("#adminAuditSubjectFilter", workspaceAdminUserId);
   await expectInputValue("#adminStatusTargetUserId", workspaceAdminUserId);
+  const adminAuditDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportAdminAuditCsvButton").click();
+  const adminAuditDownload = await adminAuditDownloadPromise;
+  assert.equal(
+    adminAuditDownload.suggestedFilename(),
+    "admin-audit-events.csv"
+  );
   await page
     .locator("#adminAuditExportPreview")
     .filter({ hasText: "adminAuditEventId" })
