@@ -645,6 +645,16 @@ export class RuntimeViewFacade {
             label: "Session",
             value: detail.participantSession.participantSessionId
           },
+          ...participantSessionLinkRows(
+            detail.participantSession.participantSessionId,
+            {
+              tenantKey: this.uiState.workspace.tenantKey.trim(),
+              workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+              loginKey: detail.participantSession.loginKey,
+              groupKey: detail.participantSession.groupKey,
+              bookletKey: detail.latestTestRun?.bookletKey
+            }
+          ),
           {
             label: "Latest Run",
             value: detail.latestTestRun?.testRunId ?? "none"
@@ -685,6 +695,20 @@ export class RuntimeViewFacade {
         badges: [detail.testRun.status, ...detail.availableActions],
         rows: [
           {
+            label: "Session",
+            value: detail.participantSession.participantSessionId
+          },
+          ...participantSessionLinkRows(
+            detail.participantSession.participantSessionId,
+            {
+              tenantKey: this.uiState.workspace.tenantKey.trim(),
+              workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+              loginKey: detail.participantSession.loginKey,
+              groupKey: detail.participantSession.groupKey,
+              bookletKey: detail.testRun.bookletKey
+            }
+          ),
+          {
             label: "Current Unit",
             value: detail.currentUnit.displayLabel ?? detail.currentUnit.unitKey ?? "none"
           },
@@ -710,6 +734,7 @@ export class RuntimeViewFacade {
         selected: this.runtime.testRunId.trim() === detail.testRun.testRunId,
         actionLabel: "Select + Sync",
         actionPayload: {
+          participantSessionId: detail.participantSession.participantSessionId,
           testRunId: detail.testRun.testRunId,
           currentUnitKey: detail.testRun.currentUnitKey ?? ""
         }

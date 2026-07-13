@@ -2330,6 +2330,8 @@ try {
     "#currentUnitKey",
     pausedCurrentState.currentRunState.currentUnit.unitKey
   );
+  const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
+  assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
   await fillAndCommitUntilValue("#currentUnitKey", "unit-paused");
   await fillAndCommit("#runtimeUnitResponse", "Filtered response smoke");
   await clickAction("Save Paused");
@@ -2358,8 +2360,25 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  const pausedTestRunId = pausedCurrentState.currentRunState.testRun.testRunId;
-  assert.ok(pausedTestRunId, "UI smoke expected a paused testRunId before resuming.");
+  const runtimeStateDetailCard = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Runtime State Detail" }) })
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantSessionId });
+  await runtimeStateDetailCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
+    .waitFor();
+  const currentRunDetailCard = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Current Run Detail" }) })
+    .locator(".record-card")
+    .filter({ hasText: participantSessionId })
+    .filter({ hasText: pausedTestRunId });
+  await currentRunDetailCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
+    .waitFor();
+  stopAfter("runtime-detail-session-links");
   await fillAndCommit("#testRunId", pausedTestRunId);
   logStep("filter-detailed-responses");
   await fillAndCommit("#detailedResponseLoginFilter", participantLoginKey);
