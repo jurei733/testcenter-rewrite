@@ -538,11 +538,11 @@ export class ContentViewFacade {
         ],
         rows: [
           { label: "Media Type", value: detail.sourcePackage.mediaType },
-        {
-          label: "Uploaded",
-          value: this.formatDateTime(detail.sourcePackage.uploadedAt)
-        }
-      ],
+          {
+            label: "Uploaded",
+            value: this.formatDateTime(detail.sourcePackage.uploadedAt)
+          }
+        ],
         selected:
           this.content.sourcePackageId.trim() === detail.sourcePackage.sourcePackageId,
         actionLabel: "Select + Load",
@@ -555,38 +555,38 @@ export class ContentViewFacade {
     ];
   }
 
-	  get sourcePackageStructureItems(): RecordCollectionItem[] {
-	    const payload = parseJsonDocument<GetSourcePackageResponse>(
-	      this.content.sourcePackageDetailView
-	    );
-	    const structure = payload?.sourcePackageDetail.sourcePackage.contentStructure;
+  get sourcePackageStructureItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetSourcePackageResponse>(
+      this.content.sourcePackageDetailView
+    );
+    const structure = payload?.sourcePackageDetail.sourcePackage.contentStructure;
     return (
       structure?.bookletEntries.map(booklet => ({
         headline: booklet.displayLabel,
         subline: booklet.bookletKey,
         badges: [`${booklet.unitEntries.length} unit(s)`],
-	        rows: [
-	          {
-	            label: "Unit Keys",
-	            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
-	          },
-	          {
-	            label: "Unit Labels",
-	            value:
-	              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
-	          },
-	          {
-	            label: "Prompt Coverage",
-	            value: this.formatUnitPromptCoverage(booklet.unitEntries)
-	          },
-	          {
-	            label: "Unit Prompts",
-	            value: this.formatUnitPromptPreview(booklet.unitEntries)
-	          }
-	        ],
-	        selected: false
-	      })) ?? []
-	    );
+        rows: [
+          {
+            label: "Unit Keys",
+            value: booklet.unitEntries.map(unit => unit.unitKey).join(", ") || "none"
+          },
+          {
+            label: "Unit Labels",
+            value:
+              booklet.unitEntries.map(unit => unit.displayLabel).join(" | ") || "none"
+          },
+          {
+            label: "Prompt Coverage",
+            value: this.formatUnitPromptCoverage(booklet.unitEntries)
+          },
+          {
+            label: "Unit Prompts",
+            value: this.formatUnitPromptPreview(booklet.unitEntries)
+          }
+        ],
+        selected: false
+      })) ?? []
+    );
   }
 
   get draftSourceDocumentPreviewItems(): RecordCollectionItem[] {
