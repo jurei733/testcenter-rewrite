@@ -923,9 +923,7 @@ export class ContentViewFacade {
     return (
       payload?.activationReadiness.blockingOpenRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
-        const participantSessionId = this.findParticipantSessionIdByLoginKey(
-          openRun.loginKey
-        );
+        const participantSessionId = openRun.participantSessionId;
 
         return {
           headline: displayName ?? openRun.loginKey,
@@ -948,7 +946,7 @@ export class ContentViewFacade {
           actionLabel: "Open In Runtime",
           actionPayload: {
             loginKey: openRun.loginKey,
-            participantSessionId: participantSessionId ?? "",
+            participantSessionId,
             testRunId: openRun.testRunId,
             currentUnitKey: openRun.currentUnitKey ?? ""
           }

@@ -6061,6 +6061,7 @@ test("activation guard returns blocking open-run details", async () => {
     details: {
       activeContentReleaseId: string;
       openRuns: Array<{
+        participantSessionId: string;
         status: string;
         loginKey: string;
         participantRosterEntry: { displayName: string | null } | null;
@@ -6085,6 +6086,10 @@ test("activation guard returns blocking open-run details", async () => {
   assert.equal(
     blockedActivation.body.details.openRuns[0]?.loginKey,
     "activation-student"
+  );
+  assert.equal(
+    blockedActivation.body.details.openRuns[0]?.participantSessionId,
+    signIn.body.participantSession.participantSessionId
   );
   assert.equal(
     blockedActivation.body.details.openRuns[0]?.participantRosterEntry?.displayName,
