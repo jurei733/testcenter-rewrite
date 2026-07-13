@@ -417,12 +417,13 @@ For browser-level frontend verification, run:
 ```bash
 npm run install:browsers
 npm run smoke:ui:content
+npm run smoke:ui:activation-roster-warnings
 npm run smoke:ui
 npm run smoke:ui:operator-auth
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:ui:postgres
 ```
 
-The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
+The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The `smoke:ui:activation-roster-warnings` variant continues to the staged-release roster compatibility warning drill-down before stopping. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
@@ -482,7 +483,7 @@ For runtime probes:
 
 ## CI / Deployability
 
-- [rewrite-app-ci.yml](/Users/julian/code/testcenter-rewrite/.github/workflows/rewrite-app-ci.yml) now verifies:
+- [ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts helpers
   - built runtime preflight against SQLite and Postgres
