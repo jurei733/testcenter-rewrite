@@ -2783,6 +2783,41 @@ try {
   await fillAndCommit("#workspaceActivitySubjectId", pausedTestRunId);
   await fillAndCommit("#workspaceActivityLimit", "5");
   await clickAction("Refresh Activity");
+  const filteredWorkspaceActivityPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_session_resumed&subjectType=test_run&subjectId=${pausedTestRunId}&limit=5`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length > 0
+  );
+  const filteredWorkspaceActivityDisplayedEvents = Math.min(
+    filteredWorkspaceActivityPayload.items.length,
+    8
+  );
+  const filteredWorkspaceActivityHiddenEvents = Math.max(
+    filteredWorkspaceActivityPayload.items.length -
+      filteredWorkspaceActivityDisplayedEvents,
+    0
+  );
+  const workspaceActivityCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Workspace Activity", exact: true })
+  });
+  await workspaceActivityCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Workspace activity window" }) })
+    .filter({
+      hasText: `${filteredWorkspaceActivityPayload.items.length} event(s) loaded for the current filters`
+    })
+    .filter({ hasText: "Loaded Events" })
+    .filter({ hasText: String(filteredWorkspaceActivityPayload.items.length) })
+    .filter({ hasText: "Displayed Events" })
+    .filter({ hasText: String(filteredWorkspaceActivityDisplayedEvents) })
+    .filter({ hasText: "Hidden Events" })
+    .filter({ hasText: String(filteredWorkspaceActivityHiddenEvents) })
+    .filter({ hasText: "Limit" })
+    .filter({ hasText: "5" })
+    .waitFor();
   await page
     .locator("article.card")
     .filter({

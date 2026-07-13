@@ -1453,52 +1453,98 @@ export class WorkspaceViewFacade {
     const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
       this.workspace.workspaceActivityView
     );
-    return payload?.items.slice(0, 8).map(item => ({
-      headline: item.activityEvent.summary,
-      subline: `${item.activityEvent.eventType} · ${this.formatDateTime(item.activityEvent.occurredAt)}`,
-      badges: [
-        item.activityEvent.subjectType,
-        item.activityEvent.actorId ?? "system"
-      ],
-      rows: [
-        { label: "Subject", value: item.activityEvent.subjectId },
-        ...this.participantSessionLinkRows(
-          this.getActivityParticipantSessionId(
-            item.activityEvent.subjectType,
-            item.activityEvent.subjectId,
-            readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
+    const activityItems = payload?.items ?? [];
+    if (activityItems.length === 0) {
+      return [];
+    }
+
+    const displayedItems = activityItems.slice(0, 8);
+    const hiddenItemCount = Math.max(activityItems.length - displayedItems.length, 0);
+
+    return [
+      {
+        headline: "Workspace activity window",
+        subline: `${activityItems.length} event(s) loaded for the current filters`,
+        badges: [
+          `${displayedItems.length} displayed`,
+          ...(hiddenItemCount > 0 ? [`${hiddenItemCount} hidden`] : [])
+        ],
+        rows: [
+          { label: "Loaded Events", value: String(activityItems.length) },
+          { label: "Displayed Events", value: String(displayedItems.length) },
+          { label: "Hidden Events", value: String(hiddenItemCount) },
+          { label: "Limit", value: this.workspace.workspaceActivityLimit }
+        ]
+      },
+      ...displayedItems.map(item => ({
+        headline: item.activityEvent.summary,
+        subline: `${item.activityEvent.eventType} · ${this.formatDateTime(item.activityEvent.occurredAt)}`,
+        badges: [
+          item.activityEvent.subjectType,
+          item.activityEvent.actorId ?? "system"
+        ],
+        rows: [
+          { label: "Subject", value: item.activityEvent.subjectId },
+          ...this.participantSessionLinkRows(
+            this.getActivityParticipantSessionId(
+              item.activityEvent.subjectType,
+              item.activityEvent.subjectId,
+              readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? ""
+            ),
+            {
+              loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
+              groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
+              bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
+            }
           ),
-          {
-            loginKey: readStringValue(item.activityEvent.details, ["loginKey"]),
-            groupKey: readStringValue(item.activityEvent.details, ["groupKey"]),
-            bookletKey: readStringValue(item.activityEvent.details, ["bookletKey"])
-          }
+          { label: "Event Id", value: item.activityEvent.activityEventId }
+        ],
+        selected: this.isActivitySubjectSelected(
+          item.activityEvent.subjectType,
+          item.activityEvent.subjectId
         ),
-        { label: "Event Id", value: item.activityEvent.activityEventId }
-      ],
-      selected: this.isActivitySubjectSelected(
-        item.activityEvent.subjectType,
-        item.activityEvent.subjectId
-      ),
-      actionLabel: this.getActivitySubjectActionLabel(item.activityEvent.subjectType),
-      actionPayload: {
-        subjectType: item.activityEvent.subjectType,
-        subjectId: item.activityEvent.subjectId,
-        participantSessionId:
-          readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
-        loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
-        currentUnitKey:
-          readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
-      }
-    })) ?? [];
+        actionLabel: this.getActivitySubjectActionLabel(item.activityEvent.subjectType),
+        actionPayload: {
+          subjectType: item.activityEvent.subjectType,
+          subjectId: item.activityEvent.subjectId,
+          participantSessionId:
+            readStringValue(item.activityEvent.details, ["participantSessionId"]) ?? "",
+          loginKey: readStringValue(item.activityEvent.details, ["loginKey"]) ?? "",
+          currentUnitKey:
+            readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
+        }
+      }))
+    ];
   }
 
   get workspaceActivityDetailItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
       this.workspace.workspaceActivityView
     );
-    return (
-      payload?.items.slice(0, 5).map(item => {
+    const activityItems = payload?.items ?? [];
+    if (activityItems.length === 0) {
+      return [];
+    }
+
+    const displayedItems = activityItems.slice(0, 5);
+    const hiddenItemCount = Math.max(activityItems.length - displayedItems.length, 0);
+
+    return [
+      {
+        headline: "Workspace activity detail window",
+        subline: `${activityItems.length} event payload(s) loaded for the current filters`,
+        badges: [
+          `${displayedItems.length} displayed`,
+          ...(hiddenItemCount > 0 ? [`${hiddenItemCount} hidden`] : [])
+        ],
+        rows: [
+          { label: "Loaded Events", value: String(activityItems.length) },
+          { label: "Displayed Details", value: String(displayedItems.length) },
+          { label: "Hidden Details", value: String(hiddenItemCount) },
+          { label: "Limit", value: this.workspace.workspaceActivityLimit }
+        ]
+      },
+      ...displayedItems.map(item => {
         const detailRows = Object.entries(item.activityEvent.details)
           .slice(0, 4)
           .map(([key, value]) => ({
@@ -1545,8 +1591,8 @@ export class WorkspaceViewFacade {
               readStringValue(item.activityEvent.details, ["currentUnitKey"]) ?? ""
           }
         } satisfies RecordCollectionItem;
-      }) ?? []
-    );
+      })
+    ];
   }
 
   init(): void {
