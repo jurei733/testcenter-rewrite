@@ -1986,7 +1986,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(invalidCompleteTestRunId.status, 400);
     assert.equal(invalidCompleteTestRunId.body.error, "test_run_id_required");
 
-    const missingLaunchSession = await requestJsonAt<{ error: string }>(
+    const missingLaunchIdentity = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/participant/starter:launch",
       {
@@ -1995,10 +1995,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       }
     );
 
-    assert.equal(missingLaunchSession.status, 400);
+    assert.equal(missingLaunchIdentity.status, 400);
     assert.equal(
-      missingLaunchSession.body.error,
-      "participant_session_id_required"
+      missingLaunchIdentity.body.error,
+      "participant_workspace_key_required"
     );
 
     const invalidLaunchBooklet = await requestJsonAt<{ error: string }>(
@@ -5851,6 +5851,46 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(betaRun.body.testRun.status, "running");
   assert.equal(betaRun.body.testRun.bookletKey, "booklet:beta");
   assert.equal(betaRun.body.testRun.currentUnitKey, "unit-beta-1");
+
+  const directLaunch = await requestJson<{
+    participantSession: {
+      participantSessionId: string;
+      loginKey: string;
+      groupKey: string;
+      status: string;
+    };
+    testRun: {
+      participantSessionId: string;
+      bookletKey: string;
+      currentUnitKey: string | null;
+    };
+  }>("/api/v1/participant/starter:launch", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "direct-booklet-launch-student",
+      groupKey: "group:booklet-launch-direct",
+      bookletKey: "booklet:beta"
+    }
+  });
+
+  assert.equal(directLaunch.status, 200);
+  assert.equal(
+    directLaunch.body.participantSession.loginKey,
+    "direct-booklet-launch-student"
+  );
+  assert.equal(
+    directLaunch.body.participantSession.groupKey,
+    "group:booklet-launch-direct"
+  );
+  assert.equal(directLaunch.body.participantSession.status, "launched");
+  assert.equal(
+    directLaunch.body.testRun.participantSessionId,
+    directLaunch.body.participantSession.participantSessionId
+  );
+  assert.equal(directLaunch.body.testRun.bookletKey, "booklet:beta");
+  assert.equal(directLaunch.body.testRun.currentUnitKey, "unit-beta-1");
 
   const secondSignIn = await requestJson<{
     participantSession: { participantSessionId: string };

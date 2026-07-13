@@ -4100,8 +4100,41 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         pathname === productionApiRoutes.participant.launch
       ) {
         const body = await readRequestJsonBody<ParticipantLaunchRequest>();
-        const testRun = await services.participantRuntime.launch(body);
-        sendJson<ParticipantLaunchResponse>(response, 200, { testRun });
+        if (
+          body.participantSessionId !== undefined &&
+          body.participantSessionId !== null
+        ) {
+          const testRun = await services.participantRuntime.launch({
+            participantSessionId: body.participantSessionId,
+            bookletKey: body.bookletKey
+          });
+          const runtimeState = await services.participantRuntime.getRuntimeState({
+            participantSessionId: testRun.participantSessionId
+          });
+          sendJson<ParticipantLaunchResponse>(response, 200, {
+            participantSession: runtimeState.participantSession,
+            testRun
+          });
+          return;
+        }
+
+        const participantSession = await services.participantRuntime.signIn({
+          tenantKey: body.tenantKey,
+          workspaceKey: body.workspaceKey ?? "",
+          loginKey: body.loginKey ?? "",
+          groupKey: body.groupKey
+        });
+        const testRun = await services.participantRuntime.resumeSession({
+          participantSessionId: participantSession.participantSessionId,
+          bookletKey: body.bookletKey
+        });
+        const runtimeState = await services.participantRuntime.getRuntimeState({
+          participantSessionId: testRun.participantSessionId
+        });
+        sendJson<ParticipantLaunchResponse>(response, 200, {
+          participantSession: runtimeState.participantSession,
+          testRun
+        });
         return;
       }
 

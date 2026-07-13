@@ -728,7 +728,11 @@ export type ResetAdminUserPasswordRequest = {
 export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
 
 export type ParticipantLaunchRequest = {
-  participantSessionId: string;
+  participantSessionId?: string;
+  tenantKey?: string | null;
+  workspaceKey?: string;
+  loginKey?: string;
+  groupKey?: string;
   bookletKey?: string;
 };
 
@@ -967,6 +971,7 @@ export type ParticipantSignInResponse = {
 };
 
 export type ParticipantLaunchResponse = {
+  participantSession: ParticipantSession;
   testRun: TestRun;
 };
 

@@ -324,7 +324,7 @@ The added read side now makes the first slice inspectable:
 - participant runtime can now be re-entered through session context, not only through `testRunId`
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
-- participant launch/resume can now carry an explicit `tenantKey` and `bookletKey` so entry links and operator flows can start a specific booklet from the intended tenant/workspace active release
+- participant launch/resume can now carry an explicit `tenantKey` and `bookletKey`, and `POST /api/v1/participant/starter:launch` can sign in by tenant/workspace/login/group and start the selected booklet in one request
 - participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses, and status/response-only saves retain the current unit for player clients that do not repeat the unit key on every save
 - study-monitor reads now include workspace summary, group drill-down, booklet drill-down, and unit drill-down with per-run answer/missing/review status plus saved-roster expected/missing unit coverage
 - participant current-state now returns a lightweight `booklet`/`currentUnit` projection plus available actions, sourced from a small content-release runtime snapshot
@@ -482,5 +482,5 @@ It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed
 - importer behavior is still limited, but can now derive and normalize runtime structure from source-package metadata plus manifest-like JSON/XML documents, IMS organization/resource dependency manifests, nested package/test wrapper objects, booklet/testlet/assessment-test/assessment-section/unit/resource/file/assessment-item/item-ref aliases, JSON item bodies, child XML text fields, CDATA bodies, and flat or nested Testtaker/Participant-style XML rosters
-- participant launch is still simplified, but now supports explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
+- participant launch is still simplified, but now supports one-step starter launch, explicit tenant/workspace scoping, group keys, booklet selection on participant entry links, and booklet-scoped unit validation when saving progress
 - monitor reads now include workspace summary, prioritized attention items, group drill-down, participant drill-down, booklet drill-down, unit drill-down, unit-progress coverage, participant-by-unit matrix export, saved-roster expected/not-started participants, CSV exports, open-run blockers, and open-run pause/resume/complete controls, but still do not cover every original Testcenter monitor view
