@@ -491,7 +491,7 @@ For runtime probes:
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
-  - SQLite startup, shutdown, fast content-browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
+  - SQLite startup, shutdown, fast content-browser, review-readiness browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
   - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
