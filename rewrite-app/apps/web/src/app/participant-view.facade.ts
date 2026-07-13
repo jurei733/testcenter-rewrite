@@ -809,6 +809,8 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
+    this.workspace.tenantKey = currentState.scope.tenantKey;
+    this.workspace.workspaceKey = currentState.scope.workspaceKey;
     this.syncParticipantSessionFields(currentState.participantSession);
     this.syncRun(currentState.testRun);
   }
@@ -830,11 +832,15 @@ export class ParticipantViewFacade {
 
     const query = new URLSearchParams({ participantSessionId });
     const currentState = this.readCurrentRunState();
-    this.appendParticipantEntryLinkParam(query, "tenantKey", this.workspace.tenantKey);
+    this.appendParticipantEntryLinkParam(
+      query,
+      "tenantKey",
+      currentState?.scope.tenantKey ?? this.workspace.tenantKey
+    );
     this.appendParticipantEntryLinkParam(
       query,
       "workspaceKey",
-      this.workspace.workspaceKey
+      currentState?.scope.workspaceKey ?? this.workspace.workspaceKey
     );
     this.appendParticipantEntryLinkParam(
       query,

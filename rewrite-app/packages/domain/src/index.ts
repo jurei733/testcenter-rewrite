@@ -335,8 +335,14 @@ export type ParticipantRuntimeStateStatus =
   | "in_progress"
   | "completed";
 
+export type ParticipantSessionScope = {
+  tenantKey: string;
+  workspaceKey: string;
+};
+
 export type ParticipantRuntimeState = {
   participantSession: ParticipantSession;
+  scope: ParticipantSessionScope;
   latestTestRun: TestRun | null;
   runtimeStatus: ParticipantRuntimeStateStatus;
   availableAction: "launch" | "resume" | "none";
@@ -344,6 +350,7 @@ export type ParticipantRuntimeState = {
 
 export type ParticipantCurrentRunState = {
   participantSession: ParticipantSession;
+  scope: ParticipantSessionScope;
   testRun: TestRun;
   booklet: {
     bookletKey: string;

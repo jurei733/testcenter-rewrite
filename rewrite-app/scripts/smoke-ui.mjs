@@ -1496,6 +1496,8 @@ try {
       storageKey,
       JSON.stringify({
         ...snapshot,
+        tenantKey: "stale-tenant-before-reentry",
+        workspaceKey: "stale-workspace-before-reentry",
         loginKey: "stale-login-before-reentry",
         groupKey: "stale-group-before-reentry",
         bookletKey: "stale-booklet-before-reentry"
@@ -1511,6 +1513,8 @@ try {
   await page.locator("#participantLoginKey").waitFor();
   await expectInputValue("#participantRouteSessionId", participantRouteSessionId);
   await expectInputValue("#participantRouteSessionLink", participantRouteSessionLink);
+  await expectInputValue("#participantTenantKey", tenantKey);
+  await expectInputValue("#participantWorkspaceKey", workspaceKey);
   await expectInputValue("#participantLoginKey", participantRouteLoginKey);
   await expectInputValue("#participantRouteGroupKey", participantRouteGroupKey);
   await expectInputValue("#participantRouteBookletKey", participantRouteBookletKey);

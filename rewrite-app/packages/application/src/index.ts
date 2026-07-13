@@ -24,6 +24,7 @@ import type {
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
   ParticipantSession,
+  ParticipantSessionScope,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
   SourcePackage,
@@ -1404,6 +1405,31 @@ const requireParticipantSession = async (
   }
 
   return participantSession;
+};
+
+const resolveParticipantSessionScope = async (
+  repository: FirstSliceRepository,
+  participantSession: ParticipantSession
+): Promise<ParticipantSessionScope> => {
+  const tenant = (await repository.listTenants()).find(
+    item => item.tenantId === participantSession.tenantId
+  );
+  const workspace = (
+    await repository.listWorkspacesByTenantId(participantSession.tenantId)
+  ).find(item => item.workspaceId === participantSession.workspaceId);
+
+  if (!tenant || !workspace) {
+    throw new FirstSliceError(
+      500,
+      "participant_session_scope_not_found",
+      `Scope for participant session '${participantSession.participantSessionId}' could not be resolved.`
+    );
+  }
+
+  return {
+    tenantKey: tenant.tenantKey,
+    workspaceKey: workspace.workspaceKey
+  };
 };
 
 const getActiveWorkspaceRelease = async (
@@ -7746,6 +7772,10 @@ export const createFirstSliceServices = (
           repository,
           participantSessionId
         );
+        const scope = await resolveParticipantSessionScope(
+          repository,
+          participantSession
+        );
         const latestTestRun = await getLatestParticipantSessionRun(
           repository,
           participantSession.participantSessionId
@@ -7754,6 +7784,7 @@ export const createFirstSliceServices = (
         if (!latestTestRun) {
           return {
             participantSession,
+            scope,
             latestTestRun: null,
             runtimeStatus: "ready_to_launch",
             availableAction: "launch"
@@ -7763,6 +7794,7 @@ export const createFirstSliceServices = (
         if (latestTestRun.status === "completed") {
           return {
             participantSession,
+            scope,
             latestTestRun: normalizeTestRun(latestTestRun),
             runtimeStatus: "completed",
             availableAction: "none"
@@ -7771,6 +7803,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
+          scope,
           latestTestRun: normalizeTestRun(latestTestRun),
           runtimeStatus: "in_progress",
           availableAction: "resume"
@@ -7783,6 +7816,10 @@ export const createFirstSliceServices = (
         const participantSession = await requireParticipantSession(
           repository,
           participantSessionId
+        );
+        const scope = await resolveParticipantSessionScope(
+          repository,
+          participantSession
         );
         const latestTestRun = await getLatestParticipantSessionRun(
           repository,
@@ -7811,6 +7848,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
+          scope,
           testRun: currentTestRun,
           booklet: resolveRuntimeBooklet(contentRelease, currentTestRun.bookletKey),
           currentUnit: resolveRuntimeUnit(

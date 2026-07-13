@@ -1763,6 +1763,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const currentState = await requestJsonAt<{
       currentRunState: {
+        scope: {
+          tenantKey: string;
+          workspaceKey: string;
+        };
         currentUnit: {
           unitKey: string | null;
           displayLabel: string | null;
@@ -1781,6 +1785,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
 
     assert.equal(currentState.status, 200);
+    assert.deepEqual(currentState.body.currentRunState.scope, {
+      tenantKey: "demo-tenant",
+      workspaceKey: "demo-workspace"
+    });
     assert.deepEqual(
       currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
       ["unit-intro", "unit-practice", "unit-finish"]
@@ -2019,6 +2027,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const stateAfterResponse = await requestJsonAt<{
       currentRunState: {
+        scope: {
+          tenantKey: string;
+          workspaceKey: string;
+        };
         testRun: { unitResponses: Record<string, string> };
       };
     }>(
@@ -2027,6 +2039,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
 
     assert.equal(stateAfterResponse.status, 200);
+    assert.deepEqual(stateAfterResponse.body.currentRunState.scope, {
+      tenantKey: "demo-tenant",
+      workspaceKey: "demo-workspace"
+    });
     assert.equal(
       stateAfterResponse.body.currentRunState.testRun.unitResponses["unit-intro"],
       "My first demo response"
