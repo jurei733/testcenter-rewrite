@@ -14,6 +14,7 @@ export function createRuntimeActionsStateHost(args: {
   return {
     request: args.request,
     getParticipantSignInPath: () => productionApiRoutes.participant.signIn,
+    getParticipantLaunchPath: () => productionApiRoutes.participant.launch,
     getResumeParticipantSessionPath: () =>
       resolveRoutePath(productionApiRoutes.participant.resumeSession, {
         participantSessionId: args.runtimeState.participantSessionId.trim()

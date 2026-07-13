@@ -2,6 +2,7 @@ import type {
   GetParticipantSessionResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
+  ParticipantLaunchResponse,
   ParticipantRuntimeStateResponse,
   ParticipantSignInResponse,
   ResumeParticipantSessionResponse,
@@ -88,6 +89,26 @@ export function applyResumeParticipantSessionResult(
   host.rememberActivity(
     "Session Resumed",
     `Run ${payload.testRun.testRunId} is ${payload.testRun.status}.`
+  );
+}
+
+export function applyParticipantLaunchResult(
+  host: RuntimePresentationHost,
+  payload: ParticipantLaunchResponse
+): void {
+  host.setParticipantSessionId(payload.participantSession.participantSessionId);
+  host.setGroupKey(payload.participantSession.groupKey);
+  host.syncRuntimeStateFromRun(payload.testRun);
+  host.updateRuntimeSummary(
+    payload.testRun.status,
+    `Run ${payload.testRun.testRunId} launched at ${payload.testRun.currentUnitKey ?? "no current unit"}.`
+  );
+  host.setRuntimeMonitorView(
+    prettyPrintJson(payload, host.getRuntimeMonitorView())
+  );
+  host.rememberActivity(
+    "Participant Started",
+    `Session ${payload.participantSession.participantSessionId} started ${payload.testRun.bookletKey}.`
   );
 }
 

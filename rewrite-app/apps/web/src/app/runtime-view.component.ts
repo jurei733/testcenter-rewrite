@@ -66,6 +66,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </label>
         <div class="actions">
           <button class="primary" type="button" (click)="view.participantSignIn()">Sign In</button>
+          <button class="primary" type="button" (click)="view.participantLaunch()">Start Participant</button>
           <button class="secondary" type="button" (click)="view.resumeSession()">Resume Session</button>
           <button class="ghost" type="button" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
           <button class="ghost" type="button" (click)="view.saveProgressPaused()">Save Paused</button>

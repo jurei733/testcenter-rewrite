@@ -7,6 +7,8 @@ import type {
   ImportParticipantRosterResponse,
   IssueMonitorRunCommandRequest,
   IssueMonitorRunCommandResponse,
+  ParticipantLaunchRequest,
+  ParticipantLaunchResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -19,6 +21,7 @@ import type {
 
 import {
   applyCompleteRunResult,
+  applyParticipantLaunchResult,
   applyParticipantSignInResult,
   applyResumeParticipantSessionResult,
   applyResumeRunResult,
@@ -34,6 +37,7 @@ export interface ShellRuntimeActionsHost {
     body?: unknown
   ): Promise<T>;
   getParticipantSignInPath(): string;
+  getParticipantLaunchPath(): string;
   getResumeParticipantSessionPath(): string;
   getSaveProgressPath(): string;
   getResumeRunPath(): string;
@@ -173,6 +177,25 @@ export async function resumeParticipantSessionAction(
     host.createRuntimePresentationHost(),
     payload
   );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+}
+
+export async function participantLaunchAction(
+  host: ShellRuntimeActionsHost
+): Promise<void> {
+  const payload = await host.request<ParticipantLaunchResponse>(
+    "Participant Starter Launch",
+    "POST",
+    host.getParticipantLaunchPath(),
+    {
+      tenantKey: host.getTenantKey().trim() || undefined,
+      workspaceKey: host.getWorkspaceKey().trim(),
+      loginKey: host.getLoginKey().trim(),
+      groupKey: host.getGroupKey().trim() || undefined,
+      bookletKey: host.getBookletKey().trim() || undefined
+    } satisfies ParticipantLaunchRequest
+  );
+  applyParticipantLaunchResult(host.createRuntimePresentationHost(), payload);
   await host.refreshCrossViewStateAfterRuntimeChange();
 }
 

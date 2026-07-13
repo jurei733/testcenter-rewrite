@@ -15,6 +15,7 @@ import {
   deleteReviewAction,
   importParticipantRosterAction,
   issueMonitorRunCommandAction,
+  participantLaunchAction,
   participantSignInAction,
   resumeParticipantSessionAction,
   resumeRunAction,
@@ -52,6 +53,14 @@ export class RewriteAppRuntimeService {
 
   async participantSignIn(): Promise<void> {
     await participantSignInAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      )
+    );
+  }
+
+  async participantLaunch(): Promise<void> {
+    await participantLaunchAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       )
@@ -317,8 +326,7 @@ export class RewriteAppRuntimeService {
 
   async participantHappyPathFlow(): Promise<void> {
     await runParticipantHappyPathFlow(createParticipantHappyPathFlowHost({
-      participantSignIn: () => this.participantSignIn(),
-      resumeParticipantSession: () => this.resumeParticipantSession(),
+      participantLaunch: () => this.participantLaunch(),
       refreshRuntimeReads: () => this.refreshRuntimeReads(),
       rememberActivity: (title: string, detail: string) => {
         this.feedback.rememberActivity(title, detail);

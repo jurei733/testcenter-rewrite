@@ -1512,14 +1512,14 @@ try {
     { timeout: 15_000 }
   );
   await participantEntryPopup.close();
-  logStep("participant-sign-in");
+  logStep("participant-start");
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
   const participantBookletKey = "booklet:starter";
   await fillAndCommit("#loginKey", participantLoginKey);
   await fillAndCommit("#groupKey", participantGroupKey);
   await fillAndCommit("#bookletKey", participantBookletKey);
-  await clickAction("Sign In");
+  await clickAction("Start Participant");
   const participantSessionsUrl = `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`;
   const hasParticipantSession = payload =>
     typeof payload === "object" &&
@@ -1541,9 +1541,9 @@ try {
       4_000
     );
   } catch {
-    process.stdout.write("ui_smoke_step=participant-sign-in-retry\n");
+    process.stdout.write("ui_smoke_step=participant-start-retry\n");
     await fillAndCommit("#loginKey", participantLoginKey);
-    await clickAction("Sign In");
+    await clickAction("Start Participant");
     participantSessionsPayload = await pollJsonWithPredicate(
       participantSessionsUrl,
       hasParticipantSession
@@ -1558,7 +1558,7 @@ try {
     "UI smoke expected participantSessionId to be populated after the runtime happy path."
   );
   logStep("filter-participant-sessions");
-  await selectAndCommit("#participantSessionStatusFilter", "signed_in");
+  await selectAndCommit("#participantSessionStatusFilter", "launched");
   await fillAndCommit("#participantSessionGroupFilter", participantGroupKey);
   await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
   await fillAndCommit("#participantSessionLimit", "1");
@@ -1581,8 +1581,7 @@ try {
     .filter({ hasText: participantGroupKey })
     .waitFor();
   await fillAndCommit("#participantSessionId", participantSessionId);
-  logStep("resume-session");
-  await clickAction("Resume Session");
+  logStep("read-started-session");
   const pausedCurrentState = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>

@@ -1164,6 +1164,10 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.participantSignIn());
   }
 
+  participantLaunch(): void {
+    this.viewState.onActionAsync(() => this.runtimeService.participantLaunch());
+  }
+
   resumeSession(): void {
     this.viewState.onActionAsync(() => this.runtimeService.resumeParticipantSession());
   }
