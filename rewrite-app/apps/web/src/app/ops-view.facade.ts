@@ -125,6 +125,54 @@ export class OpsViewFacade {
     this.viewState.setActiveView("ops");
   }
 
+  get canCreateAdminUser(): boolean {
+    return (
+      this.ops.adminCreateUsername.trim() !== "" &&
+      this.ops.adminCreatePassword !== "" &&
+      this.isScopedAdminRoleInputComplete(
+        this.ops.adminCreateRole,
+        this.ops.adminCreateTenantKey,
+        this.ops.adminCreateWorkspaceKey
+      )
+    );
+  }
+
+  get canRevokeAdminSession(): boolean {
+    return this.ops.adminSessionRevokeTargetId.trim() !== "";
+  }
+
+  get canAssignAdminRole(): boolean {
+    return (
+      this.ops.adminRoleTargetUserId.trim() !== "" &&
+      this.isScopedAdminRoleInputComplete(
+        this.ops.adminRoleRole,
+        this.ops.adminRoleTenantKey,
+        this.ops.adminRoleWorkspaceKey
+      )
+    );
+  }
+
+  get canRevokeAdminRole(): boolean {
+    return (
+      this.ops.adminRevokeTargetUserId.trim() !== "" &&
+      this.ops.adminRevokeRoleAssignmentId.trim() !== ""
+    );
+  }
+
+  get canResetAdminUserPassword(): boolean {
+    return (
+      this.ops.adminResetTargetUserId.trim() !== "" &&
+      this.ops.adminResetPassword !== ""
+    );
+  }
+
+  get canUpdateAdminUserStatus(): boolean {
+    return (
+      this.ops.adminStatusTargetUserId.trim() !== "" &&
+      this.adminStatusOptions.includes(this.ops.adminStatusValue)
+    );
+  }
+
   refreshDiagnostics(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshOperationalDiagnostics());
   }
@@ -164,7 +212,6 @@ export class OpsViewFacade {
   confirmRevokeAdminSession(): void {
     const adminSessionId = this.ops.adminSessionRevokeTargetId.trim();
     if (!adminSessionId) {
-      this.revokeAdminSession();
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -209,7 +256,6 @@ export class OpsViewFacade {
     const adminUserId = this.ops.adminRevokeTargetUserId.trim();
     const roleAssignmentId = this.ops.adminRevokeRoleAssignmentId.trim();
     if (!adminUserId || !roleAssignmentId) {
-      this.revokeAdminRole();
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -228,7 +274,6 @@ export class OpsViewFacade {
     const adminUserId = this.ops.adminStatusTargetUserId.trim();
     const status = this.ops.adminStatusValue;
     if (!adminUserId) {
-      this.updateAdminUserStatus();
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -245,8 +290,7 @@ export class OpsViewFacade {
 
   confirmResetAdminUserPassword(): void {
     const adminUserId = this.ops.adminResetTargetUserId.trim();
-    if (!adminUserId) {
-      this.resetAdminUserPassword();
+    if (!adminUserId || !this.ops.adminResetPassword) {
       return;
     }
     const confirmed = globalThis.window?.confirm(
@@ -1493,6 +1537,22 @@ export class OpsViewFacade {
     return Object.entries(value).flatMap(([key, child]) =>
       typeof child === "string" ? [key] : this.flattenRouteNames(child)
     );
+  }
+
+  private isScopedAdminRoleInputComplete(
+    role: AdminRole,
+    tenantKey: string,
+    workspaceKey: string
+  ): boolean {
+    if (role === "platform_admin") {
+      return true;
+    }
+
+    if (role === "tenant_admin") {
+      return tenantKey.trim() !== "";
+    }
+
+    return tenantKey.trim() !== "" && workspaceKey.trim() !== "";
   }
 
   private stringifyValue(value: unknown): string {

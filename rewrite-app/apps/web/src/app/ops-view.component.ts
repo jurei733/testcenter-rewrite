@@ -106,7 +106,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button class="primary" type="button" (click)="view.applyAdminSessionFilters()">Apply Session Filters</button>
           <button id="exportAdminSessionsCsvButton" class="secondary" type="button" (click)="view.exportAdminSessionsCsv()">Export Sessions CSV</button>
           <button class="secondary" type="button" (click)="view.useCurrentAdminUserAsSessionFilter()">Use Current User</button>
-          <button id="adminRevokeSessionButton" class="danger" type="button" (click)="view.confirmRevokeAdminSession()">Revoke Selected Session</button>
+          <button id="adminRevokeSessionButton" class="danger" type="button" [disabled]="!view.canRevokeAdminSession" (click)="view.confirmRevokeAdminSession()">Revoke Selected Session</button>
           <button class="ghost" type="button" (click)="view.clearAdminSessionFilters()">Clear Session Filters</button>
         </div>
       </article>
@@ -157,7 +157,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminCreateUserButton" class="primary" type="button" (click)="view.createAdminUser()">Create Admin User</button>
+          <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">Create Admin User</button>
         </div>
 
         <div class="form-grid">
@@ -181,7 +181,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminAssignRoleButton" class="ghost" type="button" (click)="view.assignAdminRole()">Assign Role</button>
+          <button id="adminAssignRoleButton" class="ghost" type="button" [disabled]="!view.canAssignAdminRole" (click)="view.assignAdminRole()">Assign Role</button>
         </div>
 
         <div class="form-grid">
@@ -195,7 +195,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminRevokeRoleButton" class="ghost" type="button" (click)="view.confirmRevokeAdminRole()">Revoke Role</button>
+          <button id="adminRevokeRoleButton" class="ghost" type="button" [disabled]="!view.canRevokeAdminRole" (click)="view.confirmRevokeAdminRole()">Revoke Role</button>
         </div>
 
         <div class="form-grid">
@@ -209,7 +209,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminResetPasswordButton" class="ghost" type="button" (click)="view.confirmResetAdminUserPassword()">Reset Password</button>
+          <button id="adminResetPasswordButton" class="ghost" type="button" [disabled]="!view.canResetAdminUserPassword" (click)="view.confirmResetAdminUserPassword()">Reset Password</button>
         </div>
 
         <div class="form-grid">
@@ -225,7 +225,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminUpdateStatusButton" class="ghost" type="button" (click)="view.confirmUpdateAdminUserStatus()">Update Status</button>
+          <button id="adminUpdateStatusButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserStatus" (click)="view.confirmUpdateAdminUserStatus()">Update Status</button>
         </div>
       </article>
 

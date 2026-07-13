@@ -404,6 +404,16 @@ try {
     await waitForNotBusy(`${name}-after-click`);
     logStep(`action-${name.replaceAll(" ", "-").toLowerCase()}-done`);
   };
+  const expectButtonSelectorEnabled = async selector => {
+    const button = page.locator(selector);
+    await button.waitFor({ timeout: 15_000 });
+    assert.equal(await button.isEnabled(), true);
+  };
+  const expectButtonSelectorDisabled = async selector => {
+    const button = page.locator(selector);
+    await button.waitFor({ timeout: 15_000 });
+    assert.equal(await button.isDisabled(), true);
+  };
   const acceptNextDialog = expectedMessagePattern =>
     new Promise((resolvePromise, reject) => {
       page.once("dialog", async dialog => {
@@ -680,6 +690,7 @@ try {
   assert.notEqual(smokeAdminSessionToken.length, 0);
   logStep("admin-revoke-session");
   await clickAction("Admin Sessions");
+  await expectButtonSelectorDisabled("#adminRevokeSessionButton");
   const revokedAdminSessionCard = page
     .locator("article.record-card")
     .filter({ hasText: adminUsername })
@@ -689,6 +700,7 @@ try {
   await revokedAdminSessionCard.waitFor();
   await revokedAdminSessionCard.getByRole("button", { name: "Select Session" }).click();
   await waitForInputMinLength("#adminSessionRevokeTargetId", 20);
+  await expectButtonSelectorEnabled("#adminRevokeSessionButton");
   const revokeAdminSessionTargetId = await page
     .locator("#adminSessionRevokeTargetId")
     .inputValue();
@@ -838,6 +850,18 @@ try {
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
   await page.locator("#adminCreateUsername").waitFor();
+  await fillAndCommit("#adminCreatePassword", "");
+  await fillAndCommit("#adminRoleTargetUserId", "");
+  await fillAndCommit("#adminRevokeTargetUserId", "");
+  await fillAndCommit("#adminRevokeRoleAssignmentId", "");
+  await fillAndCommit("#adminResetTargetUserId", "");
+  await fillAndCommit("#adminResetPassword", "");
+  await fillAndCommit("#adminStatusTargetUserId", "");
+  await expectButtonSelectorDisabled("#adminCreateUserButton");
+  await expectButtonSelectorDisabled("#adminAssignRoleButton");
+  await expectButtonSelectorDisabled("#adminRevokeRoleButton");
+  await expectButtonSelectorDisabled("#adminResetPasswordButton");
+  await expectButtonSelectorDisabled("#adminUpdateStatusButton");
   const generatedWorkspaceAdminUsername = `ui-workspace-admin-${Date.now()}`;
   const workspaceAdminPassword = "ui-workspace-admin-secret";
   const workspaceAdminResetPassword = "ui-workspace-admin-reset-secret";
@@ -854,6 +878,7 @@ try {
     workspaceAdminUsername.length > 0,
     "UI smoke expected a non-empty admin username before creating a workspace admin."
   );
+  await expectButtonSelectorEnabled("#adminCreateUserButton");
   logStep("create-workspace-admin");
   await clickAction("Create Admin User");
   const adminUsersAfterCreate = await pollJsonWithPredicate(
@@ -891,6 +916,7 @@ try {
   await fillAndCommit("#adminRoleTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminRoleRole", "tenant_admin");
   await fillAndCommit("#adminRoleTenantKey", tenantKey);
+  await expectButtonSelectorEnabled("#adminAssignRoleButton");
   logStep("assign-tenant-admin-role");
   await clickAction("Assign Role");
   const adminUsersAfterRoleAssign = await pollJsonWithPredicate(
@@ -948,6 +974,7 @@ try {
   await clickCardAction("Admin Role Assignments", "Use For Revoke", "tenant_admin");
   await expectInputValue("#adminRevokeTargetUserId", workspaceAdminUserId);
   await expectInputValue("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
+  await expectButtonSelectorEnabled("#adminRevokeRoleButton");
   logStep("revoke-tenant-admin-role");
   const revokeAdminRoleDialog = acceptNextDialog(
     new RegExp(
@@ -977,6 +1004,7 @@ try {
 
   await fillAndCommit("#adminResetTargetUserId", workspaceAdminUserId);
   await fillAndCommit("#adminResetPassword", workspaceAdminResetPassword);
+  await expectButtonSelectorEnabled("#adminResetPasswordButton");
   logStep("reset-workspace-admin-password");
   const resetAdminPasswordDialog = acceptNextDialog(
     new RegExp(`Reset password for admin user '${workspaceAdminUserId}'\\?`)
@@ -1010,6 +1038,7 @@ try {
 
   await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminStatusValue", "disabled");
+  await expectButtonSelectorEnabled("#adminUpdateStatusButton");
   logStep("disable-workspace-admin");
   const updateAdminStatusDialog = acceptNextDialog(
     new RegExp(
