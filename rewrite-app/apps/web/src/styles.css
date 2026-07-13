@@ -834,6 +834,10 @@ pre {
   text-underline-offset: 3px;
 }
 
+.record-card-row-value {
+  overflow-wrap: anywhere;
+}
+
 .record-card-rows a:hover {
   color: var(--accent);
   text-decoration-color: rgba(196, 82, 47, 0.6);

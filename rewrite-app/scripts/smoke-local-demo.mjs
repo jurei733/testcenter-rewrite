@@ -313,6 +313,22 @@ try {
   const localDemoAccessCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Local Demo Access", exact: true })
   });
+  const localDemoAccessRecord = localDemoAccessCard.locator(".record-card").filter({
+    has: page.getByRole("heading", { name: "Local demo is ready", exact: true })
+  });
+  await localDemoAccessRecord.waitFor({ timeout: 15_000 });
+  assert.equal(
+    await localDemoAccessRecord.getAttribute("aria-label"),
+    "Local demo is ready: demo-tenant / demo-workspace"
+  );
+  assert.equal(
+    await localDemoAccessRecord
+      .locator(".record-card-row-value")
+      .filter({ hasText: "student-demo" })
+      .first()
+      .getAttribute("aria-label"),
+    "Login Key: student-demo"
+  );
   const localDemoParticipantLink = localDemoAccessCard.locator(
     `a[href="${demoParticipantPath}"]`
   );

@@ -26,7 +26,7 @@ export type RecordCollectionItem = {
       <h3>{{ title }}</h3>
       <p>{{ subtitle }}</p>
 
-      <div class="record-collection-summary" *ngIf="items.length > 0">
+      <div class="record-collection-summary" role="status" aria-live="polite" *ngIf="items.length > 0">
         {{ items.length }} visible record{{ items.length === 1 ? "" : "s" }}
       </div>
 
@@ -35,7 +35,13 @@ export type RecordCollectionItem = {
       </div>
 
       <div class="record-collection-grid" *ngIf="items.length > 0">
-        <article class="record-card" [class.is-selected]="item.selected" *ngFor="let item of items">
+        <article
+          class="record-card"
+          [class.is-selected]="item.selected"
+          [attr.aria-current]="item.selected ? 'true' : null"
+          [attr.aria-label]="item.headline + ': ' + item.subline"
+          *ngFor="let item of items"
+        >
           <div class="record-card-header">
             <div>
               <h4>{{ item.headline }}</h4>
@@ -64,7 +70,15 @@ export type RecordCollectionItem = {
                 >
                   {{ row.value }}
                 </a>
-                <ng-template #plainRowValue>{{ row.value }}</ng-template>
+                <ng-template #plainRowValue>
+                  <span
+                    class="record-card-row-value"
+                    [attr.aria-label]="row.label + ': ' + row.value"
+                    [attr.title]="row.value"
+                  >
+                    {{ row.value }}
+                  </span>
+                </ng-template>
               </dd>
             </div>
           </dl>
