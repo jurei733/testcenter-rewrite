@@ -189,7 +189,7 @@ try {
     /^Build .+/
   );
   await demoAdminLink.click();
-  await page.waitForURL(/\/app\/ops\?demoAdmin=sign-in$/);
+  await page.waitForURL(/\/app\/ops$/);
   await page.waitForFunction(
     () => {
       const token = document.querySelector("#adminSessionToken")?.value ?? "";

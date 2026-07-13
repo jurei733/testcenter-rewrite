@@ -2,7 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 
 import { JsonPanelComponent } from "./json-panel.component";
 import { OpsViewFacade } from "./ops-view.facade";
@@ -469,11 +469,18 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 export class OpsViewComponent implements OnInit {
   readonly view = inject(OpsViewFacade);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   ngOnInit(): void {
     this.view.init();
     if (this.route.snapshot.queryParamMap.get("demoAdmin") === "sign-in") {
       this.view.signInLocalDemoAdmin();
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { demoAdmin: null },
+        queryParamsHandling: "merge",
+        replaceUrl: true
+      });
     }
   }
 }
