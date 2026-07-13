@@ -354,6 +354,19 @@ try {
 
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
   await page.locator("#runtimeUnitResponse").waitFor({ timeout: 15_000 });
+  const runtimeSummaryCards = page
+    .getByRole("list", { name: "Operational summary cards" })
+    .first();
+  await runtimeSummaryCards.waitFor({ timeout: 15_000 });
+  assert.equal(await runtimeSummaryCards.getAttribute("role"), "list");
+  assert.equal(
+    await runtimeSummaryCards.getAttribute("aria-label"),
+    "Operational summary cards"
+  );
+  const firstSummaryCard = runtimeSummaryCards.locator(".summary-card").first();
+  await firstSummaryCard.waitFor({ timeout: 15_000 });
+  assert.equal(await firstSummaryCard.getAttribute("role"), "listitem");
+  assert.match(await firstSummaryCard.getAttribute("aria-label"), /.+: .+\. .+/);
   await page.getByRole("button", { name: "Refresh Runtime Reads" }).click();
   await page.waitForFunction(
     () =>
