@@ -853,7 +853,7 @@ export class ParticipantViewFacade {
       return "This test is complete; responses are no longer editable.";
     }
     if (args.hasUnsavedResponse) {
-      return "Use the save, navigation, or complete action to store this answer.";
+      return "Use save, navigation, or Complete Test to store this answer. Complete Test saves this draft before closing.";
     }
     if (args.savedUnitResponse.length > 0) {
       return "The answer shown here matches the saved response for this unit.";

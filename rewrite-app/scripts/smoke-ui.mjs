@@ -1311,7 +1311,7 @@ try {
     .waitFor();
   await page
     .locator("#participantRouteDraftDetail")
-    .filter({ hasText: "save, navigation, or complete" })
+    .filter({ hasText: "Complete Test saves this draft" })
     .waitFor();
   logStep("participant-route-unit-previous");
   await clickAction("Previous Unit");
@@ -1403,6 +1403,10 @@ try {
     "#participantRouteUnitResponse",
     participantRouteFirstUnitResponse
   );
+  await page
+    .locator("#participantRouteDraftDetail")
+    .filter({ hasText: "Complete Test saves this draft before closing" })
+    .waitFor();
   await clickAction("Complete Test");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
