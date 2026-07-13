@@ -1732,15 +1732,29 @@ try {
   await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
   await fillAndCommit("#participantSessionLimit", "1");
   await clickAction("Refresh Sessions");
-  await page
+  const operatorParticipantSessionLink = `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+    participantSessionId
+  )}`;
+  const participantSessionCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Participant Sessions" })
     })
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
-    .first()
+    .first();
+  await participantSessionCard.waitFor();
+  await participantSessionCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
     .waitFor();
+  assert.equal(
+    await participantSessionCard
+      .getByRole("link", { name: operatorParticipantSessionLink })
+      .getAttribute("href"),
+    operatorParticipantSessionLink,
+    "Operator participant-session card should expose the participant re-entry link."
+  );
+  stopAfter("filter-participant-sessions");
   logStep("export-participant-sessions-csv");
   await clickAction("Export Sessions CSV");
   await page

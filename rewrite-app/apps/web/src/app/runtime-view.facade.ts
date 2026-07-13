@@ -73,6 +73,9 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(item => {
         const displayName = item.participantRosterEntry?.displayName;
+        const participantSessionLink = this.buildParticipantSessionEntryUrl(
+          item.participantSession.participantSessionId
+        );
 
         return {
           headline: displayName ?? item.participantSession.loginKey,
@@ -88,6 +91,11 @@ export class RuntimeViewFacade {
             {
               label: "Session",
               value: item.participantSession.participantSessionId
+            },
+            {
+              label: "Participant Link",
+              value: participantSessionLink,
+              href: participantSessionLink
             },
             {
               label: "Group",
@@ -131,6 +139,10 @@ export class RuntimeViewFacade {
       return [];
     }
 
+    const participantSessionLink = this.buildParticipantSessionEntryUrl(
+      detail.participantSession.participantSessionId
+    );
+
     return [
       {
         headline:
@@ -149,6 +161,11 @@ export class RuntimeViewFacade {
           {
             label: "Session",
             value: detail.participantSession.participantSessionId
+          },
+          {
+            label: "Participant Link",
+            value: participantSessionLink,
+            href: participantSessionLink
           },
           {
             label: "Group",
@@ -1780,6 +1797,14 @@ export class RuntimeViewFacade {
     if (link.bookletKey) {
       query.set("bookletKey", link.bookletKey);
     }
+    const participantPath = `/participant?${query.toString()}`;
+    return this.browserOrigin
+      ? `${this.browserOrigin}${participantPath}`
+      : participantPath;
+  }
+
+  private buildParticipantSessionEntryUrl(participantSessionId: string): string {
+    const query = new URLSearchParams({ participantSessionId });
     const participantPath = `/participant?${query.toString()}`;
     return this.browserOrigin
       ? `${this.browserOrigin}${participantPath}`
