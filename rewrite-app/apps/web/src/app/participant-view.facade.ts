@@ -57,6 +57,7 @@ type ParticipantPlayerState = {
   canGoNextUnit: boolean;
   canResumeRun: boolean;
   canComplete: boolean;
+  canClearSession: boolean;
   saveProgressLabel: string;
   unitResponse: string;
   draftStateLabel: string;
@@ -299,6 +300,7 @@ export class ParticipantViewFacade {
         canGoNextUnit: false,
         canResumeRun: false,
         canComplete: false,
+        canClearSession: hasParticipantSession,
         saveProgressLabel: "Save Progress",
         unitResponse: "",
         draftStateLabel: "No response loaded",
@@ -421,6 +423,7 @@ export class ParticipantViewFacade {
       canGoNextUnit: canNavigateUnits && nextUnitKey != null,
       canResumeRun: availableActions.includes("resume"),
       canComplete: availableActions.includes("complete"),
+      canClearSession: true,
       saveProgressLabel:
         currentState.testRun.status === "paused"
           ? "Save Running"
@@ -483,6 +486,12 @@ export class ParticipantViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.completeRunInternal());
+  }
+
+  clearSession(): void {
+    this.clearStoredParticipantSession(
+      'Session cleared locally. Use "Sign In" or "Start Or Resume" for the next participant.'
+    );
   }
 
   private async startOrResumeInternal(): Promise<void> {
@@ -548,7 +557,9 @@ export class ParticipantViewFacade {
     this.persistState();
   }
 
-  private clearStoredParticipantSession(): void {
+  private clearStoredParticipantSession(
+    message = 'Stored participant session is gone. Use "Start Or Resume".'
+  ): void {
     if (
       !this.runtime.participantSessionId.trim() &&
       !this.runtime.testRunId.trim()
@@ -558,8 +569,9 @@ export class ParticipantViewFacade {
 
     this.runtime.participantSessionId = "";
     this.runtime.testRunId = "";
-    this.runtime.currentRunStateView =
-      'Stored participant session is gone. Use "Start Or Resume".';
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentUnitResponse = "";
+    this.runtime.currentRunStateView = message;
     this.persistState();
   }
 

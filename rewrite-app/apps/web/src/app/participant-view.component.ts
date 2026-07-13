@@ -86,6 +86,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </button>
           <button class="primary" type="button" (click)="view.resumeSession()">Start Or Resume</button>
           <button class="ghost" type="button" (click)="view.refreshCurrentState()">Refresh Current State</button>
+          <button id="participantRouteClearSessionButton" class="ghost" type="button" [disabled]="!view.player.canClearSession" (click)="view.clearSession()">Leave Session</button>
         </div>
       </article>
 

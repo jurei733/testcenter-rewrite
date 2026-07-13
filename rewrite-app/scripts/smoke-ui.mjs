@@ -1730,6 +1730,28 @@ try {
     participantRouteSessionId,
     { timeout: 15_000 }
   );
+  logStep("participant-entry-clear-session");
+  await page.locator("#participantRouteClearSessionButton").click();
+  await page.waitForFunction(
+    ([expectedTenantKey, expectedWorkspaceKey, expectedLoginKey]) =>
+      document.querySelector("#participantRouteSessionId")?.value === "" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        "no run yet" &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "idle" &&
+      document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
+        "idle" &&
+      document.querySelector("#participantRouteSessionLink") == null &&
+      document.querySelector("#participantTenantKey")?.value === expectedTenantKey &&
+      document.querySelector("#participantWorkspaceKey")?.value ===
+        expectedWorkspaceKey &&
+      document.querySelector("#participantLoginKey")?.value === expectedLoginKey &&
+      document
+        .querySelector("#participantEntryNextStep")
+        ?.textContent?.includes("Sign in"),
+    [tenantKey, workspaceKey, participantRouteLoginKey],
+    { timeout: 15_000 }
+  );
   stopAfter("participant-entry-completed-session-reentry");
 
   logStep("nav-runtime");
