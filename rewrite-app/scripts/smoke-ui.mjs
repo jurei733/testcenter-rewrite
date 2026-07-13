@@ -1996,6 +1996,15 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Open Monitor Runs" }) })
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantSessionId })
+    .filter({ hasText: operatorParticipantSessionLink })
+    .filter({ hasText: pausedTestRunId })
+    .waitFor();
   logStep("export-open-runs-csv");
   const openRunsDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Open Runs CSV");
@@ -2006,7 +2015,8 @@ try {
   );
   await page
     .locator("#openRunsExportPreview")
-    .filter({ hasText: "tenantKey,workspaceKey,testRunId,loginKey" })
+    .filter({ hasText: "tenantKey,workspaceKey,participantSessionId,testRunId,loginKey" })
+    .filter({ hasText: participantSessionId })
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
     .filter({ hasText: participantBookletKey })

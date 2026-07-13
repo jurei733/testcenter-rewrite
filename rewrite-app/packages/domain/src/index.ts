@@ -310,6 +310,7 @@ export type WorkspaceActivityEvent = {
 
 export type OpenMonitorRun = {
   testRunId: string;
+  participantSessionId: string;
   loginKey: string;
   groupKey: string;
   participantRosterEntry: ParticipantRosterEntry | null;

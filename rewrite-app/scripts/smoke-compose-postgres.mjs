@@ -428,7 +428,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const openRunsCsvText = await openRunsCsv.text();
   if (
     !openRunsCsvText.startsWith(
-      "tenantKey,workspaceKey,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,"
+      "tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,"
     ) ||
     !openRunsCsvText.includes('"student-demo"') ||
     !openRunsCsvText.includes('"group:student-demo"') ||

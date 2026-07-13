@@ -897,6 +897,11 @@ export class RuntimeViewFacade {
           ],
           rows: [
             {
+              label: "Session",
+              value: openRun.participantSessionId
+            },
+            ...participantSessionLinkRows(openRun.participantSessionId),
+            {
               label: "Run",
               value: openRun.testRunId
             },
@@ -917,6 +922,7 @@ export class RuntimeViewFacade {
           actionLabel: "Select + Sync",
           actionPayload: {
             testRunId: openRun.testRunId,
+            participantSessionId: openRun.participantSessionId,
             currentUnitKey: openRun.currentUnitKey ?? "",
             loginKey: openRun.loginKey,
             groupKey: openRun.groupKey
@@ -1230,6 +1236,10 @@ export class RuntimeViewFacade {
           {
             label: "Newest Run",
             value: openRuns[0]?.testRunId ?? "unknown"
+          },
+          {
+            label: "Session",
+            value: openRuns[0]?.participantSessionId ?? "unknown"
           },
           {
             label: "Participant",

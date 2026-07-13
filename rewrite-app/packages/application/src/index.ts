@@ -1457,6 +1457,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
 
     return {
       testRunId: testRun.testRunId,
+      participantSessionId: testRun.participantSessionId,
       loginKey: participantSession?.loginKey ?? "unknown",
       groupKey: participantSession?.groupKey ?? "unknown",
       participantRosterEntry: participantSession
@@ -1985,6 +1986,7 @@ const formatOpenMonitorRunsCsv = (input: {
   const header = [
     "tenantKey",
     "workspaceKey",
+    "participantSessionId",
     "testRunId",
     "loginKey",
     "groupKey",
@@ -2002,6 +2004,7 @@ const formatOpenMonitorRunsCsv = (input: {
       [
         input.tenantKey,
         input.workspaceKey,
+        item.participantSessionId,
         item.testRunId,
         item.loginKey,
         item.groupKey,
@@ -8177,6 +8180,7 @@ export const createFirstSliceServices = (
 
             return {
               testRunId: testRun.testRunId,
+              participantSessionId: testRun.participantSessionId,
               loginKey: participantSession?.loginKey ?? "unknown-login",
               groupKey: participantSession?.groupKey ?? "unknown-group",
               participantRosterEntry: participantSession

@@ -2499,11 +2499,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
     );
     assert.match(
       studyMonitorCsv.body,
@@ -3365,7 +3365,12 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     );
 
     const openRunsAfterPause = await requestJsonAt<{
-      items: Array<{ testRunId: string; status: string; loginKey: string }>;
+      items: Array<{
+        testRunId: string;
+        participantSessionId: string;
+        status: string;
+        loginKey: string;
+      }>;
     }>(
       isolated.baseUrl,
       "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs",
@@ -3374,6 +3379,10 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
 
     assert.equal(openRunsAfterPause.status, 200);
     assert.equal(openRunsAfterPause.body.items[0]?.testRunId, resumed.body.testRun.testRunId);
+    assert.equal(
+      openRunsAfterPause.body.items[0]?.participantSessionId,
+      participantSignIn.body.participantSession.participantSessionId
+    );
     assert.equal(openRunsAfterPause.body.items[0]?.status, "paused");
     assert.equal(openRunsAfterPause.body.items[0]?.loginKey, "student-demo");
 
