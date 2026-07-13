@@ -1066,9 +1066,9 @@ try {
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
-        "idle" &&
+        "signed_in" &&
       document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
-      "no run yet",
+        "no run yet",
     participantEntrySignInSessionId,
     { timeout: 15_000 }
   );

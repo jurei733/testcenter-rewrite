@@ -251,11 +251,12 @@ export class ParticipantViewFacade {
   get player(): ParticipantPlayerState {
     const currentState = this.readCurrentRunState();
     if (!currentState) {
+      const hasParticipantSession = Boolean(this.runtime.participantSessionId.trim());
       return {
-        headline: this.runtime.participantSessionId.trim()
+        headline: hasParticipantSession
           ? "Session ready"
           : "Sign in to start",
-        detail: this.runtime.participantSessionId.trim()
+        detail: hasParticipantSession
           ? "Resume the session to launch or continue the current run."
           : "Enter your workspace and login key, then sign in.",
         loginLabel: this.runtime.loginKey.trim() || "No login yet",
@@ -275,7 +276,7 @@ export class ParticipantViewFacade {
         isComplete: false,
         previousUnitKey: null,
         nextUnitKey: null,
-        runStatus: "idle",
+        runStatus: hasParticipantSession ? "signed_in" : "idle",
         runId: this.runtime.testRunId.trim() || "no run yet",
         actions: [],
         canSaveProgress: false,
