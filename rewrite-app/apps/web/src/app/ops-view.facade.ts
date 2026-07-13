@@ -589,7 +589,11 @@ export class OpsViewFacade {
     const payload = parseJsonDocument<ListAdminUsersResponse>(
       this.ops.adminUsersView
     );
-    return (payload?.items ?? []).flatMap(item =>
+    if (!payload) {
+      return [];
+    }
+
+    const roleAssignmentItems = payload.items.flatMap(item =>
       item.roleAssignments.map(roleAssignment => ({
         headline: roleAssignment.role,
         subline: item.adminUser.username,
@@ -633,6 +637,23 @@ export class OpsViewFacade {
         }
       }))
     );
+
+    return [
+      {
+        headline: "Admin role assignment window",
+        subline: `${roleAssignmentItems.length} role assignment row(s) loaded from admin users`,
+        badges: [`${payload.items.length} source user(s)`, "role scopes"],
+        rows: [
+          { label: "Loaded Assignments", value: String(roleAssignmentItems.length) },
+          { label: "Source Users", value: String(payload.items.length) },
+          {
+            label: "Selected Assignment",
+            value: this.ops.adminRevokeRoleAssignmentId.trim() || "none"
+          }
+        ]
+      },
+      ...roleAssignmentItems
+    ];
   }
 
   get adminAuditItems(): RecordCollectionItem[] {

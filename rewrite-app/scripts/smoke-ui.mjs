@@ -853,6 +853,22 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Admin Role Assignments", exact: true })
     })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin role assignment window" })
+    })
+    .filter({ hasText: "role assignment row(s) loaded from admin users" })
+    .filter({ hasText: "source user(s)" })
+    .filter({ hasText: "role scopes" })
+    .filter({ hasText: "Loaded Assignments" })
+    .filter({ hasText: "Source Users" })
+    .filter({ hasText: "Selected Assignment" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Role Assignments", exact: true })
+    })
     .filter({ hasText: "tenant_admin" })
     .filter({ hasText: tenantRoleAssignmentId })
     .waitFor();
