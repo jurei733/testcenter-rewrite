@@ -236,6 +236,19 @@ try {
 
   await page.goto(`${baseUrl}/app/ops`, { waitUntil: "networkidle" });
   await page.getByText("Local demo is ready").waitFor({ timeout: 15_000 });
+  const localDemoAccessCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Local Demo Access", exact: true })
+  });
+  const localDemoParticipantLink = localDemoAccessCard.locator(
+    `a[href="${demoParticipantPath}"]`
+  );
+  await localDemoParticipantLink.waitFor({ timeout: 15_000 });
+  assert.equal(
+    await localDemoParticipantLink.getAttribute("aria-label"),
+    `Participant: ${demoParticipantPath}`
+  );
+  assert.equal(await localDemoParticipantLink.getAttribute("target"), "_blank");
+  assert.equal(await localDemoParticipantLink.getAttribute("rel"), "noreferrer");
   await page.getByRole("button", { name: "Sign In Demo Admin" }).click();
   await page.waitForFunction(
     () => {
