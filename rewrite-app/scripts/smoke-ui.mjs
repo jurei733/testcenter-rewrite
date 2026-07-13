@@ -3170,6 +3170,16 @@ try {
   await expectInputValue("#bookletKey", "booklet:starter");
   await expectInputValue("#participantSessionId", "");
   await expectInputValue("#testRunId", "");
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Runtime Action Queue" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Start prepared participant" }) })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "group:entry-smoke" })
+    .filter({ hasText: "booklet:starter" })
+    .filter({ hasText: "Create a participant session and start the first run" })
+    .waitFor();
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await notStartedAdaCard.waitFor();

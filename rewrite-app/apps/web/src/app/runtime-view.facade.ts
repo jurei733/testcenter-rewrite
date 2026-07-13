@@ -1434,6 +1434,45 @@ export class RuntimeViewFacade {
       this.runtime.openRunsView
     )?.items ?? [];
     const items: RecordCollectionItem[] = [];
+    const preparedLoginKey = this.runtime.loginKey.trim();
+    const preparedGroupKey = this.runtime.groupKey.trim();
+    const preparedBookletKey = this.runtime.bookletKey.trim();
+
+    if (
+      preparedLoginKey &&
+      !this.runtime.participantSessionId.trim() &&
+      !runtimeState &&
+      !currentRunState
+    ) {
+      items.push({
+        headline: "Start prepared participant",
+        subline: preparedLoginKey,
+        badges: [
+          preparedGroupKey || "default group",
+          preparedBookletKey || "default booklet"
+        ],
+        rows: [
+          {
+            label: "Login",
+            value: preparedLoginKey
+          },
+          {
+            label: "Group",
+            value: preparedGroupKey || `group:${preparedLoginKey}`
+          },
+          {
+            label: "Booklet",
+            value: preparedBookletKey || "active release default"
+          },
+          {
+            label: "Expected Result",
+            value: "Create a participant session and start the first run"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { runtimeCommand: "participantLaunch" }
+      });
+    }
 
     if (runtimeState && runtimeState.availableAction !== "none") {
       const headline =
@@ -1931,6 +1970,9 @@ export class RuntimeViewFacade {
 
   runRuntimeSuggestion(item: RecordCollectionItem): void {
     switch (item.actionPayload?.runtimeCommand) {
+      case "participantLaunch":
+        this.participantLaunch();
+        break;
       case "resumeSession":
         this.resumeSession();
         break;
