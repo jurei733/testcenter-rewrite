@@ -1866,6 +1866,22 @@ try {
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
     .first();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Sessions" })
+    })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant session window" })
+    })
+    .filter({ hasText: "1 session row(s) loaded for the current filters" })
+    .filter({ hasText: "3 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Sessions" })
+    .filter({ hasText: "Active Filters" })
+    .filter({ hasText: "status, group, login" })
+    .waitFor();
   await participantSessionCard.waitFor();
   await participantSessionCard
     .getByRole("link", { name: operatorParticipantSessionLink })

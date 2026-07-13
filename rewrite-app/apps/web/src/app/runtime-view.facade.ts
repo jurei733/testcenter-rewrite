@@ -77,8 +77,35 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<ListParticipantSessionsResponse>(
       this.runtime.participantSessionsView
     );
-    return (
-      payload?.items.map(item => {
+    if (!payload) {
+      return [];
+    }
+
+    const activeFilters = [
+      this.runtime.participantSessionStatusFilter.trim() ? "status" : "",
+      this.runtime.participantSessionGroupFilter.trim() ? "group" : "",
+      this.runtime.participantSessionLoginFilter.trim() ? "login" : "",
+      this.runtime.participantSessionReleaseFilter.trim() ? "release" : ""
+    ].filter(Boolean);
+
+    return [
+      {
+        headline: "Participant session window",
+        subline: `${payload.items.length} session row(s) loaded for the current filters`,
+        badges: [
+          `${activeFilters.length} active filter(s)`,
+          `limit ${this.runtime.participantSessionLimit}`
+        ],
+        rows: [
+          { label: "Loaded Sessions", value: String(payload.items.length) },
+          { label: "Limit", value: this.runtime.participantSessionLimit },
+          {
+            label: "Active Filters",
+            value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
+          }
+        ]
+      },
+      ...payload.items.map(item => {
         const displayName = item.participantRosterEntry?.displayName;
         return {
           headline: displayName ?? item.participantSession.loginKey,
@@ -136,8 +163,8 @@ export class RuntimeViewFacade {
             groupKey: item.participantSession.groupKey
           }
         };
-      }) ?? []
-    );
+      })
+    ];
   }
 
   get participantSessionDetailItems(): RecordCollectionItem[] {
