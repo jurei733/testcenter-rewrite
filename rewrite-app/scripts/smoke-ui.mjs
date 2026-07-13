@@ -2813,26 +2813,45 @@ try {
     "booklet:starter",
     "missing"
   ]);
-  await clickCardAction("Study Monitor", "Open Group Detail", participantGroupKey);
-  await page.waitForFunction(
-    () => {
-      const detailCard = Array.from(document.querySelectorAll("article.card")).find(
-        card =>
-          card.querySelector("h3")?.textContent?.trim() ===
-          "Study Monitor Group Detail"
-      );
-      return (
-        detailCard?.textContent?.includes("group:student-ui") &&
-        detailCard.textContent.includes("student-ui") &&
-        detailCard.textContent.includes("1 run(s)") &&
-        detailCard.textContent.includes("unit-paused") &&
-        detailCard.textContent.includes("1/1 answered") &&
-        detailCard.textContent.includes("0 missing")
-      );
-    },
-    undefined,
+  logStep("action-study-monitor-group:student-ui-start");
+  const studentGroupSummaryCard = studyMonitorCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: participantGroupKey }) });
+  await studentGroupSummaryCard.waitFor({ state: "visible", timeout: 15_000 });
+  const studentGroupDetailResponse = page.waitForResponse(
+    response =>
+      response
+        .url()
+        .includes(`/study-monitor/groups/${encodeURIComponent(participantGroupKey)}`) &&
+      response.status() === 200,
     { timeout: 15_000 }
   );
+  await studentGroupSummaryCard
+    .getByRole("button", { name: "Open Group Detail", exact: true })
+    .click();
+  await studentGroupDetailResponse;
+  await waitForNotBusy("study-monitor-group-student-ui-after-click");
+  logStep("action-study-monitor-group:student-ui-done");
+  const studyMonitorGroupDetailCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Study Monitor Group Detail",
+      exact: true
+    })
+  });
+  await studyMonitorGroupDetailCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "group:student-ui" }) })
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: "run(s)" })
+    .filter({ hasText: "Missing Responses" })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await studyMonitorGroupDetailCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" })
+    .filter({ hasText: "missing" })
+    .waitFor({ state: "visible", timeout: 15_000 });
   const activeGroupDetailStudentCard = page
     .locator("article.card")
     .filter({

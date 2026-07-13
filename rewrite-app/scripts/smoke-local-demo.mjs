@@ -446,10 +446,26 @@ try {
     "Delete selected review"
   );
   await deleteReviewDialog;
-  await page
-    .getByText("Create or load reviews to inspect operator notes.")
-    .waitFor({ timeout: 15_000 });
   await page.getByText("Review Deleted").waitFor({ timeout: 15_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Reviews" })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Review window" }) })
+    .filter({ hasText: "0 review row(s)" })
+    .waitFor({ timeout: 15_000 });
+  const remainingReviews = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews?limit=10`,
+    {
+      headers: {
+        authorization: `Bearer ${adminSessionToken}`
+      }
+    }
+  ).then(async response => {
+    assert.equal(response.status, 200);
+    return response.json();
+  });
+  assert.equal(remainingReviews.items.length, 0);
 
   const responseDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Responses CSV" }).click();
