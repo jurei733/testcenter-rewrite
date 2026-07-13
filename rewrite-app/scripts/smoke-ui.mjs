@@ -2800,8 +2800,23 @@ try {
       filteredWorkspaceActivityDisplayedEvents,
     0
   );
+  const filteredWorkspaceActivityDisplayedDetails = Math.min(
+    filteredWorkspaceActivityPayload.items.length,
+    5
+  );
+  const filteredWorkspaceActivityHiddenDetails = Math.max(
+    filteredWorkspaceActivityPayload.items.length -
+      filteredWorkspaceActivityDisplayedDetails,
+    0
+  );
   const workspaceActivityCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Workspace Activity", exact: true })
+  });
+  const workspaceActivityDetailCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Workspace Activity Detail",
+      exact: true
+    })
   });
   await workspaceActivityCard
     .locator(".record-card")
@@ -2815,6 +2830,25 @@ try {
     .filter({ hasText: String(filteredWorkspaceActivityDisplayedEvents) })
     .filter({ hasText: "Hidden Events" })
     .filter({ hasText: String(filteredWorkspaceActivityHiddenEvents) })
+    .filter({ hasText: "Limit" })
+    .filter({ hasText: "5" })
+    .waitFor();
+  await workspaceActivityDetailCard
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace activity detail window"
+      })
+    })
+    .filter({
+      hasText: `${filteredWorkspaceActivityPayload.items.length} event payload(s) loaded for the current filters`
+    })
+    .filter({ hasText: "Loaded Events" })
+    .filter({ hasText: String(filteredWorkspaceActivityPayload.items.length) })
+    .filter({ hasText: "Displayed Details" })
+    .filter({ hasText: String(filteredWorkspaceActivityDisplayedDetails) })
+    .filter({ hasText: "Hidden Details" })
+    .filter({ hasText: String(filteredWorkspaceActivityHiddenDetails) })
     .filter({ hasText: "Limit" })
     .filter({ hasText: "5" })
     .waitFor();
