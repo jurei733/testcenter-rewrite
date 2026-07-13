@@ -1240,6 +1240,34 @@ const requireWorkspace = async (
   return workspace;
 };
 
+const resolveUniqueWorkspaceByWorkspaceKey = async (
+  repository: FirstSliceRepository,
+  workspaceKey: string
+): Promise<Workspace | null> => {
+  const tenants = await repository.listTenants();
+  const workspaces = (
+    await Promise.all(
+      tenants.map(tenant => repository.listWorkspacesByTenantId(tenant.tenantId))
+    )
+  )
+    .flat()
+    .filter(workspace => workspace.workspaceKey === workspaceKey);
+
+  if (workspaces.length > 1) {
+    throw new FirstSliceError(
+      409,
+      "participant_workspace_ambiguous",
+      `Workspace key '${workspaceKey}' exists in multiple tenants. Provide tenantKey when signing in as a participant.`,
+      {
+        workspaceKey,
+        matchingWorkspaceCount: workspaces.length
+      }
+    );
+  }
+
+  return workspaces[0] ?? null;
+};
+
 const findParticipantRosterEntryByLoginKey = async (
   repository: FirstSliceRepository,
   tenantId: string,
@@ -8097,7 +8125,7 @@ export const createFirstSliceServices = (
         const loginKey = normalizeParticipantLoginKey(input.loginKey);
         const workspace = tenantKey
           ? await repository.getWorkspaceByScope(tenantKey, workspaceKey)
-          : await repository.getWorkspaceByWorkspaceKey(workspaceKey);
+          : await resolveUniqueWorkspaceByWorkspaceKey(repository, workspaceKey);
 
         if (!workspace) {
           throw new FirstSliceError(

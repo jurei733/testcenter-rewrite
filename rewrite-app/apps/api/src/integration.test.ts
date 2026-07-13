@@ -5048,6 +5048,66 @@ test("source document import resolves XML resource dependency aliases", async ()
   );
 });
 
+test("participant sign-in requires tenant key for ambiguous workspace keys", async () => {
+  const workspaceKey = "integration-shared-workspace-key";
+  const firstTenantKey = "integration-tenant-shared-workspace-a";
+  const secondTenantKey = "integration-tenant-shared-workspace-b";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey: firstTenantKey, displayName: firstTenantKey }
+  });
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey: secondTenantKey, displayName: secondTenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${firstTenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: "Shared A" }
+  });
+  await requestJson(`/api/v1/tenants/${secondTenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: "Shared B" }
+  });
+
+  const ambiguousSignIn = await requestJson<{
+    error: string;
+    details: {
+      workspaceKey: string;
+      matchingWorkspaceCount: number;
+    };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      workspaceKey,
+      loginKey: "ambiguous-student"
+    }
+  });
+
+  assert.equal(ambiguousSignIn.status, 409);
+  assert.equal(ambiguousSignIn.body.error, "participant_workspace_ambiguous");
+  assert.equal(ambiguousSignIn.body.details.workspaceKey, workspaceKey);
+  assert.equal(ambiguousSignIn.body.details.matchingWorkspaceCount, 2);
+
+  const tenantScopedSignIn = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        tenantKey: secondTenantKey,
+        workspaceKey,
+        loginKey: "ambiguous-student"
+      }
+    }
+  );
+
+  assert.equal(tenantScopedSignIn.status, 409);
+  assert.equal(
+    tenantScopedSignIn.body.error,
+    "workspace_has_no_active_content_release"
+  );
+});
+
 test("participant sign-in reuses an open session for the active release", async () => {
   const tenantKey = "integration-tenant-session-reentry";
   const workspaceKey = "integration-workspace-session-reentry";
