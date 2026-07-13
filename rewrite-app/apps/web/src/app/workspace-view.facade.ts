@@ -28,6 +28,7 @@ import {
 import type { RecordCollectionItem } from "./record-collection.component";
 import {
   type ParticipantSessionEntryLinkContext,
+  buildParticipantEntryUrl as buildParticipantEntryLinkUrl,
   participantSessionLinkRows as buildParticipantSessionLinkRows
 } from "./participant-session-links";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
@@ -1943,27 +1944,15 @@ export class WorkspaceViewFacade {
     groupKey: string;
     bookletKey: string | null;
   }): string {
-    const query = new URLSearchParams();
     const tenantKey = this.uiState.workspace.tenantKey.trim();
     const workspaceKey = this.uiState.workspace.workspaceKey.trim();
-    if (tenantKey) {
-      query.set("tenantKey", tenantKey);
-    }
-    query.set("workspaceKey", workspaceKey || "demo-workspace");
-    query.set("loginKey", rosterEntry.loginKey);
-    query.set("groupKey", rosterEntry.groupKey);
-    if (rosterEntry.bookletKey) {
-      query.set("bookletKey", rosterEntry.bookletKey);
-    }
-
-    const participantPath = `/participant?${query.toString()}`;
-    return this.browserOrigin
-      ? `${this.browserOrigin}${participantPath}`
-      : participantPath;
-  }
-
-  private get browserOrigin(): string {
-    return globalThis.location?.origin ?? "";
+    return buildParticipantEntryLinkUrl({
+      tenantKey,
+      workspaceKey: workspaceKey || "demo-workspace",
+      loginKey: rosterEntry.loginKey,
+      groupKey: rosterEntry.groupKey,
+      bookletKey: rosterEntry.bookletKey
+    });
   }
 
   private humanizeKey(value: string): string {

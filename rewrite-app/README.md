@@ -71,7 +71,7 @@ The local start also fills `APP_BUILD_SHA` from Git and `APP_BUILD_TIMESTAMP` fr
 - platform admin: `demo-admin` / `demo-admin-password`
 - tenant/workspace: `demo-tenant` / `demo-workspace`
 - active demo content release with a three-unit demo booklet
-- participant entry URL: `http://127.0.0.1:4310/participant?tenantKey=demo-tenant&workspaceKey=demo-workspace&loginKey=student-demo&groupKey=group:student-demo&bookletKey=booklet:demo`
+- participant entry URL: `http://127.0.0.1:4310/participant?tenantKey=demo-tenant&workspaceKey=demo-workspace&loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo`
 
 If the local database already has an admin user or active demo release, the bootstrap leaves the existing state in place.
 

@@ -3,18 +3,22 @@ import { Injectable, inject } from "@angular/core";
 import type { GetRuntimeConfigResponse } from "@testcenter-rewrite-app/contracts";
 
 import type { AppView } from "./rewrite-app-shell.types";
+import { buildParticipantEntryUrl } from "./participant-session-links";
 import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import type { LiveContextSection } from "./live-context.component";
 
-const localDemoParticipantLink = [
-  "/participant?tenantKey=demo-tenant",
-  "workspaceKey=demo-workspace",
-  "loginKey=student-demo",
-  "groupKey=group:student-demo",
-  "bookletKey=booklet:demo"
-].join("&");
+const localDemoParticipantLink = buildParticipantEntryUrl(
+  {
+    tenantKey: "demo-tenant",
+    workspaceKey: "demo-workspace",
+    loginKey: "student-demo",
+    groupKey: "group:student-demo",
+    bookletKey: "booklet:demo"
+  },
+  { includeOrigin: false }
+);
 
 @Injectable({ providedIn: "root" })
 export class AppShellFacade {

@@ -156,13 +156,13 @@ try {
 
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
-  const demoParticipantPath = [
-    "/participant?tenantKey=demo-tenant",
-    "workspaceKey=demo-workspace",
-    "loginKey=student-demo",
-    "groupKey=group:student-demo",
-    "bookletKey=booklet:demo"
-  ].join("&");
+  const demoParticipantPath = `/participant?${new URLSearchParams({
+    tenantKey: "demo-tenant",
+    workspaceKey: "demo-workspace",
+    loginKey: "student-demo",
+    groupKey: "group:student-demo",
+    bookletKey: "booklet:demo"
+  }).toString()}`;
   await demoLink.waitFor({ timeout: 15_000 });
   assert.equal(await demoLink.getAttribute("href"), demoParticipantPath);
   await demoLink.click();

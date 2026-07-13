@@ -20,6 +20,7 @@ import {
 
 import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
+import { buildParticipantEntryUrl } from "./participant-session-links";
 import {
   parseJsonDocument,
   readNumberValue,
@@ -88,13 +89,16 @@ const localDemoAccess = {
   tenantKey: "demo-tenant",
   workspaceKey: "demo-workspace",
   participantLoginKey: "student-demo",
-  participantPath: [
-    "/participant?tenantKey=demo-tenant",
-    "workspaceKey=demo-workspace",
-    "loginKey=student-demo",
-    "groupKey=group:student-demo",
-    "bookletKey=booklet:demo"
-  ].join("&")
+  participantPath: buildParticipantEntryUrl(
+    {
+      tenantKey: "demo-tenant",
+      workspaceKey: "demo-workspace",
+      loginKey: "student-demo",
+      groupKey: "group:student-demo",
+      bookletKey: "booklet:demo"
+    },
+    { includeOrigin: false }
+  )
 } as const;
 
 @Injectable({ providedIn: "root" })

@@ -8,6 +8,10 @@ export type ParticipantSessionEntryLinkContext = {
   bookletKey?: string | null;
 };
 
+export type ParticipantEntryLinkOptions = {
+  includeOrigin?: boolean;
+};
+
 export function participantSessionLinkRows(
   participantSessionId?: string | null,
   context: ParticipantSessionEntryLinkContext = {}
@@ -26,7 +30,8 @@ export function participantSessionLinkRows(
 
 export function buildParticipantSessionEntryUrl(
   participantSessionId: string,
-  context: ParticipantSessionEntryLinkContext = {}
+  context: ParticipantSessionEntryLinkContext = {},
+  options: ParticipantEntryLinkOptions = {}
 ): string {
   const query = new URLSearchParams({ participantSessionId });
   appendParticipantLinkParam(query, "tenantKey", context.tenantKey);
@@ -35,8 +40,21 @@ export function buildParticipantSessionEntryUrl(
   appendParticipantLinkParam(query, "groupKey", context.groupKey);
   appendParticipantLinkParam(query, "bookletKey", context.bookletKey);
   const participantPath = `/participant?${query.toString()}`;
-  const browserOrigin = globalThis.location?.origin ?? "";
-  return browserOrigin ? `${browserOrigin}${participantPath}` : participantPath;
+  return withOptionalBrowserOrigin(participantPath, options);
+}
+
+export function buildParticipantEntryUrl(
+  context: ParticipantSessionEntryLinkContext,
+  options: ParticipantEntryLinkOptions = {}
+): string {
+  const query = new URLSearchParams();
+  appendParticipantLinkParam(query, "tenantKey", context.tenantKey);
+  appendParticipantLinkParam(query, "workspaceKey", context.workspaceKey);
+  appendParticipantLinkParam(query, "loginKey", context.loginKey);
+  appendParticipantLinkParam(query, "groupKey", context.groupKey);
+  appendParticipantLinkParam(query, "bookletKey", context.bookletKey);
+  const participantPath = `/participant?${query.toString()}`;
+  return withOptionalBrowserOrigin(participantPath, options);
 }
 
 function appendParticipantLinkParam(
@@ -48,4 +66,14 @@ function appendParticipantLinkParam(
   if (normalizedValue) {
     query.set(key, normalizedValue);
   }
+}
+
+function withOptionalBrowserOrigin(
+  path: string,
+  options: ParticipantEntryLinkOptions
+): string {
+  const browserOrigin = globalThis.location?.origin ?? "";
+  return options.includeOrigin === false || !browserOrigin
+    ? path
+    : `${browserOrigin}${path}`;
 }

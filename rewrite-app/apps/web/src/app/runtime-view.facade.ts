@@ -28,7 +28,10 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
-import { participantSessionLinkRows } from "./participant-session-links";
+import {
+  buildParticipantEntryUrl,
+  participantSessionLinkRows
+} from "./participant-session-links";
 
 type RuntimePlayerPreview = {
   hasRun: boolean;
@@ -1835,24 +1838,13 @@ export class RuntimeViewFacade {
     workspaceKey: string,
     link: Omit<RuntimeEntryLink, "url">
   ): string {
-    const query = new URLSearchParams();
-    if (tenantKey) {
-      query.set("tenantKey", tenantKey);
-    }
-    query.set("workspaceKey", workspaceKey || "demo-workspace");
-    query.set("loginKey", link.loginKey);
-    query.set("groupKey", link.groupKey);
-    if (link.bookletKey) {
-      query.set("bookletKey", link.bookletKey);
-    }
-    const participantPath = `/participant?${query.toString()}`;
-    return this.browserOrigin
-      ? `${this.browserOrigin}${participantPath}`
-      : participantPath;
-  }
-
-  private get browserOrigin(): string {
-    return globalThis.location?.origin ?? "";
+    return buildParticipantEntryUrl({
+      tenantKey,
+      workspaceKey: workspaceKey || "demo-workspace",
+      loginKey: link.loginKey,
+      groupKey: link.groupKey,
+      bookletKey: link.bookletKey
+    });
   }
 
   private createEntryLinksCsv(links: RuntimeEntryLink[]): string {
