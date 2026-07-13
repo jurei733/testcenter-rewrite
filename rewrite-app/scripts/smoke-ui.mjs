@@ -41,6 +41,18 @@ const createSmokeFetchInit = () =>
       }
     : undefined;
 
+const flattenManifestRouteNames = value => {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  return Object.entries(value).flatMap(([key, nestedValue]) =>
+    typeof nestedValue === "string"
+      ? [key]
+      : flattenManifestRouteNames(nestedValue)
+  );
+};
+
 const allocatePort = () =>
   new Promise((resolvePromise, reject) => {
     const server = createNetServer();
@@ -588,6 +600,22 @@ try {
     .waitFor();
   logStep("refresh-diagnostics");
   await clickAction("Refresh Diagnostics");
+  const manifestPayload = await pollJsonWithPredicate(
+    `${baseUrl}/manifest`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      typeof payload.routes === "object" &&
+      payload.routes != null
+  );
+  const workspaceRouteNames = flattenManifestRouteNames(
+    manifestPayload.routes.workspace
+  );
+  const listedWorkspaceRouteCount = Math.min(workspaceRouteNames.length, 8);
+  const hiddenWorkspaceRouteCount = Math.max(
+    workspaceRouteNames.length - listedWorkspaceRouteCount,
+    0
+  );
   await page
     .locator("article.card")
     .filter({
@@ -609,6 +637,12 @@ try {
     })
     .locator(".record-card")
     .filter({ hasText: "Workspace" })
+    .filter({ hasText: "Total Routes" })
+    .filter({ hasText: String(workspaceRouteNames.length) })
+    .filter({ hasText: "Listed Routes" })
+    .filter({ hasText: String(listedWorkspaceRouteCount) })
+    .filter({ hasText: "Hidden Routes" })
+    .filter({ hasText: String(hiddenWorkspaceRouteCount) })
     .waitFor();
 
   logStep("nav-workspace-bootstrap");

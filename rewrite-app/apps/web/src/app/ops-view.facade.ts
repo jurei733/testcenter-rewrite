@@ -955,6 +955,11 @@ export class OpsViewFacade {
       .sort(([leftGroup], [rightGroup]) => leftGroup.localeCompare(rightGroup))
       .map(([groupName, routes]) => {
         const routeNames = this.flattenRouteNames(routes);
+        const listedRouteNames = routeNames.slice(0, 8);
+        const hiddenRouteCount = Math.max(
+          routeNames.length - listedRouteNames.length,
+          0
+        );
         return {
           headline: this.humanizeKey(groupName),
           subline: `${this.countRouteLeaves(routes)} route(s)`,
@@ -962,7 +967,19 @@ export class OpsViewFacade {
           rows: [
             {
               label: "Route Names",
-              value: routeNames.slice(0, 8).map(routeName => this.humanizeKey(routeName)).join(", ")
+              value: listedRouteNames.map(routeName => this.humanizeKey(routeName)).join(", ")
+            },
+            {
+              label: "Total Routes",
+              value: String(routeNames.length)
+            },
+            {
+              label: "Listed Routes",
+              value: String(listedRouteNames.length)
+            },
+            {
+              label: "Hidden Routes",
+              value: String(hiddenRouteCount)
             },
             {
               label: "Raw Group",
