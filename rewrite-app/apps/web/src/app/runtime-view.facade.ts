@@ -7,6 +7,7 @@ import type {
   ListReviewsResponse,
   ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
+  ListWorkspaceActivityEventsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
@@ -1042,6 +1043,52 @@ export class RuntimeViewFacade {
             currentUnitKey: openRun.currentUnitKey ?? "",
             loginKey: openRun.loginKey,
             groupKey: openRun.groupKey
+          }
+        };
+      }) ?? []
+    );
+  }
+
+  get monitorCommandHistoryItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
+      this.runtime.monitorCommandHistoryView
+    );
+    return (
+      payload?.items.map(item => {
+        const event = item.activityEvent;
+        const details = event.details ?? {};
+        const commandType = String(details.commandType ?? "command");
+        const previousStatus = String(details.previousStatus ?? "unknown");
+        const nextStatus = String(details.nextStatus ?? "unknown");
+        const participantSessionId = String(details.participantSessionId ?? "");
+        const loginKey = String(details.loginKey ?? "");
+        const groupKey = String(details.groupKey ?? "");
+        const commandId = String(details.commandId ?? event.activityEventId);
+
+        return {
+          headline: `${commandType} command`,
+          subline: commandId,
+          badges: [
+            event.actorId ?? "system",
+            `${previousStatus} -> ${nextStatus}`,
+            event.subjectId
+          ],
+          rows: [
+            { label: "Run", value: event.subjectId },
+            { label: "Session", value: participantSessionId || "unknown" },
+            { label: "Login", value: loginKey || "unknown" },
+            { label: "Group", value: groupKey || "unknown" },
+            { label: "Actor", value: event.actorId ?? "system" },
+            { label: "Occurred", value: this.formatDateTime(event.occurredAt) },
+            { label: "Summary", value: event.summary }
+          ],
+          selected: this.runtime.testRunId.trim() === event.subjectId,
+          actionLabel: "Select Run",
+          actionPayload: {
+            testRunId: event.subjectId,
+            participantSessionId,
+            loginKey,
+            groupKey
           }
         };
       }) ?? []

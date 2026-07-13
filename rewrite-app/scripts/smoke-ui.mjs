@@ -445,6 +445,38 @@ try {
     await waitForNotBusy(`${stepName}-after-click`);
     logStep(`action-${stepName}-done`);
   };
+  const expectMonitorCommandHistoryCard = async ({
+    actorId = "operator-ui",
+    commandType,
+    groupKey,
+    loginKey,
+    participantSessionId,
+    testRunId,
+    transition
+  }) => {
+    await page
+      .locator("app-record-collection")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Monitor Command History",
+          exact: true
+        })
+      })
+      .locator(".record-card")
+      .filter({
+        has: page.getByRole("heading", {
+          name: `${commandType} command`,
+          exact: true
+        })
+      })
+      .filter({ hasText: actorId })
+      .filter({ hasText: transition })
+      .filter({ hasText: testRunId })
+      .filter({ hasText: participantSessionId })
+      .filter({ hasText: loginKey })
+      .filter({ hasText: groupKey })
+      .waitFor({ timeout: 15_000 });
+  };
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/workspace$/);
   await page.waitForSelector("h1");
@@ -2218,6 +2250,15 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await clickAction("Refresh Runtime Reads");
+  await expectMonitorCommandHistoryCard({
+    commandType: "resume",
+    groupKey: participantGroupKey,
+    loginKey: participantLoginKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    transition: "paused -> running"
+  });
   logStep("monitor-pause-run");
   await clickAction("Monitor Pause");
   await pollJsonWithPredicate(
@@ -2242,6 +2283,15 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await clickAction("Refresh Runtime Reads");
+  await expectMonitorCommandHistoryCard({
+    commandType: "pause",
+    groupKey: participantGroupKey,
+    loginKey: participantLoginKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    transition: "running -> paused"
+  });
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(
@@ -3325,6 +3375,15 @@ try {
       Array.isArray(payload.items) &&
       payload.items.every(item => item?.testRunId !== pausedTestRunId)
   );
+  await clickAction("Refresh Runtime Reads");
+  await expectMonitorCommandHistoryCard({
+    commandType: "complete",
+    groupKey: participantGroupKey,
+    loginKey: participantLoginKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    transition: "running -> completed"
+  });
 
   logStep("force-activate-after-complete");
   await page.locator('[data-view-nav="content"]').click();

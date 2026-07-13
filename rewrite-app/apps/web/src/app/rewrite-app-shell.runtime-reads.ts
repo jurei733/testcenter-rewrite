@@ -3,6 +3,7 @@ import type {
   ListDetailedResponsesResponse,
   ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
+  ListWorkspaceActivityEventsResponse,
   ListReviewsResponse,
   MonitorOpenRunsResponse,
   ParticipantCurrentRunStateResponse,
@@ -28,6 +29,8 @@ export interface ShellRuntimeReadsHost {
   getOpenRunsPath(): string;
   getOpenRunsCsvExportPath(): string;
   setOpenRunsExportView(nextValue: string): void;
+  getMonitorCommandHistoryPath(): string;
+  setMonitorCommandHistoryView(nextValue: string): void;
   getParticipantSessionsPath(): string;
   setParticipantSessionsView(nextValue: string): void;
   getParticipantSessionsCsvExportPath(): string;
@@ -94,13 +97,23 @@ export async function refreshRuntimeReadsAction(
   participantSessionId: string,
   quiet = false
 ): Promise<void> {
-  const openRuns = await host.request<MonitorOpenRunsResponse>(
-    "Monitor Open Runs",
-    "GET",
-    host.getOpenRunsPath(),
-    undefined,
-    { quiet }
-  );
+  const [openRuns, monitorCommandHistory] = await Promise.all([
+    host.request<MonitorOpenRunsResponse>(
+      "Monitor Open Runs",
+      "GET",
+      host.getOpenRunsPath(),
+      undefined,
+      { quiet }
+    ),
+    host.request<ListWorkspaceActivityEventsResponse>(
+      "Monitor Command History",
+      "GET",
+      host.getMonitorCommandHistoryPath(),
+      undefined,
+      { quiet }
+    )
+  ]);
+  host.setMonitorCommandHistoryView(JSON.stringify(monitorCommandHistory, null, 2));
 
   if (!participantSessionId.trim()) {
     applyRuntimeReadsWithoutSession(

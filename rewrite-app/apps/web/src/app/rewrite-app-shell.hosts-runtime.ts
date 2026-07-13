@@ -210,6 +210,22 @@ export function createRuntimeReadsStateHost(args: {
     setOpenRunsExportView: nextValue => {
       args.runtimeState.openRunsExportView = nextValue;
     },
+    getMonitorCommandHistoryPath: () => {
+      const path = resolveRoutePath(
+        productionApiRoutes.workspace.listWorkspaceActivityEvents,
+        {
+          tenantKey: args.workspaceState.tenantKey.trim(),
+          workspaceKey: args.workspaceState.workspaceKey.trim()
+        }
+      );
+      const query = new URLSearchParams();
+      query.set("eventType", "monitor_run_command_issued");
+      query.set("limit", "25");
+      return withQuery(path, query);
+    },
+    setMonitorCommandHistoryView: nextValue => {
+      args.runtimeState.monitorCommandHistoryView = nextValue;
+    },
     getParticipantSessionsPath: buildParticipantSessionsPath,
     setParticipantSessionsView: nextValue => {
       args.runtimeState.participantSessionsView = nextValue;

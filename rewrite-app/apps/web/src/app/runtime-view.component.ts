@@ -519,9 +519,18 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No open runs are currently loaded."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Monitor Command History"
+        subtitle="Persisted operator command acknowledgements for pause, resume, and complete."
+        [items]="view.monitorCommandHistoryItems"
+        (itemAction)="view.selectTestRun($event)"
+        emptyState="No monitor commands have been issued yet."
+      ></app-record-collection>
+
       <app-json-panel title="Participant Sessions" subtitle="Operator Read" viewId="participantSessionsView" [content]="view.participantSessionsView"></app-json-panel>
       <app-json-panel title="Participant Sessions CSV Export" subtitle="Filtered Sessions" viewId="participantSessionsExportView" [content]="view.runtime.participantSessionsExportView"></app-json-panel>
       <app-json-panel title="Open Runs CSV Export" subtitle="Activation Guard Export" viewId="openRunsExportView" [content]="view.runtime.openRunsExportView"></app-json-panel>
+      <app-json-panel title="Monitor Command History" subtitle="Workspace Activity Filter" viewId="monitorCommandHistoryView" [content]="view.runtime.monitorCommandHistoryView"></app-json-panel>
       <app-json-panel title="Participant Roster" subtitle="Saved Entry Rows" viewId="participantRosterView" [content]="view.runtime.participantRosterView"></app-json-panel>
       <app-json-panel title="Participant Roster CSV Export" subtitle="Saved Entry Rows" viewId="participantRosterExportView" [content]="view.runtime.participantRosterExportView"></app-json-panel>
       <app-json-panel title="Participant Session Detail" subtitle="Run History" viewId="participantSessionDetailView" [content]="view.runtime.participantSessionDetailView"></app-json-panel>
