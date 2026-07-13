@@ -3179,7 +3179,14 @@ const collectXmlManifestResources = (
   )) {
     const resourceAttributes = parseXmlAttributes(resourceMatch[2] ?? "");
     const identifier = normalizeManifestToken(
-      readXmlAttribute(resourceAttributes, "identifier", "id", "key")
+      readXmlAttribute(
+        resourceAttributes,
+        "identifier",
+        "id",
+        "key",
+        "resourceId",
+        "resourceIdentifier"
+      )
     );
     if (!identifier) {
       continue;
@@ -3191,8 +3198,26 @@ const collectXmlManifestResources = (
     );
     const fileAttributes = fileMatch ? parseXmlAttributes(fileMatch[2] ?? "") : {};
     const key = normalizeManifestToken(
-      readXmlAttribute(resourceAttributes, "href", "path", "src", "uri") ??
-        readXmlAttribute(fileAttributes, "href", "path", "src", "uri") ??
+      readXmlAttribute(
+        resourceAttributes,
+        "href",
+        "path",
+        "src",
+        "uri",
+        "file",
+        "fileName",
+        "filename"
+      ) ??
+        readXmlAttribute(
+          fileAttributes,
+          "href",
+          "path",
+          "src",
+          "uri",
+          "file",
+          "fileName",
+          "filename"
+        ) ??
         identifier
     );
     const displayLabel = normalizeManifestLabel(
@@ -3209,7 +3234,7 @@ const collectXmlManifestResources = (
     );
     const dependencyReferences = [
       ...resourceContent.matchAll(
-        /<((?:[a-zA-Z_][\w.-]*:)?dependency)\b([^>]*?)(?:\/>|>[\s\S]*?<\/\1>)/gi
+        /<((?:[a-zA-Z_][\w.-]*:)?dependency)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
       )
     ]
       .map(dependencyMatch =>
@@ -3218,8 +3243,22 @@ const collectXmlManifestResources = (
             parseXmlAttributes(dependencyMatch[2] ?? ""),
             "identifierref",
             "identifierRef",
-            "ref"
-          )
+            "ref",
+            "resourceId",
+            "resourceIdentifier",
+            "identifier",
+            "id"
+          ) ??
+            readXmlChildText(
+              dependencyMatch[3] ?? "",
+              "identifierref",
+              "identifierRef",
+              "ref",
+              "resourceId",
+              "resourceIdentifier",
+              "identifier",
+              "id"
+            )
         )
       )
       .filter((dependencyReference): dependencyReference is string =>
