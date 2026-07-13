@@ -22,6 +22,7 @@ import {
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
+import { downloadTextFile } from "./download-text-file";
 import type { RecordCollectionItem } from "./record-collection.component";
 import { participantSessionLinkRows } from "./participant-session-links";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -1513,6 +1514,34 @@ export class ContentViewFacade {
     this.viewState.onActionAsync(() => this.contentService.loadContentReleaseDetail());
   }
 
+  downloadSelectedSourceDocument(): void {
+    this.viewState.onActionAsync(async () => {
+      const payload = await this.resolveSourcePackageDetailForDownload();
+      const sourcePackage = payload.sourcePackageDetail.sourcePackage;
+      const sourceDocument = sourcePackage.sourceDocument ?? "";
+      const filename = sourcePackage.fileName.trim() || "source-document.txt";
+      const mediaType = sourcePackage.mediaType.trim() || "text/plain";
+
+      if (!sourceDocument.trim()) {
+        this.feedback.rememberActivity(
+          "Source Document Download Skipped",
+          `${filename} has no persisted source document to download.`
+        );
+        return;
+      }
+
+      downloadTextFile({
+        filename,
+        mediaType,
+        text: sourceDocument
+      });
+      this.feedback.rememberActivity(
+        "Source Document Downloaded",
+        `${filename} downloaded from the selected source package.`
+      );
+    });
+  }
+
   retrySourcePackageImport(): void {
     this.viewState.onActionAsync(() => this.contentService.retrySourcePackageImport());
   }
@@ -1584,6 +1613,26 @@ export class ContentViewFacade {
       return "XML source document";
     }
     return "Text source document";
+  }
+
+  private async resolveSourcePackageDetailForDownload(): Promise<GetSourcePackageResponse> {
+    const selectedSourcePackageId = this.content.sourcePackageId.trim();
+    const existingPayload = parseJsonDocument<GetSourcePackageResponse>(
+      this.content.sourcePackageDetailView
+    );
+    const existingSourcePackage =
+      existingPayload?.sourcePackageDetail.sourcePackage ?? null;
+
+    if (
+      existingPayload &&
+      existingSourcePackage &&
+      (!selectedSourcePackageId ||
+        existingSourcePackage.sourcePackageId === selectedSourcePackageId)
+    ) {
+      return existingPayload;
+    }
+
+    return this.contentService.loadSourcePackageDetail();
   }
 
   private inferMediaTypeFromFile(file: File): string {

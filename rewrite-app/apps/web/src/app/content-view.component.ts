@@ -191,6 +191,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button class="primary" type="button" (click)="view.getSourcePackageDetail()">Source Package Detail</button>
           <button class="secondary" type="button" (click)="view.getImportJobDetail()">Import Job Detail</button>
+          <button id="downloadSourceDocumentButton" class="secondary" type="button" (click)="view.downloadSelectedSourceDocument()">Download Source Document</button>
           <button class="ghost" type="button" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
           <button class="ghost" type="button" (click)="view.getContentReleaseActivationReadiness()">Release Readiness</button>
           <button class="ghost" type="button" (click)="view.getContentReleaseDetail()">Release Detail</button>

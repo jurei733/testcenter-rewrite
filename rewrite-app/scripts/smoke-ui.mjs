@@ -1012,31 +1012,35 @@ try {
       payload.items.some(item => item?.contentRelease?.status === "staged")
   );
   await clickAction("Activate Release");
-	  await pollJsonWithPredicate(
-	    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
-	    payload =>
-	      typeof payload === "object" &&
-	      payload != null &&
-	      Array.isArray(payload.items) &&
-	      payload.items.some(item => item?.contentRelease?.status === "active")
-	  );
-	  logStep("content-prompt-read-model");
-	  await clickAction("Source Package Detail");
-	  await clickAction("Release Detail");
-	  await page.waitForFunction(
-	    () => {
-	      const bodyText = document.body.textContent ?? "";
-	      return (
-	        bodyText.includes("Prompt Coverage") &&
-	        bodyText.includes("1 / 3 prompt(s), 1 / 3 description(s)") &&
-	        bodyText.includes("Participant Route: Read the participant prompt.") &&
-	        bodyText.includes("Explain how the starter example works.")
-	      );
-	    },
-	    undefined,
-	    { timeout: 15_000 }
-	  );
-	  stopAfter("content-prompt-read-model");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => item?.contentRelease?.status === "active")
+  );
+  logStep("content-prompt-read-model");
+  await clickAction("Source Package Detail");
+  await clickAction("Release Detail");
+  const sourceDocumentDownloadPromise = page.waitForEvent("download");
+  await page.locator("#downloadSourceDocumentButton").click();
+  const sourceDocumentDownload = await sourceDocumentDownloadPromise;
+  assert.equal(sourceDocumentDownload.suggestedFilename(), uploadedSourceFileName);
+  await page.waitForFunction(
+    () => {
+      const bodyText = document.body.textContent ?? "";
+      return (
+        bodyText.includes("Prompt Coverage") &&
+        bodyText.includes("1 / 3 prompt(s), 1 / 3 description(s)") &&
+        bodyText.includes("Participant Route: Read the participant prompt.") &&
+        bodyText.includes("Explain how the starter example works.")
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+  stopAfter("content-prompt-read-model");
 
   logStep("participant-entry-sign-in");
   const participantEntrySignInLoginKey = "student-entry-sign-in";
