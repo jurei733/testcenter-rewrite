@@ -448,16 +448,24 @@ export class WorkspaceViewFacade {
       return [];
     }
 
-    const items: Array<{ score: number; item: RecordCollectionItem }> = [];
+    const unitsByKey = new Map(
+      summary.unitProgress.map(unit => [unit.unitKey, unit])
+    );
+    const groupsByKey = new Map(
+      summary.groups.map(group => [group.groupKey, group])
+    );
+    const bookletsByKey = new Map(
+      summary.bookletProgress.map(booklet => [booklet.bookletKey, booklet])
+    );
+    const items: RecordCollectionItem[] = [];
 
-    for (const unit of summary.unitProgress) {
-      const score = unit.missingResponseCount * 100 + unit.unexpectedResponseCount * 50;
-      if (score <= 0) {
-        continue;
-      }
-      items.push({
-        score,
-        item: {
+    for (const attention of summary.attentionItems) {
+      if (attention.subjectType === "unit") {
+        const unit = unitsByKey.get(attention.key);
+        if (!unit) {
+          continue;
+        }
+        items.push({
           headline: unit.displayLabel,
           subline: `${unit.missingResponseCount} missing response(s), ${unit.responseCount}/${unit.expectedRunCount} answered`,
           badges: [
@@ -484,26 +492,25 @@ export class WorkspaceViewFacade {
               value: unit.latestActivityAt
                 ? this.formatDateTime(unit.latestActivityAt)
                 : "none"
+            },
+            {
+              label: "Attention Score",
+              value: String(attention.score)
             }
           ],
           actionLabel: "Open Unit Detail",
           actionPayload: { unitKey: unit.unitKey }
-        }
-      });
-    }
-
-    for (const group of summary.groups) {
-      const activeRunCount = group.runningCount + group.pausedCount;
-      const score =
-        group.notStartedCount * 30 +
-        group.pausedCount * 20 +
-        group.runningCount * 10;
-      if (score <= 0) {
+        });
         continue;
       }
-      items.push({
-        score,
-        item: {
+
+      if (attention.subjectType === "group") {
+        const group = groupsByKey.get(attention.key);
+        if (!group) {
+          continue;
+        }
+        const activeRunCount = group.runningCount + group.pausedCount;
+        items.push({
           headline: group.groupKey,
           subline: `${group.notStartedCount} waiting, ${activeRunCount} active run(s)`,
           badges: [
@@ -513,58 +520,68 @@ export class WorkspaceViewFacade {
             `${group.pausedCount} paused`
           ],
           rows: [
-            { label: "Expected Participants", value: String(group.expectedParticipantCount) },
+            {
+              label: "Expected Participants",
+              value: String(group.expectedParticipantCount)
+            },
             { label: "Roster Entries", value: String(group.rosterEntryCount) },
-            { label: "Participant Sessions", value: String(group.participantSessionCount) },
+            {
+              label: "Participant Sessions",
+              value: String(group.participantSessionCount)
+            },
             { label: "Test Runs", value: String(group.testRunCount) },
             { label: "Responses", value: String(group.responseCount) },
-            { label: "Reviews", value: String(group.reviewCount) }
+            { label: "Reviews", value: String(group.reviewCount) },
+            {
+              label: "Attention Score",
+              value: String(attention.score)
+            }
           ],
           actionLabel: "Open Group Detail",
           actionPayload: { groupKey: group.groupKey }
-        }
-      });
-    }
-
-    for (const booklet of summary.bookletProgress) {
-      const activeRunCount = booklet.runningCount + booklet.pausedCount;
-      const score =
-        booklet.notStartedCount * 25 +
-        booklet.pausedCount * 20 +
-        booklet.runningCount * 10;
-      if (score <= 0) {
+        });
         continue;
       }
+
+      const booklet = bookletsByKey.get(attention.key);
+      if (!booklet) {
+        continue;
+      }
+      const activeRunCount = booklet.runningCount + booklet.pausedCount;
       items.push({
-        score,
-        item: {
-          headline: booklet.displayLabel,
-          subline: `${booklet.notStartedCount} waiting, ${activeRunCount} active run(s), ${booklet.unitCount} unit(s)`,
-          badges: [
-            "booklet",
-            `${booklet.notStartedCount} not started`,
-            `${booklet.runningCount} running`,
-            `${booklet.pausedCount} paused`
-          ],
-          rows: [
-            { label: "Booklet", value: booklet.bookletKey },
-            { label: "Expected Participants", value: String(booklet.expectedParticipantCount) },
-            { label: "Roster Entries", value: String(booklet.rosterEntryCount) },
-            { label: "Participant Sessions", value: String(booklet.participantSessionCount) },
-            { label: "Test Runs", value: String(booklet.testRunCount) },
-            { label: "Responses", value: String(booklet.responseCount) },
-            { label: "Reviews", value: String(booklet.reviewCount) }
-          ],
-          actionLabel: "Open Booklet Detail",
-          actionPayload: { bookletKey: booklet.bookletKey }
-        }
+        headline: booklet.displayLabel,
+        subline: `${booklet.notStartedCount} waiting, ${activeRunCount} active run(s), ${booklet.unitCount} unit(s)`,
+        badges: [
+          "booklet",
+          `${booklet.notStartedCount} not started`,
+          `${booklet.runningCount} running`,
+          `${booklet.pausedCount} paused`
+        ],
+        rows: [
+          { label: "Booklet", value: booklet.bookletKey },
+          {
+            label: "Expected Participants",
+            value: String(booklet.expectedParticipantCount)
+          },
+          { label: "Roster Entries", value: String(booklet.rosterEntryCount) },
+          {
+            label: "Participant Sessions",
+            value: String(booklet.participantSessionCount)
+          },
+          { label: "Test Runs", value: String(booklet.testRunCount) },
+          { label: "Responses", value: String(booklet.responseCount) },
+          { label: "Reviews", value: String(booklet.reviewCount) },
+          {
+            label: "Attention Score",
+            value: String(attention.score)
+          }
+        ],
+        actionLabel: "Open Booklet Detail",
+        actionPayload: { bookletKey: booklet.bookletKey }
       });
     }
 
-    return items
-      .sort((left, right) => right.score - left.score)
-      .slice(0, 8)
-      .map(entry => entry.item);
+    return items;
   }
 
   get studyMonitorNotStartedItems(): RecordCollectionItem[] {

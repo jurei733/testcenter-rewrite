@@ -51,6 +51,7 @@ import type {
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
+  WorkspaceStudyMonitorAttentionItem,
   WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorParticipantDetail,
   WorkspaceStudyMonitorParticipantMatrix,
@@ -4022,6 +4023,105 @@ const buildStudyMonitorBookletProgress = (input: {
     .sort((left, right) => left.bookletKey.localeCompare(right.bookletKey));
 };
 
+const studyMonitorAttentionSubjectRank: Record<
+  WorkspaceStudyMonitorAttentionItem["subjectType"],
+  number
+> = {
+  unit: 0,
+  group: 1,
+  booklet: 2
+};
+
+const buildStudyMonitorAttentionItems = (input: {
+  groups: WorkspaceStudyMonitorSummary["groups"];
+  bookletProgress: WorkspaceStudyMonitorBookletProgress[];
+  unitProgress: WorkspaceStudyMonitorUnitProgress[];
+}): WorkspaceStudyMonitorAttentionItem[] => {
+  const items: WorkspaceStudyMonitorAttentionItem[] = [];
+
+  for (const unit of input.unitProgress) {
+    const score =
+      unit.missingResponseCount * 100 + unit.unexpectedResponseCount * 50;
+    if (score <= 0) {
+      continue;
+    }
+    items.push({
+      subjectType: "unit",
+      key: unit.unitKey,
+      label: unit.displayLabel,
+      score,
+      missingResponseCount: unit.missingResponseCount,
+      unexpectedResponseCount: unit.unexpectedResponseCount,
+      notStartedCount: 0,
+      runningCount: 0,
+      pausedCount: 0,
+      responseCount: unit.responseCount,
+      reviewCount: 0,
+      latestActivityAt: unit.latestActivityAt
+    });
+  }
+
+  for (const group of input.groups) {
+    const score =
+      group.notStartedCount * 30 +
+      group.pausedCount * 20 +
+      group.runningCount * 10;
+    if (score <= 0) {
+      continue;
+    }
+    items.push({
+      subjectType: "group",
+      key: group.groupKey,
+      label: group.groupKey,
+      score,
+      missingResponseCount: 0,
+      unexpectedResponseCount: 0,
+      notStartedCount: group.notStartedCount,
+      runningCount: group.runningCount,
+      pausedCount: group.pausedCount,
+      responseCount: group.responseCount,
+      reviewCount: group.reviewCount,
+      latestActivityAt: group.latestActivityAt
+    });
+  }
+
+  for (const booklet of input.bookletProgress) {
+    const score =
+      booklet.notStartedCount * 25 +
+      booklet.pausedCount * 20 +
+      booklet.runningCount * 10;
+    if (score <= 0) {
+      continue;
+    }
+    items.push({
+      subjectType: "booklet",
+      key: booklet.bookletKey,
+      label: booklet.displayLabel,
+      score,
+      missingResponseCount: 0,
+      unexpectedResponseCount: 0,
+      notStartedCount: booklet.notStartedCount,
+      runningCount: booklet.runningCount,
+      pausedCount: booklet.pausedCount,
+      responseCount: booklet.responseCount,
+      reviewCount: booklet.reviewCount,
+      latestActivityAt: booklet.latestActivityAt
+    });
+  }
+
+  return items
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        (right.latestActivityAt ?? "").localeCompare(left.latestActivityAt ?? "") ||
+        studyMonitorAttentionSubjectRank[left.subjectType] -
+          studyMonitorAttentionSubjectRank[right.subjectType] ||
+        left.label.localeCompare(right.label) ||
+        left.key.localeCompare(right.key)
+    )
+    .slice(0, 8);
+};
+
 const buildStudyMonitorSummary = (input: {
   tenantKey: string;
   workspaceKey: string;
@@ -4159,6 +4259,20 @@ const buildStudyMonitorSummary = (input: {
         left.loginKey.localeCompare(right.loginKey)
     );
 
+  const bookletProgress = buildStudyMonitorBookletProgress({
+    participantSessions: input.participantSessions,
+    participantRosterEntries: input.participantRosterEntries,
+    testRuns: input.testRuns,
+    contentReleases: input.contentReleases,
+    reviews: input.reviews
+  });
+  const unitProgress = buildStudyMonitorUnitProgress({
+    participantSessions: input.participantSessions,
+    participantRosterEntries: input.participantRosterEntries,
+    testRuns: input.testRuns,
+    contentReleases: input.contentReleases
+  });
+
   return {
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
@@ -4178,18 +4292,12 @@ const buildStudyMonitorSummary = (input: {
     reviewCount: groups.reduce((total, group) => total + group.reviewCount, 0),
     notStartedParticipants,
     groups,
-    bookletProgress: buildStudyMonitorBookletProgress({
-      participantSessions: input.participantSessions,
-      participantRosterEntries: input.participantRosterEntries,
-      testRuns: input.testRuns,
-      contentReleases: input.contentReleases,
-      reviews: input.reviews
-    }),
-    unitProgress: buildStudyMonitorUnitProgress({
-      participantSessions: input.participantSessions,
-      participantRosterEntries: input.participantRosterEntries,
-      testRuns: input.testRuns,
-      contentReleases: input.contentReleases
+    bookletProgress,
+    unitProgress,
+    attentionItems: buildStudyMonitorAttentionItems({
+      groups,
+      bookletProgress,
+      unitProgress
     })
   };
 };

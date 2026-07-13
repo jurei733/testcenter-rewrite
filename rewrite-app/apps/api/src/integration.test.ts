@@ -2188,6 +2188,17 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           responseCount: number;
           reviewCount: number;
         }>;
+        attentionItems: Array<{
+          subjectType: string;
+          key: string;
+          label: string;
+          score: number;
+          missingResponseCount: number;
+          unexpectedResponseCount: number;
+          notStartedCount: number;
+          runningCount: number;
+          pausedCount: number;
+        }>;
       };
     }>(
       isolated.baseUrl,
@@ -2268,6 +2279,54 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       1
     );
     assert.equal(studyMonitor.body.studyMonitorSummary.groups[0]?.reviewCount, 0);
+    assert.deepEqual(
+      studyMonitor.body.studyMonitorSummary.attentionItems.map(item => ({
+        subjectType: item.subjectType,
+        key: item.key,
+        label: item.label,
+        score: item.score,
+        missingResponseCount: item.missingResponseCount,
+        unexpectedResponseCount: item.unexpectedResponseCount,
+        notStartedCount: item.notStartedCount,
+        runningCount: item.runningCount,
+        pausedCount: item.pausedCount
+      })),
+      [
+        {
+          subjectType: "unit",
+          key: "unit-finish",
+          label: "Finish",
+          score: 100,
+          missingResponseCount: 1,
+          unexpectedResponseCount: 0,
+          notStartedCount: 0,
+          runningCount: 0,
+          pausedCount: 0
+        },
+        {
+          subjectType: "group",
+          key: "group:student-demo",
+          label: "group:student-demo",
+          score: 10,
+          missingResponseCount: 0,
+          unexpectedResponseCount: 0,
+          notStartedCount: 0,
+          runningCount: 1,
+          pausedCount: 0
+        },
+        {
+          subjectType: "booklet",
+          key: "booklet:demo",
+          label: "Demo Booklet",
+          score: 10,
+          missingResponseCount: 0,
+          unexpectedResponseCount: 0,
+          notStartedCount: 0,
+          runningCount: 1,
+          pausedCount: 0
+        }
+      ]
+    );
 
     const participantMatrix = await requestJsonAt<{
       studyMonitorParticipantMatrix: {

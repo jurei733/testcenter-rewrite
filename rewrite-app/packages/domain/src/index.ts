@@ -572,6 +572,21 @@ export type WorkspaceStudyMonitorBookletDetail = {
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
 };
 
+export type WorkspaceStudyMonitorAttentionItem = {
+  subjectType: "unit" | "group" | "booklet";
+  key: string;
+  label: string;
+  score: number;
+  missingResponseCount: number;
+  unexpectedResponseCount: number;
+  notStartedCount: number;
+  runningCount: number;
+  pausedCount: number;
+  responseCount: number;
+  reviewCount: number;
+  latestActivityAt: string | null;
+};
+
 export type WorkspaceStudyMonitorSummary = {
   tenantKey: string;
   workspaceKey: string;
@@ -590,6 +605,7 @@ export type WorkspaceStudyMonitorSummary = {
   groups: WorkspaceStudyMonitorGroup[];
   bookletProgress: WorkspaceStudyMonitorBookletProgress[];
   unitProgress: WorkspaceStudyMonitorUnitProgress[];
+  attentionItems: WorkspaceStudyMonitorAttentionItem[];
 };
 
 export type WorkspaceContentReleaseListItem = {
