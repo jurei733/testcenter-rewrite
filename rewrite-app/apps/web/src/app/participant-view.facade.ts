@@ -17,6 +17,7 @@ import {
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 
+import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -830,46 +831,14 @@ export class ParticipantViewFacade {
       return "";
     }
 
-    const query = new URLSearchParams({ participantSessionId });
     const currentState = this.readCurrentRunState();
-    this.appendParticipantEntryLinkParam(
-      query,
-      "tenantKey",
-      currentState?.scope.tenantKey ?? this.workspace.tenantKey
-    );
-    this.appendParticipantEntryLinkParam(
-      query,
-      "workspaceKey",
-      currentState?.scope.workspaceKey ?? this.workspace.workspaceKey
-    );
-    this.appendParticipantEntryLinkParam(
-      query,
-      "loginKey",
-      currentState?.participantSession.loginKey ?? this.runtime.loginKey
-    );
-    this.appendParticipantEntryLinkParam(
-      query,
-      "groupKey",
-      currentState?.participantSession.groupKey ?? this.runtime.groupKey
-    );
-    this.appendParticipantEntryLinkParam(
-      query,
-      "bookletKey",
-      currentState?.testRun.bookletKey ?? this.runtime.bookletKey
-    );
-    const origin = globalThis.window?.location?.origin ?? "";
-    return `${origin}/participant?${query.toString()}`;
-  }
-
-  private appendParticipantEntryLinkParam(
-    query: URLSearchParams,
-    key: string,
-    value?: string | null
-  ): void {
-    const normalizedValue = value?.trim();
-    if (normalizedValue) {
-      query.set(key, normalizedValue);
-    }
+    return buildParticipantSessionEntryUrl(participantSessionId, {
+      tenantKey: currentState?.scope.tenantKey ?? this.workspace.tenantKey,
+      workspaceKey: currentState?.scope.workspaceKey ?? this.workspace.workspaceKey,
+      loginKey: currentState?.participantSession.loginKey ?? this.runtime.loginKey,
+      groupKey: currentState?.participantSession.groupKey ?? this.runtime.groupKey,
+      bookletKey: currentState?.testRun.bookletKey ?? this.runtime.bookletKey
+    });
   }
 
   private hasSavedResponse(
