@@ -155,6 +155,9 @@ try {
   };
 
   await page.goto(`${baseUrl}/app`, { waitUntil: "networkidle" });
+  await page.locator('[data-view-nav="workspace"].is-active').waitFor({
+    timeout: 15_000
+  });
   const demoLink = page.getByRole("link", { name: "Start Demo Participant" });
   const demoParticipantPath = `/participant?${new URLSearchParams({
     tenantKey: "demo-tenant",
@@ -190,6 +193,9 @@ try {
   );
   await demoAdminLink.click();
   await page.waitForURL(/\/app\/ops$/);
+  await page.locator('[data-view-nav="ops"].is-active').waitFor({
+    timeout: 15_000
+  });
   await page.waitForFunction(
     () => {
       const token = document.querySelector("#adminSessionToken")?.value ?? "";
