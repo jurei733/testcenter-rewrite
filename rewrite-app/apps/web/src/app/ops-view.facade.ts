@@ -474,80 +474,115 @@ export class OpsViewFacade {
     const payload = parseJsonDocument<ListAdminSessionsResponse>(
       this.ops.adminSessionsView
     );
-    return (payload?.items ?? []).map(item => ({
-      headline: item.adminUser.username,
-      subline: `${item.status} session ${item.adminSession.adminSessionId}`,
-      badges: [item.status, item.adminUser.status],
-      rows: [
-        { label: "Admin User ID", value: item.adminUser.adminUserId },
-        {
-          label: "Created",
-          value: this.formatDateTime(item.adminSession.createdAt)
-        },
-        {
-          label: "Expires",
-          value: this.formatDateTime(item.adminSession.expiresAt)
-        },
-        {
-          label: "Revoked",
-          value: item.adminSession.revokedAt
-            ? this.formatDateTime(item.adminSession.revokedAt)
-            : "no"
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Admin session window",
+        "admin session",
+        payload.items.length,
+        this.ops.adminSessionLimit,
+        [
+          this.ops.adminSessionUserFilter.trim() ? "admin user" : "",
+          this.ops.adminSessionStatusFilter.trim() ? "status" : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(item => ({
+        headline: item.adminUser.username,
+        subline: `${item.status} session ${item.adminSession.adminSessionId}`,
+        badges: [item.status, item.adminUser.status],
+        rows: [
+          { label: "Admin User ID", value: item.adminUser.adminUserId },
+          {
+            label: "Created",
+            value: this.formatDateTime(item.adminSession.createdAt)
+          },
+          {
+            label: "Expires",
+            value: this.formatDateTime(item.adminSession.expiresAt)
+          },
+          {
+            label: "Revoked",
+            value: item.adminSession.revokedAt
+              ? this.formatDateTime(item.adminSession.revokedAt)
+              : "no"
+          }
+        ],
+        actionLabel: "Select Session",
+        actionPayload: {
+          adminSessionId: item.adminSession.adminSessionId,
+          adminUserId: item.adminUser.adminUserId
         }
-      ],
-      actionLabel: "Select Session",
-      actionPayload: {
-        adminSessionId: item.adminSession.adminSessionId,
-        adminUserId: item.adminUser.adminUserId
-      }
-    }));
+      }))
+    ];
   }
 
   get adminUserItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListAdminUsersResponse>(
       this.ops.adminUsersView
     );
-    return (payload?.items ?? []).map(item => ({
-      headline: item.adminUser.username,
-      subline: item.adminUser.displayName,
-      badges: [
-        item.adminUser.status,
-        ...item.roleAssignments.map(roleAssignment => roleAssignment.role)
-      ],
-      rows: [
-        {
-          label: "Admin User ID",
-          value: item.adminUser.adminUserId
-        },
-        {
-          label: "Created",
-          value: this.formatDateTime(item.adminUser.createdAt)
-        },
-        {
-          label: "Role Scopes",
-          value: item.roleAssignments
-            .map(roleAssignment =>
-              [
-                roleAssignment.role,
-                roleAssignment.tenantId ?? "platform",
-                roleAssignment.workspaceId ?? "all-workspaces",
-                roleAssignment.roleAssignmentId
-              ].join(" / ")
-            )
-            .join(", ")
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Admin user window",
+        "admin user",
+        payload.items.length,
+        this.ops.adminUserLimit,
+        [
+          this.ops.adminUserUsernameFilter.trim() ? "username" : "",
+          this.ops.adminUserStatusFilter.trim() ? "status" : "",
+          this.ops.adminUserRoleFilter.trim() ? "role" : "",
+          this.ops.adminUserTenantFilter.trim() ? "tenant" : "",
+          this.ops.adminUserWorkspaceFilter.trim() ? "workspace" : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(item => ({
+        headline: item.adminUser.username,
+        subline: item.adminUser.displayName,
+        badges: [
+          item.adminUser.status,
+          ...item.roleAssignments.map(roleAssignment => roleAssignment.role)
+        ],
+        rows: [
+          {
+            label: "Admin User ID",
+            value: item.adminUser.adminUserId
+          },
+          {
+            label: "Created",
+            value: this.formatDateTime(item.adminUser.createdAt)
+          },
+          {
+            label: "Role Scopes",
+            value: item.roleAssignments
+              .map(roleAssignment =>
+                [
+                  roleAssignment.role,
+                  roleAssignment.tenantId ?? "platform",
+                  roleAssignment.workspaceId ?? "all-workspaces",
+                  roleAssignment.roleAssignmentId
+                ].join(" / ")
+              )
+              .join(", ")
+          }
+        ],
+        selected:
+          item.adminUser.adminUserId === this.ops.adminRoleTargetUserId ||
+          item.adminUser.adminUserId === this.ops.adminRevokeTargetUserId ||
+          item.adminUser.adminUserId === this.ops.adminStatusTargetUserId,
+        actionLabel: "Use For Admin Actions",
+        actionPayload: {
+          adminUserId: item.adminUser.adminUserId,
+          roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
+          adminUserStatus: item.adminUser.status
         }
-      ],
-      selected:
-        item.adminUser.adminUserId === this.ops.adminRoleTargetUserId ||
-        item.adminUser.adminUserId === this.ops.adminRevokeTargetUserId ||
-        item.adminUser.adminUserId === this.ops.adminStatusTargetUserId,
-      actionLabel: "Use For Admin Actions",
-      actionPayload: {
-        adminUserId: item.adminUser.adminUserId,
-        roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
-        adminUserStatus: item.adminUser.status
-      }
-    }));
+      }))
+    ];
   }
 
   get adminRoleAssignmentItems(): RecordCollectionItem[] {
@@ -604,45 +639,62 @@ export class OpsViewFacade {
     const payload = parseJsonDocument<ListAdminAuditEventsResponse>(
       this.ops.adminAuditView
     );
-    return (payload?.items ?? []).map(auditEvent => ({
-      headline: auditEvent.eventType,
-      subline: this.formatDateTime(auditEvent.occurredAt),
-      badges: [
-        auditEvent.actorAdminUserId ? "actor" : "system",
-        auditEvent.subjectAdminUserId ? "subject" : "no-subject"
-      ],
-      rows: [
-        {
-          label: "Summary",
-          value: auditEvent.summary
-        },
-        {
-          label: "Audit Event ID",
-          value: auditEvent.adminAuditEventId
-        },
-        {
-          label: "Actor Admin User ID",
-          value: auditEvent.actorAdminUserId ?? "system"
-        },
-        {
-          label: "Subject Admin User ID",
-          value: auditEvent.subjectAdminUserId ?? "n/a"
-        },
-        {
-          label: "Details",
-          value: this.stringifyValue(auditEvent.details)
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Admin audit window",
+        "admin audit event",
+        payload.items.length,
+        this.ops.adminAuditLimit,
+        [
+          this.ops.adminAuditEventTypeFilter.trim() ? "event type" : "",
+          this.ops.adminAuditActorFilter.trim() ? "actor" : "",
+          this.ops.adminAuditSubjectFilter.trim() ? "subject" : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(auditEvent => ({
+        headline: auditEvent.eventType,
+        subline: this.formatDateTime(auditEvent.occurredAt),
+        badges: [
+          auditEvent.actorAdminUserId ? "actor" : "system",
+          auditEvent.subjectAdminUserId ? "subject" : "no-subject"
+        ],
+        rows: [
+          {
+            label: "Summary",
+            value: auditEvent.summary
+          },
+          {
+            label: "Audit Event ID",
+            value: auditEvent.adminAuditEventId
+          },
+          {
+            label: "Actor Admin User ID",
+            value: auditEvent.actorAdminUserId ?? "system"
+          },
+          {
+            label: "Subject Admin User ID",
+            value: auditEvent.subjectAdminUserId ?? "n/a"
+          },
+          {
+            label: "Details",
+            value: this.stringifyValue(auditEvent.details)
+          }
+        ],
+        selected:
+          auditEvent.subjectAdminUserId != null &&
+          auditEvent.subjectAdminUserId === this.ops.adminAuditSubjectFilter.trim(),
+        actionLabel: "Use Audit Scope",
+        actionPayload: {
+          adminAuditEventType: auditEvent.eventType,
+          actorAdminUserId: auditEvent.actorAdminUserId ?? "",
+          subjectAdminUserId: auditEvent.subjectAdminUserId ?? ""
         }
-      ],
-      selected:
-        auditEvent.subjectAdminUserId != null &&
-        auditEvent.subjectAdminUserId === this.ops.adminAuditSubjectFilter.trim(),
-      actionLabel: "Use Audit Scope",
-      actionPayload: {
-        adminAuditEventType: auditEvent.eventType,
-        actorAdminUserId: auditEvent.actorAdminUserId ?? "",
-        subjectAdminUserId: auditEvent.subjectAdminUserId ?? ""
-      }
-    }));
+      }))
+    ];
   }
 
   get opsActionItems(): RecordCollectionItem[] {
@@ -1331,6 +1383,28 @@ export class OpsViewFacade {
     } catch {
       return value;
     }
+  }
+
+  private buildReadWindowItem(
+    headline: string,
+    recordLabel: string,
+    loadedCount: number,
+    limit: string,
+    activeFilters: string[]
+  ): RecordCollectionItem {
+    return {
+      headline,
+      subline: `${loadedCount} ${recordLabel} row(s) loaded for the current filters`,
+      badges: [`${activeFilters.length} active filter(s)`, `limit ${limit}`],
+      rows: [
+        { label: "Loaded Records", value: String(loadedCount) },
+        { label: "Limit", value: limit },
+        {
+          label: "Active Filters",
+          value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
+        }
+      ]
+    };
   }
 
   private humanizeKey(value: string): string {

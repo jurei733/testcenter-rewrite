@@ -556,11 +556,37 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Admin Sessions", exact: true })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Admin session window" }) })
+    .filter({ hasText: "1 admin session row(s) loaded for the current filters" })
+    .filter({ hasText: "0 active filter(s)" })
+    .filter({ hasText: "limit 100" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "none" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Sessions", exact: true })
+    })
     .filter({ hasText: adminUsername })
     .filter({ hasText: "active" })
     .waitFor();
   logStep("admin-users");
   await clickAction("Admin Users");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Admin user window" }) })
+    .filter({ hasText: "1 admin user row(s) loaded for the current filters" })
+    .filter({ hasText: "0 active filter(s)" })
+    .filter({ hasText: "limit 100" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "none" })
+    .waitFor();
   await page
     .locator("article.card")
     .filter({
@@ -923,6 +949,19 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Admin Users", exact: true })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Admin user window" }) })
+    .filter({ hasText: "1 admin user row(s) loaded for the current filters" })
+    .filter({ hasText: "5 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "username, status, role, tenant, workspace" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: "disabled" })
     .waitFor();
@@ -973,6 +1012,19 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Admin Audit Events", exact: true })
     })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Admin audit window" }) })
+    .filter({ hasText: "1 admin audit event row(s) loaded for the current filters" })
+    .filter({ hasText: "2 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "event type, subject" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Audit Events", exact: true })
+    })
     .filter({ hasText: "admin_user_updated" })
     .filter({ hasText: workspaceAdminUserId })
     .waitFor();
@@ -992,6 +1044,7 @@ try {
     .filter({ hasText: "admin_user_updated" })
     .filter({ hasText: workspaceAdminUserId })
     .waitFor({ timeout: 15_000 });
+  stopAfter("admin-audit-events");
 
   logStep("nav-content");
   await page.locator('[data-view-nav="content"]').click();
