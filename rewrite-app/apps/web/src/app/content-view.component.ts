@@ -63,7 +63,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="createSourcePackageButton" class="primary" type="button" [disabled]="!view.canCreateSourcePackage" (click)="view.createSourcePackage()">Create Source Package</button>
           <button id="createImportJobButton" class="secondary" type="button" [disabled]="!view.canCreateImportJob" (click)="view.createImportJob()">Create Import Job</button>
           <button id="activateContentReleaseButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.confirmActivateContentRelease()">Activate Release</button>
-          <button class="ghost" type="button" (click)="view.refreshContentReads()">Refresh Content Reads</button>
+          <button id="refreshContentReadsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshContentReads()">Refresh Content Reads</button>
           <button class="ghost" type="button" (click)="view.restoreDemoSource()">Restore Demo Source</button>
         </div>
       </article>

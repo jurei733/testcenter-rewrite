@@ -66,6 +66,10 @@ export class ContentViewFacade {
     this.viewState.setActiveView("content");
   }
 
+  get canUseWorkspaceScope(): boolean {
+    return this.isWorkspaceScopeComplete();
+  }
+
   get canCreateSourcePackage(): boolean {
     return (
       this.isWorkspaceScopeComplete() &&
@@ -1775,6 +1779,9 @@ export class ContentViewFacade {
   }
 
   refreshContentReads(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.refreshContentReads());
   }
 

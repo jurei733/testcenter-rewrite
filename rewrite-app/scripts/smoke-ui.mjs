@@ -1274,6 +1274,7 @@ try {
     })
     .waitFor();
   await expectButtonSelectorEnabled("#createSourcePackageButton");
+  await expectButtonSelectorEnabled("#refreshContentReadsButton");
   await expectButtonSelectorDisabled("#createImportJobButton");
   await expectButtonSelectorDisabled("#activateContentReleaseButton");
   await expectButtonSelectorDisabled("#sourcePackageDetailButton");
