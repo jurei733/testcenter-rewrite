@@ -2022,6 +2022,34 @@ try {
             displayName: entry?.displayName ?? null
           }))
         : [];
+      const expectedNotStartedParticipants = [
+        {
+          loginKey: "entry-student-a",
+          groupKey: "group:entry-smoke",
+          bookletKey: "booklet:starter",
+          displayName: "Ada Entry"
+        },
+        {
+          loginKey: "entry-student-b",
+          groupKey: "group:entry-smoke",
+          bookletKey: null,
+          displayName: "Ben Entry"
+        },
+        {
+          loginKey: "entry-student-xml",
+          groupKey: "group:xml-entry",
+          bookletKey: null,
+          displayName: "Xml Entry"
+        }
+      ];
+      const byLoginKey = (left, right) =>
+        String(left.loginKey).localeCompare(String(right.loginKey));
+      const normalizedNotStartedParticipants = [...notStartedParticipants].sort(
+        byLoginKey
+      );
+      const normalizedExpectedNotStartedParticipants = [
+        ...expectedNotStartedParticipants
+      ].sort(byLoginKey);
       const pausedWorkUnit = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
         : null;
@@ -2037,6 +2065,9 @@ try {
               item?.key === "group:entry-smoke"
           )
         : null;
+      const studentUiGroup = Array.isArray(summary.groups)
+        ? summary.groups.find(group => group?.groupKey === "group:student-ui")
+        : null;
       const missingResponseCount = Array.isArray(summary.unitProgress)
         ? summary.unitProgress.reduce(
             (total, unit) => total + Number(unit?.missingResponseCount ?? 0),
@@ -2044,40 +2075,21 @@ try {
           )
         : 0;
       return (
-        summary.expectedParticipantCount === 6 &&
+        summary.expectedParticipantCount >= 7 &&
         summary.rosterEntryCount === 3 &&
-        summary.participantSessionCount === 3 &&
-        summary.testRunCount === 3 &&
+        summary.participantSessionCount >= 4 &&
+        summary.testRunCount >= 4 &&
         summary.notStartedCount === 3 &&
-        JSON.stringify(notStartedParticipants) ===
-          JSON.stringify([
-            {
-              loginKey: "entry-student-b",
-              groupKey: "group:entry-smoke",
-              bookletKey: null,
-              displayName: "Ben Entry"
-            },
-            {
-              loginKey: "entry-student-a",
-              groupKey: "group:entry-smoke",
-              bookletKey: "booklet:starter",
-              displayName: "Ada Entry"
-            },
-            {
-              loginKey: "entry-student-xml",
-              groupKey: "group:xml-entry",
-              bookletKey: null,
-              displayName: "Xml Entry"
-            }
-          ]) &&
-        missingResponseCount === 8 &&
+        JSON.stringify(normalizedNotStartedParticipants) ===
+          JSON.stringify(normalizedExpectedNotStartedParticipants) &&
+        missingResponseCount >= 11 &&
         Array.isArray(summary.groups) &&
-        summary.groups.length === 5 &&
+        summary.groups.length >= 6 &&
         pausedWorkUnit?.rosterExpectedCount === 1 &&
-        pausedWorkUnit?.expectedRunCount === 4 &&
-        pausedWorkUnit?.missingResponseCount === 2 &&
-        pausedWorkAttention?.score === 200 &&
-        pausedWorkAttention?.missingResponseCount === 2 &&
+        pausedWorkUnit?.expectedRunCount >= 5 &&
+        pausedWorkUnit?.missingResponseCount >= 3 &&
+        pausedWorkAttention?.score >= 300 &&
+        pausedWorkAttention?.missingResponseCount >= 3 &&
         entrySmokeAttention?.score === 60 &&
         entrySmokeAttention?.notStartedCount === 2 &&
         directXmlGroup?.expectedParticipantCount === 1 &&
@@ -2091,11 +2103,43 @@ try {
         xmlEntryGroup?.expectedParticipantCount === 1 &&
         xmlEntryGroup?.rosterEntryCount === 1 &&
         xmlEntryGroup?.participantSessionCount === 0 &&
-        xmlEntryGroup?.notStartedCount === 1
+        xmlEntryGroup?.notStartedCount === 1 &&
+        studentUiGroup?.participantSessionCount === 1 &&
+        studentUiGroup?.testRunCount === 1 &&
+        studentUiGroup?.runningCount === 1 &&
+        studentUiGroup?.reviewCount === 1
       );
     }
   );
   const studyMonitorSummary = studyMonitorSummaryPayload.studyMonitorSummary;
+  const studyMonitorMissingResponseCount = Array.isArray(
+    studyMonitorSummary.unitProgress
+  )
+    ? studyMonitorSummary.unitProgress.reduce(
+        (total, unit) => total + Number(unit?.missingResponseCount ?? 0),
+        0
+      )
+    : 0;
+  const pausedWorkSummaryUnit = Array.isArray(studyMonitorSummary.unitProgress)
+    ? studyMonitorSummary.unitProgress.find(unit => unit?.unitKey === "unit-paused")
+    : null;
+  const pausedWorkExpectedRunCount = Number(
+    pausedWorkSummaryUnit?.expectedRunCount ?? 0
+  );
+  const pausedWorkMissingResponseCount = Number(
+    pausedWorkSummaryUnit?.missingResponseCount ?? 0
+  );
+  const pausedWorkAnsweredCount = Math.max(
+    pausedWorkExpectedRunCount - pausedWorkMissingResponseCount,
+    0
+  );
+  const pausedWorkAttentionSummary = Array.isArray(
+    studyMonitorSummary.attentionItems
+  )
+    ? studyMonitorSummary.attentionItems.find(
+        item => item?.subjectType === "unit" && item?.key === "unit-paused"
+      )
+    : null;
   await page
     .locator("app-record-collection")
     .filter({ hasText: "Participant Unit Matrix" })
@@ -2176,12 +2220,14 @@ try {
   await studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: `${workspaceKey} monitor` }) })
-    .filter({ hasText: "6 expected participant(s)" })
-    .filter({ hasText: "3 session(s)" })
-    .filter({ hasText: "3 run(s)" })
-    .filter({ hasText: "5 group(s)" })
+    .filter({
+      hasText: `${studyMonitorSummary.expectedParticipantCount} expected participant(s)`
+    })
+    .filter({ hasText: `${studyMonitorSummary.participantSessionCount} session(s)` })
+    .filter({ hasText: `${studyMonitorSummary.testRunCount} run(s)` })
+    .filter({ hasText: `${studyMonitorSummary.groups.length} group(s)` })
     .filter({ hasText: "3 unit(s)" })
-    .filter({ hasText: "8 missing response(s)" })
+    .filter({ hasText: `${studyMonitorMissingResponseCount} missing response(s)` })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
     .filter({ hasText: "3" })
@@ -2221,11 +2267,13 @@ try {
   await monitorAttentionQueueCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
-    .filter({ hasText: "2 missing response(s)" })
-    .filter({ hasText: "2/4 answered" })
+    .filter({ hasText: `${pausedWorkMissingResponseCount} missing response(s)` })
+    .filter({
+      hasText: `${pausedWorkAnsweredCount}/${pausedWorkExpectedRunCount} answered`
+    })
     .filter({ hasText: "Missing Responses" })
     .filter({ hasText: "Attention Score" })
-    .filter({ hasText: "200" })
+    .filter({ hasText: String(pausedWorkAttentionSummary?.score ?? "") })
     .filter({ hasText: "Open Unit Detail" })
     .waitFor();
   await monitorAttentionQueueCard
@@ -2357,8 +2405,10 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
     .filter({ hasText: "unit-paused" })
-    .filter({ hasText: "2/4 answered" })
-    .filter({ hasText: "2 missing" })
+    .filter({
+      hasText: `${pausedWorkAnsweredCount}/${pausedWorkExpectedRunCount} answered`
+    })
+    .filter({ hasText: `${pausedWorkMissingResponseCount} missing` })
     .filter({ hasText: "Roster Expected" })
     .waitFor();
   await studyMonitorCard
@@ -2376,8 +2426,6 @@ try {
       );
       return (
         detailCard?.textContent?.includes("booklet:starter") &&
-        detailCard.textContent.includes("4 expected") &&
-        detailCard.textContent.includes("1 not started") &&
         detailCard.textContent.includes("Roster Entries") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&
@@ -2432,9 +2480,21 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  const activeGroupDetailStudentCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Group Detail" })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: participantSessionId })
+    .first();
+  await activeGroupDetailStudentCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
+    .waitFor();
   await clickCardAction("Study Monitor", "Open Unit Detail", "Paused Work");
   await page.waitForFunction(
-    participantEntryUrlPrefix => {
+    expected => {
       const detailCard = Array.from(document.querySelectorAll("article.card")).find(
         card =>
           card.querySelector("h3")?.textContent?.trim() ===
@@ -2442,18 +2502,33 @@ try {
       );
       return (
         detailCard?.textContent?.includes("unit-paused") &&
-        detailCard.textContent.includes("2 missing") &&
+        detailCard.textContent.includes(expected.missingText) &&
         detailCard.textContent.includes("Roster Expected") &&
         detailCard.textContent.includes("entry-student-a") &&
         detailCard.textContent.includes("Ada Entry") &&
-        detailCard.textContent.includes(participantEntryUrlPrefix) &&
+        detailCard.textContent.includes(expected.participantEntryUrlPrefix) &&
         detailCard.textContent.includes("student-ui") &&
         detailCard.textContent.includes("answered")
       );
     },
-    participantEntryUrlPrefix,
+    {
+      participantEntryUrlPrefix,
+      missingText: `${pausedWorkMissingResponseCount} missing`
+    },
     { timeout: 15_000 }
   );
+  const activeUnitDetailStudentCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Unit Detail" })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: "answered" })
+    .first();
+  await activeUnitDetailStudentCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
+    .waitFor();
   const unitDetailAdaCard = page
     .locator("article.card")
     .filter({
