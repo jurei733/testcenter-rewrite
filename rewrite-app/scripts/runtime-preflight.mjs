@@ -165,6 +165,9 @@ for (const marker of [
 }
 
 const frontendAssetReferences = extractFrontendAssetReferences(appHtml);
+if (frontendAssetReferences.length === 0) {
+  throw new Error("Frontend index does not reference any built assets.");
+}
 for (const assetReference of frontendAssetReferences) {
   await ensureFile(resolve(frontendBuildDirectory, assetReference));
 }
@@ -179,6 +182,16 @@ if (!mainBundle) {
 }
 if (!stylesheetBundle) {
   throw new Error("Frontend build is missing a hashed stylesheet bundle.");
+}
+if (!frontendAssetReferences.includes(mainBundle)) {
+  throw new Error(
+    `Frontend index does not reference the hashed main bundle ${mainBundle}.`
+  );
+}
+if (!frontendAssetReferences.includes(stylesheetBundle)) {
+  throw new Error(
+    `Frontend index does not reference the hashed stylesheet bundle ${stylesheetBundle}.`
+  );
 }
 await access(resolve(frontendBuildDirectory, mainBundle));
 await access(resolve(frontendBuildDirectory, stylesheetBundle));
