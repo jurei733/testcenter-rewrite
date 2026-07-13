@@ -396,6 +396,27 @@ export class OpsViewFacade {
     this.persistState();
   }
 
+  selectAdminAuditEvent(item: RecordCollectionItem): void {
+    const eventType = item.actionPayload?.adminAuditEventType;
+    const actorAdminUserId = item.actionPayload?.actorAdminUserId;
+    const subjectAdminUserId = item.actionPayload?.subjectAdminUserId;
+
+    if (eventType) {
+      this.ops.adminAuditEventTypeFilter = eventType;
+    }
+    if (actorAdminUserId) {
+      this.ops.adminAuditActorFilter = actorAdminUserId;
+    }
+    if (subjectAdminUserId) {
+      this.ops.adminAuditSubjectFilter = subjectAdminUserId;
+      this.ops.adminRoleTargetUserId = subjectAdminUserId;
+      this.ops.adminRevokeTargetUserId = subjectAdminUserId;
+      this.ops.adminStatusTargetUserId = subjectAdminUserId;
+      this.ops.adminResetTargetUserId = subjectAdminUserId;
+    }
+    this.persistState();
+  }
+
   persistState(): void {
     this.viewState.persistShellState();
   }
@@ -607,7 +628,16 @@ export class OpsViewFacade {
           label: "Details",
           value: this.stringifyValue(auditEvent.details)
         }
-      ]
+      ],
+      selected:
+        auditEvent.subjectAdminUserId != null &&
+        auditEvent.subjectAdminUserId === this.ops.adminAuditSubjectFilter.trim(),
+      actionLabel: "Use Audit Scope",
+      actionPayload: {
+        adminAuditEventType: auditEvent.eventType,
+        actorAdminUserId: auditEvent.actorAdminUserId ?? "",
+        subjectAdminUserId: auditEvent.subjectAdminUserId ?? ""
+      }
     }));
   }
 

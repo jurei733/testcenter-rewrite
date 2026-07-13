@@ -924,6 +924,9 @@ try {
     .filter({ hasText: "admin_user_updated" })
     .filter({ hasText: workspaceAdminUserId })
     .waitFor();
+  await clickCardAction("Admin Audit Events", "Use Audit Scope", "admin_user_updated");
+  await expectInputValue("#adminAuditSubjectFilter", workspaceAdminUserId);
+  await expectInputValue("#adminStatusTargetUserId", workspaceAdminUserId);
   await page.locator("#exportAdminAuditCsvButton").click();
   await page
     .locator("#adminAuditExportPreview")

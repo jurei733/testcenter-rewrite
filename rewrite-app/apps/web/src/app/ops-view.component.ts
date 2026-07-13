@@ -329,6 +329,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Admin Audit Events"
         subtitle="Persistent platform-admin trail for admin sign-ins, user management, and role changes."
         [items]="view.adminAuditItems"
+        (itemAction)="view.selectAdminAuditEvent($event)"
         emptyState="Sign in as platform admin, then refresh admin audit events."
       ></app-record-collection>
 
