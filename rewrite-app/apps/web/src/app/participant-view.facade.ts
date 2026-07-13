@@ -70,6 +70,7 @@ type ParticipantPlayerUnitItem = {
   unitKey: string;
   label: string;
   position: string;
+  accessibilityLabel: string;
   isCurrent: boolean;
   hasResponse: boolean;
   canOpen: boolean;
@@ -341,14 +342,24 @@ export class ParticipantViewFacade {
     const canNavigateUnits =
       currentState.testRun.status === "running" &&
       availableActions.includes("save_progress");
-    const unitItems = bookletUnits.map((unit, index) => ({
-      unitKey: unit.unitKey,
-      label: unit.displayLabel || unit.unitKey,
-      position: `${index + 1}`,
-      isCurrent: unit.unitKey === unitKey,
-      hasResponse: this.hasSavedResponse(currentState, unit.unitKey),
-      canOpen: canNavigateUnits && unit.unitKey !== unitKey
-    }));
+    const unitItems = bookletUnits.map((unit, index) => {
+      const label = unit.displayLabel || unit.unitKey;
+      const isCurrent = unit.unitKey === unitKey;
+      const hasResponse = this.hasSavedResponse(currentState, unit.unitKey);
+      return {
+        unitKey: unit.unitKey,
+        label,
+        position: `${index + 1}`,
+        accessibilityLabel: [
+          `Unit ${index + 1}: ${label}`,
+          isCurrent ? "current" : "not current",
+          hasResponse ? "answered" : "unanswered"
+        ].join(", "),
+        isCurrent,
+        hasResponse,
+        canOpen: canNavigateUnits && !isCurrent
+      };
+    });
     const answeredUnitCount = unitItems.filter(unit => unit.hasResponse).length;
     const totalUnitCount = bookletUnits.length;
     const missingUnitCount = Math.max(totalUnitCount - answeredUnitCount, 0);

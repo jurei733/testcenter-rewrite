@@ -154,7 +154,15 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               <span>Progress</span>
               <strong id="participantRouteProgressLabel">{{ view.player.responseProgressLabel }}</strong>
             </header>
-            <div class="progress-track" aria-hidden="true">
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-labelledby="participantRouteProgressLabel"
+              [attr.aria-valuemin]="0"
+              [attr.aria-valuemax]="100"
+              [attr.aria-valuenow]="view.player.progressPercent"
+              [attr.aria-valuetext]="view.player.responseProgressLabel"
+            >
               <span [style.width.%]="view.player.progressPercent"></span>
             </div>
             <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
@@ -209,6 +217,9 @@ import { ParticipantViewFacade } from "./participant-view.facade";
                 [class.has-response]="unit.hasResponse"
                 [disabled]="!unit.canOpen"
                 [attr.data-unit-key]="unit.unitKey"
+                [attr.aria-current]="unit.isCurrent ? 'step' : null"
+                [attr.aria-label]="unit.accessibilityLabel"
+                [attr.title]="unit.accessibilityLabel"
                 (click)="view.goToUnit(unit.unitKey)"
               >
                 <span>{{ unit.position }}</span>

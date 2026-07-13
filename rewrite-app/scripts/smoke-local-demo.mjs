@@ -251,6 +251,30 @@ try {
     (await page.locator("#participantRouteUnitContent").textContent())?.trim(),
     "Describe what you see in the demo introduction."
   );
+  const progressTrack = page.locator(".participant-progress .progress-track");
+  assert.equal(await progressTrack.getAttribute("role"), "progressbar");
+  assert.equal(
+    await progressTrack.getAttribute("aria-labelledby"),
+    "participantRouteProgressLabel"
+  );
+  assert.equal(await progressTrack.getAttribute("aria-valuemin"), "0");
+  assert.equal(await progressTrack.getAttribute("aria-valuemax"), "100");
+  assert.equal(await progressTrack.getAttribute("aria-valuenow"), "0");
+  assert.equal(
+    await progressTrack.getAttribute("aria-valuetext"),
+    "0 / 3 responses saved"
+  );
+  const introUnitChip = page.locator('[data-unit-key="unit-intro"]');
+  await introUnitChip.waitFor({ timeout: 15_000 });
+  assert.equal(await introUnitChip.getAttribute("aria-current"), "step");
+  assert.equal(
+    await introUnitChip.getAttribute("aria-label"),
+    "Unit 1: Introduction, current, unanswered"
+  );
+  assert.equal(
+    await introUnitChip.getAttribute("title"),
+    "Unit 1: Introduction, current, unanswered"
+  );
   await page.locator("#participantRouteUnitResponse").fill("Intro answer from smoke");
 
   await page.locator("#participantRouteNextUnitButton").click();
@@ -262,6 +286,14 @@ try {
         "2 / 3",
     undefined,
     { timeout: 15_000 }
+  );
+  assert.equal(
+    await page.locator('[data-unit-key="unit-practice"]').getAttribute("aria-current"),
+    "step"
+  );
+  assert.equal(
+    await page.locator('[data-unit-key="unit-intro"]').getAttribute("aria-label"),
+    "Unit 1: Introduction, not current, answered"
   );
   await page.locator("#participantRoutePreviousUnitButton").click();
   await page.waitForFunction(
