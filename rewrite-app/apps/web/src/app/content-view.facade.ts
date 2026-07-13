@@ -66,6 +66,48 @@ export class ContentViewFacade {
     this.viewState.setActiveView("content");
   }
 
+  get canCreateSourcePackage(): boolean {
+    return (
+      this.isWorkspaceScopeComplete() &&
+      this.content.sourceFileName.trim() !== "" &&
+      this.content.sourceMediaType.trim() !== "" &&
+      this.content.sourceDocument.trim() !== ""
+    );
+  }
+
+  get canCreateImportJob(): boolean {
+    return this.isWorkspaceScopeComplete() && this.content.sourcePackageId.trim() !== "";
+  }
+
+  get canUseSelectedSourcePackage(): boolean {
+    return this.isWorkspaceScopeComplete() && this.content.sourcePackageId.trim() !== "";
+  }
+
+  get canUseSelectedImportJob(): boolean {
+    return this.isWorkspaceScopeComplete() && this.content.importJobId.trim() !== "";
+  }
+
+  get canUseSelectedContentRelease(): boolean {
+    return this.isWorkspaceScopeComplete() && this.content.contentReleaseId.trim() !== "";
+  }
+
+  get canUseSelectedParticipantSession(): boolean {
+    return (
+      this.isWorkspaceScopeComplete() &&
+      this.uiState.runtime.participantSessionId.trim() !== ""
+    );
+  }
+
+  get canRetrySourcePackageImport(): boolean {
+    return (
+      this.canUseSelectedSourcePackage &&
+      this.hasSelectedFailedSourcePackageContext() &&
+      this.content.sourceFileName.trim() !== "" &&
+      this.content.sourceMediaType.trim() !== "" &&
+      this.content.sourceDocument.trim() !== ""
+    );
+  }
+
   persistState(): void {
     this.viewState.persistShellState();
   }
@@ -1698,15 +1740,24 @@ export class ContentViewFacade {
   }
 
   createSourcePackage(): void {
+    if (!this.canCreateSourcePackage) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.createSourcePackage());
   }
 
   createImportJob(): void {
+    if (!this.canCreateImportJob) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.createImportJob());
   }
 
   confirmActivateContentRelease(): void {
     const releaseId = this.content.contentReleaseId.trim();
+    if (!this.canUseSelectedContentRelease) {
+      return;
+    }
     if (!this.content.forceActivation) {
       this.activateContentRelease();
       return;
@@ -1728,28 +1779,46 @@ export class ContentViewFacade {
   }
 
   getSourcePackageDetail(): void {
+    if (!this.canUseSelectedSourcePackage) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.loadSourcePackageDetail());
   }
 
   getImportJobDetail(): void {
+    if (!this.canUseSelectedImportJob) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.loadImportJobDetail());
   }
 
   getParticipantSessionDetail(): void {
+    if (!this.canUseSelectedParticipantSession) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantSessionDetail());
   }
 
   getContentReleaseActivationReadiness(): void {
+    if (!this.canUseSelectedContentRelease) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.contentService.loadContentReleaseActivationReadiness()
     );
   }
 
   getContentReleaseDetail(): void {
+    if (!this.canUseSelectedContentRelease) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.loadContentReleaseDetail());
   }
 
   downloadSelectedSourceDocument(): void {
+    if (!this.canUseSelectedSourcePackage) {
+      return;
+    }
     this.viewState.onActionAsync(async () => {
       const payload = await this.resolveSourcePackageDetailForDownload();
       const sourcePackage = payload.sourcePackageDetail.sourcePackage;
@@ -1778,6 +1847,9 @@ export class ContentViewFacade {
   }
 
   retrySourcePackageImport(): void {
+    if (!this.canRetrySourcePackageImport) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.retrySourcePackageImport());
   }
 
@@ -1837,6 +1909,39 @@ export class ContentViewFacade {
       item => item.participantSession.loginKey === loginKey
     );
     return matchingItem?.participantSession.participantSessionId ?? null;
+  }
+
+  private isWorkspaceScopeComplete(): boolean {
+    return (
+      this.uiState.workspace.tenantKey.trim() !== "" &&
+      this.uiState.workspace.workspaceKey.trim() !== ""
+    );
+  }
+
+  private hasSelectedFailedSourcePackageContext(): boolean {
+    const selectedSourcePackageId = this.content.sourcePackageId.trim();
+    if (!selectedSourcePackageId) {
+      return false;
+    }
+
+    const sourcePackageDetail = parseJsonDocument<GetSourcePackageResponse>(
+      this.content.sourcePackageDetailView
+    )?.sourcePackageDetail;
+    if (
+      sourcePackageDetail?.sourcePackage.sourcePackageId === selectedSourcePackageId &&
+      (sourcePackageDetail.sourcePackage.status === "rejected" ||
+        sourcePackageDetail.importJobs.some(importJob => importJob.status === "failed"))
+    ) {
+      return true;
+    }
+
+    const importJobDetail = parseJsonDocument<GetImportJobResponse>(
+      this.content.importJobDetailView
+    )?.importJobDetail;
+    return (
+      importJobDetail?.importJob.status === "failed" &&
+      importJobDetail.sourcePackage?.sourcePackageId === selectedSourcePackageId
+    );
   }
 
   private inferSourceDocumentKind(mediaType: string, sourceDocument: string): string {

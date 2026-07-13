@@ -60,9 +60,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.createSourcePackage()">Create Source Package</button>
-          <button class="secondary" type="button" (click)="view.createImportJob()">Create Import Job</button>
-          <button class="ghost" type="button" (click)="view.confirmActivateContentRelease()">Activate Release</button>
+          <button id="createSourcePackageButton" class="primary" type="button" [disabled]="!view.canCreateSourcePackage" (click)="view.createSourcePackage()">Create Source Package</button>
+          <button id="createImportJobButton" class="secondary" type="button" [disabled]="!view.canCreateImportJob" (click)="view.createImportJob()">Create Import Job</button>
+          <button id="activateContentReleaseButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.confirmActivateContentRelease()">Activate Release</button>
           <button class="ghost" type="button" (click)="view.refreshContentReads()">Refresh Content Reads</button>
           <button class="ghost" type="button" (click)="view.restoreDemoSource()">Restore Demo Source</button>
         </div>
@@ -189,13 +189,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <h2>Detail Reads And Retry</h2>
         <p>Inspect individual package, import, and release history, or retry a failed import with corrected content.</p>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.getSourcePackageDetail()">Source Package Detail</button>
-          <button class="secondary" type="button" (click)="view.getImportJobDetail()">Import Job Detail</button>
-          <button id="downloadSourceDocumentButton" class="secondary" type="button" (click)="view.downloadSelectedSourceDocument()">Download Source Document</button>
-          <button class="ghost" type="button" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
-          <button class="ghost" type="button" (click)="view.getContentReleaseActivationReadiness()">Release Readiness</button>
-          <button class="ghost" type="button" (click)="view.getContentReleaseDetail()">Release Detail</button>
-          <button class="ghost" type="button" (click)="view.retrySourcePackageImport()">Retry Failed Import</button>
+          <button id="sourcePackageDetailButton" class="primary" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.getSourcePackageDetail()">Source Package Detail</button>
+          <button id="importJobDetailButton" class="secondary" type="button" [disabled]="!view.canUseSelectedImportJob" (click)="view.getImportJobDetail()">Import Job Detail</button>
+          <button id="downloadSourceDocumentButton" class="secondary" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.downloadSelectedSourceDocument()">Download Source Document</button>
+          <button id="participantSessionDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedParticipantSession" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
+          <button id="releaseReadinessButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseActivationReadiness()">Release Readiness</button>
+          <button id="releaseDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseDetail()">Release Detail</button>
+          <button id="retrySourcePackageImportButton" class="ghost" type="button" [disabled]="!view.canRetrySourcePackageImport" (click)="view.retrySourcePackageImport()">Retry Failed Import</button>
         </div>
       </article>
 

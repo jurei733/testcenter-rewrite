@@ -1205,6 +1205,16 @@ try {
       has: page.getByRole("heading", { name: "Content Action Queue" })
     })
     .waitFor();
+  await expectButtonSelectorEnabled("#createSourcePackageButton");
+  await expectButtonSelectorDisabled("#createImportJobButton");
+  await expectButtonSelectorDisabled("#activateContentReleaseButton");
+  await expectButtonSelectorDisabled("#sourcePackageDetailButton");
+  await expectButtonSelectorDisabled("#importJobDetailButton");
+  await expectButtonSelectorDisabled("#downloadSourceDocumentButton");
+  await expectButtonSelectorDisabled("#participantSessionDetailButton");
+  await expectButtonSelectorDisabled("#releaseReadinessButton");
+  await expectButtonSelectorDisabled("#releaseDetailButton");
+  await expectButtonSelectorDisabled("#retrySourcePackageImportButton");
   logStep("load-source-document-file");
   const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.imsmanifest`;
   const uploadedSourcePath = resolve(".data", uploadedSourceFileName);
@@ -1250,6 +1260,11 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
+  await expectButtonSelectorEnabled("#createImportJobButton");
+  await expectButtonSelectorEnabled("#sourcePackageDetailButton");
+  await expectButtonSelectorEnabled("#downloadSourceDocumentButton");
+  await expectButtonSelectorDisabled("#retrySourcePackageImportButton");
+  await expectButtonSelectorDisabled("#activateContentReleaseButton");
   await clickAction("Create Import Job");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
@@ -1259,6 +1274,10 @@ try {
       Array.isArray(payload.items) &&
       payload.items.some(item => item?.contentRelease?.status === "staged")
   );
+  await expectButtonSelectorEnabled("#importJobDetailButton");
+  await expectButtonSelectorEnabled("#activateContentReleaseButton");
+  await expectButtonSelectorEnabled("#releaseReadinessButton");
+  await expectButtonSelectorEnabled("#releaseDetailButton");
   await clickAction("Activate Release");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
@@ -3776,6 +3795,7 @@ try {
           )
       )
   );
+  await expectButtonSelectorEnabled("#retrySourcePackageImportButton");
 
   await fillAndCommit("#sourceFileName", "fixed.xml");
   await fillAndCommit("#sourceMediaType", "application/xml");
