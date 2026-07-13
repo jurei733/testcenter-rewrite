@@ -413,7 +413,7 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - participant sign-in and session resume
 - participant roster, participant-session, and open-run export through the runtime shell
 - response and review CSV export through the runtime shell
-- study-monitor summary, group drill-down, booklet drill-down, unit-progress cards, study-monitor CSV export, and open-run CSV export
+- study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, study-monitor CSV export, and open-run CSV export
 - workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package
 - retrying that failed import on the same package identity

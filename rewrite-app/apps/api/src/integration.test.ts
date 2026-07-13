@@ -6861,6 +6861,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "study_monitor_participant_matrix_csv_export",
     "result_deletion",
     "study_monitor_read",
+    "study_monitor_attention",
     "monitor_open_runs_csv_export",
     "monitor_run_control",
     "system_diagnostics",
