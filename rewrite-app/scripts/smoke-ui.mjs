@@ -3170,16 +3170,47 @@ try {
   await expectInputValue("#bookletKey", "booklet:starter");
   await expectInputValue("#participantSessionId", "");
   await expectInputValue("#testRunId", "");
-  await page
-    .locator("article.card")
-    .filter({ has: page.getByRole("heading", { name: "Runtime Action Queue" }) })
+  const runtimeActionQueueCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", { name: "Runtime Action Queue" })
+  });
+  const startPreparedParticipantCard = runtimeActionQueueCard
     .locator(".record-card")
-    .filter({ has: page.getByRole("heading", { name: "Start prepared participant" }) })
+    .filter({
+      has: page.getByRole("heading", { name: "Start prepared participant" })
+    })
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "group:entry-smoke" })
     .filter({ hasText: "booklet:starter" })
-    .filter({ hasText: "Create a participant session and start the first run" })
-    .waitFor();
+    .filter({ hasText: "Create a participant session and start the first run" });
+  await startPreparedParticipantCard.waitFor();
+  if (stopAfterStep === "study-monitor-not-started-start-prepared-runtime") {
+    await startPreparedParticipantCard
+      .getByRole("button", { name: "Apply Suggestion", exact: true })
+      .click();
+    await waitForBusy("start-prepared-participant-after-click");
+    await waitForNotBusy("start-prepared-participant-after-click");
+    await waitForInputMinLength("#participantSessionId", 1);
+    await waitForInputMinLength("#testRunId", 1);
+    const preparedParticipantSessionId = await page
+      .locator("#participantSessionId")
+      .inputValue();
+    const preparedTestRunId = await page.locator("#testRunId").inputValue();
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${preparedParticipantSessionId}/current-state`,
+      payload =>
+        typeof payload === "object" &&
+        payload != null &&
+        "currentRunState" in payload &&
+        typeof payload.currentRunState === "object" &&
+        payload.currentRunState != null &&
+        payload.currentRunState.participantSession?.loginKey ===
+          "entry-student-a" &&
+        payload.currentRunState.testRun?.testRunId === preparedTestRunId &&
+        payload.currentRunState.testRun?.status === "running" &&
+        payload.currentRunState.testRun?.bookletKey === "booklet:starter"
+    );
+    stopAfter("study-monitor-not-started-start-prepared-runtime");
+  }
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
   await notStartedAdaCard.waitFor();
