@@ -41,6 +41,27 @@ const createSmokeFetchInit = () =>
       }
     : undefined;
 
+const sendSmokeJson = async (url, { method = "POST", body } = {}) => {
+  const response = await fetch(url, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      ...(smokeAdminSessionToken
+        ? { authorization: `Bearer ${smokeAdminSessionToken}` }
+        : {})
+    },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Unexpected status ${response.status} for ${method} ${url}: ${await response.text()}`
+    );
+  }
+
+  return response;
+};
+
 const flattenManifestRouteNames = value => {
   if (!value || typeof value !== "object") {
     return [];
@@ -1227,6 +1248,76 @@ try {
   );
   stopAfter("content-prompt-read-model");
 
+  logStep("participant-entry-ambiguous-workspace-guidance");
+  const ambiguousParticipantWorkspaceKey = `ui-ambiguous-workspace-${Date.now()}`;
+  const ambiguousParticipantTenantA = `ui-ambiguous-tenant-a-${Date.now()}`;
+  const ambiguousParticipantTenantB = `ui-ambiguous-tenant-b-${Date.now()}`;
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: ambiguousParticipantTenantA,
+      displayName: "UI Ambiguous Tenant A"
+    }
+  });
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: ambiguousParticipantTenantB,
+      displayName: "UI Ambiguous Tenant B"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantA}/workspaces`,
+    {
+      body: {
+        workspaceKey: ambiguousParticipantWorkspaceKey,
+        displayName: "UI Ambiguous Workspace A"
+      }
+    }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${ambiguousParticipantTenantB}/workspaces`,
+    {
+      body: {
+        workspaceKey: ambiguousParticipantWorkspaceKey,
+        displayName: "UI Ambiguous Workspace B"
+      }
+    }
+  );
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.locator("#participantLoginKey").waitFor();
+  await fillAndCommitUntilValue("#participantTenantKey", "");
+  await fillAndCommitUntilValue(
+    "#participantWorkspaceKey",
+    ambiguousParticipantWorkspaceKey
+  );
+  await fillAndCommitUntilValue(
+    "#participantLoginKey",
+    "ambiguous-entry-student"
+  );
+  await page.locator("#participantRouteSignInButton").click();
+  await page
+    .locator(".status-banner.is-error")
+    .filter({ hasText: "Workspace key" })
+    .filter({ hasText: "multiple tenants" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantEntryIssueTitle")
+    .filter({ hasText: "Tenant key required" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueDetail")
+    .filter({ hasText: ambiguousParticipantWorkspaceKey })
+    .filter({ hasText: "2 tenants" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueAction")
+    .filter({ hasText: "Enter the assigned tenant key" })
+    .waitFor();
+  await page
+    .locator("#participantEntryIssueCode")
+    .filter({ hasText: "participant_workspace_ambiguous" })
+    .waitFor();
+  stopAfter("participant-entry-ambiguous-workspace-guidance");
+
   logStep("participant-entry-sign-in");
   const participantEntrySignInLoginKey = "student-entry-sign-in";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
@@ -1278,6 +1369,11 @@ try {
       ),
     participantEntrySignInSessionId,
     { timeout: 15_000 }
+  );
+  assert.equal(
+    await page.locator("#participantEntryIssueCode").count(),
+    0,
+    "Participant entry issue guidance should clear after a successful sign-in."
   );
   stopAfter("participant-entry-sign-in");
   logStep("participant-entry-start-after-sign-in");

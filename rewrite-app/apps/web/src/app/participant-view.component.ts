@@ -31,6 +31,19 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           <span>{{ view.player.groupLabel }}</span>
           <span>{{ view.player.bookletLabel }}</span>
         </div>
+        <section
+          class="participant-entry-issue"
+          *ngIf="view.entryIssue as issue"
+          aria-live="polite"
+        >
+          <div>
+            <span id="participantEntryIssueStatus">{{ issue.statusCode }}</span>
+            <h3 id="participantEntryIssueTitle">{{ issue.title }}</h3>
+            <p id="participantEntryIssueDetail">{{ issue.detail }}</p>
+            <strong id="participantEntryIssueAction">{{ issue.action }}</strong>
+          </div>
+          <code id="participantEntryIssueCode">{{ issue.errorCode }}</code>
+        </section>
         <section class="participant-session-link" *ngIf="view.player.sessionEntryLink">
           <div>
             <span>Session Re-Entry</span>

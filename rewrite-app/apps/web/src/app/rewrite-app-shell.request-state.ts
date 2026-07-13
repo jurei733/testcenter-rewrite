@@ -7,6 +7,7 @@ export interface ShellRequestStateHost {
   foregroundRequestDepth: number;
   readonly activeRequestLabel: WritableSignal<string | null>;
   readonly errorMessage: WritableSignal<string | null>;
+  readonly lastApiError: WritableSignal<ApiErrorLike | null>;
   readonly responseMeta: WritableSignal<string>;
   readonly lastResponse: WritableSignal<string>;
   readonly renderVersion: WritableSignal<number>;
@@ -20,6 +21,7 @@ export function beginForegroundShellRequest(
   host.foregroundRequestDepth += 1;
   host.activeRequestLabel.set(label);
   host.errorMessage.set(null);
+  host.lastApiError.set(null);
 }
 
 export function applyForegroundShellResponse(
@@ -38,6 +40,7 @@ export function applyForegroundShellError(
   apiError: ApiErrorLike
 ): void {
   host.errorMessage.set(apiError.message);
+  host.lastApiError.set(apiError);
   host.responseMeta.set(`${label} · error`);
   host.lastResponse.set(prettyPrintJson(apiError, host.lastResponse()));
 }

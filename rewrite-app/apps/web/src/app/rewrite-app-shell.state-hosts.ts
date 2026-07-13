@@ -1,5 +1,6 @@
 import type { ApplicationRef, WritableSignal } from "@angular/core";
 
+import type { ApiErrorLike } from "./rewrite-app-api.service";
 import type { ShellLifecycleHost } from "./rewrite-app-shell.lifecycle";
 import type { ShellRequestStateHost } from "./rewrite-app-shell.request-state";
 import type {
@@ -652,6 +653,7 @@ export function createShellRequestStateHost(args: {
   setForegroundRequestDepth(nextValue: number): void;
   activeRequestLabel: WritableSignal<string | null>;
   errorMessage: WritableSignal<string | null>;
+  lastApiError: WritableSignal<ApiErrorLike | null>;
   responseMeta: WritableSignal<string>;
   lastResponse: WritableSignal<string>;
   renderVersion: WritableSignal<number>;
@@ -666,6 +668,7 @@ export function createShellRequestStateHost(args: {
     },
     activeRequestLabel: args.activeRequestLabel,
     errorMessage: args.errorMessage,
+    lastApiError: args.lastApiError,
     responseMeta: args.responseMeta,
     lastResponse: args.lastResponse,
     renderVersion: args.renderVersion,

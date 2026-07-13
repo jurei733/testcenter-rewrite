@@ -84,6 +84,7 @@ export class RewriteAppShellRequestService {
 
   clearErrorMessage(): void {
     this.uiState.errorMessage.set(null);
+    this.uiState.lastApiError.set(null);
   }
 
   setResponseMeta(value: string): void {
@@ -98,6 +99,7 @@ export class RewriteAppShellRequestService {
       },
       activeRequestLabel: this.uiState.activeRequestLabel,
       errorMessage: this.uiState.errorMessage,
+      lastApiError: this.uiState.lastApiError,
       responseMeta: this.uiState.responseMeta,
       lastResponse: this.uiState.lastResponse,
       renderVersion: this.uiState.renderVersion,

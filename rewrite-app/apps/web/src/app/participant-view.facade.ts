@@ -18,6 +18,7 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
+import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -72,6 +73,14 @@ type ParticipantPlayerUnitItem = {
   isCurrent: boolean;
   hasResponse: boolean;
   canOpen: boolean;
+};
+
+type ParticipantEntryIssue = {
+  title: string;
+  detail: string;
+  action: string;
+  errorCode: string;
+  statusCode: string;
 };
 
 type ParticipantEntryParameters = {
@@ -433,6 +442,15 @@ export class ParticipantViewFacade {
       draftStateDetail,
       hasUnsavedResponse
     };
+  }
+
+  get entryIssue(): ParticipantEntryIssue | null {
+    const error = this.uiState.lastApiError();
+    if (!error) {
+      return null;
+    }
+
+    return this.describeParticipantEntryIssue(error);
   }
 
   resumeSession(): void {
@@ -1002,5 +1020,101 @@ export class ParticipantViewFacade {
     } catch {
       return null;
     }
+  }
+
+  private describeParticipantEntryIssue(
+    error: ApiErrorLike
+  ): ParticipantEntryIssue {
+    const details = this.readErrorDetails(error);
+    const workspaceKey =
+      typeof details.workspaceKey === "string"
+        ? details.workspaceKey
+        : this.workspace.workspaceKey.trim() || "the workspace";
+    const matchingWorkspaceCount =
+      typeof details.matchingWorkspaceCount === "number"
+        ? details.matchingWorkspaceCount
+        : null;
+    const statusCode = error.statusCode ? `HTTP ${error.statusCode}` : "API error";
+
+    switch (error.error) {
+      case "participant_workspace_ambiguous":
+        return {
+          title: "Tenant key required",
+          detail: matchingWorkspaceCount
+            ? `Workspace '${workspaceKey}' exists in ${matchingWorkspaceCount} tenants.`
+            : `Workspace '${workspaceKey}' exists in multiple tenants.`,
+          action:
+            "Enter the assigned tenant key or open a participant link that includes tenantKey.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "participant_workspace_key_required":
+        return {
+          title: "Workspace key missing",
+          detail: "The participant entry cannot find a workspace without the assigned workspace key.",
+          action: "Enter the workspace key from the invitation or operator launchpad.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "participant_login_key_required":
+        return {
+          title: "Login key missing",
+          detail: "The participant entry needs the assigned login key before it can create or resume a session.",
+          action: "Enter the login key from the participant roster or direct entry link.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "workspace_not_found":
+        return {
+          title: "Workspace not found",
+          detail: error.message,
+          action:
+            "Check the tenant and workspace keys, then use Sign In again. If the link came from an operator, regenerate it from the current workspace.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "workspace_has_no_active_content_release":
+        return {
+          title: "No active test release",
+          detail: "This workspace exists, but no content release is active for participants yet.",
+          action:
+            "Ask an operator to activate a release for this workspace, then start or resume again.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "booklet_not_found":
+        return {
+          title: "Assigned booklet unavailable",
+          detail: error.message,
+          action:
+            "Check the booklet key or ask an operator to update the roster assignment for the active release.",
+          errorCode: error.error,
+          statusCode
+        };
+      case "participant_session_not_found":
+        return {
+          title: "Session link expired",
+          detail: "The saved participant session could not be found anymore.",
+          action:
+            "Use Leave Session, then sign in again with the assigned workspace and login key.",
+          errorCode: error.error,
+          statusCode
+        };
+      default:
+        return {
+          title: "Participant entry needs attention",
+          detail: error.message,
+          action:
+            "Check the entered keys and try again. If the problem persists, share the error code with an operator.",
+          errorCode: error.error,
+          statusCode
+        };
+    }
+  }
+
+  private readErrorDetails(error: ApiErrorLike): Record<string, unknown> {
+    return error.details && typeof error.details === "object"
+      ? (error.details as Record<string, unknown>)
+      : {};
   }
 }

@@ -265,6 +265,65 @@ textarea {
   line-height: 1.35;
 }
 
+.participant-entry-issue {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(196, 82, 47, 0.34);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(241, 216, 195, 0.88), rgba(255, 252, 246, 0.86)),
+    radial-gradient(circle at top right, rgba(196, 82, 47, 0.18), transparent 36%);
+}
+
+.participant-entry-issue span,
+.participant-entry-issue strong,
+.participant-entry-issue code {
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.participant-entry-issue span {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(196, 82, 47, 0.12);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-entry-issue h3 {
+  margin: 0 0 6px;
+}
+
+.participant-entry-issue p {
+  margin-bottom: 10px;
+}
+
+.participant-entry-issue strong {
+  display: block;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.participant-entry-issue code {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -1172,6 +1231,10 @@ pre {
     width: 100%;
     min-width: 0;
     text-align: left;
+  }
+
+  .participant-entry-issue {
+    display: grid;
   }
 
   .participant-session-link {

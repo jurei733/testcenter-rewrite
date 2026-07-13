@@ -1,5 +1,6 @@
 import { Injectable, signal } from "@angular/core";
 
+import type { ApiErrorLike } from "./rewrite-app-api.service";
 import {
   DEFAULT_SOURCE_DOCUMENT,
   createInitialSummaryCards,
@@ -20,6 +21,7 @@ export class RewriteAppUiStateService {
   readonly lastResponse = signal("No request sent yet.");
   readonly activeRequestLabel = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
+  readonly lastApiError = signal<ApiErrorLike | null>(null);
 
   readonly feedback = createInitialShellFeedbackState(createInitialSummaryCards);
   readonly workspace = createInitialShellWorkspaceState();
