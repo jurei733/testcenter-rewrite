@@ -420,6 +420,17 @@ try {
           .click({ force: true });
         break;
       } catch (error) {
+        if (String(error?.message).includes("not visible")) {
+          await actionScope
+            .getByRole("button", { name: buttonName, exact: true })
+            .first()
+            .evaluate(button => {
+              if (button instanceof HTMLButtonElement) {
+                button.click();
+              }
+            });
+          break;
+        }
         if (attempt === 3 || !String(error?.message).includes("not attached")) {
           throw error;
         }
@@ -3094,8 +3105,30 @@ try {
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Source package window" }) })
+    .filter({ hasText: "1 source package row(s) loaded for the current filters" })
+    .filter({ hasText: "4 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "status, media type, file name, latest import" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
     .filter({ hasText: retriedSourcePackageFileName })
     .filter({ hasText: "completed" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Import Jobs" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Import job window" }) })
+    .filter({ hasText: "1 import job row(s) loaded for the current filters" })
+    .filter({ hasText: "2 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "status, source package" })
     .waitFor();
   await page
     .locator("article.card")
@@ -3106,8 +3139,20 @@ try {
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Content Releases" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Content release window" }) })
+    .filter({ hasText: "1 content release row(s) loaded for the current filters" })
+    .filter({ hasText: "3 active filter(s)" })
+    .filter({ hasText: "limit 1" })
+    .filter({ hasText: "Loaded Records" })
+    .filter({ hasText: "status, import job, source package" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Content Releases" }) })
     .filter({ hasText: "staged" })
     .waitFor();
+  stopAfter("content-read-filters");
 
   logStep("nav-runtime-before-complete");
   await page.locator('[data-view-nav="runtime"]').click();

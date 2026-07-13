@@ -442,94 +442,151 @@ export class ContentViewFacade {
     const payload = parseJsonDocument<ListSourcePackagesResponse>(
       this.content.sourcePackagesView
     );
-    return payload?.items.map(item => ({
-      headline: item.sourcePackage.fileName,
-      subline: item.sourcePackage.sourcePackageId,
-      badges: [
-        item.sourcePackage.status,
-        item.latestImportJob?.status ?? "no import"
-      ],
-      rows: [
-        { label: "Media Type", value: item.sourcePackage.mediaType },
-        {
-          label: "Uploaded",
-          value: this.formatDateTime(item.sourcePackage.uploadedAt)
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Source package window",
+        "source package",
+        payload.items.length,
+        this.content.sourcePackageLimit,
+        [
+          this.content.sourcePackageStatusFilter.trim() ? "status" : "",
+          this.content.sourcePackageMediaTypeFilter.trim() ? "media type" : "",
+          this.content.sourcePackageFileNameFilter.trim() ? "file name" : "",
+          this.content.sourcePackageLatestImportStatusFilter.trim()
+            ? "latest import"
+            : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(item => ({
+        headline: item.sourcePackage.fileName,
+        subline: item.sourcePackage.sourcePackageId,
+        badges: [
+          item.sourcePackage.status,
+          item.latestImportJob?.status ?? "no import"
+        ],
+        rows: [
+          { label: "Media Type", value: item.sourcePackage.mediaType },
+          {
+            label: "Uploaded",
+            value: this.formatDateTime(item.sourcePackage.uploadedAt)
+          }
+        ],
+        selected:
+          this.content.sourcePackageId.trim() === item.sourcePackage.sourcePackageId,
+        actionLabel: "Select + Load",
+        actionPayload: {
+          sourcePackageId: item.sourcePackage.sourcePackageId,
+          sourceFileName: item.sourcePackage.fileName,
+          sourceMediaType: item.sourcePackage.mediaType
         }
-      ],
-      selected:
-        this.content.sourcePackageId.trim() === item.sourcePackage.sourcePackageId,
-      actionLabel: "Select + Load",
-      actionPayload: {
-        sourcePackageId: item.sourcePackage.sourcePackageId,
-        sourceFileName: item.sourcePackage.fileName,
-        sourceMediaType: item.sourcePackage.mediaType
-      }
-    })) ?? [];
+      }))
+    ];
   }
 
   get importJobItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListImportJobsResponse>(this.content.importJobsView);
-    return payload?.items.map(item => ({
-      headline: item.importJob.importJobId,
-      subline: item.sourcePackage?.fileName ?? "Unknown source package",
-      badges: [
-        item.importJob.status,
-        item.importJob.diagnostics.length > 0
-          ? `${item.importJob.diagnostics.length} diagnostic(s)`
-          : "clean"
-      ],
-      rows: [
-        {
-          label: "Finished",
-          value: item.importJob.finishedAt
-            ? this.formatDateTime(item.importJob.finishedAt)
-            : "not finished"
-        },
-        {
-          label: "Selected",
-          value:
-            this.content.importJobId.trim() === item.importJob.importJobId ? "yes" : "no"
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Import job window",
+        "import job",
+        payload.items.length,
+        this.content.importJobLimit,
+        [
+          this.content.importJobStatusFilter.trim() ? "status" : "",
+          this.content.importJobSourcePackageFilter.trim() ? "source package" : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(item => ({
+        headline: item.importJob.importJobId,
+        subline: item.sourcePackage?.fileName ?? "Unknown source package",
+        badges: [
+          item.importJob.status,
+          item.importJob.diagnostics.length > 0
+            ? `${item.importJob.diagnostics.length} diagnostic(s)`
+            : "clean"
+        ],
+        rows: [
+          {
+            label: "Finished",
+            value: item.importJob.finishedAt
+              ? this.formatDateTime(item.importJob.finishedAt)
+              : "not finished"
+          },
+          {
+            label: "Selected",
+            value:
+              this.content.importJobId.trim() === item.importJob.importJobId
+                ? "yes"
+                : "no"
+          }
+        ],
+        selected: this.content.importJobId.trim() === item.importJob.importJobId,
+        actionLabel: "Select + Load",
+        actionPayload: {
+          importJobId: item.importJob.importJobId,
+          sourcePackageId: item.sourcePackage?.sourcePackageId ?? ""
         }
-      ],
-      selected: this.content.importJobId.trim() === item.importJob.importJobId,
-      actionLabel: "Select + Load",
-      actionPayload: {
-        importJobId: item.importJob.importJobId,
-        sourcePackageId: item.sourcePackage?.sourcePackageId ?? ""
-      }
-    })) ?? [];
+      }))
+    ];
   }
 
   get contentReleaseItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListContentReleasesResponse>(
       this.content.contentReleasesView
     );
-    return payload?.items.map(item => ({
-      headline: item.contentRelease.releaseLabel,
-      subline: item.contentRelease.contentReleaseId,
-      badges: [
-        item.contentRelease.status,
-        `${item.openTestRunCount} open run(s)`
-      ],
-      rows: [
-        {
-          label: "Sessions",
-          value: String(item.participantSessionCount)
-        },
-        {
-          label: "Activated",
-          value: item.contentRelease.activatedAt
-            ? this.formatDateTime(item.contentRelease.activatedAt)
-            : "not activated"
+    if (!payload) {
+      return [];
+    }
+
+    return [
+      this.buildReadWindowItem(
+        "Content release window",
+        "content release",
+        payload.items.length,
+        this.content.contentReleaseLimit,
+        [
+          this.content.contentReleaseStatusFilter.trim() ? "status" : "",
+          this.content.contentReleaseImportJobFilter.trim() ? "import job" : "",
+          this.content.contentReleaseSourcePackageFilter.trim()
+            ? "source package"
+            : ""
+        ].filter(Boolean)
+      ),
+      ...payload.items.map(item => ({
+        headline: item.contentRelease.releaseLabel,
+        subline: item.contentRelease.contentReleaseId,
+        badges: [
+          item.contentRelease.status,
+          `${item.openTestRunCount} open run(s)`
+        ],
+        rows: [
+          {
+            label: "Sessions",
+            value: String(item.participantSessionCount)
+          },
+          {
+            label: "Activated",
+            value: item.contentRelease.activatedAt
+              ? this.formatDateTime(item.contentRelease.activatedAt)
+              : "not activated"
+          }
+        ],
+        selected:
+          this.content.contentReleaseId.trim() === item.contentRelease.contentReleaseId,
+        actionLabel: "Select + Load",
+        actionPayload: {
+          contentReleaseId: item.contentRelease.contentReleaseId
         }
-      ],
-      selected:
-        this.content.contentReleaseId.trim() === item.contentRelease.contentReleaseId,
-      actionLabel: "Select + Load",
-      actionPayload: {
-        contentReleaseId: item.contentRelease.contentReleaseId
-      }
-    })) ?? [];
+      }))
+    ];
   }
 
   get sourcePackageDetailItems(): RecordCollectionItem[] {
@@ -1659,6 +1716,28 @@ export class ContentViewFacade {
     }
 
     return this.contentService.loadSourcePackageDetail();
+  }
+
+  private buildReadWindowItem(
+    headline: string,
+    recordLabel: string,
+    loadedCount: number,
+    limit: string,
+    activeFilters: string[]
+  ): RecordCollectionItem {
+    return {
+      headline,
+      subline: `${loadedCount} ${recordLabel} row(s) loaded for the current filters`,
+      badges: [`${activeFilters.length} active filter(s)`, `limit ${limit}`],
+      rows: [
+        { label: "Loaded Records", value: String(loadedCount) },
+        { label: "Limit", value: limit },
+        {
+          label: "Active Filters",
+          value: activeFilters.length > 0 ? activeFilters.join(", ") : "none"
+        }
+      ]
+    };
   }
 
   private inferMediaTypeFromFile(file: File): string {
