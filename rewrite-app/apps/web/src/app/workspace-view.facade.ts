@@ -696,10 +696,12 @@ export class WorkspaceViewFacade {
         },
         { label: "Imported", value: this.formatDateTime(rosterEntry.importedAt) }
       ],
-      actionLabel: "Open Participant Detail",
+      actionLabel: "Prepare Runtime",
       actionPayload: {
+        participantCommand: "prepareRuntime",
         participantLoginKey: rosterEntry.loginKey,
-        groupKey: rosterEntry.groupKey
+        groupKey: rosterEntry.groupKey,
+        bookletKey: rosterEntry.bookletKey ?? ""
       }
     }));
   }
@@ -1825,6 +1827,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "prepareRuntime") {
+      this.prepareParticipantRuntime(item);
+      return;
+    }
+
     if (item.actionPayload?.testRunId?.trim()) {
       this.openStudyMonitorRun(item);
       return;
@@ -1939,6 +1946,31 @@ export class WorkspaceViewFacade {
     this.viewState.onActionAsync(() =>
       this.workspaceService.loadStudyMonitorRun(testRunId)
     );
+  }
+
+  prepareParticipantRuntime(item: RecordCollectionItem): void {
+    const loginKey = item.actionPayload?.participantLoginKey?.trim();
+    if (!loginKey) {
+      return;
+    }
+
+    const groupKey =
+      item.actionPayload?.groupKey?.trim() || `group:${loginKey}`;
+    const bookletKey = item.actionPayload?.bookletKey?.trim() ?? "";
+    const runtime = this.uiState.runtime;
+    runtime.loginKey = loginKey;
+    runtime.groupKey = groupKey;
+    runtime.bookletKey = bookletKey;
+    runtime.participantSessionId = "";
+    runtime.testRunId = "";
+    runtime.currentUnitKey = "";
+    runtime.currentUnitResponse = "";
+    runtime.currentRunStateView =
+      'Participant prepared from monitor. Use "Sign In" or "Start Participant" in Runtime.';
+    runtime.runtimeStateView =
+      'Participant prepared from monitor. Use "Sign In" or "Start Participant" in Runtime.';
+    this.persistState();
+    void this.router.navigateByUrl("/runtime");
   }
 
   refreshTenantDirectory(): void {
