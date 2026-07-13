@@ -418,19 +418,20 @@ For browser-level frontend verification, run:
 npm run install:browsers
 npm run smoke:ui:content
 npm run smoke:ui:activation-roster-warnings
+npm run smoke:ui:review-readiness
 npm run smoke:ui
 npm run smoke:ui:operator-auth
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:ui:postgres
 ```
 
-The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The `smoke:ui:activation-roster-warnings` variant continues to the staged-release roster compatibility warning drill-down before stopping. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
+The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The `smoke:ui:activation-roster-warnings` variant continues to the staged-release roster compatibility warning drill-down before stopping. The `smoke:ui:review-readiness` variant continues through participant start, detailed response filtering, review creation/filtering, and the runtime review-readiness checklist. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
 - source-package import, release activation, and roster-compatibility warning drill-downs for staged releases
 - participant sign-in and session resume
 - participant roster, participant-session, and open-run export through the runtime shell
-- response and review CSV export through the runtime shell
+- response and review CSV export plus review-readiness inspection through the runtime shell
 - study-monitor summary, prioritized attention cards, group drill-down, booklet drill-down, unit-progress cards, run drill-down, study-monitor CSV export, filtered participant-matrix CSV export, and open-run CSV export
 - workspace activity filtering and workspace log CSV export
 - failed import diagnostics on a broken package

@@ -45,6 +45,8 @@
     "smoke:ui:content:built": "UI_SMOKE_STOP_AFTER_STEP=content-prompt-read-model FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-content.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:activation-roster-warnings": "npm run build && UI_SMOKE_STOP_AFTER_STEP=activation-roster-warning-cards FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-activation-roster-warnings.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:activation-roster-warnings:built": "UI_SMOKE_STOP_AFTER_STEP=activation-roster-warning-cards FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-activation-roster-warnings.sqlite node ./scripts/smoke-ui.mjs",
+    "smoke:ui:review-readiness": "npm run build && UI_SMOKE_STOP_AFTER_STEP=filter-reviews FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-review-readiness.sqlite node ./scripts/smoke-ui.mjs",
+    "smoke:ui:review-readiness:built": "UI_SMOKE_STOP_AFTER_STEP=filter-reviews FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-review-readiness.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:operator-auth": "npm run build && FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/ui-smoke-auth.sqlite node ./scripts/smoke-ui.mjs",
     "smoke:ui:postgres": "npm run build && node ./scripts/run-postgres-ui-smoke.mjs",
     "smoke:ui:postgres:built": "node ./scripts/run-postgres-ui-smoke.mjs",
