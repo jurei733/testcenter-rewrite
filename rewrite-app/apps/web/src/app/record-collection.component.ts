@@ -70,7 +70,13 @@ export type RecordCollectionItem = {
           </dl>
 
           <div class="record-card-actions" *ngIf="item.actionLabel">
-            <button type="button" class="ghost" (click)="itemAction.emit(item)">
+            <button
+              type="button"
+              class="ghost"
+              [attr.aria-description]="item.headline"
+              [attr.title]="item.headline"
+              (click)="itemAction.emit(item)"
+            >
               {{ item.actionLabel }}
             </button>
           </div>
