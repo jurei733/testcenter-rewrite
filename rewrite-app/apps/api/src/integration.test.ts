@@ -3924,6 +3924,112 @@ test("source document import normalizes fallback labels and duplicate entries", 
   );
 });
 
+test("source document import accepts JSON booklet and unit maps", async () => {
+  const tenantKey = "integration-tenant-json-maps";
+  const workspaceKey = "integration-workspace-json-maps";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "json-mapped-manifest.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        contentStructure: {
+          booklets: {
+            "booklet:mapped": {
+              title: "Mapped Booklet",
+              units: {
+                "unit:mapped-a": {
+                  title: "Mapped Unit A",
+                  body: "Use mapped body A."
+                },
+                "unit:mapped-b": "Mapped Unit B",
+                "unit:mapped-c": {
+                  displayName: "Mapped Unit C",
+                  description: "Mapped setup C"
+                }
+              }
+            }
+          }
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              description?: string;
+              content?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklet:mapped",
+          displayLabel: "Mapped Booklet",
+          unitEntries: [
+            {
+              unitKey: "unit:mapped-a",
+              displayLabel: "Mapped Unit A",
+              content: "Use mapped body A."
+            },
+            { unitKey: "unit:mapped-b", displayLabel: "Mapped Unit B" },
+            {
+              unitKey: "unit:mapped-c",
+              displayLabel: "Mapped Unit C",
+              description: "Mapped setup C"
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts nested testcenter package manifests", async () => {
   const tenantKey = "integration-tenant-package-manifest";
   const workspaceKey = "integration-workspace-package-manifest";

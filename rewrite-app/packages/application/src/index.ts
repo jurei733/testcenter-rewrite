@@ -2385,8 +2385,149 @@ const normalizeParsedJsonContentStructure = (
     }
     return [];
   };
+  const hasAnyField = (
+    value: Record<string, unknown>,
+    candidateNames: string[]
+  ): boolean => {
+    const normalizedKeys = new Set(
+      Object.keys(value).map(key => key.toLowerCase())
+    );
+    return candidateNames.some(candidateName =>
+      normalizedKeys.has(candidateName.toLowerCase())
+    );
+  };
+  const readKeyedMapEntries = (
+    value: unknown,
+    options: {
+      keyFieldName: string;
+      listFieldName?: string;
+      singleEntryFieldNames: string[];
+    }
+  ): unknown[] => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    const objectValue = asObject(value);
+    if (!objectValue) {
+      return [];
+    }
+
+    if (hasAnyField(objectValue, options.singleEntryFieldNames)) {
+      return [objectValue];
+    }
+
+    return Object.entries(objectValue).map(([entryKey, entryValue]) => {
+      const entryObject = asObject(entryValue);
+      if (entryObject) {
+        return { [options.keyFieldName]: entryKey, ...entryObject };
+      }
+
+      if (Array.isArray(entryValue)) {
+        return {
+          [options.keyFieldName]: entryKey,
+          [options.listFieldName ?? "items"]: entryValue
+        };
+      }
+
+      if (typeof entryValue === "string") {
+        return {
+          [options.keyFieldName]: entryKey,
+          displayLabel: entryValue
+        };
+      }
+
+      return { [options.keyFieldName]: entryKey };
+    });
+  };
+  const readBookletEntries = (...values: unknown[]): unknown[] => {
+    for (const value of values) {
+      const entries = readKeyedMapEntries(value, {
+        keyFieldName: "bookletKey",
+        listFieldName: "unitEntries",
+        singleEntryFieldNames: [
+          "bookletKey",
+          "bookletId",
+          "testletKey",
+          "testletId",
+          "assessmentTestKey",
+          "assessmentTestId",
+          "assessmentSectionKey",
+          "assessmentSectionId",
+          "sectionKey",
+          "sectionId",
+          "identifier",
+          "key",
+          "id",
+          "alias",
+          "code",
+          "displayLabel",
+          "label",
+          "title",
+          "name",
+          "displayName",
+          "unitEntries",
+          "units",
+          "unitRefs",
+          "items",
+          "resources",
+          "assessmentItemRefs",
+          "assessmentItems"
+        ]
+      });
+      if (entries.length > 0) {
+        return entries;
+      }
+    }
+    return [];
+  };
+  const readUnitEntries = (value: unknown): unknown[] =>
+    readKeyedMapEntries(value, {
+      keyFieldName: "unitKey",
+      singleEntryFieldNames: [
+        "unitKey",
+        "unitId",
+        "identifier",
+        "key",
+        "id",
+        "unitRef",
+        "ref",
+        "identifierref",
+        "identifierRef",
+        "alias",
+        "code",
+        "path",
+        "src",
+        "uri",
+        "file",
+        "fileName",
+        "filename",
+        "resourceId",
+        "moduleId",
+        "taskId",
+        "href",
+        "name",
+        "displayLabel",
+        "label",
+        "title",
+        "displayName",
+        "description",
+        "summary",
+        "instructions",
+        "content",
+        "prompt",
+        "question",
+        "body",
+        "itemBody",
+        "item-body",
+        "text",
+        "stimulus",
+        "markdown",
+        "html"
+      ]
+    });
   const readExplicitBookletEntries = (value: Record<string, unknown>): unknown[] =>
-    readEntries(
+    readBookletEntries(
       value.bookletEntries,
       value.booklets,
       value.testlets,
@@ -2394,7 +2535,7 @@ const normalizeParsedJsonContentStructure = (
       value.testlet
     );
   const readAssessmentTestEntries = (value: Record<string, unknown>): unknown[] =>
-    readEntries(
+    readBookletEntries(
       value.assessmentTests,
       value.assessmentTest,
       value["assessment-tests"],
@@ -2403,7 +2544,7 @@ const normalizeParsedJsonContentStructure = (
   const readAssessmentSectionEntries = (
     value: Record<string, unknown>
   ): unknown[] =>
-    readEntries(
+    readBookletEntries(
       value.assessmentSections,
       value.assessmentSection,
       value["assessment-sections"],
@@ -2807,37 +2948,37 @@ const normalizeParsedJsonContentStructure = (
 
         const booklet = rawBooklet as Record<string, unknown>;
         const rawUnits = [
-          ...readEntries(booklet.unitEntries),
-          ...readEntries(booklet.units),
-          ...readEntries(booklet.unitRefs),
-          ...readEntries(booklet.unitReferences),
-          ...readEntries(booklet.unitFiles),
-          ...readEntries(booklet.items),
-          ...readEntries(booklet.resources),
-          ...readEntries(booklet.files),
-          ...readEntries(booklet.modules),
-          ...readEntries(booklet.tasks),
-          ...readEntries(booklet.assessmentItemRefs),
-          ...readEntries(booklet.assessmentItemRef),
-          ...readEntries(booklet.assessmentItems),
-          ...readEntries(booklet.assessmentItem),
-          ...readEntries(booklet["assessment-items"]),
-          ...readEntries(booklet["assessment-item"]),
-          ...readEntries(booklet["assessment-item-refs"]),
-          ...readEntries(booklet["assessment-item-ref"]),
-          ...readEntries(booklet.itemRefs),
-          ...readEntries(booklet.itemRef),
-          ...readEntries(booklet["item-refs"]),
-          ...readEntries(booklet["item-ref"]),
-          ...readEntries(booklet.unit),
-          ...readEntries(booklet.unitRef),
-          ...readEntries(booklet.unitReference),
-          ...readEntries(booklet.unitFile),
-          ...readEntries(booklet.item),
-          ...readEntries(booklet.resource),
-          ...readEntries(booklet.file),
-          ...readEntries(booklet.module),
-          ...readEntries(booklet.task)
+          ...readUnitEntries(booklet.unitEntries),
+          ...readUnitEntries(booklet.units),
+          ...readUnitEntries(booklet.unitRefs),
+          ...readUnitEntries(booklet.unitReferences),
+          ...readUnitEntries(booklet.unitFiles),
+          ...readUnitEntries(booklet.items),
+          ...readUnitEntries(booklet.resources),
+          ...readUnitEntries(booklet.files),
+          ...readUnitEntries(booklet.modules),
+          ...readUnitEntries(booklet.tasks),
+          ...readUnitEntries(booklet.assessmentItemRefs),
+          ...readUnitEntries(booklet.assessmentItemRef),
+          ...readUnitEntries(booklet.assessmentItems),
+          ...readUnitEntries(booklet.assessmentItem),
+          ...readUnitEntries(booklet["assessment-items"]),
+          ...readUnitEntries(booklet["assessment-item"]),
+          ...readUnitEntries(booklet["assessment-item-refs"]),
+          ...readUnitEntries(booklet["assessment-item-ref"]),
+          ...readUnitEntries(booklet.itemRefs),
+          ...readUnitEntries(booklet.itemRef),
+          ...readUnitEntries(booklet["item-refs"]),
+          ...readUnitEntries(booklet["item-ref"]),
+          ...readUnitEntries(booklet.unit),
+          ...readUnitEntries(booklet.unitRef),
+          ...readUnitEntries(booklet.unitReference),
+          ...readUnitEntries(booklet.unitFile),
+          ...readUnitEntries(booklet.item),
+          ...readUnitEntries(booklet.resource),
+          ...readUnitEntries(booklet.file),
+          ...readUnitEntries(booklet.module),
+          ...readUnitEntries(booklet.task)
         ];
 
         return {
