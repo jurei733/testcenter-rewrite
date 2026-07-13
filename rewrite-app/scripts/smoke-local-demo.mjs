@@ -459,8 +459,8 @@ try {
     { timeout: 15_000 }
   );
   page.once("dialog", async dialog => {
-    assert.match(dialog.message(), /group 'group:student-demo'/);
-    await dialog.accept();
+    assert.match(dialog.message(), /Type 'group:student-demo'/);
+    await dialog.accept("group:student-demo");
   });
   await page.getByRole("button", { name: "Delete Group Results" }).click();
   await page.getByText("Group Results Deleted").waitFor({ timeout: 15_000 });
