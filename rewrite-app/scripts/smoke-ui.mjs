@@ -2269,7 +2269,7 @@ try {
     .filter({ hasText: "review(s)" })
     .filter({ hasText: "Unit Reviews" })
     .waitFor();
-  await page
+  const reviewReadinessPausedWorkCard = page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Review Readiness" }) })
     .locator(".record-card")
@@ -2277,8 +2277,17 @@ try {
     .filter({ hasText: "answered" })
     .filter({ hasText: "reviewed" })
     .filter({ hasText: "Filtered response smoke" })
-    .filter({ hasText: "Filtered review smoke" })
-    .waitFor();
+    .filter({ hasText: "Filtered review smoke" });
+  await reviewReadinessPausedWorkCard.waitFor();
+  await reviewReadinessPausedWorkCard
+    .getByRole("button", { name: "Select Review Scope" })
+    .click();
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#reviewReviewerFilter", "operator-ui");
+  await expectInputValue("#reviewCategoryFilter", "note");
   stopAfter("filter-reviews");
   logStep("export-response-csv");
   const responseDownloadPromise = page.waitForEvent("download");

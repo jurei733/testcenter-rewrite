@@ -2107,6 +2107,59 @@ export class RuntimeViewFacade {
     this.selectTestRun(item);
   }
 
+  selectReviewReadinessItem(item: RecordCollectionItem): void {
+    const testRunId = item.actionPayload?.testRunId?.trim();
+    if (!testRunId) {
+      return;
+    }
+
+    const currentUnitKey = item.actionPayload?.currentUnitKey ?? "";
+    const participantSessionId =
+      item.actionPayload?.participantSessionId?.trim() ||
+      this.runtime.participantSessionId.trim();
+
+    if (item.actionPayload?.reviewId) {
+      this.runtime.reviewId = item.actionPayload.reviewId;
+    }
+    if (item.actionPayload?.reviewerId) {
+      this.runtime.reviewerId = item.actionPayload.reviewerId;
+    }
+    if (item.actionPayload?.reviewCategory) {
+      this.runtime.reviewCategory = item.actionPayload.reviewCategory;
+    }
+    if (item.actionPayload?.reviewComment) {
+      this.runtime.reviewComment = item.actionPayload.reviewComment;
+    }
+
+    this.runtime.testRunId = testRunId;
+    this.runtime.currentUnitKey = currentUnitKey;
+    if (participantSessionId) {
+      this.runtime.participantSessionId = participantSessionId;
+    }
+    this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.detailedResponseSessionFilter = participantSessionId;
+    this.runtime.detailedResponseRunFilter = testRunId;
+    this.runtime.detailedResponseUnitFilter = currentUnitKey;
+    this.runtime.reviewLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.reviewGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.reviewSessionFilter = participantSessionId;
+    this.runtime.reviewRunFilter = testRunId;
+    this.runtime.reviewUnitFilter = currentUnitKey;
+    this.runtime.reviewReviewerFilter = this.runtime.reviewerId.trim();
+    this.runtime.reviewCategoryFilter = this.runtime.reviewCategory.trim();
+    this.persistState();
+
+    this.viewState.onActionAsync(async () => {
+      if (this.runtime.participantSessionId.trim()) {
+        await this.runtimeService.loadParticipantSessionDetail();
+        await this.runtimeService.refreshRuntimeReads(true);
+      }
+      await this.runtimeService.loadDetailedResponses();
+      await this.runtimeService.loadReviews();
+    });
+  }
+
   private findParticipantSessionIdByLoginKey(loginKey: string): string | null {
     const payload = parseJsonDocument<ListParticipantSessionsResponse>(
       this.runtime.participantSessionsView

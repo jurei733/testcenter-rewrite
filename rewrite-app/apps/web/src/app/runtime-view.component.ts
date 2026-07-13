@@ -366,7 +366,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Review Readiness"
         subtitle="Answered units and attached reviews for the selected participant run."
         [items]="view.reviewReadinessItems"
-        (itemAction)="view.selectReview($event)"
+        (itemAction)="view.selectReviewReadinessItem($event)"
         emptyState="Select a participant run and load its current state to inspect review readiness."
       ></app-record-collection>
 
