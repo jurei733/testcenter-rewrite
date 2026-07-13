@@ -161,6 +161,16 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <strong id="participantRouteDraftLabel">{{ view.player.draftStateLabel }}</strong>
             <p id="participantRouteDraftDetail">{{ view.player.draftStateDetail }}</p>
           </section>
+          <section
+            class="participant-completion-readiness"
+            [class.is-ready]="view.player.completionReadinessState === 'ready'"
+            [class.is-complete]="view.player.completionReadinessState === 'complete'"
+            aria-live="polite"
+          >
+            <span>Completion Readiness</span>
+            <strong id="participantRouteCompletionReadinessLabel">{{ view.player.completionReadinessLabel }}</strong>
+            <p id="participantRouteCompletionReadinessDetail">{{ view.player.completionReadinessDetail }}</p>
+          </section>
           <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.unitItems.length > 0">
             <header>
               <span>Booklet Units</span>

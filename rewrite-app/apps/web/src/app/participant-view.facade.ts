@@ -40,6 +40,9 @@ type ParticipantPlayerState = {
   missingResponseLabel: string;
   progressPercent: number;
   completionLabel: string;
+  completionReadinessLabel: string;
+  completionReadinessDetail: string;
+  completionReadinessState: "idle" | "incomplete" | "ready" | "complete";
   isComplete: boolean;
   previousUnitKey: string | null;
   nextUnitKey: string | null;
@@ -276,6 +279,10 @@ export class ParticipantViewFacade {
         missingResponseLabel: "No booklet loaded",
         progressPercent: 0,
         completionLabel: "Not started",
+        completionReadinessLabel: "Not ready",
+        completionReadinessDetail:
+          "Start or resume a test before checking completion readiness.",
+        completionReadinessState: "idle",
         isComplete: false,
         previousUnitKey: null,
         nextUnitKey: null,
@@ -342,6 +349,15 @@ export class ParticipantViewFacade {
     const currentDraft = this.runtime.currentUnitResponse;
     const hasUnsavedResponse =
       currentState.testRun.status !== "completed" && currentDraft !== savedUnitResponse;
+    const effectiveCompletion = this.getEffectiveCompletionState({
+      answeredUnitCount,
+      currentDraft,
+      currentUnitKey: unitKey,
+      hasUnsavedResponse,
+      isComplete,
+      totalUnitCount,
+      unitItems
+    });
     const draftStateLabel = this.getDraftStateLabel({
       canSaveProgress: availableActions.includes("save_progress"),
       hasSavedResponse: savedUnitResponse.length > 0,
@@ -381,6 +397,9 @@ export class ParticipantViewFacade {
           ? `Completed ${currentState.testRun.completedAt}`
           : "Completed"
         : "Not completed yet",
+      completionReadinessLabel: effectiveCompletion.label,
+      completionReadinessDetail: effectiveCompletion.detail,
+      completionReadinessState: effectiveCompletion.state,
       isComplete,
       previousUnitKey,
       nextUnitKey,
@@ -452,13 +471,12 @@ export class ParticipantViewFacade {
 
   completeRun(): void {
     const player = this.player;
-    const effectiveCompletionState = this.getEffectiveCompletionState(player);
     if (
       player.canComplete &&
       !player.isComplete &&
-      effectiveCompletionState.progressPercent < 100 &&
+      player.completionReadinessState !== "ready" &&
       !globalThis.window?.confirm(
-        `Complete this test with ${effectiveCompletionState.missingResponseLabel.toLowerCase()}`
+        `Complete this test with ${player.completionReadinessLabel.toLowerCase()}?`
       )
     ) {
       return;
@@ -807,35 +825,65 @@ export class ParticipantViewFacade {
     );
   }
 
-  private getEffectiveCompletionState(player: ParticipantPlayerState): {
-    progressPercent: number;
-    missingResponseLabel: string;
+  private getEffectiveCompletionState(args: {
+    answeredUnitCount: number;
+    currentDraft: string;
+    currentUnitKey: string;
+    hasUnsavedResponse: boolean;
+    isComplete: boolean;
+    totalUnitCount: number;
+    unitItems: ParticipantPlayerUnitItem[];
+  }): {
+    label: string;
+    detail: string;
+    state: ParticipantPlayerState["completionReadinessState"];
   } {
-    const currentState = this.readCurrentRunState();
-    const currentUnitKey = this.runtime.currentUnitKey.trim();
-    const draftAddsCurrentResponse =
-      currentState != null &&
-      currentUnitKey.length > 0 &&
-      this.runtime.currentUnitResponse.length > 0 &&
-      !this.hasSavedResponse(currentState, currentUnitKey);
-    if (!draftAddsCurrentResponse || player.unitItems.length === 0) {
+    if (args.isComplete) {
       return {
-        progressPercent: player.progressPercent,
-        missingResponseLabel: player.missingResponseLabel
+        label: "Complete",
+        detail: "This test run is closed and ready for operator review.",
+        state: "complete"
       };
     }
 
-    const answeredUnitCount =
-      player.unitItems.filter(unit => unit.hasResponse).length + 1;
-    const totalUnitCount = player.unitItems.length;
+    if (args.totalUnitCount === 0) {
+      return {
+        label: "Not ready",
+        detail: "No booklet units are loaded yet.",
+        state: "idle"
+      };
+    }
+
+    const draftAddsCurrentResponse =
+      args.currentUnitKey.length > 0 &&
+      args.currentDraft.length > 0 &&
+      !args.unitItems.some(
+        unit => unit.unitKey === args.currentUnitKey && unit.hasResponse
+      );
+    const answeredUnitCount = args.answeredUnitCount + (draftAddsCurrentResponse ? 1 : 0);
+    const totalUnitCount = args.totalUnitCount;
     const missingUnitCount = Math.max(totalUnitCount - answeredUnitCount, 0);
+    const missingResponseLabel =
+      missingUnitCount === 0
+        ? "all units will have a saved response"
+        : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} still missing`;
+
+    if (missingUnitCount === 0) {
+      return {
+        label: "Ready to complete",
+        detail: args.hasUnsavedResponse
+          ? "All units will be answered after Complete Test saves the current draft."
+          : "All units already have saved responses.",
+        state: "ready"
+      };
+    }
 
     return {
-      progressPercent: Math.round((answeredUnitCount / totalUnitCount) * 100),
-      missingResponseLabel:
-        missingUnitCount === 0
-          ? "All units have a saved response."
-          : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`
+      label: `${missingUnitCount} ${missingUnitCount === 1 ? "response" : "responses"} missing`,
+      detail: args.hasUnsavedResponse
+        ? `Complete Test will save this draft, but ${missingResponseLabel}.`
+        : `${missingResponseLabel} before the test is fully answered.`,
+      state: "incomplete"
     };
   }
 

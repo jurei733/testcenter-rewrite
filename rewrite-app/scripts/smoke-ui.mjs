@@ -1416,6 +1416,16 @@ try {
     .locator("#participantRouteDraftDetail")
     .filter({ hasText: "Complete Test saves this draft before closing" })
     .waitFor();
+  await page
+    .locator("#participantRouteCompletionReadinessLabel")
+    .filter({ hasText: "Ready to complete" })
+    .waitFor();
+  await page
+    .locator("#participantRouteCompletionReadinessDetail")
+    .filter({
+      hasText: "All units will be answered after Complete Test saves the current draft."
+    })
+    .waitFor();
   await clickAction("Complete Test");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,
@@ -1443,6 +1453,12 @@ try {
       document.querySelector("#participantRouteMissingLabel")?.textContent?.trim() ===
         "All units have a saved response." &&
       document
+        .querySelector("#participantRouteCompletionReadinessLabel")
+        ?.textContent?.trim() === "Complete" &&
+      document
+        .querySelector("#participantRouteCompletionReadinessDetail")
+        ?.textContent?.includes("closed and ready for operator review") &&
+      document
         .querySelector("#participantRouteCompletionLabel")
         ?.textContent?.includes("Completed"),
     undefined,
@@ -1469,6 +1485,9 @@ try {
       document.querySelector("#participantEntryNextStep")?.textContent?.includes(
         "Completed"
       ) &&
+      document
+        .querySelector("#participantRouteCompletionReadinessLabel")
+        ?.textContent?.trim() === "Complete" &&
       document
         .querySelector("#participantRouteCompletionLabel")
         ?.textContent?.includes("Completed"),

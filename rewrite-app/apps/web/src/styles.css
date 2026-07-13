@@ -984,6 +984,47 @@ pre {
   color: var(--muted);
 }
 
+.participant-completion-readiness {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(196, 82, 47, 0.22);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(196, 82, 47, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.76);
+}
+
+.participant-completion-readiness.is-ready,
+.participant-completion-readiness.is-complete {
+  border-color: rgba(31, 92, 84, 0.18);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(31, 92, 84, 0.16), transparent 34%),
+    rgba(255, 255, 255, 0.78);
+}
+
+.participant-completion-readiness span {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-completion-readiness strong {
+  color: var(--accent);
+}
+
+.participant-completion-readiness.is-ready strong,
+.participant-completion-readiness.is-complete strong {
+  color: var(--green-deep);
+}
+
+.participant-completion-readiness p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .participant-unit-prompt {
   display: grid;
   gap: 8px;
