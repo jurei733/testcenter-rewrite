@@ -59,6 +59,9 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </label>
         </div>
         <div class="actions">
+          <button id="participantRouteSignInButton" class="secondary" type="button" (click)="view.signIn()">
+            Sign In
+          </button>
           <button class="primary" type="button" (click)="view.resumeSession()">Start Or Resume</button>
           <button class="ghost" type="button" (click)="view.refreshCurrentState()">Refresh Current State</button>
         </div>

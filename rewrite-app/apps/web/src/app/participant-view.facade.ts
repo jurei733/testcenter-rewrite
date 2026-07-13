@@ -4,6 +4,8 @@ import type {
   ParticipantCurrentRunStateResponse,
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
+  ParticipantSignInRequest,
+  ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
@@ -396,6 +398,10 @@ export class ParticipantViewFacade {
     this.viewState.onActionAsync(() => this.startOrResumeInternal());
   }
 
+  signIn(): void {
+    this.viewState.onActionAsync(() => this.signInInternal());
+  }
+
   refreshCurrentState(): void {
     this.viewState.onActionAsync(() => this.refreshCurrentStateInternal(false));
   }
@@ -456,6 +462,40 @@ export class ParticipantViewFacade {
     }
 
     await this.starterLaunchInternal();
+  }
+
+  private async signInInternal(): Promise<void> {
+    const payload = await this.requestState.request<ParticipantSignInResponse>(
+      "Participant Sign In",
+      "POST",
+      productionApiRoutes.participant.signIn,
+      {
+        tenantKey: this.workspace.tenantKey.trim() || undefined,
+        workspaceKey: this.workspace.workspaceKey.trim(),
+        loginKey: this.runtime.loginKey.trim(),
+        groupKey: this.runtime.groupKey.trim() || undefined
+      } satisfies ParticipantSignInRequest
+    );
+
+    this.runtime.participantSessionId =
+      payload.participantSession.participantSessionId;
+    this.runtime.groupKey = payload.participantSession.groupKey;
+    this.runtime.testRunId = "";
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentUnitResponse = "";
+    this.runtime.currentRunStateView = prettyPrintJson(
+      {
+        status: "participant_signed_in",
+        message: 'Session is ready. Use "Start Or Resume" to open the test run.',
+        participantSession: payload.participantSession
+      },
+      this.runtime.currentRunStateView
+    );
+    this.runtime.runtimeMonitorView = prettyPrintJson(
+      payload,
+      this.runtime.runtimeMonitorView
+    );
+    this.persistState();
   }
 
   private clearStoredParticipantSession(): void {

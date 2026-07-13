@@ -1023,8 +1023,59 @@ try {
 	  );
 	  stopAfter("content-prompt-read-model");
 
-	  logStep("participant-entry-url");
-	  const participantRouteLoginKey = "student-participant-route";
+  logStep("participant-entry-sign-in");
+  const participantEntrySignInLoginKey = "student-entry-sign-in";
+  const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.locator("#participantLoginKey").waitFor();
+  await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
+  await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
+  await fillAndCommitUntilValue("#participantLoginKey", participantEntrySignInLoginKey);
+  await fillAndCommitUntilValue(
+    "#participantRouteGroupKey",
+    participantEntrySignInGroupKey
+  );
+  await page.locator("#participantRouteSignInButton").click();
+  const participantEntrySignInSessionsPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => {
+        const participantSession = item?.participantSession;
+        return (
+          participantSession?.loginKey === participantEntrySignInLoginKey &&
+          participantSession?.groupKey === participantEntrySignInGroupKey &&
+          participantSession?.status === "signed_in"
+        );
+      })
+  );
+  const participantEntrySignInSessionId =
+    participantEntrySignInSessionsPayload.items.find(item => {
+      const participantSession = item?.participantSession;
+      return participantSession?.loginKey === participantEntrySignInLoginKey;
+    })?.participantSession?.participantSessionId;
+  assert.ok(
+    participantEntrySignInSessionId,
+    "UI smoke expected participant Sign In to create a signed-in session."
+  );
+  await expectInputValue("#participantRouteSessionId", participantEntrySignInSessionId);
+  await page.waitForFunction(
+    expectedSessionId =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "idle" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+      "no run yet",
+    participantEntrySignInSessionId,
+    { timeout: 15_000 }
+  );
+  stopAfter("participant-entry-sign-in");
+
+  logStep("participant-entry-url");
+  const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
   const participantRouteBookletKey = "booklet:starter";
   const participantRouteFirstUnitKey = "unit-1";
