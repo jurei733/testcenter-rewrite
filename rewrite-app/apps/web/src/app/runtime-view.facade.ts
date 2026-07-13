@@ -687,6 +687,179 @@ export class RuntimeViewFacade {
     });
   }
 
+  get reviewReadinessItems(): RecordCollectionItem[] {
+    const currentRunState = parseJsonDocument<ParticipantCurrentRunStateResponse>(
+      this.runtime.currentRunStateView
+    )?.currentRunState;
+    const sessionDetail = parseJsonDocument<GetParticipantSessionResponse>(
+      this.runtime.participantSessionDetailView
+    )?.participantSessionDetail;
+    const selectedRunId =
+      this.runtime.testRunId.trim() || currentRunState?.testRun.testRunId || "";
+    const selectedRun =
+      currentRunState?.testRun.testRunId === selectedRunId
+        ? currentRunState.testRun
+        : sessionDetail?.testRuns.find(testRun => testRun.testRunId === selectedRunId) ??
+          sessionDetail?.testRuns[0] ??
+          currentRunState?.testRun;
+
+    if (!selectedRun) {
+      return [];
+    }
+
+    const reviewItems = parseJsonDocument<ListReviewsResponse>(
+      this.runtime.reviewsView
+    )?.items ?? [];
+    const reviewsById = new Map(
+      [
+        ...(sessionDetail?.reviews ?? []),
+        ...reviewItems.map(item => item.review)
+      ]
+        .filter(review => review.testRunId === selectedRun.testRunId)
+        .map(review => [review.reviewId, review])
+    );
+    const reviews = [...reviewsById.values()];
+    const runReviews = reviews.filter(review => review.unitKey === null);
+    const bookletUnits =
+      currentRunState?.testRun.testRunId === selectedRun.testRunId
+        ? currentRunState.bookletUnits
+        : [];
+    const responseEntries = Object.entries(selectedRun.unitResponses ?? {});
+    const unitKeys = [
+      ...bookletUnits.map(unit => unit.unitKey),
+      ...responseEntries.map(([unitKey]) => unitKey)
+    ].filter((unitKey, index, all) => unitKey && all.indexOf(unitKey) === index);
+    const answeredCount = unitKeys.filter(
+      unitKey => (selectedRun.unitResponses?.[unitKey] ?? "").trim().length > 0
+    ).length;
+    const expectedCount = unitKeys.length;
+    const missingCount = Math.max(expectedCount - answeredCount, 0);
+    const unitReviewCount = reviews.filter(review => review.unitKey !== null).length;
+    const participantLabel =
+      sessionDetail?.participantRosterEntry?.displayName ??
+      currentRunState?.participantSession.loginKey ??
+      sessionDetail?.participantSession.loginKey ??
+      (this.runtime.loginKey.trim() || "selected participant");
+    const latestReview = reviews
+      .slice()
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+
+    const items: RecordCollectionItem[] = [
+      {
+        headline: "Review readiness",
+        subline: `${participantLabel} · ${selectedRun.testRunId}`,
+        badges: [
+          selectedRun.status,
+          `${answeredCount} / ${expectedCount} answered`,
+          `${reviews.length} review(s)`
+        ],
+        rows: [
+          { label: "Run", value: selectedRun.testRunId },
+          { label: "Booklet", value: selectedRun.bookletKey },
+          {
+            label: "Missing Responses",
+            value: missingCount === 0 ? "none" : String(missingCount)
+          },
+          { label: "Unit Reviews", value: String(unitReviewCount) },
+          { label: "Whole Run Reviews", value: String(runReviews.length) },
+          {
+            label: "Latest Review",
+            value: latestReview
+              ? `${latestReview.category} by ${latestReview.reviewerId}`
+              : "none"
+          }
+        ],
+        selected: this.runtime.testRunId.trim() === selectedRun.testRunId,
+        actionLabel: "Select Run",
+        actionPayload: {
+          testRunId: selectedRun.testRunId,
+          currentUnitKey: selectedRun.currentUnitKey ?? "",
+          participantSessionId: selectedRun.participantSessionId
+        }
+      }
+    ];
+
+    items.push(
+      ...unitKeys.map((unitKey, index) => {
+        const unit = bookletUnits.find(entry => entry.unitKey === unitKey);
+        const response = selectedRun.unitResponses?.[unitKey] ?? "";
+        const unitReviews = reviews.filter(review => review.unitKey === unitKey);
+        const latestUnitReview = unitReviews
+          .slice()
+          .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+
+        return {
+          headline: unit?.displayLabel || unitKey,
+          subline: `${index + 1} / ${unitKeys.length} · ${unitKey}`,
+          badges: [
+            response.trim() ? "answered" : "missing response",
+            unitReviews.length > 0 ? "reviewed" : "needs review",
+            `${response.length} char(s)`
+          ],
+          rows: [
+            { label: "Response", value: this.formatResponsePreview(response) },
+            { label: "Reviews", value: String(unitReviews.length) },
+            {
+              label: "Latest Review",
+              value: latestUnitReview
+                ? `${latestUnitReview.category}: ${this.formatResponsePreview(
+                    latestUnitReview.comment
+                  )}`
+                : "none"
+            },
+            {
+              label: "Updated",
+              value: latestUnitReview
+                ? this.formatDateTime(latestUnitReview.updatedAt)
+                : this.formatDateTime(selectedRun.updatedAt)
+            }
+          ],
+          selected:
+            this.runtime.testRunId.trim() === selectedRun.testRunId &&
+            this.runtime.currentUnitKey.trim() === unitKey,
+          actionLabel: "Select Review Scope",
+          actionPayload: {
+            testRunId: selectedRun.testRunId,
+            currentUnitKey: unitKey,
+            participantSessionId: selectedRun.participantSessionId,
+            reviewId: latestUnitReview?.reviewId ?? "",
+            reviewerId: latestUnitReview?.reviewerId ?? "",
+            reviewCategory: latestUnitReview?.category ?? "",
+            reviewComment: latestUnitReview?.comment ?? ""
+          }
+        };
+      })
+    );
+
+    if (runReviews.length > 0) {
+      items.push(
+        ...runReviews.map(review => ({
+          headline: `Whole run · ${review.category}`,
+          subline: review.reviewId,
+          badges: [review.reviewerId, "whole run"],
+          rows: [
+            { label: "Comment", value: this.formatResponsePreview(review.comment) },
+            { label: "Run", value: review.testRunId },
+            { label: "Updated", value: this.formatDateTime(review.updatedAt) }
+          ],
+          selected: this.runtime.reviewId.trim() === review.reviewId,
+          actionLabel: "Select Review",
+          actionPayload: {
+            reviewId: review.reviewId,
+            testRunId: review.testRunId,
+            currentUnitKey: "",
+            participantSessionId: review.participantSessionId,
+            reviewerId: review.reviewerId,
+            reviewCategory: review.category,
+            reviewComment: review.comment
+          }
+        }))
+      );
+    }
+
+    return items;
+  }
+
   get detailedResponseItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListDetailedResponsesResponse>(
       this.runtime.detailedResponsesView

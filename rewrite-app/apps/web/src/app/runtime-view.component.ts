@@ -362,6 +362,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No unit responses saved for the selected run yet."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Review Readiness"
+        subtitle="Answered units and attached reviews for the selected participant run."
+        [items]="view.reviewReadinessItems"
+        (itemAction)="view.selectReview($event)"
+        emptyState="Select a participant run and load its current state to inspect review readiness."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Detailed Response Filters</h2>
         <p>Narrow response inspection and response CSV export by participant, run, unit, status, or limit.</p>

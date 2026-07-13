@@ -2259,6 +2259,26 @@ try {
     .filter({ hasText: "Filtered review smoke" })
     .filter({ hasText: "operator-ui" })
     .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Review Readiness" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Review readiness" }) })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "review(s)" })
+    .filter({ hasText: "Unit Reviews" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Review Readiness" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
+    .filter({ hasText: "answered" })
+    .filter({ hasText: "reviewed" })
+    .filter({ hasText: "Filtered response smoke" })
+    .filter({ hasText: "Filtered review smoke" })
+    .waitFor();
   stopAfter("filter-reviews");
   logStep("export-response-csv");
   const responseDownloadPromise = page.waitForEvent("download");
