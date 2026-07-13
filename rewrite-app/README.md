@@ -334,7 +334,7 @@ The added read side now makes the first slice inspectable:
 - workspace log CSV export returns the persisted activity timeline with event metadata and details JSON
 - review CSV export returns persisted operator comments with participant, run, booklet, unit, reviewer, category, timestamp, and saved-roster display/assignment context, using the same filters as review reads
 - content-release detail now resolves a single release together with its import/source-package lineage, attached sessions/runs, and neighboring activation history within the workspace release line
-- content-release activation readiness now previews whether a staged release can be switched in immediately, whether open runs block it, and whether saved roster booklet assignments would warn against the selected release
+- content-release activation readiness now previews whether a staged release can be switched in immediately, whether open runs block it, and whether saved roster booklet assignments would warn against the selected release, with concrete roster-warning cards that can prepare the affected participant in the runtime shell
 - workspace activity events now provide a persisted operator timeline for setup, import, activation, and runtime actions, filterable by event type, subject type, subject id, and limit
 - failed source packages can now be retried in place with corrected manifest data, producing a fresh import job on the same package identity
 - content-release listing returns staged/active/superseded releases together with their import/source-package lineage, filterable by status, import job, source package, and limit
@@ -426,7 +426,7 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
-- source-package import and release activation
+- source-package import, release activation, and roster-compatibility warning drill-downs for staged releases
 - participant sign-in and session resume
 - participant roster, participant-session, and open-run export through the runtime shell
 - response and review CSV export through the runtime shell

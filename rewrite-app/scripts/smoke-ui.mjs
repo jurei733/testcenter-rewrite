@@ -1871,6 +1871,61 @@ try {
     .filter({ hasText: "Download participant entry links" })
     .filter({ hasText: "Refresh participant sessions" })
     .waitFor();
+  logStep("activation-roster-warning-cards");
+  const authenticatedJsonHeaders = {
+    ...(createSmokeFetchInit()?.headers ?? {}),
+    "content-type": "application/json"
+  };
+  const incompatibleSourcePackageResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      headers: authenticatedJsonHeaders,
+      body: JSON.stringify({
+        fileName: "incompatible-roster-release.xml",
+        mediaType: "application/xml",
+        sourceDocument:
+          '<assessment><booklet key="booklet:alternate" label="Alternate"><unit key="unit-alternate" label="Alternate Unit" /></booklet></assessment>'
+      })
+    }
+  );
+  assert.equal(incompatibleSourcePackageResponse.status, 201);
+  const incompatibleSourcePackagePayload =
+    await incompatibleSourcePackageResponse.json();
+  const incompatibleImportResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      headers: authenticatedJsonHeaders,
+      body: JSON.stringify({
+        sourcePackageId:
+          incompatibleSourcePackagePayload.sourcePackage.sourcePackageId
+      })
+    }
+  );
+  assert.equal(incompatibleImportResponse.status, 201);
+  const incompatibleImportPayload = await incompatibleImportResponse.json();
+  const incompatibleReleaseId =
+    incompatibleImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(incompatibleReleaseId);
+  await page.goto(`${baseUrl}/app/content`, { waitUntil: "networkidle" });
+  await fillAndCommitUntilValue("#contentReleaseId", incompatibleReleaseId);
+  await clickAction("Release Readiness");
+  const rosterWarningCard = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Roster Compatibility Warnings" }) })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Ada Entry" }) })
+    .filter({ hasText: "entry-student-a" })
+    .filter({ hasText: "booklet:starter" })
+    .filter({ hasText: "booklet_not_found_in_active_release" });
+  await rosterWarningCard.waitFor({ state: "visible", timeout: 15_000 });
+  await rosterWarningCard.getByRole("button", { name: "Open In Runtime" }).click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#loginKey", "entry-student-a");
+  await expectInputValue("#groupKey", "group:entry-smoke");
+  await expectInputValue("#bookletKey", participantRouteBookletKey);
+  stopAfter("activation-roster-warning-cards");
   await fillAndCommit(
     "#entryRosterText",
     [

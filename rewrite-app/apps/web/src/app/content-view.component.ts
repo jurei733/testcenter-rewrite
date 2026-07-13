@@ -269,6 +269,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Roster Compatibility Warnings"
+        subtitle="Saved roster entries whose booklet assignments do not match the selected release."
+        [items]="view.activationRosterWarningItems"
+        (itemAction)="view.openRosterWarningInRuntime($event)"
+        emptyState="No roster compatibility warnings are loaded for this release."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Activation Blocking Runs"
         subtitle="Runs that currently block superseding the active release."
         [items]="view.activationBlockingRunItems"

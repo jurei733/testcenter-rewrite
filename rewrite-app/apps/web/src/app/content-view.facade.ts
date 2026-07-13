@@ -987,6 +987,50 @@ export class ContentViewFacade {
     ];
   }
 
+  get activationRosterWarningItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetContentReleaseActivationReadinessResponse>(
+      this.content.contentReleaseActivationReadinessView
+    );
+    return (
+      payload?.activationReadiness.participantRosterWarnings.map(entry => {
+        const warnings = entry.validationWarnings ?? [];
+        return {
+          headline: entry.displayName ?? entry.loginKey,
+          subline: entry.displayName ? entry.loginKey : entry.participantRosterEntryId,
+          badges: [
+            entry.groupKey,
+            entry.bookletKey ?? "default booklet",
+            `${warnings.length} warning${warnings.length === 1 ? "" : "s"}`
+          ],
+          rows: [
+            { label: "Login", value: entry.loginKey },
+            { label: "Group", value: entry.groupKey },
+            {
+              label: "Booklet",
+              value: entry.bookletKey ?? "active release default"
+            },
+            {
+              label: "Validation",
+              value: warnings.length
+                ? warnings
+                    .map(warning => `${warning.code}: ${warning.message}`)
+                    .join(" | ")
+                : "No roster warnings"
+            },
+            { label: "Imported", value: this.formatDateTime(entry.importedAt) }
+          ],
+          selected: this.uiState.runtime.loginKey.trim() === entry.loginKey,
+          actionLabel: "Open In Runtime",
+          actionPayload: {
+            loginKey: entry.loginKey,
+            groupKey: entry.groupKey,
+            bookletKey: entry.bookletKey ?? ""
+          }
+        };
+      }) ?? []
+    );
+  }
+
   get activationBlockingRunItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetContentReleaseActivationReadinessResponse>(
       this.content.contentReleaseActivationReadinessView
@@ -1467,6 +1511,28 @@ export class ContentViewFacade {
       default:
         return;
     }
+  }
+
+  openRosterWarningInRuntime(item: RecordCollectionItem): void {
+    const loginKey = item.actionPayload?.loginKey?.trim();
+    if (!loginKey) {
+      return;
+    }
+
+    const runtime = this.uiState.runtime;
+    runtime.loginKey = loginKey;
+    runtime.groupKey = item.actionPayload?.groupKey?.trim() || `group:${loginKey}`;
+    runtime.bookletKey = item.actionPayload?.bookletKey?.trim() ?? "";
+    runtime.participantSessionId = "";
+    runtime.testRunId = "";
+    runtime.currentUnitKey = "";
+
+    this.persistState();
+    this.feedback.rememberActivity(
+      "Roster Warning Opened",
+      `Prepared runtime launch context for ${loginKey}.`
+    );
+    void this.router.navigateByUrl("/runtime");
   }
 
   openBlockingRunInRuntime(item: RecordCollectionItem): void {
