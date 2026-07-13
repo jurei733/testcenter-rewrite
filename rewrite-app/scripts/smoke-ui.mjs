@@ -644,6 +644,7 @@ try {
     .filter({ hasText: "Hidden Routes" })
     .filter({ hasText: String(hiddenWorkspaceRouteCount) })
     .waitFor();
+  stopAfter("refresh-diagnostics");
 
   logStep("nav-workspace-bootstrap");
   await page.locator('[data-view-nav="workspace"]').click();
