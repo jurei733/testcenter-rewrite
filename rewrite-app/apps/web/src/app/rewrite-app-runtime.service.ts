@@ -120,6 +120,9 @@ export class RewriteAppRuntimeService {
   }
 
   async refreshRuntimeReads(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await refreshRuntimeReadsAction(
       this.hosts.createRuntimeReadsHost(),
       this.getParticipantSessionId(),
@@ -128,6 +131,9 @@ export class RewriteAppRuntimeService {
   }
 
   async loadParticipantSessions(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const payload = await loadParticipantSessionsAction(
       this.hosts.createRuntimeReadsHost(),
       quiet
@@ -141,6 +147,9 @@ export class RewriteAppRuntimeService {
   }
 
   async exportOpenRunsCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const csv = await exportOpenRunsCsvAction(this.hosts.createRuntimeReadsHost());
     const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
     downloadTextFile({
@@ -156,6 +165,9 @@ export class RewriteAppRuntimeService {
   }
 
   async exportParticipantSessionsCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const csv = await exportParticipantSessionsCsvAction(
       this.hosts.createRuntimeReadsHost()
     );
@@ -173,6 +185,9 @@ export class RewriteAppRuntimeService {
   }
 
   async importParticipantRoster(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const payload = await importParticipantRosterAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
@@ -185,6 +200,9 @@ export class RewriteAppRuntimeService {
   }
 
   async loadParticipantRoster(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const payload = await loadParticipantRosterAction(
       this.hosts.createRuntimeReadsHost(),
       quiet
@@ -198,6 +216,9 @@ export class RewriteAppRuntimeService {
   }
 
   async exportParticipantRosterCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const csv = await exportParticipantRosterCsvAction(
       this.hosts.createRuntimeReadsHost()
     );
@@ -215,12 +236,18 @@ export class RewriteAppRuntimeService {
   }
 
   async loadParticipantSessionDetail(): Promise<GetParticipantSessionResponse> {
+    if (!this.hasWorkspaceScope()) {
+      throw new Error("Workspace scope is required before loading session detail.");
+    }
     return loadParticipantSessionDetailAction(
       this.presentationHosts.createRuntimePresentationHost()
     );
   }
 
   async exportResponsesCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const csv = await exportResponsesCsvAction(this.hosts.createRuntimeReadsHost());
     const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
     downloadTextFile({
@@ -236,6 +263,9 @@ export class RewriteAppRuntimeService {
   }
 
   async exportReviewsCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const csv = await exportReviewsCsvAction(this.hosts.createRuntimeReadsHost());
     const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
     downloadTextFile({
@@ -251,6 +281,9 @@ export class RewriteAppRuntimeService {
   }
 
   async loadDetailedResponses(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const payload = await loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost());
     this.feedback.rememberActivity(
       "Detailed Responses Loaded",
@@ -259,6 +292,9 @@ export class RewriteAppRuntimeService {
   }
 
   async loadReviews(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const payload = await loadReviewsAction(this.hosts.createRuntimeReadsHost());
     this.feedback.rememberActivity(
       "Reviews Loaded",
@@ -345,5 +381,12 @@ export class RewriteAppRuntimeService {
 
   private getParticipantSessionId(): string {
     return this.runtimeState.participantSessionId.trim();
+  }
+
+  private hasWorkspaceScope(): boolean {
+    return (
+      this.uiState.workspace.tenantKey.trim() !== "" &&
+      this.uiState.workspace.workspaceKey.trim() !== ""
+    );
   }
 }

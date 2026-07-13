@@ -68,10 +68,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <section class="action-group">
             <span>Participant Setup</span>
             <div class="actions">
-              <button class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantSignIn()">Sign In</button>
-              <button class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantLaunch()">Start Participant</button>
-              <button class="secondary" type="button" [disabled]="!view.canUseParticipantSessionActions" (click)="view.resumeSession()">Resume Session</button>
-              <button class="ghost" type="button" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
+              <button id="runtimeParticipantSignInButton" class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantSignIn()">Sign In</button>
+              <button id="runtimeParticipantLaunchButton" class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantLaunch()">Start Participant</button>
+              <button id="runtimeResumeSessionButton" class="secondary" type="button" [disabled]="!view.canUseParticipantSessionActions" (click)="view.resumeSession()">Resume Session</button>
+              <button id="runtimeRefreshRuntimeReadsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
             </div>
           </section>
           <section class="action-group">
@@ -89,21 +89,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
-              <button class="ghost" type="button" (click)="view.openRuns()">Monitor Open Runs</button>
-              <button class="ghost" type="button" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
+              <button id="runtimeOpenRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.openRuns()">Monitor Open Runs</button>
+              <button id="runtimeExportOpenRunsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
             </div>
           </section>
           <section class="action-group">
             <span>Review And Export</span>
             <div class="actions">
-              <button class="ghost" type="button" (click)="view.loadDetailedResponses()">Detailed Responses</button>
+              <button id="runtimeLoadDetailedResponsesButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadDetailedResponses()">Detailed Responses</button>
               <button class="ghost" type="button" [disabled]="!view.canCreateReviewAction" (click)="view.createReview()">Create Review</button>
               <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.updateReview()">Update Review</button>
               <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.confirmDeleteReview()">Delete Review</button>
-              <button class="ghost" type="button" (click)="view.loadReviews()">Load Reviews</button>
+              <button id="runtimeLoadReviewsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadReviews()">Load Reviews</button>
               <button class="ghost" type="button" [disabled]="!view.canDeleteGroupResultsAction" (click)="view.confirmDeleteGroupResults()">Delete Group Results</button>
-              <button id="runtimeExportResponsesCsvButton" class="ghost" type="button" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
-              <button id="runtimeExportReviewsCsvButton" class="ghost" type="button" (click)="view.exportReviewsCsv()">Export Review CSV</button>
+              <button id="runtimeExportResponsesCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportResponsesCsv()">Export Responses CSV</button>
+              <button id="runtimeExportReviewsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportReviewsCsv()">Export Review CSV</button>
             </div>
           </section>
         </div>
@@ -176,8 +176,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <h2>Guided Flow</h2>
         <p>Drive the participant happy path end to end from sign-in to live runtime state.</p>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.participantHappyPathFlow()">Participant Happy Path</button>
-          <button class="ghost" type="button" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
+          <button id="participantHappyPathButton" class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantHappyPathFlow()">Participant Happy Path</button>
+          <button id="runtimeParticipantSessionDetailButton" class="ghost" type="button" [disabled]="!view.canUseParticipantSessionActions" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
         </div>
       </article>
 
@@ -242,8 +242,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="refreshParticipantSessionsButton" class="primary" type="button" (click)="view.refreshParticipantSessions()">Refresh Sessions</button>
-          <button class="ghost" type="button" (click)="view.exportParticipantSessionsCsv()">Export Sessions CSV</button>
+          <button id="refreshParticipantSessionsButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshParticipantSessions()">Refresh Sessions</button>
+          <button id="exportParticipantSessionsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportParticipantSessionsCsv()">Export Sessions CSV</button>
           <button class="ghost" type="button" (click)="view.clearParticipantSessionFilters()">Clear Filters</button>
         </div>
       </article>
@@ -312,13 +312,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;"></textarea>
         </label>
         <div class="actions">
-          <button id="importParticipantRosterButton" class="primary" type="button" (click)="view.importParticipantRoster()">Import Saved Roster</button>
-          <button id="loadParticipantRosterButton" class="secondary" type="button" (click)="view.loadParticipantRoster()">Load Saved Roster</button>
-          <button id="exportParticipantRosterCsvButton" class="secondary" type="button" (click)="view.exportParticipantRosterCsv()">Export Saved Roster CSV</button>
-          <button id="generateEntryLinksButton" class="primary" type="button" (click)="view.generateEntryLinks()">Generate Entry Links</button>
-          <button id="generateSavedRosterEntryLinksButton" class="secondary" type="button" (click)="view.generateEntryLinksFromSavedRoster()">Generate From Saved Roster</button>
-          <button id="downloadEntryLinksCsvButton" class="secondary" type="button" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
-          <button class="ghost" type="button" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
+          <button id="importParticipantRosterButton" class="primary" type="button" [disabled]="!view.canImportParticipantRoster" (click)="view.importParticipantRoster()">Import Saved Roster</button>
+          <button id="loadParticipantRosterButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadParticipantRoster()">Load Saved Roster</button>
+          <button id="exportParticipantRosterCsvButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportParticipantRosterCsv()">Export Saved Roster CSV</button>
+          <button id="generateEntryLinksButton" class="primary" type="button" [disabled]="!view.canGenerateEntryLinks" (click)="view.generateEntryLinks()">Generate Entry Links</button>
+          <button id="generateSavedRosterEntryLinksButton" class="secondary" type="button" [disabled]="!view.canGenerateSavedRosterEntryLinks" (click)="view.generateEntryLinksFromSavedRoster()">Generate From Saved Roster</button>
+          <button id="downloadEntryLinksCsvButton" class="secondary" type="button" [disabled]="!view.canDownloadEntryLinksCsv" (click)="view.downloadEntryLinksCsv()">Download Entry Links CSV</button>
+          <button id="useSelectedParticipantAsEntryRosterButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedParticipantAsEntryRoster()">Use Selected Participant</button>
         </div>
         <div class="entry-link-summary-grid" id="entryLinkSummary">
           <div *ngFor="let card of view.entryLinkCards">
@@ -415,8 +415,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyDetailedResponseFilters()">Apply Response Filters</button>
-          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsDetailedResponseFilters()">Use Selected Run</button>
+          <button id="applyDetailedResponseFiltersButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyDetailedResponseFilters()">Apply Response Filters</button>
+          <button id="useSelectedRuntimeAsDetailedResponseFiltersButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedRuntimeAsDetailedResponseFilters()">Use Selected Run</button>
           <button class="ghost" type="button" (click)="view.clearDetailedResponseFilters()">Clear Response Filters</button>
         </div>
       </article>
@@ -467,8 +467,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyReviewFilters()">Apply Review Filters</button>
-          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsReviewFilters()">Use Selected Review Scope</button>
+          <button id="applyReviewFiltersButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyReviewFilters()">Apply Review Filters</button>
+          <button id="useSelectedRuntimeAsReviewFiltersButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedRuntimeAsReviewFilters()">Use Selected Review Scope</button>
           <button class="ghost" type="button" (click)="view.clearReviewFilters()">Clear Review Filters</button>
         </div>
       </article>
@@ -549,8 +549,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.applyMonitorCommandHistoryFilters()">Apply Command Filters</button>
-          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsMonitorCommandHistoryFilter()">Use Selected Run</button>
+          <button id="applyMonitorCommandHistoryFiltersButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorCommandHistoryFilters()">Apply Command Filters</button>
+          <button id="useSelectedRuntimeAsMonitorCommandHistoryFilterButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedRuntimeAsMonitorCommandHistoryFilter()">Use Selected Run</button>
           <button class="ghost" type="button" (click)="view.clearMonitorCommandHistoryFilters()">Clear Command Filters</button>
         </div>
       </article>

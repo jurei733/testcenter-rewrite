@@ -53,10 +53,16 @@ export class RewriteAppWorkspaceService {
   }
 
   async refreshWorkspaceOverview(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await refreshWorkspaceOverviewAction(this.contentHosts.createContentReadsHost(), quiet);
   }
 
   async refreshStudyMonitor(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const [payload, participantMatrixPayload] = await Promise.all([
@@ -102,6 +108,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async refreshWorkspaceActivity(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const host = this.contentHosts.createContentReadsHost();
     const payload = await this.requestState.request<ListWorkspaceActivityEventsResponse>(
       "Workspace Activity",
@@ -400,5 +409,12 @@ export class RewriteAppWorkspaceService {
       }
       throw error;
     }
+  }
+
+  private hasWorkspaceScope(): boolean {
+    return (
+      this.workspaceState.tenantKey.trim() !== "" &&
+      this.workspaceState.workspaceKey.trim() !== ""
+    );
   }
 }

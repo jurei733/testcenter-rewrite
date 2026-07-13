@@ -1801,15 +1801,25 @@ export class RuntimeViewFacade {
   }
 
   get canUseParticipantLoginActions(): boolean {
-    return this.runtime.loginKey.trim().length > 0;
+    return this.canUseWorkspaceScope && this.runtime.loginKey.trim().length > 0;
+  }
+
+  get canUseWorkspaceScope(): boolean {
+    return (
+      this.uiState.workspace.tenantKey.trim().length > 0 &&
+      this.uiState.workspace.workspaceKey.trim().length > 0
+    );
   }
 
   get canUseParticipantSessionActions(): boolean {
-    return this.runtime.participantSessionId.trim().length > 0;
+    return (
+      this.canUseWorkspaceScope &&
+      this.runtime.participantSessionId.trim().length > 0
+    );
   }
 
   get canUseRunActions(): boolean {
-    return this.runtime.testRunId.trim().length > 0;
+    return this.canUseWorkspaceScope && this.runtime.testRunId.trim().length > 0;
   }
 
   get canSaveProgressActions(): boolean {
@@ -1825,31 +1835,66 @@ export class RuntimeViewFacade {
   }
 
   get canUseSelectedReviewActions(): boolean {
-    return this.runtime.reviewId.trim().length > 0;
+    return this.canUseWorkspaceScope && this.runtime.reviewId.trim().length > 0;
   }
 
   get canDeleteGroupResultsAction(): boolean {
-    return this.runtime.groupKey.trim().length > 0;
+    return this.canUseWorkspaceScope && this.runtime.groupKey.trim().length > 0;
+  }
+
+  get canImportParticipantRoster(): boolean {
+    return this.canUseWorkspaceScope && this.runtime.entryRosterText.trim().length > 0;
+  }
+
+  get canGenerateEntryLinks(): boolean {
+    return this.canUseWorkspaceScope && this.runtime.entryRosterText.trim().length > 0;
+  }
+
+  get canGenerateSavedRosterEntryLinks(): boolean {
+    return this.canUseWorkspaceScope && this.parseParticipantRosterView().length > 0;
+  }
+
+  get canDownloadEntryLinksCsv(): boolean {
+    return (
+      this.canUseWorkspaceScope &&
+      (this.parseEntryLinksView().length > 0 ||
+        this.runtime.entryRosterText.trim().length > 0)
+    );
   }
 
   participantSignIn(): void {
+    if (!this.canUseParticipantLoginActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.participantSignIn());
   }
 
   participantLaunch(): void {
+    if (!this.canUseParticipantLoginActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.participantLaunch());
   }
 
   resumeSession(): void {
+    if (!this.canUseParticipantSessionActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.resumeParticipantSession());
   }
 
   refreshRuntimeReads(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
   }
 
   refreshParticipantSessions(): void {
     this.persistState();
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.loadParticipantSessions()
     );
@@ -1935,6 +1980,9 @@ export class RuntimeViewFacade {
   }
 
   generateEntryLinks(): void {
+    if (!this.canGenerateEntryLinks) {
+      return;
+    }
     const links = this.parseEntryRosterRows();
     this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
     this.persistState();
@@ -1942,6 +1990,9 @@ export class RuntimeViewFacade {
 
   importParticipantRoster(): void {
     this.persistState();
+    if (!this.canImportParticipantRoster) {
+      return;
+    }
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.importParticipantRoster();
       this.generateEntryLinksFromSavedRoster();
@@ -1949,10 +2000,16 @@ export class RuntimeViewFacade {
   }
 
   loadParticipantRoster(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantRoster());
   }
 
   exportParticipantRosterCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.exportParticipantRosterCsv()
     );
@@ -1981,6 +2038,9 @@ export class RuntimeViewFacade {
   }
 
   generateEntryLinksFromSavedRoster(): void {
+    if (!this.canGenerateSavedRosterEntryLinks) {
+      return;
+    }
     const links = this.parseParticipantRosterView().map(entry => ({
       loginKey: entry.loginKey,
       groupKey: entry.groupKey,
@@ -2001,6 +2061,9 @@ export class RuntimeViewFacade {
   }
 
   downloadEntryLinksCsv(): void {
+    if (!this.canDownloadEntryLinksCsv) {
+      return;
+    }
     let links = this.parseEntryLinksView();
     if (links.length === 0) {
       links = this.parseEntryRosterRows();
@@ -2017,6 +2080,9 @@ export class RuntimeViewFacade {
   }
 
   useSelectedParticipantAsEntryRoster(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     const loginKey = this.runtime.loginKey.trim() || "student-demo";
     const groupKey = this.runtime.groupKey.trim() || `group:${loginKey}`;
     const bookletKey = this.runtime.bookletKey.trim();
@@ -2027,10 +2093,16 @@ export class RuntimeViewFacade {
   }
 
   saveProgressPaused(): void {
+    if (!this.canSaveProgressActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.saveProgress("paused"));
   }
 
   saveProgressRunning(): void {
+    if (!this.canSaveProgressActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.saveProgress("running"));
   }
 
@@ -2043,36 +2115,57 @@ export class RuntimeViewFacade {
   }
 
   resumeRun(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.resumeRun());
   }
 
   completeRun(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.completeRun());
   }
 
   issueMonitorPause(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("pause")
     );
   }
 
   issueMonitorResume(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("resume")
     );
   }
 
   issueMonitorComplete(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("complete")
     );
   }
 
   openRuns(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.refreshRuntimeReads());
   }
 
   exportOpenRunsCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.exportOpenRunsCsv());
   }
 
@@ -2151,36 +2244,60 @@ export class RuntimeViewFacade {
   }
 
   participantHappyPathFlow(): void {
+    if (!this.canUseParticipantLoginActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.participantHappyPathFlow());
   }
 
   getParticipantSessionDetail(): void {
+    if (!this.canUseParticipantSessionActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.loadParticipantSessionDetail());
   }
 
   exportParticipantSessionsCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.runtimeService.exportParticipantSessionsCsv()
     );
   }
 
   exportResponsesCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.exportResponsesCsv());
   }
 
   loadDetailedResponses(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.loadDetailedResponses());
   }
 
   loadReviews(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.loadReviews());
   }
 
   createReview(): void {
+    if (!this.canCreateReviewAction) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.createReview());
   }
 
   updateReview(): void {
+    if (!this.canUseSelectedReviewActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.updateReview());
   }
 
@@ -2199,10 +2316,16 @@ export class RuntimeViewFacade {
   }
 
   private deleteReview(): void {
+    if (!this.canUseSelectedReviewActions) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.deleteReview());
   }
 
   exportReviewsCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.exportReviewsCsv());
   }
 
@@ -2220,6 +2343,9 @@ export class RuntimeViewFacade {
   }
 
   private deleteGroupResults(): void {
+    if (!this.canDeleteGroupResultsAction) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.runtimeService.deleteGroupResults());
   }
 

@@ -62,6 +62,9 @@ export class RewriteAppContentService {
   }
 
   async refreshContentReads(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await refreshContentReadsAction(this.hosts.createContentReadsHost(), quiet);
   }
 
@@ -131,5 +134,12 @@ export class RewriteAppContentService {
 
   private getContentReleaseId(): string {
     return this.contentState.contentReleaseId.trim();
+  }
+
+  private hasWorkspaceScope(): boolean {
+    return (
+      this.uiState.workspace.tenantKey.trim() !== "" &&
+      this.uiState.workspace.workspaceKey.trim() !== ""
+    );
   }
 }
