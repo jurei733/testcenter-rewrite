@@ -519,6 +519,26 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No open runs are currently loaded."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Monitor Command History Filters</h2>
+        <p>Narrow persisted operator command acknowledgements by test run and result window.</p>
+        <div class="form-grid">
+          <label>
+            Test Run Id
+            <input id="monitorCommandHistoryRunFilter" name="monitorCommandHistoryRunFilter" [(ngModel)]="view.runtime.monitorCommandHistoryRunFilter" (change)="view.persistState()" placeholder="Optional run id" />
+          </label>
+          <label>
+            Limit
+            <input id="monitorCommandHistoryLimit" name="monitorCommandHistoryLimit" type="number" min="1" max="500" step="1" [(ngModel)]="view.runtime.monitorCommandHistoryLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="primary" type="button" (click)="view.applyMonitorCommandHistoryFilters()">Apply Command Filters</button>
+          <button class="ghost" type="button" (click)="view.useSelectedRuntimeAsMonitorCommandHistoryFilter()">Use Selected Run</button>
+          <button class="ghost" type="button" (click)="view.clearMonitorCommandHistoryFilters()">Clear Command Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Monitor Command History"
         subtitle="Persisted operator command acknowledgements for pause, resume, and complete."

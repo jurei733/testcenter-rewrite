@@ -1542,6 +1542,22 @@ export class RuntimeViewFacade {
     this.applyReviewFilters();
   }
 
+  applyMonitorCommandHistoryFilters(): void {
+    this.persistState();
+    this.refreshRuntimeReads();
+  }
+
+  useSelectedRuntimeAsMonitorCommandHistoryFilter(): void {
+    this.runtime.monitorCommandHistoryRunFilter = this.runtime.testRunId.trim();
+    this.applyMonitorCommandHistoryFilters();
+  }
+
+  clearMonitorCommandHistoryFilters(): void {
+    this.runtime.monitorCommandHistoryRunFilter = "";
+    this.runtime.monitorCommandHistoryLimit = "25";
+    this.applyMonitorCommandHistoryFilters();
+  }
+
   generateEntryLinks(): void {
     const links = this.parseEntryRosterRows();
     this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);

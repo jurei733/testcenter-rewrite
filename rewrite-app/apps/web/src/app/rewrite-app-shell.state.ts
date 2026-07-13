@@ -86,6 +86,8 @@ export interface ShellRuntimeState {
   reviewReviewerFilter: string;
   reviewCategoryFilter: string;
   reviewLimit: string;
+  monitorCommandHistoryRunFilter: string;
+  monitorCommandHistoryLimit: string;
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
@@ -258,6 +260,8 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     reviewReviewerFilter: "",
     reviewCategoryFilter: "",
     reviewLimit: "100",
+    monitorCommandHistoryRunFilter: "",
+    monitorCommandHistoryLimit: "25",
     entryRosterText: [
       "student-a,group:demo-a,booklet:demo",
       "student-b,group:demo-a,booklet:demo",

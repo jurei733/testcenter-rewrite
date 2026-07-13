@@ -368,6 +368,18 @@ export function createShellPersistenceStateHost(args: {
     set reviewLimit(nextValue) {
       args.runtimeState.reviewLimit = nextValue;
     },
+    get monitorCommandHistoryRunFilter() {
+      return args.runtimeState.monitorCommandHistoryRunFilter;
+    },
+    set monitorCommandHistoryRunFilter(nextValue) {
+      args.runtimeState.monitorCommandHistoryRunFilter = nextValue;
+    },
+    get monitorCommandHistoryLimit() {
+      return args.runtimeState.monitorCommandHistoryLimit;
+    },
+    set monitorCommandHistoryLimit(nextValue) {
+      args.runtimeState.monitorCommandHistoryLimit = nextValue;
+    },
     get entryRosterText() {
       return args.runtimeState.entryRosterText;
     },

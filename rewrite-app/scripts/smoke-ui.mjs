@@ -2292,6 +2292,38 @@ try {
     testRunId: pausedTestRunId,
     transition: "running -> paused"
   });
+  await fillAndCommit("#monitorCommandHistoryRunFilter", "missing-monitor-run");
+  await fillAndCommit("#monitorCommandHistoryLimit", "1");
+  await clickAction("Apply Command Filters");
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Monitor Command History",
+        exact: true
+      })
+    })
+    .filter({ hasText: "No monitor commands have been issued yet." })
+    .waitFor({ timeout: 15_000 });
+  await fillAndCommit("#monitorCommandHistoryRunFilter", pausedTestRunId);
+  await fillAndCommit("#monitorCommandHistoryLimit", "2");
+  await clickAction("Apply Command Filters");
+  await expectMonitorCommandHistoryCard({
+    commandType: "pause",
+    groupKey: participantGroupKey,
+    loginKey: participantLoginKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    transition: "running -> paused"
+  });
+  await expectMonitorCommandHistoryCard({
+    commandType: "resume",
+    groupKey: participantGroupKey,
+    loginKey: participantLoginKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    transition: "paused -> running"
+  });
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(

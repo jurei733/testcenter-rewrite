@@ -64,6 +64,8 @@ export type PersistedShellState = {
   reviewReviewerFilter: string;
   reviewCategoryFilter: string;
   reviewLimit: string;
+  monitorCommandHistoryRunFilter: string;
+  monitorCommandHistoryLimit: string;
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;

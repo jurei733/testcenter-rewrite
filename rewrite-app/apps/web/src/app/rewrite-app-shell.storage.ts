@@ -52,6 +52,8 @@ export type ShellPersistenceTarget = {
   reviewReviewerFilter: string;
   reviewCategoryFilter: string;
   reviewLimit: string;
+  monitorCommandHistoryRunFilter: string;
+  monitorCommandHistoryLimit: string;
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
@@ -148,6 +150,8 @@ export const createPersistedShellState = (
   reviewReviewerFilter: target.reviewReviewerFilter,
   reviewCategoryFilter: target.reviewCategoryFilter,
   reviewLimit: target.reviewLimit,
+  monitorCommandHistoryRunFilter: target.monitorCommandHistoryRunFilter,
+  monitorCommandHistoryLimit: target.monitorCommandHistoryLimit,
   entryRosterText: target.entryRosterText,
   entryLinksView: target.entryLinksView,
   participantRosterView: target.participantRosterView,
@@ -377,6 +381,14 @@ export const applyHydratedShellState = (
     target.reviewCategoryFilter
   );
   target.reviewLimit = hydrateString(snapshot.reviewLimit, target.reviewLimit);
+  target.monitorCommandHistoryRunFilter = hydrateString(
+    snapshot.monitorCommandHistoryRunFilter,
+    target.monitorCommandHistoryRunFilter
+  );
+  target.monitorCommandHistoryLimit = hydrateString(
+    snapshot.monitorCommandHistoryLimit,
+    target.monitorCommandHistoryLimit
+  );
   target.entryRosterText = hydrateString(
     snapshot.entryRosterText,
     target.entryRosterText

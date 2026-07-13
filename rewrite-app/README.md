@@ -351,7 +351,7 @@ The added read side now makes the first slice inspectable:
 - imports now fail explicitly with persisted job diagnostics when provided `contentStructure` or `sourceDocument` cannot produce a valid runtime structure
 - guarded activation now returns explicit blocking details for open runs on the currently active release, so operators and the shell can see why a release switch was rejected
 - runtime now supports `running -> paused -> running -> completed` on test-runs
-- monitor controls let authorized operators pause, resume, or complete an open run from the operator shell, persist a `monitor_run_command_issued` workspace activity event, and keep the open-run/read-model state in sync
+- monitor controls let authorized operators pause, resume, or complete an open run from the operator shell, persist a `monitor_run_command_issued` workspace activity event, surface filterable command-history acknowledgements, and keep the open-run/read-model state in sync
 - completed test-runs now leave the monitor queue and persist their completion timestamp
 
 ## Frontend Shell

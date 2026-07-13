@@ -220,7 +220,14 @@ export function createRuntimeReadsStateHost(args: {
       );
       const query = new URLSearchParams();
       query.set("eventType", "monitor_run_command_issued");
-      query.set("limit", "25");
+      if (args.runtimeState.monitorCommandHistoryRunFilter.trim()) {
+        query.set("subjectType", "test_run");
+        query.set(
+          "subjectId",
+          args.runtimeState.monitorCommandHistoryRunFilter.trim()
+        );
+      }
+      appendQueryValue(query, "limit", args.runtimeState.monitorCommandHistoryLimit);
       return withQuery(path, query);
     },
     setMonitorCommandHistoryView: nextValue => {
