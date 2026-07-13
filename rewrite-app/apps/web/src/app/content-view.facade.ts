@@ -22,7 +22,10 @@ import {
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
-import type { RecordCollectionItem } from "./record-collection.component";
+import type {
+  RecordCollectionItem,
+  RecordCollectionRow
+} from "./record-collection.component";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
@@ -922,6 +925,9 @@ export class ContentViewFacade {
     return (
       payload?.activationReadiness.blockingOpenRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
+        const participantSessionId = this.findParticipantSessionIdByLoginKey(
+          openRun.loginKey
+        );
 
         return {
           headline: displayName ?? openRun.loginKey,
@@ -933,6 +939,7 @@ export class ContentViewFacade {
           ],
           rows: [
             { label: "Run", value: openRun.testRunId },
+            ...this.participantSessionLinkRows(participantSessionId),
             { label: "Booklet", value: openRun.bookletKey },
             {
               label: "Current Unit",
@@ -943,6 +950,7 @@ export class ContentViewFacade {
           actionLabel: "Open In Runtime",
           actionPayload: {
             loginKey: openRun.loginKey,
+            participantSessionId: participantSessionId ?? "",
             testRunId: openRun.testRunId,
             currentUnitKey: openRun.currentUnitKey ?? ""
           }
@@ -1228,6 +1236,9 @@ export class ContentViewFacade {
               label: "Session",
               value: participantSession.participantSessionId
             },
+            ...this.participantSessionLinkRows(
+              participantSession.participantSessionId
+            ),
             {
               label: "Booklet",
               value: rosterEntry?.bookletKey ?? "none"
@@ -1287,6 +1298,11 @@ export class ContentViewFacade {
               label: "Run",
               value: testRun.testRunId
             },
+            {
+              label: "Participant Session",
+              value: testRun.participantSessionId
+            },
+            ...this.participantSessionLinkRows(testRun.participantSessionId),
             {
               label: "Current Unit",
               value: testRun.currentUnitKey ?? "none"
@@ -1385,7 +1401,9 @@ export class ContentViewFacade {
     runtime.testRunId = testRunId;
     runtime.currentUnitKey = item.actionPayload?.currentUnitKey ?? "";
 
-    const participantSessionId = this.findParticipantSessionIdByLoginKey(loginKey);
+    const participantSessionId =
+      item.actionPayload?.participantSessionId?.trim() ||
+      this.findParticipantSessionIdByLoginKey(loginKey);
     if (participantSessionId) {
       runtime.participantSessionId = participantSessionId;
     }
@@ -1559,6 +1577,30 @@ export class ContentViewFacade {
       item => item.participantSession.loginKey === loginKey
     );
     return matchingItem?.participantSession.participantSessionId ?? null;
+  }
+
+  private participantSessionLinkRows(
+    participantSessionId?: string | null
+  ): RecordCollectionRow[] {
+    const normalizedParticipantSessionId = participantSessionId?.trim();
+    if (!normalizedParticipantSessionId) {
+      return [];
+    }
+
+    const url = this.buildParticipantSessionEntryUrl(normalizedParticipantSessionId);
+    return [{ label: "Participant Link", value: url, href: url }];
+  }
+
+  private buildParticipantSessionEntryUrl(participantSessionId: string): string {
+    const query = new URLSearchParams({ participantSessionId });
+    const participantPath = `/participant?${query.toString()}`;
+    return this.browserOrigin
+      ? `${this.browserOrigin}${participantPath}`
+      : participantPath;
+  }
+
+  private get browserOrigin(): string {
+    return globalThis.location?.origin ?? "";
   }
 
   private inferSourceDocumentKind(mediaType: string, sourceDocument: string): string {

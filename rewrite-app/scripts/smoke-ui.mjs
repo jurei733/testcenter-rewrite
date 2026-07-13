@@ -2573,17 +2573,22 @@ try {
   );
 
   logStep("open-blocking-run-in-runtime");
-  await page
+  const activationBlockingStudentCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Activation Blocking Runs" })
     })
     .locator(".record-card")
-    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantLoginKey });
+  await activationBlockingStudentCard
+    .getByRole("link", { name: operatorParticipantSessionLink })
+    .waitFor();
+  await activationBlockingStudentCard
     .getByRole("button", { name: "Open In Runtime" })
     .first()
     .click();
   await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
   await expectInputValue("#testRunId", pausedTestRunId);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
@@ -2597,6 +2602,7 @@ try {
       payload.currentRunState.testRun != null &&
       payload.currentRunState.testRun.testRunId === pausedTestRunId
   );
+  stopAfter("open-blocking-run-in-runtime");
 
   logStep("nav-content-after-blocking-run");
   await page.locator('[data-view-nav="content"]').click();
