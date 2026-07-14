@@ -3358,6 +3358,34 @@ try {
     studyMonitorSummary.completedCount,
     "Runs completed by participants."
   );
+  const monitorBookletProgressCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Monitor Booklet Progress",
+      exact: true
+    })
+  });
+  await monitorBookletProgressCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Starter" }) })
+    .filter({ hasText: "booklet:starter" })
+    .filter({ hasText: "expected participant(s)" })
+    .filter({ hasText: "Participant Sessions" })
+    .filter({ hasText: "Open Booklet Detail" })
+    .waitFor();
+  const monitorUnitProgressCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Monitor Unit Progress",
+      exact: true
+    })
+  });
+  await monitorUnitProgressCard
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: `${pausedWorkMissingResponseCount} missing` })
+    .filter({ hasText: "Missing Responses" })
+    .filter({ hasText: "Open Unit Detail" })
+    .waitFor();
   const monitorAttentionQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Attention Queue",

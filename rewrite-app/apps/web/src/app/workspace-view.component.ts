@@ -142,6 +142,22 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-record-collection>
 
       <app-record-collection
+        title="Monitor Booklet Progress"
+        subtitle="Booklet-level participant load, run state, response, and review coverage."
+        [items]="view.studyMonitorBookletProgressItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="Refresh the study monitor to inspect booklet progress."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Monitor Unit Progress"
+        subtitle="Unit-level answer coverage and missing-response pressure across the workspace."
+        [items]="view.studyMonitorUnitProgressItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="Refresh the study monitor to inspect unit progress."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Monitor Attention Queue"
         subtitle="Prioritized unit, group, and booklet pressure from the latest study monitor summary."
         [items]="view.studyMonitorAttentionItems"

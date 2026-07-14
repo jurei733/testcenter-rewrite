@@ -530,6 +530,82 @@ export class WorkspaceViewFacade {
     }));
   }
 
+  get studyMonitorBookletProgressItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
+      this.workspace.studyMonitorView
+    );
+    const summary = payload?.studyMonitorSummary;
+    if (!summary) {
+      return [];
+    }
+
+    return summary.bookletProgress.map(booklet => ({
+      headline: booklet.displayLabel,
+      subline: `${booklet.bookletKey} · ${booklet.expectedParticipantCount} expected participant(s)`,
+      badges: [
+        `${booklet.notStartedCount} not started`,
+        `${booklet.runningCount} running`,
+        `${booklet.pausedCount} paused`,
+        `${booklet.completedCount} completed`,
+        `${booklet.reviewCount} review(s)`
+      ],
+      rows: [
+        { label: "Booklet", value: booklet.bookletKey },
+        { label: "Roster Entries", value: String(booklet.rosterEntryCount) },
+        {
+          label: "Participant Sessions",
+          value: String(booklet.participantSessionCount)
+        },
+        { label: "Test Runs", value: String(booklet.testRunCount) },
+        { label: "Responses", value: String(booklet.responseCount) },
+        { label: "Units", value: String(booklet.unitCount) },
+        {
+          label: "Latest Activity",
+          value: booklet.latestActivityAt
+            ? this.formatDateTime(booklet.latestActivityAt)
+            : "none"
+        }
+      ],
+      actionLabel: "Open Booklet Detail",
+      actionPayload: { bookletKey: booklet.bookletKey }
+    }));
+  }
+
+  get studyMonitorUnitProgressItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
+      this.workspace.studyMonitorView
+    );
+    const summary = payload?.studyMonitorSummary;
+    if (!summary) {
+      return [];
+    }
+
+    return summary.unitProgress.map(unit => ({
+      headline: unit.displayLabel,
+      subline: unit.unitKey,
+      badges: this.unitProgressBadges(unit),
+      rows: [
+        { label: "Expected Runs", value: String(unit.expectedRunCount) },
+        { label: "Roster Expected", value: String(unit.rosterExpectedCount) },
+        { label: "Responses", value: String(unit.responseCount) },
+        { label: "Missing Responses", value: String(unit.missingResponseCount) },
+        {
+          label: "Unexpected Responses",
+          value: String(unit.unexpectedResponseCount)
+        },
+        { label: "Completed Runs", value: String(unit.completedRunCount) },
+        {
+          label: "Latest Activity",
+          value: unit.latestActivityAt
+            ? this.formatDateTime(unit.latestActivityAt)
+            : "none"
+        }
+      ],
+      actionLabel: "Open Unit Detail",
+      actionPayload: { unitKey: unit.unitKey }
+    }));
+  }
+
   get studyMonitorAttentionItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
