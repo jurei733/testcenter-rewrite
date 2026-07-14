@@ -503,9 +503,14 @@ export class ParticipantViewFacade {
   }
 
   saveProgressFromPlayer(): void {
+    const player = this.player;
+    if (!player.canSaveProgress) {
+      return;
+    }
+
     this.viewState.onActionAsync(() =>
       this.saveProgressInternal(
-        this.player.runStatus === "paused" ? "running" : "paused",
+        player.runStatus === "paused" ? "running" : "paused",
         this.runtime.currentUnitKey.trim() || undefined,
         this.runtime.currentUnitResponse
       )
@@ -513,25 +518,44 @@ export class ParticipantViewFacade {
   }
 
   goToPreviousUnit(): void {
+    if (!this.player.canGoPreviousUnit) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("previous"));
   }
 
   goToNextUnit(): void {
+    if (!this.player.canGoNextUnit) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("next"));
   }
 
   goToUnit(unitKey: string): void {
+    if (!this.player.unitItems.some(unit => unit.unitKey === unitKey && unit.canOpen)) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal(unitKey));
   }
 
   resumeRun(): void {
+    if (!this.player.canResumeRun) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.resumeRunInternal());
   }
 
   completeRun(): void {
     const player = this.player;
+    if (!player.canComplete) {
+      return;
+    }
+
     if (
-      player.canComplete &&
       !player.isComplete &&
       player.completionReadinessState !== "ready" &&
       !globalThis.window?.confirm(
