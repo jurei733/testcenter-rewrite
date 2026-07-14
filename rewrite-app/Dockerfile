@@ -46,6 +46,10 @@ COPY --from=build /app/packages/file-store/dist ./packages/file-store/dist
 COPY --from=build /app/packages/sqlite-store/dist ./packages/sqlite-store/dist
 COPY --from=build /app/packages/postgres-store/dist ./packages/postgres-store/dist
 
+RUN RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true \
+  RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=false \
+  node ./scripts/runtime-preflight.mjs
+
 RUN npm ci --omit=dev && chown -R node:node /app
 
 USER node

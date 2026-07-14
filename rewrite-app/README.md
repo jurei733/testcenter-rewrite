@@ -494,7 +494,7 @@ For runtime probes:
   - protected browser-driven Angular UI smoke against a Postgres service database
   - SQLite startup, shutdown, fast content-browser, review-readiness browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
   - Docker compose release smoke with explicit migrate, preflight, and api roles
-- [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
+- [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
 
