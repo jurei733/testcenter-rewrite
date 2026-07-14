@@ -17,6 +17,7 @@
     "ci": "npm run typecheck && npm run test:unit && npm run build && npm run test:integration && npm run smoke:startup:sqlite && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight-ci.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight-ci.sqlite RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=false npm run preflight:runtime:built && npm run smoke:shutdown:sqlite && npm run smoke:ui && npm run smoke:ui:operator-auth && npm run smoke:local-demo",
     "ci:fast": "npm run build && npm run test:unit:built && npm run test:integration:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/smoke-startup-fast.sqlite npm run smoke:startup:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight-fast.sqlite npm run db:migrate:sqlite:built && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight-fast.sqlite RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=false npm run preflight:runtime:built && npm run smoke:ui:content:built",
     "install:browsers": "playwright install chromium",
+    "smoke:docker:build": "docker build --build-arg APP_BUILD_SHA=${APP_BUILD_SHA:-local-docker} --build-arg APP_BUILD_TIMESTAMP=${APP_BUILD_TIMESTAMP:-unknown} -t ${DOCKER_IMAGE_TAG:-testcenter-rewrite-app:smoke} .",
     "db:doctor": "npm run build && node ./scripts/storage-admin.mjs doctor",
     "db:doctor:built": "node ./scripts/storage-admin.mjs doctor",
     "db:doctor:postgres": "npm run build && FIRST_SLICE_STORE=postgres node ./scripts/storage-admin.mjs doctor",

@@ -105,6 +105,7 @@ The full CI command executes:
 - a built runtime preflight against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
 - browser-driven Angular UI smokes against SQLite in focused content, participant-entry, review-readiness, open, and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
+- a standalone production Docker image build that runs the runtime artifact preflight during the image build
 
 For explicit storage administration, run:
 
@@ -229,6 +230,15 @@ docker build \
   --build-arg APP_BUILD_SHA=$(git rev-parse --short HEAD) \
   --build-arg APP_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
   -f Dockerfile .
+```
+
+For the same standalone image-build check used by CI, run:
+
+```bash
+APP_BUILD_SHA=$(git rev-parse --short=12 HEAD) \
+APP_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+DOCKER_IMAGE_TAG=testcenter-rewrite-app:smoke \
+npm run smoke:docker:build
 ```
 
 ## Current Live Flow
@@ -494,6 +504,7 @@ For runtime probes:
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
   - SQLite startup, shutdown, fast content-browser, participant-entry browser, review-readiness browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
+  - standalone production Docker image build with image-time runtime artifact preflight
   - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks

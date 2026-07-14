@@ -229,6 +229,25 @@ jobs:
       - name: Run SQLite smoke
         run: ${{ matrix.command }}
 
+  docker-image-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build production image
+        run: |
+          APP_BUILD_SHA="${GITHUB_SHA::12}" \
+          APP_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          DOCKER_IMAGE_TAG="testcenter-rewrite-app:${GITHUB_SHA::12}" \
+          npm run smoke:docker:build
+
   compose-postgres-smoke:
     name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
     runs-on: ubuntu-latest
