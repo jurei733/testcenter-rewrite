@@ -267,6 +267,12 @@ export function createShellPersistenceStateHost(args: {
     set participantSessionLoginFilter(nextValue) {
       args.runtimeState.participantSessionLoginFilter = nextValue;
     },
+    get participantSessionBookletFilter() {
+      return args.runtimeState.participantSessionBookletFilter;
+    },
+    set participantSessionBookletFilter(nextValue) {
+      args.runtimeState.participantSessionBookletFilter = nextValue;
+    },
     get participantSessionReleaseFilter() {
       return args.runtimeState.participantSessionReleaseFilter;
     },

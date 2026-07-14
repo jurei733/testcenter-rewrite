@@ -614,6 +614,7 @@ export type ParticipantSessionListQuery = {
   status?: ParticipantSessionStatus;
   groupKey?: string;
   loginKey?: string;
+  bookletKey?: string;
   contentReleaseId?: string;
   limit?: number;
 };

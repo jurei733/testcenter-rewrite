@@ -202,6 +202,7 @@ export type WorkspaceAdminReadPort = {
     status?: ParticipantSessionStatus;
     groupKey?: string;
     loginKey?: string;
+    bookletKey?: string;
     contentReleaseId?: string;
     limit?: number;
   }): Promise<WorkspaceParticipantSessionListItem[]>;
@@ -211,6 +212,7 @@ export type WorkspaceAdminReadPort = {
     status?: ParticipantSessionStatus;
     groupKey?: string;
     loginKey?: string;
+    bookletKey?: string;
     contentReleaseId?: string;
     limit?: number;
   }): Promise<string>;
@@ -7057,16 +7059,6 @@ export const createFirstSliceServices = (
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
         return participantSessions
-          .filter(
-            participantSession =>
-              (!input.status || participantSession.status === input.status) &&
-              (!input.groupKey || participantSession.groupKey === input.groupKey) &&
-              (!input.loginKey || participantSession.loginKey === input.loginKey) &&
-              (!input.contentReleaseId ||
-                participantSession.contentReleaseId === input.contentReleaseId)
-          )
-          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-          .slice(0, limit)
           .map<WorkspaceParticipantSessionListItem>(participantSession => {
             const sessionRuns = testRuns
               .filter(
@@ -7090,7 +7082,39 @@ export const createFirstSliceServices = (
                     participantSession.contentReleaseId
                 ) ?? null
             };
-          });
+          })
+          .filter(item => {
+            const participantSession = item.participantSession;
+            if (input.status && participantSession.status !== input.status) {
+              return false;
+            }
+            if (input.groupKey && participantSession.groupKey !== input.groupKey) {
+              return false;
+            }
+            if (input.loginKey && participantSession.loginKey !== input.loginKey) {
+              return false;
+            }
+            if (
+              input.bookletKey &&
+              item.latestTestRun?.bookletKey !== input.bookletKey &&
+              item.participantRosterEntry?.bookletKey !== input.bookletKey
+            ) {
+              return false;
+            }
+            if (
+              input.contentReleaseId &&
+              participantSession.contentReleaseId !== input.contentReleaseId
+            ) {
+              return false;
+            }
+            return true;
+          })
+          .sort((left, right) =>
+            right.participantSession.createdAt.localeCompare(
+              left.participantSession.createdAt
+            )
+          )
+          .slice(0, limit);
       },
       async exportParticipantSessionsCsv(input) {
         const items = await this.listParticipantSessions(input);

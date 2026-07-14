@@ -47,6 +47,7 @@ export type PersistedShellState = {
   participantSessionStatusFilter: string;
   participantSessionGroupFilter: string;
   participantSessionLoginFilter: string;
+  participantSessionBookletFilter: string;
   participantSessionReleaseFilter: string;
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;

@@ -69,6 +69,7 @@ export interface ShellRuntimeState {
   participantSessionStatusFilter: string;
   participantSessionGroupFilter: string;
   participantSessionLoginFilter: string;
+  participantSessionBookletFilter: string;
   participantSessionReleaseFilter: string;
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;
@@ -251,6 +252,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionStatusFilter: "",
     participantSessionGroupFilter: "",
     participantSessionLoginFilter: "",
+    participantSessionBookletFilter: "",
     participantSessionReleaseFilter: "",
     participantSessionLimit: "100",
     detailedResponseLoginFilter: "",

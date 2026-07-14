@@ -2483,8 +2483,21 @@ try {
   await selectAndCommit("#participantSessionStatusFilter", "launched");
   await fillAndCommit("#participantSessionGroupFilter", participantGroupKey);
   await fillAndCommit("#participantSessionLoginFilter", participantLoginKey);
+  await fillAndCommit("#participantSessionBookletFilter", participantBookletKey);
   await fillAndCommit("#participantSessionLimit", "1");
   await clickAction("Refresh Sessions");
+  const filteredParticipantSessionsResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?status=launched&groupKey=${encodeURIComponent(participantGroupKey)}&loginKey=${encodeURIComponent(participantLoginKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&limit=1`,
+    createSmokeFetchInit()
+  );
+  assert.equal(filteredParticipantSessionsResponse.status, 200);
+  const filteredParticipantSessionsPayload =
+    await filteredParticipantSessionsResponse.json();
+  assert.equal(filteredParticipantSessionsPayload.items.length, 1);
+  assert.equal(
+    filteredParticipantSessionsPayload.items[0]?.latestTestRun?.bookletKey,
+    participantBookletKey
+  );
   const operatorParticipantSessionLink = `${baseUrl}/participant?${new URLSearchParams({
     participantSessionId,
     tenantKey,
@@ -2511,11 +2524,11 @@ try {
       has: page.getByRole("heading", { name: "Participant session window" })
     })
     .filter({ hasText: "1 session row(s) loaded for the current filters" })
-    .filter({ hasText: "3 active filter(s)" })
+    .filter({ hasText: "4 active filter(s)" })
     .filter({ hasText: "limit 1" })
     .filter({ hasText: "Loaded Sessions" })
     .filter({ hasText: "Active Filters" })
-    .filter({ hasText: "status, group, login" })
+    .filter({ hasText: "status, group, login, booklet" })
     .waitFor();
   await participantSessionCard.waitFor();
   await participantSessionCard

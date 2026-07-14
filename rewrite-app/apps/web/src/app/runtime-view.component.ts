@@ -183,7 +183,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Session Filters</h2>
-        <p>Narrow the operator session list by status, group, login, release, or a small result limit.</p>
+        <p>Narrow the operator session list by status, group, login, booklet, release, or a small result limit.</p>
         <div class="form-grid">
           <label>
             Status
@@ -215,6 +215,16 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               [(ngModel)]="view.runtime.participantSessionLoginFilter"
               (change)="view.persistState()"
               placeholder="Optional login key"
+            />
+          </label>
+          <label>
+            Booklet Key
+            <input
+              id="participantSessionBookletFilter"
+              name="participantSessionBookletFilter"
+              [(ngModel)]="view.runtime.participantSessionBookletFilter"
+              (change)="view.persistState()"
+              placeholder="Optional booklet key"
             />
           </label>
           <label>

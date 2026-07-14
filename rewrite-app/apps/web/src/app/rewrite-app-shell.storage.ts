@@ -35,6 +35,7 @@ export type ShellPersistenceTarget = {
   participantSessionStatusFilter: string;
   participantSessionGroupFilter: string;
   participantSessionLoginFilter: string;
+  participantSessionBookletFilter: string;
   participantSessionReleaseFilter: string;
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;
@@ -140,6 +141,7 @@ export const createPersistedShellState = (
   participantSessionStatusFilter: target.participantSessionStatusFilter,
   participantSessionGroupFilter: target.participantSessionGroupFilter,
   participantSessionLoginFilter: target.participantSessionLoginFilter,
+  participantSessionBookletFilter: target.participantSessionBookletFilter,
   participantSessionReleaseFilter: target.participantSessionReleaseFilter,
   participantSessionLimit: target.participantSessionLimit,
   detailedResponseLoginFilter: target.detailedResponseLoginFilter,
@@ -327,6 +329,11 @@ export const applyHydratedShellState = (
     hydrateString(
       snapshot.participantSessionLoginFilter,
       target.participantSessionLoginFilter
+    );
+  target.participantSessionBookletFilter =
+    hydrateString(
+      snapshot.participantSessionBookletFilter,
+      target.participantSessionBookletFilter
     );
   target.participantSessionReleaseFilter =
     hydrateString(

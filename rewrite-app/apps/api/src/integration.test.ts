@@ -6904,7 +6904,7 @@ test("workspace participant-session list shows latest run and active release", a
         groupKey: string;
         status: string;
       };
-      latestTestRun: { testRunId: string; status: string } | null;
+      latestTestRun: { testRunId: string; bookletKey: string; status: string } | null;
       contentRelease: { contentReleaseId: string; status: string } | null;
     }>;
   }>(
@@ -6930,6 +6930,10 @@ test("workspace participant-session list shows latest run and active release", a
   assert.equal(
     resumedSessionItem?.latestTestRun?.status,
     "running"
+  );
+  assert.equal(
+    resumedSessionItem?.latestTestRun?.bookletKey,
+    "booklet:session"
   );
   assert.equal(
     resumedSessionItem?.contentRelease?.contentReleaseId,
@@ -6970,6 +6974,21 @@ test("workspace participant-session list shows latest run and active release", a
     signIn.body.participantSession.participantSessionId
   );
 
+  const bookletFilteredSessions = await requestJson<typeof participantSessions.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?bookletKey=booklet%3Asession`
+  );
+
+  assert.equal(bookletFilteredSessions.status, 200);
+  assert.equal(bookletFilteredSessions.body.items.length, 1);
+  assert.equal(
+    bookletFilteredSessions.body.items[0]?.participantSession.participantSessionId,
+    signIn.body.participantSession.participantSessionId
+  );
+  assert.equal(
+    bookletFilteredSessions.body.items[0]?.latestTestRun?.bookletKey,
+    "booklet:session"
+  );
+
   const releaseFilteredSessions = await requestJson<typeof participantSessions.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?contentReleaseId=${contentReleaseId}&limit=1`
   );
@@ -6980,6 +6999,18 @@ test("workspace participant-session list shows latest run and active release", a
     releaseFilteredSessions.body.items[0]?.contentRelease?.contentReleaseId,
     contentReleaseId
   );
+
+  const participantSessionsCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/participant-sessions.csv?bookletKey=booklet%3Asession&limit=10`
+  );
+
+  assert.equal(participantSessionsCsv.status, 200);
+  assert.match(
+    participantSessionsCsv.body,
+    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName\n/
+  );
+  assert.match(participantSessionsCsv.body, /booklet:session/);
+  assert.equal(participantSessionsCsv.body.trim().split("\n").length, 2);
 
   const invalidParticipantSessionStatus = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions?status=unsupported`

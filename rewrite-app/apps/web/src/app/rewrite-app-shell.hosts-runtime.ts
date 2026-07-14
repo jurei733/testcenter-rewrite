@@ -130,6 +130,7 @@ export function createRuntimeReadsStateHost(args: {
     appendQueryValue(query, "status", args.runtimeState.participantSessionStatusFilter);
     appendQueryValue(query, "groupKey", args.runtimeState.participantSessionGroupFilter);
     appendQueryValue(query, "loginKey", args.runtimeState.participantSessionLoginFilter);
+    appendQueryValue(query, "bookletKey", args.runtimeState.participantSessionBookletFilter);
     appendQueryValue(
       query,
       "contentReleaseId",

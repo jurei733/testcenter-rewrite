@@ -86,6 +86,7 @@ export class RuntimeViewFacade {
       this.runtime.participantSessionStatusFilter.trim() ? "status" : "",
       this.runtime.participantSessionGroupFilter.trim() ? "group" : "",
       this.runtime.participantSessionLoginFilter.trim() ? "login" : "",
+      this.runtime.participantSessionBookletFilter.trim() ? "booklet" : "",
       this.runtime.participantSessionReleaseFilter.trim() ? "release" : ""
     ].filter(Boolean);
 
@@ -1904,6 +1905,7 @@ export class RuntimeViewFacade {
     this.runtime.participantSessionStatusFilter = "";
     this.runtime.participantSessionGroupFilter = "";
     this.runtime.participantSessionLoginFilter = "";
+    this.runtime.participantSessionBookletFilter = "";
     this.runtime.participantSessionReleaseFilter = "";
     this.runtime.participantSessionLimit = "100";
     this.refreshParticipantSessions();

@@ -3427,6 +3427,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
         const groupKey = url.searchParams.get("groupKey")?.trim() || undefined;
         const loginKey = url.searchParams.get("loginKey")?.trim() || undefined;
+        const bookletKey =
+          url.searchParams.get("bookletKey")?.trim() || undefined;
         const contentReleaseId =
           url.searchParams.get("contentReleaseId")?.trim() || undefined;
         const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
@@ -3452,6 +3454,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           status: status as ParticipantSessionStatus | undefined,
           groupKey,
           loginKey,
+          bookletKey,
           contentReleaseId,
           limit
         });
@@ -3492,6 +3495,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
         const groupKey = url.searchParams.get("groupKey")?.trim() || undefined;
         const loginKey = url.searchParams.get("loginKey")?.trim() || undefined;
+        const bookletKey =
+          url.searchParams.get("bookletKey")?.trim() || undefined;
         const contentReleaseId =
           url.searchParams.get("contentReleaseId")?.trim() || undefined;
         const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
@@ -3517,6 +3522,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           status: status as ParticipantSessionStatus | undefined,
           groupKey,
           loginKey,
+          bookletKey,
           contentReleaseId,
           limit
         });
