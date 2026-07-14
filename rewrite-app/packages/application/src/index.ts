@@ -120,6 +120,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     unitKey?: string;
     testRunStatus?: TestRunStatus | "not_started";
     answerState?: "answered" | "missing";
@@ -2059,6 +2060,7 @@ const filterStudyMonitorParticipantMatrix = (
   input: {
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     unitKey?: string;
     testRunStatus?: TestRunStatus | "not_started";
     answerState?: "answered" | "missing";
@@ -2067,6 +2069,7 @@ const filterStudyMonitorParticipantMatrix = (
 ): WorkspaceStudyMonitorParticipantMatrix => {
   const loginKey = input.loginKey?.trim().toLowerCase() ?? "";
   const groupKey = input.groupKey?.trim().toLowerCase() ?? "";
+  const bookletKey = input.bookletKey?.trim().toLowerCase() ?? "";
   const unitKey = input.unitKey?.trim().toLowerCase() ?? "";
   const filteredRows = matrix.rows.filter(row => {
     if (
@@ -2076,6 +2079,14 @@ const filterStudyMonitorParticipantMatrix = (
       return false;
     }
     if (groupKey && !row.groupKey.toLowerCase().includes(groupKey)) {
+      return false;
+    }
+    if (
+      bookletKey &&
+      !`${row.bookletKey ?? ""} ${row.rosterBookletKey ?? ""}`
+        .toLowerCase()
+        .includes(bookletKey)
+    ) {
       return false;
     }
     if (

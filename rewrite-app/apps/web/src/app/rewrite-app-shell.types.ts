@@ -76,6 +76,13 @@ export type PersistedShellState = {
   workspaceActivitySubjectType: string;
   workspaceActivitySubjectId: string;
   workspaceActivityLimit: string;
+  studyMonitorMatrixLoginFilter: string;
+  studyMonitorMatrixGroupFilter: string;
+  studyMonitorMatrixBookletFilter: string;
+  studyMonitorMatrixUnitFilter: string;
+  studyMonitorMatrixStatusFilter: string;
+  studyMonitorMatrixAnswerFilter: string;
+  studyMonitorMatrixLimit: string;
   forceActivation: boolean;
   adminUsername: string;
   adminDisplayName: string;

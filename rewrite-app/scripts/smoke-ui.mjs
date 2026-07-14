@@ -3394,6 +3394,7 @@ try {
     .click();
   await expectInputValue("#studyMonitorMatrixLoginFilter", "");
   await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixBookletFilter", "");
   await expectInputValue("#studyMonitorMatrixUnitFilter", "");
   await expectInputValue("#studyMonitorMatrixStatusFilter", "running");
   await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
@@ -3413,14 +3414,33 @@ try {
       exact: true
     })
   });
-  await monitorBookletProgressCard
+  const starterBookletProgressCard = monitorBookletProgressCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Starter" }) })
     .filter({ hasText: "booklet:starter" })
     .filter({ hasText: "expected participant(s)" })
     .filter({ hasText: "Participant Sessions" })
     .filter({ hasText: "Open Booklet Detail" })
+    .filter({ hasText: "Show In Matrix" });
+  await starterBookletProgressCard.waitFor();
+  logStep("study-monitor-booklet-filter-matrix");
+  await starterBookletProgressCard
+    .getByRole("button", { name: "Show In Matrix" })
+    .click();
+  await expectInputValue("#studyMonitorMatrixLoginFilter", "");
+  await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixBookletFilter", "booklet:starter");
+  await expectInputValue("#studyMonitorMatrixUnitFilter", "");
+  await expectInputValue("#studyMonitorMatrixStatusFilter", "");
+  await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
+  await expectInputValue("#studyMonitorMatrixLimit", "25");
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({ hasText: "booklet:starter" })
+    .first()
     .waitFor();
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  stopAfter("study-monitor-booklet-filter-matrix");
   const monitorUnitProgressCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Unit Progress",
@@ -3442,6 +3462,7 @@ try {
     .click();
   await expectInputValue("#studyMonitorMatrixLoginFilter", "");
   await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixBookletFilter", "");
   await expectInputValue("#studyMonitorMatrixUnitFilter", "unit-paused");
   await expectInputValue("#studyMonitorMatrixStatusFilter", "");
   await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
@@ -3487,6 +3508,7 @@ try {
     .click();
   await expectInputValue("#studyMonitorMatrixLoginFilter", "");
   await expectInputValue("#studyMonitorMatrixGroupFilter", "group:entry-smoke");
+  await expectInputValue("#studyMonitorMatrixBookletFilter", "");
   await expectInputValue("#studyMonitorMatrixUnitFilter", "");
   await expectInputValue("#studyMonitorMatrixStatusFilter", "");
   await expectInputValue("#studyMonitorMatrixAnswerFilter", "");

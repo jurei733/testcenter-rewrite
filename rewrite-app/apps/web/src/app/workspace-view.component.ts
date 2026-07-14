@@ -176,7 +176,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
 
       <article class="card">
         <h2>Participant Matrix Filters</h2>
-        <p>Keep large monitor matrices focused by participant, group, unit, run status, answer state, and visible-row limit. The participant-matrix CSV export uses the same filters.</p>
+        <p>Keep large monitor matrices focused by participant, group, booklet, unit, run status, answer state, and visible-row limit. The participant-matrix CSV export uses the same filters.</p>
         <div class="form-grid">
           <label>
             Login
@@ -185,6 +185,10 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <label>
             Group
             <input id="studyMonitorMatrixGroupFilter" name="studyMonitorMatrixGroupFilter" [(ngModel)]="view.workspace.studyMonitorMatrixGroupFilter" (change)="view.persistState()" placeholder="Optional group" />
+          </label>
+          <label>
+            Booklet
+            <input id="studyMonitorMatrixBookletFilter" name="studyMonitorMatrixBookletFilter" [(ngModel)]="view.workspace.studyMonitorMatrixBookletFilter" (change)="view.persistState()" placeholder="Optional booklet" />
           </label>
           <label>
             Unit

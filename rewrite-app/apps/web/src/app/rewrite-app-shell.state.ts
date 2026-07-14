@@ -158,6 +158,7 @@ export interface ShellWorkspaceState {
   workspaceActivityLimit: string;
   studyMonitorMatrixLoginFilter: string;
   studyMonitorMatrixGroupFilter: string;
+  studyMonitorMatrixBookletFilter: string;
   studyMonitorMatrixUnitFilter: string;
   studyMonitorMatrixStatusFilter: string;
   studyMonitorMatrixAnswerFilter: string;
@@ -350,6 +351,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceActivityLimit: "100",
     studyMonitorMatrixLoginFilter: "",
     studyMonitorMatrixGroupFilter: "",
+    studyMonitorMatrixBookletFilter: "",
     studyMonitorMatrixUnitFilter: "",
     studyMonitorMatrixStatusFilter: "",
     studyMonitorMatrixAnswerFilter: "",

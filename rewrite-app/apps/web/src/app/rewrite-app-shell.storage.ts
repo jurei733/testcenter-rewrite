@@ -64,6 +64,13 @@ export type ShellPersistenceTarget = {
   workspaceActivitySubjectType: string;
   workspaceActivitySubjectId: string;
   workspaceActivityLimit: string;
+  studyMonitorMatrixLoginFilter: string;
+  studyMonitorMatrixGroupFilter: string;
+  studyMonitorMatrixBookletFilter: string;
+  studyMonitorMatrixUnitFilter: string;
+  studyMonitorMatrixStatusFilter: string;
+  studyMonitorMatrixAnswerFilter: string;
+  studyMonitorMatrixLimit: string;
   forceActivation: boolean;
   adminUsername: string;
   adminDisplayName: string;
@@ -162,6 +169,13 @@ export const createPersistedShellState = (
   workspaceActivitySubjectType: target.workspaceActivitySubjectType,
   workspaceActivitySubjectId: target.workspaceActivitySubjectId,
   workspaceActivityLimit: target.workspaceActivityLimit,
+  studyMonitorMatrixLoginFilter: target.studyMonitorMatrixLoginFilter,
+  studyMonitorMatrixGroupFilter: target.studyMonitorMatrixGroupFilter,
+  studyMonitorMatrixBookletFilter: target.studyMonitorMatrixBookletFilter,
+  studyMonitorMatrixUnitFilter: target.studyMonitorMatrixUnitFilter,
+  studyMonitorMatrixStatusFilter: target.studyMonitorMatrixStatusFilter,
+  studyMonitorMatrixAnswerFilter: target.studyMonitorMatrixAnswerFilter,
+  studyMonitorMatrixLimit: target.studyMonitorMatrixLimit,
   forceActivation: target.forceActivation,
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
@@ -424,6 +438,34 @@ export const applyHydratedShellState = (
     );
   target.workspaceActivityLimit =
     hydrateString(snapshot.workspaceActivityLimit, target.workspaceActivityLimit);
+  target.studyMonitorMatrixLoginFilter = hydrateString(
+    snapshot.studyMonitorMatrixLoginFilter,
+    target.studyMonitorMatrixLoginFilter
+  );
+  target.studyMonitorMatrixGroupFilter = hydrateString(
+    snapshot.studyMonitorMatrixGroupFilter,
+    target.studyMonitorMatrixGroupFilter
+  );
+  target.studyMonitorMatrixBookletFilter = hydrateString(
+    snapshot.studyMonitorMatrixBookletFilter,
+    target.studyMonitorMatrixBookletFilter
+  );
+  target.studyMonitorMatrixUnitFilter = hydrateString(
+    snapshot.studyMonitorMatrixUnitFilter,
+    target.studyMonitorMatrixUnitFilter
+  );
+  target.studyMonitorMatrixStatusFilter = hydrateString(
+    snapshot.studyMonitorMatrixStatusFilter,
+    target.studyMonitorMatrixStatusFilter
+  );
+  target.studyMonitorMatrixAnswerFilter = hydrateString(
+    snapshot.studyMonitorMatrixAnswerFilter,
+    target.studyMonitorMatrixAnswerFilter
+  );
+  target.studyMonitorMatrixLimit = hydrateString(
+    snapshot.studyMonitorMatrixLimit,
+    target.studyMonitorMatrixLimit
+  );
   target.forceActivation = snapshot.forceActivation ?? target.forceActivation;
   target.adminUsername = hydrateString(
     snapshot.adminUsername,

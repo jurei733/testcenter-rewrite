@@ -192,6 +192,9 @@ export class WorkspaceViewFacade {
     const groupFilter = this.workspace.studyMonitorMatrixGroupFilter
       .trim()
       .toLowerCase();
+    const bookletFilter = this.workspace.studyMonitorMatrixBookletFilter
+      .trim()
+      .toLowerCase();
     const unitFilter = this.workspace.studyMonitorMatrixUnitFilter
       .trim()
       .toLowerCase();
@@ -212,6 +215,14 @@ export class WorkspaceViewFacade {
         return false;
       }
       if (groupFilter && !row.groupKey.toLowerCase().includes(groupFilter)) {
+        return false;
+      }
+      if (
+        bookletFilter &&
+        !`${row.bookletKey ?? ""} ${row.rosterBookletKey ?? ""}`
+          .toLowerCase()
+          .includes(bookletFilter)
+      ) {
         return false;
       }
       if (
@@ -551,7 +562,12 @@ export class WorkspaceViewFacade {
           }
         ],
         actionLabel: "Open Booklet Detail",
-        actionPayload: { bookletKey: booklet.bookletKey }
+        actionPayload: { bookletKey: booklet.bookletKey },
+        actions: [
+          this.studyMonitorMatrixFilterAction({
+            bookletKey: booklet.bookletKey
+          })
+        ]
       })),
       ...summary.unitProgress.map(unit => ({
         headline: unit.displayLabel,
@@ -685,7 +701,12 @@ export class WorkspaceViewFacade {
         }
       ],
       actionLabel: "Open Booklet Detail",
-      actionPayload: { bookletKey: booklet.bookletKey }
+      actionPayload: { bookletKey: booklet.bookletKey },
+      actions: [
+        this.studyMonitorMatrixFilterAction({
+          bookletKey: booklet.bookletKey
+        })
+      ]
     }));
   }
 
@@ -869,7 +890,12 @@ export class WorkspaceViewFacade {
           }
         ],
         actionLabel: "Open Booklet Detail",
-        actionPayload: { bookletKey: booklet.bookletKey }
+        actionPayload: { bookletKey: booklet.bookletKey },
+        actions: [
+          this.studyMonitorMatrixFilterAction({
+            bookletKey: booklet.bookletKey
+          })
+        ]
       });
     }
 
@@ -2207,6 +2233,7 @@ export class WorkspaceViewFacade {
   clearStudyMonitorMatrixFilters(): void {
     this.workspace.studyMonitorMatrixLoginFilter = "";
     this.workspace.studyMonitorMatrixGroupFilter = "";
+    this.workspace.studyMonitorMatrixBookletFilter = "";
     this.workspace.studyMonitorMatrixUnitFilter = "";
     this.workspace.studyMonitorMatrixStatusFilter = "";
     this.workspace.studyMonitorMatrixAnswerFilter = "";
@@ -2222,6 +2249,7 @@ export class WorkspaceViewFacade {
 
     this.workspace.studyMonitorMatrixLoginFilter = "";
     this.workspace.studyMonitorMatrixGroupFilter = "";
+    this.workspace.studyMonitorMatrixBookletFilter = "";
     this.workspace.studyMonitorMatrixUnitFilter = "";
     this.workspace.studyMonitorMatrixStatusFilter = testRunStatus;
     this.workspace.studyMonitorMatrixAnswerFilter = "";
@@ -2231,13 +2259,15 @@ export class WorkspaceViewFacade {
 
   private filterStudyMonitorMatrixScope(item: RecordCollectionItem): void {
     const groupKey = item.actionPayload?.groupKey?.trim() ?? "";
+    const bookletKey = item.actionPayload?.bookletKey?.trim() ?? "";
     const unitKey = item.actionPayload?.unitKey?.trim() ?? "";
-    if (!this.canUseWorkspaceScope || (!groupKey && !unitKey)) {
+    if (!this.canUseWorkspaceScope || (!groupKey && !bookletKey && !unitKey)) {
       return;
     }
 
     this.workspace.studyMonitorMatrixLoginFilter = "";
     this.workspace.studyMonitorMatrixGroupFilter = groupKey;
+    this.workspace.studyMonitorMatrixBookletFilter = bookletKey;
     this.workspace.studyMonitorMatrixUnitFilter = unitKey;
     this.workspace.studyMonitorMatrixStatusFilter = "";
     this.workspace.studyMonitorMatrixAnswerFilter = "";

@@ -434,6 +434,7 @@ export class RewriteAppWorkspaceService {
     const matrixFilters: Array<[string, string]> = [
       ["loginKey", this.workspaceState.studyMonitorMatrixLoginFilter],
       ["groupKey", this.workspaceState.studyMonitorMatrixGroupFilter],
+      ["bookletKey", this.workspaceState.studyMonitorMatrixBookletFilter],
       ["unitKey", this.workspaceState.studyMonitorMatrixUnitFilter],
       ["testRunStatus", this.workspaceState.studyMonitorMatrixStatusFilter],
       ["answerState", this.workspaceState.studyMonitorMatrixAnswerFilter],

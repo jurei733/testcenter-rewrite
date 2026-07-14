@@ -2354,6 +2354,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           loginKey: string;
           groupKey: string;
           displayName: string | null;
+          bookletKey: string | null;
           testRunStatus: string;
           unitKey: string;
           unitLabel: string;
@@ -2393,6 +2394,35 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       }
     );
     assert.ok((introMatrixRow?.responseLength ?? 0) > 0);
+
+    const bookletFilteredParticipantMatrix = await requestJsonAt<{
+      studyMonitorParticipantMatrix: {
+        rows: Array<{
+          bookletKey: string | null;
+          rosterBookletKey: string | null;
+        }>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/study-monitor/participants?bookletKey=booklet%3Ademo&limit=10",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(bookletFilteredParticipantMatrix.status, 200);
+    assert.ok(
+      bookletFilteredParticipantMatrix.body.studyMonitorParticipantMatrix.rows.length > 0
+    );
+    assert.ok(
+      bookletFilteredParticipantMatrix.body.studyMonitorParticipantMatrix.rows.every(
+        row =>
+          row.bookletKey === "booklet:demo" ||
+          row.rosterBookletKey === "booklet:demo"
+      )
+    );
 
     const participantDetail = await requestJsonAt<{
       studyMonitorParticipant: {
@@ -2503,6 +2533,28 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(
       studyMonitorParticipantMatrixCsv.body,
       /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","[^"]+","launched","[^"]+","running","booklet:demo","unit-finish","Finish","true","false","0","0","[^"]+"/
+    );
+
+    const filteredStudyMonitorParticipantMatrixCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/study-monitor-participants.csv?bookletKey=booklet%3Ademo&unitKey=unit-intro&limit=10",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(filteredStudyMonitorParticipantMatrixCsv.status, 200);
+    assert.match(
+      filteredStudyMonitorParticipantMatrixCsv.body,
+      /^tenantKey,workspaceKey,generatedAt,loginKey,groupKey,displayName,rosterBookletKey,participantSessionId,participantSessionStatus,testRunId,testRunStatus,bookletKey,unitKey,unitLabel,expected,answered,responseLength,reviewCount,latestActivityAt\n/
+    );
+    assert.match(filteredStudyMonitorParticipantMatrixCsv.body, /booklet:demo/);
+    assert.match(filteredStudyMonitorParticipantMatrixCsv.body, /unit-intro/);
+    assert.equal(
+      filteredStudyMonitorParticipantMatrixCsv.body.trim().split("\n").length,
+      2
     );
 
     const openRunsCsv = await requestTextAt(

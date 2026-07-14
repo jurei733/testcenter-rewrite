@@ -150,6 +150,7 @@ type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 type StudyMonitorParticipantMatrixQuery = {
   loginKey?: string;
   groupKey?: string;
+  bookletKey?: string;
   unitKey?: string;
   testRunStatus?: TestRunStatus | "not_started";
   answerState?: "answered" | "missing";
@@ -2085,6 +2086,7 @@ const parseStudyMonitorParticipantMatrixQuery = (
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
     groupKey: readOptionalQueryValue(url, "groupKey"),
+    bookletKey: readOptionalQueryValue(url, "bookletKey"),
     unitKey: readOptionalQueryValue(url, "unitKey"),
     testRunStatus: testRunStatus as TestRunStatus | "not_started" | undefined,
     answerState: answerState as "answered" | "missing" | undefined,

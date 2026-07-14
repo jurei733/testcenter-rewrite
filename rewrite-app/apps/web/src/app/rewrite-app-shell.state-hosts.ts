@@ -441,6 +441,48 @@ export function createShellPersistenceStateHost(args: {
     set workspaceActivityLimit(nextValue) {
       args.workspaceState.workspaceActivityLimit = nextValue;
     },
+    get studyMonitorMatrixLoginFilter() {
+      return args.workspaceState.studyMonitorMatrixLoginFilter;
+    },
+    set studyMonitorMatrixLoginFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixLoginFilter = nextValue;
+    },
+    get studyMonitorMatrixGroupFilter() {
+      return args.workspaceState.studyMonitorMatrixGroupFilter;
+    },
+    set studyMonitorMatrixGroupFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixGroupFilter = nextValue;
+    },
+    get studyMonitorMatrixBookletFilter() {
+      return args.workspaceState.studyMonitorMatrixBookletFilter;
+    },
+    set studyMonitorMatrixBookletFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixBookletFilter = nextValue;
+    },
+    get studyMonitorMatrixUnitFilter() {
+      return args.workspaceState.studyMonitorMatrixUnitFilter;
+    },
+    set studyMonitorMatrixUnitFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixUnitFilter = nextValue;
+    },
+    get studyMonitorMatrixStatusFilter() {
+      return args.workspaceState.studyMonitorMatrixStatusFilter;
+    },
+    set studyMonitorMatrixStatusFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixStatusFilter = nextValue;
+    },
+    get studyMonitorMatrixAnswerFilter() {
+      return args.workspaceState.studyMonitorMatrixAnswerFilter;
+    },
+    set studyMonitorMatrixAnswerFilter(nextValue) {
+      args.workspaceState.studyMonitorMatrixAnswerFilter = nextValue;
+    },
+    get studyMonitorMatrixLimit() {
+      return args.workspaceState.studyMonitorMatrixLimit;
+    },
+    set studyMonitorMatrixLimit(nextValue) {
+      args.workspaceState.studyMonitorMatrixLimit = nextValue;
+    },
     get forceActivation() {
       return args.contentState.forceActivation;
     },
