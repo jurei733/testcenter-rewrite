@@ -104,7 +104,7 @@ The full CI command executes:
 - a built-server startup smoke test against SQLite
 - a built runtime preflight against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
-- browser-driven Angular UI smokes against SQLite in open and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
+- browser-driven Angular UI smokes against SQLite in focused content, participant-entry, review-readiness, open, and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
 
 For explicit storage administration, run:
 
@@ -418,6 +418,7 @@ For browser-level frontend verification, run:
 ```bash
 npm run install:browsers
 npm run smoke:ui:content
+npm run smoke:ui:participant-entry
 npm run smoke:ui:activation-roster-warnings
 npm run smoke:ui:review-readiness
 npm run smoke:ui
@@ -425,7 +426,7 @@ npm run smoke:ui:operator-auth
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run smoke:ui:postgres
 ```
 
-The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The `smoke:ui:activation-roster-warnings` variant continues to the staged-release roster compatibility warning drill-down before stopping. The `smoke:ui:review-readiness` variant continues through participant start, detailed response filtering, review creation/filtering, and the runtime review-readiness checklist. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
+The `smoke:ui:content` variant is a fast browser slice that stops after admin/workspace bootstrap, source-package import, release activation, and the content prompt read model have been verified. The `smoke:ui:participant-entry` variant continues through participant-route action gating, sign-in, start/resume, session re-entry, completion, and local leave/reset. The `smoke:ui:activation-roster-warnings` variant continues to the staged-release roster compatibility warning drill-down before stopping. The `smoke:ui:review-readiness` variant continues through participant start, detailed response filtering, review creation/filtering, and the runtime review-readiness checklist. The full SQLite variants build the Angular frontend, boot the built API process on SQLite, and drive a real browser through:
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap
@@ -492,7 +493,7 @@ For runtime probes:
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
-  - SQLite startup, shutdown, fast content-browser, review-readiness browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
+  - SQLite startup, shutdown, fast content-browser, participant-entry browser, review-readiness browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
   - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks

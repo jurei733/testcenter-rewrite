@@ -194,6 +194,9 @@ jobs:
           - smoke: ui-content
             command: npm run smoke:ui:content
             playwright: true
+          - smoke: ui-participant-entry
+            command: npm run smoke:ui:participant-entry
+            playwright: true
           - smoke: ui-review-readiness
             command: npm run smoke:ui:review-readiness
             playwright: true
