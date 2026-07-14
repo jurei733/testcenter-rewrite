@@ -104,6 +104,30 @@ export class WorkspaceViewFacade {
     }
   });
 
+  private readonly openRuntimeActions = (
+    payload: Record<string, string>
+  ): RecordCollectionAction[] => {
+    const testRunId = payload.testRunId?.trim();
+    const participantSessionId = payload.participantSessionId?.trim();
+    if (!testRunId || !participantSessionId) {
+      return [];
+    }
+
+    return [
+      {
+        label: "Open In Runtime",
+        payload: {
+          ...payload,
+          participantCommand: "openRuntime",
+          subjectType: "test_run",
+          subjectId: payload.subjectId?.trim() || testRunId,
+          testRunId,
+          participantSessionId
+        }
+      }
+    ];
+  };
+
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
   }
@@ -239,7 +263,17 @@ export class WorkspaceViewFacade {
           groupKey: row.groupKey,
           bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
-        }
+        },
+        actions: this.openRuntimeActions({
+          participantLoginKey: row.loginKey,
+          unitKey: row.unitKey,
+          participantSessionId: row.participantSessionId ?? "",
+          testRunId: row.testRunId ?? "",
+          loginKey: row.loginKey,
+          groupKey: row.groupKey,
+          bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
+          currentUnitKey: row.unitKey
+        })
       }))
     ];
   }
@@ -315,7 +349,17 @@ export class WorkspaceViewFacade {
           groupKey: detail.groupKey ?? "",
           bookletKey: row.bookletKey ?? detail.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
-        }
+        },
+        actions: this.openRuntimeActions({
+          subjectType: "test_run",
+          subjectId: row.testRunId ?? "",
+          testRunId: row.testRunId ?? "",
+          participantSessionId: row.participantSessionId ?? "",
+          loginKey: row.loginKey,
+          groupKey: detail.groupKey ?? "",
+          bookletKey: row.bookletKey ?? detail.rosterBookletKey ?? "",
+          currentUnitKey: row.unitKey
+        })
       })),
       ...detail.testRuns.map(item => ({
         headline: item.testRun.bookletKey,
@@ -359,7 +403,18 @@ export class WorkspaceViewFacade {
           groupKey: item.participantSession?.groupKey ?? detail.groupKey ?? "",
           bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
-        }
+        },
+        actions: this.openRuntimeActions({
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: detail.loginKey,
+          groupKey: item.participantSession?.groupKey ?? detail.groupKey ?? "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        })
       }))
     ];
   }
@@ -961,7 +1016,21 @@ export class WorkspaceViewFacade {
             "",
           bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
-        }
+        },
+        actions: this.openRuntimeActions({
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        })
       }))
     ];
   }
@@ -1186,7 +1255,21 @@ export class WorkspaceViewFacade {
             "",
           bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
-        }
+        },
+        actions: this.openRuntimeActions({
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        })
       }))
     ];
   }
@@ -1310,7 +1393,21 @@ export class WorkspaceViewFacade {
             "",
           bookletKey: item.testRun.bookletKey,
           currentUnitKey: detail.unitKey
-        }
+        },
+        actions: this.openRuntimeActions({
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: detail.unitKey
+        })
       }))
     ];
   }
@@ -1999,6 +2096,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "openRuntime") {
+      this.openActivitySubject(item);
+      return;
+    }
+
     if (item.actionPayload?.participantCommand === "prepareRuntime") {
       this.prepareParticipantRuntime(item);
       return;
@@ -2039,6 +2141,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorBookletDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "openRuntime") {
+      this.openActivitySubject(item);
+      return;
+    }
+
     if (item.actionPayload?.participantCommand === "prepareRuntime") {
       this.prepareParticipantRuntime(item);
       return;
@@ -2063,6 +2170,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "openRuntime") {
+      this.openActivitySubject(item);
+      return;
+    }
+
     if (item.actionPayload?.participantCommand === "prepareRuntime") {
       this.prepareParticipantRuntime(item);
       return;

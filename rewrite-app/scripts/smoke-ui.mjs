@@ -3319,14 +3319,29 @@ try {
     filteredParticipantMatrixJson.studyMonitorParticipantMatrix.rows.length,
     1
   );
-  await participantUnitMatrixCard
+  const filteredParticipantMatrixRunCard = participantUnitMatrixCard
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: "running" })
-    .filter({ hasText: "answered" })
+    .filter({ hasText: "answered" });
+  await filteredParticipantMatrixRunCard
     .filter({ hasText: "Open Run Detail" })
+    .filter({ hasText: "Open In Runtime" })
     .waitFor();
+  logStep("study-monitor-matrix-open-runtime");
+  await filteredParticipantMatrixRunCard
+    .getByRole("button", { name: "Open In Runtime" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-matrix-open-runtime");
   const filteredParticipantMatrixCsvResponse = await fetch(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-participants.csv?loginKey=${encodeURIComponent(participantLoginKey)}&unitKey=unit-paused&testRunStatus=running&answerState=answered&limit=5`,
     createSmokeFetchInit()
@@ -3772,6 +3787,19 @@ try {
   await activeUnitDetailStudentCard
     .getByRole("link", { name: operatorParticipantSessionLink })
     .waitFor();
+  logStep("study-monitor-unit-detail-open-runtime");
+  await activeUnitDetailStudentCard
+    .getByRole("button", { name: "Open In Runtime" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-unit-detail-open-runtime");
   const unitDetailAdaCard = page
     .locator("article.card")
     .filter({
