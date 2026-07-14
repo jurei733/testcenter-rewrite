@@ -26,7 +26,10 @@ import {
   readNumberValue,
   readStringValue
 } from "./rewrite-app-shell.readers";
-import type { RecordCollectionItem } from "./record-collection.component";
+import type {
+  RecordCollectionAction,
+  RecordCollectionItem
+} from "./record-collection.component";
 import {
   type ParticipantSessionEntryLinkContext,
   buildParticipantEntryUrl as buildParticipantEntryLinkUrl,
@@ -86,6 +89,20 @@ export class WorkspaceViewFacade {
       workspaceKey: this.uiState.workspace.workspaceKey,
       ...context
     });
+
+  private readonly prepareRuntimeAction = (rosterEntry: {
+    loginKey: string;
+    groupKey?: string | null;
+    bookletKey?: string | null;
+  }): RecordCollectionAction => ({
+    label: "Prepare Runtime",
+    payload: {
+      participantCommand: "prepareRuntime",
+      participantLoginKey: rosterEntry.loginKey,
+      groupKey: rosterEntry.groupKey ?? "",
+      bookletKey: rosterEntry.bookletKey ?? ""
+    }
+  });
 
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
@@ -796,6 +813,17 @@ export class WorkspaceViewFacade {
       return [];
     }
 
+    const startedRosterLoginKeys = new Set(
+      detail.testRuns
+        .map(
+          item =>
+            item.participantSession?.loginKey ??
+            item.participantRosterEntry?.loginKey ??
+            ""
+        )
+        .filter(loginKey => loginKey.length > 0)
+    );
+
     return [
       {
         headline: detail.displayLabel,
@@ -857,7 +885,10 @@ export class WorkspaceViewFacade {
         actionPayload: {
           participantLoginKey: rosterEntry.loginKey,
           groupKey: rosterEntry.groupKey
-        }
+        },
+        actions: startedRosterLoginKeys.has(rosterEntry.loginKey)
+          ? []
+          : [this.prepareRuntimeAction(rosterEntry)]
       })),
       ...detail.unitProgress.map(unit => ({
         headline: unit.displayLabel,
@@ -1026,7 +1057,10 @@ export class WorkspaceViewFacade {
         actionPayload: {
           participantLoginKey: rosterEntry.loginKey,
           groupKey: rosterEntry.groupKey
-        }
+        },
+        actions: signedInRosterLoginKeys.has(rosterEntry.loginKey)
+          ? []
+          : [this.prepareRuntimeAction(rosterEntry)]
       })),
       ...detail.sessions.map(session => ({
         headline: this.monitorParticipantLabel(session),
@@ -1221,7 +1255,8 @@ export class WorkspaceViewFacade {
         actionPayload: {
           participantLoginKey: rosterEntry.loginKey,
           groupKey: rosterEntry.groupKey
-        }
+        },
+        actions: [this.prepareRuntimeAction(rosterEntry)]
       })),
       ...detail.testRuns.map(item => ({
         headline: this.monitorParticipantLabel(item),
@@ -2004,6 +2039,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorBookletDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "prepareRuntime") {
+      this.prepareParticipantRuntime(item);
+      return;
+    }
+
     if (item.actionPayload?.testRunId?.trim()) {
       this.openStudyMonitorRun(item);
       return;
@@ -2023,6 +2063,11 @@ export class WorkspaceViewFacade {
   }
 
   openStudyMonitorDetailItem(item: RecordCollectionItem): void {
+    if (item.actionPayload?.participantCommand === "prepareRuntime") {
+      this.prepareParticipantRuntime(item);
+      return;
+    }
+
     if (item.actionPayload?.testRunId?.trim()) {
       this.openStudyMonitorRun(item);
       return;

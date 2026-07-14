@@ -7,6 +7,11 @@ export type RecordCollectionRow = {
   href?: string;
 };
 
+export type RecordCollectionAction = {
+  label: string;
+  payload: Record<string, string>;
+};
+
 export type RecordCollectionItem = {
   headline: string;
   subline: string;
@@ -15,6 +20,7 @@ export type RecordCollectionItem = {
   selected?: boolean;
   actionLabel?: string;
   actionPayload?: Record<string, string>;
+  actions?: RecordCollectionAction[];
 };
 
 @Component({
@@ -83,15 +89,26 @@ export type RecordCollectionItem = {
             </div>
           </dl>
 
-          <div class="record-card-actions" *ngIf="item.actionLabel">
+          <div class="record-card-actions" *ngIf="item.actionLabel || item.actions?.length">
+            <button
+              *ngIf="item.actionLabel"
+              type="button"
+              class="ghost"
+              [attr.aria-description]="item.headline"
+              [attr.title]="item.headline"
+              (click)="emitAction(item)"
+            >
+              {{ item.actionLabel }}
+            </button>
             <button
               type="button"
               class="ghost"
               [attr.aria-description]="item.headline"
               [attr.title]="item.headline"
-              (click)="itemAction.emit(item)"
+              (click)="emitAction(item, action)"
+              *ngFor="let action of item.actions"
             >
-              {{ item.actionLabel }}
+              {{ action.label }}
             </button>
           </div>
         </article>
@@ -105,4 +122,17 @@ export class RecordCollectionComponent {
   @Input({ required: true }) items: RecordCollectionItem[] = [];
   @Input() emptyState = "No items yet.";
   @Output() readonly itemAction = new EventEmitter<RecordCollectionItem>();
+
+  emitAction(item: RecordCollectionItem, action?: RecordCollectionAction): void {
+    if (!action) {
+      this.itemAction.emit(item);
+      return;
+    }
+
+    this.itemAction.emit({
+      ...item,
+      actionLabel: action.label,
+      actionPayload: action.payload
+    });
+  }
 }
