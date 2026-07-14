@@ -464,15 +464,41 @@ export class ParticipantViewFacade {
     return this.describeParticipantEntryIssue(error);
   }
 
+  get canSignIn(): boolean {
+    return Boolean(
+      this.workspace.workspaceKey.trim() && this.runtime.loginKey.trim()
+    );
+  }
+
+  get canStartOrResume(): boolean {
+    return Boolean(this.runtime.participantSessionId.trim()) || this.canSignIn;
+  }
+
+  get canRefreshCurrentState(): boolean {
+    return Boolean(this.runtime.participantSessionId.trim());
+  }
+
   resumeSession(): void {
+    if (!this.canStartOrResume) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.startOrResumeInternal());
   }
 
   signIn(): void {
+    if (!this.canSignIn) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.signInInternal());
   }
 
   refreshCurrentState(): void {
+    if (!this.canRefreshCurrentState) {
+      return;
+    }
+
     this.viewState.onActionAsync(() => this.refreshCurrentStateInternal(false));
   }
 

@@ -94,11 +94,11 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </label>
         </div>
         <div class="actions">
-          <button id="participantRouteSignInButton" class="secondary" type="button" (click)="view.signIn()">
+          <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In
           </button>
-          <button class="primary" type="button" (click)="view.resumeSession()">Start Or Resume</button>
-          <button class="ghost" type="button" (click)="view.refreshCurrentState()">Refresh Current State</button>
+          <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">Start Or Resume</button>
+          <button id="participantRouteRefreshCurrentStateButton" class="ghost" type="button" [disabled]="!view.canRefreshCurrentState" (click)="view.refreshCurrentState()">Refresh Current State</button>
           <button id="participantRouteClearSessionButton" class="ghost" type="button" [disabled]="!view.player.canClearSession" (click)="view.clearSession()">Leave Session</button>
         </div>
       </article>

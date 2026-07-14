@@ -1423,15 +1423,44 @@ try {
   );
   await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
   await page.locator("#participantLoginKey").waitFor();
+  await page.evaluate(() => {
+    const storageKey = "testcenter-rewrite-app-shell";
+    const snapshot = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}");
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        ...snapshot,
+        tenantKey: "",
+        workspaceKey: "",
+        loginKey: "",
+        participantSessionId: "",
+        testRunId: "",
+        currentRunStateView: ""
+      })
+    );
+  });
+  await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
+  await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", "");
+  await fillAndCommitUntilValue("#participantWorkspaceKey", "");
+  await fillAndCommitUntilValue("#participantLoginKey", "");
+  await expectButtonSelectorDisabled("#participantRouteSignInButton");
+  await expectButtonSelectorDisabled("#participantRouteStartOrResumeButton");
+  await expectButtonSelectorDisabled("#participantRouteRefreshCurrentStateButton");
+  await expectButtonSelectorDisabled("#participantRouteClearSessionButton");
   await fillAndCommitUntilValue(
     "#participantWorkspaceKey",
     ambiguousParticipantWorkspaceKey
   );
+  await expectButtonSelectorDisabled("#participantRouteSignInButton");
+  await expectButtonSelectorDisabled("#participantRouteStartOrResumeButton");
   await fillAndCommitUntilValue(
     "#participantLoginKey",
     "ambiguous-entry-student"
   );
+  await expectButtonSelectorEnabled("#participantRouteSignInButton");
+  await expectButtonSelectorEnabled("#participantRouteStartOrResumeButton");
+  await expectButtonSelectorDisabled("#participantRouteRefreshCurrentStateButton");
   await page.locator("#participantRouteSignInButton").click();
   await page
     .locator(".status-banner.is-error")
@@ -1529,6 +1558,9 @@ try {
     "UI smoke expected participant Sign In to create a signed-in session."
   );
   await expectInputValue("#participantRouteSessionId", participantEntrySignInSessionId);
+  await expectButtonSelectorEnabled("#participantRouteStartOrResumeButton");
+  await expectButtonSelectorEnabled("#participantRouteRefreshCurrentStateButton");
+  await expectButtonSelectorEnabled("#participantRouteClearSessionButton");
   await page.waitForFunction(
     expectedSessionId =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
@@ -2021,6 +2053,10 @@ try {
     [tenantKey, workspaceKey, participantRouteLoginKey],
     { timeout: 15_000 }
   );
+  await expectButtonSelectorEnabled("#participantRouteSignInButton");
+  await expectButtonSelectorEnabled("#participantRouteStartOrResumeButton");
+  await expectButtonSelectorDisabled("#participantRouteRefreshCurrentStateButton");
+  await expectButtonSelectorDisabled("#participantRouteClearSessionButton");
   stopAfter("participant-entry-completed-session-reentry");
 
   logStep("nav-runtime");
