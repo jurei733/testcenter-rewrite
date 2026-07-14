@@ -118,6 +118,12 @@ export type WorkspaceAdminReadPort = {
   getStudyMonitorParticipantMatrix(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    unitKey?: string;
+    testRunStatus?: TestRunStatus | "not_started";
+    answerState?: "answered" | "missing";
+    limit?: number;
   }): Promise<WorkspaceStudyMonitorParticipantMatrix>;
   getStudyMonitorParticipantDetail(input: {
     tenantKey: string;
@@ -6381,7 +6387,7 @@ export const createFirstSliceServices = (
             )
           ]);
 
-        return buildStudyMonitorParticipantMatrix({
+        const matrix = buildStudyMonitorParticipantMatrix({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           generatedAt: now(),
@@ -6391,6 +6397,8 @@ export const createFirstSliceServices = (
           contentReleases,
           reviews
         });
+
+        return filterStudyMonitorParticipantMatrix(matrix, input);
       },
       async getStudyMonitorParticipantDetail(input) {
         const workspace = await requireWorkspace(
@@ -6735,9 +6743,7 @@ export const createFirstSliceServices = (
       async exportStudyMonitorParticipantMatrixCsv(input) {
         const matrix = await this.getStudyMonitorParticipantMatrix(input);
 
-        return formatStudyMonitorParticipantMatrixCsv(
-          filterStudyMonitorParticipantMatrix(matrix, input)
-        );
+        return formatStudyMonitorParticipantMatrixCsv(matrix);
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(

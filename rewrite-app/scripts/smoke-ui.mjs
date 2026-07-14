@@ -3307,6 +3307,18 @@ try {
     .filter({ hasText: "Visible Limit" })
     .filter({ hasText: "5" })
     .waitFor();
+  await clickAction("Refresh Study Monitor");
+  const filteredParticipantMatrixJsonResponse = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/participants?loginKey=${encodeURIComponent(participantLoginKey)}&unitKey=unit-paused&testRunStatus=running&answerState=answered&limit=5`,
+    createSmokeFetchInit()
+  );
+  assert.equal(filteredParticipantMatrixJsonResponse.status, 200);
+  const filteredParticipantMatrixJson =
+    await filteredParticipantMatrixJsonResponse.json();
+  assert.equal(
+    filteredParticipantMatrixJson.studyMonitorParticipantMatrix.rows.length,
+    1
+  );
   await participantUnitMatrixCard
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
@@ -3328,6 +3340,7 @@ try {
   assert.match(filteredParticipantMatrixCsv, /running/);
   assert.equal(filteredParticipantMatrixCsv.trim().split("\n").length, 2);
   await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await clickAction("Refresh Study Monitor");
   await participantUnitMatrixCard
     .locator(".record-collection-summary")
     .filter({ hasText: `${visibleParticipantMatrixRecords} visible records` })

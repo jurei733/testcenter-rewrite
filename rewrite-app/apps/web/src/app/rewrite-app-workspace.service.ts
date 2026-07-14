@@ -79,13 +79,7 @@ export class RewriteAppWorkspaceService {
       this.requestState.request<GetStudyMonitorParticipantMatrixResponse>(
         "Study Monitor Participant Matrix",
         "GET",
-        resolveRoutePath(
-          productionApiRoutes.workspace.getStudyMonitorParticipantMatrix,
-          {
-            tenantKey,
-            workspaceKey
-          }
-        ),
+        this.getStudyMonitorParticipantMatrixPath(tenantKey, workspaceKey),
         undefined,
         { quiet }
       )
@@ -363,29 +357,11 @@ export class RewriteAppWorkspaceService {
     }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
-    const path = resolveRoutePath(
-      productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv,
-      {
-        tenantKey,
-        workspaceKey
-      }
+    const exportPath = this.getStudyMonitorParticipantMatrixPath(
+      tenantKey,
+      workspaceKey,
+      productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv
     );
-    const query = new URLSearchParams();
-    const matrixFilters: Array<[string, string]> = [
-      ["loginKey", this.workspaceState.studyMonitorMatrixLoginFilter],
-      ["groupKey", this.workspaceState.studyMonitorMatrixGroupFilter],
-      ["unitKey", this.workspaceState.studyMonitorMatrixUnitFilter],
-      ["testRunStatus", this.workspaceState.studyMonitorMatrixStatusFilter],
-      ["answerState", this.workspaceState.studyMonitorMatrixAnswerFilter],
-      ["limit", this.workspaceState.studyMonitorMatrixLimit]
-    ];
-    for (const [key, value] of matrixFilters) {
-      const trimmedValue = value.trim();
-      if (trimmedValue) {
-        query.set(key, trimmedValue);
-      }
-    }
-    const exportPath = query.toString() ? `${path}?${query.toString()}` : path;
     const csv = await this.requestState.request<string>(
       "Study Monitor Participant Matrix CSV Export",
       "GET",
@@ -443,6 +419,35 @@ export class RewriteAppWorkspaceService {
       this.hasTenantScope() &&
       this.workspaceState.workspaceKey.trim() !== ""
     );
+  }
+
+  private getStudyMonitorParticipantMatrixPath(
+    tenantKey: string,
+    workspaceKey: string,
+    route: string = productionApiRoutes.workspace.getStudyMonitorParticipantMatrix
+  ): string {
+    const path = resolveRoutePath(route, {
+      tenantKey,
+      workspaceKey
+    });
+    const query = new URLSearchParams();
+    const matrixFilters: Array<[string, string]> = [
+      ["loginKey", this.workspaceState.studyMonitorMatrixLoginFilter],
+      ["groupKey", this.workspaceState.studyMonitorMatrixGroupFilter],
+      ["unitKey", this.workspaceState.studyMonitorMatrixUnitFilter],
+      ["testRunStatus", this.workspaceState.studyMonitorMatrixStatusFilter],
+      ["answerState", this.workspaceState.studyMonitorMatrixAnswerFilter],
+      ["limit", this.workspaceState.studyMonitorMatrixLimit]
+    ];
+    for (const [key, value] of matrixFilters) {
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        query.set(key, trimmedValue);
+      }
+    }
+
+    const encodedQuery = query.toString();
+    return encodedQuery ? `${path}?${encodedQuery}` : path;
   }
 
   private hasTenantScope(): boolean {

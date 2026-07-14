@@ -147,6 +147,15 @@ import {
 
 type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 
+type StudyMonitorParticipantMatrixQuery = {
+  loginKey?: string;
+  groupKey?: string;
+  unitKey?: string;
+  testRunStatus?: TestRunStatus | "not_started";
+  answerState?: "answered" | "missing";
+  limit?: number;
+};
+
 const parseIntegerEnvironmentValue = (
   envKey: string,
   fallbackValue: number
@@ -2032,6 +2041,57 @@ const parseWorkspaceReviewListQuery = (
   };
 };
 
+const parseStudyMonitorParticipantMatrixQuery = (
+  url: URL,
+  response: ServerResponse
+): StudyMonitorParticipantMatrixQuery | null => {
+  const testRunStatus =
+    url.searchParams.get("testRunStatus")?.trim() || undefined;
+  if (
+    testRunStatus &&
+    testRunStatus !== "not_started" &&
+    !testRunStatuses.includes(testRunStatus as TestRunStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "invalid_study_monitor_matrix_status_filter",
+      "testRunStatus must be one of not_started, created, running, paused, or completed."
+    );
+    return null;
+  }
+
+  const answerState = url.searchParams.get("answerState")?.trim() || undefined;
+  if (answerState && answerState !== "answered" && answerState !== "missing") {
+    sendError(
+      response,
+      400,
+      "invalid_study_monitor_matrix_answer_filter",
+      "answerState must be answered or missing."
+    );
+    return null;
+  }
+
+  const limitResult = parseOperatorReadLimit(
+    url,
+    response,
+    "invalid_study_monitor_matrix_limit",
+    "limit must be an integer from 1 to 500."
+  );
+  if (!limitResult.ok) {
+    return null;
+  }
+
+  return {
+    loginKey: readOptionalQueryValue(url, "loginKey"),
+    groupKey: readOptionalQueryValue(url, "groupKey"),
+    unitKey: readOptionalQueryValue(url, "unitKey"),
+    testRunStatus: testRunStatus as TestRunStatus | "not_started" | undefined,
+    answerState: answerState as "answered" | "missing" | undefined,
+    limit: limitResult.limit
+  };
+};
+
 const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
   async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const services = runtime.services;
@@ -2818,11 +2878,19 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
+        const matrixQuery = parseStudyMonitorParticipantMatrixQuery(
+          url,
+          response
+        );
+        if (!matrixQuery) {
+          return;
+        }
 
         const studyMonitorParticipantMatrix =
           await services.workspaceAdminRead.getStudyMonitorParticipantMatrix({
             tenantKey,
-            workspaceKey
+            workspaceKey,
+            ...matrixQuery
           });
         sendJson<GetStudyMonitorParticipantMatrixResponse>(response, 200, {
           studyMonitorParticipantMatrix
@@ -3748,43 +3816,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const testRunStatus =
-          url.searchParams.get("testRunStatus")?.trim() || undefined;
-        if (
-          testRunStatus &&
-          testRunStatus !== "not_started" &&
-          !testRunStatuses.includes(testRunStatus as TestRunStatus)
-        ) {
-          sendError(
-            response,
-            400,
-            "invalid_study_monitor_matrix_status_filter",
-            "testRunStatus must be one of not_started, created, running, paused, or completed."
-          );
-          return;
-        }
-        const answerState =
-          url.searchParams.get("answerState")?.trim() || undefined;
-        if (
-          answerState &&
-          answerState !== "answered" &&
-          answerState !== "missing"
-        ) {
-          sendError(
-            response,
-            400,
-            "invalid_study_monitor_matrix_answer_filter",
-            "answerState must be answered or missing."
-          );
-          return;
-        }
-        const limitResult = parseOperatorReadLimit(
+        const matrixQuery = parseStudyMonitorParticipantMatrixQuery(
           url,
-          response,
-          "invalid_study_monitor_matrix_limit",
-          "limit must be an integer from 1 to 500."
+          response
         );
-        if (!limitResult.ok) {
+        if (!matrixQuery) {
           return;
         }
 
@@ -3793,12 +3829,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             {
               tenantKey,
               workspaceKey,
-              loginKey: readOptionalQueryValue(url, "loginKey"),
-              groupKey: readOptionalQueryValue(url, "groupKey"),
-              unitKey: readOptionalQueryValue(url, "unitKey"),
-              testRunStatus: testRunStatus as TestRunStatus | "not_started" | undefined,
-              answerState: answerState as "answered" | "missing" | undefined,
-              limit: limitResult.limit
+              ...matrixQuery
             }
           );
         sendCsv(
