@@ -1275,6 +1275,8 @@ try {
     .waitFor();
   await expectButtonSelectorEnabled("#createSourcePackageButton");
   await expectButtonSelectorEnabled("#refreshContentReadsButton");
+  await expectButtonSelectorEnabled("#applyContentReadFiltersButton");
+  await expectButtonSelectorEnabled("#useSelectedIdsAsContentReadFiltersButton");
   await expectButtonSelectorDisabled("#createImportJobButton");
   await expectButtonSelectorDisabled("#activateContentReleaseButton");
   await expectButtonSelectorDisabled("#sourcePackageDetailButton");
@@ -2043,6 +2045,13 @@ try {
   await page.locator("#tenantKey").waitFor();
   await fillAndCommit("#tenantKey", "");
   await fillAndCommit("#workspaceKey", "");
+  await page.goto(`${baseUrl}/app/content`, { waitUntil: "networkidle" });
+  await page.waitForURL(/\/app\/content$/);
+  await page.locator("#sourceFileName").waitFor();
+  await expectButtonSelectorDisabled("#createSourcePackageButton");
+  await expectButtonSelectorDisabled("#refreshContentReadsButton");
+  await expectButtonSelectorDisabled("#applyContentReadFiltersButton");
+  await expectButtonSelectorDisabled("#useSelectedIdsAsContentReadFiltersButton");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();

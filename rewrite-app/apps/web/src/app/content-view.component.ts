@@ -147,8 +147,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button class="primary" type="button" data-content-filter-action="apply" (click)="view.applyContentReadFilters()">Apply Content Filters</button>
-          <button class="secondary" type="button" (click)="view.useSelectedIdsAsContentReadFilters()">Use Selected IDs</button>
+          <button id="applyContentReadFiltersButton" class="primary" type="button" data-content-filter-action="apply" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyContentReadFilters()">Apply Content Filters</button>
+          <button id="useSelectedIdsAsContentReadFiltersButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedIdsAsContentReadFilters()">Use Selected IDs</button>
           <button class="ghost" type="button" (click)="view.clearContentReadFilters()">Clear Content Filters</button>
         </div>
       </article>

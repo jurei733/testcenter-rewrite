@@ -161,10 +161,13 @@ export class ContentViewFacade {
     this.content.contentReleaseSourcePackageFilter = "";
     this.content.contentReleaseLimit = "100";
     this.persistState();
-    this.viewState.onActionAsync(() => this.contentService.refreshContentReads());
+    this.refreshContentReads();
   }
 
   useSelectedIdsAsContentReadFilters(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     const sourcePackageId = this.content.sourcePackageId.trim();
     const importJobId = this.content.importJobId.trim();
     if (sourcePackageId) {
@@ -179,6 +182,9 @@ export class ContentViewFacade {
   }
 
   applyContentReadFilters(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
     this.persistState();
     this.refreshContentReads();
   }
