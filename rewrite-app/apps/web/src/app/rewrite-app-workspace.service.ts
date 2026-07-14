@@ -133,6 +133,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async loadStudyMonitorGroup(groupKey: string): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload = await this.requestState.request<GetStudyMonitorGroupResponse>(
@@ -156,6 +159,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async loadStudyMonitorParticipant(loginKey: string): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload =
@@ -180,6 +186,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async loadStudyMonitorBooklet(bookletKey: string): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload = await this.requestState.request<GetStudyMonitorBookletResponse>(
@@ -203,6 +212,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async loadStudyMonitorUnit(unitKey: string): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload = await this.requestState.request<GetStudyMonitorUnitResponse>(
@@ -226,6 +238,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async loadStudyMonitorRun(testRunId: string): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const payload = await this.requestState.request<GetStudyMonitorRunResponse>(
@@ -266,6 +281,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async refreshWorkspaceDirectory(): Promise<void> {
+    if (!this.hasTenantScope()) {
+      return;
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const payload = await this.requestState.request<ListWorkspacesResponse>(
       "Workspace Directory",
@@ -284,6 +302,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async exportWorkspaceLogCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const csv = await this.requestState.request<string>(
@@ -309,6 +330,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async exportStudyMonitorCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const csv = await this.requestState.request<string>(
@@ -334,6 +358,9 @@ export class RewriteAppWorkspaceService {
   }
 
   async exportStudyMonitorParticipantMatrixCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const path = resolveRoutePath(
@@ -413,8 +440,12 @@ export class RewriteAppWorkspaceService {
 
   private hasWorkspaceScope(): boolean {
     return (
-      this.workspaceState.tenantKey.trim() !== "" &&
+      this.hasTenantScope() &&
       this.workspaceState.workspaceKey.trim() !== ""
     );
+  }
+
+  private hasTenantScope(): boolean {
+    return this.workspaceState.tenantKey.trim() !== "";
   }
 }

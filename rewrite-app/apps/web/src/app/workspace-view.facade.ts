@@ -1913,7 +1913,7 @@ export class WorkspaceViewFacade {
 
   openStudyMonitorParticipant(item: RecordCollectionItem): void {
     const loginKey = item.actionPayload?.participantLoginKey?.trim();
-    if (!loginKey) {
+    if (!this.canUseWorkspaceScope || !loginKey) {
       return;
     }
 
@@ -1962,7 +1962,7 @@ export class WorkspaceViewFacade {
 
   openStudyMonitorGroup(item: RecordCollectionItem): void {
     const groupKey = item.actionPayload?.groupKey?.trim();
-    if (!groupKey) {
+    if (!this.canUseWorkspaceScope || !groupKey) {
       return;
     }
 
@@ -1973,7 +1973,7 @@ export class WorkspaceViewFacade {
 
   openStudyMonitorBooklet(item: RecordCollectionItem): void {
     const bookletKey = item.actionPayload?.bookletKey?.trim();
-    if (!bookletKey) {
+    if (!this.canUseWorkspaceScope || !bookletKey) {
       return;
     }
 
@@ -1984,7 +1984,7 @@ export class WorkspaceViewFacade {
 
   openStudyMonitorUnit(item: RecordCollectionItem): void {
     const unitKey = item.actionPayload?.unitKey?.trim();
-    if (!unitKey) {
+    if (!this.canUseWorkspaceScope || !unitKey) {
       return;
     }
 
@@ -1995,7 +1995,7 @@ export class WorkspaceViewFacade {
 
   openStudyMonitorRun(item: RecordCollectionItem): void {
     const testRunId = item.actionPayload?.testRunId?.trim();
-    if (!testRunId) {
+    if (!this.canUseWorkspaceScope || !testRunId) {
       return;
     }
 
