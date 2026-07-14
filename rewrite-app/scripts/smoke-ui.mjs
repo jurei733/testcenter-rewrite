@@ -3440,6 +3440,35 @@ try {
     .filter({ hasText: "60" })
     .filter({ hasText: "Open Group Detail" })
     .waitFor();
+  const monitorReviewQueueCard = page.locator("article.card").filter({
+    has: page.getByRole("heading", {
+      name: "Monitor Review Queue",
+      exact: true
+    })
+  });
+  const monitorReviewQueueStudentCard = monitorReviewQueueCard
+    .locator(".record-card")
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" })
+    .filter({ hasText: "reviewed" })
+    .filter({ hasText: "1 review(s)" })
+    .filter({ hasText: "Open Run Detail" })
+    .filter({ hasText: "Open In Runtime" });
+  await monitorReviewQueueStudentCard.waitFor();
+  logStep("study-monitor-review-queue-open-runtime");
+  await monitorReviewQueueStudentCard
+    .getByRole("button", { name: "Open In Runtime" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-review-queue-open-runtime");
   const studyMonitorDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Study Monitor CSV");
   const studyMonitorDownload = await studyMonitorDownloadPromise;

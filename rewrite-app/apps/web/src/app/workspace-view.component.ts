@@ -165,6 +165,14 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="No monitor pressure is visible in the latest summary."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Monitor Review Queue"
+        subtitle="Answered participant-unit rows that are ready for operator review follow-up."
+        [items]="view.studyMonitorReviewQueueItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
+        emptyState="Refresh the study monitor to inspect answered units ready for review."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Participant Matrix Filters</h2>
         <p>Keep large monitor matrices focused by participant, group, unit, run status, answer state, and visible-row limit. The participant-matrix CSV export uses the same filters.</p>

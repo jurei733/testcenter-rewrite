@@ -823,6 +823,72 @@ export class WorkspaceViewFacade {
     return items;
   }
 
+  get studyMonitorReviewQueueItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<GetStudyMonitorParticipantMatrixResponse>(
+      this.workspace.studyMonitorParticipantMatrixView
+    );
+    const matrix = payload?.studyMonitorParticipantMatrix;
+    if (!matrix) {
+      return [];
+    }
+
+    return matrix.rows
+      .filter(row => row.answered && row.testRunId && row.participantSessionId)
+      .sort((left, right) => {
+        const reviewDelta = left.reviewCount - right.reviewCount;
+        if (reviewDelta !== 0) {
+          return reviewDelta;
+        }
+        return (right.latestActivityAt ?? "").localeCompare(
+          left.latestActivityAt ?? ""
+        );
+      })
+      .slice(0, 12)
+      .map(row => {
+        const actionPayload = {
+          participantLoginKey: row.loginKey,
+          unitKey: row.unitKey,
+          subjectType: "test_run",
+          subjectId: row.testRunId ?? "",
+          testRunId: row.testRunId ?? "",
+          participantSessionId: row.participantSessionId ?? "",
+          loginKey: row.loginKey,
+          groupKey: row.groupKey,
+          bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
+          currentUnitKey: row.unitKey
+        };
+
+        return {
+          headline: row.displayName ?? row.loginKey,
+          subline: `${row.unitLabel || row.unitKey || "No unit"} in ${row.bookletKey ?? "no booklet"}`,
+          badges: [
+            "answered",
+            row.reviewCount > 0 ? "reviewed" : "needs review",
+            row.testRunStatus,
+            `${row.reviewCount} review(s)`
+          ],
+          rows: [
+            { label: "Login", value: row.loginKey },
+            { label: "Group", value: row.groupKey },
+            { label: "Unit", value: row.unitKey || "none" },
+            { label: "Booklet", value: row.bookletKey ?? "none" },
+            { label: "Test Run", value: row.testRunId ?? "none" },
+            { label: "Response Length", value: String(row.responseLength) },
+            { label: "Reviews", value: String(row.reviewCount) },
+            {
+              label: "Latest Activity",
+              value: row.latestActivityAt
+                ? this.formatDateTime(row.latestActivityAt)
+                : "none"
+            }
+          ],
+          actionLabel: "Open Run Detail",
+          actionPayload,
+          actions: this.openRuntimeActions(actionPayload)
+        };
+      });
+  }
+
   get studyMonitorNotStartedItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorSummaryResponse>(
       this.workspace.studyMonitorView
