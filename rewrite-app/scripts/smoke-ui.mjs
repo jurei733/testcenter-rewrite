@@ -271,7 +271,8 @@ try {
         const field = document.querySelector(targetSelector);
         return (
           (field instanceof HTMLInputElement ||
-            field instanceof HTMLTextAreaElement) &&
+            field instanceof HTMLTextAreaElement ||
+            field instanceof HTMLSelectElement) &&
           field.value === targetValue
         );
       },
@@ -3231,7 +3232,7 @@ try {
           .toFixed(1)
           .replace(/\.0$/, "");
   const expectMonitorStatusCard = async (headline, count, meaning) => {
-    await monitorStatusDistributionCard
+    const statusCard = monitorStatusDistributionCard
       .locator(".record-card")
       .filter({ has: page.getByRole("heading", { name: headline }) })
       .filter({
@@ -3239,7 +3240,9 @@ try {
       })
       .filter({ hasText: `${formatMonitorStatusPercent(count)}%` })
       .filter({ hasText: meaning })
-      .waitFor();
+      .filter({ hasText: "Show In Matrix" });
+    await statusCard.waitFor();
+    return statusCard;
   };
   const studyMonitorCard = page.locator("article.card").filter({
     has: page.getByRole("heading", { name: "Study Monitor", exact: true })
@@ -3370,7 +3373,7 @@ try {
     studyMonitorSummary.notStartedCount,
     "Expected participants without a launched run."
   );
-  await expectMonitorStatusCard(
+  const runningMonitorStatusCard = await expectMonitorStatusCard(
     "Running",
     studyMonitorSummary.runningCount,
     "Runs currently marked as running."
@@ -3385,6 +3388,25 @@ try {
     studyMonitorSummary.completedCount,
     "Runs completed by participants."
   );
+  logStep("study-monitor-status-filter-matrix");
+  await runningMonitorStatusCard
+    .getByRole("button", { name: "Show In Matrix" })
+    .click();
+  await expectInputValue("#studyMonitorMatrixLoginFilter", "");
+  await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixUnitFilter", "");
+  await expectInputValue("#studyMonitorMatrixStatusFilter", "running");
+  await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
+  await expectInputValue("#studyMonitorMatrixLimit", "25");
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Participant Unit Matrix" }) })
+    .locator(".record-card")
+    .filter({ hasText: "running" })
+    .first()
+    .waitFor();
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  stopAfter("study-monitor-status-filter-matrix");
   const monitorBookletProgressCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Booklet Progress",

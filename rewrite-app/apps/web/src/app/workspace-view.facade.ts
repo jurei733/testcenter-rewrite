@@ -579,24 +579,28 @@ export class WorkspaceViewFacade {
       {
         headline: "Not Started",
         count: summary.notStartedCount,
+        status: "not_started",
         badges: ["roster", "waiting"],
         detail: "Expected participants without a launched run."
       },
       {
         headline: "Running",
         count: summary.runningCount,
+        status: "running",
         badges: ["active", "in progress"],
         detail: "Runs currently marked as running."
       },
       {
         headline: "Paused",
         count: summary.pausedCount,
+        status: "paused",
         badges: ["active", "paused"],
         detail: "Runs saved as paused and resumable."
       },
       {
         headline: "Completed",
         count: summary.completedCount,
+        status: "completed",
         badges: ["closed", "complete"],
         detail: "Runs completed by participants."
       }
@@ -621,7 +625,12 @@ export class WorkspaceViewFacade {
         },
         { label: "Total States", value: String(totalStatusCount) },
         { label: "Meaning", value: status.detail }
-      ]
+      ],
+      actionLabel: "Show In Matrix",
+      actionPayload: {
+        participantCommand: "filterStudyMonitorMatrixStatus",
+        testRunStatus: status.status
+      }
     }));
   }
 
@@ -2184,6 +2193,21 @@ export class WorkspaceViewFacade {
     this.applyStudyMonitorMatrixFilters();
   }
 
+  private filterStudyMonitorMatrixStatus(item: RecordCollectionItem): void {
+    const testRunStatus = item.actionPayload?.testRunStatus?.trim();
+    if (!this.canUseWorkspaceScope || !testRunStatus) {
+      return;
+    }
+
+    this.workspace.studyMonitorMatrixLoginFilter = "";
+    this.workspace.studyMonitorMatrixGroupFilter = "";
+    this.workspace.studyMonitorMatrixUnitFilter = "";
+    this.workspace.studyMonitorMatrixStatusFilter = testRunStatus;
+    this.workspace.studyMonitorMatrixAnswerFilter = "";
+    this.workspace.studyMonitorMatrixLimit = "25";
+    this.applyStudyMonitorMatrixFilters();
+  }
+
   openStudyMonitorItem(item: RecordCollectionItem): void {
     if (item.actionPayload?.participantCommand === "openRuntime") {
       this.openActivitySubject(item);
@@ -2192,6 +2216,14 @@ export class WorkspaceViewFacade {
 
     if (item.actionPayload?.participantCommand === "reviewResponse") {
       this.reviewResponseInRuntime(item);
+      return;
+    }
+
+    if (
+      item.actionPayload?.participantCommand ===
+      "filterStudyMonitorMatrixStatus"
+    ) {
+      this.filterStudyMonitorMatrixStatus(item);
       return;
     }
 

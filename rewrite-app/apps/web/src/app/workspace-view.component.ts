@@ -138,6 +138,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         title="Monitor Status Distribution"
         subtitle="Fast operator split across not-started, running, paused, and completed participant states."
         [items]="view.studyMonitorStatusItems"
+        (itemAction)="view.openStudyMonitorItem($event)"
         emptyState="Refresh the study monitor to inspect participant state distribution."
       ></app-record-collection>
 
