@@ -44,14 +44,23 @@ export class RewriteAppContentService {
   private readonly contentState = this.uiState.content;
 
   async createSourcePackage(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await createSourcePackageAction(this.createActionsHost());
   }
 
   async createImportJob(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await createImportJobAction(this.createActionsHost());
   }
 
   async activateContentRelease(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await activateContentReleaseAction(
       this.hosts.createActivationActionsHost(
         () => this.refreshContentReads(),
@@ -85,10 +94,16 @@ export class RewriteAppContentService {
   }
 
   async retrySourcePackageImport(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await retrySourcePackageImportAction(this.createActionsHost());
   }
 
   async importActivateFlow(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await runImportActivateFlow(createImportActivateFlowHost({
       createSourcePackage: () => this.createSourcePackage(),
       createImportJob: () => this.createImportJob(),
@@ -101,6 +116,9 @@ export class RewriteAppContentService {
   }
 
   async blockedActivationFlow(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
     await runBlockedActivationFlow(createBlockedActivationFlowHost({
       createSourcePackage: () => this.createSourcePackage(),
       createImportJob: () => this.createImportJob(),
