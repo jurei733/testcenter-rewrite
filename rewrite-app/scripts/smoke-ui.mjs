@@ -3662,6 +3662,19 @@ try {
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
   ]);
+  logStep("study-monitor-booklet-detail-prepare-runtime");
+  await bookletDetailAdaCard
+    .getByRole("button", { name: "Prepare Runtime" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#loginKey", "entry-student-a");
+  await expectInputValue("#groupKey", "group:entry-smoke");
+  await expectInputValue("#bookletKey", "booklet:starter");
+  await expectInputValue("#participantSessionId", "");
+  await expectInputValue("#testRunId", "");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-booklet-detail-prepare-runtime");
   await bookletDetailAdaCard
     .getByRole("button", { name: "Open Participant Detail" })
     .click();
@@ -3772,6 +3785,19 @@ try {
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
   ]);
+  logStep("study-monitor-unit-detail-prepare-runtime");
+  await unitDetailAdaCard
+    .getByRole("button", { name: "Prepare Runtime" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#loginKey", "entry-student-a");
+  await expectInputValue("#groupKey", "group:entry-smoke");
+  await expectInputValue("#bookletKey", "booklet:starter");
+  await expectInputValue("#participantSessionId", "");
+  await expectInputValue("#testRunId", "");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-unit-detail-prepare-runtime");
   await unitDetailAdaCard
     .getByRole("button", { name: "Open Participant Detail" })
     .click();
