@@ -127,7 +127,7 @@ FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm ru
 FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run preflight:runtime:built
 ```
 
-Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` must be present. Set `RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true` only for image-only checks where the backing store is intentionally unavailable.
+Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` must be present. The preflight validates the selected `FIRST_SLICE_STORE` and requires a valid Postgres connection string when `FIRST_SLICE_STORE=postgres`. Set `RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true` only for image-only checks where the backing store is intentionally unavailable; store selection and Postgres URL validation still run.
 
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 

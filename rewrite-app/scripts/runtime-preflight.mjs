@@ -2,7 +2,53 @@ import { access, readdir, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 
-const store = process.env.FIRST_SLICE_STORE ?? "memory";
+const reportFatalPreflightError = error => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Runtime preflight failed: ${message}`);
+  process.exit(1);
+};
+
+process.on("uncaughtException", reportFatalPreflightError);
+process.on("unhandledRejection", reportFatalPreflightError);
+
+const supportedStores = new Set(["memory", "file", "sqlite", "postgres"]);
+
+const normalizeStore = value => {
+  const normalizedValue = String(value ?? "memory")
+    .trim()
+    .toLowerCase();
+  if (!supportedStores.has(normalizedValue)) {
+    throw new Error(
+      `Unsupported FIRST_SLICE_STORE '${value}'. Expected one of: ${[
+        ...supportedStores
+      ].join(", ")}.`
+    );
+  }
+  return normalizedValue;
+};
+
+const assertPostgresUrl = value => {
+  const normalizedValue = String(value ?? "").trim();
+  if (!normalizedValue) {
+    throw new Error(
+      "FIRST_SLICE_POSTGRES_URL is required when FIRST_SLICE_STORE=postgres."
+    );
+  }
+  if (!/^postgres(?:ql)?:\/\//.test(normalizedValue)) {
+    throw new Error(
+      "FIRST_SLICE_POSTGRES_URL must be a postgres:// or postgresql:// connection string."
+    );
+  }
+  try {
+    new URL(normalizedValue);
+  } catch (error) {
+    throw new Error(
+      `FIRST_SLICE_POSTGRES_URL is not a valid URL: ${error.message}`
+    );
+  }
+};
+
+const store = normalizeStore(process.env.FIRST_SLICE_STORE);
 
 const requiredBuiltFiles = [
   "apps/api/dist/apps/api/src/index.js",
@@ -148,6 +194,10 @@ const runStorageDoctor = () =>
       }
     });
   });
+
+if (store === "postgres") {
+  assertPostgresUrl(process.env.FIRST_SLICE_POSTGRES_URL);
+}
 
 for (const filePath of requiredBuiltFiles) {
   await ensureFile(filePath);
