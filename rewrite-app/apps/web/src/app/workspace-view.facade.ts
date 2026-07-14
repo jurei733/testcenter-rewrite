@@ -1948,6 +1948,11 @@ export class WorkspaceViewFacade {
     this.refreshWorkspaceActivity();
   }
 
+  applyStudyMonitorMatrixFilters(): void {
+    this.persistState();
+    this.refreshStudyMonitor();
+  }
+
   clearStudyMonitorMatrixFilters(): void {
     this.workspace.studyMonitorMatrixLoginFilter = "";
     this.workspace.studyMonitorMatrixGroupFilter = "";
@@ -1955,7 +1960,7 @@ export class WorkspaceViewFacade {
     this.workspace.studyMonitorMatrixStatusFilter = "";
     this.workspace.studyMonitorMatrixAnswerFilter = "";
     this.workspace.studyMonitorMatrixLimit = "25";
-    this.persistState();
+    this.applyStudyMonitorMatrixFilters();
   }
 
   openStudyMonitorItem(item: RecordCollectionItem): void {

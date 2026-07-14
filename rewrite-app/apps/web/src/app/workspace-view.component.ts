@@ -206,7 +206,8 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           </label>
         </div>
         <div class="actions">
-          <button class="ghost" type="button" (click)="view.clearStudyMonitorMatrixFilters()">Clear Matrix Filters</button>
+          <button id="applyStudyMonitorMatrixFiltersButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyStudyMonitorMatrixFilters()">Apply Matrix Filters</button>
+          <button class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.clearStudyMonitorMatrixFilters()">Clear Matrix Filters</button>
         </div>
       </article>
 
