@@ -593,7 +593,7 @@ export class ParticipantViewFacade {
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
     try {
-      await this.resumeSessionInternal();
+      await this.resumeSessionInternal({ quiet: true });
       await this.applyEntryDraftAfterResume(normalized);
     } catch (error) {
       if (!this.isParticipantSessionNoLongerResumable(error)) {

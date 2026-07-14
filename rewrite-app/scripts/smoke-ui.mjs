@@ -2031,6 +2031,11 @@ try {
     participantRouteSessionId,
     { timeout: 15_000 }
   );
+  assert.equal(
+    await page.locator("#participantEntryIssueCode").count(),
+    0,
+    "Completed participant session re-entry should not surface the expected resume fallback as an entry issue."
+  );
   logStep("participant-entry-clear-session");
   await page.locator("#participantRouteClearSessionButton").click();
   await page.waitForFunction(
