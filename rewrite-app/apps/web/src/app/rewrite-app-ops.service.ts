@@ -103,6 +103,9 @@ export class RewriteAppOpsService {
   }
 
   async refreshAdminSession(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<GetAdminCurrentSessionResponse>(
       "Admin Current Session",
       "GET",
@@ -120,6 +123,9 @@ export class RewriteAppOpsService {
   }
 
   async refreshAdminSessions(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<ListAdminSessionsResponse>(
       "Admin Sessions",
       "GET",
@@ -139,6 +145,9 @@ export class RewriteAppOpsService {
   }
 
   async signOutAdmin(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<AdminSignOutResponse>(
       "Admin Sign Out",
       "POST",
@@ -160,6 +169,9 @@ export class RewriteAppOpsService {
   }
 
   async revokeAdminSession(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const adminSessionId = this.opsState.adminSessionRevokeTargetId.trim();
     const payload = await this.requestState.request<RevokeAdminSessionResponse>(
       "Revoke Admin Session",
@@ -181,6 +193,9 @@ export class RewriteAppOpsService {
   }
 
   async exportAdminSessionsCsv(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const csv = await this.requestState.request<string>(
       "Admin Sessions CSV",
       "GET",
@@ -207,6 +222,9 @@ export class RewriteAppOpsService {
   }
 
   async refreshAdminUsers(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<ListAdminUsersResponse>(
       "Admin Users",
       "GET",
@@ -226,6 +244,9 @@ export class RewriteAppOpsService {
   }
 
   async exportAdminUsersCsv(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const csv = await this.requestState.request<string>(
       "Admin Users CSV",
       "GET",
@@ -252,6 +273,9 @@ export class RewriteAppOpsService {
   }
 
   async refreshAdminAuditEvents(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<ListAdminAuditEventsResponse>(
       "Admin Audit Events",
       "GET",
@@ -271,6 +295,9 @@ export class RewriteAppOpsService {
   }
 
   async exportAdminAuditEventsCsv(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const csv = await this.requestState.request<string>(
       "Admin Audit Events CSV",
       "GET",
@@ -297,6 +324,9 @@ export class RewriteAppOpsService {
   }
 
   async createAdminUser(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const payload = await this.requestState.request<CreateAdminUserResponse>(
       "Create Admin User",
       "POST",
@@ -332,6 +362,9 @@ export class RewriteAppOpsService {
   }
 
   async assignAdminRole(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const adminUserId = this.opsState.adminRoleTargetUserId.trim();
     const payload = await this.requestState.request<AssignAdminRoleResponse>(
       "Assign Admin Role",
@@ -360,6 +393,9 @@ export class RewriteAppOpsService {
   }
 
   async revokeAdminRole(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const adminUserId = this.opsState.adminRevokeTargetUserId.trim();
     const roleAssignmentId = this.opsState.adminRevokeRoleAssignmentId.trim();
     const payload = await this.requestState.request<RevokeAdminRoleResponse>(
@@ -388,6 +424,9 @@ export class RewriteAppOpsService {
   }
 
   async updateAdminUserStatus(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const adminUserId = this.opsState.adminStatusTargetUserId.trim();
     const payload = await this.requestState.request<UpdateAdminUserResponse>(
       "Update Admin User",
@@ -410,6 +449,9 @@ export class RewriteAppOpsService {
   }
 
   async resetAdminUserPassword(): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
     const adminUserId = this.opsState.adminResetTargetUserId.trim();
     const payload = await this.requestState.request<ResetAdminUserPasswordResponse>(
       "Reset Admin Password",
@@ -538,6 +580,10 @@ export class RewriteAppOpsService {
   private createAdminHeaders(): Record<string, string> {
     const token = this.opsState.adminSessionToken.trim();
     return token ? { authorization: `Bearer ${token}` } : {};
+  }
+
+  private hasAdminSession(): boolean {
+    return this.opsState.adminSessionToken.trim() !== "";
   }
 
   private createRoleAssignmentRequest(
