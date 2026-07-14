@@ -128,6 +128,29 @@ export class WorkspaceViewFacade {
     ];
   };
 
+  private readonly reviewResponseActions = (
+    payload: Record<string, string>
+  ): RecordCollectionAction[] => {
+    const testRunId = payload.testRunId?.trim();
+    const participantSessionId = payload.participantSessionId?.trim();
+    if (!testRunId || !participantSessionId) {
+      return [];
+    }
+
+    return [
+      {
+        label: "Review Response",
+        payload: {
+          ...payload,
+          participantCommand: "reviewResponse",
+          testRunId,
+          participantSessionId
+        }
+      },
+      ...this.openRuntimeActions(payload)
+    ];
+  };
+
   get workspaceActivityView(): string {
     return this.uiState.workspace.workspaceActivityView;
   }
@@ -884,7 +907,7 @@ export class WorkspaceViewFacade {
           ],
           actionLabel: "Open Run Detail",
           actionPayload,
-          actions: this.openRuntimeActions(actionPayload)
+          actions: this.reviewResponseActions(actionPayload)
         };
       });
   }
@@ -2167,6 +2190,11 @@ export class WorkspaceViewFacade {
       return;
     }
 
+    if (item.actionPayload?.participantCommand === "reviewResponse") {
+      this.reviewResponseInRuntime(item);
+      return;
+    }
+
     if (item.actionPayload?.participantCommand === "prepareRuntime") {
       this.prepareParticipantRuntime(item);
       return;
@@ -2557,6 +2585,44 @@ export class WorkspaceViewFacade {
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.loadParticipantSessionDetail();
       await this.runtimeService.refreshRuntimeReads(true);
+    });
+  }
+
+  private reviewResponseInRuntime(item: RecordCollectionItem): void {
+    const testRunId = item.actionPayload?.testRunId?.trim();
+    const participantSessionId = item.actionPayload?.participantSessionId?.trim();
+    if (!this.canUseWorkspaceScope || !testRunId || !participantSessionId) {
+      return;
+    }
+
+    const runtime = this.uiState.runtime;
+    runtime.testRunId = testRunId;
+    runtime.participantSessionId = participantSessionId;
+    runtime.currentUnitKey = item.actionPayload?.currentUnitKey ?? "";
+    runtime.loginKey = item.actionPayload?.loginKey ?? runtime.loginKey;
+    runtime.groupKey = item.actionPayload?.groupKey ?? runtime.groupKey;
+    runtime.bookletKey = item.actionPayload?.bookletKey ?? runtime.bookletKey;
+    runtime.detailedResponseLoginFilter = runtime.loginKey.trim();
+    runtime.detailedResponseGroupFilter = runtime.groupKey.trim();
+    runtime.detailedResponseSessionFilter = participantSessionId;
+    runtime.detailedResponseRunFilter = testRunId;
+    runtime.detailedResponseUnitFilter = runtime.currentUnitKey.trim();
+    runtime.detailedResponseStatusFilter = "";
+    runtime.reviewLoginFilter = runtime.loginKey.trim();
+    runtime.reviewGroupFilter = runtime.groupKey.trim();
+    runtime.reviewSessionFilter = participantSessionId;
+    runtime.reviewRunFilter = testRunId;
+    runtime.reviewUnitFilter = runtime.currentUnitKey.trim();
+    runtime.reviewReviewerFilter = "";
+    runtime.reviewCategoryFilter = "";
+    this.persistState();
+
+    void this.router.navigateByUrl("/runtime");
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.loadParticipantSessionDetail();
+      await this.runtimeService.refreshRuntimeReads(true);
+      await this.runtimeService.loadDetailedResponses();
+      await this.runtimeService.loadReviews();
     });
   }
 

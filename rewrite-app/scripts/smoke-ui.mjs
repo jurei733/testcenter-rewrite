@@ -3454,11 +3454,12 @@ try {
     .filter({ hasText: "reviewed" })
     .filter({ hasText: "1 review(s)" })
     .filter({ hasText: "Open Run Detail" })
+    .filter({ hasText: "Review Response" })
     .filter({ hasText: "Open In Runtime" });
   await monitorReviewQueueStudentCard.waitFor();
-  logStep("study-monitor-review-queue-open-runtime");
+  logStep("study-monitor-review-queue-review-response");
   await monitorReviewQueueStudentCard
-    .getByRole("button", { name: "Open In Runtime" })
+    .getByRole("button", { name: "Review Response" })
     .click();
   await page.waitForURL(/\/app\/runtime$/);
   await expectInputValue("#participantSessionId", participantSessionId);
@@ -3466,9 +3467,35 @@ try {
   await expectInputValue("#groupKey", participantGroupKey);
   await expectInputValue("#bookletKey", participantBookletKey);
   await expectInputValue("#currentUnitKey", "unit-paused");
+  await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#reviewLoginFilter", participantLoginKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewSessionFilter", participantSessionId);
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Detailed Responses", exact: true })
+    })
+    .filter({ hasText: "Filtered response smoke" })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "unit-paused" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Reviews", exact: true }) })
+    .filter({ hasText: "Filtered review smoke" })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "unit-paused" })
+    .waitFor();
   await page.locator('[data-view-nav="workspace"]').click();
   await page.waitForURL(/\/app\/workspace$/);
-  stopAfter("study-monitor-review-queue-open-runtime");
+  stopAfter("study-monitor-review-queue-review-response");
   const studyMonitorDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Study Monitor CSV");
   const studyMonitorDownload = await studyMonitorDownloadPromise;
