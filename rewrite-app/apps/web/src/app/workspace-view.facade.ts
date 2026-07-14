@@ -64,6 +64,16 @@ export class WorkspaceViewFacade {
       : [])
   ];
 
+  private readonly studyMonitorMatrixFilterAction = (
+    payload: Record<string, string>
+  ): RecordCollectionAction => ({
+    label: "Show In Matrix",
+    payload: {
+      participantCommand: "filterStudyMonitorMatrixScope",
+      ...payload
+    }
+  });
+
   private readonly monitorParticipantLabel = (item: {
     participantRosterEntry?: { displayName: string | null; loginKey: string } | null;
     participantSession?: { loginKey: string } | null;
@@ -510,7 +520,10 @@ export class WorkspaceViewFacade {
           }
         ],
         actionLabel: "Open Group Detail",
-        actionPayload: { groupKey: group.groupKey }
+        actionPayload: { groupKey: group.groupKey },
+        actions: [
+          this.studyMonitorMatrixFilterAction({ groupKey: group.groupKey })
+        ]
       })),
       ...summary.bookletProgress.map(booklet => ({
         headline: booklet.displayLabel,
@@ -561,7 +574,8 @@ export class WorkspaceViewFacade {
           }
         ],
         actionLabel: "Open Unit Detail",
-        actionPayload: { unitKey: unit.unitKey }
+        actionPayload: { unitKey: unit.unitKey },
+        actions: [this.studyMonitorMatrixFilterAction({ unitKey: unit.unitKey })]
       }))
     ];
   }
@@ -706,7 +720,8 @@ export class WorkspaceViewFacade {
         }
       ],
       actionLabel: "Open Unit Detail",
-      actionPayload: { unitKey: unit.unitKey }
+      actionPayload: { unitKey: unit.unitKey },
+      actions: [this.studyMonitorMatrixFilterAction({ unitKey: unit.unitKey })]
     }));
   }
 
@@ -770,7 +785,10 @@ export class WorkspaceViewFacade {
             }
           ],
           actionLabel: "Open Unit Detail",
-          actionPayload: { unitKey: unit.unitKey }
+          actionPayload: { unitKey: unit.unitKey },
+          actions: [
+            this.studyMonitorMatrixFilterAction({ unitKey: unit.unitKey })
+          ]
         });
         continue;
       }
@@ -809,7 +827,10 @@ export class WorkspaceViewFacade {
             }
           ],
           actionLabel: "Open Group Detail",
-          actionPayload: { groupKey: group.groupKey }
+          actionPayload: { groupKey: group.groupKey },
+          actions: [
+            this.studyMonitorMatrixFilterAction({ groupKey: group.groupKey })
+          ]
         });
         continue;
       }
@@ -2208,6 +2229,22 @@ export class WorkspaceViewFacade {
     this.applyStudyMonitorMatrixFilters();
   }
 
+  private filterStudyMonitorMatrixScope(item: RecordCollectionItem): void {
+    const groupKey = item.actionPayload?.groupKey?.trim() ?? "";
+    const unitKey = item.actionPayload?.unitKey?.trim() ?? "";
+    if (!this.canUseWorkspaceScope || (!groupKey && !unitKey)) {
+      return;
+    }
+
+    this.workspace.studyMonitorMatrixLoginFilter = "";
+    this.workspace.studyMonitorMatrixGroupFilter = groupKey;
+    this.workspace.studyMonitorMatrixUnitFilter = unitKey;
+    this.workspace.studyMonitorMatrixStatusFilter = "";
+    this.workspace.studyMonitorMatrixAnswerFilter = "";
+    this.workspace.studyMonitorMatrixLimit = "25";
+    this.applyStudyMonitorMatrixFilters();
+  }
+
   openStudyMonitorItem(item: RecordCollectionItem): void {
     if (item.actionPayload?.participantCommand === "openRuntime") {
       this.openActivitySubject(item);
@@ -2224,6 +2261,14 @@ export class WorkspaceViewFacade {
       "filterStudyMonitorMatrixStatus"
     ) {
       this.filterStudyMonitorMatrixStatus(item);
+      return;
+    }
+
+    if (
+      item.actionPayload?.participantCommand ===
+      "filterStudyMonitorMatrixScope"
+    ) {
+      this.filterStudyMonitorMatrixScope(item);
       return;
     }
 

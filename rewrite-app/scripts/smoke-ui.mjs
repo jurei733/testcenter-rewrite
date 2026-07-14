@@ -3427,14 +3427,32 @@ try {
       exact: true
     })
   });
-  await monitorUnitProgressCard
+  const pausedWorkUnitProgressCard = monitorUnitProgressCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Paused Work" }) })
     .filter({ hasText: "unit-paused" })
     .filter({ hasText: `${pausedWorkMissingResponseCount} missing` })
     .filter({ hasText: "Missing Responses" })
     .filter({ hasText: "Open Unit Detail" })
+    .filter({ hasText: "Show In Matrix" });
+  await pausedWorkUnitProgressCard.waitFor();
+  logStep("study-monitor-unit-filter-matrix");
+  await pausedWorkUnitProgressCard
+    .getByRole("button", { name: "Show In Matrix" })
+    .click();
+  await expectInputValue("#studyMonitorMatrixLoginFilter", "");
+  await expectInputValue("#studyMonitorMatrixGroupFilter", "");
+  await expectInputValue("#studyMonitorMatrixUnitFilter", "unit-paused");
+  await expectInputValue("#studyMonitorMatrixStatusFilter", "");
+  await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
+  await expectInputValue("#studyMonitorMatrixLimit", "25");
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({ hasText: "unit-paused" })
+    .first()
     .waitFor();
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  stopAfter("study-monitor-unit-filter-matrix");
   const monitorAttentionQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Attention Queue",
@@ -3453,7 +3471,7 @@ try {
     .filter({ hasText: String(pausedWorkAttentionSummary?.score ?? "") })
     .filter({ hasText: "Open Unit Detail" })
     .waitFor();
-  await monitorAttentionQueueCard
+  const entrySmokeAttentionGroupCard = monitorAttentionQueueCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
     .filter({ hasText: "2 waiting, 0 active run(s)" })
@@ -3461,7 +3479,25 @@ try {
     .filter({ hasText: "Attention Score" })
     .filter({ hasText: "60" })
     .filter({ hasText: "Open Group Detail" })
+    .filter({ hasText: "Show In Matrix" });
+  await entrySmokeAttentionGroupCard.waitFor();
+  logStep("study-monitor-group-filter-matrix");
+  await entrySmokeAttentionGroupCard
+    .getByRole("button", { name: "Show In Matrix" })
+    .click();
+  await expectInputValue("#studyMonitorMatrixLoginFilter", "");
+  await expectInputValue("#studyMonitorMatrixGroupFilter", "group:entry-smoke");
+  await expectInputValue("#studyMonitorMatrixUnitFilter", "");
+  await expectInputValue("#studyMonitorMatrixStatusFilter", "");
+  await expectInputValue("#studyMonitorMatrixAnswerFilter", "");
+  await expectInputValue("#studyMonitorMatrixLimit", "25");
+  await participantUnitMatrixCard
+    .locator(".record-card")
+    .filter({ hasText: "group:entry-smoke" })
+    .first()
     .waitFor();
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  stopAfter("study-monitor-group-filter-matrix");
   const monitorReviewQueueCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {
       name: "Monitor Review Queue",
