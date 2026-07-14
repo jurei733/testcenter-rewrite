@@ -215,7 +215,7 @@ cp .env.example .env
 
 Then adjust the storage variables for your local mode.
 
-The Docker build context excludes local `.env`, `.env.local`, data, cache, and build-output files so local secrets or generated state are not sent to the Docker daemon.
+The Docker build context excludes local `.env` variants, `.npmrc`, Git metadata, workflow files, data, cache, logs, and build-output files so local secrets or generated state are not sent to the Docker daemon.
 
 `FIRST_SLICE_MAX_JSON_BODY_BYTES` defaults to `1048576` and limits JSON command payloads before they are accumulated in memory. Oversized requests return `413 request_body_too_large`.
 
