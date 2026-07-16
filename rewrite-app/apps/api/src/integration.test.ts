@@ -12,23 +12,31 @@ let baseUrl = "";
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 type ZipCompressionMethod = 0 | 8;
+type ZipFixtureEntry = {
+  fileName: string;
+  content: string;
+  compressionMethod?: ZipCompressionMethod;
+  compressedContent?: Buffer;
+};
 
 const createZipBase64 = (
-  entries: Array<{ fileName: string; content: string }>,
+  entries: ZipFixtureEntry[],
   options: { compressionMethod?: ZipCompressionMethod } = {}
 ): string => {
-  const compressionMethod = options.compressionMethod ?? 0;
   const localFileHeaders: Buffer[] = [];
   const centralDirectoryHeaders: Buffer[] = [];
   let offset = 0;
 
   for (const entry of entries) {
+    const compressionMethod =
+      entry.compressionMethod ?? options.compressionMethod ?? 0;
     const fileName = Buffer.from(entry.fileName, "utf8");
     const uncompressedContent = Buffer.from(entry.content, "utf8");
     const content =
-      compressionMethod === 8
+      entry.compressedContent ??
+      (compressionMethod === 8
         ? deflateRawSync(uncompressedContent)
-        : uncompressedContent;
+        : uncompressedContent);
     const localHeader = Buffer.alloc(30 + fileName.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
@@ -5768,6 +5776,58 @@ test("source document import reports invalid ZIP source documents", async () => 
   assert.equal(
     importResult.body.importJob.diagnostics[0]?.code,
     "source_document_zip_invalid"
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
+test("source document import reports unreadable deflated ZIP manifest entries", async () => {
+  const tenantKey = "integration-tenant-unreadable-zip-manifest";
+  const workspaceKey = "integration-workspace-unreadable-zip-manifest";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: "<manifest />",
+      compressionMethod: 8,
+      compressedContent: Buffer.from("not raw deflate data", "utf8")
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unreadable-manifest.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.equal(
+    importResult.body.importJob.diagnostics[0]?.code,
+    "source_document_zip_manifest_unreadable"
   );
   assert.equal(importResult.body.stagedContentRelease, null);
 });

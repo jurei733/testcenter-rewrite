@@ -4006,6 +4006,7 @@ type ZipEntry = {
 type ZipManifestExtractionResult =
   | { status: "found"; manifestText: string }
   | { status: "invalid_zip" }
+  | { status: "manifest_unreadable" }
   | { status: "manifest_missing" };
 
 const MAX_EXTRACTED_MANIFEST_BYTES = 5 * 1024 * 1024;
@@ -4087,12 +4088,17 @@ const readZipEntryText = (
   }
 
   const compressedData = zipBuffer.subarray(dataStart, dataEnd);
-  const data =
-    entry.compressionMethod === 0
-      ? compressedData
-      : entry.compressionMethod === 8
-        ? inflateRawSync(compressedData)
-        : null;
+  let data: Buffer | null = null;
+  try {
+    data =
+      entry.compressionMethod === 0
+        ? compressedData
+        : entry.compressionMethod === 8
+          ? inflateRawSync(compressedData)
+          : null;
+  } catch {
+    return null;
+  }
 
   if (!data || data.length > MAX_EXTRACTED_MANIFEST_BYTES) {
     return null;
@@ -4142,14 +4148,21 @@ const extractXmlManifestFromZipSourceDocument = (
     ...entries.filter(entry => entry.fileName.toLowerCase().endsWith(".xml"))
   ];
 
+  let foundUnreadableCandidate = false;
   for (const entry of candidates) {
     const text = readZipEntryText(zipBuffer, entry);
+    if (!text) {
+      foundUnreadableCandidate = true;
+      continue;
+    }
     if (text?.trimStart().startsWith("<") && /<[^>]*manifest\b/i.test(text)) {
       return { status: "found", manifestText: text };
     }
   }
 
-  return { status: "manifest_missing" };
+  return {
+    status: foundUnreadableCandidate ? "manifest_unreadable" : "manifest_missing"
+  };
 };
 
 const deriveRuntimeSnapshotFromSourceDocument = (
@@ -4233,6 +4246,11 @@ const deriveRuntimeSnapshotFromSourceDocument = (
               "source_document_zip_invalid",
               `Source package '${sourcePackage.fileName}' did not contain a readable ZIP sourceDocument.`
             )
+          : manifestExtraction.status === "manifest_unreadable"
+            ? createImportDiagnostic(
+                "source_document_zip_manifest_unreadable",
+                `Source package '${sourcePackage.fileName}' contained an XML manifest candidate that could not be read from its ZIP sourceDocument.`
+              )
           : createImportDiagnostic(
               "source_document_zip_manifest_missing",
               `Source package '${sourcePackage.fileName}' did not contain a readable XML manifest in its ZIP sourceDocument.`
