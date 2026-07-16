@@ -2503,6 +2503,9 @@ try {
     .filter({ hasText: "Ben Entry" });
   await savedRosterBenCard.getByRole("link", { name: /Entry URL:/ }).waitFor();
   await savedRosterBenCard
+    .getByRole("button", { name: /Copy Entry URL:/ })
+    .waitFor({ state: "visible" });
+  await savedRosterBenCard
     .getByRole("button", { name: "Use Roster Entry", exact: true })
     .click({ force: true });
   await expectInputValue("#loginKey", "entry-student-b");
@@ -2715,6 +2718,9 @@ try {
   await directEntryLinkCard.waitFor();
   await directEntryLinkCard
     .getByRole("link", { name: /URL:/ })
+    .waitFor({ state: "visible" });
+  await directEntryLinkCard
+    .getByRole("button", { name: /Copy URL:/ })
     .waitFor({ state: "visible" });
   await directEntryLinkCard
     .getByRole("button", { name: "Use Entry Link", exact: true })

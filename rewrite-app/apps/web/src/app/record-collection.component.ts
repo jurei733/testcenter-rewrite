@@ -76,6 +76,16 @@ export type RecordCollectionItem = {
                 >
                   {{ row.value }}
                 </a>
+                <button
+                  *ngIf="row.href"
+                  type="button"
+                  class="record-card-copy-link"
+                  [attr.aria-label]="'Copy ' + row.label + ': ' + row.value"
+                  [attr.title]="'Copy ' + row.value"
+                  (click)="copyRowValue(row)"
+                >
+                  Copy Link
+                </button>
                 <ng-template #plainRowValue>
                   <span
                     class="record-card-row-value"
@@ -134,5 +144,41 @@ export class RecordCollectionComponent {
       actionLabel: action.label,
       actionPayload: action.payload
     });
+  }
+
+  async copyRowValue(row: RecordCollectionRow): Promise<void> {
+    const value = row.value.trim();
+    if (!value) {
+      return;
+    }
+
+    const clipboard = globalThis.navigator?.clipboard;
+    if (!clipboard?.writeText) {
+      this.copyRowValueWithFallback(value);
+      return;
+    }
+
+    try {
+      await clipboard.writeText(value);
+    } catch {
+      this.copyRowValueWithFallback(value);
+    }
+  }
+
+  private copyRowValueWithFallback(value: string): void {
+    const documentRef = globalThis.document;
+    const textArea = documentRef?.createElement("textarea");
+    if (!documentRef?.body || !textArea) {
+      return;
+    }
+
+    textArea.value = value;
+    textArea.setAttribute("readonly", "true");
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    documentRef.body.append(textArea);
+    textArea.select();
+    documentRef.execCommand("copy");
+    textArea.remove();
   }
 }

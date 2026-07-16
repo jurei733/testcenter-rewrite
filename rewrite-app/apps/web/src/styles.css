@@ -843,6 +843,22 @@ pre {
   text-decoration-color: rgba(196, 82, 47, 0.6);
 }
 
+.record-card-copy-link {
+  margin-top: 6px;
+  padding: 5px 8px;
+  width: fit-content;
+  min-height: 0;
+  border-color: rgba(31, 92, 84, 0.32);
+  background: rgba(31, 92, 84, 0.08);
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.record-card-copy-link:hover {
+  background: rgba(31, 92, 84, 0.14);
+  color: var(--ink);
+}
+
 .record-card-selection {
   display: inline-flex;
   width: fit-content;
