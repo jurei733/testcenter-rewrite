@@ -167,8 +167,10 @@ export class RecordCollectionComponent implements OnDestroy {
   }
 
   async copyRowValue(row: RecordCollectionRow): Promise<void> {
-    if (await copyTextToClipboard(row.value)) {
-      this.markRowCopied(row);
+    const rowKey = this.createRowKey(row);
+    this.markRowCopied(row);
+    if (!(await copyTextToClipboard(row.value)) && this.copiedRowKey === rowKey) {
+      this.clearCopiedRow();
     }
   }
 
@@ -182,9 +184,16 @@ export class RecordCollectionComponent implements OnDestroy {
       globalThis.clearTimeout(this.copyResetHandle);
     }
     this.copyResetHandle = globalThis.setTimeout(() => {
-      this.copiedRowKey = "";
-      this.copyResetHandle = undefined;
+      this.clearCopiedRow();
     }, 2500);
+  }
+
+  private clearCopiedRow(): void {
+    this.copiedRowKey = "";
+    if (this.copyResetHandle) {
+      globalThis.clearTimeout(this.copyResetHandle);
+      this.copyResetHandle = undefined;
+    }
   }
 
   private createRowKey(row: RecordCollectionRow): string {

@@ -101,8 +101,13 @@ For CI-shaped local slices that map to the workflow jobs without requiring Docke
 npm run ci:static
 npm run ci:storage
 npm run ci:browser:quick
+npm run ci:browser:review
+npm run ci:browser:monitor
+npm run ci:browser:ops
 npm run ci:deployability
 ```
+
+The browser groups build once and then reuse built artifacts: `ci:browser:quick` covers content, roster links, participant entry, and activation roster warnings; `ci:browser:review` covers response/review handoff paths; `ci:browser:monitor` covers open-run synchronization and activation-blocking runtime handoff; `ci:browser:ops` covers destructive operator actions and protected-operator auth.
 
 Use `npm run ci:deployability` for a non-Docker release gate that builds once, migrates SQLite, requires build metadata in the runtime preflight, and verifies the built startup smoke with the same metadata. Use `npm run ci:postgres` when `FIRST_SLICE_POSTGRES_URL` points at a reachable Postgres database. Docker-only release checks remain covered by `npm run smoke:docker:runtime` and `npm run smoke:compose:postgres`.
 
