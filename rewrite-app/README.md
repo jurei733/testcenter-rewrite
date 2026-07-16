@@ -105,7 +105,7 @@ The full CI command executes:
 - a built runtime preflight against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
 - browser-driven Angular UI smokes against SQLite in focused content, participant-entry, review-readiness, open, and protected operator modes, plus an optional Postgres-backed protected UI smoke when a Postgres URL is configured
-- a standalone production Docker image build that runs the runtime artifact preflight during the image build
+- a standalone production Docker image runtime smoke that builds the image, migrates SQLite inside the container, starts the API as the non-root runtime user, and verifies `/readyz`, `/manifest`, and `/app`
 
 For explicit storage administration, run:
 
@@ -232,13 +232,19 @@ docker build \
   -f Dockerfile .
 ```
 
-For the same standalone image-build check used by CI, run:
+For the same standalone image runtime smoke used by CI, run:
 
 ```bash
 APP_BUILD_SHA=$(git rev-parse --short=12 HEAD) \
 APP_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
 DOCKER_IMAGE_TAG=testcenter-rewrite-app:smoke \
-npm run smoke:docker:build
+npm run smoke:docker:runtime
+```
+
+If you already built the image and only want to rerun the container smoke, use:
+
+```bash
+DOCKER_IMAGE_TAG=testcenter-rewrite-app:smoke npm run smoke:docker:runtime:built
 ```
 
 ## Current Live Flow
