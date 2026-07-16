@@ -2726,7 +2726,7 @@ try {
   );
   await participantEntryPopup.close();
   await clickAction("Refresh Sessions");
-  await page
+  const directLaunchStatusCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Participant Launch Status" })
@@ -2741,7 +2741,19 @@ try {
     .filter({ hasText: "participantSessionId=" })
     .filter({ hasText: "loginKey=entry-student-direct-xml" })
     .filter({ hasText: "groupKey=group%3Adirect-xml" })
-    .filter({ hasText: "bookletKey=booklet%3Astarter" })
+    .filter({ hasText: "bookletKey=booklet%3Astarter" });
+  await directLaunchStatusCard.waitFor();
+  await waitForNotBusy("direct-launch-status-select-before-click");
+  await directLaunchStatusCard
+    .getByRole("button", { name: "Select + Load", exact: true })
+    .click();
+  await waitForBusy("direct-launch-status-select-after-click");
+  await waitForNotBusy("direct-launch-status-select-after-click");
+  await expectInputValue("#participantDisplayName", "Direct Xml");
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Runtime Snapshot" }) })
+    .filter({ hasText: "Direct Xml" })
     .waitFor();
   stopAfter("participant-launch-status-session-link");
   logStep("participant-start");

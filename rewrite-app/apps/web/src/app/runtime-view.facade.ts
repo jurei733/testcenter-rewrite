@@ -167,7 +167,8 @@ export class RuntimeViewFacade {
             bookletKey:
               item.participantRosterEntry?.bookletKey ??
               item.latestTestRun?.bookletKey ??
-              ""
+              "",
+            displayName: displayName ?? ""
           }
         };
       })
@@ -254,7 +255,8 @@ export class RuntimeViewFacade {
           bookletKey:
             detail.participantRosterEntry?.bookletKey ??
             detail.testRuns[0]?.bookletKey ??
-            ""
+            "",
+          displayName: detail.participantRosterEntry?.displayName ?? ""
         }
       }
     ];
@@ -613,7 +615,8 @@ export class RuntimeViewFacade {
           url: link.url,
           participantSessionId: session?.participantSessionId ?? "",
           testRunId: latestRun?.testRunId ?? "",
-          currentUnitKey: latestRun?.currentUnitKey ?? ""
+          currentUnitKey: latestRun?.currentUnitKey ?? "",
+          displayName: link.displayName ?? ""
         }
       };
     });
@@ -1006,7 +1009,8 @@ export class RuntimeViewFacade {
           participantSessionId: selectedRun.participantSessionId,
           loginKey: selectedParticipantSession?.loginKey ?? "",
           groupKey: selectedParticipantSession?.groupKey ?? "",
-          bookletKey: selectedRun.bookletKey
+          bookletKey: selectedRun.bookletKey,
+          displayName: sessionDetail?.participantRosterEntry?.displayName ?? ""
         }
       }
     ];
@@ -1162,7 +1166,8 @@ export class RuntimeViewFacade {
             participantSessionId: item.participantSessionId,
             loginKey: item.loginKey,
             groupKey: item.groupKey,
-            bookletKey: item.bookletKey
+            bookletKey: item.bookletKey,
+            displayName: displayName ?? ""
           }
         };
       })
@@ -1297,7 +1302,8 @@ export class RuntimeViewFacade {
             bookletKey: item.testRun?.bookletKey ?? "",
             reviewerId: item.review.reviewerId,
             reviewCategory: item.review.category,
-            reviewComment: item.review.comment
+            reviewComment: item.review.comment,
+            displayName: displayName ?? ""
           }
         };
       })
@@ -1464,7 +1470,8 @@ export class RuntimeViewFacade {
             currentUnitKey: openRun.currentUnitKey ?? "",
             loginKey: openRun.loginKey,
             groupKey: openRun.groupKey,
-            bookletKey: openRun.bookletKey
+            bookletKey: openRun.bookletKey,
+            displayName: displayName ?? ""
           }
         };
       }) ?? []
@@ -1537,12 +1544,28 @@ export class RuntimeViewFacade {
       "not set";
     const openRuns = readUnknownValue(openRunsState, ["items"]);
     const openRunCount = Array.isArray(openRuns) ? openRuns.length : 0;
+    const participantLabel =
+      this.runtime.participantDisplayName.trim() ||
+      readStringValue(runtimeState, [
+        "runtimeState",
+        "participantRosterEntry",
+        "displayName"
+      ]) ||
+      readStringValue(currentRunState, [
+        "currentRunState",
+        "participantRosterEntry",
+        "displayName"
+      ]) ||
+      this.runtime.loginKey.trim() ||
+      "no participant selected";
 
     return [
       {
         label: "Session",
         headline: runtimeStatus,
-        detail: this.runtime.participantSessionId.trim() || "no session selected"
+        detail: `${participantLabel} · ${
+          this.runtime.participantSessionId.trim() || "no session selected"
+        }`
       },
       {
         label: "Run",
@@ -2512,6 +2535,7 @@ export class RuntimeViewFacade {
       this.runtime.groupKey = item.actionPayload.groupKey;
     }
     this.runtime.bookletKey = item.actionPayload?.bookletKey ?? "";
+    this.syncParticipantDisplayName(item);
     this.persistState();
 
     const url = item.actionPayload?.url?.trim();
@@ -2546,6 +2570,7 @@ export class RuntimeViewFacade {
     if (item.actionPayload?.bookletKey != null) {
       this.runtime.bookletKey = item.actionPayload.bookletKey;
     }
+    this.syncParticipantDisplayName(item);
     this.persistState();
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.loadParticipantSessionDetail();
@@ -2609,6 +2634,7 @@ export class RuntimeViewFacade {
     if (item.actionPayload?.participantSessionId) {
       this.runtime.participantSessionId = item.actionPayload.participantSessionId;
     }
+    this.syncParticipantDisplayName(item);
     if (!this.runtime.participantSessionId.trim() && this.runtime.loginKey.trim()) {
       const derivedParticipantSessionId = this.findParticipantSessionIdByLoginKey(
         this.runtime.loginKey.trim()
@@ -2683,6 +2709,7 @@ export class RuntimeViewFacade {
     if (item.actionPayload?.bookletKey != null) {
       this.runtime.bookletKey = item.actionPayload.bookletKey;
     }
+    this.syncParticipantDisplayName(item);
     this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
     this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
     this.runtime.detailedResponseBookletFilter = this.runtime.bookletKey.trim();
@@ -2723,6 +2750,12 @@ export class RuntimeViewFacade {
       item => item.participantSession.loginKey === loginKey
     );
     return matchingItem?.participantSession.participantSessionId ?? null;
+  }
+
+  private syncParticipantDisplayName(item: RecordCollectionItem): void {
+    if (item.actionPayload?.displayName != null) {
+      this.runtime.participantDisplayName = item.actionPayload.displayName;
+    }
   }
 
   private parseEntryRosterRows(): RuntimeEntryLink[] {
