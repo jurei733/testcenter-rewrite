@@ -17,6 +17,7 @@ import {
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 
+import { copyTextToClipboard } from "./copy-text-to-clipboard";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
@@ -118,6 +119,7 @@ export class ParticipantViewFacade {
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
+  private copiedSessionEntryLink = "";
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -594,6 +596,25 @@ export class ParticipantViewFacade {
     );
   }
 
+  async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
+    const normalizedSessionEntryLink = sessionEntryLink.trim();
+    if (!normalizedSessionEntryLink) {
+      return;
+    }
+
+    this.copiedSessionEntryLink = normalizedSessionEntryLink;
+    if (!(await copyTextToClipboard(normalizedSessionEntryLink))) {
+      this.copiedSessionEntryLink = "";
+    }
+  }
+
+  isSessionEntryLinkCopied(sessionEntryLink: string): boolean {
+    return (
+      Boolean(sessionEntryLink.trim()) &&
+      this.copiedSessionEntryLink === sessionEntryLink.trim()
+    );
+  }
+
   private async startOrResumeInternal(): Promise<void> {
     if (this.runtime.participantSessionId.trim()) {
       try {
@@ -661,6 +682,7 @@ export class ParticipantViewFacade {
   private clearStoredParticipantSession(
     message = 'Stored participant session is gone. Use "Start Or Resume".'
   ): void {
+    this.copiedSessionEntryLink = "";
     if (
       !this.runtime.participantSessionId.trim() &&
       !this.runtime.testRunId.trim()

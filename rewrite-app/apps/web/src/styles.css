@@ -1059,7 +1059,7 @@ pre {
 
 .participant-session-link {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 12px;
   align-items: center;
   margin-bottom: 14px;
@@ -1096,6 +1096,13 @@ pre {
 .participant-session-link input {
   grid-column: 1 / -1;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.participant-session-link-copy-status {
+  grid-column: 1 / -1;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .participant-progress {

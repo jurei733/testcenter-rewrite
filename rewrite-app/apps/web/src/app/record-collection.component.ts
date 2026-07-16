@@ -2,6 +2,8 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import type { OnDestroy } from "@angular/core";
 
+import { copyTextToClipboard } from "./copy-text-to-clipboard";
+
 export type RecordCollectionRow = {
   label: string;
   value: string;
@@ -165,26 +167,8 @@ export class RecordCollectionComponent implements OnDestroy {
   }
 
   async copyRowValue(row: RecordCollectionRow): Promise<void> {
-    const value = row.value.trim();
-    if (!value) {
-      return;
-    }
-
-    const clipboard = globalThis.navigator?.clipboard;
-    if (!clipboard?.writeText) {
-      if (this.copyRowValueWithFallback(value)) {
-        this.markRowCopied(row);
-      }
-      return;
-    }
-
-    try {
-      await clipboard.writeText(value);
+    if (await copyTextToClipboard(row.value)) {
       this.markRowCopied(row);
-    } catch {
-      if (this.copyRowValueWithFallback(value)) {
-        this.markRowCopied(row);
-      }
     }
   }
 
@@ -207,21 +191,4 @@ export class RecordCollectionComponent implements OnDestroy {
     return `${row.label}\u0000${row.value}`;
   }
 
-  private copyRowValueWithFallback(value: string): boolean {
-    const documentRef = globalThis.document;
-    const textArea = documentRef?.createElement("textarea");
-    if (!documentRef?.body || !textArea) {
-      return false;
-    }
-
-    textArea.value = value;
-    textArea.setAttribute("readonly", "true");
-    textArea.style.position = "fixed";
-    textArea.style.opacity = "0";
-    documentRef.body.append(textArea);
-    textArea.select();
-    const copied = documentRef.execCommand("copy");
-    textArea.remove();
-    return copied;
-  }
 }

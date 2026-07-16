@@ -259,8 +259,12 @@ try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
 
   browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
   const baseUrl = `http://127.0.0.1:${port}`;
+  const context = await browser.newContext();
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: baseUrl
+  });
+  const page = await context.newPage();
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
   const participantEntryUrlPrefix = `${baseUrl}/participant?tenantKey=${encodeURIComponent(
@@ -1956,6 +1960,23 @@ try {
     ],
     { timeout: 15_000 }
   );
+  const participantRouteCopySessionLinkButton = page.locator(
+    "#participantRouteCopySessionLinkButton"
+  );
+  await participantRouteCopySessionLinkButton.waitFor({ state: "visible" });
+  assert.equal(
+    await participantRouteCopySessionLinkButton.getAttribute("aria-label"),
+    `Copy Session Re-Entry: ${participantRouteSessionLink}`
+  );
+  await participantRouteCopySessionLinkButton.click();
+  await page
+    .locator("#participantRouteCopySessionLinkButton")
+    .filter({ hasText: "Copied" })
+    .waitFor({ state: "visible" });
+  await page
+    .locator("#participantRouteSessionLinkCopyStatus")
+    .filter({ hasText: "Session link copied" })
+    .waitFor({ state: "visible" });
   await clickAction("Save Paused");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantRouteSessionId}/current-state`,

@@ -62,6 +62,25 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           >
             Open Session
           </a>
+          <button
+            id="participantRouteCopySessionLinkButton"
+            class="ghost"
+            type="button"
+            [attr.aria-label]="(view.isSessionEntryLinkCopied(view.player.sessionEntryLink) ? 'Copied Session Re-Entry: ' : 'Copy Session Re-Entry: ') + view.player.sessionEntryLink"
+            [attr.title]="'Copy ' + view.player.sessionEntryLink"
+            (click)="view.copySessionEntryLink(view.player.sessionEntryLink)"
+          >
+            {{ view.isSessionEntryLinkCopied(view.player.sessionEntryLink) ? "Copied" : "Copy Session Link" }}
+          </button>
+          <span
+            id="participantRouteSessionLinkCopyStatus"
+            class="participant-session-link-copy-status"
+            *ngIf="view.isSessionEntryLinkCopied(view.player.sessionEntryLink)"
+            role="status"
+            aria-live="polite"
+          >
+            Session link copied
+          </span>
           <input id="participantRouteSessionLink" name="participantRouteSessionLink" readonly [value]="view.player.sessionEntryLink" />
         </section>
         <div class="form-grid">
