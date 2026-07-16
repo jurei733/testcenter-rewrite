@@ -2003,11 +2003,19 @@ try {
     ([expectedUnitKey, expectedNextUnitKey]) =>
       document.querySelector("#participantRouteUnitKey")?.textContent?.trim() ===
         expectedUnitKey &&
+      document.querySelector("#participantRouteUnitOverview")?.textContent?.trim() ===
+        "1/3 answered · 2 open" &&
+      document
+        .querySelector(`#participantRouteUnitRail [data-unit-key="${expectedUnitKey}"] em`)
+        ?.textContent?.trim() === "Current answered" &&
       document
         .querySelector(
           `#participantRouteUnitRail [data-unit-key="${expectedNextUnitKey}"]`
         )
-        ?.textContent?.includes("Paused Work"),
+        ?.textContent?.includes("Paused Work") &&
+      document
+        .querySelector(`#participantRouteUnitRail [data-unit-key="${expectedNextUnitKey}"] em`)
+        ?.textContent?.trim() === "Open",
     [participantRouteUnitKey, participantRouteNextUnitKey],
     { timeout: 15_000 }
   );
@@ -2079,6 +2087,8 @@ try {
         expectedUnitKey &&
       document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
         "2 / 3" &&
+      document.querySelector("#participantRouteUnitOverview")?.textContent?.trim() ===
+        "2/3 answered · 1 open" &&
       document.querySelector("#participantRouteUnitResponse")?.value ===
         expectedResponse,
     [participantRouteUnitKey, participantRouteUnitResponse],
@@ -2181,6 +2191,8 @@ try {
         "completed" &&
       document.querySelector("#participantRouteProgressLabel")?.textContent?.trim() ===
         "3 / 3 responses saved" &&
+      document.querySelector("#participantRouteUnitOverview")?.textContent?.trim() ===
+        "3/3 answered · 0 open" &&
       document.querySelector("#participantRouteMissingLabel")?.textContent?.trim() ===
         "All units have a saved response." &&
       document

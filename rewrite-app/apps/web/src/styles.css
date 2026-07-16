@@ -949,6 +949,18 @@ pre {
   color: var(--ink);
 }
 
+.unit-rail header div {
+  display: grid;
+  gap: 3px;
+}
+
+.unit-rail header small {
+  color: var(--secondary);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .participant-meta-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1278,7 +1290,16 @@ pre {
 }
 
 .unit-chip strong {
+  grid-column: 2;
   overflow-wrap: anywhere;
+}
+
+.unit-chip em {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .unit-chip.has-response span {
@@ -1295,6 +1316,10 @@ pre {
 .unit-chip.is-current span {
   background: var(--accent);
   color: white;
+}
+
+.unit-chip.is-current em {
+  color: var(--accent);
 }
 
 .record-card-actions {

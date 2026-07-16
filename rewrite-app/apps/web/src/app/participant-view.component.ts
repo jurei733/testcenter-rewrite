@@ -210,7 +210,10 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </section>
           <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.unitItems.length > 0">
             <header>
-              <span>Booklet Units</span>
+              <div>
+                <span>Booklet Units</span>
+                <small id="participantRouteUnitOverview">{{ view.player.unitOverviewLabel }}</small>
+              </div>
               <strong>{{ view.player.unitPosition }}</strong>
             </header>
             <div class="unit-rail-grid" id="participantRouteUnitRail">
@@ -229,6 +232,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
               >
                 <span>{{ unit.position }}</span>
                 <strong>{{ unit.label }}</strong>
+                <em>{{ unit.statusLabel }}</em>
               </button>
             </div>
           </section>

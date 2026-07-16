@@ -38,6 +38,7 @@ type ParticipantPlayerState = {
   unitContent: string;
   unitKey: string;
   unitPosition: string;
+  unitOverviewLabel: string;
   unitItems: ParticipantPlayerUnitItem[];
   responseProgressLabel: string;
   missingResponseLabel: string;
@@ -71,6 +72,7 @@ type ParticipantPlayerUnitItem = {
   unitKey: string;
   label: string;
   position: string;
+  statusLabel: string;
   accessibilityLabel: string;
   isCurrent: boolean;
   hasResponse: boolean;
@@ -291,6 +293,7 @@ export class ParticipantViewFacade {
         unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
+        unitOverviewLabel: "No units loaded",
         unitItems: [],
         responseProgressLabel: "0 / 0 responses saved",
         missingResponseLabel: "No booklet loaded",
@@ -351,10 +354,18 @@ export class ParticipantViewFacade {
       const label = unit.displayLabel || unit.unitKey;
       const isCurrent = unit.unitKey === unitKey;
       const hasResponse = this.hasSavedResponse(currentState, unit.unitKey);
+      const statusLabel = isCurrent
+        ? hasResponse
+          ? "Current answered"
+          : "Current"
+        : hasResponse
+          ? "Answered"
+          : "Open";
       return {
         unitKey: unit.unitKey,
         label,
         position: `${index + 1}`,
+        statusLabel,
         accessibilityLabel: [
           `Unit ${index + 1}: ${label}`,
           isCurrent ? "current" : "not current",
@@ -417,6 +428,7 @@ export class ParticipantViewFacade {
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
+      unitOverviewLabel: `${answeredUnitCount}/${totalUnitCount} answered · ${missingUnitCount} open`,
       unitItems,
       responseProgressLabel: `${answeredUnitCount} / ${totalUnitCount} responses saved`,
       missingResponseLabel:
