@@ -1573,7 +1573,7 @@ export class WorkspaceViewFacade {
     const participantSessionId =
       detail.participantSession?.participantSessionId ?? "";
     const participantGroupKey = detail.participantSession?.groupKey ?? "";
-    const runActionPayload = {
+    const runInspectionPayload = {
       subjectType: "test_run",
       subjectId: detail.testRun.testRunId,
       testRunId: detail.testRun.testRunId,
@@ -1606,11 +1606,14 @@ export class WorkspaceViewFacade {
           { label: "Generated", value: this.formatDateTime(detail.generatedAt) }
         ],
         actionLabel: "Open In Runtime",
-        actionPayload: runActionPayload
+        actionPayload: {
+          ...runInspectionPayload,
+          participantCommand: "openRuntime"
+        }
       },
       ...detail.units.map(unit => {
         const unitActionPayload = {
-          ...runActionPayload,
+          ...runInspectionPayload,
           unitKey: unit.unitKey,
           currentUnitKey: unit.unitKey
         };

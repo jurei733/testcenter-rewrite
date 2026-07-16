@@ -1655,6 +1655,46 @@ export class ContentViewFacade {
     void this.router.navigateByUrl("/runtime");
   }
 
+  private seedRuntimeRunInspectionFilters(input: {
+    loginKey: string;
+    groupKey: string;
+    bookletKey: string;
+    participantSessionId: string;
+    testRunId: string;
+    currentUnitKey: string;
+  }): void {
+    const runtime = this.uiState.runtime;
+    const loginKey = input.loginKey.trim();
+    const groupKey = input.groupKey.trim();
+    const bookletKey = input.bookletKey.trim();
+    const participantSessionId = input.participantSessionId.trim();
+    const testRunId = input.testRunId.trim();
+    const currentUnitKey = input.currentUnitKey.trim();
+
+    runtime.detailedResponseLoginFilter = loginKey;
+    runtime.detailedResponseGroupFilter = groupKey;
+    runtime.detailedResponseBookletFilter = bookletKey;
+    runtime.detailedResponseSessionFilter = participantSessionId;
+    runtime.detailedResponseRunFilter = testRunId;
+    runtime.detailedResponseUnitFilter = currentUnitKey;
+    runtime.detailedResponseStatusFilter = "";
+    runtime.reviewLoginFilter = loginKey;
+    runtime.reviewGroupFilter = groupKey;
+    runtime.reviewBookletFilter = bookletKey;
+    runtime.reviewSessionFilter = participantSessionId;
+    runtime.reviewRunFilter = testRunId;
+    runtime.reviewUnitFilter = currentUnitKey;
+    runtime.reviewReviewerFilter = "";
+    runtime.reviewCategoryFilter = "";
+    runtime.openRunLoginFilter = loginKey;
+    runtime.openRunGroupFilter = groupKey;
+    runtime.openRunBookletFilter = bookletKey;
+    runtime.openRunSessionFilter = participantSessionId;
+    runtime.openRunRunFilter = testRunId;
+    runtime.openRunUnitFilter = currentUnitKey;
+    runtime.openRunStatusFilter = "";
+  }
+
   openBlockingRunInRuntime(item: RecordCollectionItem): void {
     const loginKey = item.actionPayload?.loginKey?.trim();
     const testRunId = item.actionPayload?.testRunId?.trim();
@@ -1679,6 +1719,14 @@ export class ContentViewFacade {
     if (participantSessionId) {
       runtime.participantSessionId = participantSessionId;
     }
+    this.seedRuntimeRunInspectionFilters({
+      loginKey: runtime.loginKey,
+      groupKey: runtime.groupKey,
+      bookletKey: runtime.bookletKey,
+      participantSessionId: runtime.participantSessionId,
+      testRunId: runtime.testRunId,
+      currentUnitKey: runtime.currentUnitKey
+    });
 
     this.persistState();
     void this.router.navigateByUrl("/runtime");
@@ -1711,6 +1759,14 @@ export class ContentViewFacade {
     if (item.actionPayload?.bookletKey != null) {
       runtime.bookletKey = item.actionPayload.bookletKey;
     }
+    this.seedRuntimeRunInspectionFilters({
+      loginKey: runtime.loginKey,
+      groupKey: runtime.groupKey,
+      bookletKey: runtime.bookletKey,
+      participantSessionId: runtime.participantSessionId,
+      testRunId: runtime.testRunId,
+      currentUnitKey: runtime.currentUnitKey
+    });
 
     this.persistState();
     void this.router.navigateByUrl("/runtime");
