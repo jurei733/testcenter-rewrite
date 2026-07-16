@@ -2665,6 +2665,7 @@ const normalizeParsedJsonContentStructure = (
         "body",
         "itemBody",
         "item-body",
+        "definition",
         "text",
         "stimulus",
         "markdown",
@@ -3284,6 +3285,8 @@ const normalizeParsedJsonContentStructure = (
                   unit.body ??
                   unit.itemBody ??
                   unit["item-body"] ??
+                  unit.definition ??
+                  unit.Definition ??
                   unit.text ??
                   unit.stimulus ??
                   unit.markdown ??
@@ -3995,6 +3998,7 @@ const collectXmlBookletEntries = (
           "body",
           "itemBody",
           "item-body",
+          "definition",
           "text",
           "stimulus",
           "markdown",
@@ -4008,6 +4012,7 @@ const collectXmlBookletEntries = (
             "body",
             "itemBody",
             "item-body",
+            "definition",
             "text",
             "stimulus",
             "markdown",

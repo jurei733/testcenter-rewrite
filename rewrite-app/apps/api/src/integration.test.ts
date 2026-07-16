@@ -4130,7 +4130,8 @@ test("source document import accepts native JSON booklet and unit maps", async (
                 "unit:mapped-b": "Mapped Unit B",
                 "unit:mapped-c": {
                   displayName: "Mapped Unit C",
-                  description: "Mapped setup C"
+                  description: "Mapped setup C",
+                  definition: "Use mapped definition C."
                 }
               }
             }
@@ -4194,7 +4195,8 @@ test("source document import accepts native JSON booklet and unit maps", async (
             {
               unitKey: "unit:mapped-c",
               displayLabel: "Mapped Unit C",
-              description: "Mapped setup C"
+              description: "Mapped setup C",
+              content: "Use mapped definition C."
             }
           ]
         }
@@ -5287,6 +5289,11 @@ test("source document import preserves testcenter unit aliases", async () => {
             <Testlet id="another_testlet" label="Second Block">
               <Unit id="UNIT.SAMPLE" label="Sample Unit again, with Alias" labelshort="Sample Unit Again" alias="an_alias" />
             </Testlet>
+            <Unit id="UNIT.INLINE" label="Inline definition unit">
+              <Definition><![CDATA[
+                <section>Loaded direct Testcenter definition payload.</section>
+              ]]></Definition>
+            </Unit>
           </Units>
         </Booklet>
       `
@@ -5315,7 +5322,11 @@ test("source document import preserves testcenter unit aliases", async () => {
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
-            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              content?: string;
+            }>;
           }>;
         };
       };
@@ -5344,6 +5355,11 @@ test("source document import preserves testcenter unit aliases", async () => {
             {
               unitKey: "an_alias",
               displayLabel: "Sample Unit again, with Alias"
+            },
+            {
+              unitKey: "UNIT.INLINE",
+              displayLabel: "Inline definition unit",
+              content: "Loaded direct Testcenter definition payload."
             }
           ]
         }
