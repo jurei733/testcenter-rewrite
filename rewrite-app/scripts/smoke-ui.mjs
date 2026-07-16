@@ -2232,6 +2232,37 @@ try {
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "Xml Entry" })
     .waitFor();
+  await fillAndCommit(
+    "#entryRosterText",
+    JSON.stringify({
+      groups: [
+        {
+          groupKey: "group:json-entry",
+          booklets: [
+            {
+              bookletKey: participantRouteBookletKey,
+              participants: [
+                {
+                  loginKey: "entry-student-json",
+                  displayName: "Json Entry"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    })
+  );
+  await page.locator("#importParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-json" })
+    .filter({ hasText: "Json Entry" })
+    .filter({ hasText: "group:json-entry" })
+    .waitFor();
   await page.locator("#loadParticipantRosterButton").click();
   await page
     .locator("article.card")
@@ -2258,6 +2289,8 @@ try {
     .filter({ hasText: "groupKey" })
     .filter({ hasText: "entry-student-a" })
     .filter({ hasText: "Ada Entry" })
+    .filter({ hasText: "entry-student-json" })
+    .filter({ hasText: "Json Entry" })
     .filter({ hasText: "booklet:starter" })
     .waitFor();
   await page.locator("#generateSavedRosterEntryLinksButton").click();
@@ -2270,6 +2303,17 @@ try {
     .filter({ hasText: "Ada Entry" })
     .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: "group%3Aentry-smoke" })
+    .filter({ hasText: "booklet%3Astarter" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Generated Entry Links" })
+    })
+    .filter({ hasText: "entry-student-json" })
+    .filter({ hasText: "Json Entry" })
+    .filter({ hasText: participantEntryUrlPrefix })
+    .filter({ hasText: "group%3Ajson-entry" })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
   await page
@@ -2292,14 +2336,14 @@ try {
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "3" })
+    .filter({ hasText: "4" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "3" })
+    .filter({ hasText: "4" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
@@ -2324,6 +2368,7 @@ try {
     .filter({ hasText: "Download participant entry links" })
     .filter({ hasText: "Refresh participant sessions" })
     .waitFor();
+  stopAfter("generate-entry-links");
   logStep("activation-roster-warning-cards");
   const authenticatedJsonHeaders = {
     ...(createSmokeFetchInit()?.headers ?? {}),
@@ -3088,6 +3133,9 @@ try {
       const xmlEntryGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:xml-entry")
         : null;
+      const jsonEntryGroup = Array.isArray(summary.groups)
+        ? summary.groups.find(group => group?.groupKey === "group:json-entry")
+        : null;
       const notStartedParticipants = Array.isArray(summary.notStartedParticipants)
         ? summary.notStartedParticipants.map(entry => ({
             loginKey: entry?.loginKey,
@@ -3114,6 +3162,12 @@ try {
           groupKey: "group:xml-entry",
           bookletKey: null,
           displayName: "Xml Entry"
+        },
+        {
+          loginKey: "entry-student-json",
+          groupKey: "group:json-entry",
+          bookletKey: "booklet:starter",
+          displayName: "Json Entry"
         }
       ];
       const byLoginKey = (left, right) =>
@@ -3149,19 +3203,19 @@ try {
           )
         : 0;
       return (
-        summary.expectedParticipantCount >= 7 &&
-        summary.rosterEntryCount === 3 &&
+        summary.expectedParticipantCount >= 8 &&
+        summary.rosterEntryCount === 4 &&
         summary.participantSessionCount >= 4 &&
         summary.testRunCount >= 4 &&
-        summary.notStartedCount >= 3 &&
+        summary.notStartedCount >= 4 &&
         JSON.stringify(normalizedNotStartedParticipants) ===
           JSON.stringify(normalizedExpectedNotStartedParticipants) &&
         missingResponseCount >= 11 &&
         Array.isArray(summary.groups) &&
         summary.groups.length >= 6 &&
-        pausedWorkUnit?.rosterExpectedCount === 1 &&
-        pausedWorkUnit?.expectedRunCount >= 5 &&
-        pausedWorkUnit?.missingResponseCount >= 3 &&
+        pausedWorkUnit?.rosterExpectedCount === 2 &&
+        pausedWorkUnit?.expectedRunCount >= 6 &&
+        pausedWorkUnit?.missingResponseCount >= 4 &&
         pausedWorkAttention?.score >= 300 &&
         pausedWorkAttention?.missingResponseCount >= 3 &&
         entrySmokeAttention?.score === 60 &&
@@ -3178,6 +3232,10 @@ try {
         xmlEntryGroup?.rosterEntryCount === 1 &&
         xmlEntryGroup?.participantSessionCount === 0 &&
         xmlEntryGroup?.notStartedCount === 1 &&
+        jsonEntryGroup?.expectedParticipantCount === 1 &&
+        jsonEntryGroup?.rosterEntryCount === 1 &&
+        jsonEntryGroup?.participantSessionCount === 0 &&
+        jsonEntryGroup?.notStartedCount === 1 &&
         studentUiGroup?.participantSessionCount === 1 &&
         studentUiGroup?.testRunCount === 1 &&
         studentUiGroup?.runningCount === 1 &&

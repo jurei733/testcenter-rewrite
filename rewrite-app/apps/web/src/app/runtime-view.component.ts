@@ -306,20 +306,20 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Entry Links</h2>
-        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML rosters are accepted too.</p>
+        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML and JSON roster structures are accepted too.</p>
         <label>
           Load Roster File
           <input
             id="entryRosterFile"
             name="entryRosterFile"
             type="file"
-            accept=".csv,.tsv,.txt,.xml,text/csv,text/tab-separated-values,text/plain,application/xml,text/xml"
+            accept=".csv,.tsv,.txt,.xml,.json,text/csv,text/tab-separated-values,text/plain,application/xml,text/xml,application/json"
             (change)="view.loadEntryRosterFile($event)"
           />
         </label>
         <label>
-          Roster Rows or XML
-          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;"></textarea>
+          Roster Rows, XML, or JSON
+          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;&#10;{&quot;groups&quot;:[{&quot;groupKey&quot;:&quot;group:demo-a&quot;,&quot;participants&quot;:[{&quot;loginKey&quot;:&quot;student-c&quot;,&quot;displayName&quot;:&quot;Cara Demo&quot;}]}]}"></textarea>
         </label>
         <div class="actions">
           <button id="importParticipantRosterButton" class="primary" type="button" [disabled]="!view.canImportParticipantRoster" (click)="view.importParticipantRoster()">Import Saved Roster</button>

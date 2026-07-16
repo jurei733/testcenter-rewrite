@@ -2068,7 +2068,7 @@ export class RuntimeViewFacade {
     this.applicationRef.tick();
     this.feedback.rememberActivity(
       "Participant Roster Loaded",
-      `${file.name} loaded with ${rosterText.length} character(s).`
+      `${file.name} loaded as CSV/TSV/XML/JSON roster text with ${rosterText.length} character(s).`
     );
   }
 
