@@ -859,6 +859,20 @@ pre {
   color: var(--ink);
 }
 
+.record-card-copy-link.is-copied {
+  border-color: rgba(31, 92, 84, 0.48);
+  background: rgba(31, 92, 84, 0.16);
+  color: var(--ink);
+}
+
+.record-card-copy-status {
+  display: block;
+  margin-top: 4px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .record-card-selection {
   display: inline-flex;
   width: fit-content;

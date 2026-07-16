@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
+import type { OnDestroy } from "@angular/core";
 
 export type RecordCollectionRow = {
   label: string;
@@ -80,12 +81,21 @@ export type RecordCollectionItem = {
                   *ngIf="row.href"
                   type="button"
                   class="record-card-copy-link"
-                  [attr.aria-label]="'Copy ' + row.label + ': ' + row.value"
+                  [class.is-copied]="isCopiedRow(row)"
+                  [attr.aria-label]="(isCopiedRow(row) ? 'Copied ' : 'Copy ') + row.label + ': ' + row.value"
                   [attr.title]="'Copy ' + row.value"
                   (click)="copyRowValue(row)"
                 >
-                  Copy Link
+                  {{ isCopiedRow(row) ? "Copied" : "Copy Link" }}
                 </button>
+                <span
+                  *ngIf="isCopiedRow(row)"
+                  class="record-card-copy-status"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Link copied
+                </span>
                 <ng-template #plainRowValue>
                   <span
                     class="record-card-row-value"
@@ -126,12 +136,20 @@ export type RecordCollectionItem = {
     </article>
   `
 })
-export class RecordCollectionComponent {
+export class RecordCollectionComponent implements OnDestroy {
   @Input({ required: true }) title = "";
   @Input({ required: true }) subtitle = "";
   @Input({ required: true }) items: RecordCollectionItem[] = [];
   @Input() emptyState = "No items yet.";
   @Output() readonly itemAction = new EventEmitter<RecordCollectionItem>();
+  private copiedRowKey = "";
+  private copyResetHandle?: ReturnType<typeof globalThis.setTimeout>;
+
+  ngOnDestroy(): void {
+    if (this.copyResetHandle) {
+      globalThis.clearTimeout(this.copyResetHandle);
+    }
+  }
 
   emitAction(item: RecordCollectionItem, action?: RecordCollectionAction): void {
     if (!action) {
@@ -154,22 +172,46 @@ export class RecordCollectionComponent {
 
     const clipboard = globalThis.navigator?.clipboard;
     if (!clipboard?.writeText) {
-      this.copyRowValueWithFallback(value);
+      if (this.copyRowValueWithFallback(value)) {
+        this.markRowCopied(row);
+      }
       return;
     }
 
     try {
       await clipboard.writeText(value);
+      this.markRowCopied(row);
     } catch {
-      this.copyRowValueWithFallback(value);
+      if (this.copyRowValueWithFallback(value)) {
+        this.markRowCopied(row);
+      }
     }
   }
 
-  private copyRowValueWithFallback(value: string): void {
+  isCopiedRow(row: RecordCollectionRow): boolean {
+    return this.copiedRowKey === this.createRowKey(row);
+  }
+
+  private markRowCopied(row: RecordCollectionRow): void {
+    this.copiedRowKey = this.createRowKey(row);
+    if (this.copyResetHandle) {
+      globalThis.clearTimeout(this.copyResetHandle);
+    }
+    this.copyResetHandle = globalThis.setTimeout(() => {
+      this.copiedRowKey = "";
+      this.copyResetHandle = undefined;
+    }, 2500);
+  }
+
+  private createRowKey(row: RecordCollectionRow): string {
+    return `${row.label}\u0000${row.value}`;
+  }
+
+  private copyRowValueWithFallback(value: string): boolean {
     const documentRef = globalThis.document;
     const textArea = documentRef?.createElement("textarea");
     if (!documentRef?.body || !textArea) {
-      return;
+      return false;
     }
 
     textArea.value = value;
@@ -178,7 +220,8 @@ export class RecordCollectionComponent {
     textArea.style.opacity = "0";
     documentRef.body.append(textArea);
     textArea.select();
-    documentRef.execCommand("copy");
+    const copied = documentRef.execCommand("copy");
     textArea.remove();
+    return copied;
   }
 }

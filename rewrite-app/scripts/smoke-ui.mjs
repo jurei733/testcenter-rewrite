@@ -2502,9 +2502,15 @@ try {
     .filter({ has: page.getByRole("heading", { name: "entry-student-b" }) })
     .filter({ hasText: "Ben Entry" });
   await savedRosterBenCard.getByRole("link", { name: /Entry URL:/ }).waitFor();
+  const savedRosterCopyLinkButton = savedRosterBenCard.getByRole("button", {
+    name: /Copy Entry URL:/
+  });
+  await savedRosterCopyLinkButton.waitFor({ state: "visible" });
+  await savedRosterCopyLinkButton.click({ force: true });
   await savedRosterBenCard
-    .getByRole("button", { name: /Copy Entry URL:/ })
+    .getByRole("button", { name: /Copied Entry URL:/ })
     .waitFor({ state: "visible" });
+  await savedRosterBenCard.getByText("Link copied").waitFor({ state: "visible" });
   await savedRosterBenCard
     .getByRole("button", { name: "Use Roster Entry", exact: true })
     .click({ force: true });
@@ -2719,8 +2725,13 @@ try {
   await directEntryLinkCard
     .getByRole("link", { name: /URL:/ })
     .waitFor({ state: "visible" });
+  const directEntryCopyLinkButton = directEntryLinkCard.getByRole("button", {
+    name: /Copy URL:/
+  });
+  await directEntryCopyLinkButton.waitFor({ state: "visible" });
+  await directEntryCopyLinkButton.click({ force: true });
   await directEntryLinkCard
-    .getByRole("button", { name: /Copy URL:/ })
+    .getByRole("button", { name: /Copied URL:/ })
     .waitFor({ state: "visible" });
   await directEntryLinkCard
     .getByRole("button", { name: "Use Entry Link", exact: true })
