@@ -57,6 +57,11 @@ export type ParsedParticipantRosterEntry = {
   displayName: string | null;
 };
 
+export type ParticipantRosterSource =
+  | string
+  | Record<string, unknown>
+  | unknown[];
+
 const splitRosterLine = (line: string): string[] => {
   const delimiter = line.includes("\t")
     ? "\t"
@@ -279,21 +284,9 @@ const readJsonRosterChildValues = (
   ...readJsonRosterEntries(value.roster, value.testtakersRoster)
 ];
 
-const parseParticipantRosterJsonText = (
-  rosterText: string
+const parseParticipantRosterJsonValue = (
+  parsed: unknown
 ): ParsedParticipantRosterEntry[] => {
-  const trimmedRosterText = rosterText.trim();
-  if (!trimmedRosterText.startsWith("{") && !trimmedRosterText.startsWith("[")) {
-    return [];
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmedRosterText);
-  } catch {
-    return [];
-  }
-
   const entries: ParsedParticipantRosterEntry[] = [];
   const visit = (
     candidate: unknown,
@@ -444,6 +437,24 @@ const parseParticipantRosterJsonText = (
 
   visit(parsed, { groupKey: null, bookletKey: null });
   return entries;
+};
+
+const parseParticipantRosterJsonText = (
+  rosterText: string
+): ParsedParticipantRosterEntry[] => {
+  const trimmedRosterText = rosterText.trim();
+  if (!trimmedRosterText.startsWith("{") && !trimmedRosterText.startsWith("[")) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmedRosterText);
+  } catch {
+    return [];
+  }
+
+  return parseParticipantRosterJsonValue(parsed);
 };
 
 type XmlRosterContextRange = {
@@ -686,8 +697,12 @@ const parseParticipantRosterXmlText = (
 };
 
 export const parseParticipantRosterText = (
-  rosterText: string
+  rosterText: ParticipantRosterSource
 ): ParsedParticipantRosterEntry[] => {
+  if (typeof rosterText !== "string") {
+    return parseParticipantRosterJsonValue(rosterText);
+  }
+
   const jsonEntries = parseParticipantRosterJsonText(rosterText);
   if (jsonEntries.length > 0) {
     return jsonEntries;
@@ -1024,7 +1039,7 @@ export type ParticipantLaunchRequest = {
 };
 
 export type ImportParticipantRosterRequest = {
-  rosterText: string;
+  rosterText: ParticipantRosterSource;
 };
 
 export type ResumeParticipantSessionRequest = {

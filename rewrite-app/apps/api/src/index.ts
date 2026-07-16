@@ -3641,12 +3641,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
 
         const body = await readRequestJsonBody<ImportParticipantRosterRequest>();
-        if (!body || typeof body.rosterText !== "string") {
+        const hasSupportedRosterSource =
+          typeof body?.rosterText === "string" ||
+          Array.isArray(body?.rosterText) ||
+          (typeof body?.rosterText === "object" && body.rosterText !== null);
+        if (!hasSupportedRosterSource) {
           sendError(
             response,
             400,
             "participant_roster_request_invalid",
-            "rosterText must be a string."
+            "rosterText must be a string, JSON object, or JSON array."
           );
           return;
         }

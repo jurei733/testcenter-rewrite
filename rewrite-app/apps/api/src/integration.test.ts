@@ -5695,12 +5695,76 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(jsonRosterG?.bookletKey, "booklet:json-override");
   assert.equal(jsonRosterG?.displayName, "Gus JSON");
 
+  const nativeJsonImport = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: {
+          groups: [
+            {
+              id: "group:native-json",
+              booklets: [
+                {
+                  id: "booklet:native-json",
+                  participants: [
+                    { loginKey: "roster-h", displayName: "Hana Native" },
+                    {
+                      username: "roster-i",
+                      firstName: "Ivan",
+                      lastName: "Native"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  );
+
+  assert.equal(nativeJsonImport.status, 201);
+  assert.equal(nativeJsonImport.body.importedCount, 2);
+  assert.equal(nativeJsonImport.body.updatedCount, 0);
+  const nativeJsonRosterH = nativeJsonImport.body.items.find(
+    item => item.loginKey === "roster-h"
+  );
+  assert.equal(nativeJsonRosterH?.groupKey, "group:native-json");
+  assert.equal(nativeJsonRosterH?.bookletKey, "booklet:native-json");
+  assert.equal(nativeJsonRosterH?.displayName, "Hana Native");
+  const nativeJsonRosterI = nativeJsonImport.body.items.find(
+    item => item.loginKey === "roster-i"
+  );
+  assert.equal(nativeJsonRosterI?.groupKey, "group:native-json");
+  assert.equal(nativeJsonRosterI?.bookletKey, "booklet:native-json");
+  assert.equal(nativeJsonRosterI?.displayName, "Ivan Native");
+
+  const invalidRosterImport = await requestJson<{
+    error: string;
+    message: string;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: true
+      }
+    }
+  );
+
+  assert.equal(invalidRosterImport.status, 400);
+  assert.equal(
+    invalidRosterImport.body.error,
+    "participant_roster_request_invalid"
+  );
+
   const listedRoster = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
   );
 
   assert.equal(listedRoster.status, 200);
-  assert.equal(listedRoster.body.items.length, 7);
+  assert.equal(listedRoster.body.items.length, 9);
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
     [
@@ -5710,7 +5774,9 @@ test("workspace participant roster can be imported, updated, and listed", async 
       "roster-d",
       "roster-e",
       "roster-f",
-      "roster-g"
+      "roster-g",
+      "roster-h",
+      "roster-i"
     ]
   );
 
@@ -5747,6 +5813,14 @@ test("workspace participant roster can be imported, updated, and listed", async 
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","group:json","booklet:json-override","Gus JSON"/
   );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-h","group:native-json","booklet:native-json","Hana Native"/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-i","group:native-json","booklet:native-json","Ivan Native"/
+  );
 
   const metricsResponse = await requestJson<{
     requestCountsByRoute: Record<string, number>;
@@ -5774,7 +5848,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
   );
   assert.equal(activityEvents.status, 200);
-  assert.equal(activityEvents.body.items.length, 4);
+  assert.equal(activityEvents.body.items.length, 5);
 });
 
 test("participant runtime uses saved roster defaults for group and booklet", async () => {

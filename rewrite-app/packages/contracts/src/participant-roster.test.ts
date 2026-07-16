@@ -156,6 +156,49 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("parses native JSON roster objects and arrays", () => {
+    assert.deepEqual(
+      parseParticipantRosterText({
+        groups: [
+          {
+            id: "group:native",
+            booklets: [
+              {
+                id: "booklet:native",
+                participants: [
+                  { loginKey: "native-a", displayName: "Native A" },
+                  { username: "native-b", firstName: "Native", lastName: "B" }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      [
+        {
+          loginKey: "native-a",
+          groupKey: "group:native",
+          bookletKey: "booklet:native",
+          displayName: "Native A"
+        },
+        {
+          loginKey: "native-b",
+          groupKey: "group:native",
+          bookletKey: "booklet:native",
+          displayName: "Native B"
+        }
+      ]
+    );
+    assert.deepEqual(parseParticipantRosterText([{ login: "native-c" }]), [
+      {
+        loginKey: "native-c",
+        groupKey: "group:native-c",
+        bookletKey: null,
+        displayName: null
+      }
+    ]);
+  });
+
   it("defaults missing groups from login keys", () => {
     assert.deepEqual(parseParticipantRosterText("solo-login"), [
       {

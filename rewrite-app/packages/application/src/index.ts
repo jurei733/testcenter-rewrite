@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
+import type { ParticipantRosterSource } from "@testcenter-rewrite-app/contracts";
 import { monitorRunCommandTypes } from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
@@ -220,7 +221,7 @@ export type WorkspaceAdminReadPort = {
   importParticipantRoster(input: {
     tenantKey: string;
     workspaceKey: string;
-    rosterText: string;
+    rosterText: ParticipantRosterSource;
   }): Promise<{
     importedCount: number;
     updatedCount: number;
