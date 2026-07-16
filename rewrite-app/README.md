@@ -507,7 +507,7 @@ For runtime probes:
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
-  - SQLite startup, shutdown, fast content-browser, participant-entry browser, review-readiness browser, monitor-review browser, open-run sync browser, run-detail review browser, unit-detail review browser, activation-blocking runtime browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
+  - SQLite startup, shutdown, fast content-browser, participant-entry browser, review-readiness browser, monitor-review browser, monitor-detail review browser, open-run sync browser, run-detail review browser, unit-detail review browser, participant-detail review browser, activation-blocking runtime browser, delete-group-results browser, full browser, protected-operator, and local-demo smokes as isolated matrix jobs
   - standalone production Docker image build with image-time runtime artifact preflight
   - Docker compose release smoke with explicit migrate, preflight, and api roles
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
