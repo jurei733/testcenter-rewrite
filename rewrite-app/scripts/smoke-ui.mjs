@@ -3480,8 +3480,55 @@ try {
     .filter({ hasText: "answered" });
   await filteredParticipantMatrixRunCard
     .filter({ hasText: "Open Run Detail" })
+    .filter({ hasText: "Open Participant Detail" })
+    .filter({ hasText: "Review Response" })
     .filter({ hasText: "Open In Runtime" })
     .waitFor();
+  logStep("study-monitor-participant-detail-review-response");
+  await filteredParticipantMatrixRunCard
+    .getByRole("button", { name: "Open Participant Detail" })
+    .click();
+  const activeParticipantDetailRunCard = page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Participant Detail" })
+    .locator(".record-card")
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: participantSessionId })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" });
+  await activeParticipantDetailRunCard
+    .getByRole("button", { name: "Review Response" })
+    .waitFor();
+  await activeParticipantDetailRunCard
+    .getByRole("button", { name: "Review Response" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
+  await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#reviewLoginFilter", participantLoginKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
+  await expectInputValue("#reviewSessionFilter", participantSessionId);
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#openRunLoginFilter", participantLoginKey);
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
+  await expectInputValue("#openRunBookletFilter", participantBookletKey);
+  await expectInputValue("#openRunSessionFilter", participantSessionId);
+  await expectInputValue("#openRunRunFilter", pausedTestRunId);
+  await expectInputValue("#openRunUnitFilter", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-participant-detail-review-response");
   logStep("study-monitor-matrix-open-runtime");
   await filteredParticipantMatrixRunCard
     .getByRole("button", { name: "Open In Runtime" })

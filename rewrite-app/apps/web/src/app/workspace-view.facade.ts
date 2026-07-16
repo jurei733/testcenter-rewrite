@@ -274,31 +274,8 @@ export class WorkspaceViewFacade {
           { label: "Generated", value: this.formatDateTime(matrix.generatedAt) }
         ]
       },
-      ...displayedRows.map(row => ({
-        headline: row.displayName ?? row.loginKey,
-        subline: `${row.unitLabel || row.unitKey || "No unit"} in ${row.bookletKey ?? "no booklet"}`,
-        badges: [
-          row.participantSessionStatus,
-          row.testRunStatus,
-          row.answered ? "answered" : "missing",
-          `${row.reviewCount} review(s)`
-        ],
-        rows: [
-          { label: "Login", value: row.loginKey },
-          { label: "Group", value: row.groupKey },
-          { label: "Roster Booklet", value: row.rosterBookletKey ?? "none" },
-          { label: "Unit", value: row.unitKey || "none" },
-          { label: "Expected", value: row.expected ? "yes" : "no" },
-          { label: "Response Length", value: String(row.responseLength) },
-          {
-            label: "Latest Activity",
-            value: row.latestActivityAt
-              ? this.formatDateTime(row.latestActivityAt)
-              : "none"
-          }
-        ],
-        actionLabel: row.testRunId ? "Open Run Detail" : "Open Participant Detail",
-        actionPayload: {
+      ...displayedRows.map(row => {
+        const matrixActionPayload = {
           participantLoginKey: row.loginKey,
           unitKey: row.unitKey,
           participantSessionId: row.participantSessionId ?? "",
@@ -307,18 +284,47 @@ export class WorkspaceViewFacade {
           groupKey: row.groupKey,
           bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
-        },
-        actions: this.openRuntimeActions({
-          participantLoginKey: row.loginKey,
-          unitKey: row.unitKey,
-          participantSessionId: row.participantSessionId ?? "",
-          testRunId: row.testRunId ?? "",
-          loginKey: row.loginKey,
-          groupKey: row.groupKey,
-          bookletKey: row.bookletKey ?? row.rosterBookletKey ?? "",
-          currentUnitKey: row.unitKey
-        })
-      }))
+        };
+
+        return {
+          headline: row.displayName ?? row.loginKey,
+          subline: `${row.unitLabel || row.unitKey || "No unit"} in ${row.bookletKey ?? "no booklet"}`,
+          badges: [
+            row.participantSessionStatus,
+            row.testRunStatus,
+            row.answered ? "answered" : "missing",
+            `${row.reviewCount} review(s)`
+          ],
+          rows: [
+            { label: "Login", value: row.loginKey },
+            { label: "Group", value: row.groupKey },
+            { label: "Roster Booklet", value: row.rosterBookletKey ?? "none" },
+            { label: "Unit", value: row.unitKey || "none" },
+            { label: "Expected", value: row.expected ? "yes" : "no" },
+            { label: "Response Length", value: String(row.responseLength) },
+            {
+              label: "Latest Activity",
+              value: row.latestActivityAt
+                ? this.formatDateTime(row.latestActivityAt)
+                : "none"
+            }
+          ],
+          actionLabel: row.testRunId ? "Open Run Detail" : "Open Participant Detail",
+          actionPayload: matrixActionPayload,
+          actions: [
+            {
+              label: "Open Participant Detail",
+              payload: {
+                participantLoginKey: row.loginKey,
+                groupKey: row.groupKey
+              }
+            },
+            ...(row.answered
+              ? this.reviewResponseActions(matrixActionPayload)
+              : this.openRuntimeActions(matrixActionPayload))
+          ]
+        };
+      })
     ];
   }
 
@@ -358,33 +364,8 @@ export class WorkspaceViewFacade {
           }
         ]
       },
-      ...detail.unitRows.map(row => ({
-        headline: row.unitLabel || row.unitKey || "No unit",
-        subline: `${row.bookletKey ?? "no booklet"} / ${row.testRunStatus}`,
-        badges: [
-          row.expected ? "expected" : "unexpected",
-          row.answered ? "answered" : "missing",
-          row.participantSessionStatus,
-          `${row.reviewCount} review(s)`
-        ],
-        rows: [
-          { label: "Unit", value: row.unitKey || "none" },
-          { label: "Booklet", value: row.bookletKey ?? "none" },
-          { label: "Test Run", value: row.testRunId ?? "none" },
-          ...this.participantSessionLinkRows(row.participantSessionId, {
-            loginKey: row.loginKey,
-            bookletKey: row.bookletKey
-          }),
-          { label: "Response Length", value: String(row.responseLength) },
-          {
-            label: "Latest Activity",
-            value: row.latestActivityAt
-              ? this.formatDateTime(row.latestActivityAt)
-              : "none"
-          }
-        ],
-        actionLabel: row.testRunId ? "Open Run Detail" : undefined,
-        actionPayload: {
+      ...detail.unitRows.map(row => {
+        const unitActionPayload = {
           subjectType: "test_run",
           subjectId: row.testRunId ?? "",
           testRunId: row.testRunId ?? "",
@@ -393,51 +374,42 @@ export class WorkspaceViewFacade {
           groupKey: detail.groupKey ?? "",
           bookletKey: row.bookletKey ?? detail.rosterBookletKey ?? "",
           currentUnitKey: row.unitKey
-        },
-        actions: this.openRuntimeActions({
-          subjectType: "test_run",
-          subjectId: row.testRunId ?? "",
-          testRunId: row.testRunId ?? "",
-          participantSessionId: row.participantSessionId ?? "",
-          loginKey: row.loginKey,
-          groupKey: detail.groupKey ?? "",
-          bookletKey: row.bookletKey ?? detail.rosterBookletKey ?? "",
-          currentUnitKey: row.unitKey
-        })
-      })),
-      ...detail.testRuns.map(item => ({
-        headline: item.testRun.bookletKey,
-        subline: item.testRun.testRunId,
-        badges: [
-          item.testRun.status,
-          `${item.responseCount} response(s)`,
-          `${item.reviewCount} review(s)`
-        ],
-        rows: [
-          {
-            label: "Participant Session",
-            value: item.participantSession?.participantSessionId ?? "none"
-          },
-          ...this.participantSessionLinkRows(
-            item.participantSession?.participantSessionId,
+        };
+
+        return {
+          headline: row.unitLabel || row.unitKey || "No unit",
+          subline: `${row.bookletKey ?? "no booklet"} / ${row.testRunStatus}`,
+          badges: [
+            row.expected ? "expected" : "unexpected",
+            row.answered ? "answered" : "missing",
+            row.participantSessionStatus,
+            `${row.reviewCount} review(s)`
+          ],
+          rows: [
+            { label: "Unit", value: row.unitKey || "none" },
+            { label: "Booklet", value: row.bookletKey ?? "none" },
+            { label: "Test Run", value: row.testRunId ?? "none" },
+            ...this.participantSessionLinkRows(row.participantSessionId, {
+              loginKey: row.loginKey,
+              bookletKey: row.bookletKey
+            }),
+            { label: "Response Length", value: String(row.responseLength) },
             {
-              loginKey: item.participantSession?.loginKey,
-              groupKey: item.participantSession?.groupKey,
-              bookletKey: item.testRun.bookletKey
+              label: "Latest Activity",
+              value: row.latestActivityAt
+                ? this.formatDateTime(row.latestActivityAt)
+                : "none"
             }
-          ),
-          { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
-          {
-            label: "Started",
-            value: this.formatDateTime(item.testRun.createdAt)
-          },
-          {
-            label: "Updated",
-            value: this.formatDateTime(item.testRun.updatedAt)
-          }
-        ],
-        actionLabel: "Open Run Detail",
-        actionPayload: {
+          ],
+          actionLabel: row.testRunId ? "Open Run Detail" : undefined,
+          actionPayload: unitActionPayload,
+          actions: row.answered
+            ? this.reviewResponseActions(unitActionPayload)
+            : this.openRuntimeActions(unitActionPayload)
+        };
+      }),
+      ...detail.testRuns.map(item => {
+        const runActionPayload = {
           subjectType: "test_run",
           subjectId: item.testRun.testRunId,
           testRunId: item.testRun.testRunId,
@@ -447,19 +419,47 @@ export class WorkspaceViewFacade {
           groupKey: item.participantSession?.groupKey ?? detail.groupKey ?? "",
           bookletKey: item.testRun.bookletKey,
           currentUnitKey: item.testRun.currentUnitKey ?? ""
-        },
-        actions: this.openRuntimeActions({
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: detail.loginKey,
-          groupKey: item.participantSession?.groupKey ?? detail.groupKey ?? "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: item.testRun.currentUnitKey ?? ""
-        })
-      }))
+        };
+
+        return {
+          headline: item.testRun.bookletKey,
+          subline: item.testRun.testRunId,
+          badges: [
+            item.testRun.status,
+            `${item.responseCount} response(s)`,
+            `${item.reviewCount} review(s)`
+          ],
+          rows: [
+            {
+              label: "Participant Session",
+              value: item.participantSession?.participantSessionId ?? "none"
+            },
+            ...this.participantSessionLinkRows(
+              item.participantSession?.participantSessionId,
+              {
+                loginKey: item.participantSession?.loginKey,
+                groupKey: item.participantSession?.groupKey,
+                bookletKey: item.testRun.bookletKey
+              }
+            ),
+            { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
+            {
+              label: "Started",
+              value: this.formatDateTime(item.testRun.createdAt)
+            },
+            {
+              label: "Updated",
+              value: this.formatDateTime(item.testRun.updatedAt)
+            }
+          ],
+          actionLabel: "Open Run Detail",
+          actionPayload: runActionPayload,
+          actions:
+            item.responseCount > 0
+              ? this.reviewResponseActions(runActionPayload)
+              : this.openRuntimeActions(runActionPayload)
+        };
+      })
     ];
   }
 
