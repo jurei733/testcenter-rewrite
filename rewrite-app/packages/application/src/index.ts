@@ -2793,9 +2793,9 @@ const normalizeParsedJsonContentStructure = (
     value: unknown
   ): Map<string, JsonManifestResource> => {
     const resources = new Map<string, JsonManifestResource>();
-    const visit = (candidate: unknown): void => {
+    const visit = (candidate: unknown, inheritedBasePath = ""): void => {
       if (Array.isArray(candidate)) {
-        candidate.forEach(item => visit(item));
+        candidate.forEach(item => visit(item, inheritedBasePath));
         return;
       }
 
@@ -2803,6 +2803,10 @@ const normalizeParsedJsonContentStructure = (
       if (!objectValue) {
         return;
       }
+      const manifestBasePath = resolveXmlManifestPath(
+        inheritedBasePath,
+        readStringValue(objectValue, "xml:base", "base")
+      );
 
       for (const rawResource of [
         ...readResourceEntries(objectValue.resources),
@@ -2845,7 +2849,7 @@ const normalizeParsedJsonContentStructure = (
                   "name"
                 )
               : "";
-        const key =
+        const rawKey =
           readStringValue(
             resource,
             "href",
@@ -2858,6 +2862,16 @@ const normalizeParsedJsonContentStructure = (
           ) ||
           fileKey ||
           identifier;
+        const resourceBasePath = readStringValue(resource, "xml:base", "base");
+        const fileBasePath = firstFileObject
+          ? readStringValue(firstFileObject, "xml:base", "base")
+          : "";
+        const key = resolveXmlManifestPath(
+          manifestBasePath,
+          resourceBasePath,
+          fileBasePath,
+          rawKey
+        );
         const displayLabel = normalizeManifestLabel(
           readStringValue(
             resource,
@@ -2905,7 +2919,7 @@ const normalizeParsedJsonContentStructure = (
       }
 
       for (const container of readNestedManifestContainers(objectValue)) {
-        visit(container);
+        visit(container, manifestBasePath);
       }
     };
 
