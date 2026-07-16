@@ -1641,18 +1641,34 @@ export class WorkspaceViewFacade {
             : this.openRuntimeActions(unitActionPayload)
         };
       }),
-      ...detail.reviews.map(review => ({
-        headline: `${review.category} by ${review.reviewerId}`,
-        subline: review.unitKey ?? "whole run",
-        badges: ["review", review.category],
-        rows: [
-          { label: "Review", value: review.reviewId },
-          { label: "Unit", value: review.unitKey ?? "whole run" },
-          { label: "Comment", value: review.comment },
-          { label: "Created", value: this.formatDateTime(review.createdAt) },
-          { label: "Updated", value: this.formatDateTime(review.updatedAt) }
-        ]
-      }))
+      ...detail.reviews.map(review => {
+        const reviewActionPayload = {
+          ...runInspectionPayload,
+          reviewId: review.reviewId,
+          unitKey: review.unitKey ?? "",
+          currentUnitKey: review.unitKey ?? "",
+          reviewerId: review.reviewerId,
+          reviewCategory: review.category,
+          reviewComment: review.comment,
+          participantCommand: "reviewResponse"
+        };
+
+        return {
+          headline: `${review.category} by ${review.reviewerId}`,
+          subline: review.unitKey ?? "whole run",
+          badges: ["review", review.category],
+          rows: [
+            { label: "Review", value: review.reviewId },
+            { label: "Unit", value: review.unitKey ?? "whole run" },
+            { label: "Comment", value: review.comment },
+            { label: "Created", value: this.formatDateTime(review.createdAt) },
+            { label: "Updated", value: this.formatDateTime(review.updatedAt) }
+          ],
+          actionLabel: "Select Review",
+          actionPayload: reviewActionPayload,
+          actions: this.openRuntimeActions(reviewActionPayload)
+        };
+      })
     ];
   }
 
@@ -2742,14 +2758,20 @@ export class WorkspaceViewFacade {
     runtime.reviewSessionFilter = participantSessionId;
     runtime.reviewRunFilter = testRunId;
     runtime.reviewUnitFilter = runtime.currentUnitKey.trim();
+    runtime.reviewId = item.actionPayload?.reviewId ?? runtime.reviewId;
+    runtime.reviewerId = item.actionPayload?.reviewerId ?? runtime.reviewerId;
+    runtime.reviewCategory =
+      item.actionPayload?.reviewCategory ?? runtime.reviewCategory;
+    runtime.reviewComment = item.actionPayload?.reviewComment ?? runtime.reviewComment;
     runtime.openRunLoginFilter = runtime.loginKey.trim();
     runtime.openRunGroupFilter = runtime.groupKey.trim();
     runtime.openRunBookletFilter = runtime.bookletKey.trim();
     runtime.openRunSessionFilter = participantSessionId;
     runtime.openRunRunFilter = testRunId;
     runtime.openRunUnitFilter = runtime.currentUnitKey.trim();
-    runtime.reviewReviewerFilter = "";
-    runtime.reviewCategoryFilter = "";
+    runtime.reviewReviewerFilter = item.actionPayload?.reviewerId?.trim() ?? "";
+    runtime.reviewCategoryFilter =
+      item.actionPayload?.reviewCategory?.trim() ?? "";
     this.persistState();
 
     void this.router.navigateByUrl("/runtime");
