@@ -83,7 +83,7 @@
     "test:integration": "npm run test:integration:memory && npm run test:integration:sqlite",
     "test:integration:memory": "npm run build && node --test apps/api/dist/apps/api/src/integration.test.js",
     "test:integration:sqlite": "npm run build && npm run test:integration:sqlite:built",
-    "test:integration:sqlite:built": "rm -f ./.data/integration-sqlite.sqlite && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js",
+    "test:integration:sqlite:built": "rm -f ./.data/integration-sqlite.sqlite ./.data/integration-sqlite.sqlite-shm ./.data/integration-sqlite.sqlite-wal ./.data/integration-sqlite.sqlite-journal && FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/integration-sqlite.sqlite node --test apps/api/dist/apps/api/src/integration.test.js",
     "test:integration:postgres": "npm run build && node ./scripts/run-postgres-integration.mjs",
     "test:integration:postgres:built": "node ./scripts/run-postgres-integration.mjs",
     "typecheck": "tsc -b --pretty packages/domain packages/contracts packages/application packages/memory-store packages/file-store packages/sqlite-store packages/postgres-store apps/api && ng build rewrite-app-web --configuration development",

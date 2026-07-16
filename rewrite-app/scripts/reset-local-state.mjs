@@ -10,7 +10,8 @@ const localSqliteFile = resolve(
 const localSqliteFiles = [
   localSqliteFile,
   `${localSqliteFile}-shm`,
-  `${localSqliteFile}-wal`
+  `${localSqliteFile}-wal`,
+  `${localSqliteFile}-journal`
 ];
 
 const removeIfPresent = async filePath => {

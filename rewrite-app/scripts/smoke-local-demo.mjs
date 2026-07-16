@@ -90,7 +90,8 @@ await mkdir(dirname(sqliteFile), { recursive: true });
 await Promise.all([
   rm(sqliteFile, { force: true }),
   rm(`${sqliteFile}-shm`, { force: true }),
-  rm(`${sqliteFile}-wal`, { force: true })
+  rm(`${sqliteFile}-wal`, { force: true }),
+  rm(`${sqliteFile}-journal`, { force: true })
 ]);
 
 const baseEnv = {

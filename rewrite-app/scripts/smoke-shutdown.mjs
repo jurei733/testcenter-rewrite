@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { createServer as createNetServer } from "node:net";
@@ -47,6 +47,11 @@ const ensureDataDirectory = async () => {
     );
     process.env.FIRST_SLICE_SQLITE_FILE = filePath;
     await mkdir(dirname(filePath), { recursive: true });
+    await Promise.all(
+      [filePath, `${filePath}-wal`, `${filePath}-shm`, `${filePath}-journal`].map(
+        sqlitePath => rm(sqlitePath, { force: true })
+      )
+    );
   }
 };
 
