@@ -2344,6 +2344,14 @@ try {
     .filter({ hasText: "Ada Entry" })
     .filter({ hasText: "Ben Entry" })
     .waitFor();
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Participant Launchpad Actions" })
+    })
+    .filter({ hasText: "Import current roster input" })
+    .filter({ hasText: "2 parsed input rows" })
+    .waitFor();
   await page.locator("#importParticipantRosterButton").click();
   const savedAdaRosterCard = page
     .locator("article.card")

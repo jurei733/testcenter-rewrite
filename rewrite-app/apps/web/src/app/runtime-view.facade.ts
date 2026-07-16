@@ -380,9 +380,26 @@ export class RuntimeViewFacade {
 
   get participantLaunchpadActionItems(): RecordCollectionItem[] {
     const rosterEntries = this.parseParticipantRosterView();
+    const inputEntries = this.parseEntryRosterRowsPreview();
     const links = this.parseEntryLinksView();
     const sessions = this.parseParticipantSessionListView();
     const items: RecordCollectionItem[] = [];
+
+    if (inputEntries.length > 0 && rosterEntries.length === 0) {
+      items.push({
+        headline: "Import current roster input",
+        subline: `${inputEntries.length} parsed input row${inputEntries.length === 1 ? "" : "s"}`,
+        badges: ["roster", "import"],
+        rows: [
+          {
+            label: "Expected Result",
+            value: "Parsed participants are persisted before link handoff"
+          }
+        ],
+        actionLabel: "Apply Suggestion",
+        actionPayload: { launchpadCommand: "importRosterInput" }
+      });
+    }
 
     if (rosterEntries.length === 0) {
       items.push({
@@ -2362,6 +2379,9 @@ export class RuntimeViewFacade {
 
   runParticipantLaunchpadSuggestion(item: RecordCollectionItem): void {
     switch (item.actionPayload?.launchpadCommand) {
+      case "importRosterInput":
+        this.importParticipantRoster();
+        break;
       case "loadRoster":
         this.loadParticipantRoster();
         break;
