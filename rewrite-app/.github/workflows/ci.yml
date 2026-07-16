@@ -203,6 +203,15 @@ jobs:
           - smoke: ui-monitor-review
             command: npm run smoke:ui:monitor-review
             playwright: true
+          - smoke: ui-open-run-sync
+            command: npm run smoke:ui:open-run-sync
+            playwright: true
+          - smoke: ui-run-detail-review
+            command: npm run smoke:ui:run-detail-review
+            playwright: true
+          - smoke: ui-activation-blocking-runtime
+            command: npm run smoke:ui:activation-blocking-runtime
+            playwright: true
           - smoke: ui-full
             command: npm run smoke:ui
             playwright: true
