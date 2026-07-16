@@ -3552,6 +3552,67 @@ const collectXmlManifestItems = (sourceDocument: string): XmlManifestItemNode[] 
   return root.children;
 };
 
+const collectXmlOrganizationItemSourceDocuments = (
+  sourceDocument: string
+): string[] => {
+  const organizationItemSourceDocuments: string[] = [];
+
+  for (const organizationsMatch of sourceDocument.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?organizations)\b([^>]*?)>([\s\S]*?)<\/\1>/gi
+  )) {
+    const organizationsAttributes = parseXmlAttributes(
+      organizationsMatch[2] ?? ""
+    );
+    const defaultOrganizationKey = normalizeManifestToken(
+      readXmlAttribute(
+        organizationsAttributes,
+        "default",
+        "defaultOrganization",
+        "defaultOrganisation",
+        "defaultOrganizationId",
+        "defaultOrganisationId",
+        "defaultOrg"
+      )
+    );
+    const organizationMatches = [
+      ...(organizationsMatch[3] ?? "").matchAll(
+        /<((?:[a-zA-Z_][\w.-]*:)?organization)\b([^>]*?)>([\s\S]*?)<\/\1>/gi
+      )
+    ];
+    if (organizationMatches.length === 0) {
+      continue;
+    }
+
+    const selectedOrganizationMatches = defaultOrganizationKey
+      ? organizationMatches.filter(organizationMatch => {
+          const organizationAttributes = parseXmlAttributes(
+            organizationMatch[2] ?? ""
+          );
+          return (
+            normalizeManifestToken(
+              readXmlAttribute(
+                organizationAttributes,
+                "identifier",
+                "id",
+                "key",
+                "organizationId",
+                "organisationId"
+              )
+            ) === defaultOrganizationKey
+          );
+        })
+      : organizationMatches;
+
+    organizationItemSourceDocuments.push(
+      ...selectedOrganizationMatches.map(
+        organizationMatch => organizationMatch[3] ?? ""
+      )
+    );
+  }
+
+  return organizationItemSourceDocuments;
+};
+
 const collectXmlOrganizationBookletEntries = (
   sourceDocument: string
 ): SourcePackageContentStructure["bookletEntries"] => {
@@ -3560,23 +3621,48 @@ const collectXmlOrganizationBookletEntries = (
     return [];
   }
 
-  return collectXmlManifestItems(sourceDocument)
+  const organizationItemSourceDocuments =
+    collectXmlOrganizationItemSourceDocuments(sourceDocument);
+  const itemSourceDocuments =
+    organizationItemSourceDocuments.length > 0
+      ? organizationItemSourceDocuments
+      : [sourceDocument];
+
+  return itemSourceDocuments
+    .flatMap(itemSourceDocument =>
+      collectXmlManifestItems(itemSourceDocument).map(item => ({
+        item,
+        itemSourceDocument
+      }))
+    )
     .map(item => {
       const bookletReference = normalizeManifestToken(
-        readXmlAttribute(item.attributes, "identifierref", "identifierRef", "ref")
+        readXmlAttribute(
+          item.item.attributes,
+          "identifierref",
+          "identifierRef",
+          "ref"
+        )
       );
       const bookletResource = resources.get(bookletReference);
-      if (!bookletReference || !bookletResource || item.children.length === 0) {
+      if (
+        !bookletReference ||
+        !bookletResource ||
+        item.item.children.length === 0
+      ) {
         return null;
       }
 
-      const bookletContent = sourceDocument.slice(item.contentStart, item.contentEnd);
+      const bookletContent = item.itemSourceDocument.slice(
+        item.item.contentStart,
+        item.item.contentEnd
+      );
       return {
         bookletKey: bookletResource.key,
         displayLabel: normalizeManifestToken(
           readXmlChildText(bookletContent, "title", "label") ??
             readXmlAttribute(
-              item.attributes,
+              item.item.attributes,
               "displayLabel",
               "label",
               "title",
@@ -3585,7 +3671,7 @@ const collectXmlOrganizationBookletEntries = (
             ) ??
             bookletResource.displayLabel
         ),
-        unitEntries: item.children
+        unitEntries: item.item.children
           .map(unitItem => {
             const unitReference = normalizeManifestToken(
               readXmlAttribute(
@@ -3600,7 +3686,7 @@ const collectXmlOrganizationBookletEntries = (
               return null;
             }
 
-            const unitContent = sourceDocument.slice(
+            const unitContent = item.itemSourceDocument.slice(
               unitItem.contentStart,
               unitItem.contentEnd
             );
