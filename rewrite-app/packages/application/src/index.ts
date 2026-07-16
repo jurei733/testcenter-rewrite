@@ -2726,6 +2726,54 @@ const normalizeParsedJsonContentStructure = (
     displayLabel: string;
     dependencyReferences: string[];
   };
+  const readResourceEntries = (value: unknown): unknown[] =>
+    readKeyedMapEntries(value, {
+      keyFieldName: "identifier",
+      listFieldName: "files",
+      singleEntryFieldNames: [
+        "identifier",
+        "id",
+        "key",
+        "resourceId",
+        "resourceIdentifier",
+        "href",
+        "path",
+        "src",
+        "uri",
+        "file",
+        "fileName",
+        "filename",
+        "files",
+        "dependencies",
+        "dependency",
+        "dependencyReferences",
+        "dependencyReference",
+        "displayLabel",
+        "label",
+        "title",
+        "name",
+        "displayName"
+      ]
+    });
+  const readOrganizationEntries = (value: unknown): unknown[] =>
+    readKeyedMapEntries(value, {
+      keyFieldName: "identifier",
+      listFieldName: "items",
+      singleEntryFieldNames: [
+        "identifier",
+        "id",
+        "key",
+        "items",
+        "item",
+        "children",
+        "childItems",
+        "displayLabel",
+        "label",
+        "title",
+        "name",
+        "displayName"
+      ]
+    });
   const collectJsonManifestResources = (
     value: unknown
   ): Map<string, JsonManifestResource> => {
@@ -2741,10 +2789,10 @@ const normalizeParsedJsonContentStructure = (
         return;
       }
 
-      for (const rawResource of readEntries(
-        objectValue.resources,
-        objectValue.resource
-      )) {
+      for (const rawResource of [
+        ...readResourceEntries(objectValue.resources),
+        ...readResourceEntries(objectValue.resource)
+      ]) {
         const resource = asObject(rawResource);
         if (!resource) {
           continue;
@@ -2853,12 +2901,12 @@ const normalizeParsedJsonContentStructure = (
     value: Record<string, unknown>
   ): unknown[] => {
     const items: unknown[] = [];
-    for (const organization of readEntries(
-      value.organizations,
-      value.organization,
-      value.orgs,
-      value.org
-    )) {
+    for (const organization of [
+      ...readOrganizationEntries(value.organizations),
+      ...readOrganizationEntries(value.organization),
+      ...readOrganizationEntries(value.orgs),
+      ...readOrganizationEntries(value.org)
+    ]) {
       const organizationObject = asObject(organization);
       if (organizationObject) {
         items.push(...readEntries(organizationObject.items, organizationObject.item));

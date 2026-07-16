@@ -4439,6 +4439,107 @@ test("source document import resolves JSON organization item references", async 
   );
 });
 
+test("source document import resolves keyed JSON IMS manifest maps", async () => {
+  const tenantKey = "integration-tenant-json-keyed-ims";
+  const workspaceKey = "integration-workspace-json-keyed-ims";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest-keyed.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          defaultOrganization: "ORG-1",
+          organizations: {
+            "ORG-1": {
+              title: "Default Organization",
+              items: [
+                {
+                  identifierref: "RES-BOOKLET-KEYED",
+                  title: "Keyed Booklet",
+                  item: {
+                    identifierref: "RES-UNIT-KEYED",
+                    title: "Keyed Unit"
+                  }
+                }
+              ]
+            }
+          },
+          resources: {
+            "RES-BOOKLET-KEYED": {
+              href: "booklets/keyed-booklet.xml",
+              title: "Resource Booklet"
+            },
+            "RES-UNIT-KEYED": {
+              files: [{ href: "items/keyed-unit.xml" }],
+              title: "Resource Unit"
+            }
+          }
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/keyed-booklet.xml",
+          displayLabel: "Keyed Booklet",
+          unitEntries: [
+            { unitKey: "items/keyed-unit.xml", displayLabel: "Keyed Unit" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves JSON resource dependencies", async () => {
   const tenantKey = "integration-tenant-json-dependencies";
   const workspaceKey = "integration-workspace-json-dependencies";
