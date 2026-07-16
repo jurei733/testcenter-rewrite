@@ -170,6 +170,282 @@ const combineRosterDisplayName = (
   return combinedName || null;
 };
 
+const asRosterObject = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readRosterObjectValue = (
+  value: unknown,
+  ...candidateNames: string[]
+): string | null => {
+  if (typeof value === "string" || typeof value === "number") {
+    return normalizeRosterTextValue(String(value));
+  }
+
+  const objectValue = asRosterObject(value);
+  if (!objectValue) {
+    return null;
+  }
+
+  return readJsonRosterString(objectValue, ...candidateNames);
+};
+
+const readJsonRosterString = (
+  value: Record<string, unknown>,
+  ...candidateNames: string[]
+): string | null => {
+  for (const candidateName of candidateNames) {
+    const candidateValue = value[candidateName];
+    if (candidateValue !== undefined) {
+      return readRosterObjectValue(
+        candidateValue,
+        "key",
+        "id",
+        "identifier",
+        "ref",
+        "code",
+        "name",
+        "label"
+      );
+    }
+  }
+
+  const normalizedEntries = Object.entries(value).map(([key, entryValue]) => [
+    key.toLowerCase(),
+    entryValue
+  ] as const);
+  for (const candidateName of candidateNames) {
+    const normalizedName = candidateName.toLowerCase();
+    const match = normalizedEntries.find(([key]) => key === normalizedName);
+    if (match) {
+      return readRosterObjectValue(
+        match[1],
+        "key",
+        "id",
+        "identifier",
+        "ref",
+        "code",
+        "name",
+        "label"
+      );
+    }
+  }
+
+  return null;
+};
+
+const readJsonRosterEntries = (...values: unknown[]): unknown[] => {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (asRosterObject(value)) {
+      return [value];
+    }
+  }
+  return [];
+};
+
+const readJsonRosterChildValues = (
+  value: Record<string, unknown>
+): unknown[] => [
+  ...readJsonRosterEntries(
+    value.participants,
+    value.participant,
+    value.testtakers,
+    value.testtaker,
+    value["test-takers"],
+    value["test-taker"],
+    value.people,
+    value.persons,
+    value.person,
+    value.students,
+    value.student,
+    value.users,
+    value.user,
+    value.examinees,
+    value.examinee,
+    value.entries,
+    value.items
+  ),
+  ...readJsonRosterEntries(value.groups, value.group, value.classes, value.class),
+  ...readJsonRosterEntries(
+    value.booklets,
+    value.booklet,
+    value.testlets,
+    value.testlet
+  ),
+  ...readJsonRosterEntries(value.roster, value.testtakersRoster)
+];
+
+const parseParticipantRosterJsonText = (
+  rosterText: string
+): ParsedParticipantRosterEntry[] => {
+  const trimmedRosterText = rosterText.trim();
+  if (!trimmedRosterText.startsWith("{") && !trimmedRosterText.startsWith("[")) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmedRosterText);
+  } catch {
+    return [];
+  }
+
+  const entries: ParsedParticipantRosterEntry[] = [];
+  const visit = (
+    candidate: unknown,
+    context: { groupKey: string | null; bookletKey: string | null }
+  ): void => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach(item => visit(item, context));
+      return;
+    }
+
+    const objectValue = asRosterObject(candidate);
+    if (!objectValue) {
+      return;
+    }
+
+    const childValues = readJsonRosterChildValues(objectValue);
+    const explicitLoginKey = readJsonRosterString(
+      objectValue,
+      "loginKey",
+      "login",
+      "username",
+      "userName",
+      "code",
+      "identifier"
+    );
+    const loginKey =
+      explicitLoginKey ??
+      (childValues.length === 0 ? readJsonRosterString(objectValue, "id") : null);
+    const groupKey =
+      readJsonRosterString(
+        objectValue,
+        "groupKey",
+        "group",
+        "groupId",
+        "groupName",
+        "class",
+        "className"
+      ) ?? context.groupKey;
+    const bookletKey =
+      readJsonRosterString(
+        objectValue,
+        "bookletKey",
+        "booklet",
+        "bookletId",
+        "testlet",
+        "testletId"
+      ) ?? context.bookletKey;
+
+    if (loginKey) {
+      entries.push({
+        loginKey,
+        groupKey: groupKey || `group:${loginKey}`,
+        bookletKey,
+        displayName: combineRosterDisplayName(
+          readJsonRosterString(
+            objectValue,
+            "displayName",
+            "displayLabel",
+            "label",
+            "name",
+            "fullName"
+          ),
+          readJsonRosterString(objectValue, "firstName", "firstname", "givenName"),
+          readJsonRosterString(objectValue, "lastName", "lastname", "familyName")
+        )
+      });
+      return;
+    }
+
+    const childContext = { groupKey, bookletKey };
+    for (const childValue of readJsonRosterEntries(
+      objectValue.participants,
+      objectValue.participant,
+      objectValue.testtakers,
+      objectValue.testtaker,
+      objectValue["test-takers"],
+      objectValue["test-taker"],
+      objectValue.people,
+      objectValue.persons,
+      objectValue.person,
+      objectValue.students,
+      objectValue.student,
+      objectValue.users,
+      objectValue.user,
+      objectValue.examinees,
+      objectValue.examinee,
+      objectValue.entries,
+      objectValue.items,
+      objectValue.roster,
+      objectValue.testtakersRoster
+    )) {
+      visit(childValue, childContext);
+    }
+
+    for (const childValue of readJsonRosterEntries(
+      objectValue.groups,
+      objectValue.group,
+      objectValue.classes,
+      objectValue.class
+    )) {
+      const childObject = asRosterObject(childValue);
+      visit(childValue, {
+        groupKey: childObject
+          ? readJsonRosterString(
+              childObject,
+              "groupKey",
+              "group",
+              "groupId",
+              "groupName",
+              "class",
+              "className",
+              "key",
+              "id",
+              "identifier",
+              "ref"
+            ) ?? groupKey
+          : groupKey,
+        bookletKey
+      });
+    }
+
+    for (const childValue of readJsonRosterEntries(
+      objectValue.booklets,
+      objectValue.booklet,
+      objectValue.testlets,
+      objectValue.testlet
+    )) {
+      const childObject = asRosterObject(childValue);
+      visit(childValue, {
+        groupKey,
+        bookletKey: childObject
+          ? readJsonRosterString(
+              childObject,
+              "bookletKey",
+              "booklet",
+              "bookletId",
+              "testlet",
+              "testletId",
+              "key",
+              "id",
+              "identifier",
+              "ref"
+            ) ?? bookletKey
+          : bookletKey
+      });
+    }
+  };
+
+  visit(parsed, { groupKey: null, bookletKey: null });
+  return entries;
+};
+
 type XmlRosterContextRange = {
   start: number;
   end: number;
@@ -412,6 +688,11 @@ const parseParticipantRosterXmlText = (
 export const parseParticipantRosterText = (
   rosterText: string
 ): ParsedParticipantRosterEntry[] => {
+  const jsonEntries = parseParticipantRosterJsonText(rosterText);
+  if (jsonEntries.length > 0) {
+    return jsonEntries;
+  }
+
   const xmlEntries = parseParticipantRosterXmlText(rosterText);
   if (xmlEntries.length > 0) {
     return xmlEntries;

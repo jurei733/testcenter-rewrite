@@ -101,6 +101,61 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("parses JSON roster entries and inherited group/booklet contexts", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        JSON.stringify({
+          groups: [
+            {
+              groupKey: "group:json",
+              booklets: [
+                {
+                  bookletKey: "booklet:json",
+                  participants: [
+                    {
+                      loginKey: "json-a",
+                      displayName: "Json A"
+                    },
+                    {
+                      login: "json-b",
+                      booklet: { id: "booklet:override" },
+                      firstName: "Json",
+                      lastName: "B"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id: "group:second",
+              testtakers: [{ username: "json-c" }]
+            }
+          ]
+        })
+      ),
+      [
+        {
+          loginKey: "json-a",
+          groupKey: "group:json",
+          bookletKey: "booklet:json",
+          displayName: "Json A"
+        },
+        {
+          loginKey: "json-b",
+          groupKey: "group:json",
+          bookletKey: "booklet:override",
+          displayName: "Json B"
+        },
+        {
+          loginKey: "json-c",
+          groupKey: "group:second",
+          bookletKey: null,
+          displayName: null
+        }
+      ]
+    );
+  });
+
   it("defaults missing groups from login keys", () => {
     assert.deepEqual(parseParticipantRosterText("solo-login"), [
       {

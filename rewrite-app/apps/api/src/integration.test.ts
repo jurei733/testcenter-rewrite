@@ -5653,15 +5653,65 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(xmlRosterE?.bookletKey, "booklet:nested");
   assert.equal(xmlRosterE?.displayName, "Eve Nested");
 
+  const jsonImport = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: JSON.stringify({
+          groups: [
+            {
+              groupKey: "group:json",
+              booklets: [
+                {
+                  bookletKey: "booklet:json",
+                  participants: [
+                    { loginKey: "roster-f", displayName: "Faye JSON" },
+                    {
+                      login: "roster-g",
+                      booklet: { id: "booklet:json-override" },
+                      firstName: "Gus",
+                      lastName: "JSON"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        })
+      }
+    }
+  );
+
+  assert.equal(jsonImport.status, 201);
+  assert.equal(jsonImport.body.importedCount, 2);
+  assert.equal(jsonImport.body.updatedCount, 0);
+  const jsonRosterF = jsonImport.body.items.find(item => item.loginKey === "roster-f");
+  assert.equal(jsonRosterF?.groupKey, "group:json");
+  assert.equal(jsonRosterF?.bookletKey, "booklet:json");
+  assert.equal(jsonRosterF?.displayName, "Faye JSON");
+  const jsonRosterG = jsonImport.body.items.find(item => item.loginKey === "roster-g");
+  assert.equal(jsonRosterG?.groupKey, "group:json");
+  assert.equal(jsonRosterG?.bookletKey, "booklet:json-override");
+  assert.equal(jsonRosterG?.displayName, "Gus JSON");
+
   const listedRoster = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
   );
 
   assert.equal(listedRoster.status, 200);
-  assert.equal(listedRoster.body.items.length, 5);
+  assert.equal(listedRoster.body.items.length, 7);
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
-    ["roster-a", "roster-b", "roster-c", "roster-d", "roster-e"]
+    [
+      "roster-a",
+      "roster-b",
+      "roster-c",
+      "roster-d",
+      "roster-e",
+      "roster-f",
+      "roster-g"
+    ]
   );
 
   const rosterCsv = await fetch(
@@ -5688,6 +5738,14 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.match(
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","group:nested","booklet:nested","Eve Nested"/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-f","group:json","booklet:json","Faye JSON"/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","group:json","booklet:json-override","Gus JSON"/
   );
 
   const metricsResponse = await requestJson<{
@@ -5716,7 +5774,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
   );
   assert.equal(activityEvents.status, 200);
-  assert.equal(activityEvents.body.items.length, 3);
+  assert.equal(activityEvents.body.items.length, 4);
 });
 
 test("participant runtime uses saved roster defaults for group and booklet", async () => {
