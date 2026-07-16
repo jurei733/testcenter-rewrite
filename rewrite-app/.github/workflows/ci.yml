@@ -18,6 +18,7 @@ jobs:
   typecheck:
     name: Typecheck and build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -53,6 +54,7 @@ jobs:
   integration:
     name: Integration (${{ matrix.store }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +82,7 @@ jobs:
   postgres-integration:
     name: Integration (postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -139,6 +142,7 @@ jobs:
   postgres-ui-smoke:
     name: UI smoke (postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -181,6 +185,7 @@ jobs:
   sqlite-smoke:
     name: SQLite smoke (${{ matrix.smoke }})
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -259,6 +264,7 @@ jobs:
   docker-image-build:
     name: Docker image build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -278,6 +284,7 @@ jobs:
   compose-postgres-smoke:
     name: Compose Postgres smoke (demo=${{ matrix.bootstrap-demo }})
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
