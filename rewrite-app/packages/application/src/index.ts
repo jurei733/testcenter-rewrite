@@ -4004,7 +4004,13 @@ type ZipEntry = {
 };
 
 type ZipManifestExtractionResult =
-  | { status: "found"; manifestText: string }
+  | {
+      status: "found";
+      manifestText: string;
+      manifestFileName: string;
+      zipBuffer: Buffer;
+      entries: ZipEntry[];
+    }
   | { status: "invalid_zip" }
   | { status: "manifest_unreadable" }
   | { status: "manifest_missing" };
@@ -4109,6 +4115,100 @@ const readZipEntryText = (
   return data.toString("utf8");
 };
 
+const normalizeZipEntryPath = (path: string): string => {
+  const segments: string[] = [];
+  for (const segment of path.replace(/\\/g, "/").split("/")) {
+    if (!segment || segment === ".") {
+      continue;
+    }
+
+    if (segment === "..") {
+      if (segments.length === 0) {
+        return "";
+      }
+      segments.pop();
+      continue;
+    }
+
+    segments.push(segment);
+  }
+
+  return segments.join("/");
+};
+
+const resolveZipResourcePathCandidates = (
+  manifestFileName: string,
+  resourcePath: string
+): string[] => {
+  const directPath = normalizeZipEntryPath(resourcePath);
+  const manifestPath = normalizeZipEntryPath(manifestFileName);
+  const manifestDirectory = manifestPath.includes("/")
+    ? manifestPath.slice(0, manifestPath.lastIndexOf("/"))
+    : "";
+  const relativePath = normalizeZipEntryPath(
+    manifestDirectory ? `${manifestDirectory}/${resourcePath}` : resourcePath
+  );
+
+  return [...new Set([directPath, relativePath].filter(Boolean))];
+};
+
+const findZipEntryByPath = (
+  entries: ZipEntry[],
+  candidatePaths: string[]
+): ZipEntry | null => {
+  const entriesByPath = new Map(
+    entries.map(entry => [normalizeZipEntryPath(entry.fileName), entry])
+  );
+  const entriesByLowercasePath = new Map(
+    entries.map(entry => [normalizeZipEntryPath(entry.fileName).toLowerCase(), entry])
+  );
+
+  for (const candidatePath of candidatePaths) {
+    const normalizedCandidatePath = normalizeZipEntryPath(candidatePath);
+    const entry =
+      entriesByPath.get(normalizedCandidatePath) ??
+      entriesByLowercasePath.get(normalizedCandidatePath.toLowerCase());
+    if (entry) {
+      return entry;
+    }
+  }
+
+  return null;
+};
+
+const extractZipUnitContent = (sourceDocument: string): string | null => {
+  const content = normalizeUnitContent(
+    readXmlChildText(
+      sourceDocument,
+      "itemBody",
+      "item-body",
+      "body",
+      "content",
+      "prompt",
+      "question",
+      "text",
+      "stimulus",
+      "markdown",
+      "html"
+    ) ?? sourceDocument
+  );
+  return content || null;
+};
+
+const extractZipUnitDescription = (sourceDocument: string): string | null => {
+  const description = normalizeUnitContent(
+    readXmlChildText(
+      sourceDocument,
+      "description",
+      "summary",
+      "instructions",
+      "title",
+      "label"
+    )
+  );
+  return description || null;
+};
+
 const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null => {
   const trimmedSourceDocument = sourceDocument.trim();
   const dataUrlMatch = trimmedSourceDocument.match(
@@ -4158,12 +4258,74 @@ const extractXmlManifestFromZipSourceDocument = (
       continue;
     }
     if (text?.trimStart().startsWith("<") && /<[^>]*manifest\b/i.test(text)) {
-      return { status: "found", manifestText: text };
+      return {
+        status: "found",
+        manifestText: text,
+        manifestFileName: entry.fileName,
+        zipBuffer,
+        entries
+      };
     }
   }
 
   return {
     status: foundUnreadableCandidate ? "manifest_unreadable" : "manifest_missing"
+  };
+};
+
+const normalizeParsedZipXmlContentStructure = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+): ContentReleaseRuntimeSnapshot | null => {
+  const runtimeSnapshot = normalizeParsedXmlContentStructure(
+    manifestExtraction.manifestText
+  );
+  if (!runtimeSnapshot) {
+    return null;
+  }
+
+  return {
+    bookletEntries: runtimeSnapshot.bookletEntries.map(bookletEntry => ({
+      ...bookletEntry,
+      unitEntries: bookletEntry.unitEntries.map(unitEntry => {
+        if (unitEntry.content) {
+          return unitEntry;
+        }
+
+        const referencedEntry = findZipEntryByPath(
+          manifestExtraction.entries,
+          resolveZipResourcePathCandidates(
+            manifestExtraction.manifestFileName,
+            unitEntry.unitKey
+          )
+        );
+        if (!referencedEntry) {
+          return unitEntry;
+        }
+
+        const sourceDocument = readZipEntryText(
+          manifestExtraction.zipBuffer,
+          referencedEntry
+        );
+        if (!sourceDocument) {
+          return unitEntry;
+        }
+
+        const content = extractZipUnitContent(sourceDocument);
+        if (!content) {
+          return unitEntry;
+        }
+
+        const description = unitEntry.description
+          ? null
+          : extractZipUnitDescription(sourceDocument);
+
+        return {
+          ...unitEntry,
+          ...(description ? { description } : {}),
+          content
+        };
+      })
+    }))
   };
 };
 
@@ -4233,8 +4395,8 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     );
     if (manifestExtraction.status === "found") {
       return {
-        runtimeSnapshot: normalizeParsedXmlContentStructure(
-          manifestExtraction.manifestText
+        runtimeSnapshot: normalizeParsedZipXmlContentStructure(
+          manifestExtraction
         ),
         diagnostics: []
       };
