@@ -3240,6 +3240,43 @@ try {
     .filter({ hasText: `${studyMonitorRunDetail.missingExpectedUnitCount} missing` })
     .filter({ hasText: "1 review(s)" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  logStep("run-detail-review-response");
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Study Monitor Run Detail" })
+    .locator(".record-card")
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" })
+    .getByRole("button", { name: "Review Response" })
+    .first()
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
+  await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#reviewLoginFilter", participantLoginKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
+  await expectInputValue("#reviewSessionFilter", participantSessionId);
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#openRunLoginFilter", participantLoginKey);
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
+  await expectInputValue("#openRunBookletFilter", participantBookletKey);
+  await expectInputValue("#openRunSessionFilter", participantSessionId);
+  await expectInputValue("#openRunRunFilter", pausedTestRunId);
+  await expectInputValue("#openRunUnitFilter", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("run-detail-review-response");
   logStep("run-detail-open-runtime");
   await page
     .locator("app-record-collection")

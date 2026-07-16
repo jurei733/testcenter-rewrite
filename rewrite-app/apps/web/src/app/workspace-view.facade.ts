@@ -1570,6 +1570,19 @@ export class WorkspaceViewFacade {
       detail.participantSession?.loginKey ??
       detail.participantRosterEntry?.loginKey ??
       "unknown participant";
+    const participantSessionId =
+      detail.participantSession?.participantSessionId ?? "";
+    const participantGroupKey = detail.participantSession?.groupKey ?? "";
+    const runActionPayload = {
+      subjectType: "test_run",
+      subjectId: detail.testRun.testRunId,
+      testRunId: detail.testRun.testRunId,
+      participantSessionId,
+      loginKey: participantLogin,
+      groupKey: participantGroupKey,
+      bookletKey: detail.bookletKey,
+      currentUnitKey: detail.testRun.currentUnitKey ?? ""
+    };
 
     return [
       {
@@ -1593,44 +1606,38 @@ export class WorkspaceViewFacade {
           { label: "Generated", value: this.formatDateTime(detail.generatedAt) }
         ],
         actionLabel: "Open In Runtime",
-        actionPayload: {
-          subjectType: "test_run",
-          subjectId: detail.testRun.testRunId,
-          participantSessionId:
-            detail.participantSession?.participantSessionId ?? "",
-          loginKey: participantLogin,
-          groupKey: detail.participantSession?.groupKey ?? "",
-          bookletKey: detail.bookletKey,
-          currentUnitKey: detail.testRun.currentUnitKey ?? ""
-        }
+        actionPayload: runActionPayload
       },
-      ...detail.units.map(unit => ({
-        headline: unit.displayLabel,
-        subline: unit.unitKey,
-        badges: [
-          unit.expected ? "expected" : "unexpected",
-          unit.answered ? "answered" : "missing",
-          unit.current ? "current" : "not current",
-          `${unit.reviewCount} review(s)`
-        ],
-        rows: [
-          { label: "Expected", value: unit.expected ? "yes" : "no" },
-          { label: "Answered", value: unit.answered ? "yes" : "no" },
-          { label: "Response Length", value: String(unit.responseLength) },
-          { label: "Reviews", value: String(unit.reviewCount) },
-          { label: "Current Unit", value: unit.current ? "yes" : "no" }
-        ],
-        actionLabel: "Open Unit Detail",
-        actionPayload: {
+      ...detail.units.map(unit => {
+        const unitActionPayload = {
+          ...runActionPayload,
           unitKey: unit.unitKey,
-          subjectType: "test_run",
-          subjectId: detail.testRun.testRunId,
-          participantSessionId:
-            detail.participantSession?.participantSessionId ?? "",
-          loginKey: participantLogin,
           currentUnitKey: unit.unitKey
-        }
-      })),
+        };
+
+        return {
+          headline: unit.displayLabel,
+          subline: unit.unitKey,
+          badges: [
+            unit.expected ? "expected" : "unexpected",
+            unit.answered ? "answered" : "missing",
+            unit.current ? "current" : "not current",
+            `${unit.reviewCount} review(s)`
+          ],
+          rows: [
+            { label: "Expected", value: unit.expected ? "yes" : "no" },
+            { label: "Answered", value: unit.answered ? "yes" : "no" },
+            { label: "Response Length", value: String(unit.responseLength) },
+            { label: "Reviews", value: String(unit.reviewCount) },
+            { label: "Current Unit", value: unit.current ? "yes" : "no" }
+          ],
+          actionLabel: "Open Unit Detail",
+          actionPayload: unitActionPayload,
+          actions: unit.answered
+            ? this.reviewResponseActions(unitActionPayload)
+            : this.openRuntimeActions(unitActionPayload)
+        };
+      }),
       ...detail.reviews.map(review => ({
         headline: `${review.category} by ${review.reviewerId}`,
         subline: review.unitKey ?? "whole run",
@@ -2347,6 +2354,11 @@ export class WorkspaceViewFacade {
       return;
     }
 
+    if (item.actionPayload?.participantCommand === "reviewResponse") {
+      this.reviewResponseInRuntime(item);
+      return;
+    }
+
     if (item.actionPayload?.participantCommand === "prepareRuntime") {
       this.prepareParticipantRuntime(item);
       return;
@@ -2373,6 +2385,11 @@ export class WorkspaceViewFacade {
   openStudyMonitorDetailItem(item: RecordCollectionItem): void {
     if (item.actionPayload?.participantCommand === "openRuntime") {
       this.openActivitySubject(item);
+      return;
+    }
+
+    if (item.actionPayload?.participantCommand === "reviewResponse") {
+      this.reviewResponseInRuntime(item);
       return;
     }
 
