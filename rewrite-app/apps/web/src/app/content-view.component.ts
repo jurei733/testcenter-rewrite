@@ -33,7 +33,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Load Source Document File
-            <input id="sourceDocumentFile" name="sourceDocumentFile" type="file" accept=".xml,.json,.imsmanifest,.manifest,application/xml,text/xml,application/json" (change)="view.loadSourceDocumentFile($event)" />
+            <input id="sourceDocumentFile" name="sourceDocumentFile" type="file" accept=".xml,.json,.imsmanifest,.manifest,.zip,application/xml,text/xml,application/json,application/zip,application/x-zip-compressed" (change)="view.loadSourceDocumentFile($event)" />
           </label>
           <label>
             Source Document

@@ -134,7 +134,9 @@ export class ContentViewFacade {
       return;
     }
 
-    const sourceDocument = await file.text();
+    const sourceDocument = this.isZipSourceFile(file)
+      ? await this.readFileAsDataUrl(file)
+      : await file.text();
     this.content.sourceFileName = file.name;
     this.content.sourceMediaType = this.inferMediaTypeFromFile(file);
     this.content.sourceDocument = sourceDocument;
@@ -143,7 +145,7 @@ export class ContentViewFacade {
     this.applicationRef.tick();
     this.feedback.rememberActivity(
       "Source Document Loaded",
-      `${file.name} loaded with ${sourceDocument.length} character(s).`
+      `${file.name} loaded with ${sourceDocument.length} character(s) as ${this.content.sourceMediaType}.`
     );
   }
 
@@ -761,9 +763,15 @@ export class ContentViewFacade {
       return [];
     }
 
+    const isZipSourceDocument = this.isZipSourceDocument(
+      input.mediaType,
+      sourceDocument
+    );
     const normalizedPreview = sourceDocument.replace(/\s+/g, " ").trim();
     const preview =
-      normalizedPreview.length > 180
+      isZipSourceDocument
+        ? "Base64 ZIP package payload staged for server-side manifest extraction."
+        : normalizedPreview.length > 180
         ? `${normalizedPreview.slice(0, 177)}...`
         : normalizedPreview;
     const lineCount = sourceDocument.split(/\r?\n/).length;
@@ -2015,6 +2023,9 @@ export class ContentViewFacade {
 
   private inferSourceDocumentKind(mediaType: string, sourceDocument: string): string {
     const normalizedMediaType = mediaType.toLowerCase();
+    if (this.isZipSourceDocument(mediaType, sourceDocument)) {
+      return "ZIP package source document";
+    }
     if (normalizedMediaType.includes("json") || sourceDocument.trim().startsWith("{")) {
       return "JSON source document";
     }
@@ -2068,6 +2079,9 @@ export class ContentViewFacade {
 
   private inferMediaTypeFromFile(file: File): string {
     const normalizedName = file.name.toLowerCase();
+    if (this.isZipSourceFile(file)) {
+      return "application/zip";
+    }
     if (normalizedName.endsWith(".json")) {
       return "application/json";
     }
@@ -2081,12 +2095,47 @@ export class ContentViewFacade {
     return file.type || this.content.sourceMediaType.trim() || "text/plain";
   }
 
+  private isZipSourceFile(file: File): boolean {
+    const normalizedName = file.name.toLowerCase();
+    const normalizedType = file.type.toLowerCase();
+    return (
+      normalizedName.endsWith(".zip") ||
+      normalizedType.includes("zip")
+    );
+  }
+
+  private readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        resolve(typeof reader.result === "string" ? reader.result : "");
+      });
+      reader.addEventListener("error", () => {
+        reject(reader.error ?? new Error(`Could not read ${file.name}.`));
+      });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private isZipSourceDocument(mediaType: string, sourceDocument: string): boolean {
+    const normalizedMediaType = mediaType.toLowerCase();
+    const trimmedDocument = sourceDocument.trim();
+    return (
+      normalizedMediaType.includes("zip") ||
+      trimmedDocument.startsWith("data:application/zip;base64,") ||
+      trimmedDocument.startsWith("data:application/x-zip-compressed;base64,")
+    );
+  }
+
   private estimateSourceDocumentBookletCount(
     mediaType: string,
     sourceDocument: string
   ): number | null {
     const trimmedDocument = sourceDocument.trim();
     if (!trimmedDocument) {
+      return null;
+    }
+    if (this.isZipSourceDocument(mediaType, sourceDocument)) {
       return null;
     }
 

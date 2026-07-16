@@ -27,6 +27,61 @@ const uploadedSourceDocument =
   '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
 let smokeAdminSessionToken = "";
 
+const createStoredZipBuffer = entries => {
+  const localFileHeaders = [];
+  const centralDirectoryHeaders = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const fileName = Buffer.from(entry.fileName, "utf8");
+    const content = Buffer.from(entry.content, "utf8");
+    const localHeader = Buffer.alloc(30 + fileName.length);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt32LE(0, 10);
+    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(content.length, 18);
+    localHeader.writeUInt32LE(content.length, 22);
+    localHeader.writeUInt16LE(fileName.length, 26);
+    fileName.copy(localHeader, 30);
+    localFileHeaders.push(localHeader, content);
+
+    const centralDirectoryHeader = Buffer.alloc(46 + fileName.length);
+    centralDirectoryHeader.writeUInt32LE(0x02014b50, 0);
+    centralDirectoryHeader.writeUInt16LE(20, 4);
+    centralDirectoryHeader.writeUInt16LE(20, 6);
+    centralDirectoryHeader.writeUInt16LE(0x0800, 8);
+    centralDirectoryHeader.writeUInt16LE(0, 10);
+    centralDirectoryHeader.writeUInt32LE(0, 12);
+    centralDirectoryHeader.writeUInt32LE(0, 16);
+    centralDirectoryHeader.writeUInt32LE(content.length, 20);
+    centralDirectoryHeader.writeUInt32LE(content.length, 24);
+    centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
+    centralDirectoryHeader.writeUInt32LE(offset, 42);
+    fileName.copy(centralDirectoryHeader, 46);
+    centralDirectoryHeaders.push(centralDirectoryHeader);
+
+    offset += localHeader.length + content.length;
+  }
+
+  const centralDirectoryOffset = offset;
+  const centralDirectory = Buffer.concat(centralDirectoryHeaders);
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+
+  return Buffer.concat([
+    ...localFileHeaders,
+    centralDirectory,
+    endOfCentralDirectory
+  ]);
+};
+
 class UiSmokeEarlyExit extends Error {
   constructor(step) {
     super(`UI smoke stopped after requested step: ${step}`);
@@ -1320,6 +1375,47 @@ try {
   await expectButtonSelectorDisabled("#releaseReadinessButton");
   await expectButtonSelectorDisabled("#releaseDetailButton");
   await expectButtonSelectorDisabled("#retrySourcePackageImportButton");
+  logStep("load-zip-source-document-file");
+  const uploadedZipSourceFileName = `ui-smoke-source-${Date.now()}.zip`;
+  const uploadedZipSourcePath = resolve(".data", uploadedZipSourceFileName);
+  await mkdir(dirname(uploadedZipSourcePath), { recursive: true });
+  await writeFile(
+    uploadedZipSourcePath,
+    createStoredZipBuffer([
+      {
+        fileName: "imsmanifest.xml",
+        content:
+          '<manifest><organizations default="ORG"><organization identifier="ORG"><item identifierref="BOOKLET"><item identifierref="UNIT" /></item></organization></organizations><resources><resource identifier="BOOKLET" href="booklets/ui-zip.xml" /><resource identifier="UNIT" href="units/ui-zip.xml" /></resources></manifest>'
+      }
+    ])
+  );
+  await page.locator("#sourceDocumentFile").setInputFiles(uploadedZipSourcePath);
+  await page.waitForFunction(
+    expectedFileName => {
+      const sourceFileName = document.querySelector("#sourceFileName");
+      const sourceMediaType = document.querySelector("#sourceMediaType");
+      const sourceDocument = document.querySelector("#sourceDocument");
+      return (
+        sourceFileName instanceof HTMLInputElement &&
+        sourceFileName.value === expectedFileName &&
+        sourceMediaType instanceof HTMLInputElement &&
+        sourceMediaType.value === "application/zip" &&
+        sourceDocument instanceof HTMLTextAreaElement &&
+        sourceDocument.value.startsWith("data:") &&
+        sourceDocument.value.includes(";base64,")
+      );
+    },
+    uploadedZipSourceFileName,
+    { timeout: 15_000 }
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Draft Source Document Preview" })
+    })
+    .filter({ hasText: uploadedZipSourceFileName })
+    .filter({ hasText: "ZIP package source document" })
+    .waitFor();
   logStep("load-source-document-file");
   const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.imsmanifest`;
   const uploadedSourcePath = resolve(".data", uploadedSourceFileName);
