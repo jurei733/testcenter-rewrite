@@ -167,7 +167,11 @@ const ensureDataDirectory = async () => {
     );
     process.env.FIRST_SLICE_SQLITE_FILE = filePath;
     await mkdir(dirname(filePath), { recursive: true });
-    await rm(filePath, { force: true });
+    await Promise.all(
+      [filePath, `${filePath}-wal`, `${filePath}-shm`, `${filePath}-journal`].map(
+        sqlitePath => rm(sqlitePath, { force: true })
+      )
+    );
   }
 };
 
@@ -2562,20 +2566,28 @@ try {
       hasText:
         '"entry-student-login","group:testcenter-login-entry","booklet:starter"'
     })
+    .filter({
+      hasText:
+        '"student-entry-sign-in","group:participant-entry-sign-in",""'
+    })
+    .filter({
+      hasText:
+        '"student-participant-route","group:participant-route-smoke","booklet:starter"'
+    })
     .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "5" })
+    .filter({ hasText: "7" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "5" })
+    .filter({ hasText: "7" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
