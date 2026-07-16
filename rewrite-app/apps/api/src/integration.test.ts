@@ -5974,6 +5974,126 @@ test("source document import resolves IMS xml:base paths for ZIP unit content", 
   );
 });
 
+test("source document import enriches ZIP units from IMS dependency files", async () => {
+  const tenantKey = "integration-tenant-zip-dependency-content";
+  const workspaceKey = "integration-workspace-zip-dependency-content";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <organizations default="ORG-ZIP-DEPENDENCY">
+            <organization identifier="ORG-ZIP-DEPENDENCY">
+              <item identifierref="RES-ZIP-DEPENDENCY-BOOKLET">
+                <title>ZIP Dependency Booklet</title>
+                <item identifierref="RES-ZIP-DEPENDENCY-UNIT">
+                  <title>ZIP Dependency Unit</title>
+                </item>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-ZIP-DEPENDENCY-BOOKLET" href="booklets/dependency-booklet.xml" />
+            <resource identifier="RES-ZIP-DEPENDENCY-UNIT" href="units/dependency-wrapper.xml">
+              <dependency identifierref="RES-ZIP-DEPENDENCY-ITEM" />
+            </resource>
+            <resource identifier="RES-ZIP-DEPENDENCY-ITEM" href="items/dependency-item.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/items/dependency-item.xml",
+      content: `
+        <assessmentItem>
+          <title>Dependency Item Description</title>
+          <itemBody>
+            <p>Resolved from a dependent item file.</p>
+          </itemBody>
+        </assessmentItem>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-zip-dependency-content-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              description?: string;
+              content?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/dependency-booklet.xml",
+          displayLabel: "ZIP Dependency Booklet",
+          unitEntries: [
+            {
+              unitKey: "units/dependency-wrapper.xml",
+              displayLabel: "ZIP Dependency Unit",
+              description: "Dependency Item Description",
+              content: "Resolved from a dependent item file."
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import reports invalid ZIP source documents", async () => {
   const tenantKey = "integration-tenant-invalid-zip";
   const workspaceKey = "integration-workspace-invalid-zip";

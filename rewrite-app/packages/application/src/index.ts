@@ -3808,6 +3808,26 @@ const collectXmlResourceDependencyBookletEntries = (
     .filter(Boolean) as SourcePackageContentStructure["bookletEntries"];
 };
 
+const collectXmlManifestResourceContentPathCandidates = (
+  sourceDocument: string
+): Map<string, string[]> => {
+  const resources = collectXmlManifestResources(sourceDocument);
+  const candidatesByResourceKey = new Map<string, string[]>();
+
+  for (const resource of resources.values()) {
+    const candidates = [
+      resource.key,
+      ...resource.dependencyReferences
+        .map(dependencyReference => resources.get(dependencyReference)?.key)
+        .filter((dependencyKey): dependencyKey is string => Boolean(dependencyKey))
+    ];
+
+    candidatesByResourceKey.set(resource.key, [...new Set(candidates)]);
+  }
+
+  return candidatesByResourceKey;
+};
+
 const collectXmlBookletEntries = (
   sourceDocument: string,
   bookletTagNames: string
@@ -4344,6 +4364,10 @@ const normalizeParsedZipXmlContentStructure = (
   if (!runtimeSnapshot) {
     return null;
   }
+  const contentPathCandidatesByResourceKey =
+    collectXmlManifestResourceContentPathCandidates(
+      manifestExtraction.manifestText
+    );
 
   return {
     bookletEntries: runtimeSnapshot.bookletEntries.map(bookletEntry => ({
@@ -4353,11 +4377,17 @@ const normalizeParsedZipXmlContentStructure = (
           return unitEntry;
         }
 
+        const resourcePathCandidates =
+          contentPathCandidatesByResourceKey.get(unitEntry.unitKey) ?? [
+            unitEntry.unitKey
+          ];
         const referencedEntry = findZipEntryByPath(
           manifestExtraction.entries,
-          resolveZipResourcePathCandidates(
-            manifestExtraction.manifestFileName,
-            unitEntry.unitKey
+          resourcePathCandidates.flatMap(resourcePath =>
+            resolveZipResourcePathCandidates(
+              manifestExtraction.manifestFileName,
+              resourcePath
+            )
           )
         );
         if (!referencedEntry) {
