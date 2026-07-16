@@ -219,44 +219,17 @@ jobs:
           - smoke: shutdown
             command: npm run smoke:shutdown:sqlite
             playwright: false
-          - smoke: ui-content
-            command: npm run smoke:ui:content
+          - smoke: ui-quick
+            command: npm run ci:browser:quick
             playwright: true
-          - smoke: ui-json-roster
-            command: npm run smoke:ui:json-roster
+          - smoke: ui-review
+            command: npm run ci:browser:review
             playwright: true
-          - smoke: ui-participant-entry
-            command: npm run smoke:ui:participant-entry
+          - smoke: ui-monitor
+            command: npm run ci:browser:monitor
             playwright: true
-          - smoke: ui-activation-roster-warnings
-            command: npm run smoke:ui:activation-roster-warnings
-            playwright: true
-          - smoke: ui-review-readiness
-            command: npm run smoke:ui:review-readiness
-            playwright: true
-          - smoke: ui-monitor-review
-            command: npm run smoke:ui:monitor-review
-            playwright: true
-          - smoke: ui-monitor-detail-review
-            command: npm run smoke:ui:monitor-detail-review
-            playwright: true
-          - smoke: ui-open-run-sync
-            command: npm run smoke:ui:open-run-sync
-            playwright: true
-          - smoke: ui-run-detail-review
-            command: npm run smoke:ui:run-detail-review
-            playwright: true
-          - smoke: ui-unit-detail-review
-            command: npm run smoke:ui:unit-detail-review
-            playwright: true
-          - smoke: ui-participant-detail-review
-            command: npm run smoke:ui:participant-detail-review
-            playwright: true
-          - smoke: ui-activation-blocking-runtime
-            command: npm run smoke:ui:activation-blocking-runtime
-            playwright: true
-          - smoke: ui-delete-group-results
-            command: npm run smoke:ui:delete-group-results
+          - smoke: ui-ops
+            command: npm run ci:browser:ops
             playwright: true
           - smoke: ui-full
             command: npm run smoke:ui
