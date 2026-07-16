@@ -4003,6 +4003,11 @@ type ZipEntry = {
   localHeaderOffset: number;
 };
 
+type ZipManifestExtractionResult =
+  | { status: "found"; manifestText: string }
+  | { status: "invalid_zip" }
+  | { status: "manifest_missing" };
+
 const MAX_EXTRACTED_MANIFEST_BYTES = 5 * 1024 * 1024;
 
 const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
@@ -4116,10 +4121,10 @@ const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null =>
 
 const extractXmlManifestFromZipSourceDocument = (
   sourceDocument: string
-): string | null => {
+): ZipManifestExtractionResult => {
   const zipBuffer = decodeBase64ZipSourceDocument(sourceDocument);
   if (!zipBuffer) {
-    return null;
+    return { status: "invalid_zip" };
   }
 
   const entries = readZipEntries(zipBuffer).filter(
@@ -4140,11 +4145,11 @@ const extractXmlManifestFromZipSourceDocument = (
   for (const entry of candidates) {
     const text = readZipEntryText(zipBuffer, entry);
     if (text?.trimStart().startsWith("<") && /<[^>]*manifest\b/i.test(text)) {
-      return text;
+      return { status: "found", manifestText: text };
     }
   }
 
-  return null;
+  return { status: "manifest_missing" };
 };
 
 const deriveRuntimeSnapshotFromSourceDocument = (
@@ -4208,12 +4213,14 @@ const deriveRuntimeSnapshotFromSourceDocument = (
   }
 
   if (looksLikeZipPackage) {
-    const manifestText = extractXmlManifestFromZipSourceDocument(
+    const manifestExtraction = extractXmlManifestFromZipSourceDocument(
       sourcePackage.sourceDocument
     );
-    if (manifestText) {
+    if (manifestExtraction.status === "found") {
       return {
-        runtimeSnapshot: normalizeParsedXmlContentStructure(manifestText),
+        runtimeSnapshot: normalizeParsedXmlContentStructure(
+          manifestExtraction.manifestText
+        ),
         diagnostics: []
       };
     }
@@ -4221,10 +4228,15 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     return {
       runtimeSnapshot: null,
       diagnostics: [
-        createImportDiagnostic(
-          "source_document_zip_manifest_missing",
-          `Source package '${sourcePackage.fileName}' did not contain a readable XML manifest in its ZIP sourceDocument.`
-        )
+        manifestExtraction.status === "invalid_zip"
+          ? createImportDiagnostic(
+              "source_document_zip_invalid",
+              `Source package '${sourcePackage.fileName}' did not contain a readable ZIP sourceDocument.`
+            )
+          : createImportDiagnostic(
+              "source_document_zip_manifest_missing",
+              `Source package '${sourcePackage.fileName}' did not contain a readable XML manifest in its ZIP sourceDocument.`
+            )
       ]
     };
   }

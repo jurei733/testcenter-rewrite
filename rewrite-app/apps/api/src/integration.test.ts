@@ -5729,6 +5729,49 @@ test("source document import extracts IMS manifest from deflated base64 ZIP pack
   );
 });
 
+test("source document import reports invalid ZIP source documents", async () => {
+  const tenantKey = "integration-tenant-invalid-zip";
+  const workspaceKey = "integration-workspace-invalid-zip";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "broken-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: "data:application/zip;base64,this-is-not-a-zip-package"
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.equal(
+    importResult.body.importJob.diagnostics[0]?.code,
+    "source_document_zip_invalid"
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
 test("source document import resolves IMS resource dependencies", async () => {
   const tenantKey = "integration-tenant-ims-dependencies";
   const workspaceKey = "integration-workspace-ims-dependencies";
