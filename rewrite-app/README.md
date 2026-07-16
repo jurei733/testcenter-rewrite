@@ -524,6 +524,7 @@ For runtime probes:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts helpers
   - built runtime preflight against SQLite and Postgres
+  - metadata-required deployability preflight plus built startup smoke
   - memory + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
