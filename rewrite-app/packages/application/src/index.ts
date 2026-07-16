@@ -1,7 +1,10 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
-import type { ParticipantRosterSource } from "@testcenter-rewrite-app/contracts";
+import type {
+  ParticipantRosterSource,
+  SourceDocumentSource
+} from "@testcenter-rewrite-app/contracts";
 import { monitorRunCommandTypes } from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
@@ -82,7 +85,7 @@ export type ContentIntakePort = {
     fileName: string;
     mediaType: string;
     contentStructure?: SourcePackageContentStructure;
-    sourceDocument?: string;
+    sourceDocument?: SourceDocumentSource;
   }): Promise<SourcePackage>;
   createImportJob(input: {
     tenantKey: string;
@@ -96,7 +99,7 @@ export type ContentIntakePort = {
     fileName?: string;
     mediaType?: string;
     contentStructure?: SourcePackageContentStructure | null;
-    sourceDocument?: string | null;
+    sourceDocument?: SourceDocumentSource | null;
   }): Promise<CreateImportJobResult & { sourcePackage: SourcePackage }>;
   activateContentRelease(input: {
     tenantKey: string;
@@ -1036,11 +1039,15 @@ const normalizeOptionalSourceDocument = (
     return null;
   }
 
+  if (typeof value === "object") {
+    return JSON.stringify(value, null, 2);
+  }
+
   if (typeof value !== "string") {
     throw new FirstSliceError(
       400,
       "source_document_invalid",
-      "sourceDocument must be a string when provided."
+      "sourceDocument must be a string, JSON object, or JSON array when provided."
     );
   }
 

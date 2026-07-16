@@ -865,11 +865,16 @@ export type CreateWorkspaceRequest = {
   displayName: string;
 };
 
+export type SourceDocumentSource =
+  | string
+  | Record<string, unknown>
+  | unknown[];
+
 export type CreateSourcePackageRequest = {
   fileName: string;
   mediaType: string;
   contentStructure?: SourcePackageContentStructure;
-  sourceDocument?: string;
+  sourceDocument?: SourceDocumentSource;
 };
 
 export type CreateImportJobRequest = {
@@ -880,7 +885,7 @@ export type RetrySourcePackageImportRequest = {
   fileName?: string;
   mediaType?: string;
   contentStructure?: SourcePackageContentStructure | null;
-  sourceDocument?: string | null;
+  sourceDocument?: SourceDocumentSource | null;
 };
 
 export type ActivateContentReleaseRequest = {

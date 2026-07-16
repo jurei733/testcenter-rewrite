@@ -3674,10 +3674,17 @@ test("failed import can be retried on the same source package", async () => {
     {
       method: "POST",
       body: {
-        fileName: "fixed.xml",
-        mediaType: "application/xml",
-        sourceDocument:
-          "<Assessment><Booklet Key='booklet:fixed' Label='Fixed'><Unit Key='unit-fixed' Label='Fixed Unit' /></Booklet></Assessment>"
+        fileName: "fixed.json",
+        mediaType: "application/json",
+        sourceDocument: {
+          booklets: [
+            {
+              bookletKey: "booklet:fixed",
+              title: "Fixed",
+              units: [{ unitKey: "unit-fixed", title: "Fixed Unit" }]
+            }
+          ]
+        }
       }
     }
   );
@@ -3698,7 +3705,7 @@ test("failed import can be retried on the same source package", async () => {
       latestImportJob: { status: string } | null;
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fxml&fileName=fixed.xml&latestImportStatus=completed&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
   );
 
   assert.equal(acceptedSourcePackages.status, 200);
@@ -3860,7 +3867,7 @@ test("source-package intake rejects invalid metadata before import", async () =>
       body: {
         fileName: "valid.xml",
         mediaType: "application/xml",
-        sourceDocument: { xml: "<assessment />" }
+        sourceDocument: true
       }
     }
   );
@@ -3903,7 +3910,7 @@ test("source-package intake rejects invalid metadata before import", async () =>
     {
       method: "POST",
       body: {
-        sourceDocument: ["not", "a", "document"]
+        sourceDocument: true
       }
     }
   );
@@ -4014,7 +4021,7 @@ test("source document import normalizes fallback labels and duplicate entries", 
   );
 });
 
-test("source document import accepts JSON booklet and unit maps", async () => {
+test("source document import accepts native JSON booklet and unit maps", async () => {
   const tenantKey = "integration-tenant-json-maps";
   const workspaceKey = "integration-workspace-json-maps";
 
@@ -4034,7 +4041,7 @@ test("source document import accepts JSON booklet and unit maps", async () => {
     body: {
       fileName: "json-mapped-manifest.json",
       mediaType: "application/json",
-      sourceDocument: JSON.stringify({
+      sourceDocument: {
         contentStructure: {
           booklets: {
             "booklet:mapped": {
@@ -4053,7 +4060,7 @@ test("source document import accepts JSON booklet and unit maps", async () => {
             }
           }
         }
-      })
+      }
     }
   });
 
