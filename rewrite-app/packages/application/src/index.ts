@@ -3400,6 +3400,46 @@ const readXmlChildText = (
   return undefined;
 };
 
+const resolveXmlManifestPath = (...segments: Array<string | undefined>): string => {
+  let resolvedPath = "";
+
+  for (const segment of segments) {
+    const normalizedSegment = normalizeManifestToken(segment);
+    if (!normalizedSegment) {
+      continue;
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:/i.test(normalizedSegment)) {
+      resolvedPath = normalizedSegment;
+      continue;
+    }
+
+    resolvedPath = resolvedPath
+      ? `${resolvedPath.replace(/\/+$/, "")}/${normalizedSegment.replace(/^\/+/, "")}`
+      : normalizedSegment;
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(resolvedPath)) {
+    return resolvedPath;
+  }
+
+  const pathSegments: string[] = [];
+  for (const pathSegment of resolvedPath.replace(/\\/g, "/").split("/")) {
+    if (!pathSegment || pathSegment === ".") {
+      continue;
+    }
+
+    if (pathSegment === "..") {
+      pathSegments.pop();
+      continue;
+    }
+
+    pathSegments.push(pathSegment);
+  }
+
+  return pathSegments.join("/");
+};
+
 type XmlManifestResource = {
   key: string;
   displayLabel: string;
@@ -3410,6 +3450,16 @@ const collectXmlManifestResources = (
   sourceDocument: string
 ): Map<string, XmlManifestResource> => {
   const resources = new Map<string, XmlManifestResource>();
+  const manifestAttributes = parseXmlAttributes(
+    sourceDocument.match(
+      /<((?:[a-zA-Z_][\w.-]*:)?manifest)\b([^>]*?)(?:\/>|>)/i
+    )?.[2] ?? ""
+  );
+  const manifestBasePath = readXmlAttribute(
+    manifestAttributes,
+    "xml:base",
+    "base"
+  );
 
   for (const resourceMatch of sourceDocument.matchAll(
     /<((?:[a-zA-Z_][\w.-]*:)?resource)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
@@ -3434,7 +3484,13 @@ const collectXmlManifestResources = (
       /<((?:[a-zA-Z_][\w.-]*:)?file)\b([^>]*?)(?:\/>|>[\s\S]*?<\/\1>)/i
     );
     const fileAttributes = fileMatch ? parseXmlAttributes(fileMatch[2] ?? "") : {};
-    const key = normalizeManifestToken(
+    const resourceBasePath = readXmlAttribute(
+      resourceAttributes,
+      "xml:base",
+      "base"
+    );
+    const fileBasePath = readXmlAttribute(fileAttributes, "xml:base", "base");
+    const rawHref =
       readXmlAttribute(
         resourceAttributes,
         "href",
@@ -3455,7 +3511,12 @@ const collectXmlManifestResources = (
           "fileName",
           "filename"
         ) ??
-        identifier
+        identifier;
+    const key = resolveXmlManifestPath(
+      manifestBasePath,
+      resourceBasePath,
+      fileBasePath,
+      rawHref
     );
     const displayLabel = normalizeManifestLabel(
       readXmlAttribute(

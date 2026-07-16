@@ -5857,6 +5857,123 @@ test("source document import enriches ZIP units with referenced file content", a
   );
 });
 
+test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
+  const tenantKey = "integration-tenant-zip-xml-base";
+  const workspaceKey = "integration-workspace-zip-xml-base";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1" xml:base="content/">
+          <organizations default="ORG-ZIP-BASE">
+            <organization identifier="ORG-ZIP-BASE">
+              <item identifierref="RES-ZIP-BASE-BOOKLET">
+                <title>ZIP Base Booklet</title>
+                <item identifierref="RES-ZIP-BASE-UNIT">
+                  <title>ZIP Base Unit</title>
+                </item>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-ZIP-BASE-BOOKLET" xml:base="booklets/" href="zip-base-booklet.xml" />
+            <resource identifier="RES-ZIP-BASE-UNIT" xml:base="items/" href="zip-base-unit.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/content/items/zip-base-unit.xml",
+      content: `
+        <assessmentItem>
+          <title>ZIP Base Unit Description</title>
+          <itemBody>
+            <p>Use xml base paths to find this unit.</p>
+          </itemBody>
+        </assessmentItem>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-zip-xml-base-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              description?: string;
+              content?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "content/booklets/zip-base-booklet.xml",
+          displayLabel: "ZIP Base Booklet",
+          unitEntries: [
+            {
+              unitKey: "content/items/zip-base-unit.xml",
+              displayLabel: "ZIP Base Unit",
+              description: "ZIP Base Unit Description",
+              content: "Use xml base paths to find this unit."
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import reports invalid ZIP source documents", async () => {
   const tenantKey = "integration-tenant-invalid-zip";
   const workspaceKey = "integration-workspace-invalid-zip";
