@@ -2495,10 +2495,21 @@ const normalizeParsedJsonContentStructure = (
     typeof value === "object" && value !== null && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
+  const splitManifestListText = (value: string): string[] =>
+    value
+      .split(/[,\n;]+/)
+      .map(item => item.trim())
+      .filter(Boolean);
   const readEntries = (...values: unknown[]): unknown[] => {
     for (const value of values) {
       if (Array.isArray(value)) {
         return value;
+      }
+      if (typeof value === "string") {
+        const entries = splitManifestListText(value);
+        if (entries.length > 0) {
+          return entries;
+        }
       }
       if (asObject(value)) {
         return [value];
@@ -2527,6 +2538,10 @@ const normalizeParsedJsonContentStructure = (
   ): unknown[] => {
     if (Array.isArray(value)) {
       return value;
+    }
+
+    if (typeof value === "string") {
+      return splitManifestListText(value);
     }
 
     const objectValue = asObject(value);

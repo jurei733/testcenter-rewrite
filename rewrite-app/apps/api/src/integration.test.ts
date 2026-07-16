@@ -4234,6 +4234,90 @@ test("source document import accepts nested testcenter package manifests", async
   );
 });
 
+test("source document import accepts delimited JSON unit reference strings", async () => {
+  const tenantKey = "integration-tenant-json-unit-ref-strings";
+  const workspaceKey = "integration-workspace-json-unit-ref-strings";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unit-ref-strings.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          booklets: [
+            {
+              bookletKey: "booklet:string-refs",
+              title: "String Ref Booklet",
+              unitRefs: "unit:string-a, unit:string-b; unit:string-c\nunit:string-d"
+            }
+          ]
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries,
+    [
+      {
+        bookletKey: "booklet:string-refs",
+        displayLabel: "String Ref Booklet",
+        unitEntries: [
+          { unitKey: "unit:string-a", displayLabel: "Unit unit string a" },
+          { unitKey: "unit:string-b", displayLabel: "Unit unit string b" },
+          { unitKey: "unit:string-c", displayLabel: "Unit unit string c" },
+          { unitKey: "unit:string-d", displayLabel: "Unit unit string d" }
+        ]
+      }
+    ]
+  );
+});
+
 test("source document import resolves JSON organization item references", async () => {
   const tenantKey = "integration-tenant-json-organization";
   const workspaceKey = "integration-workspace-json-organization";
