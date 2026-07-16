@@ -2493,6 +2493,25 @@ try {
     .filter({ hasText: "entry-student-b" })
     .filter({ hasText: "Ben Entry" })
     .waitFor();
+  const savedRosterBenCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "entry-student-b" }) })
+    .filter({ hasText: "Ben Entry" });
+  await savedRosterBenCard.getByRole("link", { name: /Entry URL:/ }).waitFor();
+  await savedRosterBenCard
+    .getByRole("button", { name: "Use Roster Entry", exact: true })
+    .click({ force: true });
+  await expectInputValue("#loginKey", "entry-student-b");
+  await expectInputValue("#groupKey", "group:entry-smoke");
+  await expectInputValue("#bookletKey", participantRouteBookletKey);
+  await expectInputValue("#participantDisplayName", "Ben Entry");
+  await savedRosterBenCard
+    .getByRole("button", { name: "Open Participant Entry", exact: true })
+    .waitFor();
   const participantRosterDownloadPromise = page.waitForEvent("download");
   await page.locator("#exportParticipantRosterCsvButton").click();
   const participantRosterDownload = await participantRosterDownloadPromise;

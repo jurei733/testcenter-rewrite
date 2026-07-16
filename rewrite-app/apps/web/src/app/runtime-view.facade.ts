@@ -646,6 +646,11 @@ export class RuntimeViewFacade {
           groupKey: entry.groupKey,
           bookletKey: entry.bookletKey ?? ""
         };
+        const entryUrl = this.buildParticipantEntryUrl(
+          this.uiState.workspace.tenantKey.trim(),
+          this.uiState.workspace.workspaceKey.trim(),
+          link
+        );
         return {
           headline: entry.loginKey,
           subline: entry.displayName ?? entry.participantRosterEntryId,
@@ -672,16 +677,8 @@ export class RuntimeViewFacade {
             { label: "Imported", value: this.formatDateTime(entry.importedAt) },
             {
               label: "Entry URL",
-              value: this.buildParticipantEntryUrl(
-                this.uiState.workspace.tenantKey.trim(),
-                this.uiState.workspace.workspaceKey.trim(),
-                link
-              ),
-              href: this.buildParticipantEntryUrl(
-                this.uiState.workspace.tenantKey.trim(),
-                this.uiState.workspace.workspaceKey.trim(),
-                link
-              )
+              value: entryUrl,
+              href: entryUrl
             }
           ],
           selected: this.runtime.loginKey.trim() === entry.loginKey,
@@ -689,8 +686,21 @@ export class RuntimeViewFacade {
           actionPayload: {
             loginKey: entry.loginKey,
             groupKey: entry.groupKey,
-            bookletKey: entry.bookletKey ?? ""
-          }
+            bookletKey: entry.bookletKey ?? "",
+            displayName: entry.displayName ?? ""
+          },
+          actions: [
+            {
+              label: "Open Participant Entry",
+              payload: {
+                loginKey: entry.loginKey,
+                groupKey: entry.groupKey,
+                bookletKey: entry.bookletKey ?? "",
+                displayName: entry.displayName ?? "",
+                url: entryUrl
+              }
+            }
+          ]
         };
       }) ?? []
     );
