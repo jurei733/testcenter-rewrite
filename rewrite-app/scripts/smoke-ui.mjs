@@ -2333,6 +2333,17 @@ try {
     uploadedRosterText,
     { timeout: 15_000 }
   );
+  const rosterInputPreviewCard = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Roster Input Preview" })
+    });
+  await rosterInputPreviewCard
+    .filter({ hasText: "2 participant rows parsed" })
+    .filter({ hasText: "Alias headers and canonical columns are normalized before import." })
+    .filter({ hasText: "Ada Entry" })
+    .filter({ hasText: "Ben Entry" })
+    .waitFor();
   await page.locator("#importParticipantRosterButton").click();
   const savedAdaRosterCard = page
     .locator("article.card")

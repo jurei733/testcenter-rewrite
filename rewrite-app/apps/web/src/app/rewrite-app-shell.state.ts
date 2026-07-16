@@ -285,9 +285,10 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     monitorCommandHistoryRunFilter: "",
     monitorCommandHistoryLimit: "25",
     entryRosterText: [
-      "student-a,group:demo-a,booklet:demo",
-      "student-b,group:demo-a,booklet:demo",
-      "student-c,group:demo-b,booklet:demo"
+      "login,group,booklet,name",
+      "student-a,group:demo-a,booklet:demo,Ada Demo",
+      "student-b,group:demo-a,booklet:demo,Ben Demo",
+      "student-c,group:demo-b,booklet:demo,Cara Demo"
     ].join("\n"),
     entryLinksView: "",
     participantRosterView: 'Use "Load Saved Roster".',

@@ -306,7 +306,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Entry Links</h2>
-        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Use CSV/TSV/semicolon rows as loginKey, groupKey, optional bookletKey, optional displayName; Testtaker/Participant-style XML and JSON roster structures are accepted too.</p>
+        <p>Import participant rows into the workspace roster, then generate start links from saved entries. CSV/TSV/semicolon rows can use headers such as login, group, booklet, name or the canonical loginKey, groupKey, bookletKey, displayName columns; positional rows, Testtaker/Participant-style XML, and JSON roster structures are accepted too.</p>
         <label>
           Load Roster File
           <input
@@ -319,8 +319,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </label>
         <label>
           Roster Rows, XML, or JSON
-          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;&#10;{&quot;groups&quot;:[{&quot;groupKey&quot;:&quot;group:demo-a&quot;,&quot;participants&quot;:[{&quot;loginKey&quot;:&quot;student-c&quot;,&quot;displayName&quot;:&quot;Cara Demo&quot;}]}]}"></textarea>
+          <textarea id="entryRosterText" name="entryRosterText" [(ngModel)]="view.runtime.entryRosterText" (change)="view.persistState()" placeholder="login,group,booklet,name&#10;student-a,group:demo-a,booklet:demo,Ada Demo&#10;&lt;Testtaker login=&quot;student-b&quot; group=&quot;group:demo-a&quot; booklet=&quot;booklet:demo&quot; name=&quot;Ben Demo&quot; /&gt;&#10;{&quot;groups&quot;:[{&quot;groupKey&quot;:&quot;group:demo-a&quot;,&quot;participants&quot;:[{&quot;loginKey&quot;:&quot;student-c&quot;,&quot;displayName&quot;:&quot;Cara Demo&quot;}]}]}"></textarea>
         </label>
+        <app-record-collection
+          title="Roster Input Preview"
+          subtitle="Local parser result before importing or generating links."
+          [items]="view.entryRosterPreviewItems"
+          emptyState="Paste CSV/TSV/semicolon, XML, or JSON roster text to preview parsed participants."
+        ></app-record-collection>
         <div class="actions">
           <button id="importParticipantRosterButton" class="primary" type="button" [disabled]="!view.canImportParticipantRoster" (click)="view.importParticipantRoster()">Import Saved Roster</button>
           <button id="loadParticipantRosterButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadParticipantRoster()">Load Saved Roster</button>

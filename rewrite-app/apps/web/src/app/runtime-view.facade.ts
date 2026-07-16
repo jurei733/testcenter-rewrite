@@ -9,6 +9,7 @@ import type {
   ListParticipantSessionsResponse,
   ListWorkspaceActivityEventsResponse,
   MonitorOpenRunsResponse,
+  ParsedParticipantRosterEntry,
   ParticipantCurrentRunStateResponse,
   ParticipantRuntimeStateResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -325,6 +326,7 @@ export class RuntimeViewFacade {
   get participantLaunchpadCards(): SummaryCard[] {
     const rosterEntries = this.parseParticipantRosterView();
     const links = this.parseEntryLinksView();
+    const inputEntries = this.parseEntryRosterRowsPreview();
     const sessions = this.parseParticipantSessionListView();
     const linkLogins = new Set(links.map(link => link.loginKey));
     const startedLinkedSessions = sessions.filter(item =>
@@ -340,6 +342,14 @@ export class RuntimeViewFacade {
           rosterEntries.length > 0
             ? "Saved participants are available for entry-link generation."
             : "Load or import a roster before handing out links."
+      },
+      {
+        label: "Input Preview",
+        headline: String(inputEntries.length),
+        detail:
+          inputEntries.length > 0
+            ? "Current roster text parses locally before import."
+            : "Paste roster rows to preview parsed participants."
       },
       {
         label: "Generated Links",
@@ -435,6 +445,96 @@ export class RuntimeViewFacade {
       actionLabel: "Apply Suggestion",
       actionPayload: { launchpadCommand: "refreshSessions" }
     });
+
+    return items;
+  }
+
+  get entryRosterPreviewItems(): RecordCollectionItem[] {
+    const rosterText = this.runtime.entryRosterText.trim();
+    if (rosterText.length === 0) {
+      return [];
+    }
+
+    let entries: ParsedParticipantRosterEntry[];
+    try {
+      entries = parseParticipantRosterText(rosterText);
+    } catch (error) {
+      return [
+        {
+          headline: "Roster input could not be parsed",
+          subline: error instanceof Error ? error.message : "Unknown parser error",
+          badges: ["local preview", "invalid"],
+          rows: [
+            {
+              label: "Accepted Formats",
+              value:
+                "CSV/TSV/semicolon rows with alias headers, positional rows, XML, or JSON"
+            }
+          ]
+        }
+      ];
+    }
+
+    if (entries.length === 0) {
+      return [
+        {
+          headline: "No participant rows detected",
+          subline: "The current text parsed successfully but did not contain participants.",
+          badges: ["local preview", "empty"],
+          rows: [
+            {
+              label: "Hint",
+              value: "Add at least login and group columns or a Testtaker/JSON participant."
+            }
+          ]
+        }
+      ];
+    }
+
+    const previewEntries = entries.slice(0, 5);
+    const remainingCount = Math.max(entries.length - previewEntries.length, 0);
+    const items: RecordCollectionItem[] = [
+      {
+        headline: `${entries.length} participant row${entries.length === 1 ? "" : "s"} parsed`,
+        subline: "Alias headers and canonical columns are normalized before import.",
+        badges: ["local preview", "ready"],
+        rows: [
+          {
+            label: "Header Aliases",
+            value: "login, group, booklet, name"
+          },
+          {
+            label: "Canonical Columns",
+            value: "loginKey, groupKey, bookletKey, displayName"
+          }
+        ]
+      },
+      ...previewEntries.map(entry => ({
+        headline: entry.displayName ?? entry.loginKey,
+        subline: entry.loginKey,
+        badges: [entry.groupKey, entry.bookletKey ?? "default booklet"],
+        rows: [
+          { label: "Login", value: entry.loginKey },
+          { label: "Group", value: entry.groupKey },
+          { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+          { label: "Display Name", value: entry.displayName ?? "none" }
+        ]
+      }))
+    ];
+
+    if (remainingCount > 0) {
+      items.push({
+        headline: `${remainingCount} more row${remainingCount === 1 ? "" : "s"}`,
+        subline: "Import or generate links to process the full roster input.",
+        badges: ["local preview", "truncated"],
+        rows: [
+          {
+            label: "Preview Limit",
+            value: "Showing the first 5 parsed participants."
+          }
+        ]
+      });
+    }
 
     return items;
   }
@@ -2608,7 +2708,7 @@ export class RuntimeViewFacade {
   private parseEntryRosterRows(): RuntimeEntryLink[] {
     const tenantKey = this.uiState.workspace.tenantKey.trim();
     const workspaceKey = this.uiState.workspace.workspaceKey.trim();
-    return parseParticipantRosterText(this.runtime.entryRosterText).map(link => {
+    return this.parseEntryRosterRowsPreview().map(link => {
       const entryLink = {
         loginKey: link.loginKey,
         groupKey: link.groupKey,
@@ -2620,6 +2720,14 @@ export class RuntimeViewFacade {
         url: this.buildParticipantEntryUrl(tenantKey, workspaceKey, entryLink)
       };
     });
+  }
+
+  private parseEntryRosterRowsPreview(): ParsedParticipantRosterEntry[] {
+    try {
+      return parseParticipantRosterText(this.runtime.entryRosterText);
+    } catch {
+      return [];
+    }
   }
 
   private parseEntryLinksView(): RuntimeEntryLink[] {
