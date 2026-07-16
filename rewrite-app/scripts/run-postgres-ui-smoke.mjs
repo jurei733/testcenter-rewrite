@@ -65,6 +65,12 @@ if (!/^postgres(?:ql)?:\/\//.test(connectionString)) {
   );
 }
 
+try {
+  new URL(connectionString);
+} catch (error) {
+  fail(`FIRST_SLICE_POSTGRES_URL is not a valid URL: ${error.message}`);
+}
+
 const smokeEnv = {
   ...process.env,
   FIRST_SLICE_STORE: "postgres",

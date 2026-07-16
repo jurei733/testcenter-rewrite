@@ -40,6 +40,12 @@ if (!/^postgres(?:ql)?:\/\//.test(connectionString)) {
   );
 }
 
+try {
+  new URL(connectionString);
+} catch (error) {
+  fail(`FIRST_SLICE_POSTGRES_URL is not a valid URL: ${error.message}`);
+}
+
 process.stdout.write(
   `Running Postgres integration tests against ${redactConnectionString(connectionString)}\n`
 );
