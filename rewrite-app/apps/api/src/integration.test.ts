@@ -5974,7 +5974,7 @@ test("source document import resolves IMS xml:base paths for ZIP unit content", 
   );
 });
 
-test("source document import enriches ZIP units from IMS dependency files", async () => {
+test("source document import enriches ZIP units from nested IMS dependency files", async () => {
   const tenantKey = "integration-tenant-zip-dependency-content";
   const workspaceKey = "integration-workspace-zip-dependency-content";
 
@@ -6005,6 +6005,9 @@ test("source document import enriches ZIP units from IMS dependency files", asyn
           <resources>
             <resource identifier="RES-ZIP-DEPENDENCY-BOOKLET" href="booklets/dependency-booklet.xml" />
             <resource identifier="RES-ZIP-DEPENDENCY-UNIT" href="units/dependency-wrapper.xml">
+              <dependency identifierref="RES-ZIP-DEPENDENCY-SECTION" />
+            </resource>
+            <resource identifier="RES-ZIP-DEPENDENCY-SECTION" href="sections/dependency-section.xml">
               <dependency identifierref="RES-ZIP-DEPENDENCY-ITEM" />
             </resource>
             <resource identifier="RES-ZIP-DEPENDENCY-ITEM" href="items/dependency-item.xml" />

@@ -3813,16 +3813,46 @@ const collectXmlManifestResourceContentPathCandidates = (
 ): Map<string, string[]> => {
   const resources = collectXmlManifestResources(sourceDocument);
   const candidatesByResourceKey = new Map<string, string[]>();
+  const collectResourceCandidates = (
+    resource: XmlManifestResource,
+    visitedResourceIdentifiers: Set<string>
+  ): string[] => {
+    const candidates = [resource.key];
 
-  for (const resource of resources.values()) {
-    const candidates = [
+    for (const dependencyReference of resource.dependencyReferences) {
+      if (visitedResourceIdentifiers.has(dependencyReference)) {
+        continue;
+      }
+
+      const dependencyResource = resources.get(dependencyReference);
+      if (!dependencyResource) {
+        continue;
+      }
+
+      visitedResourceIdentifiers.add(dependencyReference);
+      candidates.push(
+        ...collectResourceCandidates(
+          dependencyResource,
+          visitedResourceIdentifiers
+        )
+      );
+    }
+
+    return candidates;
+  };
+
+  for (const [resourceIdentifier, resource] of resources) {
+    candidatesByResourceKey.set(
       resource.key,
-      ...resource.dependencyReferences
-        .map(dependencyReference => resources.get(dependencyReference)?.key)
-        .filter((dependencyKey): dependencyKey is string => Boolean(dependencyKey))
-    ];
-
-    candidatesByResourceKey.set(resource.key, [...new Set(candidates)]);
+      [
+        ...new Set(
+          collectResourceCandidates(
+            resource,
+            new Set([resourceIdentifier])
+          )
+        )
+      ]
+    );
   }
 
   return candidatesByResourceKey;
