@@ -221,6 +221,9 @@ jobs:
           - smoke: ui-activation-blocking-runtime
             command: npm run smoke:ui:activation-blocking-runtime
             playwright: true
+          - smoke: ui-delete-group-results
+            command: npm run smoke:ui:delete-group-results
+            playwright: true
           - smoke: ui-full
             command: npm run smoke:ui
             playwright: true

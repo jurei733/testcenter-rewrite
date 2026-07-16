@@ -4813,6 +4813,7 @@ try {
     .filter({ hasText: "Group Results Deleted" })
     .filter({ hasText: participantGroupKey })
     .waitFor();
+  stopAfter("delete-group-results");
 
   process.stdout.write(
     `UI smoke passed for store=${store} at http://127.0.0.1:${port}/app\n`
