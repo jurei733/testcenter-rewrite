@@ -5978,11 +5978,22 @@ test("source document import derives ZIP runtime structure from referenced bookl
       fileName: "export/booklets/referenced-booklet.xml",
       content: `
         <Booklet id="booklet:zip-referenced" label="Referenced ZIP Booklet">
-          <Unit id="unit:zip-referenced-a" label="Referenced Unit A" />
+          <Unit id="unit:zip-referenced-a" label="Referenced Unit A" href="../items/referenced-unit-a.xml" />
           <Unit id="unit:zip-referenced-b" label="Referenced Unit B">
             <content>Loaded from the referenced booklet file.</content>
           </Unit>
         </Booklet>
+      `
+    },
+    {
+      fileName: "export/items/referenced-unit-a.xml",
+      content: `
+        <assessmentItem>
+          <title>Referenced Unit A Description</title>
+          <itemBody>
+            <p>Loaded from the booklet-relative unit file.</p>
+          </itemBody>
+        </assessmentItem>
       `
     }
   ]);
@@ -6044,7 +6055,9 @@ test("source document import derives ZIP runtime structure from referenced bookl
           unitEntries: [
             {
               unitKey: "unit:zip-referenced-a",
-              displayLabel: "Referenced Unit A"
+              displayLabel: "Referenced Unit A",
+              content: "Loaded from the booklet-relative unit file.",
+              description: "Referenced Unit A Description"
             },
             {
               unitKey: "unit:zip-referenced-b",

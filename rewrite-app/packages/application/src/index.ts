@@ -4064,6 +4064,108 @@ const collectXmlBookletEntries = (
   return bookletEntries;
 };
 
+const collectXmlBookletUnitContentPathCandidates = (
+  sourceDocument: string
+): Map<string, string[]> => {
+  const candidatesByUnitKey = new Map<string, string[]>();
+
+  for (const bookletMatch of sourceDocument.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet|assessmentTest|assessment-test|assessmentSection|assessment-section|section))\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  )) {
+    for (const unitMatch of (bookletMatch[3] ?? "").matchAll(
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:unit|unitRef|unit-ref|unitReference|unitDefinition|assessmentItem|assessment-item|assessmentItemRef|assessment-item-ref|itemRef|item-ref|unitFile|unit-file|resource|file|item|task|module))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+    )) {
+      const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
+      const unitContent = unitMatch[3] ?? "";
+      const unitKey = String(
+        readXmlAttribute(
+          unitAttributes,
+          "unitKey",
+          "unitId",
+          "identifier",
+          "key",
+          "id",
+          "ref",
+          "identifierref",
+          "identifierRef",
+          "alias",
+          "code",
+          "resourceId",
+          "moduleId",
+          "taskId",
+          "name",
+          "path",
+          "src",
+          "uri",
+          "file",
+          "fileName",
+          "filename",
+          "href"
+        ) ??
+          readXmlChildText(
+            unitContent,
+            "unitKey",
+            "unitId",
+            "identifier",
+            "key",
+            "id",
+            "ref",
+            "identifierref",
+            "identifierRef",
+            "alias",
+            "code",
+            "resourceId",
+            "moduleId",
+            "taskId",
+            "name",
+            "path",
+            "src",
+            "uri",
+            "file",
+            "fileName",
+            "filename",
+            "href"
+          ) ??
+          ""
+      ).trim();
+      const contentPath = String(
+        readXmlAttribute(
+          unitAttributes,
+          "href",
+          "path",
+          "src",
+          "uri",
+          "file",
+          "fileName",
+          "filename"
+        ) ??
+          readXmlChildText(
+            unitContent,
+            "href",
+            "path",
+            "src",
+            "uri",
+            "file",
+            "fileName",
+            "filename"
+          ) ??
+          ""
+      ).trim();
+
+      if (!unitKey || !contentPath || unitKey === contentPath) {
+        continue;
+      }
+
+      const existingCandidates = candidatesByUnitKey.get(unitKey) ?? [];
+      candidatesByUnitKey.set(unitKey, [
+        ...new Set([...existingCandidates, contentPath])
+      ]);
+    }
+  }
+
+  return candidatesByUnitKey;
+};
+
 const normalizeParsedXmlContentStructure = (
   sourceDocument: string
 ): ContentReleaseRuntimeSnapshot | null => {
@@ -4302,6 +4404,11 @@ const findZipEntryByPath = (
   return null;
 };
 
+type ZipResourcePathCandidate = {
+  baseFileName: string;
+  resourcePath: string;
+};
+
 const extractZipUnitContent = (sourceDocument: string): string | null => {
   const content = normalizeUnitContent(
     readXmlChildText(
@@ -4402,6 +4509,24 @@ const extractXmlManifestFromZipSourceDocument = (
 const normalizeParsedZipXmlContentStructure = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ContentReleaseRuntimeSnapshot | null => {
+  const bookletUnitContentPathCandidatesByUnitKey = new Map<
+    string,
+    ZipResourcePathCandidate[]
+  >();
+  const addBookletUnitContentPathCandidates = (
+    baseFileName: string,
+    candidatesByUnitKey: Map<string, string[]>
+  ): void => {
+    for (const [unitKey, resourcePaths] of candidatesByUnitKey) {
+      const existingCandidates =
+        bookletUnitContentPathCandidatesByUnitKey.get(unitKey) ?? [];
+      bookletUnitContentPathCandidatesByUnitKey.set(unitKey, [
+        ...existingCandidates,
+        ...resourcePaths.map(resourcePath => ({ baseFileName, resourcePath }))
+      ]);
+    }
+  };
+
   let runtimeSnapshot = normalizeParsedXmlContentStructure(
     manifestExtraction.manifestText
   );
@@ -4428,6 +4553,11 @@ const normalizeParsedZipXmlContentStructure = (
         return [];
       }
 
+      addBookletUnitContentPathCandidates(
+        referencedEntry.fileName,
+        collectXmlBookletUnitContentPathCandidates(sourceDocument)
+      );
+
       return (
         normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
       );
@@ -4453,16 +4583,29 @@ const normalizeParsedZipXmlContentStructure = (
           return unitEntry;
         }
 
-        const resourcePathCandidates =
-          contentPathCandidatesByResourceKey.get(unitEntry.unitKey) ?? [
-            unitEntry.unitKey
-          ];
+        const manifestResourcePathCandidates = (
+          contentPathCandidatesByResourceKey.get(unitEntry.unitKey) ?? []
+        ).map(resourcePath => ({
+          baseFileName: manifestExtraction.manifestFileName,
+          resourcePath
+        }));
+        const bookletResourcePathCandidates =
+          bookletUnitContentPathCandidatesByUnitKey.get(unitEntry.unitKey) ??
+          [];
+        const resourcePathCandidates: ZipResourcePathCandidate[] = [
+          ...manifestResourcePathCandidates,
+          ...bookletResourcePathCandidates,
+          {
+            baseFileName: manifestExtraction.manifestFileName,
+            resourcePath: unitEntry.unitKey
+          }
+        ];
         const referencedEntry = findZipEntryByPath(
           manifestExtraction.entries,
-          resourcePathCandidates.flatMap(resourcePath =>
+          resourcePathCandidates.flatMap(candidate =>
             resolveZipResourcePathCandidates(
-              manifestExtraction.manifestFileName,
-              resourcePath
+              candidate.baseFileName,
+              candidate.resourcePath
             )
           )
         );
