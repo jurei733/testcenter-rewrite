@@ -3952,6 +3952,18 @@ try {
     participantEntryUrlPrefix,
     { timeout: 15_000 }
   );
+  const bookletDetailStudentCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Study Monitor Booklet Detail" })
+    })
+    .locator(".record-card")
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: participantSessionId });
+  await bookletDetailStudentCard
+    .getByRole("button", { name: "Review Response" })
+    .waitFor();
   const bookletDetailAdaCard = page
     .locator("article.card")
     .filter({
@@ -4038,6 +4050,14 @@ try {
   await activeGroupDetailStudentCard
     .getByRole("link", { name: operatorParticipantSessionLink })
     .waitFor();
+  const activeGroupDetailRunCard = studyMonitorGroupDetailCard
+    .locator(".record-card")
+    .filter({ hasText: "student-ui" })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: participantSessionId });
+  await activeGroupDetailRunCard
+    .getByRole("button", { name: "Review Response" })
+    .waitFor();
   await clickCardAction("Study Monitor", "Open Unit Detail", "Paused Work");
   await page.waitForFunction(
     expected => {
@@ -4075,6 +4095,37 @@ try {
   await activeUnitDetailStudentCard
     .getByRole("link", { name: operatorParticipantSessionLink })
     .waitFor();
+  logStep("study-monitor-unit-detail-review-response");
+  await activeUnitDetailStudentCard
+    .getByRole("button", { name: "Review Response" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#bookletKey", participantBookletKey);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
+  await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#reviewLoginFilter", participantLoginKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
+  await expectInputValue("#reviewSessionFilter", participantSessionId);
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#openRunLoginFilter", participantLoginKey);
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
+  await expectInputValue("#openRunBookletFilter", participantBookletKey);
+  await expectInputValue("#openRunSessionFilter", participantSessionId);
+  await expectInputValue("#openRunRunFilter", pausedTestRunId);
+  await expectInputValue("#openRunUnitFilter", "unit-paused");
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-unit-detail-review-response");
   logStep("study-monitor-unit-detail-open-runtime");
   await activeUnitDetailStudentCard
     .getByRole("button", { name: "Open In Runtime" })

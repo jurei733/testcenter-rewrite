@@ -1113,70 +1113,64 @@ export class WorkspaceViewFacade {
         actionLabel: "Open Unit Detail",
         actionPayload: { unitKey: unit.unitKey }
       })),
-      ...detail.testRuns.map(item => ({
-        headline: this.monitorParticipantLabel(item),
-        subline: item.testRun.testRunId,
-        badges: [
-          item.participantRosterEntry ? "roster" : "ad hoc",
-          item.testRun.status,
-          item.testRun.bookletKey
-        ],
-        rows: [
-          {
-            label: "Login",
-            value: this.monitorParticipantLogin(item)
-          },
-          {
-            label: "Display Name",
-            value: item.participantRosterEntry?.displayName ?? "none"
-          },
-          { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
-          ...this.participantSessionLinkRows(
-            item.participantSession?.participantSessionId,
+      ...detail.testRuns.map(item => {
+        const runActionPayload = {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        };
+
+        return {
+          headline: this.monitorParticipantLabel(item),
+          subline: item.testRun.testRunId,
+          badges: [
+            item.participantRosterEntry ? "roster" : "ad hoc",
+            item.testRun.status,
+            item.testRun.bookletKey
+          ],
+          rows: [
             {
-              loginKey: this.monitorParticipantLogin(item),
-              groupKey: item.participantSession?.groupKey,
-              bookletKey: item.testRun.bookletKey
+              label: "Login",
+              value: this.monitorParticipantLogin(item)
+            },
+            {
+              label: "Display Name",
+              value: item.participantRosterEntry?.displayName ?? "none"
+            },
+            { label: "Group", value: item.participantSession?.groupKey ?? "unknown group" },
+            ...this.participantSessionLinkRows(
+              item.participantSession?.participantSessionId,
+              {
+                loginKey: this.monitorParticipantLogin(item),
+                groupKey: item.participantSession?.groupKey,
+                bookletKey: item.testRun.bookletKey
+              }
+            ),
+            { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
+            { label: "Responses", value: String(item.responseCount) },
+            { label: "Reviews", value: String(item.reviewCount) },
+            {
+              label: "Updated",
+              value: this.formatDateTime(item.testRun.updatedAt)
             }
-          ),
-          { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
-          { label: "Responses", value: String(item.responseCount) },
-          { label: "Reviews", value: String(item.reviewCount) },
-          {
-            label: "Updated",
-            value: this.formatDateTime(item.testRun.updatedAt)
-          }
-        ],
-        actionLabel: "Open Run Detail",
-        actionPayload: {
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: item.testRun.currentUnitKey ?? ""
-        },
-        actions: this.openRuntimeActions({
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: item.testRun.currentUnitKey ?? ""
-        })
-      }))
+          ],
+          actionLabel: "Open Run Detail",
+          actionPayload: runActionPayload,
+          actions:
+            item.responseCount > 0
+              ? this.reviewResponseActions(runActionPayload)
+              : this.openRuntimeActions(runActionPayload)
+        };
+      })
     ];
   }
 
@@ -1353,69 +1347,63 @@ export class WorkspaceViewFacade {
         actionLabel: "Open Unit Detail",
         actionPayload: { unitKey: unit.unitKey }
       })),
-      ...detail.testRuns.map(item => ({
-        headline: this.monitorParticipantLabel(item),
-        subline: item.testRun.testRunId,
-        badges: [
-          item.participantRosterEntry ? "roster" : "ad hoc",
-          item.testRun.status,
-          item.testRun.bookletKey
-        ],
-        rows: [
-          {
-            label: "Login",
-            value: this.monitorParticipantLogin(item)
-          },
-          {
-            label: "Display Name",
-            value: item.participantRosterEntry?.displayName ?? "none"
-          },
-          ...this.participantSessionLinkRows(
-            item.participantSession?.participantSessionId,
+      ...detail.testRuns.map(item => {
+        const runActionPayload = {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: item.testRun.currentUnitKey ?? ""
+        };
+
+        return {
+          headline: this.monitorParticipantLabel(item),
+          subline: item.testRun.testRunId,
+          badges: [
+            item.participantRosterEntry ? "roster" : "ad hoc",
+            item.testRun.status,
+            item.testRun.bookletKey
+          ],
+          rows: [
             {
-              loginKey: this.monitorParticipantLogin(item),
-              groupKey: item.participantSession?.groupKey,
-              bookletKey: item.testRun.bookletKey
+              label: "Login",
+              value: this.monitorParticipantLogin(item)
+            },
+            {
+              label: "Display Name",
+              value: item.participantRosterEntry?.displayName ?? "none"
+            },
+            ...this.participantSessionLinkRows(
+              item.participantSession?.participantSessionId,
+              {
+                loginKey: this.monitorParticipantLogin(item),
+                groupKey: item.participantSession?.groupKey,
+                bookletKey: item.testRun.bookletKey
+              }
+            ),
+            { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
+            { label: "Responses", value: String(item.responseCount) },
+            { label: "Reviews", value: String(item.reviewCount) },
+            {
+              label: "Updated",
+              value: this.formatDateTime(item.testRun.updatedAt)
             }
-          ),
-          { label: "Current Unit", value: item.testRun.currentUnitKey ?? "none" },
-          { label: "Responses", value: String(item.responseCount) },
-          { label: "Reviews", value: String(item.reviewCount) },
-          {
-            label: "Updated",
-            value: this.formatDateTime(item.testRun.updatedAt)
-          }
-        ],
-        actionLabel: "Open Run Detail",
-        actionPayload: {
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: item.testRun.currentUnitKey ?? ""
-        },
-        actions: this.openRuntimeActions({
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: item.testRun.currentUnitKey ?? ""
-        })
-      }))
+          ],
+          actionLabel: "Open Run Detail",
+          actionPayload: runActionPayload,
+          actions:
+            item.responseCount > 0
+              ? this.reviewResponseActions(runActionPayload)
+              : this.openRuntimeActions(runActionPayload)
+        };
+      })
     ];
   }
 
@@ -1486,74 +1474,67 @@ export class WorkspaceViewFacade {
         },
         actions: [this.prepareRuntimeAction(rosterEntry)]
       })),
-      ...detail.testRuns.map(item => ({
-        headline: this.monitorParticipantLabel(item),
-        subline: item.testRun.testRunId,
-        badges: [
-          item.participantRosterEntry ? "roster" : "ad hoc",
-          item.testRun.status,
-          item.answered ? "answered" : "missing",
-          `${item.reviewCount} review(s)`
-        ],
-        rows: [
-          {
-            label: "Login",
-            value: this.monitorParticipantLogin(item)
-          },
-          {
-            label: "Display Name",
-            value: item.participantRosterEntry?.displayName ?? "none"
-          },
-          {
-            label: "Group",
-            value: item.participantSession?.groupKey ?? "unknown group"
-          },
-          ...this.participantSessionLinkRows(
-            item.participantSession?.participantSessionId,
+      ...detail.testRuns.map(item => {
+        const runActionPayload = {
+          subjectType: "test_run",
+          subjectId: item.testRun.testRunId,
+          testRunId: item.testRun.testRunId,
+          participantSessionId:
+            item.participantSession?.participantSessionId ?? "",
+          loginKey: item.participantSession?.loginKey ?? "",
+          groupKey:
+            item.participantSession?.groupKey ??
+            item.participantRosterEntry?.groupKey ??
+            "",
+          bookletKey: item.testRun.bookletKey,
+          currentUnitKey: detail.unitKey
+        };
+
+        return {
+          headline: this.monitorParticipantLabel(item),
+          subline: item.testRun.testRunId,
+          badges: [
+            item.participantRosterEntry ? "roster" : "ad hoc",
+            item.testRun.status,
+            item.answered ? "answered" : "missing",
+            `${item.reviewCount} review(s)`
+          ],
+          rows: [
             {
-              loginKey: this.monitorParticipantLogin(item),
-              groupKey: item.participantSession?.groupKey,
-              bookletKey: item.testRun.bookletKey
+              label: "Login",
+              value: this.monitorParticipantLogin(item)
+            },
+            {
+              label: "Display Name",
+              value: item.participantRosterEntry?.displayName ?? "none"
+            },
+            {
+              label: "Group",
+              value: item.participantSession?.groupKey ?? "unknown group"
+            },
+            ...this.participantSessionLinkRows(
+              item.participantSession?.participantSessionId,
+              {
+                loginKey: this.monitorParticipantLogin(item),
+                groupKey: item.participantSession?.groupKey,
+                bookletKey: item.testRun.bookletKey
+              }
+            ),
+            { label: "Booklet", value: item.testRun.bookletKey },
+            { label: "Expected", value: item.expected ? "yes" : "no" },
+            { label: "Response Length", value: String(item.responseLength) },
+            {
+              label: "Updated",
+              value: this.formatDateTime(item.testRun.updatedAt)
             }
-          ),
-          { label: "Booklet", value: item.testRun.bookletKey },
-          { label: "Expected", value: item.expected ? "yes" : "no" },
-          { label: "Response Length", value: String(item.responseLength) },
-          {
-            label: "Updated",
-            value: this.formatDateTime(item.testRun.updatedAt)
-          }
-        ],
-        actionLabel: "Open Run Detail",
-        actionPayload: {
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: detail.unitKey
-        },
-        actions: this.openRuntimeActions({
-          subjectType: "test_run",
-          subjectId: item.testRun.testRunId,
-          testRunId: item.testRun.testRunId,
-          participantSessionId:
-            item.participantSession?.participantSessionId ?? "",
-          loginKey: item.participantSession?.loginKey ?? "",
-          groupKey:
-            item.participantSession?.groupKey ??
-            item.participantRosterEntry?.groupKey ??
-            "",
-          bookletKey: item.testRun.bookletKey,
-          currentUnitKey: detail.unitKey
-        })
-      }))
+          ],
+          actionLabel: "Open Run Detail",
+          actionPayload: runActionPayload,
+          actions: item.answered
+            ? this.reviewResponseActions(runActionPayload)
+            : this.openRuntimeActions(runActionPayload)
+        };
+      })
     ];
   }
 

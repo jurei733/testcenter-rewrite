@@ -209,6 +209,9 @@ jobs:
           - smoke: ui-run-detail-review
             command: npm run smoke:ui:run-detail-review
             playwright: true
+          - smoke: ui-unit-detail-review
+            command: npm run smoke:ui:unit-detail-review
+            playwright: true
           - smoke: ui-activation-blocking-runtime
             command: npm run smoke:ui:activation-blocking-runtime
             playwright: true
