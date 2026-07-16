@@ -3334,7 +3334,8 @@ const decodeXmlTextContent = (value: string): string =>
   decodeXmlAttributeValue(
     value
       .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-      .replace(/<[^>]+>/g, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
       .trim()
   );
 

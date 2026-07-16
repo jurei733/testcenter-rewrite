@@ -5780,7 +5780,8 @@ test("source document import enriches ZIP units with referenced file content", a
         <assessmentItem>
           <title>Extracted ZIP Unit Description</title>
           <itemBody>
-            <p>Read the extracted ZIP unit body and answer the question.</p>
+            <p>Read the extracted ZIP unit body.</p>
+            <p>Answer the question.</p>
           </itemBody>
         </assessmentItem>
       `
@@ -5847,7 +5848,7 @@ test("source document import enriches ZIP units with referenced file content", a
               unitKey: "items/zip-content-unit.xml",
               displayLabel: "ZIP Content Unit",
               description: "Extracted ZIP Unit Description",
-              content: "Read the extracted ZIP unit body and answer the question."
+              content: "Read the extracted ZIP unit body. Answer the question."
             }
           ]
         }
