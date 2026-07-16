@@ -3856,17 +3856,13 @@ const collectXmlManifestResourceContentPathCandidates = (
   };
 
   for (const [resourceIdentifier, resource] of resources) {
-    candidatesByResourceKey.set(
-      resource.key,
-      [
-        ...new Set(
-          collectResourceCandidates(
-            resource,
-            new Set([resourceIdentifier])
-          )
-        )
-      ]
-    );
+    const candidates = [
+      ...new Set(
+        collectResourceCandidates(resource, new Set([resourceIdentifier]))
+      )
+    ];
+    candidatesByResourceKey.set(resource.key, candidates);
+    candidatesByResourceKey.set(resourceIdentifier, candidates);
   }
 
   return candidatesByResourceKey;
@@ -4405,6 +4401,8 @@ type ZipResourcePathCandidate = {
 };
 
 const extractZipUnitContent = (sourceDocument: string): string | null => {
+  const hasDefinitionReference =
+    /<((?:[a-zA-Z_][\w.-]*:)?DefinitionRef)\b/i.test(sourceDocument);
   const content = normalizeUnitContent(
     readXmlChildText(
       sourceDocument,
@@ -4417,10 +4415,38 @@ const extractZipUnitContent = (sourceDocument: string): string | null => {
       "text",
       "stimulus",
       "markdown",
-      "html"
-    ) ?? sourceDocument
+      "html",
+      "Definition",
+      "definition"
+    ) ?? (hasDefinitionReference ? "" : sourceDocument)
   );
   return content || null;
+};
+
+const extractZipUnitDefinitionReference = (
+  sourceDocument: string
+): string | null => {
+  const definitionReferenceMatch = sourceDocument.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?DefinitionRef)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/i
+  );
+  if (!definitionReferenceMatch) {
+    return null;
+  }
+
+  const attributes = parseXmlAttributes(definitionReferenceMatch[2] ?? "");
+  const reference = normalizeManifestToken(
+    readXmlAttribute(
+      attributes,
+      "href",
+      "path",
+      "src",
+      "uri",
+      "file",
+      "fileName",
+      "filename"
+    ) ?? decodeXmlTextContent(definitionReferenceMatch[3] ?? "")
+  );
+  return reference || null;
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -4525,39 +4551,49 @@ const normalizeParsedZipXmlContentStructure = (
   let runtimeSnapshot = normalizeParsedXmlContentStructure(
     manifestExtraction.manifestText
   );
+  const referencedBookletEntries = [
+    ...collectXmlManifestResources(manifestExtraction.manifestText).values()
+  ].flatMap(resource => {
+    const referencedEntry = findZipEntryByPath(
+      manifestExtraction.entries,
+      resolveZipResourcePathCandidates(
+        manifestExtraction.manifestFileName,
+        resource.key
+      )
+    );
+    if (!referencedEntry) {
+      return [];
+    }
+
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      referencedEntry
+    );
+    if (!sourceDocument) {
+      return [];
+    }
+
+    addBookletUnitContentPathCandidates(
+      referencedEntry.fileName,
+      collectXmlBookletUnitContentPathCandidates(sourceDocument)
+    );
+
+    return (
+      normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
+    );
+  });
+  const referencedRuntimeSnapshot =
+    referencedBookletEntries.length > 0
+      ? normalizeContentStructure({
+          bookletEntries: referencedBookletEntries
+        })
+      : null;
+
+  if (referencedRuntimeSnapshot) {
+    runtimeSnapshot = referencedRuntimeSnapshot;
+  }
+
   if (!runtimeSnapshot) {
-    const referencedBookletEntries = [
-      ...collectXmlManifestResources(manifestExtraction.manifestText).values()
-    ].flatMap(resource => {
-      const referencedEntry = findZipEntryByPath(
-        manifestExtraction.entries,
-        resolveZipResourcePathCandidates(
-          manifestExtraction.manifestFileName,
-          resource.key
-        )
-      );
-      if (!referencedEntry) {
-        return [];
-      }
-
-      const sourceDocument = readZipEntryText(
-        manifestExtraction.zipBuffer,
-        referencedEntry
-      );
-      if (!sourceDocument) {
-        return [];
-      }
-
-      addBookletUnitContentPathCandidates(
-        referencedEntry.fileName,
-        collectXmlBookletUnitContentPathCandidates(sourceDocument)
-      );
-
-      return (
-        normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
-      );
-    });
-
     runtimeSnapshot = normalizeContentStructure({
       bookletEntries: referencedBookletEntries
     });
@@ -4616,7 +4652,25 @@ const normalizeParsedZipXmlContentStructure = (
           return unitEntry;
         }
 
-        const content = extractZipUnitContent(sourceDocument);
+        const definitionReference =
+          extractZipUnitDefinitionReference(sourceDocument);
+        const definitionEntry = definitionReference
+          ? findZipEntryByPath(
+              manifestExtraction.entries,
+              resolveZipResourcePathCandidates(
+                referencedEntry.fileName,
+                definitionReference
+              )
+            )
+          : null;
+        const definitionDocument = definitionEntry
+          ? readZipEntryText(manifestExtraction.zipBuffer, definitionEntry)
+          : null;
+        const definitionContent = definitionDocument
+          ? normalizeUnitContent(decodeXmlTextContent(definitionDocument))
+          : null;
+        const content =
+          definitionContent ?? extractZipUnitContent(sourceDocument);
         if (!content) {
           return unitEntry;
         }

@@ -6171,6 +6171,162 @@ test("source document import derives ZIP runtime structure from referenced bookl
   );
 });
 
+test("source document import resolves ZIP Testcenter unit definitions", async () => {
+  const tenantKey = "integration-tenant-zip-testcenter-definition";
+  const workspaceKey = "integration-workspace-zip-testcenter-definition";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="BOOKLET.SAMPLE-1" href="booklets/Booklet.xml">
+              <dependency identifierref="UNIT.SAMPLE" />
+              <dependency identifierref="UNIT.INLINE" />
+            </resource>
+            <resource identifier="UNIT.SAMPLE" href="units/UNIT.SAMPLE.xml" />
+            <resource identifier="UNIT.INLINE" href="units/UNIT.INLINE.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>BOOKLET.SAMPLE-1</Id>
+            <Label>Sample booklet</Label>
+          </Metadata>
+          <Units>
+            <Unit id="UNIT.SAMPLE" label="Referenced definition unit" />
+            <Unit id="UNIT.INLINE" label="Inline definition unit" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/UNIT.SAMPLE.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>UNIT.SAMPLE</Id>
+            <Label>A sample unit</Label>
+            <Description>Original Unit Description</Description>
+          </Metadata>
+          <DefinitionRef player="verona-player-simple@6.0">assets/SAMPLE_UNITCONTENTS.HTM</DefinitionRef>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/assets/SAMPLE_UNITCONTENTS.HTM",
+      content: `
+        <main>
+          <p>Loaded original Testcenter definition payload.</p>
+        </main>
+      `
+    },
+    {
+      fileName: "export/units/UNIT.INLINE.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>UNIT.INLINE</Id>
+            <Label>Inline Unit</Label>
+          </Metadata>
+          <Definition><![CDATA[
+            <section>Loaded inline Testcenter definition payload.</section>
+          ]]></Definition>
+        </Unit>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-definition-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              description?: string;
+              content?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "BOOKLET.SAMPLE-1",
+          displayLabel: "Sample booklet",
+          unitEntries: [
+            {
+              unitKey: "UNIT.SAMPLE",
+              displayLabel: "Referenced definition unit",
+              description: "Original Unit Description",
+              content: "Loaded original Testcenter definition payload."
+            },
+            {
+              unitKey: "UNIT.INLINE",
+              displayLabel: "Inline definition unit",
+              description: "Inline Unit",
+              content: "Loaded inline Testcenter definition payload."
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
   const tenantKey = "integration-tenant-zip-xml-base";
   const workspaceKey = "integration-workspace-zip-xml-base";
