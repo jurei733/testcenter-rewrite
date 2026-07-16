@@ -1416,6 +1416,12 @@ try {
     .filter({ hasText: uploadedZipSourceFileName })
     .filter({ hasText: "ZIP package source document" })
     .waitFor();
+  const persistedAfterZipLoad = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+  );
+  assert.equal(persistedAfterZipLoad.sourceFileName, uploadedZipSourceFileName);
+  assert.equal(persistedAfterZipLoad.sourceMediaType, "application/zip");
+  assert.equal(persistedAfterZipLoad.sourceDocument, "");
   logStep("load-source-document-file");
   const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.imsmanifest`;
   const uploadedSourcePath = resolve(".data", uploadedSourceFileName);
