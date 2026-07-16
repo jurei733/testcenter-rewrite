@@ -101,6 +101,38 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("parses Testcenter Login XML roster entries", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          "<Testtakers>",
+          "  <Group id=\"sample_group\" label=\"Primary Sample Group\">",
+          "    <Login mode=\"run-hot-return\" name=\"test\" pw=\"user123\">",
+          "      <Booklet codes=\"xxx yyy\">BOOKLET.SAMPLE-1</Booklet>",
+          "      <Booklet>BOOKLET.SAMPLE-2</Booklet>",
+          "    </Login>",
+          "    <Login mode=\"monitor-group\" name=\"test-group-monitor\" pw=\"user123\" />",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      ),
+      [
+        {
+          loginKey: "test",
+          groupKey: "sample_group",
+          bookletKey: "BOOKLET.SAMPLE-1",
+          displayName: null
+        },
+        {
+          loginKey: "test-group-monitor",
+          groupKey: "sample_group",
+          bookletKey: null,
+          displayName: null
+        }
+      ]
+    );
+  });
+
   it("parses JSON roster entries and inherited group/booklet contexts", () => {
     assert.deepEqual(
       parseParticipantRosterText(

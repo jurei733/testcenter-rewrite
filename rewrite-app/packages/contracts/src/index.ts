@@ -528,7 +528,9 @@ const collectXmlRosterContextRanges = (
     const end = offset + match[0].length;
     const content = rosterText.slice(entry.start, end);
     if (
-      content.match(/<(?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee)\b/i)
+      content.match(
+        /<(?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee|login)\b/i
+      )
     ) {
       ranges.push({
         start: entry.start,
@@ -682,6 +684,94 @@ const parseParticipantRosterXmlText = (
       normalizeRosterTextValue(
         readXmlAttribute(attributes, "lastName", "lastname", "familyName") ??
           readXmlChildText(content, "lastName", "lastname", "familyName")
+      )
+    );
+
+    entries.push({
+      loginKey,
+      groupKey: groupKey || `group:${loginKey}`,
+      bookletKey,
+      displayName
+    });
+  }
+
+  for (const match of rosterText.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?Login)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g
+  )) {
+    const entryOffset = match.index ?? 0;
+    const attributes = parseXmlAttributes(match[2] ?? "");
+    const content = match[3] ?? "";
+    const loginKey = normalizeRosterTextValue(
+      readXmlAttribute(
+        attributes,
+        "loginKey",
+        "login",
+        "username",
+        "userName",
+        "code",
+        "identifier",
+        "id",
+        "name"
+      )
+    );
+    if (!loginKey) {
+      continue;
+    }
+
+    const groupKey =
+      normalizeRosterTextValue(
+        readXmlAttribute(
+          attributes,
+          "groupKey",
+          "group",
+          "groupId",
+          "groupName",
+          "class",
+          "className"
+        )
+      ) ?? findNearestXmlRosterContextValue(groupContextRanges, entryOffset);
+    const bookletKey = normalizeRosterTextValue(
+      readXmlAttribute(
+        attributes,
+        "bookletKey",
+        "booklet",
+        "bookletId",
+        "testlet",
+        "testletId"
+      ) ??
+        readXmlChildAttribute(
+          content,
+          "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref",
+          "bookletKey",
+          "key",
+          "id",
+          "identifier",
+          "ref"
+        ) ??
+        readXmlChildText(
+          content,
+          "bookletKey",
+          "booklet",
+          "bookletId",
+          "testlet",
+          "testletId"
+        )
+    );
+    const displayName = combineRosterDisplayName(
+      normalizeRosterTextValue(
+        readXmlAttribute(
+          attributes,
+          "displayName",
+          "displayLabel",
+          "label",
+          "fullName"
+        )
+      ),
+      normalizeRosterTextValue(
+        readXmlAttribute(attributes, "firstName", "firstname", "givenName")
+      ),
+      normalizeRosterTextValue(
+        readXmlAttribute(attributes, "lastName", "lastname", "familyName")
       )
     );
 

@@ -7331,6 +7331,41 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(xmlRosterE?.bookletKey, "booklet:nested");
   assert.equal(xmlRosterE?.displayName, "Eve Nested");
 
+  const testcenterLoginImport = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          "<Testtakers>",
+          "  <Group id=\"sample_group\" label=\"Primary Sample Group\">",
+          "    <Login mode=\"run-hot-return\" name=\"test\" pw=\"user123\">",
+          "      <Booklet codes=\"xxx yyy\">BOOKLET.SAMPLE-1</Booklet>",
+          "      <Booklet>BOOKLET.SAMPLE-2</Booklet>",
+          "    </Login>",
+          "    <Login mode=\"monitor-group\" name=\"test-group-monitor\" pw=\"user123\" />",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+
+  assert.equal(testcenterLoginImport.status, 201);
+  assert.equal(testcenterLoginImport.body.importedCount, 2);
+  assert.equal(testcenterLoginImport.body.updatedCount, 0);
+  const testcenterLogin = testcenterLoginImport.body.items.find(
+    item => item.loginKey === "test"
+  );
+  assert.equal(testcenterLogin?.groupKey, "sample_group");
+  assert.equal(testcenterLogin?.bookletKey, "BOOKLET.SAMPLE-1");
+  assert.equal(testcenterLogin?.displayName, null);
+  const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
+    item => item.loginKey === "test-group-monitor"
+  );
+  assert.equal(testcenterMonitorLogin?.groupKey, "sample_group");
+  assert.equal(testcenterMonitorLogin?.bookletKey, null);
+
   const jsonImport = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
@@ -7442,7 +7477,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
 
   assert.equal(listedRoster.status, 200);
-  assert.equal(listedRoster.body.items.length, 9);
+  assert.equal(listedRoster.body.items.length, 11);
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
     [
@@ -7454,7 +7489,9 @@ test("workspace participant roster can be imported, updated, and listed", async 
       "roster-f",
       "roster-g",
       "roster-h",
-      "roster-i"
+      "roster-i",
+      "test",
+      "test-group-monitor"
     ]
   );
 
@@ -7482,6 +7519,14 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.match(
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","group:nested","booklet:nested","Eve Nested"/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","sample_group","BOOKLET\.SAMPLE-1",""/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test-group-monitor","sample_group","",""/
   );
   assert.match(
     rosterCsvText,
@@ -7526,7 +7571,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
   );
   assert.equal(activityEvents.status, 200);
-  assert.equal(activityEvents.body.items.length, 5);
+  assert.equal(activityEvents.body.items.length, 6);
 });
 
 test("participant runtime uses saved roster defaults for group and booklet", async () => {
