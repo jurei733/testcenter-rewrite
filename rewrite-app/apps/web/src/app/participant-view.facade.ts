@@ -277,7 +277,10 @@ export class ParticipantViewFacade {
         detail: hasParticipantSession
           ? "Resume the session to launch or continue the current run."
           : "Enter your workspace and login key, then sign in.",
-        displayNameLabel: "No participant name yet",
+        displayNameLabel:
+          this.runtime.participantDisplayName.trim() ||
+          this.runtime.loginKey.trim() ||
+          "No participant name yet",
         loginLabel: this.runtime.loginKey.trim() || "No login yet",
         groupLabel: this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
@@ -624,6 +627,7 @@ export class ParticipantViewFacade {
     );
 
     this.syncParticipantSessionFields(payload.participantSession);
+    this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
@@ -689,6 +693,7 @@ export class ParticipantViewFacade {
     );
 
     this.syncParticipantSessionFields(payload.participantSession);
+    this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRun(payload.testRun);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
@@ -910,7 +915,15 @@ export class ParticipantViewFacade {
     this.workspace.tenantKey = currentState.scope.tenantKey;
     this.workspace.workspaceKey = currentState.scope.workspaceKey;
     this.syncParticipantSessionFields(currentState.participantSession);
+    this.syncParticipantRosterEntry(currentState.participantRosterEntry);
     this.syncRun(currentState.testRun);
+  }
+
+  private syncParticipantRosterEntry(
+    participantRosterEntry: { displayName: string | null } | null
+  ): void {
+    this.runtime.participantDisplayName =
+      participantRosterEntry?.displayName?.trim() ?? "";
   }
 
   private syncCurrentUnitResponse(

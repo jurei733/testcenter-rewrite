@@ -1688,6 +1688,22 @@ try {
   logStep("participant-entry-sign-in");
   const participantEntrySignInLoginKey = "student-entry-sign-in";
   const participantEntrySignInGroupKey = "group:participant-entry-sign-in";
+  const participantEntrySignInDisplayName = "Student Entry Sign In";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "loginKey,groupKey,displayName",
+          [
+            participantEntrySignInLoginKey,
+            participantEntrySignInGroupKey,
+            participantEntrySignInDisplayName
+          ].join(",")
+        ].join("\n")
+      }
+    }
+  );
   await page.goto(`${baseUrl}/participant`, { waitUntil: "networkidle" });
   await page.locator("#participantLoginKey").waitFor();
   await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
@@ -1728,9 +1744,11 @@ try {
   await expectButtonSelectorEnabled("#participantRouteRefreshCurrentStateButton");
   await expectButtonSelectorEnabled("#participantRouteClearSessionButton");
   await page.waitForFunction(
-    expectedSessionId =>
+    ([expectedSessionId, expectedDisplayName]) =>
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
+      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+        expectedDisplayName &&
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "signed_in" &&
       document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
@@ -1738,7 +1756,7 @@ try {
       document.querySelector("#participantEntryNextStep")?.textContent?.includes(
         "Start test"
       ),
-    participantEntrySignInSessionId,
+    [participantEntrySignInSessionId, participantEntrySignInDisplayName],
     { timeout: 15_000 }
   );
   assert.equal(

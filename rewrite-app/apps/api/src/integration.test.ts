@@ -1812,6 +1812,9 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         loginKey: string;
         groupKey: string;
       };
+      participantRosterEntry: {
+        displayName: string | null;
+      } | null;
     }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
       method: "POST",
       body: {
@@ -1822,6 +1825,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(participantSignIn.status, 200);
     assert.equal(participantSignIn.body.participantSession.loginKey, "student-demo");
+    assert.equal(
+      participantSignIn.body.participantRosterEntry?.displayName,
+      "Demo Student"
+    );
 
     const resumed = await requestJsonAt<{
       testRun: {

@@ -9294,10 +9294,17 @@ export const createFirstSliceServices = (
           repository,
           participantSession.participantSessionId
         );
+        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
+          repository,
+          participantSession.tenantId,
+          participantSession.workspaceId,
+          participantSession.loginKey
+        );
 
         if (!latestTestRun) {
           return {
             participantSession,
+            participantRosterEntry,
             scope,
             latestTestRun: null,
             runtimeStatus: "ready_to_launch",
@@ -9308,6 +9315,7 @@ export const createFirstSliceServices = (
         if (latestTestRun.status === "completed") {
           return {
             participantSession,
+            participantRosterEntry,
             scope,
             latestTestRun: normalizeTestRun(latestTestRun),
             runtimeStatus: "completed",
@@ -9317,6 +9325,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
+          participantRosterEntry,
           scope,
           latestTestRun: normalizeTestRun(latestTestRun),
           runtimeStatus: "in_progress",

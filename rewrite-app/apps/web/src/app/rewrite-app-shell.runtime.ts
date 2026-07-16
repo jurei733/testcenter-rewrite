@@ -26,6 +26,7 @@ export interface RuntimePresentationHost {
   getParticipantSessionId(): string;
   setParticipantSessionId(nextValue: string): void;
   setGroupKey(nextValue: string): void;
+  setParticipantDisplayName(nextValue: string): void;
   syncRuntimeStateFromRun(testRun: RuntimeTestRunLike): void;
   getOpenRunsView(): string;
   setOpenRunsView(nextValue: string): void;
@@ -61,6 +62,7 @@ export function applyParticipantSignInResult(
 ): void {
   host.setParticipantSessionId(payload.participantSession.participantSessionId);
   host.setGroupKey(payload.participantSession.groupKey);
+  host.setParticipantDisplayName(payload.participantRosterEntry?.displayName ?? "");
   host.updateRuntimeSummary(
     payload.participantSession.status,
     `Session ${payload.participantSession.participantSessionId} signed in for login ${payload.participantSession.loginKey}.`
@@ -98,6 +100,7 @@ export function applyParticipantLaunchResult(
 ): void {
   host.setParticipantSessionId(payload.participantSession.participantSessionId);
   host.setGroupKey(payload.participantSession.groupKey);
+  host.setParticipantDisplayName(payload.participantRosterEntry?.displayName ?? "");
   host.syncRuntimeStateFromRun(payload.testRun);
   host.updateRuntimeSummary(
     payload.testRun.status,

@@ -16,6 +16,7 @@ import type {
   MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantRosterEntry,
   ParticipantSession,
   ParticipantSessionStatus,
   ParticipantRuntimeState,
@@ -1489,10 +1490,12 @@ export type ActivateContentReleaseResponse = {
 
 export type ParticipantSignInResponse = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
 };
 
 export type ParticipantLaunchResponse = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
   testRun: TestRun;
 };
 

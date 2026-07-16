@@ -34,6 +34,10 @@ export function createRuntimePresentationStateHost(args: {
       args.runtimeState.groupKey = nextValue;
       args.persistShellState();
     },
+    setParticipantDisplayName: nextValue => {
+      args.runtimeState.participantDisplayName = nextValue;
+      args.persistShellState();
+    },
     syncRuntimeStateFromRun: testRun => {
       if (!testRun) {
         return;

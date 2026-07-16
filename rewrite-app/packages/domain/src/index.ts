@@ -342,6 +342,7 @@ export type ParticipantSessionScope = {
 
 export type ParticipantRuntimeState = {
   participantSession: ParticipantSession;
+  participantRosterEntry: ParticipantRosterEntry | null;
   scope: ParticipantSessionScope;
   latestTestRun: TestRun | null;
   runtimeStatus: ParticipantRuntimeStateStatus;

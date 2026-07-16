@@ -4218,7 +4218,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       ) {
         const body = await readRequestJsonBody<ParticipantSignInRequest>();
         const participantSession = await services.participantRuntime.signIn(body);
-        sendJson<ParticipantSignInResponse>(response, 200, { participantSession });
+        const runtimeState = await services.participantRuntime.getRuntimeState({
+          participantSessionId: participantSession.participantSessionId
+        });
+        sendJson<ParticipantSignInResponse>(response, 200, {
+          participantSession,
+          participantRosterEntry: runtimeState.participantRosterEntry
+        });
         return;
       }
 
@@ -4288,6 +4294,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           });
           sendJson<ParticipantLaunchResponse>(response, 200, {
             participantSession: runtimeState.participantSession,
+            participantRosterEntry: runtimeState.participantRosterEntry,
             testRun
           });
           return;
@@ -4308,6 +4315,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         });
         sendJson<ParticipantLaunchResponse>(response, 200, {
           participantSession: runtimeState.participantSession,
+          participantRosterEntry: runtimeState.participantRosterEntry,
           testRun
         });
         return;
