@@ -5252,6 +5252,106 @@ test("source document import accepts testcenter-style XML aliases", async () => 
   );
 });
 
+test("source document import preserves testcenter unit aliases", async () => {
+  const tenantKey = "integration-tenant-testcenter-aliases";
+  const workspaceKey = "integration-workspace-testcenter-aliases";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata>
+            <Id>BOOKLET.SAMPLE-1</Id>
+            <Label>Sample booklet</Label>
+            <Description>This a sample booklet for testing/development/showcase purposes.</Description>
+          </Metadata>
+          <Units>
+            <Unit id="UNIT.SAMPLE" label="A Sample Unit to demonstrate the SamplePlayer2" labelshort="Sample Unit" />
+            <Testlet id="a_testlet_with_restrictions" label="First Block">
+              <Unit id="UNIT.SAMPLE-2" label="A very Simple Sample Unit" labelshort="2nd Sample Unit" />
+            </Testlet>
+            <Testlet id="another_testlet" label="Second Block">
+              <Unit id="UNIT.SAMPLE" label="Sample Unit again, with Alias" labelshort="Sample Unit Again" alias="an_alias" />
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "BOOKLET.SAMPLE-1",
+          displayLabel: "Sample booklet",
+          unitEntries: [
+            {
+              unitKey: "UNIT.SAMPLE",
+              displayLabel: "A Sample Unit to demonstrate the SamplePlayer2"
+            },
+            {
+              unitKey: "UNIT.SAMPLE-2",
+              displayLabel: "A very Simple Sample Unit"
+            },
+            {
+              unitKey: "an_alias",
+              displayLabel: "Sample Unit again, with Alias"
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts QTI assessment sections as booklets", async () => {
   const tenantKey = "integration-tenant-qti-sections";
   const workspaceKey = "integration-workspace-qti-sections";

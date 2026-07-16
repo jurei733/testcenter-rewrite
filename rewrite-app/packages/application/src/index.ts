@@ -3872,6 +3872,96 @@ const collectXmlManifestResourceContentPathCandidates = (
   return candidatesByResourceKey;
 };
 
+const readXmlUnitEntryKey = (
+  unitAttributes: Record<string, string>,
+  unitContent: string
+): string =>
+  String(
+    readXmlAttribute(
+      unitAttributes,
+      "unitKey",
+      "alias",
+      "unitId",
+      "identifier",
+      "key",
+      "id",
+      "ref",
+      "identifierref",
+      "identifierRef",
+      "code",
+      "path",
+      "src",
+      "uri",
+      "file",
+      "fileName",
+      "filename",
+      "resourceId",
+      "moduleId",
+      "taskId",
+      "href",
+      "name"
+    ) ??
+      readXmlChildText(
+        unitContent,
+        "unitKey",
+        "alias",
+        "unitId",
+        "identifier",
+        "key",
+        "id",
+        "ref",
+        "identifierref",
+        "identifierRef",
+        "code",
+        "path",
+        "src",
+        "uri",
+        "file",
+        "fileName",
+        "filename",
+        "resourceId",
+        "moduleId",
+        "taskId",
+        "href",
+        "name"
+      ) ??
+      ""
+  ).trim();
+
+const readXmlUnitEntryIdentity = (
+  unitAttributes: Record<string, string>,
+  unitContent: string
+): string =>
+  String(
+    readXmlAttribute(
+      unitAttributes,
+      "unitId",
+      "identifier",
+      "key",
+      "id",
+      "ref",
+      "identifierref",
+      "identifierRef",
+      "resourceId",
+      "moduleId",
+      "taskId"
+    ) ??
+      readXmlChildText(
+        unitContent,
+        "unitId",
+        "identifier",
+        "key",
+        "id",
+        "ref",
+        "identifierref",
+        "identifierRef",
+        "resourceId",
+        "moduleId",
+        "taskId"
+      ) ??
+      ""
+  ).trim();
+
 const collectXmlBookletEntries = (
   sourceDocument: string,
   bookletTagNames: string
@@ -3929,62 +4019,14 @@ const collectXmlBookletEntries = (
           )
       );
       unitEntries.push({
-        unitKey: String(
-          readXmlAttribute(
-            unitAttributes,
-            "unitKey",
-            "unitId",
-            "identifier",
-            "key",
-            "id",
-            "ref",
-            "identifierref",
-            "identifierRef",
-            "alias",
-            "code",
-            "path",
-            "src",
-            "uri",
-            "file",
-            "fileName",
-            "filename",
-            "resourceId",
-            "moduleId",
-            "taskId",
-            "href",
-            "name"
-          ) ??
-            readXmlChildText(
-              unitContent,
-              "unitKey",
-              "unitId",
-              "identifier",
-              "key",
-              "id",
-              "ref",
-              "identifierref",
-              "identifierRef",
-              "alias",
-              "code",
-              "path",
-              "src",
-              "uri",
-              "file",
-              "fileName",
-              "filename",
-              "resourceId",
-              "moduleId",
-              "taskId",
-              "href",
-              "name"
-            ) ??
-            ""
-        ).trim(),
+        unitKey: readXmlUnitEntryKey(unitAttributes, unitContent),
         displayLabel: String(
           readXmlAttribute(
             unitAttributes,
             "displayLabel",
             "label",
+            "labelshort",
+            "labelShort",
             "title",
             "name",
             "displayName"
@@ -3993,6 +4035,8 @@ const collectXmlBookletEntries = (
               unitContent,
               "title",
               "label",
+              "labelshort",
+              "labelShort",
               "name",
               "displayName"
             ) ??
@@ -4077,57 +4121,8 @@ const collectXmlBookletUnitContentPathCandidates = (
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       const unitContent = unitMatch[3] ?? "";
-      const unitKey = String(
-        readXmlAttribute(
-          unitAttributes,
-          "unitKey",
-          "unitId",
-          "identifier",
-          "key",
-          "id",
-          "ref",
-          "identifierref",
-          "identifierRef",
-          "alias",
-          "code",
-          "resourceId",
-          "moduleId",
-          "taskId",
-          "name",
-          "path",
-          "src",
-          "uri",
-          "file",
-          "fileName",
-          "filename",
-          "href"
-        ) ??
-          readXmlChildText(
-            unitContent,
-            "unitKey",
-            "unitId",
-            "identifier",
-            "key",
-            "id",
-            "ref",
-            "identifierref",
-            "identifierRef",
-            "alias",
-            "code",
-            "resourceId",
-            "moduleId",
-            "taskId",
-            "name",
-            "path",
-            "src",
-            "uri",
-            "file",
-            "fileName",
-            "filename",
-            "href"
-          ) ??
-          ""
-      ).trim();
+      const unitKey = readXmlUnitEntryKey(unitAttributes, unitContent);
+      const unitIdentity = readXmlUnitEntryIdentity(unitAttributes, unitContent);
       const contentPath = String(
         readXmlAttribute(
           unitAttributes,
@@ -4149,7 +4144,7 @@ const collectXmlBookletUnitContentPathCandidates = (
             "fileName",
             "filename"
           ) ??
-          ""
+          (unitIdentity && unitIdentity !== unitKey ? unitIdentity : "")
       ).trim();
 
       if (!unitKey || !contentPath || unitKey === contentPath) {
