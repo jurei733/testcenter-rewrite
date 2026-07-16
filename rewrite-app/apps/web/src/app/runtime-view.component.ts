@@ -545,6 +545,53 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No current run state loaded yet."
       ></app-record-collection>
 
+      <article class="card">
+        <h2>Open Run Filters</h2>
+        <p>Narrow activation-guard open runs and CSV export by participant, booklet, run, unit, status, or limit.</p>
+        <div class="form-grid">
+          <label>
+            Login Key
+            <input id="openRunLoginFilter" name="openRunLoginFilter" [(ngModel)]="view.runtime.openRunLoginFilter" (change)="view.persistState()" placeholder="Optional login key" />
+          </label>
+          <label>
+            Group Key
+            <input id="openRunGroupFilter" name="openRunGroupFilter" [(ngModel)]="view.runtime.openRunGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
+          </label>
+          <label>
+            Booklet Key
+            <input id="openRunBookletFilter" name="openRunBookletFilter" [(ngModel)]="view.runtime.openRunBookletFilter" (change)="view.persistState()" placeholder="Optional booklet key" />
+          </label>
+          <label>
+            Session Id
+            <input id="openRunSessionFilter" name="openRunSessionFilter" [(ngModel)]="view.runtime.openRunSessionFilter" (change)="view.persistState()" placeholder="Optional session id" />
+          </label>
+          <label>
+            Test Run Id
+            <input id="openRunRunFilter" name="openRunRunFilter" [(ngModel)]="view.runtime.openRunRunFilter" (change)="view.persistState()" placeholder="Optional run id" />
+          </label>
+          <label>
+            Unit Key
+            <input id="openRunUnitFilter" name="openRunUnitFilter" [(ngModel)]="view.runtime.openRunUnitFilter" (change)="view.persistState()" placeholder="Optional current unit" />
+          </label>
+          <label>
+            Status
+            <select id="openRunStatusFilter" name="openRunStatusFilter" [(ngModel)]="view.runtime.openRunStatusFilter" (change)="view.persistState()">
+              <option value="">All statuses</option>
+              <option *ngFor="let status of view.testRunStatusOptions" [value]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Limit
+            <input id="openRunLimit" name="openRunLimit" type="number" min="1" max="500" step="1" [(ngModel)]="view.runtime.openRunLimit" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="applyOpenRunFiltersButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyOpenRunFilters()">Apply Open Run Filters</button>
+          <button id="useSelectedRuntimeAsOpenRunFiltersButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedRuntimeAsOpenRunFilters()">Use Selected Run</button>
+          <button class="ghost" type="button" (click)="view.clearOpenRunFilters()">Clear Open Run Filters</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Open Monitor Runs"
         subtitle="Runs that currently keep the activation guard active."

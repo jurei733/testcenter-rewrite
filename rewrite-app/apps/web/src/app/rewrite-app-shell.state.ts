@@ -107,6 +107,14 @@ export interface ShellRuntimeState {
   participantSessionDetailView: string;
   runtimeStateView: string;
   currentRunStateView: string;
+  openRunLoginFilter: string;
+  openRunGroupFilter: string;
+  openRunBookletFilter: string;
+  openRunSessionFilter: string;
+  openRunRunFilter: string;
+  openRunUnitFilter: string;
+  openRunStatusFilter: string;
+  openRunLimit: string;
   openRunsView: string;
   openRunsExportView: string;
   monitorCommandHistoryView: string;
@@ -296,6 +304,14 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionDetailView: 'Use "Participant Session Detail".',
     runtimeStateView: 'Use "Refresh Runtime Reads".',
     currentRunStateView: 'Use "Refresh Runtime Reads".',
+    openRunLoginFilter: "",
+    openRunGroupFilter: "",
+    openRunBookletFilter: "",
+    openRunSessionFilter: "",
+    openRunRunFilter: "",
+    openRunUnitFilter: "",
+    openRunStatusFilter: "",
+    openRunLimit: "100",
     openRunsView: 'Use "Refresh Runtime Reads".',
     openRunsExportView: 'Use "Export Open Runs CSV".',
     monitorCommandHistoryView: 'Use "Refresh Runtime Reads".',

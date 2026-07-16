@@ -387,6 +387,54 @@ export function createShellPersistenceStateHost(args: {
     set reviewLimit(nextValue) {
       args.runtimeState.reviewLimit = nextValue;
     },
+    get openRunLoginFilter() {
+      return args.runtimeState.openRunLoginFilter;
+    },
+    set openRunLoginFilter(nextValue) {
+      args.runtimeState.openRunLoginFilter = nextValue;
+    },
+    get openRunGroupFilter() {
+      return args.runtimeState.openRunGroupFilter;
+    },
+    set openRunGroupFilter(nextValue) {
+      args.runtimeState.openRunGroupFilter = nextValue;
+    },
+    get openRunBookletFilter() {
+      return args.runtimeState.openRunBookletFilter;
+    },
+    set openRunBookletFilter(nextValue) {
+      args.runtimeState.openRunBookletFilter = nextValue;
+    },
+    get openRunSessionFilter() {
+      return args.runtimeState.openRunSessionFilter;
+    },
+    set openRunSessionFilter(nextValue) {
+      args.runtimeState.openRunSessionFilter = nextValue;
+    },
+    get openRunRunFilter() {
+      return args.runtimeState.openRunRunFilter;
+    },
+    set openRunRunFilter(nextValue) {
+      args.runtimeState.openRunRunFilter = nextValue;
+    },
+    get openRunUnitFilter() {
+      return args.runtimeState.openRunUnitFilter;
+    },
+    set openRunUnitFilter(nextValue) {
+      args.runtimeState.openRunUnitFilter = nextValue;
+    },
+    get openRunStatusFilter() {
+      return args.runtimeState.openRunStatusFilter;
+    },
+    set openRunStatusFilter(nextValue) {
+      args.runtimeState.openRunStatusFilter = nextValue;
+    },
+    get openRunLimit() {
+      return args.runtimeState.openRunLimit;
+    },
+    set openRunLimit(nextValue) {
+      args.runtimeState.openRunLimit = nextValue;
+    },
     get monitorCommandHistoryRunFilter() {
       return args.runtimeState.monitorCommandHistoryRunFilter;
     },

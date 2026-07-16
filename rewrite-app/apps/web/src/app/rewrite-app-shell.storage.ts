@@ -55,6 +55,14 @@ export type ShellPersistenceTarget = {
   reviewReviewerFilter: string;
   reviewCategoryFilter: string;
   reviewLimit: string;
+  openRunLoginFilter: string;
+  openRunGroupFilter: string;
+  openRunBookletFilter: string;
+  openRunSessionFilter: string;
+  openRunRunFilter: string;
+  openRunUnitFilter: string;
+  openRunStatusFilter: string;
+  openRunLimit: string;
   monitorCommandHistoryRunFilter: string;
   monitorCommandHistoryLimit: string;
   entryRosterText: string;
@@ -163,6 +171,14 @@ export const createPersistedShellState = (
   reviewReviewerFilter: target.reviewReviewerFilter,
   reviewCategoryFilter: target.reviewCategoryFilter,
   reviewLimit: target.reviewLimit,
+  openRunLoginFilter: target.openRunLoginFilter,
+  openRunGroupFilter: target.openRunGroupFilter,
+  openRunBookletFilter: target.openRunBookletFilter,
+  openRunSessionFilter: target.openRunSessionFilter,
+  openRunRunFilter: target.openRunRunFilter,
+  openRunUnitFilter: target.openRunUnitFilter,
+  openRunStatusFilter: target.openRunStatusFilter,
+  openRunLimit: target.openRunLimit,
   monitorCommandHistoryRunFilter: target.monitorCommandHistoryRunFilter,
   monitorCommandHistoryLimit: target.monitorCommandHistoryLimit,
   entryRosterText: target.entryRosterText,
@@ -414,6 +430,35 @@ export const applyHydratedShellState = (
     target.reviewCategoryFilter
   );
   target.reviewLimit = hydrateString(snapshot.reviewLimit, target.reviewLimit);
+  target.openRunLoginFilter = hydrateString(
+    snapshot.openRunLoginFilter,
+    target.openRunLoginFilter
+  );
+  target.openRunGroupFilter = hydrateString(
+    snapshot.openRunGroupFilter,
+    target.openRunGroupFilter
+  );
+  target.openRunBookletFilter = hydrateString(
+    snapshot.openRunBookletFilter,
+    target.openRunBookletFilter
+  );
+  target.openRunSessionFilter = hydrateString(
+    snapshot.openRunSessionFilter,
+    target.openRunSessionFilter
+  );
+  target.openRunRunFilter = hydrateString(
+    snapshot.openRunRunFilter,
+    target.openRunRunFilter
+  );
+  target.openRunUnitFilter = hydrateString(
+    snapshot.openRunUnitFilter,
+    target.openRunUnitFilter
+  );
+  target.openRunStatusFilter = hydrateString(
+    snapshot.openRunStatusFilter,
+    target.openRunStatusFilter
+  );
+  target.openRunLimit = hydrateString(snapshot.openRunLimit, target.openRunLimit);
   target.monitorCommandHistoryRunFilter = hydrateString(
     snapshot.monitorCommandHistoryRunFilter,
     target.monitorCommandHistoryRunFilter

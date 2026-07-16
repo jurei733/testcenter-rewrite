@@ -73,6 +73,7 @@ import {
   type ListContentReleasesResponse,
   type ListSourcePackagesResponse,
   type MonitorOpenRunsResponse,
+  type MonitorOpenRunsQuery,
   type ParticipantCurrentRunStateResponse,
   type ParticipantLaunchRequest,
   type ParticipantLaunchResponse,
@@ -2044,6 +2045,43 @@ const parseWorkspaceReviewListQuery = (
   };
 };
 
+const parseMonitorOpenRunsQuery = (
+  url: URL,
+  response: ServerResponse
+): MonitorOpenRunsQuery | null => {
+  const status = readOptionalQueryValue(url, "status");
+  if (status && !testRunStatuses.includes(status as TestRunStatus)) {
+    sendError(
+      response,
+      400,
+      "open_runs_status_invalid",
+      `Open runs status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const limitResult = parseOperatorReadLimit(
+    url,
+    response,
+    "open_runs_limit_invalid",
+    "Open runs limit must be an integer between 1 and 500."
+  );
+  if (!limitResult.ok) {
+    return null;
+  }
+
+  return {
+    loginKey: readOptionalQueryValue(url, "loginKey"),
+    groupKey: readOptionalQueryValue(url, "groupKey"),
+    bookletKey: readOptionalQueryValue(url, "bookletKey"),
+    participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
+    testRunId: readOptionalQueryValue(url, "testRunId"),
+    unitKey: readOptionalQueryValue(url, "unitKey"),
+    status: status as TestRunStatus | undefined,
+    limit: limitResult.limit
+  };
+};
+
 const parseStudyMonitorParticipantMatrixQuery = (
   url: URL,
   response: ServerResponse
@@ -3868,9 +3906,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseMonitorOpenRunsQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const csv = await services.monitorRead.exportOpenRunsCsv({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendCsv(response, 200, `${workspaceKey}-open-runs.csv`, csv);
         return;
@@ -4353,9 +4397,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseMonitorOpenRunsQuery(url, response);
+        if (!query) {
+          return;
+        }
+
         const items = await services.monitorRead.listOpenRuns({
           tenantKey,
-          workspaceKey
+          workspaceKey,
+          ...query
         });
         sendJson<MonitorOpenRunsResponse>(response, 200, { items });
         return;

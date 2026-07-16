@@ -329,7 +329,7 @@ The added read side now makes the first slice inspectable:
 - study monitor participant matrix read model exposes participant-by-unit session/run/answer/review status directly for the operator shell
 - study monitor CSV export flattens workspace, group, booklet, unit, and not-started participant rows for operator handoff outside the shell
 - study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context, and can be narrowed by the same login/group/booklet/unit/status/answer/limit filters used by the operator matrix
-- open-run CSV export flattens the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff
+- open-run reads and CSV export flatten the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff, filterable by login, group, booklet, session, run, unit, status, and limit
 - source-package listing shows uploaded packages together with their latest import attempt, filterable by status, media type, file name, latest import status, and limit
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing shows completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit

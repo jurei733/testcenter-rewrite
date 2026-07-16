@@ -383,10 +383,26 @@ export type MonitorReadPort = {
   listOpenRuns(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    bookletKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    status?: TestRun["status"];
+    limit?: number;
   }): Promise<OpenMonitorRun[]>;
   exportOpenRunsCsv(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    bookletKey?: string;
+    participantSessionId?: string;
+    testRunId?: string;
+    unitKey?: string;
+    status?: TestRun["status"];
+    limit?: number;
   }): Promise<string>;
 };
 
@@ -1607,6 +1623,17 @@ type WorkspaceReviewFilters = {
   limit?: number;
 };
 
+type OpenMonitorRunFilters = {
+  loginKey?: string;
+  groupKey?: string;
+  bookletKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  status?: TestRun["status"];
+  limit?: number;
+};
+
 const normalizeExactFilter = (value: string | undefined): string | undefined => {
   const normalizedValue = value?.trim();
   return normalizedValue ? normalizedValue : undefined;
@@ -1614,6 +1641,37 @@ const normalizeExactFilter = (value: string | undefined): string | undefined => 
 
 const resolveOperatorReadLimit = (limit: number | undefined): number =>
   Math.max(1, Math.min(limit ?? 500, 500));
+
+const filterOpenMonitorRuns = (
+  items: OpenMonitorRun[],
+  input: OpenMonitorRunFilters
+): OpenMonitorRun[] => {
+  const filters = {
+    loginKey: normalizeExactFilter(input.loginKey),
+    groupKey: normalizeExactFilter(input.groupKey),
+    bookletKey: normalizeExactFilter(input.bookletKey),
+    participantSessionId: normalizeExactFilter(input.participantSessionId),
+    testRunId: normalizeExactFilter(input.testRunId),
+    unitKey: normalizeExactFilter(input.unitKey),
+    status: input.status
+  };
+
+  return items
+    .filter(
+      item =>
+        (!filters.loginKey || item.loginKey === filters.loginKey) &&
+        (!filters.groupKey || item.groupKey === filters.groupKey) &&
+        (!filters.bookletKey ||
+          item.bookletKey === filters.bookletKey ||
+          item.participantRosterEntry?.bookletKey === filters.bookletKey) &&
+        (!filters.participantSessionId ||
+          item.participantSessionId === filters.participantSessionId) &&
+        (!filters.testRunId || item.testRunId === filters.testRunId) &&
+        (!filters.unitKey || item.currentUnitKey === filters.unitKey) &&
+        (!filters.status || item.status === filters.status)
+    )
+    .slice(0, resolveOperatorReadLimit(input.limit));
+};
 
 const listDetailedResponsesForWorkspace = (input: {
   tenantKey: string;
@@ -8726,7 +8784,7 @@ export const createFirstSliceServices = (
             workspace.workspaceId
           );
 
-        return testRuns
+        const items = testRuns
           .filter(testRun => testRun.status !== "completed")
           .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
           .map<OpenMonitorRun>(testRun => {
@@ -8752,6 +8810,8 @@ export const createFirstSliceServices = (
               updatedAt: testRun.updatedAt
             };
           });
+
+        return filterOpenMonitorRuns(items, input);
       },
       async exportOpenRunsCsv(input) {
         const items = await this.listOpenRuns(input);

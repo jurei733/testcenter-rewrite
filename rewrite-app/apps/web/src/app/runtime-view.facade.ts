@@ -1971,6 +1971,33 @@ export class RuntimeViewFacade {
     this.applyReviewFilters();
   }
 
+  applyOpenRunFilters(): void {
+    this.persistState();
+    this.refreshRuntimeReads();
+  }
+
+  useSelectedRuntimeAsOpenRunFilters(): void {
+    this.runtime.openRunLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.openRunGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.openRunBookletFilter = this.runtime.bookletKey.trim();
+    this.runtime.openRunSessionFilter = this.runtime.participantSessionId.trim();
+    this.runtime.openRunRunFilter = this.runtime.testRunId.trim();
+    this.runtime.openRunUnitFilter = this.runtime.currentUnitKey.trim();
+    this.applyOpenRunFilters();
+  }
+
+  clearOpenRunFilters(): void {
+    this.runtime.openRunLoginFilter = "";
+    this.runtime.openRunGroupFilter = "";
+    this.runtime.openRunBookletFilter = "";
+    this.runtime.openRunSessionFilter = "";
+    this.runtime.openRunRunFilter = "";
+    this.runtime.openRunUnitFilter = "";
+    this.runtime.openRunStatusFilter = "";
+    this.runtime.openRunLimit = "100";
+    this.applyOpenRunFilters();
+  }
+
   applyMonitorCommandHistoryFilters(): void {
     this.persistState();
     this.refreshRuntimeReads();
@@ -2513,6 +2540,12 @@ export class RuntimeViewFacade {
     this.runtime.reviewSessionFilter = participantSessionId;
     this.runtime.reviewRunFilter = testRunId;
     this.runtime.reviewUnitFilter = currentUnitKey;
+    this.runtime.openRunLoginFilter = this.runtime.loginKey.trim();
+    this.runtime.openRunGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.openRunBookletFilter = this.runtime.bookletKey.trim();
+    this.runtime.openRunSessionFilter = participantSessionId;
+    this.runtime.openRunRunFilter = testRunId;
+    this.runtime.openRunUnitFilter = currentUnitKey;
     this.runtime.reviewReviewerFilter = this.runtime.reviewerId.trim();
     this.runtime.reviewCategoryFilter = this.runtime.reviewCategory.trim();
     this.persistState();

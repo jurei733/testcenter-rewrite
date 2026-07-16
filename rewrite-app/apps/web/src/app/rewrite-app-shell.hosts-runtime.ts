@@ -201,19 +201,34 @@ export function createRuntimeReadsStateHost(args: {
     return withQuery(path, query);
   };
 
+  const buildOpenRunsPath = (route: string): string => {
+    const path = resolveRoutePath(route, {
+      tenantKey: args.workspaceState.tenantKey.trim(),
+      workspaceKey: args.workspaceState.workspaceKey.trim()
+    });
+    const query = new URLSearchParams();
+    appendQueryValue(query, "loginKey", args.runtimeState.openRunLoginFilter);
+    appendQueryValue(query, "groupKey", args.runtimeState.openRunGroupFilter);
+    appendQueryValue(query, "bookletKey", args.runtimeState.openRunBookletFilter);
+    appendQueryValue(
+      query,
+      "participantSessionId",
+      args.runtimeState.openRunSessionFilter
+    );
+    appendQueryValue(query, "testRunId", args.runtimeState.openRunRunFilter);
+    appendQueryValue(query, "unitKey", args.runtimeState.openRunUnitFilter);
+    appendQueryValue(query, "status", args.runtimeState.openRunStatusFilter);
+    appendQueryValue(query, "limit", args.runtimeState.openRunLimit);
+
+    return withQuery(path, query);
+  };
+
   return {
     request: args.request,
     isCurrentRunMissingError: args.isCurrentRunMissingError,
-    getOpenRunsPath: () =>
-      resolveRoutePath(productionApiRoutes.monitor.openRuns, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+    getOpenRunsPath: () => buildOpenRunsPath(productionApiRoutes.monitor.openRuns),
     getOpenRunsCsvExportPath: () =>
-      resolveRoutePath(productionApiRoutes.workspace.exportOpenRunsCsv, {
-        tenantKey: args.workspaceState.tenantKey.trim(),
-        workspaceKey: args.workspaceState.workspaceKey.trim()
-      }),
+      buildOpenRunsPath(productionApiRoutes.workspace.exportOpenRunsCsv),
     setOpenRunsExportView: nextValue => {
       args.runtimeState.openRunsExportView = nextValue;
     },

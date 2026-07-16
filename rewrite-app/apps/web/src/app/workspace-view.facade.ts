@@ -2722,6 +2722,12 @@ export class WorkspaceViewFacade {
     runtime.reviewSessionFilter = participantSessionId;
     runtime.reviewRunFilter = testRunId;
     runtime.reviewUnitFilter = runtime.currentUnitKey.trim();
+    runtime.openRunLoginFilter = runtime.loginKey.trim();
+    runtime.openRunGroupFilter = runtime.groupKey.trim();
+    runtime.openRunBookletFilter = runtime.bookletKey.trim();
+    runtime.openRunSessionFilter = participantSessionId;
+    runtime.openRunRunFilter = testRunId;
+    runtime.openRunUnitFilter = runtime.currentUnitKey.trim();
     runtime.reviewReviewerFilter = "";
     runtime.reviewCategoryFilter = "";
     this.persistState();

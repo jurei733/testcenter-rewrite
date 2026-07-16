@@ -1013,6 +1013,17 @@ export type MonitorOpenRunsResponse = {
   items: OpenMonitorRun[];
 };
 
+export type MonitorOpenRunsQuery = {
+  loginKey?: string;
+  groupKey?: string;
+  bookletKey?: string;
+  participantSessionId?: string;
+  testRunId?: string;
+  unitKey?: string;
+  status?: TestRun["status"];
+  limit?: number;
+};
+
 export type IssueMonitorRunCommandRequest = {
   commandType: MonitorRunCommandType;
   actorId?: string | null;

@@ -2104,6 +2104,7 @@ try {
   await expectButtonSelectorDisabled("#runtimeRefreshRuntimeReadsButton");
   await expectButtonSelectorDisabled("#runtimeOpenRunsButton");
   await expectButtonSelectorDisabled("#runtimeExportOpenRunsCsvButton");
+  await expectButtonSelectorDisabled("#applyOpenRunFiltersButton");
   await expectButtonSelectorDisabled("#runtimeLoadDetailedResponsesButton");
   await expectButtonSelectorDisabled("#runtimeLoadReviewsButton");
   await expectButtonSelectorDisabled("#runtimeExportResponsesCsvButton");
@@ -2132,6 +2133,7 @@ try {
   await expectButtonSelectorEnabled("#runtimeRefreshRuntimeReadsButton");
   await expectButtonSelectorEnabled("#runtimeOpenRunsButton");
   await expectButtonSelectorEnabled("#runtimeExportOpenRunsCsvButton");
+  await expectButtonSelectorEnabled("#applyOpenRunFiltersButton");
   await expectButtonSelectorEnabled("#runtimeLoadDetailedResponsesButton");
   await expectButtonSelectorEnabled("#runtimeLoadReviewsButton");
   await expectButtonSelectorEnabled("#runtimeExportResponsesCsvButton");
@@ -2964,6 +2966,25 @@ try {
     .filter({ hasText: operatorParticipantSessionLink })
     .filter({ hasText: pausedTestRunId })
     .waitFor();
+  logStep("filter-open-runs");
+  await fillAndCommit("#openRunLoginFilter", participantLoginKey);
+  await fillAndCommit("#openRunGroupFilter", participantGroupKey);
+  await fillAndCommit("#openRunBookletFilter", participantBookletKey);
+  await fillAndCommit("#openRunSessionFilter", participantSessionId);
+  await fillAndCommit("#openRunRunFilter", pausedTestRunId);
+  await fillAndCommit("#openRunUnitFilter", "unit-paused");
+  await selectAndCommit("#openRunStatusFilter", "running");
+  await fillAndCommit("#openRunLimit", "1");
+  await clickAction("Apply Open Run Filters");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=running&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 1 &&
+      payload.items[0]?.testRunId === pausedTestRunId
+  );
   logStep("export-open-runs-csv");
   const openRunsDownloadPromise = page.waitForEvent("download");
   await clickAction("Export Open Runs CSV");

@@ -2561,7 +2561,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const openRunsCsv = await requestTextAt(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/open-runs.csv",
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/open-runs.csv?loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-practice&status=running&limit=1`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
@@ -2579,6 +2579,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       openRunsCsv.body,
       /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
     );
+    assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
       studyMonitorCsv.body,
       /"demo-tenant","demo-workspace","unit","unit-finish","Finish","","","unit-finish"/
@@ -3451,10 +3452,13 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
         participantSessionId: string;
         status: string;
         loginKey: string;
+        groupKey: string;
+        bookletKey: string;
+        currentUnitKey: string | null;
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs",
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&status=paused&limit=1`,
       { headers: { authorization } }
     );
 
@@ -3466,6 +3470,8 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     );
     assert.equal(openRunsAfterPause.body.items[0]?.status, "paused");
     assert.equal(openRunsAfterPause.body.items[0]?.loginKey, "student-demo");
+    assert.equal(openRunsAfterPause.body.items[0]?.groupKey, "group:student-demo");
+    assert.equal(openRunsAfterPause.body.items[0]?.bookletKey, "booklet:demo");
 
     const resumeCommand = await requestJsonAt<{
       command: {
