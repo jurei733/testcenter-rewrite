@@ -646,6 +646,7 @@ export class RuntimeViewFacade {
           groupKey: entry.groupKey,
           bookletKey: entry.bookletKey ?? ""
         };
+        const selectionBookletKey = entry.bookletKey ?? this.runtime.bookletKey.trim();
         const entryUrl = this.buildParticipantEntryUrl(
           this.uiState.workspace.tenantKey.trim(),
           this.uiState.workspace.workspaceKey.trim(),
@@ -686,7 +687,7 @@ export class RuntimeViewFacade {
           actionPayload: {
             loginKey: entry.loginKey,
             groupKey: entry.groupKey,
-            bookletKey: entry.bookletKey ?? "",
+            bookletKey: selectionBookletKey,
             displayName: entry.displayName ?? ""
           },
           actions: [
