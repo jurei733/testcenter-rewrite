@@ -2433,6 +2433,40 @@ export class RuntimeViewFacade {
     });
   }
 
+  private seedSelectedRunInspectionFilters(item: RecordCollectionItem): void {
+    const loginKey = this.runtime.loginKey.trim();
+    const groupKey = this.runtime.groupKey.trim();
+    const bookletKey = this.runtime.bookletKey.trim();
+    const participantSessionId = this.runtime.participantSessionId.trim();
+    const testRunId = this.runtime.testRunId.trim();
+    const currentUnitKey = this.runtime.currentUnitKey.trim();
+
+    this.runtime.detailedResponseLoginFilter = loginKey;
+    this.runtime.detailedResponseGroupFilter = groupKey;
+    this.runtime.detailedResponseBookletFilter = bookletKey;
+    this.runtime.detailedResponseSessionFilter = participantSessionId;
+    this.runtime.detailedResponseRunFilter = testRunId;
+    this.runtime.detailedResponseUnitFilter = currentUnitKey;
+    this.runtime.detailedResponseStatusFilter = "";
+    this.runtime.reviewLoginFilter = loginKey;
+    this.runtime.reviewGroupFilter = groupKey;
+    this.runtime.reviewBookletFilter = bookletKey;
+    this.runtime.reviewSessionFilter = participantSessionId;
+    this.runtime.reviewRunFilter = testRunId;
+    this.runtime.reviewUnitFilter = currentUnitKey;
+    this.runtime.reviewReviewerFilter =
+      item.actionPayload?.reviewerId?.trim() ?? "";
+    this.runtime.reviewCategoryFilter =
+      item.actionPayload?.reviewCategory?.trim() ?? "";
+    this.runtime.openRunLoginFilter = loginKey;
+    this.runtime.openRunGroupFilter = groupKey;
+    this.runtime.openRunBookletFilter = bookletKey;
+    this.runtime.openRunSessionFilter = participantSessionId;
+    this.runtime.openRunRunFilter = testRunId;
+    this.runtime.openRunUnitFilter = currentUnitKey;
+    this.runtime.openRunStatusFilter = "";
+  }
+
   selectTestRun(item: RecordCollectionItem): void {
     const testRunId = item.actionPayload?.testRunId?.trim();
     if (!testRunId) {
@@ -2463,6 +2497,7 @@ export class RuntimeViewFacade {
         this.runtime.participantSessionId = derivedParticipantSessionId;
       }
     }
+    this.seedSelectedRunInspectionFilters(item);
     this.persistState();
     if (!this.runtime.participantSessionId.trim()) {
       return;

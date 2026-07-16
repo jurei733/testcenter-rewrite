@@ -2957,15 +2957,47 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
-  await page
+  const openRunStudentCard = page
     .locator("app-record-collection")
     .filter({ has: page.getByRole("heading", { name: "Open Monitor Runs" }) })
     .locator(".record-card")
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantSessionId })
     .filter({ hasText: operatorParticipantSessionLink })
-    .filter({ hasText: pausedTestRunId })
-    .waitFor();
+    .filter({ hasText: pausedTestRunId });
+  await openRunStudentCard.waitFor();
+  logStep("open-run-select-sync");
+  await fillAndCommit("#detailedResponseLoginFilter", "stale-login");
+  await selectAndCommit("#detailedResponseStatusFilter", "paused");
+  await selectAndCommit("#openRunStatusFilter", "paused");
+  await openRunStudentCard
+    .getByRole("button", { name: "Select + Sync" })
+    .click();
+  await waitForNotBusy("open-run-select-sync");
+  await expectInputValue("#participantSessionId", participantSessionId);
+  await expectInputValue("#testRunId", pausedTestRunId);
+  await expectInputValue("#currentUnitKey", "unit-paused");
+  await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
+  await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+  await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
+  await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#detailedResponseStatusFilter", "");
+  await expectInputValue("#reviewLoginFilter", participantLoginKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
+  await expectInputValue("#reviewSessionFilter", participantSessionId);
+  await expectInputValue("#reviewRunFilter", pausedTestRunId);
+  await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#openRunLoginFilter", participantLoginKey);
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
+  await expectInputValue("#openRunBookletFilter", participantBookletKey);
+  await expectInputValue("#openRunSessionFilter", participantSessionId);
+  await expectInputValue("#openRunRunFilter", pausedTestRunId);
+  await expectInputValue("#openRunUnitFilter", "unit-paused");
+  await expectInputValue("#openRunStatusFilter", "");
+  stopAfter("open-run-select-sync");
   logStep("filter-open-runs");
   await fillAndCommit("#openRunLoginFilter", participantLoginKey);
   await fillAndCommit("#openRunGroupFilter", participantGroupKey);
