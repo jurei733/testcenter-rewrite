@@ -43,11 +43,17 @@ jobs:
           - check: shutdown
             command: npm run smoke:shutdown:sqlite
             playwright: false
-          - check: ui-content
-            command: npm run smoke:ui:content
+          - check: ui-quick
+            command: npm run ci:browser:quick
             playwright: true
-          - check: ui-review-readiness
-            command: npm run smoke:ui:review-readiness
+          - check: ui-review
+            command: npm run ci:browser:review
+            playwright: true
+          - check: ui-monitor
+            command: npm run ci:browser:monitor
+            playwright: true
+          - check: ui-ops
+            command: npm run ci:browser:ops
             playwright: true
           - check: ui-full
             command: npm run smoke:ui
