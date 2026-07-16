@@ -2755,6 +2755,12 @@ try {
     .filter({ has: page.getByRole("heading", { name: "Runtime Snapshot" }) })
     .filter({ hasText: "Direct Xml" })
     .waitFor();
+  await page
+    .locator("app-live-context")
+    .filter({ hasText: "Participant Runtime" })
+    .filter({ hasText: "Participant" })
+    .filter({ hasText: "Direct Xml" })
+    .waitFor();
   stopAfter("participant-launch-status-session-link");
   logStep("participant-start");
   const participantLoginKey = "student-ui";

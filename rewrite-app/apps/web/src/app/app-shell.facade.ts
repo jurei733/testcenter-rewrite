@@ -138,6 +138,12 @@ export class AppShellFacade {
         route: "/participant",
         items: [
           {
+            label: "Participant",
+            value: this.displayValue(
+              this.runtime.participantDisplayName || this.runtime.loginKey
+            )
+          },
+          {
             label: "Session",
             value: this.displayValue(this.runtime.participantSessionId)
           },
