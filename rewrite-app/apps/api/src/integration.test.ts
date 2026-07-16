@@ -4642,6 +4642,106 @@ test("source document import resolves JSON resource dependencies", async () => {
   );
 });
 
+test("source document import resolves keyed JSON resource dependency maps", async () => {
+  const tenantKey = "integration-tenant-json-keyed-dependencies";
+  const workspaceKey = "integration-workspace-json-keyed-dependencies";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest-keyed-dependencies.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          resources: {
+            "RES-TEST": {
+              href: "tests/keyed-dependency-booklet.xml",
+              title: "Keyed Dependency Booklet",
+              dependencies: {
+                "RES-ITEM-A": {},
+                "RES-ITEM-B": {}
+              }
+            },
+            "RES-ITEM-A": {
+              href: "items/keyed-dependency-a.xml",
+              title: "Keyed Dependency A"
+            },
+            "RES-ITEM-B": {
+              files: [{ href: "items/keyed-dependency-b.xml" }],
+              title: "Keyed Dependency B"
+            }
+          }
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "tests/keyed-dependency-booklet.xml",
+          displayLabel: "Keyed Dependency Booklet",
+          unitEntries: [
+            {
+              unitKey: "items/keyed-dependency-a.xml",
+              displayLabel: "Keyed Dependency A"
+            },
+            {
+              unitKey: "items/keyed-dependency-b.xml",
+              displayLabel: "Keyed Dependency B"
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import accepts JSON QTI assessment sections as booklets", async () => {
   const tenantKey = "integration-tenant-json-qti-sections";
   const workspaceKey = "integration-workspace-json-qti-sections";

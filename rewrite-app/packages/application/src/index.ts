@@ -2774,6 +2774,20 @@ const normalizeParsedJsonContentStructure = (
         "displayName"
       ]
     });
+  const readDependencyEntries = (value: unknown): unknown[] =>
+    readKeyedMapEntries(value, {
+      keyFieldName: "identifierref",
+      singleEntryFieldNames: [
+        "identifierref",
+        "identifierRef",
+        "ref",
+        "resourceId",
+        "resourceIdentifier",
+        "identifier",
+        "id",
+        "key"
+      ]
+    });
   const collectJsonManifestResources = (
     value: unknown
   ): Map<string, JsonManifestResource> => {
@@ -2855,12 +2869,12 @@ const normalizeParsedJsonContentStructure = (
           "Resource",
           key
         );
-        const dependencyReferences = readEntries(
-          resource.dependencies,
-          resource.dependency,
-          resource.dependencyReferences,
-          resource.dependencyReference
-        )
+        const dependencyReferences = [
+          ...readDependencyEntries(resource.dependencies),
+          ...readDependencyEntries(resource.dependency),
+          ...readDependencyEntries(resource.dependencyReferences),
+          ...readDependencyEntries(resource.dependencyReference)
+        ]
           .map(rawDependency => {
             if (typeof rawDependency === "string") {
               return normalizeManifestToken(rawDependency);
