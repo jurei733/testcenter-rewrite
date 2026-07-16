@@ -71,6 +71,144 @@ const splitRosterLine = (line: string): string[] => {
   return line.split(delimiter).map(value => value.trim());
 };
 
+const normalizeRosterHeaderName = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+const rosterHeaderAliases = {
+  loginKey: new Set([
+    "loginkey",
+    "login",
+    "username",
+    "user",
+    "userid",
+    "userkey",
+    "code",
+    "identifier"
+  ]),
+  groupKey: new Set([
+    "groupkey",
+    "group",
+    "groupid",
+    "groupname",
+    "class",
+    "classname"
+  ]),
+  bookletKey: new Set([
+    "bookletkey",
+    "booklet",
+    "bookletid",
+    "testlet",
+    "testletid"
+  ]),
+  displayName: new Set([
+    "displayname",
+    "displaylabel",
+    "fullname",
+    "name",
+    "participantname",
+    "studentname",
+    "label"
+  ])
+};
+
+type RosterDelimitedHeader = {
+  loginKey: number;
+  groupKey: number | null;
+  bookletKey: number | null;
+  displayName: number | null;
+};
+
+const findRosterHeaderIndex = (
+  headerValues: string[],
+  aliases: Set<string>
+): number | null => {
+  const index = headerValues.findIndex(value =>
+    aliases.has(normalizeRosterHeaderName(value))
+  );
+  return index >= 0 ? index : null;
+};
+
+const readRosterDelimitedHeader = (
+  values: string[]
+): RosterDelimitedHeader | null => {
+  if (values.length < 2) {
+    return null;
+  }
+
+  const loginKeyIndex = findRosterHeaderIndex(
+    values,
+    rosterHeaderAliases.loginKey
+  );
+  if (loginKeyIndex === null) {
+    return null;
+  }
+
+  return {
+    loginKey: loginKeyIndex,
+    groupKey: findRosterHeaderIndex(values, rosterHeaderAliases.groupKey),
+    bookletKey: findRosterHeaderIndex(values, rosterHeaderAliases.bookletKey),
+    displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName)
+  };
+};
+
+const readRosterDelimitedValue = (
+  values: string[],
+  index: number | null
+): string | null => {
+  if (index === null) {
+    return null;
+  }
+  return normalizeRosterTextValue(values[index]);
+};
+
+const parseDelimitedRosterRows = (
+  rosterText: string
+): ParsedParticipantRosterEntry[] => {
+  const rows = rosterText
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith("#"))
+    .map(splitRosterLine);
+
+  const header = rows.length > 0 ? readRosterDelimitedHeader(rows[0] ?? []) : null;
+  const dataRows = header ? rows.slice(1) : rows;
+
+  return dataRows.flatMap(values => {
+    const loginKey = header
+      ? readRosterDelimitedValue(values, header.loginKey)
+      : normalizeRosterTextValue(values[0]);
+    if (!loginKey) {
+      return [];
+    }
+
+    if (!header && normalizeRosterHeaderName(loginKey) === "loginkey") {
+      return [];
+    }
+
+    const groupKey = header
+      ? readRosterDelimitedValue(values, header.groupKey)
+      : normalizeRosterTextValue(values[1]);
+    const bookletKey = header
+      ? readRosterDelimitedValue(values, header.bookletKey)
+      : normalizeRosterTextValue(values[2]);
+    const displayName = header
+      ? readRosterDelimitedValue(values, header.displayName)
+      : normalizeRosterTextValue(values[3]);
+
+    return [
+      {
+        loginKey,
+        groupKey: groupKey || `group:${loginKey}`,
+        bookletKey,
+        displayName
+      }
+    ];
+  });
+};
+
 const decodeXmlText = (value: string): string =>
   value
     .replace(/&quot;/g, "\"")
@@ -803,25 +941,7 @@ export const parseParticipantRosterText = (
     return xmlEntries;
   }
 
-  return rosterText
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith("#"))
-    .flatMap(line => {
-      const [loginKey, groupKey, bookletKey, displayName] = splitRosterLine(line);
-      if (!loginKey || loginKey.toLowerCase() === "loginkey") {
-        return [];
-      }
-
-      return [
-        {
-          loginKey,
-          groupKey: groupKey || `group:${loginKey}`,
-          bookletKey: bookletKey || null,
-          displayName: displayName || null
-        }
-      ];
-    });
+  return parseDelimitedRosterRows(rosterText);
 };
 
 export const productionApiRoutes = {

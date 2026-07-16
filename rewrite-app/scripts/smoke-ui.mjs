@@ -2319,7 +2319,7 @@ try {
   stopAfter("runtime-scope-gating");
   logStep("generate-entry-links");
   const uploadedRosterText = [
-    "loginKey\tgroupKey\tbookletKey\tdisplayName",
+    "login\tgroup\tbooklet\tname",
     `entry-student-a\tgroup:entry-smoke\t${participantRouteBookletKey}\tAda Entry`,
     "entry-student-b\tgroup:entry-smoke\t\tBen Entry"
   ].join("\n");

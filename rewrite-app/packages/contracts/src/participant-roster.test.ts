@@ -37,6 +37,53 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("maps delimited roster headers with common alias names", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          "login,booklet,group,name",
+          "alias-a,booklet:alias-a,group:alias-a,Ada Alias",
+          "alias-b\tbooklet:alias-b\tgroup:alias-b\tBen Alias",
+          "alias-c;booklet:alias-c;group:alias-c;Cara Alias"
+        ].join("\n")
+      ),
+      [
+        {
+          loginKey: "alias-a",
+          groupKey: "group:alias-a",
+          bookletKey: "booklet:alias-a",
+          displayName: "Ada Alias"
+        },
+        {
+          loginKey: "alias-b",
+          groupKey: "group:alias-b",
+          bookletKey: "booklet:alias-b",
+          displayName: "Ben Alias"
+        },
+        {
+          loginKey: "alias-c",
+          groupKey: "group:alias-c",
+          bookletKey: "booklet:alias-c",
+          displayName: "Cara Alias"
+        }
+      ]
+    );
+  });
+
+  it("keeps positional delimited roster rows without a header", () => {
+    assert.deepEqual(
+      parseParticipantRosterText("pos-a,group:pos-a,booklet:pos-a,Position A"),
+      [
+        {
+          loginKey: "pos-a",
+          groupKey: "group:pos-a",
+          bookletKey: "booklet:pos-a",
+          displayName: "Position A"
+        }
+      ]
+    );
+  });
+
   it("parses Testtaker and participant XML roster entries", () => {
     assert.deepEqual(
       parseParticipantRosterText(

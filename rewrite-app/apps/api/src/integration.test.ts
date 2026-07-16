@@ -7278,6 +7278,36 @@ test("workspace participant roster can be imported, updated, and listed", async 
     ["active_content_release_missing"]
   );
 
+  const aliasHeaderImport = await requestJson<typeof initialImport.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          "login,booklet,group,name",
+          "roster-alias-a,booklet:alias-a,group:alias-a,Ada Alias",
+          "roster-alias-b\tbooklet:alias-b\tgroup:alias-b\tBen Alias"
+        ].join("\n")
+      }
+    }
+  );
+
+  assert.equal(aliasHeaderImport.status, 201);
+  assert.equal(aliasHeaderImport.body.importedCount, 2);
+  assert.equal(aliasHeaderImport.body.updatedCount, 0);
+  const aliasRosterA = aliasHeaderImport.body.items.find(
+    item => item.loginKey === "roster-alias-a"
+  );
+  assert.equal(aliasRosterA?.groupKey, "group:alias-a");
+  assert.equal(aliasRosterA?.bookletKey, "booklet:alias-a");
+  assert.equal(aliasRosterA?.displayName, "Ada Alias");
+  const aliasRosterB = aliasHeaderImport.body.items.find(
+    item => item.loginKey === "roster-alias-b"
+  );
+  assert.equal(aliasRosterB?.groupKey, "group:alias-b");
+  assert.equal(aliasRosterB?.bookletKey, "booklet:alias-b");
+  assert.equal(aliasRosterB?.displayName, "Ben Alias");
+
   const rosterAEntryId = initialImport.body.items[0]?.participantRosterEntryId;
   const updateImport = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
@@ -7292,7 +7322,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(updateImport.status, 201);
   assert.equal(updateImport.body.importedCount, 0);
   assert.equal(updateImport.body.updatedCount, 1);
-  assert.equal(updateImport.body.items.length, 2);
+  assert.equal(updateImport.body.items.length, 4);
   const updatedRosterA = updateImport.body.items.find(
     item => item.loginKey === "roster-a"
   );
@@ -7493,11 +7523,13 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
 
   assert.equal(listedRoster.status, 200);
-  assert.equal(listedRoster.body.items.length, 11);
+  assert.equal(listedRoster.body.items.length, 13);
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
     [
       "roster-a",
+      "roster-alias-a",
+      "roster-alias-b",
       "roster-b",
       "roster-c",
       "roster-d",
@@ -7527,6 +7559,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.match(
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","group:updated","booklet:updated","Ada Updated","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
+  );
+  assert.match(
+    rosterCsvText,
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","group:alias-a","booklet:alias-a","Ada Alias"/
   );
   assert.match(
     rosterCsvText,
@@ -7587,7 +7623,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
   );
   assert.equal(activityEvents.status, 200);
-  assert.equal(activityEvents.body.items.length, 6);
+  assert.equal(activityEvents.body.items.length, 7);
 });
 
 test("participant runtime uses saved roster defaults for group and booklet", async () => {
