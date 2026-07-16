@@ -4094,7 +4094,9 @@ const readZipEntryText = (
       entry.compressionMethod === 0
         ? compressedData
         : entry.compressionMethod === 8
-          ? inflateRawSync(compressedData)
+          ? inflateRawSync(compressedData, {
+              maxOutputLength: MAX_EXTRACTED_MANIFEST_BYTES + 1
+            })
           : null;
   } catch {
     return null;

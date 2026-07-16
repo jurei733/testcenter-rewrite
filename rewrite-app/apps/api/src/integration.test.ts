@@ -17,6 +17,7 @@ type ZipFixtureEntry = {
   content: string;
   compressionMethod?: ZipCompressionMethod;
   compressedContent?: Buffer;
+  uncompressedSize?: number;
 };
 
 const createZipBase64 = (
@@ -37,6 +38,7 @@ const createZipBase64 = (
       (compressionMethod === 8
         ? deflateRawSync(uncompressedContent)
         : uncompressedContent);
+    const uncompressedSize = entry.uncompressedSize ?? uncompressedContent.length;
     const localHeader = Buffer.alloc(30 + fileName.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
@@ -45,7 +47,7 @@ const createZipBase64 = (
     localHeader.writeUInt32LE(0, 10);
     localHeader.writeUInt32LE(0, 14);
     localHeader.writeUInt32LE(content.length, 18);
-    localHeader.writeUInt32LE(uncompressedContent.length, 22);
+    localHeader.writeUInt32LE(uncompressedSize, 22);
     localHeader.writeUInt16LE(fileName.length, 26);
     fileName.copy(localHeader, 30);
     localFileHeaders.push(localHeader, content);
@@ -59,7 +61,7 @@ const createZipBase64 = (
     centralDirectoryHeader.writeUInt32LE(0, 12);
     centralDirectoryHeader.writeUInt32LE(0, 16);
     centralDirectoryHeader.writeUInt32LE(content.length, 20);
-    centralDirectoryHeader.writeUInt32LE(uncompressedContent.length, 24);
+    centralDirectoryHeader.writeUInt32LE(uncompressedSize, 24);
     centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
     centralDirectoryHeader.writeUInt32LE(offset, 42);
     fileName.copy(centralDirectoryHeader, 46);
@@ -5808,6 +5810,59 @@ test("source document import reports unreadable deflated ZIP manifest entries", 
     method: "POST",
     body: {
       fileName: "unreadable-manifest.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.equal(
+    importResult.body.importJob.diagnostics[0]?.code,
+    "source_document_zip_manifest_unreadable"
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
+test("source document import bounds oversized deflated ZIP manifest entries", async () => {
+  const tenantKey = "integration-tenant-oversized-zip-manifest";
+  const workspaceKey = "integration-workspace-oversized-zip-manifest";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const oversizedManifest = `<manifest>${"x".repeat(5 * 1024 * 1024 + 2)}</manifest>`;
+  const zipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: oversizedManifest,
+      compressionMethod: 8,
+      uncompressedSize: 1
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "oversized-manifest.zip",
       mediaType: "application/zip",
       sourceDocument: `data:application/zip;base64,${zipPayload}`
     }
