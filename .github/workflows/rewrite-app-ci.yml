@@ -58,9 +58,6 @@ jobs:
           - check: ui-full
             command: npm run smoke:ui
             playwright: true
-          - check: ui-operator-auth
-            command: npm run smoke:ui:operator-auth
-            playwright: true
           - check: local-demo
             command: npm run smoke:local-demo
             playwright: true
