@@ -3655,6 +3655,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             loginKey?: string;
             groupKey?: string;
             bookletKey?: string;
+            displayName?: string | null;
           };
         };
       }>;
@@ -3693,6 +3694,10 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(
       commandActivity.body.items[0]?.activityEvent.details.bookletKey,
       resumed.body.testRun.bookletKey
+    );
+    assert.equal(
+      commandActivity.body.items[0]?.activityEvent.details.displayName,
+      "Demo Student"
     );
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),

@@ -9843,6 +9843,12 @@ export const createFirstSliceServices = (
           repository,
           testRun.participantSessionId
         );
+        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
+          repository,
+          workspace.tenantId,
+          workspace.workspaceId,
+          participantSession.loginKey
+        );
         const issuedAt = now();
         const nextStatus: TestRunStatus =
           commandType === "pause"
@@ -9899,7 +9905,8 @@ export const createFirstSliceServices = (
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
-            bookletKey: testRun.bookletKey
+            bookletKey: testRun.bookletKey,
+            displayName: participantRosterEntry?.displayName ?? null
           }
         });
 

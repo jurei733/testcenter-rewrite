@@ -1493,11 +1493,12 @@ export class RuntimeViewFacade {
         const loginKey = String(details.loginKey ?? "");
         const groupKey = String(details.groupKey ?? "");
         const bookletKey = String(details.bookletKey ?? "");
+        const displayName = String(details.displayName ?? "");
         const commandId = String(details.commandId ?? event.activityEventId);
 
         return {
           headline: `${commandType} command`,
-          subline: commandId,
+          subline: displayName ? `${displayName} · ${commandId}` : commandId,
           badges: [
             event.actorId ?? "system",
             `${previousStatus} -> ${nextStatus}`,
@@ -1506,6 +1507,7 @@ export class RuntimeViewFacade {
           rows: [
             { label: "Run", value: event.subjectId },
             { label: "Session", value: participantSessionId || "unknown" },
+            { label: "Participant", value: displayName || loginKey || "unknown" },
             { label: "Login", value: loginKey || "unknown" },
             { label: "Group", value: groupKey || "unknown" },
             { label: "Booklet", value: bookletKey || "unknown" },
@@ -1520,7 +1522,8 @@ export class RuntimeViewFacade {
             participantSessionId,
             loginKey,
             groupKey,
-            bookletKey
+            bookletKey,
+            displayName
           }
         };
       }) ?? []

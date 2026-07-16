@@ -586,6 +586,7 @@ try {
     commandType,
     groupKey,
     bookletKey = "",
+    displayName = "",
     loginKey,
     participantSessionId,
     testRunId,
@@ -610,6 +611,7 @@ try {
       .filter({ hasText: transition })
       .filter({ hasText: testRunId })
       .filter({ hasText: participantSessionId })
+      .filter(displayName ? { hasText: displayName } : { hasText: loginKey })
       .filter({ hasText: loginKey })
       .filter({ hasText: groupKey })
       .filter(
