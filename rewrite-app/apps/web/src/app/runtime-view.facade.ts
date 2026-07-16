@@ -992,6 +992,7 @@ export class RuntimeViewFacade {
     const activeFilters = [
       this.runtime.detailedResponseLoginFilter.trim() ? "login" : "",
       this.runtime.detailedResponseGroupFilter.trim() ? "group" : "",
+      this.runtime.detailedResponseBookletFilter.trim() ? "booklet" : "",
       this.runtime.detailedResponseSessionFilter.trim() ? "session" : "",
       this.runtime.detailedResponseRunFilter.trim() ? "run" : "",
       this.runtime.detailedResponseUnitFilter.trim() ? "unit" : "",
@@ -1109,6 +1110,7 @@ export class RuntimeViewFacade {
     const activeFilters = [
       this.runtime.reviewLoginFilter.trim() ? "login" : "",
       this.runtime.reviewGroupFilter.trim() ? "group" : "",
+      this.runtime.reviewBookletFilter.trim() ? "booklet" : "",
       this.runtime.reviewSessionFilter.trim() ? "session" : "",
       this.runtime.reviewRunFilter.trim() ? "run" : "",
       this.runtime.reviewUnitFilter.trim() ? "unit" : "",
@@ -1919,6 +1921,7 @@ export class RuntimeViewFacade {
   useSelectedRuntimeAsDetailedResponseFilters(): void {
     this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
     this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.detailedResponseBookletFilter = this.runtime.bookletKey.trim();
     this.runtime.detailedResponseSessionFilter =
       this.runtime.participantSessionId.trim();
     this.runtime.detailedResponseRunFilter = this.runtime.testRunId.trim();
@@ -1929,6 +1932,7 @@ export class RuntimeViewFacade {
   clearDetailedResponseFilters(): void {
     this.runtime.detailedResponseLoginFilter = "";
     this.runtime.detailedResponseGroupFilter = "";
+    this.runtime.detailedResponseBookletFilter = "";
     this.runtime.detailedResponseSessionFilter = "";
     this.runtime.detailedResponseRunFilter = "";
     this.runtime.detailedResponseUnitFilter = "";
@@ -1945,6 +1949,7 @@ export class RuntimeViewFacade {
   useSelectedRuntimeAsReviewFilters(): void {
     this.runtime.reviewLoginFilter = this.runtime.loginKey.trim();
     this.runtime.reviewGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.reviewBookletFilter = this.runtime.bookletKey.trim();
     this.runtime.reviewSessionFilter = this.runtime.participantSessionId.trim();
     this.runtime.reviewRunFilter = this.runtime.testRunId.trim();
     this.runtime.reviewUnitFilter = this.runtime.currentUnitKey.trim();
@@ -1956,6 +1961,7 @@ export class RuntimeViewFacade {
   clearReviewFilters(): void {
     this.runtime.reviewLoginFilter = "";
     this.runtime.reviewGroupFilter = "";
+    this.runtime.reviewBookletFilter = "";
     this.runtime.reviewSessionFilter = "";
     this.runtime.reviewRunFilter = "";
     this.runtime.reviewUnitFilter = "";
@@ -2497,11 +2503,13 @@ export class RuntimeViewFacade {
     }
     this.runtime.detailedResponseLoginFilter = this.runtime.loginKey.trim();
     this.runtime.detailedResponseGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.detailedResponseBookletFilter = this.runtime.bookletKey.trim();
     this.runtime.detailedResponseSessionFilter = participantSessionId;
     this.runtime.detailedResponseRunFilter = testRunId;
     this.runtime.detailedResponseUnitFilter = currentUnitKey;
     this.runtime.reviewLoginFilter = this.runtime.loginKey.trim();
     this.runtime.reviewGroupFilter = this.runtime.groupKey.trim();
+    this.runtime.reviewBookletFilter = this.runtime.bookletKey.trim();
     this.runtime.reviewSessionFilter = participantSessionId;
     this.runtime.reviewRunFilter = testRunId;
     this.runtime.reviewUnitFilter = currentUnitKey;

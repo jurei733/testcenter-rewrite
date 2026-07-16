@@ -2635,6 +2635,7 @@ try {
   logStep("filter-detailed-responses");
   await fillAndCommit("#detailedResponseLoginFilter", participantLoginKey);
   await fillAndCommit("#detailedResponseGroupFilter", participantGroupKey);
+  await fillAndCommit("#detailedResponseBookletFilter", participantBookletKey);
   await fillAndCommit("#detailedResponseSessionFilter", participantSessionId);
   await fillAndCommit("#detailedResponseRunFilter", pausedTestRunId);
   await fillAndCommit("#detailedResponseUnitFilter", "unit-paused");
@@ -2642,7 +2643,7 @@ try {
   await fillAndCommit("#detailedResponseLimit", "1");
   await clickAction("Apply Response Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=paused&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=paused&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
@@ -2656,11 +2657,11 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Detailed response window" }) })
     .filter({ hasText: "1 response row(s) loaded for the current filters" })
-    .filter({ hasText: "6 active filter(s)" })
+    .filter({ hasText: "7 active filter(s)" })
     .filter({ hasText: "limit 1" })
     .filter({ hasText: "Loaded Responses" })
     .filter({ hasText: "Active Filters" })
-    .filter({ hasText: "login, group, session, run, unit, status" })
+    .filter({ hasText: "login, group, booklet, session, run, unit, status" })
     .waitFor();
   await page
     .locator("article.card")
@@ -2710,6 +2711,7 @@ try {
   logStep("filter-reviews");
   await fillAndCommit("#reviewLoginFilter", participantLoginKey);
   await fillAndCommit("#reviewGroupFilter", participantGroupKey);
+  await fillAndCommit("#reviewBookletFilter", participantBookletKey);
   await fillAndCommit("#reviewSessionFilter", participantSessionId);
   await fillAndCommit("#reviewRunFilter", pausedTestRunId);
   await fillAndCommit("#reviewUnitFilter", "unit-paused");
@@ -2718,7 +2720,7 @@ try {
   await fillAndCommit("#reviewLimit", "1");
   await clickAction("Apply Review Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&reviewerId=operator-ui&category=note&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&reviewerId=operator-ui&category=note&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
@@ -2732,11 +2734,11 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Review window" }) })
     .filter({ hasText: "1 review row(s) loaded for the current filters" })
-    .filter({ hasText: "7 active filter(s)" })
+    .filter({ hasText: "8 active filter(s)" })
     .filter({ hasText: "limit 1" })
     .filter({ hasText: "Loaded Reviews" })
     .filter({ hasText: "Active Filters" })
-    .filter({ hasText: "login, group, session, run, unit, reviewer, category" })
+    .filter({ hasText: "login, group, booklet, session, run, unit, reviewer, category" })
     .waitFor();
   await page
     .locator("article.card")
@@ -2769,8 +2771,10 @@ try {
     .click();
   await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
   await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
   await expectInputValue("#reviewRunFilter", pausedTestRunId);
   await expectInputValue("#reviewUnitFilter", "unit-paused");
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
   await expectInputValue("#reviewReviewerFilter", "operator-ui");
   await expectInputValue("#reviewCategoryFilter", "note");
   stopAfter("filter-reviews");
@@ -3562,11 +3566,13 @@ try {
   await expectInputValue("#currentUnitKey", "unit-paused");
   await expectInputValue("#detailedResponseLoginFilter", participantLoginKey);
   await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#detailedResponseBookletFilter", participantBookletKey);
   await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
   await expectInputValue("#detailedResponseRunFilter", pausedTestRunId);
   await expectInputValue("#detailedResponseUnitFilter", "unit-paused");
   await expectInputValue("#reviewLoginFilter", participantLoginKey);
   await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewBookletFilter", participantBookletKey);
   await expectInputValue("#reviewSessionFilter", participantSessionId);
   await expectInputValue("#reviewRunFilter", pausedTestRunId);
   await expectInputValue("#reviewUnitFilter", "unit-paused");

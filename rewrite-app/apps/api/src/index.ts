@@ -2008,6 +2008,7 @@ const parseDetailedResponseListQuery = (
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
     groupKey: readOptionalQueryValue(url, "groupKey"),
+    bookletKey: readOptionalQueryValue(url, "bookletKey"),
     participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
     unitKey: readOptionalQueryValue(url, "unitKey"),
@@ -2033,6 +2034,7 @@ const parseWorkspaceReviewListQuery = (
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
     groupKey: readOptionalQueryValue(url, "groupKey"),
+    bookletKey: readOptionalQueryValue(url, "bookletKey"),
     participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
     unitKey: readOptionalQueryValue(url, "unitKey"),

@@ -40,6 +40,7 @@ export type ShellPersistenceTarget = {
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;
   detailedResponseGroupFilter: string;
+  detailedResponseBookletFilter: string;
   detailedResponseSessionFilter: string;
   detailedResponseRunFilter: string;
   detailedResponseUnitFilter: string;
@@ -47,6 +48,7 @@ export type ShellPersistenceTarget = {
   detailedResponseLimit: string;
   reviewLoginFilter: string;
   reviewGroupFilter: string;
+  reviewBookletFilter: string;
   reviewSessionFilter: string;
   reviewRunFilter: string;
   reviewUnitFilter: string;
@@ -146,6 +148,7 @@ export const createPersistedShellState = (
   participantSessionLimit: target.participantSessionLimit,
   detailedResponseLoginFilter: target.detailedResponseLoginFilter,
   detailedResponseGroupFilter: target.detailedResponseGroupFilter,
+  detailedResponseBookletFilter: target.detailedResponseBookletFilter,
   detailedResponseSessionFilter: target.detailedResponseSessionFilter,
   detailedResponseRunFilter: target.detailedResponseRunFilter,
   detailedResponseUnitFilter: target.detailedResponseUnitFilter,
@@ -153,6 +156,7 @@ export const createPersistedShellState = (
   detailedResponseLimit: target.detailedResponseLimit,
   reviewLoginFilter: target.reviewLoginFilter,
   reviewGroupFilter: target.reviewGroupFilter,
+  reviewBookletFilter: target.reviewBookletFilter,
   reviewSessionFilter: target.reviewSessionFilter,
   reviewRunFilter: target.reviewRunFilter,
   reviewUnitFilter: target.reviewUnitFilter,
@@ -353,6 +357,10 @@ export const applyHydratedShellState = (
     snapshot.detailedResponseGroupFilter,
     target.detailedResponseGroupFilter
   );
+  target.detailedResponseBookletFilter = hydrateString(
+    snapshot.detailedResponseBookletFilter,
+    target.detailedResponseBookletFilter
+  );
   target.detailedResponseSessionFilter = hydrateString(
     snapshot.detailedResponseSessionFilter,
     target.detailedResponseSessionFilter
@@ -380,6 +388,10 @@ export const applyHydratedShellState = (
   target.reviewGroupFilter = hydrateString(
     snapshot.reviewGroupFilter,
     target.reviewGroupFilter
+  );
+  target.reviewBookletFilter = hydrateString(
+    snapshot.reviewBookletFilter,
+    target.reviewBookletFilter
   );
   target.reviewSessionFilter = hydrateString(
     snapshot.reviewSessionFilter,

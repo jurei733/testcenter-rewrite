@@ -172,6 +172,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     unitKey?: string;
     testRunStatus?: TestRunStatus | "not_started";
     answerState?: "answered" | "missing";
@@ -243,6 +244,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -254,6 +256,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -301,6 +304,7 @@ export type WorkspaceReviewPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -337,6 +341,7 @@ export type WorkspaceReviewPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -1582,6 +1587,7 @@ const escapeCsvCell = (value: string | null | undefined): string => {
 type DetailedResponseFilters = {
   loginKey?: string;
   groupKey?: string;
+  bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;
@@ -1592,6 +1598,7 @@ type DetailedResponseFilters = {
 type WorkspaceReviewFilters = {
   loginKey?: string;
   groupKey?: string;
+  bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;
@@ -1627,6 +1634,7 @@ const listDetailedResponsesForWorkspace = (input: {
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
     groupKey: normalizeExactFilter(input.groupKey),
+    bookletKey: normalizeExactFilter(input.bookletKey),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
     unitKey: normalizeExactFilter(input.unitKey),
@@ -1665,6 +1673,9 @@ const listDetailedResponsesForWorkspace = (input: {
       row =>
         (!filters.loginKey || row.loginKey === filters.loginKey) &&
         (!filters.groupKey || row.groupKey === filters.groupKey) &&
+        (!filters.bookletKey ||
+          row.bookletKey === filters.bookletKey ||
+          row.participantRosterEntry?.bookletKey === filters.bookletKey) &&
         (!filters.participantSessionId ||
           row.participantSessionId === filters.participantSessionId) &&
         (!filters.testRunId || row.testRunId === filters.testRunId) &&
@@ -2179,6 +2190,7 @@ const buildWorkspaceReviewListItems = (input: {
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
     groupKey: normalizeExactFilter(input.groupKey),
+    bookletKey: normalizeExactFilter(input.bookletKey),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
     unitKey: normalizeExactFilter(input.unitKey),
@@ -2207,6 +2219,9 @@ const buildWorkspaceReviewListItems = (input: {
           item.participantSession?.loginKey === filters.loginKey) &&
         (!filters.groupKey ||
           item.participantSession?.groupKey === filters.groupKey) &&
+        (!filters.bookletKey ||
+          item.testRun?.bookletKey === filters.bookletKey ||
+          item.participantRosterEntry?.bookletKey === filters.bookletKey) &&
         (!filters.participantSessionId ||
           item.review.participantSessionId === filters.participantSessionId) &&
         (!filters.testRunId || item.review.testRunId === filters.testRunId) &&
@@ -2238,6 +2253,7 @@ const formatReviewCsv = (input: {
     testRuns: input.testRuns,
     loginKey: input.loginKey,
     groupKey: input.groupKey,
+    bookletKey: input.bookletKey,
     participantSessionId: input.participantSessionId,
     testRunId: input.testRunId,
     unitKey: input.unitKey,
@@ -7349,6 +7365,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
@@ -7386,6 +7403,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
@@ -7604,6 +7622,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
@@ -7915,6 +7934,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,

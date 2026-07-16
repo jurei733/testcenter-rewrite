@@ -162,6 +162,11 @@ export function createRuntimeReadsStateHost(args: {
     appendQueryValue(query, "groupKey", args.runtimeState.detailedResponseGroupFilter);
     appendQueryValue(
       query,
+      "bookletKey",
+      args.runtimeState.detailedResponseBookletFilter
+    );
+    appendQueryValue(
+      query,
       "participantSessionId",
       args.runtimeState.detailedResponseSessionFilter
     );
@@ -181,6 +186,7 @@ export function createRuntimeReadsStateHost(args: {
     const query = new URLSearchParams();
     appendQueryValue(query, "loginKey", args.runtimeState.reviewLoginFilter);
     appendQueryValue(query, "groupKey", args.runtimeState.reviewGroupFilter);
+    appendQueryValue(query, "bookletKey", args.runtimeState.reviewBookletFilter);
     appendQueryValue(
       query,
       "participantSessionId",

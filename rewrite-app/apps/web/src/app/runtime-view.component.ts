@@ -390,7 +390,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Detailed Response Filters</h2>
-        <p>Narrow response inspection and response CSV export by participant, run, unit, status, or limit.</p>
+        <p>Narrow response inspection and response CSV export by participant, booklet, run, unit, status, or limit.</p>
         <div class="form-grid">
           <label>
             Login Key
@@ -399,6 +399,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <label>
             Group Key
             <input id="detailedResponseGroupFilter" name="detailedResponseGroupFilter" [(ngModel)]="view.runtime.detailedResponseGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
+          </label>
+          <label>
+            Booklet Key
+            <input id="detailedResponseBookletFilter" name="detailedResponseBookletFilter" [(ngModel)]="view.runtime.detailedResponseBookletFilter" (change)="view.persistState()" placeholder="Optional booklet key" />
           </label>
           <label>
             Session Id
@@ -441,7 +445,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Review Filters</h2>
-        <p>Narrow review reads and review CSV export by participant, run, unit, reviewer, category, or limit.</p>
+        <p>Narrow review reads and review CSV export by participant, booklet, run, unit, reviewer, category, or limit.</p>
         <div class="form-grid">
           <label>
             Login Key
@@ -450,6 +454,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <label>
             Group Key
             <input id="reviewGroupFilter" name="reviewGroupFilter" [(ngModel)]="view.runtime.reviewGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
+          </label>
+          <label>
+            Booklet Key
+            <input id="reviewBookletFilter" name="reviewBookletFilter" [(ngModel)]="view.runtime.reviewBookletFilter" (change)="view.persistState()" placeholder="Optional booklet key" />
           </label>
           <label>
             Session Id

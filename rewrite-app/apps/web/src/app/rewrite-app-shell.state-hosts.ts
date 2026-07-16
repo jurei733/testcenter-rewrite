@@ -297,6 +297,12 @@ export function createShellPersistenceStateHost(args: {
     set detailedResponseGroupFilter(nextValue) {
       args.runtimeState.detailedResponseGroupFilter = nextValue;
     },
+    get detailedResponseBookletFilter() {
+      return args.runtimeState.detailedResponseBookletFilter;
+    },
+    set detailedResponseBookletFilter(nextValue) {
+      args.runtimeState.detailedResponseBookletFilter = nextValue;
+    },
     get detailedResponseSessionFilter() {
       return args.runtimeState.detailedResponseSessionFilter;
     },
@@ -338,6 +344,12 @@ export function createShellPersistenceStateHost(args: {
     },
     set reviewGroupFilter(nextValue) {
       args.runtimeState.reviewGroupFilter = nextValue;
+    },
+    get reviewBookletFilter() {
+      return args.runtimeState.reviewBookletFilter;
+    },
+    set reviewBookletFilter(nextValue) {
+      args.runtimeState.reviewBookletFilter = nextValue;
     },
     get reviewSessionFilter() {
       return args.runtimeState.reviewSessionFilter;

@@ -2103,13 +2103,14 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       items: Array<{
         loginKey: string;
         groupKey: string;
+        bookletKey: string;
         testRunId: string;
         unitKey: string;
         status: string;
       }>;
     }>(
       isolated.baseUrl,
-      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?loginKey=student-demo&groupKey=group%3Astudent-demo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&status=running&limit=1`,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/responses/detailed?loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&status=running&limit=1`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
@@ -2120,6 +2121,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredDetailedResponses.status, 200);
     assert.equal(filteredDetailedResponses.body.items.length, 1);
     assert.equal(filteredDetailedResponses.body.items[0]?.loginKey, "student-demo");
+    assert.equal(filteredDetailedResponses.body.items[0]?.bookletKey, "booklet:demo");
     assert.equal(filteredDetailedResponses.body.items[0]?.unitKey, "unit-intro");
     assert.equal(filteredDetailedResponses.body.items[0]?.status, "running");
 
@@ -2748,10 +2750,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           unitKey: string | null;
         };
         participantSession: { loginKey: string; groupKey: string } | null;
+        testRun: { bookletKey: string } | null;
       }>;
     }>(
       isolated.baseUrl,
-      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews?loginKey=student-demo&groupKey=group%3Astudent-demo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&reviewerId=integration-reviewer&category=final-check&limit=1`,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/reviews?loginKey=student-demo&groupKey=group%3Astudent-demo&bookletKey=booklet%3Ademo&participantSessionId=${participantSignIn.body.participantSession.participantSessionId}&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-intro&reviewerId=integration-reviewer&category=final-check&limit=1`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
@@ -2764,6 +2767,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredReviews.body.items[0]?.review.reviewerId, "integration-reviewer");
     assert.equal(filteredReviews.body.items[0]?.review.category, "final-check");
     assert.equal(filteredReviews.body.items[0]?.participantSession?.loginKey, "student-demo");
+    assert.equal(filteredReviews.body.items[0]?.testRun?.bookletKey, "booklet:demo");
 
     const invalidReviewLimit = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -3156,7 +3160,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     const filteredReviewCsv = await requestTextAt(
       isolated.baseUrl,
-      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv?reviewerId=integration-reviewer&category=final-check&limit=1`,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv?bookletKey=booklet%3Ademo&reviewerId=integration-reviewer&category=final-check&limit=1`,
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
@@ -5954,7 +5958,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
       response: string;
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?loginKey=roster-runtime-student&bookletKey=booklet%3Abeta&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
   );
   assert.equal(detailedResponses.status, 200);
   assert.equal(detailedResponses.body.items.length, 1);
@@ -5965,7 +5969,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   );
 
   const responseCsv = await requestText(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/responses.csv?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/responses.csv?loginKey=roster-runtime-student&bookletKey=booklet%3Abeta&testRunId=${resumed.body.testRun.testRunId}&unitKey=unit-beta-1&limit=1`
   );
   assert.equal(responseCsv.status, 200);
   assert.equal(responseCsv.contentType, "text/csv; charset=utf-8");
@@ -6014,7 +6018,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
       review: { reviewId: string; category: string };
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/reviews?loginKey=roster-runtime-student&bookletKey=booklet%3Abeta&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
   );
   assert.equal(reviews.status, 200);
   assert.equal(reviews.body.items.length, 1);
@@ -6028,7 +6032,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   );
 
   const reviewCsv = await requestText(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/reviews.csv?loginKey=roster-runtime-student&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/reviews.csv?loginKey=roster-runtime-student&bookletKey=booklet%3Abeta&testRunId=${resumed.body.testRun.testRunId}&category=roster-note&limit=1`
   );
   assert.equal(reviewCsv.status, 200);
   assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");

@@ -74,6 +74,7 @@ export interface ShellRuntimeState {
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;
   detailedResponseGroupFilter: string;
+  detailedResponseBookletFilter: string;
   detailedResponseSessionFilter: string;
   detailedResponseRunFilter: string;
   detailedResponseUnitFilter: string;
@@ -81,6 +82,7 @@ export interface ShellRuntimeState {
   detailedResponseLimit: string;
   reviewLoginFilter: string;
   reviewGroupFilter: string;
+  reviewBookletFilter: string;
   reviewSessionFilter: string;
   reviewRunFilter: string;
   reviewUnitFilter: string;
@@ -257,6 +259,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionLimit: "100",
     detailedResponseLoginFilter: "",
     detailedResponseGroupFilter: "",
+    detailedResponseBookletFilter: "",
     detailedResponseSessionFilter: "",
     detailedResponseRunFilter: "",
     detailedResponseUnitFilter: "",
@@ -264,6 +267,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     detailedResponseLimit: "100",
     reviewLoginFilter: "",
     reviewGroupFilter: "",
+    reviewBookletFilter: "",
     reviewSessionFilter: "",
     reviewRunFilter: "",
     reviewUnitFilter: "",

@@ -2711,12 +2711,14 @@ export class WorkspaceViewFacade {
     runtime.bookletKey = item.actionPayload?.bookletKey ?? runtime.bookletKey;
     runtime.detailedResponseLoginFilter = runtime.loginKey.trim();
     runtime.detailedResponseGroupFilter = runtime.groupKey.trim();
+    runtime.detailedResponseBookletFilter = runtime.bookletKey.trim();
     runtime.detailedResponseSessionFilter = participantSessionId;
     runtime.detailedResponseRunFilter = testRunId;
     runtime.detailedResponseUnitFilter = runtime.currentUnitKey.trim();
     runtime.detailedResponseStatusFilter = "";
     runtime.reviewLoginFilter = runtime.loginKey.trim();
     runtime.reviewGroupFilter = runtime.groupKey.trim();
+    runtime.reviewBookletFilter = runtime.bookletKey.trim();
     runtime.reviewSessionFilter = participantSessionId;
     runtime.reviewRunFilter = testRunId;
     runtime.reviewUnitFilter = runtime.currentUnitKey.trim();

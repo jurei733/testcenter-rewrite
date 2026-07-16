@@ -622,6 +622,7 @@ export type ParticipantSessionListQuery = {
 export type DetailedResponseListQuery = {
   loginKey?: string;
   groupKey?: string;
+  bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;
@@ -632,6 +633,7 @@ export type DetailedResponseListQuery = {
 export type WorkspaceReviewListQuery = {
   loginKey?: string;
   groupKey?: string;
+  bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;

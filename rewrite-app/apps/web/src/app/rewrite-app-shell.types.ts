@@ -52,6 +52,7 @@ export type PersistedShellState = {
   participantSessionLimit: string;
   detailedResponseLoginFilter: string;
   detailedResponseGroupFilter: string;
+  detailedResponseBookletFilter: string;
   detailedResponseSessionFilter: string;
   detailedResponseRunFilter: string;
   detailedResponseUnitFilter: string;
@@ -59,6 +60,7 @@ export type PersistedShellState = {
   detailedResponseLimit: string;
   reviewLoginFilter: string;
   reviewGroupFilter: string;
+  reviewBookletFilter: string;
   reviewSessionFilter: string;
   reviewRunFilter: string;
   reviewUnitFilter: string;
