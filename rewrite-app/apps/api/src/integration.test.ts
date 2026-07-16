@@ -1847,6 +1847,9 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           tenantKey: string;
           workspaceKey: string;
         };
+        participantRosterEntry: {
+          displayName: string | null;
+        } | null;
         currentUnit: {
           unitKey: string | null;
           displayLabel: string | null;
@@ -1869,6 +1872,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       tenantKey: "demo-tenant",
       workspaceKey: "demo-workspace"
     });
+    assert.equal(
+      currentState.body.currentRunState.participantRosterEntry?.displayName,
+      "Demo Student"
+    );
     assert.deepEqual(
       currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
       ["unit-intro", "unit-practice", "unit-finish"]

@@ -9353,6 +9353,12 @@ export const createFirstSliceServices = (
           repository,
           currentTestRun.contentReleaseId
         );
+        const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
+          repository,
+          participantSession.tenantId,
+          participantSession.workspaceId,
+          participantSession.loginKey
+        );
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
         if (currentTestRun.status === "paused") {
           availableActions.push("resume", "save_progress", "complete");
@@ -9362,6 +9368,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
+          participantRosterEntry,
           scope,
           testRun: currentTestRun,
           booklet: resolveRuntimeBooklet(contentRelease, currentTestRun.bookletKey),

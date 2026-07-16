@@ -27,6 +27,7 @@ import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 type ParticipantPlayerState = {
   headline: string;
   detail: string;
+  displayNameLabel: string;
   loginLabel: string;
   groupLabel: string;
   sessionLabel: string;
@@ -276,6 +277,7 @@ export class ParticipantViewFacade {
         detail: hasParticipantSession
           ? "Resume the session to launch or continue the current run."
           : "Enter your workspace and login key, then sign in.",
+        displayNameLabel: "No participant name yet",
         loginLabel: this.runtime.loginKey.trim() || "No login yet",
         groupLabel: this.runtime.groupKey.trim() || "No group yet",
         sessionLabel: this.runtime.participantSessionId.trim() || "No session yet",
@@ -393,10 +395,14 @@ export class ParticipantViewFacade {
       currentDraft,
       isComplete
     });
+    const displayNameLabel =
+      currentState.participantRosterEntry?.displayName?.trim() ||
+      currentState.participantSession.loginKey;
 
     return {
       headline: unitLabel,
       detail: currentState.booklet.displayLabel,
+      displayNameLabel,
       loginLabel: currentState.participantSession.loginKey,
       groupLabel: currentState.participantSession.groupKey,
       sessionLabel: currentState.participantSession.participantSessionId,

@@ -27,6 +27,7 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </div>
         </header>
         <div class="participant-entry-context">
+          <span id="participantEntryDisplayName">{{ view.player.displayNameLabel }}</span>
           <span>{{ view.player.loginLabel }}</span>
           <span>{{ view.player.groupLabel }}</span>
           <span>{{ view.player.bookletLabel }}</span>
@@ -107,6 +108,10 @@ import { ParticipantViewFacade } from "./participant-view.facade";
         <h2>Current Test</h2>
         <div class="record-card" [class.is-selected]="view.player.runStatus !== 'idle'">
           <div class="participant-meta-grid">
+            <div>
+              <span>Name</span>
+              <strong id="participantRouteDisplayName">{{ view.player.displayNameLabel }}</strong>
+            </div>
             <div>
               <span>Login</span>
               <strong id="participantRouteLoginLabel">{{ view.player.loginLabel }}</strong>

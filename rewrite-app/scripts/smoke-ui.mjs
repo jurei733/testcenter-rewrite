@@ -1789,6 +1789,23 @@ try {
   const participantRouteFirstUnitResponse = "Final unit response before complete";
   const participantRouteUnitResponse = "Prefilled participant route response";
   const participantRouteNextUnitResponse = "Second unit participant response";
+  const participantRouteDisplayName = "Student Participant Route";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "loginKey,groupKey,bookletKey,displayName",
+          [
+            participantRouteLoginKey,
+            participantRouteGroupKey,
+            participantRouteBookletKey,
+            participantRouteDisplayName
+          ].join(",")
+        ].join("\n")
+      }
+    }
+  );
   await page.goto(
     `${baseUrl}/participant?tenantKey=${encodeURIComponent(
       tenantKey
@@ -1888,7 +1905,7 @@ try {
       payload.currentRunState.testRun.status === "running"
   );
   await page.waitForFunction(
-    ([expectedLoginKey, expectedGroupKey, expectedSessionId]) =>
+    ([expectedLoginKey, expectedGroupKey, expectedDisplayName, expectedSessionId]) =>
       document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
         "running" &&
       document.querySelector("#participantEntryStatus")?.textContent?.trim() ===
@@ -1897,6 +1914,10 @@ try {
         expectedLoginKey &&
       document.querySelector("#participantRouteGroupLabel")?.textContent?.trim() ===
         expectedGroupKey &&
+      document.querySelector("#participantRouteDisplayName")?.textContent?.trim() ===
+        expectedDisplayName &&
+      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+        expectedDisplayName &&
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
       document.querySelector("#participantRouteUnitDescription")?.textContent?.trim() ===
@@ -1906,6 +1927,7 @@ try {
     [
       participantRouteLoginKey,
       participantRouteGroupKey,
+      participantRouteDisplayName,
       participantRouteSessionId
     ],
     { timeout: 15_000 }
