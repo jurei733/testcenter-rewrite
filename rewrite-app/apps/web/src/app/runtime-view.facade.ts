@@ -1946,11 +1946,11 @@ export class RuntimeViewFacade {
   }
 
   get canImportParticipantRoster(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.entryRosterText.trim().length > 0;
+    return this.canUseWorkspaceScope && this.parseEntryRosterRowsPreview().length > 0;
   }
 
   get canGenerateEntryLinks(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.entryRosterText.trim().length > 0;
+    return this.canUseWorkspaceScope && this.parseEntryRosterRowsPreview().length > 0;
   }
 
   get canGenerateSavedRosterEntryLinks(): boolean {
@@ -1961,7 +1961,7 @@ export class RuntimeViewFacade {
     return (
       this.canUseWorkspaceScope &&
       (this.parseEntryLinksView().length > 0 ||
-        this.runtime.entryRosterText.trim().length > 0)
+        this.parseEntryRosterRowsPreview().length > 0)
     );
   }
 
