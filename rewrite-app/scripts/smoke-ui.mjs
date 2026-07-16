@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -1422,6 +1422,35 @@ try {
   assert.equal(persistedAfterZipLoad.sourceFileName, uploadedZipSourceFileName);
   assert.equal(persistedAfterZipLoad.sourceMediaType, "application/zip");
   assert.equal(persistedAfterZipLoad.sourceDocument, "");
+  logStep("download-zip-source-document");
+  await expectButtonSelectorEnabled("#createSourcePackageButton");
+  await page.locator("#createSourcePackageButton").click();
+  await page.waitForFunction(
+    () => {
+      const sourcePackageId = document.querySelector("#sourcePackageId");
+      return (
+        sourcePackageId instanceof HTMLInputElement &&
+        sourcePackageId.value.trim() !== ""
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+  await expectButtonSelectorEnabled("#downloadSourceDocumentButton");
+  const zipDownloadPromise = page.waitForEvent("download");
+  await page.locator("#downloadSourceDocumentButton").click();
+  const zipDownload = await zipDownloadPromise;
+  assert.equal(zipDownload.suggestedFilename(), uploadedZipSourceFileName);
+  const downloadedZipPath = resolve(
+    ".data",
+    `downloaded-${uploadedZipSourceFileName}`
+  );
+  await zipDownload.saveAs(downloadedZipPath);
+  const downloadedZip = await readFile(downloadedZipPath);
+  assert.equal(downloadedZip.readUInt32LE(0), 0x04034b50);
+  await fillAndCommit("#sourcePackageId", "");
+  await fillAndCommit("#importJobId", "");
+  await fillAndCommit("#contentReleaseId", "");
   logStep("load-source-document-file");
   const uploadedSourceFileName = `ui-smoke-source-${Date.now()}.imsmanifest`;
   const uploadedSourcePath = resolve(".data", uploadedSourceFileName);

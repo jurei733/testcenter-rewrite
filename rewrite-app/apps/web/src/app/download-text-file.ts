@@ -4,7 +4,17 @@ export function downloadTextFile(input: {
   text: string;
 }): void {
   const blob = new Blob([input.text], { type: input.mediaType });
-  const url = URL.createObjectURL(blob);
+  downloadBlobFile({
+    filename: input.filename,
+    blob
+  });
+}
+
+export function downloadBlobFile(input: {
+  filename: string;
+  blob: Blob;
+}): void {
+  const url = URL.createObjectURL(input.blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = input.filename;
@@ -14,4 +24,29 @@ export function downloadTextFile(input: {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+export function downloadDataUrlFile(input: {
+  filename: string;
+  dataUrl: string;
+}): boolean {
+  const match = input.dataUrl.match(/^data:([^,]*?)(;base64)?,([\s\S]*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const mediaType = match[1] || "application/octet-stream";
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] ?? "";
+  const bytes = isBase64
+    ? Uint8Array.from(atob(payload.replace(/\s+/g, "")), character =>
+        character.charCodeAt(0)
+      )
+    : new TextEncoder().encode(decodeURIComponent(payload));
+
+  downloadBlobFile({
+    filename: input.filename,
+    blob: new Blob([bytes], { type: mediaType })
+  });
+  return true;
 }

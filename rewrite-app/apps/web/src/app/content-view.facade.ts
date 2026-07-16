@@ -23,7 +23,7 @@ import {
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
-import { downloadTextFile } from "./download-text-file";
+import { downloadDataUrlFile, downloadTextFile } from "./download-text-file";
 import type { RecordCollectionItem } from "./record-collection.component";
 import {
   type ParticipantSessionEntryLinkContext,
@@ -1911,11 +1911,17 @@ export class ContentViewFacade {
         return;
       }
 
-      downloadTextFile({
+      const downloadedFromDataUrl = downloadDataUrlFile({
         filename,
-        mediaType,
-        text: sourceDocument
+        dataUrl: sourceDocument
       });
+      if (!downloadedFromDataUrl) {
+        downloadTextFile({
+          filename,
+          mediaType,
+          text: sourceDocument
+        });
+      }
       this.feedback.rememberActivity(
         "Source Document Downloaded",
         `${filename} downloaded from the selected source package.`
