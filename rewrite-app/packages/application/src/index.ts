@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { inflateRawSync } from "node:zlib";
 
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -3994,6 +3995,158 @@ const normalizeParsedXmlContentStructure = (
   });
 };
 
+type ZipEntry = {
+  fileName: string;
+  compressionMethod: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  localHeaderOffset: number;
+};
+
+const MAX_EXTRACTED_MANIFEST_BYTES = 5 * 1024 * 1024;
+
+const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
+  const minimumOffset = Math.max(0, zipBuffer.length - 65557);
+  for (let offset = zipBuffer.length - 22; offset >= minimumOffset; offset -= 1) {
+    if (zipBuffer.readUInt32LE(offset) === 0x06054b50) {
+      return offset;
+    }
+  }
+  return -1;
+};
+
+const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
+  const endOfCentralDirectoryOffset =
+    findZipEndOfCentralDirectoryOffset(zipBuffer);
+  if (endOfCentralDirectoryOffset < 0) {
+    return [];
+  }
+
+  const entryCount = zipBuffer.readUInt16LE(endOfCentralDirectoryOffset + 10);
+  const centralDirectoryOffset = zipBuffer.readUInt32LE(
+    endOfCentralDirectoryOffset + 16
+  );
+  const entries: ZipEntry[] = [];
+  let offset = centralDirectoryOffset;
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (offset + 46 > zipBuffer.length || zipBuffer.readUInt32LE(offset) !== 0x02014b50) {
+      return [];
+    }
+
+    const compressionMethod = zipBuffer.readUInt16LE(offset + 10);
+    const compressedSize = zipBuffer.readUInt32LE(offset + 20);
+    const uncompressedSize = zipBuffer.readUInt32LE(offset + 24);
+    const fileNameLength = zipBuffer.readUInt16LE(offset + 28);
+    const extraLength = zipBuffer.readUInt16LE(offset + 30);
+    const commentLength = zipBuffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = zipBuffer.readUInt32LE(offset + 42);
+    const fileNameStart = offset + 46;
+    const fileNameEnd = fileNameStart + fileNameLength;
+
+    if (fileNameEnd > zipBuffer.length) {
+      return [];
+    }
+
+    entries.push({
+      fileName: zipBuffer.toString("utf8", fileNameStart, fileNameEnd),
+      compressionMethod,
+      compressedSize,
+      uncompressedSize,
+      localHeaderOffset
+    });
+    offset = fileNameEnd + extraLength + commentLength;
+  }
+
+  return entries;
+};
+
+const readZipEntryText = (
+  zipBuffer: Buffer,
+  entry: ZipEntry
+): string | null => {
+  if (
+    entry.uncompressedSize > MAX_EXTRACTED_MANIFEST_BYTES ||
+    entry.localHeaderOffset + 30 > zipBuffer.length ||
+    zipBuffer.readUInt32LE(entry.localHeaderOffset) !== 0x04034b50
+  ) {
+    return null;
+  }
+
+  const fileNameLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 26);
+  const extraLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 28);
+  const dataStart = entry.localHeaderOffset + 30 + fileNameLength + extraLength;
+  const dataEnd = dataStart + entry.compressedSize;
+  if (dataEnd > zipBuffer.length) {
+    return null;
+  }
+
+  const compressedData = zipBuffer.subarray(dataStart, dataEnd);
+  const data =
+    entry.compressionMethod === 0
+      ? compressedData
+      : entry.compressionMethod === 8
+        ? inflateRawSync(compressedData)
+        : null;
+
+  if (!data || data.length > MAX_EXTRACTED_MANIFEST_BYTES) {
+    return null;
+  }
+
+  return data.toString("utf8");
+};
+
+const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null => {
+  const trimmedSourceDocument = sourceDocument.trim();
+  const dataUrlMatch = trimmedSourceDocument.match(
+    /^data:[^,]*;base64,([\s\S]+)$/i
+  );
+  const base64Payload = (dataUrlMatch?.[1] ?? trimmedSourceDocument)
+    .replace(/\s+/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  if (!/^[A-Za-z0-9+/=]+$/.test(base64Payload)) {
+    return null;
+  }
+
+  const zipBuffer = Buffer.from(base64Payload, "base64");
+  return findZipEndOfCentralDirectoryOffset(zipBuffer) >= 0 ? zipBuffer : null;
+};
+
+const extractXmlManifestFromZipSourceDocument = (
+  sourceDocument: string
+): string | null => {
+  const zipBuffer = decodeBase64ZipSourceDocument(sourceDocument);
+  if (!zipBuffer) {
+    return null;
+  }
+
+  const entries = readZipEntries(zipBuffer).filter(
+    entry => !entry.fileName.endsWith("/")
+  );
+  const candidates = [
+    ...entries.filter(entry =>
+      entry.fileName.toLowerCase().endsWith("/imsmanifest.xml") ||
+      entry.fileName.toLowerCase() === "imsmanifest.xml"
+    ),
+    ...entries.filter(entry =>
+      entry.fileName.toLowerCase().endsWith("/manifest.xml") ||
+      entry.fileName.toLowerCase() === "manifest.xml"
+    ),
+    ...entries.filter(entry => entry.fileName.toLowerCase().endsWith(".xml"))
+  ];
+
+  for (const entry of candidates) {
+    const text = readZipEntryText(zipBuffer, entry);
+    if (text?.trimStart().startsWith("<") && /<[^>]*manifest\b/i.test(text)) {
+      return text;
+    }
+  }
+
+  return null;
+};
+
 const deriveRuntimeSnapshotFromSourceDocument = (
   sourcePackage: SourcePackage
 ): {
@@ -4013,6 +4166,8 @@ const deriveRuntimeSnapshotFromSourceDocument = (
   const looksLikeJsonDocument =
     sourceDocumentText.startsWith("{") || sourceDocumentText.startsWith("[");
   const looksLikeXmlDocument = sourceDocumentText.startsWith("<");
+  const looksLikeZipPackage =
+    normalizedMediaType.includes("zip") || normalizedFileName.endsWith(".zip");
 
   if (
     normalizedMediaType.includes("json") ||
@@ -4049,6 +4204,28 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     return {
       runtimeSnapshot: normalizeParsedXmlContentStructure(sourcePackage.sourceDocument),
       diagnostics: []
+    };
+  }
+
+  if (looksLikeZipPackage) {
+    const manifestText = extractXmlManifestFromZipSourceDocument(
+      sourcePackage.sourceDocument
+    );
+    if (manifestText) {
+      return {
+        runtimeSnapshot: normalizeParsedXmlContentStructure(manifestText),
+        diagnostics: []
+      };
+    }
+
+    return {
+      runtimeSnapshot: null,
+      diagnostics: [
+        createImportDiagnostic(
+          "source_document_zip_manifest_missing",
+          `Source package '${sourcePackage.fileName}' did not contain a readable XML manifest in its ZIP sourceDocument.`
+        )
+      ]
     };
   }
 

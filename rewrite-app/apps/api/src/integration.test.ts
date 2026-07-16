@@ -10,6 +10,63 @@ let baseUrl = "";
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
+const createStoredZipBase64 = (
+  entries: Array<{ fileName: string; content: string }>
+): string => {
+  const localFileHeaders: Buffer[] = [];
+  const centralDirectoryHeaders: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const fileName = Buffer.from(entry.fileName, "utf8");
+    const content = Buffer.from(entry.content, "utf8");
+    const localHeader = Buffer.alloc(30 + fileName.length);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt32LE(0, 10);
+    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(content.length, 18);
+    localHeader.writeUInt32LE(content.length, 22);
+    localHeader.writeUInt16LE(fileName.length, 26);
+    fileName.copy(localHeader, 30);
+    localFileHeaders.push(localHeader, content);
+
+    const centralDirectoryHeader = Buffer.alloc(46 + fileName.length);
+    centralDirectoryHeader.writeUInt32LE(0x02014b50, 0);
+    centralDirectoryHeader.writeUInt16LE(20, 4);
+    centralDirectoryHeader.writeUInt16LE(20, 6);
+    centralDirectoryHeader.writeUInt16LE(0x0800, 8);
+    centralDirectoryHeader.writeUInt16LE(0, 10);
+    centralDirectoryHeader.writeUInt32LE(0, 12);
+    centralDirectoryHeader.writeUInt32LE(0, 16);
+    centralDirectoryHeader.writeUInt32LE(content.length, 20);
+    centralDirectoryHeader.writeUInt32LE(content.length, 24);
+    centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
+    centralDirectoryHeader.writeUInt32LE(offset, 42);
+    fileName.copy(centralDirectoryHeader, 46);
+    centralDirectoryHeaders.push(centralDirectoryHeader);
+
+    offset += localHeader.length + content.length;
+  }
+
+  const centralDirectoryOffset = offset;
+  const centralDirectory = Buffer.concat(centralDirectoryHeaders);
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+
+  return Buffer.concat([
+    ...localFileHeaders,
+    centralDirectory,
+    endOfCentralDirectory
+  ]).toString("base64");
+};
+
 type JsonResponse<T> = {
   status: number;
   body: T;
@@ -5457,6 +5514,104 @@ test("source document import sniffs manifest text from package media types", asy
           unitEntries: [
             { unitKey: "units/sniffed-item.xml", displayLabel: "Sniffed Unit" }
           ]
+        }
+      ]
+    }
+  );
+});
+
+test("source document import extracts IMS manifest from base64 ZIP packages", async () => {
+  const tenantKey = "integration-tenant-zip-manifest";
+  const workspaceKey = "integration-workspace-zip-manifest";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createStoredZipBase64([
+    {
+      fileName: "README.txt",
+      content: "not the manifest"
+    },
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <organizations default="ORG-ZIP">
+            <organization identifier="ORG-ZIP">
+              <item identifierref="RES-ZIP-BOOKLET">
+                <title>ZIP Booklet</title>
+                <item identifierref="RES-ZIP-UNIT">
+                  <title>ZIP Unit</title>
+                </item>
+              </item>
+            </organization>
+          </organizations>
+          <resources>
+            <resource identifier="RES-ZIP-BOOKLET" href="booklets/zip-booklet.xml" />
+            <resource identifier="RES-ZIP-UNIT" href="items/zip-unit.xml" />
+          </resources>
+        </manifest>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/zip-booklet.xml",
+          displayLabel: "ZIP Booklet",
+          unitEntries: [{ unitKey: "items/zip-unit.xml", displayLabel: "ZIP Unit" }]
         }
       ]
     }
