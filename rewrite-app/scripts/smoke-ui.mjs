@@ -24,7 +24,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work" /></booklet></assessment>';
+  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></unit></booklet></assessment>';
 let smokeAdminSessionToken = "";
 
 const createStoredZipBuffer = entries => {
@@ -1542,9 +1542,10 @@ try {
       const bodyText = document.body.textContent ?? "";
       return (
         bodyText.includes("Prompt Coverage") &&
-        bodyText.includes("1 / 3 prompt(s), 1 / 3 description(s)") &&
+        bodyText.includes("2 / 3 prompt(s), 1 / 3 description(s)") &&
         bodyText.includes("Participant Route: Read the participant prompt.") &&
-        bodyText.includes("Explain how the starter example works.")
+        bodyText.includes("Explain how the starter example works.") &&
+        bodyText.includes("Paused Work: Answer the direct Testcenter definition prompt.")
       );
     },
     undefined,
@@ -1988,6 +1989,8 @@ try {
         expectedUnitKey &&
       document.querySelector("#participantRouteUnitPosition")?.textContent?.trim() ===
         "3 / 3" &&
+      document.querySelector("#participantRouteUnitContent")?.textContent?.trim() ===
+        "Answer the direct Testcenter definition prompt." &&
       document.querySelector("#participantRouteUnitResponse")?.value === "",
     [participantRouteNextUnitKey],
     { timeout: 15_000 }
@@ -2365,6 +2368,28 @@ try {
     .waitFor();
   await fillAndCommit(
     "#entryRosterText",
+    [
+      "<Testtakers>",
+      "  <Group id=\"group:testcenter-login-entry\">",
+      "    <Login name=\"entry-student-login\">",
+      `      <Booklet>${participantRouteBookletKey}</Booklet>`,
+      "    </Login>",
+      "  </Group>",
+      "</Testtakers>"
+    ].join("\n")
+  );
+  await page.locator("#importParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-login" })
+    .filter({ hasText: "group:testcenter-login-entry" })
+    .filter({ hasText: participantRouteBookletKey })
+    .waitFor();
+  await fillAndCommit(
+    "#entryRosterText",
     JSON.stringify({
       groups: [
         {
@@ -2422,6 +2447,7 @@ try {
     .filter({ hasText: "Ada Entry" })
     .filter({ hasText: "entry-student-json" })
     .filter({ hasText: "Json Entry" })
+    .filter({ hasText: "entry-student-login" })
     .filter({ hasText: "booklet:starter" })
     .waitFor();
   await page.locator("#generateSavedRosterEntryLinksButton").click();
@@ -2452,6 +2478,16 @@ try {
     .filter({
       has: page.getByRole("heading", { name: "Generated Entry Links" })
     })
+    .filter({ hasText: "entry-student-login" })
+    .filter({ hasText: participantEntryUrlPrefix })
+    .filter({ hasText: "group%3Atestcenter-login-entry" })
+    .filter({ hasText: "booklet%3Astarter" })
+    .waitFor();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Generated Entry Links" })
+    })
     .filter({ hasText: "entry-student-xml" })
     .filter({ hasText: "Xml Entry" })
     .filter({ hasText: participantEntryUrlPrefix })
@@ -2461,20 +2497,24 @@ try {
     .locator("#entryLinksCsvPreview")
     .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
+    .filter({
+      hasText:
+        '"entry-student-login","group:testcenter-login-entry","booklet:starter"'
+    })
     .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "4" })
+    .filter({ hasText: "5" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "4" })
+    .filter({ hasText: "5" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
