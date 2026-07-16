@@ -5950,6 +5950,114 @@ test("source document import enriches ZIP units with referenced file content", a
   );
 });
 
+test("source document import derives ZIP runtime structure from referenced booklet XML", async () => {
+  const tenantKey = "integration-tenant-zip-booklet-file";
+  const workspaceKey = "integration-workspace-zip-booklet-file";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="RES-REFERENCED-BOOKLET" href="booklets/referenced-booklet.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/referenced-booklet.xml",
+      content: `
+        <Booklet id="booklet:zip-referenced" label="Referenced ZIP Booklet">
+          <Unit id="unit:zip-referenced-a" label="Referenced Unit A" />
+          <Unit id="unit:zip-referenced-b" label="Referenced Unit B">
+            <content>Loaded from the referenced booklet file.</content>
+          </Unit>
+        </Booklet>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "testcenter-zip-booklet-file-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              content?: string;
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklet:zip-referenced",
+          displayLabel: "Referenced ZIP Booklet",
+          unitEntries: [
+            {
+              unitKey: "unit:zip-referenced-a",
+              displayLabel: "Referenced Unit A"
+            },
+            {
+              unitKey: "unit:zip-referenced-b",
+              displayLabel: "Referenced Unit B",
+              content: "Loaded from the referenced booklet file."
+            }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
   const tenantKey = "integration-tenant-zip-xml-base";
   const workspaceKey = "integration-workspace-zip-xml-base";

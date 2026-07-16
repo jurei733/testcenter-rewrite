@@ -4402,11 +4402,43 @@ const extractXmlManifestFromZipSourceDocument = (
 const normalizeParsedZipXmlContentStructure = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ContentReleaseRuntimeSnapshot | null => {
-  const runtimeSnapshot = normalizeParsedXmlContentStructure(
+  let runtimeSnapshot = normalizeParsedXmlContentStructure(
     manifestExtraction.manifestText
   );
   if (!runtimeSnapshot) {
-    return null;
+    const referencedBookletEntries = [
+      ...collectXmlManifestResources(manifestExtraction.manifestText).values()
+    ].flatMap(resource => {
+      const referencedEntry = findZipEntryByPath(
+        manifestExtraction.entries,
+        resolveZipResourcePathCandidates(
+          manifestExtraction.manifestFileName,
+          resource.key
+        )
+      );
+      if (!referencedEntry) {
+        return [];
+      }
+
+      const sourceDocument = readZipEntryText(
+        manifestExtraction.zipBuffer,
+        referencedEntry
+      );
+      if (!sourceDocument) {
+        return [];
+      }
+
+      return (
+        normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
+      );
+    });
+
+    runtimeSnapshot = normalizeContentStructure({
+      bookletEntries: referencedBookletEntries
+    });
+    if (!runtimeSnapshot) {
+      return null;
+    }
   }
   const contentPathCandidatesByResourceKey =
     collectXmlManifestResourceContentPathCandidates(
