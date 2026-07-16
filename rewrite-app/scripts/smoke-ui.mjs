@@ -280,6 +280,39 @@ try {
       { timeout: 15_000 }
     );
   };
+  const expectRuntimeReviewHandoff = async ({
+    loginKey,
+    groupKey,
+    bookletKey,
+    participantSessionId,
+    testRunId,
+    unitKey
+  }) => {
+    await page.waitForURL(/\/app\/runtime$/);
+    await expectInputValue("#participantSessionId", participantSessionId);
+    await expectInputValue("#testRunId", testRunId);
+    await expectInputValue("#groupKey", groupKey);
+    await expectInputValue("#bookletKey", bookletKey);
+    await expectInputValue("#currentUnitKey", unitKey);
+    await expectInputValue("#detailedResponseLoginFilter", loginKey);
+    await expectInputValue("#detailedResponseGroupFilter", groupKey);
+    await expectInputValue("#detailedResponseBookletFilter", bookletKey);
+    await expectInputValue("#detailedResponseSessionFilter", participantSessionId);
+    await expectInputValue("#detailedResponseRunFilter", testRunId);
+    await expectInputValue("#detailedResponseUnitFilter", unitKey);
+    await expectInputValue("#reviewLoginFilter", loginKey);
+    await expectInputValue("#reviewGroupFilter", groupKey);
+    await expectInputValue("#reviewBookletFilter", bookletKey);
+    await expectInputValue("#reviewSessionFilter", participantSessionId);
+    await expectInputValue("#reviewRunFilter", testRunId);
+    await expectInputValue("#reviewUnitFilter", unitKey);
+    await expectInputValue("#openRunLoginFilter", loginKey);
+    await expectInputValue("#openRunGroupFilter", groupKey);
+    await expectInputValue("#openRunBookletFilter", bookletKey);
+    await expectInputValue("#openRunSessionFilter", participantSessionId);
+    await expectInputValue("#openRunRunFilter", testRunId);
+    await expectInputValue("#openRunUnitFilter", unitKey);
+  };
   const fillAndCommitUntilValue = async (selector, value) => {
     let lastError = null;
     for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -4011,6 +4044,21 @@ try {
   await bookletDetailStudentCard
     .getByRole("button", { name: "Review Response" })
     .waitFor();
+  logStep("study-monitor-booklet-detail-review-response");
+  await bookletDetailStudentCard
+    .getByRole("button", { name: "Review Response" })
+    .click();
+  await expectRuntimeReviewHandoff({
+    loginKey: participantLoginKey,
+    groupKey: participantGroupKey,
+    bookletKey: participantBookletKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    unitKey: "unit-paused"
+  });
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-booklet-detail-review-response");
   const bookletDetailAdaCard = page
     .locator("article.card")
     .filter({
@@ -4105,6 +4153,21 @@ try {
   await activeGroupDetailRunCard
     .getByRole("button", { name: "Review Response" })
     .waitFor();
+  logStep("study-monitor-group-detail-review-response");
+  await activeGroupDetailRunCard
+    .getByRole("button", { name: "Review Response" })
+    .click();
+  await expectRuntimeReviewHandoff({
+    loginKey: participantLoginKey,
+    groupKey: participantGroupKey,
+    bookletKey: participantBookletKey,
+    participantSessionId,
+    testRunId: pausedTestRunId,
+    unitKey: "unit-paused"
+  });
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  stopAfter("study-monitor-group-detail-review-response");
   await clickCardAction("Study Monitor", "Open Unit Detail", "Paused Work");
   await page.waitForFunction(
     expected => {
