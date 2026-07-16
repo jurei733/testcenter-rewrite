@@ -9177,6 +9177,17 @@ export const createFirstSliceServices = (
         );
 
         if (existingRun) {
+          if (
+            requestedBookletKey &&
+            existingRun.bookletKey !== requestedBookletKey
+          ) {
+            throw new FirstSliceError(
+              409,
+              "participant_session_open_run_booklet_conflict",
+              `Participant session '${participantSessionId}' already has an open run for booklet '${existingRun.bookletKey}'.`
+            );
+          }
+
           return normalizeTestRun(existingRun);
         }
 
@@ -9262,6 +9273,17 @@ export const createFirstSliceServices = (
         );
 
         if (existingRun) {
+          if (
+            requestedBookletKey &&
+            existingRun.bookletKey !== requestedBookletKey
+          ) {
+            throw new FirstSliceError(
+              409,
+              "participant_session_open_run_booklet_conflict",
+              `Participant session '${participantSessionId}' already has an open run for booklet '${existingRun.bookletKey}'.`
+            );
+          }
+
           if (existingRun.status === "paused") {
             const resumedRun: TestRun = {
               ...normalizeTestRun(existingRun),

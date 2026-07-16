@@ -7835,6 +7835,20 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(betaRun.body.testRun.bookletKey, "booklet:beta");
   assert.equal(betaRun.body.testRun.currentUnitKey, "unit-beta-1");
 
+  const conflictingBookletRun = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    {
+      method: "POST",
+      body: { bookletKey: "booklet:alpha" }
+    }
+  );
+
+  assert.equal(conflictingBookletRun.status, 409);
+  assert.equal(
+    conflictingBookletRun.body.error,
+    "participant_session_open_run_booklet_conflict"
+  );
+
   const directLaunch = await requestJson<{
     participantSession: {
       participantSessionId: string;
