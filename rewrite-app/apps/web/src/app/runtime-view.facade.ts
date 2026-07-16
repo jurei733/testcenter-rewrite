@@ -272,16 +272,28 @@ export class RuntimeViewFacade {
         { label: "Group", value: link.groupKey },
         { label: "Booklet", value: link.bookletKey || "active release default" },
         { label: "Display Name", value: link.displayName || "none" },
-        { label: "URL", value: link.url }
+        { label: "URL", value: link.url, href: link.url }
       ],
       selected: this.runtime.loginKey.trim() === link.loginKey,
-      actionLabel: "Open Participant Entry",
+      actionLabel: "Use Entry Link",
       actionPayload: {
         loginKey: link.loginKey,
         groupKey: link.groupKey,
         bookletKey: link.bookletKey,
-        url: link.url
-      }
+        displayName: link.displayName ?? ""
+      },
+      actions: [
+        {
+          label: "Open Participant Entry",
+          payload: {
+            loginKey: link.loginKey,
+            groupKey: link.groupKey,
+            bookletKey: link.bookletKey,
+            displayName: link.displayName ?? "",
+            url: link.url
+          }
+        }
+      ]
     }));
   }
 

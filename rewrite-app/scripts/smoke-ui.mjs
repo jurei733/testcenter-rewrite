@@ -2694,6 +2694,15 @@ try {
     .filter({ hasText: "group%3Adirect-xml" })
     .filter({ hasText: "booklet%3Astarter" });
   await directEntryLinkCard.waitFor();
+  await directEntryLinkCard
+    .getByRole("link", { name: /URL:/ })
+    .waitFor({ state: "visible" });
+  await directEntryLinkCard
+    .getByRole("button", { name: "Use Entry Link", exact: true })
+    .click({ force: true });
+  await expectInputValue("#loginKey", "entry-student-direct-xml");
+  await expectInputValue("#groupKey", "group:direct-xml");
+  await expectInputValue("#bookletKey", participantRouteBookletKey);
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
