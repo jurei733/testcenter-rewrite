@@ -2915,12 +2915,41 @@ const normalizeParsedJsonContentStructure = (
     value: Record<string, unknown>
   ): unknown[] => {
     const items: unknown[] = [];
-    for (const organization of [
+    const defaultOrganizationKey = readStringValue(
+      value,
+      "defaultOrganization",
+      "defaultOrganisation",
+      "defaultOrganizationId",
+      "defaultOrganisationId",
+      "defaultOrg",
+      "default"
+    );
+    const organizationEntries = [
       ...readOrganizationEntries(value.organizations),
       ...readOrganizationEntries(value.organization),
       ...readOrganizationEntries(value.orgs),
       ...readOrganizationEntries(value.org)
-    ]) {
+    ];
+    const selectedOrganizationEntries = defaultOrganizationKey
+      ? organizationEntries.filter(organization => {
+          const organizationObject = asObject(organization);
+          return (
+            organizationObject &&
+            readStringValue(
+              organizationObject,
+              "identifier",
+              "id",
+              "key",
+              "organizationId",
+              "organisationId"
+            ) === defaultOrganizationKey
+          );
+        })
+      : [];
+
+    for (const organization of selectedOrganizationEntries.length > 0
+      ? selectedOrganizationEntries
+      : organizationEntries) {
       const organizationObject = asObject(organization);
       if (organizationObject) {
         items.push(...readEntries(organizationObject.items, organizationObject.item));

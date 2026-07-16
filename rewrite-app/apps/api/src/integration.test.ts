@@ -4540,6 +4540,127 @@ test("source document import resolves keyed JSON IMS manifest maps", async () =>
   );
 });
 
+test("source document import respects JSON default organization", async () => {
+  const tenantKey = "integration-tenant-json-default-organization";
+  const workspaceKey = "integration-workspace-json-default-organization";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "imsmanifest-default-organization.json",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({
+        manifest: {
+          defaultOrganization: "ORG-DEFAULT",
+          organizations: [
+            {
+              identifier: "ORG-DISTRACTOR",
+              items: [
+                {
+                  identifierref: "RES-BOOKLET-DISTRACTOR",
+                  title: "Distractor Booklet",
+                  items: [{ identifierref: "RES-UNIT-DISTRACTOR" }]
+                }
+              ]
+            },
+            {
+              identifier: "ORG-DEFAULT",
+              items: [
+                {
+                  identifierref: "RES-BOOKLET-DEFAULT",
+                  title: "Default Booklet",
+                  items: [
+                    {
+                      identifierref: "RES-UNIT-DEFAULT",
+                      title: "Default Unit"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          resources: [
+            {
+              identifier: "RES-BOOKLET-DISTRACTOR",
+              href: "booklets/distractor.xml"
+            },
+            {
+              identifier: "RES-UNIT-DISTRACTOR",
+              href: "items/distractor.xml"
+            },
+            {
+              identifier: "RES-BOOKLET-DEFAULT",
+              href: "booklets/default.xml"
+            },
+            {
+              identifier: "RES-UNIT-DEFAULT",
+              href: "items/default.xml"
+            }
+          ]
+        }
+      })
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{ unitKey: string; displayLabel: string }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+  );
+
+  assert.equal(contentRelease.status, 200);
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      bookletEntries: [
+        {
+          bookletKey: "booklets/default.xml",
+          displayLabel: "Default Booklet",
+          unitEntries: [
+            { unitKey: "items/default.xml", displayLabel: "Default Unit" }
+          ]
+        }
+      ]
+    }
+  );
+});
+
 test("source document import resolves JSON resource dependencies", async () => {
   const tenantKey = "integration-tenant-json-dependencies";
   const workspaceKey = "integration-workspace-json-dependencies";
