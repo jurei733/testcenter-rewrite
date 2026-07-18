@@ -71,6 +71,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
           <button id="exportStudyMonitorCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
           <button id="exportParticipantMatrixCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
+          <button id="exportStudyMonitorRunCsvButton" class="ghost" type="button" [disabled]="!view.canExportStudyMonitorRunCsv" (click)="view.exportStudyMonitorRunCsv()">Export Run Detail CSV</button>
           <button id="exportWorkspaceLogCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
         </div>
       </article>
@@ -372,6 +373,12 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         <pre id="studyMonitorParticipantMatrixExportPreview">{{ view.studyMonitorParticipantMatrixExportView }}</pre>
       </article>
 
+      <article class="card">
+        <h2>Run Detail CSV Export</h2>
+        <p>Selected run export with unit-level expected/current/answered state, response length, reviews, and response text.</p>
+        <pre id="studyMonitorRunExportPreview">{{ view.studyMonitorRunExportView }}</pre>
+      </article>
+
       <app-json-panel
         title="Workspace Overview"
         subtitle="Read Model"
@@ -454,6 +461,13 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         subtitle="Participant Unit Matrix"
         viewId="studyMonitorParticipantMatrixExportView"
         [content]="view.studyMonitorParticipantMatrixExportView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Run Detail CSV Export"
+        subtitle="Selected Run Units"
+        viewId="studyMonitorRunExportView"
+        [content]="view.studyMonitorRunExportView"
       ></app-json-panel>
     </div>
   `

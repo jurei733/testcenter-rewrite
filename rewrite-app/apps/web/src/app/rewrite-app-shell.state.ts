@@ -188,6 +188,7 @@ export interface ShellWorkspaceState {
   studyMonitorRunView: string;
   studyMonitorExportView: string;
   studyMonitorParticipantMatrixExportView: string;
+  studyMonitorRunExportView: string;
   workspaceLogExportView: string;
   workspaceLoaded: boolean;
 }
@@ -395,6 +396,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     studyMonitorExportView: 'Use "Export Study Monitor CSV".',
     studyMonitorParticipantMatrixExportView:
       'Use "Export Participant Matrix CSV".',
+    studyMonitorRunExportView: 'Open a run, then use "Export Run Detail CSV".',
     workspaceLogExportView: 'Use "Export Workspace Logs CSV".',
     workspaceLoaded: false
   };

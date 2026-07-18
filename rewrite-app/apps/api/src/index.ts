@@ -1333,6 +1333,9 @@ const studyMonitorCsvExportPattern = createRoutePattern(
 const studyMonitorParticipantMatrixCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv
 );
+const studyMonitorRunCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportStudyMonitorRunCsv
+);
 const openRunsCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportOpenRunsCsv
 );
@@ -1427,6 +1430,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", participantRosterCsvExportPattern],
   ["GET", studyMonitorCsvExportPattern],
   ["GET", studyMonitorParticipantMatrixCsvExportPattern],
+  ["GET", studyMonitorRunCsvExportPattern],
   ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", reviewListPattern],
@@ -1884,6 +1888,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       studyMonitorParticipantMatrixCsvExportPattern,
       productionApiRoutes.workspace.exportStudyMonitorParticipantMatrixCsv
+    ],
+    [
+      "GET",
+      studyMonitorRunCsvExportPattern,
+      productionApiRoutes.workspace.exportStudyMonitorRunCsv
     ],
     [
       "GET",
@@ -3355,6 +3364,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         studyMonitorCsvExportPattern.exec(pathname);
       const studyMonitorParticipantMatrixCsvExportMatch =
         studyMonitorParticipantMatrixCsvExportPattern.exec(pathname);
+      const studyMonitorRunCsvExportMatch =
+        studyMonitorRunCsvExportPattern.exec(pathname);
       const openRunsCsvExportMatch = openRunsCsvExportPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
@@ -3888,6 +3899,40 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           response,
           200,
           `${workspaceKey}-study-monitor-participants.csv`,
+          csv
+        );
+        return;
+      }
+
+      if (request.method === "GET" && studyMonitorRunCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          studyMonitorRunCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          studyMonitorRunCsvExportMatch.groups.workspaceKey
+        );
+        const testRunId = decodeRouteGroup(
+          studyMonitorRunCsvExportMatch.groups.testRunId
+        );
+        if (!tenantKey || !workspaceKey || !testRunId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey and testRunId are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportStudyMonitorRunCsv({
+          tenantKey,
+          workspaceKey,
+          testRunId
+        });
+        sendCsv(
+          response,
+          200,
+          `${workspaceKey}-study-monitor-run-${testRunId}.csv`,
           csv
         );
         return;

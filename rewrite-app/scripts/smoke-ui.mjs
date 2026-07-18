@@ -3712,6 +3712,26 @@ try {
     .filter({ hasText: `${studyMonitorRunDetail.missingExpectedUnitCount} missing` })
     .filter({ hasText: "1 review(s)" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  logStep("run-detail-csv-export");
+  await expectButtonSelectorEnabled("#exportStudyMonitorRunCsvButton");
+  const studyMonitorRunDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Run Detail CSV");
+  const studyMonitorRunDownload = await studyMonitorRunDownloadPromise;
+  assert.equal(
+    studyMonitorRunDownload.suggestedFilename(),
+    `${workspaceKey}-study-monitor-run-${pausedTestRunId}.csv`
+  );
+  await page
+    .locator("#studyMonitorRunExportPreview")
+    .filter({
+      hasText:
+        "tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId"
+    })
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: pausedTestRunId })
+    .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "Filtered response smoke" })
+    .waitFor();
   logStep("run-detail-review-response");
   await page
     .locator("app-record-collection")

@@ -381,6 +381,36 @@ export class RewriteAppWorkspaceService {
     return csv;
   }
 
+  async exportStudyMonitorRunCsv(testRunId: string): Promise<string> {
+    if (!this.hasWorkspaceScope() || !testRunId.trim()) {
+      return "";
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const normalizedTestRunId = testRunId.trim();
+    const csv = await this.requestState.request<string>(
+      "Study Monitor Run CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportStudyMonitorRunCsv, {
+        tenantKey,
+        workspaceKey,
+        testRunId: normalizedTestRunId
+      })
+    );
+
+    this.workspaceState.studyMonitorRunExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-study-monitor-run-${normalizedTestRunId}.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Run Detail Exported",
+      `CSV run detail export loaded for ${tenantKey}/${workspaceKey}/${normalizedTestRunId}.`
+    );
+    return csv;
+  }
+
   async bootstrapWorkspaceFlow(): Promise<void> {
     await runBootstrapWorkspaceFlow(createBootstrapWorkspaceFlowHost({
       createTenant: () => this.createTenant(),

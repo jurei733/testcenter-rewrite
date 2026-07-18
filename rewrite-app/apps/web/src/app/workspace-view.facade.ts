@@ -177,6 +177,21 @@ export class WorkspaceViewFacade {
     return this.uiState.workspace.studyMonitorParticipantMatrixExportView;
   }
 
+  get studyMonitorRunExportView(): string {
+    return this.uiState.workspace.studyMonitorRunExportView;
+  }
+
+  get canExportStudyMonitorRunCsv(): boolean {
+    return this.canUseWorkspaceScope && this.selectedStudyMonitorRunId !== "";
+  }
+
+  private get selectedStudyMonitorRunId(): string {
+    const payload = parseJsonDocument<GetStudyMonitorRunResponse>(
+      this.workspace.studyMonitorRunView
+    );
+    return payload?.studyMonitorRun.testRun.testRunId ?? "";
+  }
+
   get studyMonitorParticipantMatrixItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<GetStudyMonitorParticipantMatrixResponse>(
       this.workspace.studyMonitorParticipantMatrixView
@@ -2518,6 +2533,16 @@ export class WorkspaceViewFacade {
     }
     this.viewState.onActionAsync(() =>
       this.workspaceService.exportStudyMonitorParticipantMatrixCsv()
+    );
+  }
+
+  exportStudyMonitorRunCsv(): void {
+    const testRunId = this.selectedStudyMonitorRunId;
+    if (!this.canUseWorkspaceScope || !testRunId) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportStudyMonitorRunCsv(testRunId)
     );
   }
 

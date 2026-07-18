@@ -183,6 +183,11 @@ export type WorkspaceAdminReadPort = {
     answerState?: "answered" | "missing";
     limit?: number;
   }): Promise<string>;
+  exportStudyMonitorRunCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    testRunId: string;
+  }): Promise<string>;
   getSourcePackageDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -580,6 +585,7 @@ export const firstSliceUseCases = {
   exportLogCsv: "ExportLogCsv",
   exportStudyMonitorCsv: "ExportStudyMonitorCsv",
   exportStudyMonitorParticipantMatrixCsv: "ExportStudyMonitorParticipantMatrixCsv",
+  exportStudyMonitorRunCsv: "ExportStudyMonitorRunCsv",
   exportOpenRunsCsv: "ExportOpenRunsCsv",
   exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
@@ -2128,6 +2134,63 @@ const formatStudyMonitorParticipantMatrixCsv = (
         String(row.responseLength),
         String(row.reviewCount),
         row.latestActivityAt ?? ""
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatStudyMonitorRunCsv = (
+  detail: WorkspaceStudyMonitorRunDetail
+): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "generatedAt",
+    "testRunId",
+    "participantSessionId",
+    "loginKey",
+    "groupKey",
+    "displayName",
+    "bookletKey",
+    "bookletLabel",
+    "testRunStatus",
+    "currentUnitKey",
+    "unitKey",
+    "unitLabel",
+    "expected",
+    "current",
+    "answered",
+    "responseLength",
+    "reviewCount",
+    "response"
+  ];
+
+  return [
+    header.join(","),
+    ...detail.units.map(unit =>
+      [
+        detail.tenantKey,
+        detail.workspaceKey,
+        detail.generatedAt,
+        detail.testRun.testRunId,
+        detail.participantSession?.participantSessionId ?? "",
+        detail.participantSession?.loginKey ?? "",
+        detail.participantSession?.groupKey ?? "",
+        detail.participantRosterEntry?.displayName ?? "",
+        detail.bookletKey,
+        detail.bookletLabel,
+        detail.testRun.status,
+        detail.testRun.currentUnitKey ?? "",
+        unit.unitKey,
+        unit.displayLabel,
+        String(unit.expected),
+        String(unit.current),
+        String(unit.answered),
+        String(unit.responseLength),
+        String(unit.reviewCount),
+        unit.response ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -7767,6 +7830,11 @@ export const createFirstSliceServices = (
         const matrix = await this.getStudyMonitorParticipantMatrix(input);
 
         return formatStudyMonitorParticipantMatrixCsv(matrix);
+      },
+      async exportStudyMonitorRunCsv(input) {
+        const detail = await this.getStudyMonitorRunDetail(input);
+
+        return formatStudyMonitorRunCsv(detail);
       },
       async getSourcePackageDetail(input) {
         const workspace = await requireWorkspace(

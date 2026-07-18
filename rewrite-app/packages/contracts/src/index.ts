@@ -1015,6 +1015,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/study-monitor.csv",
     exportStudyMonitorParticipantMatrixCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/study-monitor-participants.csv",
+    exportStudyMonitorRunCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/study-monitor-runs/:testRunId.csv",
     exportOpenRunsCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/open-runs.csv",
     exportResponseCsv:
