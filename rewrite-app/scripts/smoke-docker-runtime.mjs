@@ -109,6 +109,15 @@ const expectEqual = (label, actual, expected) => {
   }
 };
 
+const expectHeader = (response, headerName, expectedValue) => {
+  const actualValue = response.headers.get(headerName);
+  if (actualValue !== expectedValue) {
+    throw new Error(
+      `Expected ${headerName}=${expectedValue} but got ${actualValue ?? "missing"}.`
+    );
+  }
+};
+
 const dumpContainerLogs = async () => {
   await run("docker", ["logs", containerName]).catch(() => undefined);
 };
@@ -188,6 +197,14 @@ try {
   if (!contentType.includes("text/html")) {
     throw new Error(`Expected /app to serve HTML but got '${contentType}'.`);
   }
+  expectHeader(appResponse, "x-content-type-options", "nosniff");
+  expectHeader(appResponse, "referrer-policy", "no-referrer");
+  expectHeader(appResponse, "x-frame-options", "SAMEORIGIN");
+  expectHeader(
+    appResponse,
+    "permissions-policy",
+    "camera=(), geolocation=(), microphone=()"
+  );
   if (!appHtml.includes("<app-root></app-root>")) {
     throw new Error("Expected /app HTML to contain the Angular root marker.");
   }
