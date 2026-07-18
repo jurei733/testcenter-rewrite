@@ -29,6 +29,7 @@ import {
   runBlockedActivationFlow,
   runImportActivateFlow
 } from "./rewrite-app-shell.workflows";
+import { downloadTextFile } from "./download-text-file";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppShellContentHostsService } from "./rewrite-app-shell-content-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -75,6 +76,31 @@ export class RewriteAppContentService {
       return;
     }
     await refreshContentReadsAction(this.hosts.createContentReadsHost(), quiet);
+  }
+
+  async exportSourcePackagesCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Source Packages CSV Export",
+      "GET",
+      this.hosts.createContentReadsHost().getSourcePackagesExportPath()
+    );
+
+    this.contentState.sourcePackagesExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-source-packages.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Source Packages Exported",
+      `CSV source package export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
   }
 
   async loadSourcePackageDetail(): Promise<GetSourcePackageResponse> {

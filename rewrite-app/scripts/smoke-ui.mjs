@@ -1506,6 +1506,21 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
+  logStep("export-source-packages-csv");
+  await expectButtonSelectorEnabled("#exportSourcePackagesCsvButton");
+  const sourcePackagesDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Source Packages CSV");
+  const sourcePackagesDownload = await sourcePackagesDownloadPromise;
+  assert.equal(
+    sourcePackagesDownload.suggestedFilename(),
+    `${workspaceKey}-source-packages.csv`
+  );
+  await page
+    .locator("#sourcePackagesExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,sourcePackageId" })
+    .filter({ hasText: uploadedSourceFileName })
+    .filter({ hasText: "application/xml" })
+    .waitFor();
   await expectButtonSelectorEnabled("#createImportJobButton");
   await expectButtonSelectorEnabled("#sourcePackageDetailButton");
   await expectButtonSelectorEnabled("#downloadSourceDocumentButton");

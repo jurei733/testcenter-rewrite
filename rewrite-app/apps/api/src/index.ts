@@ -97,6 +97,7 @@ import {
   type UpdateAdminUserResponse,
   type AdminSessionListQuery,
   type AdminUserListQuery,
+  type SourcePackageListQuery,
   type UpdateReviewRequest,
   type WorkspaceReviewListQuery,
   productionApiRoutes,
@@ -1303,6 +1304,9 @@ const sourcePackageListPattern = createRoutePattern(
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
 );
+const sourcePackageCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportSourcePackagesCsv
+);
 const sourcePackageRetryImportPattern = createRoutePattern(
   productionApiRoutes.workspace.retrySourcePackageImport
 );
@@ -1418,6 +1422,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageCreatePattern],
   ["GET", sourcePackageListPattern],
   ["GET", sourcePackageDetailPattern],
+  ["GET", sourcePackageCsvExportPattern],
   ["POST", sourcePackageRetryImportPattern],
   ["POST", importJobCreatePattern],
   ["GET", importJobListPattern],
@@ -1812,6 +1817,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
+      "GET",
+      sourcePackageCsvExportPattern,
+      productionApiRoutes.workspace.exportSourcePackagesCsv
+    ],
+    [
       "POST",
       sourcePackageRetryImportPattern,
       productionApiRoutes.workspace.retrySourcePackageImport
@@ -1988,6 +1998,54 @@ const parseOperatorReadLimit = (
   }
 
   return { ok: true, limit };
+};
+
+const parseSourcePackageListQuery = (
+  url: URL,
+  response: ServerResponse
+): SourcePackageListQuery | null => {
+  const status = readOptionalQueryValue(url, "status");
+  if (status && !sourcePackageStatuses.includes(status as SourcePackageStatus)) {
+    sendError(
+      response,
+      400,
+      "source_package_status_invalid",
+      `Source package status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const latestImportStatus = readOptionalQueryValue(url, "latestImportStatus");
+  if (
+    latestImportStatus &&
+    !importJobStatuses.includes(latestImportStatus as ImportJobStatus)
+  ) {
+    sendError(
+      response,
+      400,
+      "source_package_latest_import_status_invalid",
+      `Latest import status '${latestImportStatus}' is not supported.`
+    );
+    return null;
+  }
+
+  const limit = parseOperatorReadLimit(
+    url,
+    response,
+    "source_package_limit_invalid",
+    "Source package limit must be an integer between 1 and 500."
+  );
+  if (!limit.ok) {
+    return null;
+  }
+
+  return {
+    status: status as SourcePackageStatus | undefined,
+    mediaType: readOptionalQueryValue(url, "mediaType"),
+    fileName: readOptionalQueryValue(url, "fileName"),
+    latestImportStatus: latestImportStatus as ImportJobStatus | undefined,
+    limit: limit.limit
+  };
 };
 
 const parseDetailedResponseListQuery = (
@@ -3182,6 +3240,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
+      const sourcePackageCsvExportMatch =
+        sourcePackageCsvExportPattern.exec(pathname);
       const sourcePackageRetryImportMatch =
         sourcePackageRetryImportPattern.exec(pathname);
       if (request.method === "GET" && sourcePackageListMatch?.groups) {
@@ -3199,61 +3259,48 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const status = url.searchParams.get("status")?.trim() || undefined;
-        if (status && !sourcePackageStatuses.includes(status as SourcePackageStatus)) {
-          sendError(
-            response,
-            400,
-            "source_package_status_invalid",
-            `Source package status '${status}' is not supported.`
-          );
-          return;
-        }
-
-        const latestImportStatus =
-          url.searchParams.get("latestImportStatus")?.trim() || undefined;
-        if (
-          latestImportStatus &&
-          !importJobStatuses.includes(latestImportStatus as ImportJobStatus)
-        ) {
-          sendError(
-            response,
-            400,
-            "source_package_latest_import_status_invalid",
-            `Latest import status '${latestImportStatus}' is not supported.`
-          );
-          return;
-        }
-
-        const mediaType = url.searchParams.get("mediaType")?.trim() || undefined;
-        const fileName = url.searchParams.get("fileName")?.trim() || undefined;
-        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
-        const limit = limitRawValue
-          ? Number.parseInt(limitRawValue, 10)
-          : undefined;
-        if (
-          limitRawValue &&
-          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
-        ) {
-          sendError(
-            response,
-            400,
-            "source_package_limit_invalid",
-            "Source package limit must be an integer between 1 and 500."
-          );
+        const query = parseSourcePackageListQuery(url, response);
+        if (!query) {
           return;
         }
 
         const items = await services.workspaceAdminRead.listSourcePackages({
           tenantKey,
           workspaceKey,
-          status: status as SourcePackageStatus | undefined,
-          mediaType,
-          fileName,
-          latestImportStatus: latestImportStatus as ImportJobStatus | undefined,
-          limit
+          ...query
         });
         sendJson<ListSourcePackagesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && sourcePackageCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          sourcePackageCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const query = parseSourcePackageListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportSourcePackagesCsv({
+          tenantKey,
+          workspaceKey,
+          ...query
+        });
+        sendCsv(response, 200, `${workspaceKey}-source-packages.csv`, csv);
         return;
       }
 

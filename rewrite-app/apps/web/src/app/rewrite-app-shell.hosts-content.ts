@@ -76,9 +76,9 @@ export function createContentReadsStateHost(args: {
     return queryString ? `${path}?${queryString}` : path;
   };
 
-  const buildSourcePackagesPath = (): string =>
+  const buildSourcePackagesPathForRoute = (route: string): string =>
     appendQuery(
-      resolveRoutePath(productionApiRoutes.workspace.listSourcePackages, {
+      resolveRoutePath(route, {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
@@ -92,6 +92,14 @@ export function createContentReadsStateHost(args: {
         ],
         ["limit", args.contentState.sourcePackageLimit]
       ]
+    );
+
+  const buildSourcePackagesPath = (): string =>
+    buildSourcePackagesPathForRoute(productionApiRoutes.workspace.listSourcePackages);
+
+  const buildSourcePackagesExportPath = (): string =>
+    buildSourcePackagesPathForRoute(
+      productionApiRoutes.workspace.exportSourcePackagesCsv
     );
 
   const buildImportJobsPath = (): string =>
@@ -130,6 +138,7 @@ export function createContentReadsStateHost(args: {
       }),
     getWorkspaceActivityPath: buildWorkspaceActivityPath,
     getSourcePackagesPath: buildSourcePackagesPath,
+    getSourcePackagesExportPath: buildSourcePackagesExportPath,
     getImportJobsPath: buildImportJobsPath,
     getParticipantSessionsPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {

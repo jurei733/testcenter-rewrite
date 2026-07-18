@@ -793,6 +793,7 @@ export type FirstSliceCapability =
   | "workspace_activity_read"
   | "source_package_intake"
   | "source_package_read"
+  | "source_package_csv_export"
   | "source_package_retry"
   | "import_job_intake"
   | "import_job_read"
@@ -845,6 +846,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "workspace_activity_read",
   "source_package_intake",
   "source_package_read",
+  "source_package_csv_export",
   "source_package_retry",
   "import_job_intake",
   "import_job_read",

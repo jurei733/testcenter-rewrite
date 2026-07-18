@@ -202,6 +202,15 @@ export type WorkspaceAdminReadPort = {
     latestImportStatus?: ImportJobStatus;
     limit?: number;
   }): Promise<WorkspaceSourcePackageListItem[]>;
+  exportSourcePackagesCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    status?: SourcePackageStatus;
+    mediaType?: string;
+    fileName?: string;
+    latestImportStatus?: ImportJobStatus;
+    limit?: number;
+  }): Promise<string>;
   getImportJobDetail(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -590,6 +599,7 @@ export const firstSliceUseCases = {
   exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
   listSourcePackages: "ListSourcePackages",
+  exportSourcePackagesCsv: "ExportSourcePackagesCsv",
   createSourcePackage: "CreateSourcePackage",
   createImportJob: "CreateImportJob",
   retrySourcePackageImport: "RetrySourcePackageImport",
@@ -1859,6 +1869,62 @@ const formatWorkspaceActivityCsv = (input: {
         .map(escapeCsvCell)
         .join(",")
     )
+  ].join("\n") + "\n";
+};
+
+const formatSourcePackagesCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: WorkspaceSourcePackageListItem[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "sourcePackageId",
+    "fileName",
+    "mediaType",
+    "status",
+    "uploadedAt",
+    "bookletCount",
+    "unitCount",
+    "hasSourceDocument",
+    "latestImportJobId",
+    "latestImportStatus",
+    "latestImportCreatedAt",
+    "latestImportFinishedAt",
+    "latestImportDiagnosticCount"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(item => {
+      const sourcePackage = item.sourcePackage;
+      const bookletEntries = sourcePackage.contentStructure?.bookletEntries ?? [];
+      const unitCount = bookletEntries.reduce(
+        (total, booklet) => total + booklet.unitEntries.length,
+        0
+      );
+
+      return [
+        input.tenantKey,
+        input.workspaceKey,
+        sourcePackage.sourcePackageId,
+        sourcePackage.fileName,
+        sourcePackage.mediaType,
+        sourcePackage.status,
+        sourcePackage.uploadedAt,
+        String(bookletEntries.length),
+        String(unitCount),
+        String(sourcePackage.sourceDocument !== null),
+        item.latestImportJob?.importJobId ?? "",
+        item.latestImportJob?.status ?? "",
+        item.latestImportJob?.createdAt ?? "",
+        item.latestImportJob?.finishedAt ?? "",
+        String(item.latestImportJob?.diagnostics.length ?? 0)
+      ]
+        .map(escapeCsvCell)
+        .join(",");
+    })
   ].join("\n") + "\n";
 };
 
@@ -7925,6 +7991,15 @@ export const createFirstSliceServices = (
             )
           )
           .slice(0, limit);
+      },
+      async exportSourcePackagesCsv(input) {
+        const items = await this.listSourcePackages(input);
+
+        return formatSourcePackagesCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       },
       async getImportJobDetail(input) {
         const workspace = await requireWorkspace(

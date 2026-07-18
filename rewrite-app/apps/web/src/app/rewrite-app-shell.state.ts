@@ -156,6 +156,7 @@ export interface ShellContentState {
   contentReleaseActivationReadinessView: string;
   contentReleaseDetailView: string;
   activationGuardView: string;
+  sourcePackagesExportView: string;
   contentLoaded: boolean;
 }
 
@@ -361,6 +362,7 @@ export function createInitialShellContentState(
     contentReleaseDetailView: 'Use "Release Detail".',
     activationGuardView:
       "Activation guard details appear here when readiness or activation reports open-run blockers.",
+    sourcePackagesExportView: 'Use "Export Source Packages CSV".',
     contentLoaded: false
   };
 }

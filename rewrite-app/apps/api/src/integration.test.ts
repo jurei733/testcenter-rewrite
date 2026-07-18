@@ -1297,6 +1297,14 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedOverview.status, 401);
     assert.equal(rejectedOverview.body.error, "admin_session_missing");
 
+    const rejectedSourcePackageCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/source-packages.csv"
+    );
+
+    assert.equal(rejectedSourcePackageCsv.status, 401);
+    assert.equal(rejectedSourcePackageCsv.body.error, "admin_session_missing");
+
     const rejectedStudyMonitorSummary = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/summary"
@@ -3845,6 +3853,23 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(
     acceptedSourcePackages.body.items[0]?.latestImportJob?.status,
     "completed"
+  );
+
+  const sourcePackagesCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/source-packages.csv?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
+  );
+
+  assert.equal(sourcePackagesCsv.status, 200);
+  assert.equal(sourcePackagesCsv.contentType, "text/csv; charset=utf-8");
+  assert.match(
+    sourcePackagesCsv.body,
+    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
+  );
+  assert.match(
+    sourcePackagesCsv.body,
+    new RegExp(
+      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
+    )
   );
 
   const failedImportJobs = await requestJson<{
@@ -9400,6 +9425,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         listParticipantRoster: string;
         exportParticipantRosterCsv: string;
         exportParticipantSessionsCsv: string;
+        exportSourcePackagesCsv: string;
         listDetailedResponses: string;
         exportStudyMonitorCsv: string;
         getStudyMonitorParticipantMatrix: string;
@@ -9443,6 +9469,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "admin_audit_read",
     "admin_audit_csv_export",
     "source_package_read",
+    "source_package_csv_export",
     "source_package_retry",
     "import_job_read",
     "content_release_read",
@@ -9483,6 +9510,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(
     manifest.routes.workspace.exportParticipantSessionsCsv,
     /participant-sessions\.csv/
+  );
+  assert.match(
+    manifest.routes.workspace.exportSourcePackagesCsv,
+    /source-packages\.csv/
   );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);

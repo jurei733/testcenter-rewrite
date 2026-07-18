@@ -993,6 +993,8 @@ export const productionApiRoutes = {
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
+    exportSourcePackagesCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/source-packages.csv",
     retrySourcePackageImport:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/retry-import",
     createImportJob: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/import-jobs",
