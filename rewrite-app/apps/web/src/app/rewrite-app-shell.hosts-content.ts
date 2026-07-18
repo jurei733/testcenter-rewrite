@@ -102,9 +102,9 @@ export function createContentReadsStateHost(args: {
       productionApiRoutes.workspace.exportSourcePackagesCsv
     );
 
-  const buildImportJobsPath = (): string =>
+  const buildImportJobsPathForRoute = (route: string): string =>
     appendQuery(
-      resolveRoutePath(productionApiRoutes.workspace.listImportJobs, {
+      resolveRoutePath(route, {
         tenantKey: args.workspaceState.tenantKey.trim(),
         workspaceKey: args.workspaceState.workspaceKey.trim()
       }),
@@ -114,6 +114,12 @@ export function createContentReadsStateHost(args: {
         ["limit", args.contentState.importJobLimit]
       ]
     );
+
+  const buildImportJobsPath = (): string =>
+    buildImportJobsPathForRoute(productionApiRoutes.workspace.listImportJobs);
+
+  const buildImportJobsExportPath = (): string =>
+    buildImportJobsPathForRoute(productionApiRoutes.workspace.exportImportJobsCsv);
 
   const buildContentReleasesPath = (): string =>
     appendQuery(
@@ -140,6 +146,7 @@ export function createContentReadsStateHost(args: {
     getSourcePackagesPath: buildSourcePackagesPath,
     getSourcePackagesExportPath: buildSourcePackagesExportPath,
     getImportJobsPath: buildImportJobsPath,
+    getImportJobsExportPath: buildImportJobsExportPath,
     getParticipantSessionsPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.listParticipantSessions, {
         tenantKey: args.workspaceState.tenantKey.trim(),

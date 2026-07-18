@@ -103,6 +103,31 @@ export class RewriteAppContentService {
     return csv;
   }
 
+  async exportImportJobsCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Import Jobs CSV Export",
+      "GET",
+      this.hosts.createContentReadsHost().getImportJobsExportPath()
+    );
+
+    this.contentState.importJobsExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-import-jobs.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Import Jobs Exported",
+      `CSV import job export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async loadSourcePackageDetail(): Promise<GetSourcePackageResponse> {
     return loadSourcePackageDetailAction(this.hosts.createContentDetailsHost());
   }

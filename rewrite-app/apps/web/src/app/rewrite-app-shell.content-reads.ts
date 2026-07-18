@@ -26,6 +26,7 @@ export interface ShellContentReadsHost {
   getSourcePackagesPath(): string;
   getSourcePackagesExportPath(): string;
   getImportJobsPath(): string;
+  getImportJobsExportPath(): string;
   getParticipantSessionsPath(): string;
   getContentReleasesPath(): string;
   createWorkspaceContentPresentationHost(): WorkspaceContentPresentationHost;

@@ -299,6 +299,13 @@ export type WorkspaceAdminReadPort = {
     sourcePackageId?: string;
     limit?: number;
   }): Promise<WorkspaceImportJobListItem[]>;
+  exportImportJobsCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    status?: ImportJobStatus;
+    sourcePackageId?: string;
+    limit?: number;
+  }): Promise<string>;
   listContentReleases(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -616,6 +623,7 @@ export const firstSliceUseCases = {
   exportResponseCsv: "ExportResponseCsv",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
   listImportJobs: "ListImportJobs",
+  exportImportJobsCsv: "ExportImportJobsCsv",
   listContentReleases: "ListContentReleases",
   getContentReleaseDetail: "GetContentReleaseDetail",
   activateContentRelease: "ActivateContentRelease",
@@ -1925,6 +1933,51 @@ const formatSourcePackagesCsv = (input: {
         .map(escapeCsvCell)
         .join(",");
     })
+  ].join("\n") + "\n";
+};
+
+const formatImportJobsCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: WorkspaceImportJobListItem[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "importJobId",
+    "sourcePackageId",
+    "sourceFileName",
+    "sourceMediaType",
+    "status",
+    "createdAt",
+    "finishedAt",
+    "diagnosticCount",
+    "diagnosticSeverities",
+    "diagnosticCodes",
+    "diagnosticMessages"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(item =>
+      [
+        input.tenantKey,
+        input.workspaceKey,
+        item.importJob.importJobId,
+        item.importJob.sourcePackageId,
+        item.sourcePackage?.fileName ?? "",
+        item.sourcePackage?.mediaType ?? "",
+        item.importJob.status,
+        item.importJob.createdAt,
+        item.importJob.finishedAt ?? "",
+        String(item.importJob.diagnostics.length),
+        item.importJob.diagnostics.map(diagnostic => diagnostic.severity).join("|"),
+        item.importJob.diagnostics.map(diagnostic => diagnostic.code).join("|"),
+        item.importJob.diagnostics.map(diagnostic => diagnostic.message).join("|")
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
   ].join("\n") + "\n";
 };
 
@@ -8072,6 +8125,15 @@ export const createFirstSliceServices = (
                   sourcePackage.sourcePackageId === importJob.sourcePackageId
               ) ?? null
           }));
+      },
+      async exportImportJobsCsv(input) {
+        const items = await this.listImportJobs(input);
+
+        return formatImportJobsCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       },
       async getContentReleaseDetail(input) {
         const workspace = await requireWorkspace(

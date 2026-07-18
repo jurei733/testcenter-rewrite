@@ -97,6 +97,7 @@ import {
   type UpdateAdminUserResponse,
   type AdminSessionListQuery,
   type AdminUserListQuery,
+  type ImportJobListQuery,
   type SourcePackageListQuery,
   type UpdateReviewRequest,
   type WorkspaceReviewListQuery,
@@ -1316,6 +1317,9 @@ const importJobCreatePattern = createRoutePattern(
 const importJobListPattern = createRoutePattern(
   productionApiRoutes.workspace.listImportJobs
 );
+const importJobCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportImportJobsCsv
+);
 const participantSessionListPattern = createRoutePattern(
   productionApiRoutes.workspace.listParticipantSessions
 );
@@ -1427,6 +1431,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", importJobCreatePattern],
   ["GET", importJobListPattern],
   ["GET", importJobDetailPattern],
+  ["GET", importJobCsvExportPattern],
   ["GET", participantSessionListPattern],
   ["GET", participantSessionCsvExportPattern],
   ["GET", participantSessionDetailPattern],
@@ -1831,6 +1836,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", importJobDetailPattern, productionApiRoutes.workspace.getImportJob],
     [
       "GET",
+      importJobCsvExportPattern,
+      productionApiRoutes.workspace.exportImportJobsCsv
+    ],
+    [
+      "GET",
       participantSessionListPattern,
       productionApiRoutes.workspace.listParticipantSessions
     ],
@@ -2044,6 +2054,38 @@ const parseSourcePackageListQuery = (
     mediaType: readOptionalQueryValue(url, "mediaType"),
     fileName: readOptionalQueryValue(url, "fileName"),
     latestImportStatus: latestImportStatus as ImportJobStatus | undefined,
+    limit: limit.limit
+  };
+};
+
+const parseImportJobListQuery = (
+  url: URL,
+  response: ServerResponse
+): ImportJobListQuery | null => {
+  const status = readOptionalQueryValue(url, "status");
+  if (status && !importJobStatuses.includes(status as ImportJobStatus)) {
+    sendError(
+      response,
+      400,
+      "import_job_status_invalid",
+      `Import job status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const limit = parseOperatorReadLimit(
+    url,
+    response,
+    "import_job_limit_invalid",
+    "Import job limit must be an integer between 1 and 500."
+  );
+  if (!limit.ok) {
+    return null;
+  }
+
+  return {
+    status: status as ImportJobStatus | undefined,
+    sourcePackageId: readOptionalQueryValue(url, "sourcePackageId"),
     limit: limit.limit
   };
 };
@@ -3395,6 +3437,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const importJobCreateMatch = importJobCreatePattern.exec(pathname);
       const importJobListMatch = importJobListPattern.exec(pathname);
       const importJobDetailMatch = importJobDetailPattern.exec(pathname);
+      const importJobCsvExportMatch = importJobCsvExportPattern.exec(pathname);
       const participantSessionListMatch = participantSessionListPattern.exec(pathname);
       const participantSessionDetailMatch =
         participantSessionDetailPattern.exec(pathname);
@@ -3430,44 +3473,46 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const status = url.searchParams.get("status")?.trim() || undefined;
-        if (status && !importJobStatuses.includes(status as ImportJobStatus)) {
-          sendError(
-            response,
-            400,
-            "import_job_status_invalid",
-            `Import job status '${status}' is not supported.`
-          );
-          return;
-        }
-
-        const sourcePackageId =
-          url.searchParams.get("sourcePackageId")?.trim() || undefined;
-        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
-        const limit = limitRawValue
-          ? Number.parseInt(limitRawValue, 10)
-          : undefined;
-        if (
-          limitRawValue &&
-          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
-        ) {
-          sendError(
-            response,
-            400,
-            "import_job_limit_invalid",
-            "Import job limit must be an integer between 1 and 500."
-          );
+        const query = parseImportJobListQuery(url, response);
+        if (!query) {
           return;
         }
 
         const items = await services.workspaceAdminRead.listImportJobs({
           tenantKey,
           workspaceKey,
-          status: status as ImportJobStatus | undefined,
-          sourcePackageId,
-          limit
+          ...query
         });
         sendJson<ListImportJobsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && importJobCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(importJobCsvExportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          importJobCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const query = parseImportJobListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportImportJobsCsv({
+          tenantKey,
+          workspaceKey,
+          ...query
+        });
+        sendCsv(response, 200, `${workspaceKey}-import-jobs.csv`, csv);
         return;
       }
 

@@ -198,6 +198,13 @@ export class ContentViewFacade {
     this.viewState.onActionAsync(() => this.contentService.exportSourcePackagesCsv());
   }
 
+  exportImportJobsCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() => this.contentService.exportImportJobsCsv());
+  }
+
   get contentCards(): SummaryCard[] {
     const sourcePackages = parseJsonDocument(this.content.sourcePackagesView);
     const importJobs = parseJsonDocument(this.content.importJobsView);

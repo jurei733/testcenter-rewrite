@@ -1535,6 +1535,21 @@ try {
       Array.isArray(payload.items) &&
       payload.items.some(item => item?.contentRelease?.status === "staged")
   );
+  logStep("export-import-jobs-csv");
+  await expectButtonSelectorEnabled("#exportImportJobsCsvButton");
+  const importJobsDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Import Jobs CSV");
+  const importJobsDownload = await importJobsDownloadPromise;
+  assert.equal(
+    importJobsDownload.suggestedFilename(),
+    `${workspaceKey}-import-jobs.csv`
+  );
+  await page
+    .locator("#importJobsExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,importJobId" })
+    .filter({ hasText: uploadedSourceFileName })
+    .filter({ hasText: "completed" })
+    .waitFor();
   await expectButtonSelectorEnabled("#importJobDetailButton");
   await expectButtonSelectorEnabled("#activateContentReleaseButton");
   await expectButtonSelectorEnabled("#releaseReadinessButton");

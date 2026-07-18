@@ -157,6 +157,7 @@ export interface ShellContentState {
   contentReleaseDetailView: string;
   activationGuardView: string;
   sourcePackagesExportView: string;
+  importJobsExportView: string;
   contentLoaded: boolean;
 }
 
@@ -363,6 +364,7 @@ export function createInitialShellContentState(
     activationGuardView:
       "Activation guard details appear here when readiness or activation reports open-run blockers.",
     sourcePackagesExportView: 'Use "Export Source Packages CSV".',
+    importJobsExportView: 'Use "Export Import Jobs CSV".',
     contentLoaded: false
   };
 }

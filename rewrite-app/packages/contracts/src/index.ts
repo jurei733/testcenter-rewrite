@@ -1001,6 +1001,8 @@ export const productionApiRoutes = {
     listImportJobs: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/import-jobs",
     getImportJob:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/import-jobs/:importJobId",
+    exportImportJobsCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/import-jobs.csv",
     listParticipantSessions:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/participant-sessions",
     getParticipantSession:

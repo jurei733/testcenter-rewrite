@@ -149,6 +149,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="applyContentReadFiltersButton" class="primary" type="button" data-content-filter-action="apply" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyContentReadFilters()">Apply Content Filters</button>
           <button id="exportSourcePackagesCsvButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportSourcePackagesCsv()">Export Source Packages CSV</button>
+          <button id="exportImportJobsCsvButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportImportJobsCsv()">Export Import Jobs CSV</button>
           <button id="useSelectedIdsAsContentReadFiltersButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.useSelectedIdsAsContentReadFilters()">Use Selected IDs</button>
           <button class="ghost" type="button" (click)="view.clearContentReadFilters()">Clear Content Filters</button>
         </div>
@@ -183,6 +184,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         (itemAction)="view.selectImportJob($event)"
         emptyState="No import jobs yet."
       ></app-record-collection>
+
+      <article class="card">
+        <h2>Import Jobs CSV Export</h2>
+        <p>Filtered import attempt export with source package context and persisted diagnostics.</p>
+        <pre id="importJobsExportPreview">{{ view.content.importJobsExportView }}</pre>
+      </article>
 
       <app-record-collection
         title="Content Releases"
@@ -359,6 +366,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Source Packages" subtitle="History" viewId="sourcePackagesView" [content]="view.content.sourcePackagesView"></app-json-panel>
       <app-json-panel title="Source Packages CSV Export" subtitle="Filtered Export" viewId="sourcePackagesExportView" [content]="view.content.sourcePackagesExportView"></app-json-panel>
       <app-json-panel title="Import Jobs" subtitle="Diagnostics" viewId="importJobsView" [content]="view.content.importJobsView"></app-json-panel>
+      <app-json-panel title="Import Jobs CSV Export" subtitle="Filtered Export" viewId="importJobsExportView" [content]="view.content.importJobsExportView"></app-json-panel>
       <app-json-panel title="Content Releases" subtitle="Lifecycle" viewId="contentReleasesView" [content]="view.content.contentReleasesView"></app-json-panel>
       <app-json-panel title="Source Package Detail" subtitle="Retry History" viewId="sourcePackageDetailView" [content]="view.content.sourcePackageDetailView"></app-json-panel>
       <app-json-panel title="Import Job Detail" subtitle="Single Attempt" viewId="importJobDetailView" [content]="view.content.importJobDetailView"></app-json-panel>
