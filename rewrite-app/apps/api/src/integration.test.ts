@@ -1313,6 +1313,14 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedImportJobCsv.status, 401);
     assert.equal(rejectedImportJobCsv.body.error, "admin_session_missing");
 
+    const rejectedContentReleaseCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/content-releases.csv"
+    );
+
+    assert.equal(rejectedContentReleaseCsv.status, 401);
+    assert.equal(rejectedContentReleaseCsv.body.error, "admin_session_missing");
+
     const rejectedStudyMonitorSummary = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/summary"
@@ -3936,6 +3944,23 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(
     stagedContentReleases.body.items[0]?.sourcePackage?.sourcePackageId,
     sourcePackage.body.sourcePackage.sourcePackageId
+  );
+
+  const stagedContentReleasesCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/content-releases.csv?status=staged&sourcePackageId=${sourcePackage.body.sourcePackage.sourcePackageId}&importJobId=${retriedImport.body.importJob.importJobId}&limit=1`
+  );
+
+  assert.equal(stagedContentReleasesCsv.status, 200);
+  assert.equal(stagedContentReleasesCsv.contentType, "text/csv; charset=utf-8");
+  assert.match(
+    stagedContentReleasesCsv.body,
+    /^tenantKey,workspaceKey,contentReleaseId,releaseLabel,status,createdAt,activatedAt,importJobId,importJobStatus,sourcePackageId,sourceFileName,sourceMediaType,bookletCount,unitCount,participantSessionCount,openTestRunCount\n/
+  );
+  assert.match(
+    stagedContentReleasesCsv.body,
+    new RegExp(
+      `"${tenantKey}","${workspaceKey}","${retriedImport.body.stagedContentRelease.contentReleaseId}","[^"]+","staged","[^"]+","","${retriedImport.body.importJob.importJobId}","completed","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","1","1","0","0"`
+    )
   );
 
   const invalidSourcePackageStatus = await requestJson<{ error: string }>(
@@ -9452,6 +9477,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportParticipantSessionsCsv: string;
         exportSourcePackagesCsv: string;
         exportImportJobsCsv: string;
+        exportContentReleasesCsv: string;
         listDetailedResponses: string;
         exportStudyMonitorCsv: string;
         getStudyMonitorParticipantMatrix: string;
@@ -9500,6 +9526,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "import_job_read",
     "import_job_csv_export",
     "content_release_read",
+    "content_release_csv_export",
     "content_release_readiness",
     "participant_roster_import",
     "participant_roster_read",
@@ -9545,6 +9572,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(
     manifest.routes.workspace.exportImportJobsCsv,
     /import-jobs\.csv/
+  );
+  assert.match(
+    manifest.routes.workspace.exportContentReleasesCsv,
+    /content-releases\.csv/
   );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);

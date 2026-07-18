@@ -128,6 +128,31 @@ export class RewriteAppContentService {
     return csv;
   }
 
+  async exportContentReleasesCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.uiState.workspace.tenantKey.trim();
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Content Releases CSV Export",
+      "GET",
+      this.hosts.createContentReadsHost().getContentReleasesExportPath()
+    );
+
+    this.contentState.contentReleasesExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-content-releases.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Content Releases Exported",
+      `CSV content release export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async loadSourcePackageDetail(): Promise<GetSourcePackageResponse> {
     return loadSourcePackageDetailAction(this.hosts.createContentDetailsHost());
   }

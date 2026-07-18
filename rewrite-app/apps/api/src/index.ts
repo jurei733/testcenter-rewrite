@@ -97,6 +97,7 @@ import {
   type UpdateAdminUserResponse,
   type AdminSessionListQuery,
   type AdminUserListQuery,
+  type ContentReleaseListQuery,
   type ImportJobListQuery,
   type SourcePackageListQuery,
   type UpdateReviewRequest,
@@ -1374,6 +1375,9 @@ const importJobDetailPattern = createRoutePattern(
 const contentReleaseListPattern = createRoutePattern(
   productionApiRoutes.workspace.listContentReleases
 );
+const contentReleaseCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportContentReleasesCsv
+);
 const contentReleaseDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getContentRelease
 );
@@ -1432,6 +1436,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", importJobListPattern],
   ["GET", importJobDetailPattern],
   ["GET", importJobCsvExportPattern],
+  ["GET", contentReleaseCsvExportPattern],
   ["GET", participantSessionListPattern],
   ["GET", participantSessionCsvExportPattern],
   ["GET", participantSessionDetailPattern],
@@ -1941,6 +1946,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     [
       "GET",
+      contentReleaseCsvExportPattern,
+      productionApiRoutes.workspace.exportContentReleasesCsv
+    ],
+    [
+      "GET",
       contentReleaseDetailPattern,
       productionApiRoutes.workspace.getContentRelease
     ],
@@ -2085,6 +2095,39 @@ const parseImportJobListQuery = (
 
   return {
     status: status as ImportJobStatus | undefined,
+    sourcePackageId: readOptionalQueryValue(url, "sourcePackageId"),
+    limit: limit.limit
+  };
+};
+
+const parseContentReleaseListQuery = (
+  url: URL,
+  response: ServerResponse
+): ContentReleaseListQuery | null => {
+  const status = readOptionalQueryValue(url, "status");
+  if (status && !contentReleaseStatuses.includes(status as ContentReleaseStatus)) {
+    sendError(
+      response,
+      400,
+      "content_release_status_invalid",
+      `Content release status '${status}' is not supported.`
+    );
+    return null;
+  }
+
+  const limit = parseOperatorReadLimit(
+    url,
+    response,
+    "content_release_limit_invalid",
+    "Content release limit must be an integer between 1 and 500."
+  );
+  if (!limit.ok) {
+    return null;
+  }
+
+  return {
+    status: status as ContentReleaseStatus | undefined,
+    importJobId: readOptionalQueryValue(url, "importJobId"),
     sourcePackageId: readOptionalQueryValue(url, "sourcePackageId"),
     limit: limit.limit
   };
@@ -4189,6 +4232,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const contentReleaseListMatch = contentReleaseListPattern.exec(pathname);
+      const contentReleaseCsvExportMatch =
+        contentReleaseCsvExportPattern.exec(pathname);
       if (request.method === "GET" && contentReleaseListMatch?.groups) {
         const tenantKey = decodeRouteGroup(contentReleaseListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -4204,49 +4249,48 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const status = url.searchParams.get("status")?.trim() || undefined;
-        if (
-          status &&
-          !contentReleaseStatuses.includes(status as ContentReleaseStatus)
-        ) {
-          sendError(
-            response,
-            400,
-            "content_release_status_invalid",
-            `Content release status '${status}' is not supported.`
-          );
-          return;
-        }
-
-        const importJobId = url.searchParams.get("importJobId")?.trim() || undefined;
-        const sourcePackageId =
-          url.searchParams.get("sourcePackageId")?.trim() || undefined;
-        const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
-        const limit = limitRawValue
-          ? Number.parseInt(limitRawValue, 10)
-          : undefined;
-        if (
-          limitRawValue &&
-          (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
-        ) {
-          sendError(
-            response,
-            400,
-            "content_release_limit_invalid",
-            "Content release limit must be an integer between 1 and 500."
-          );
+        const query = parseContentReleaseListQuery(url, response);
+        if (!query) {
           return;
         }
 
         const items = await services.workspaceAdminRead.listContentReleases({
           tenantKey,
           workspaceKey,
-          status: status as ContentReleaseStatus | undefined,
-          importJobId,
-          sourcePackageId,
-          limit
+          ...query
         });
         sendJson<ListContentReleasesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && contentReleaseCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          contentReleaseCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          contentReleaseCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const query = parseContentReleaseListQuery(url, response);
+        if (!query) {
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportContentReleasesCsv({
+          tenantKey,
+          workspaceKey,
+          ...query
+        });
+        sendCsv(response, 200, `${workspaceKey}-content-releases.csv`, csv);
         return;
       }
 

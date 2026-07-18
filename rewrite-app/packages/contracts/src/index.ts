@@ -1043,6 +1043,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups/:groupKey",
     listContentReleases:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
+    exportContentReleasesCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/content-releases.csv",
     getContentRelease:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases/:contentReleaseId",
     getContentReleaseActivationReadiness:

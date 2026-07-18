@@ -1550,6 +1550,21 @@ try {
     .filter({ hasText: uploadedSourceFileName })
     .filter({ hasText: "completed" })
     .waitFor();
+  logStep("export-content-releases-csv");
+  await expectButtonSelectorEnabled("#exportContentReleasesCsvButton");
+  const contentReleasesDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Content Releases CSV");
+  const contentReleasesDownload = await contentReleasesDownloadPromise;
+  assert.equal(
+    contentReleasesDownload.suggestedFilename(),
+    `${workspaceKey}-content-releases.csv`
+  );
+  await page
+    .locator("#contentReleasesExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,contentReleaseId" })
+    .filter({ hasText: uploadedSourceFileName })
+    .filter({ hasText: "staged" })
+    .waitFor();
   await expectButtonSelectorEnabled("#importJobDetailButton");
   await expectButtonSelectorEnabled("#activateContentReleaseButton");
   await expectButtonSelectorEnabled("#releaseReadinessButton");

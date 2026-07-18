@@ -314,6 +314,14 @@ export type WorkspaceAdminReadPort = {
     sourcePackageId?: string;
     limit?: number;
   }): Promise<WorkspaceContentReleaseListItem[]>;
+  exportContentReleasesCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    status?: ContentReleaseStatus;
+    importJobId?: string;
+    sourcePackageId?: string;
+    limit?: number;
+  }): Promise<string>;
 };
 
 export type WorkspaceResultsPort = {
@@ -625,6 +633,7 @@ export const firstSliceUseCases = {
   listImportJobs: "ListImportJobs",
   exportImportJobsCsv: "ExportImportJobsCsv",
   listContentReleases: "ListContentReleases",
+  exportContentReleasesCsv: "ExportContentReleasesCsv",
   getContentReleaseDetail: "GetContentReleaseDetail",
   activateContentRelease: "ActivateContentRelease",
   participantSignIn: "ParticipantSignIn",
@@ -1978,6 +1987,63 @@ const formatImportJobsCsv = (input: {
         .map(escapeCsvCell)
         .join(",")
     )
+  ].join("\n") + "\n";
+};
+
+const formatContentReleasesCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  items: WorkspaceContentReleaseListItem[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "contentReleaseId",
+    "releaseLabel",
+    "status",
+    "createdAt",
+    "activatedAt",
+    "importJobId",
+    "importJobStatus",
+    "sourcePackageId",
+    "sourceFileName",
+    "sourceMediaType",
+    "bookletCount",
+    "unitCount",
+    "participantSessionCount",
+    "openTestRunCount"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(item => {
+      const bookletCount = item.contentRelease.runtimeSnapshot.bookletEntries.length;
+      const unitCount = item.contentRelease.runtimeSnapshot.bookletEntries.reduce(
+        (sum, booklet) => sum + booklet.unitEntries.length,
+        0
+      );
+
+      return [
+        input.tenantKey,
+        input.workspaceKey,
+        item.contentRelease.contentReleaseId,
+        item.contentRelease.releaseLabel,
+        item.contentRelease.status,
+        item.contentRelease.createdAt,
+        item.contentRelease.activatedAt ?? "",
+        item.contentRelease.importJobId,
+        item.importJob?.status ?? "",
+        item.sourcePackage?.sourcePackageId ?? "",
+        item.sourcePackage?.fileName ?? "",
+        item.sourcePackage?.mediaType ?? "",
+        String(bookletCount),
+        String(unitCount),
+        String(item.participantSessionCount),
+        String(item.openTestRunCount)
+      ]
+        .map(escapeCsvCell)
+        .join(",");
+    })
   ].join("\n") + "\n";
 };
 
@@ -8717,6 +8783,15 @@ export const createFirstSliceServices = (
           participantSessions,
           testRuns
         }).slice(0, limit);
+      },
+      async exportContentReleasesCsv(input) {
+        const items = await this.listContentReleases(input);
+
+        return formatContentReleasesCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          items
+        });
       }
     },
     workspaceResults: {
