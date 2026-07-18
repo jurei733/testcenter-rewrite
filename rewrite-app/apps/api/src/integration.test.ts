@@ -1297,6 +1297,17 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedOverview.status, 401);
     assert.equal(rejectedOverview.body.error, "admin_session_missing");
 
+    const rejectedWorkspaceOverviewCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/workspace-overview.csv"
+    );
+
+    assert.equal(rejectedWorkspaceOverviewCsv.status, 401);
+    assert.equal(
+      rejectedWorkspaceOverviewCsv.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedSourcePackageCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/source-packages.csv"
@@ -1433,6 +1444,23 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(
       overview.body.workspaceOverview.workspace.workspaceKey,
       "auth-required-workspace"
+    );
+
+    const overviewCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/workspace-overview.csv",
+      { headers: adminHeaders }
+    );
+
+    assert.equal(overviewCsv.status, 200);
+    assert.equal(overviewCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(
+      overviewCsv.body,
+      /^tenantKey,workspaceKey,tenantDisplayName,workspaceDisplayName,sourcePackageCount,importJobCount,contentReleaseCount,activeContentReleaseId,latestImportJobAt,participantSessionCount,openTestRunCount\n/
+    );
+    assert.match(
+      overviewCsv.body,
+      /"auth-required-tenant","auth-required-workspace","Auth Required","Auth Required Workspace","0","0","0","","","0","0"/
     );
 
     const workspaceAdmin = await requestJsonAt<{
@@ -9471,6 +9499,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     capabilities: string[];
     routes: {
       workspace: {
+        exportWorkspaceOverviewCsv: string;
         importParticipantRoster: string;
         listParticipantRoster: string;
         exportParticipantRosterCsv: string;
@@ -9520,6 +9549,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "admin_user_csv_export",
     "admin_audit_read",
     "admin_audit_csv_export",
+    "workspace_overview_csv_export",
     "source_package_read",
     "source_package_csv_export",
     "source_package_retry",
@@ -9556,6 +9586,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   }
 
   assert.match(manifest.routes.workspace.importParticipantRoster, /participant-roster/);
+  assert.match(
+    manifest.routes.workspace.exportWorkspaceOverviewCsv,
+    /workspace-overview\.csv/
+  );
   assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
   assert.match(
     manifest.routes.workspace.exportParticipantRosterCsv,

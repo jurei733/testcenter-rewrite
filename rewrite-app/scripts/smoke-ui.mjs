@@ -929,6 +929,7 @@ try {
   await expectButtonSelectorDisabled("#createTenantButton");
   await expectButtonSelectorDisabled("#createWorkspaceButton");
   await expectButtonSelectorDisabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorDisabled("#exportWorkspaceOverviewCsvButton");
   await expectButtonSelectorDisabled("#refreshStudyMonitorButton");
   await expectButtonSelectorEnabled("#refreshTenantDirectoryButton");
   await expectButtonSelectorDisabled("#refreshWorkspaceDirectoryButton");
@@ -943,6 +944,7 @@ try {
   await fillAndCommit("#workspaceKey", workspaceKey);
   await expectButtonSelectorEnabled("#createWorkspaceButton");
   await expectButtonSelectorEnabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorEnabled("#exportWorkspaceOverviewCsvButton");
   await expectButtonSelectorEnabled("#refreshStudyMonitorButton");
   await expectButtonSelectorEnabled("#exportStudyMonitorCsvButton");
   await expectButtonSelectorEnabled("#exportParticipantMatrixCsvButton");
@@ -964,6 +966,20 @@ try {
       payload.workspaceOverview.workspace != null &&
       payload.workspaceOverview.workspace.workspaceKey === workspaceKey
   );
+  logStep("export-workspace-overview-csv");
+  const workspaceOverviewDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Workspace Overview CSV");
+  const workspaceOverviewDownload = await workspaceOverviewDownloadPromise;
+  assert.equal(
+    workspaceOverviewDownload.suggestedFilename(),
+    `${workspaceKey}-workspace-overview.csv`
+  );
+  await page
+    .locator("#workspaceOverviewExportPreview")
+    .filter({ hasText: "tenantKey,workspaceKey,tenantDisplayName" })
+    .filter({ hasText: tenantKey })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
   logStep("workspace-directory-reads");
   await clickAction("Refresh Tenant Directory");
   await page

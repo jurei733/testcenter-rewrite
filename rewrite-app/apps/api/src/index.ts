@@ -1273,6 +1273,9 @@ const workspaceCreatePattern = createRoutePattern(
 const workspaceOverviewPattern = createRoutePattern(
   productionApiRoutes.workspace.getWorkspaceOverview
 );
+const workspaceOverviewCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportWorkspaceOverviewCsv
+);
 const studyMonitorSummaryPattern = createRoutePattern(
   productionApiRoutes.workspace.getStudyMonitorSummary
 );
@@ -1419,6 +1422,7 @@ type OperatorAccessScope =
 
 const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", workspaceOverviewPattern],
+  ["GET", workspaceOverviewCsvExportPattern],
   ["GET", studyMonitorSummaryPattern],
   ["GET", studyMonitorParticipantMatrixPattern],
   ["GET", studyMonitorParticipantPattern],
@@ -1783,6 +1787,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", workspaceCreatePattern, productionApiRoutes.workspace.createWorkspace],
     ["GET", workspaceCreatePattern, productionApiRoutes.workspace.listWorkspaces],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
+    [
+      "GET",
+      workspaceOverviewCsvExportPattern,
+      productionApiRoutes.workspace.exportWorkspaceOverviewCsv
+    ],
     [
       "GET",
       studyMonitorSummaryPattern,
@@ -2990,6 +2999,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const workspaceOverviewMatch = workspaceOverviewPattern.exec(pathname);
+      const workspaceOverviewCsvExportMatch =
+        workspaceOverviewCsvExportPattern.exec(pathname);
       const studyMonitorSummaryMatch = studyMonitorSummaryPattern.exec(pathname);
       const studyMonitorParticipantMatrixMatch =
         studyMonitorParticipantMatrixPattern.exec(pathname);
@@ -2999,6 +3010,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const studyMonitorBookletMatch = studyMonitorBookletPattern.exec(pathname);
       const studyMonitorUnitMatch = studyMonitorUnitPattern.exec(pathname);
       const studyMonitorRunMatch = studyMonitorRunPattern.exec(pathname);
+      if (request.method === "GET" && workspaceOverviewCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          workspaceOverviewCsvExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          workspaceOverviewCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const csv = await services.workspaceAdminRead.exportWorkspaceOverviewCsv({
+          tenantKey,
+          workspaceKey
+        });
+        sendCsv(response, 200, `${workspaceKey}-workspace-overview.csv`, csv);
+        return;
+      }
+
       if (request.method === "GET" && workspaceOverviewMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(

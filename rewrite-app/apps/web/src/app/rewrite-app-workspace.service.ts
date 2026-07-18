@@ -323,6 +323,34 @@ export class RewriteAppWorkspaceService {
     return csv;
   }
 
+  async exportWorkspaceOverviewCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Workspace Overview CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportWorkspaceOverviewCsv, {
+        tenantKey,
+        workspaceKey
+      })
+    );
+
+    this.workspaceState.workspaceOverviewExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-workspace-overview.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Workspace Overview Exported",
+      `CSV overview export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
   async exportStudyMonitorCsv(): Promise<string> {
     if (!this.hasWorkspaceScope()) {
       return "";

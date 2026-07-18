@@ -2222,6 +2222,15 @@ export class WorkspaceViewFacade {
     this.viewState.onActionAsync(() => this.workspaceService.refreshWorkspaceOverview());
   }
 
+  exportWorkspaceOverviewCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportWorkspaceOverviewCsv()
+    );
+  }
+
   refreshStudyMonitor(): void {
     if (!this.canUseWorkspaceScope) {
       return;

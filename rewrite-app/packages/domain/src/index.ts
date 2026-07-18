@@ -790,6 +790,7 @@ export type FirstSliceCapability =
   | "tenant_lifecycle"
   | "workspace_lifecycle"
   | "workspace_admin_read"
+  | "workspace_overview_csv_export"
   | "workspace_activity_read"
   | "source_package_intake"
   | "source_package_read"
@@ -845,6 +846,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "tenant_lifecycle",
   "workspace_lifecycle",
   "workspace_admin_read",
+  "workspace_overview_csv_export",
   "workspace_activity_read",
   "source_package_intake",
   "source_package_read",

@@ -181,6 +181,7 @@ export interface ShellWorkspaceState {
   tenantsView: string;
   workspacesView: string;
   workspaceOverviewView: string;
+  workspaceOverviewExportView: string;
   workspaceActivityView: string;
   studyMonitorView: string;
   studyMonitorParticipantMatrixView: string;
@@ -391,6 +392,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     tenantsView: 'Use "Refresh Tenant Directory".',
     workspacesView: 'Use "Refresh Workspace Directory".',
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
+    workspaceOverviewExportView: 'Use "Export Workspace Overview CSV".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
     studyMonitorView: 'Use "Refresh Study Monitor".',
     studyMonitorParticipantMatrixView: 'Use "Refresh Study Monitor".',

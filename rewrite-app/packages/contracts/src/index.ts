@@ -973,6 +973,8 @@ export const productionApiRoutes = {
     createWorkspace: "/api/v1/tenants/:tenantKey/workspaces",
     listWorkspaces: "/api/v1/tenants/:tenantKey/workspaces",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
+    exportWorkspaceOverviewCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/workspace-overview.csv",
     getStudyMonitorSummary:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/summary",
     getStudyMonitorParticipantMatrix:

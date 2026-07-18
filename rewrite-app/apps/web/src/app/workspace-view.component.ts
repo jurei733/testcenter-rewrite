@@ -66,6 +66,7 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button id="createTenantButton" class="primary" type="button" [disabled]="!view.canUseTenantScope" (click)="view.createTenant()">Create Tenant</button>
           <button id="createWorkspaceButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.createWorkspace()">Create Workspace</button>
           <button id="refreshWorkspaceOverviewButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
+          <button id="exportWorkspaceOverviewCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceOverviewCsv()">Export Workspace Overview CSV</button>
           <button id="refreshStudyMonitorButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
@@ -379,11 +380,24 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         <pre id="studyMonitorRunExportPreview">{{ view.studyMonitorRunExportView }}</pre>
       </article>
 
+      <article class="card">
+        <h2>Workspace Overview CSV Export</h2>
+        <p>One-row scope snapshot with active release, import, participant, and open-run pressure counts.</p>
+        <pre id="workspaceOverviewExportPreview">{{ view.workspace.workspaceOverviewExportView }}</pre>
+      </article>
+
       <app-json-panel
         title="Workspace Overview"
         subtitle="Read Model"
         viewId="workspaceOverviewView"
         [content]="view.workspace.workspaceOverviewView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Workspace Overview CSV Export"
+        subtitle="Scope Snapshot"
+        viewId="workspaceOverviewExportView"
+        [content]="view.workspace.workspaceOverviewExportView"
       ></app-json-panel>
 
       <app-json-panel

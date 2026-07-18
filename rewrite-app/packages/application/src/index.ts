@@ -116,6 +116,10 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
   }): Promise<WorkspaceOverview>;
+  exportWorkspaceOverviewCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
   getStudyMonitorSummary(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -598,6 +602,7 @@ export const firstSliceUseCases = {
   listWorkspaces: "ListWorkspaces",
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
+  exportWorkspaceOverviewCsv: "ExportWorkspaceOverviewCsv",
   getStudyMonitorSummary: "GetStudyMonitorSummary",
   getStudyMonitorParticipantMatrix: "GetStudyMonitorParticipantMatrix",
   getStudyMonitorParticipantDetail: "GetStudyMonitorParticipantDetail",
@@ -1942,6 +1947,45 @@ const formatSourcePackagesCsv = (input: {
         .map(escapeCsvCell)
         .join(",");
     })
+  ].join("\n") + "\n";
+};
+
+const formatWorkspaceOverviewCsv = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  overview: WorkspaceOverview;
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "tenantDisplayName",
+    "workspaceDisplayName",
+    "sourcePackageCount",
+    "importJobCount",
+    "contentReleaseCount",
+    "activeContentReleaseId",
+    "latestImportJobAt",
+    "participantSessionCount",
+    "openTestRunCount"
+  ];
+
+  return [
+    header.join(","),
+    [
+      input.tenantKey,
+      input.workspaceKey,
+      input.overview.tenant.displayName,
+      input.overview.workspace.displayName,
+      String(input.overview.sourcePackageCount),
+      String(input.overview.importJobCount),
+      String(input.overview.contentReleaseCount),
+      input.overview.activeContentReleaseId ?? "",
+      input.overview.latestImportJobAt ?? "",
+      String(input.overview.participantSessionCount),
+      String(input.overview.openTestRunCount)
+    ]
+      .map(escapeCsvCell)
+      .join(",")
   ].join("\n") + "\n";
 };
 
@@ -7574,6 +7618,15 @@ export const createFirstSliceServices = (
           openTestRunCount: testRuns.filter(testRun => testRun.status !== "completed")
             .length
         };
+      },
+      async exportWorkspaceOverviewCsv(input) {
+        const overview = await this.getWorkspaceOverview(input);
+
+        return formatWorkspaceOverviewCsv({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          overview
+        });
       },
       async getStudyMonitorSummary(input) {
         const workspace = await requireWorkspace(
