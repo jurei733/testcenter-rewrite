@@ -116,7 +116,7 @@ The full CI command executes:
 - typecheck
 - build
 - focused unit tests for shared contracts helpers
-- memory + sqlite integration tests
+- memory + file + sqlite integration tests
 - a built-server startup smoke test against SQLite
 - a built runtime preflight against SQLite
 - a built-server graceful shutdown/drain smoke test against SQLite
@@ -428,6 +428,7 @@ npm run test:integration
 That runs:
 
 - `memory`
+- `file`
 - `sqlite`
 
 And there is an optional Postgres-backed run:
@@ -536,16 +537,16 @@ For runtime probes:
 
 - [ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
   - Node 22 typecheck and production build
-  - focused unit tests for shared contracts helpers
+  - focused unit tests for shared contracts and file-store helpers
   - built runtime preflight against SQLite and Postgres
   - metadata-required deployability preflight plus built startup smoke
-  - memory + sqlite integration matrix
+  - memory + file + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
   - SQLite startup, shutdown, grouped quick/review/monitor/ops browser suites, full browser, and local-demo smokes as isolated matrix jobs
   - standalone production Docker image runtime smoke with image-time artifact preflight, in-container SQLite migration, non-root API start, and `/readyz`/`/manifest`/`/app` verification
   - Docker compose release smoke with explicit migrate, preflight, and api roles
-- [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/SQLite integration plus startup/shutdown, `ci:browser:quick`, `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
+- [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/file/SQLite integration plus startup/shutdown, `ci:browser:quick`, `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables

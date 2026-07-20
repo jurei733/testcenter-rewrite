@@ -61,6 +61,8 @@ jobs:
         include:
           - store: memory
             command: npm run test:integration:memory
+          - store: file
+            command: npm run test:integration:file
           - store: sqlite
             command: npm run test:integration:sqlite
     steps:
