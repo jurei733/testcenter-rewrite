@@ -38,6 +38,7 @@ const ensureDataDirectory = async () => {
     );
     process.env.FIRST_SLICE_FILE = filePath;
     await mkdir(dirname(filePath), { recursive: true });
+    await rm(filePath, { force: true });
     return;
   }
 

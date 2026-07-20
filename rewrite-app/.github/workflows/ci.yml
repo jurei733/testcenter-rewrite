@@ -208,13 +208,19 @@ jobs:
           npm run ci:deployability
 
   sqlite-smoke:
-    name: SQLite smoke (${{ matrix.smoke }})
+    name: Runtime smoke (${{ matrix.smoke }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
+          - smoke: startup-file
+            command: npm run smoke:startup:file
+            playwright: false
+          - smoke: shutdown-file
+            command: npm run smoke:shutdown:file
+            playwright: false
           - smoke: startup
             command: npm run smoke:startup:sqlite
             playwright: false
@@ -256,7 +262,7 @@ jobs:
         if: ${{ matrix.playwright }}
         run: npm run install:browsers
 
-      - name: Run SQLite smoke
+      - name: Run runtime smoke
         run: ${{ matrix.command }}
 
   docker-image-runtime-smoke:
