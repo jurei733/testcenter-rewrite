@@ -1894,6 +1894,108 @@ try {
   );
   stopAfter("participant-entry-start-after-sign-in");
 
+  logStep("participant-entry-protected-password");
+  const protectedParticipantLoginKey = "student-entry-protected";
+  const protectedParticipantGroupKey = "group:participant-entry-protected";
+  const protectedParticipantDisplayName = "Student Entry Protected";
+  const protectedParticipantPassword = "entry-protected-secret";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "loginKey,groupKey,displayName,pw",
+          [
+            protectedParticipantLoginKey,
+            protectedParticipantGroupKey,
+            protectedParticipantDisplayName,
+            protectedParticipantPassword
+          ].join(",")
+        ].join("\n")
+      }
+    }
+  );
+  await page.locator("#participantRouteClearSessionButton").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantRouteSessionId")?.value === "" &&
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        "no run yet",
+    undefined,
+    { timeout: 15_000 }
+  );
+  await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
+  await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
+  await fillAndCommitUntilValue(
+    "#participantLoginKey",
+    protectedParticipantLoginKey
+  );
+  await fillAndCommitUntilValue(
+    "#participantRouteGroupKey",
+    protectedParticipantGroupKey
+  );
+  await fillAndCommitUntilValue("#participantRouteBookletKey", "");
+  await fillAndCommitUntilValue("#participantPassword", "wrong-entry-password");
+  await page.locator("#participantRouteSignInButton").click();
+  await page
+    .locator("#participantEntryIssueCode")
+    .filter({ hasText: "participant_password_invalid" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantEntryIssueStatus").filter({ hasText: "401" }).waitFor();
+  await expectInputValue("#participantRouteSessionId", "");
+  await fillAndCommitUntilValue("#participantPassword", protectedParticipantPassword);
+  await page.locator("#participantRouteSignInButton").click();
+  const protectedParticipantSessionsPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => {
+        const participantSession = item?.participantSession;
+        return (
+          participantSession?.loginKey === protectedParticipantLoginKey &&
+          participantSession?.groupKey === protectedParticipantGroupKey &&
+          participantSession?.status === "signed_in"
+        );
+      })
+  );
+  const protectedParticipantSessionId =
+    protectedParticipantSessionsPayload.items.find(item => {
+      const participantSession = item?.participantSession;
+      return participantSession?.loginKey === protectedParticipantLoginKey;
+    })?.participantSession?.participantSessionId;
+  assert.ok(
+    protectedParticipantSessionId,
+    "UI smoke expected protected participant Sign In to create a signed-in session."
+  );
+  await expectInputValue("#participantRouteSessionId", protectedParticipantSessionId);
+  await page.waitForFunction(
+    ([expectedSessionId, expectedDisplayName]) =>
+      document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
+        expectedSessionId &&
+      document.querySelector("#participantEntryDisplayName")?.textContent?.trim() ===
+        expectedDisplayName &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "signed_in",
+    [protectedParticipantSessionId, protectedParticipantDisplayName],
+    { timeout: 15_000 }
+  );
+  assert.equal(
+    await page.locator("#participantEntryIssueCode").count(),
+    0,
+    "Protected participant issue guidance should clear after a successful sign-in."
+  );
+  const persistedAfterProtectedSignIn = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+  );
+  assert.equal(
+    Object.hasOwn(persistedAfterProtectedSignIn, "participantPassword"),
+    false,
+    "Participant passwords should not be persisted in shell localStorage."
+  );
+  stopAfter("participant-entry-protected-password");
+
   logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";
