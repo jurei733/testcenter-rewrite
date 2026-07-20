@@ -109,7 +109,7 @@ npm run ci:deployability
 
 The browser groups build once and then reuse built artifacts: `ci:browser:quick` covers content, roster links, participant entry, and activation roster warnings; `ci:browser:review` covers response/review handoff paths; `ci:browser:monitor` covers open-run synchronization and activation-blocking runtime handoff; `ci:browser:ops` covers destructive operator actions and protected-operator auth.
 
-Use `npm run ci:deployability` for a non-Docker release gate that builds once, migrates SQLite, requires build metadata in the runtime preflight, and verifies the built startup smoke with the same metadata. Use `npm run ci:postgres` when `FIRST_SLICE_POSTGRES_URL` points at a reachable Postgres database. Docker-only release checks remain covered by `npm run smoke:docker:runtime` and `npm run smoke:compose:postgres`.
+Use `npm run ci:deployability` for a non-Docker release gate that builds once, runs file-store migrate/doctor/preflight, migrates SQLite, requires build metadata in both runtime preflights, and verifies the built SQLite startup smoke with the same metadata. Use `npm run ci:postgres` when `FIRST_SLICE_POSTGRES_URL` points at a reachable Postgres database. Docker-only release checks remain covered by `npm run smoke:docker:runtime` and `npm run smoke:compose:postgres`.
 
 The full CI command executes:
 
@@ -118,7 +118,7 @@ The full CI command executes:
 - focused unit tests for shared contracts helpers
 - memory + file + sqlite integration tests
 - built-server startup smoke tests against file and SQLite storage
-- a built runtime preflight against SQLite
+- built runtime preflights against file and SQLite storage
 - built-server graceful shutdown/drain smoke tests against file and SQLite storage
 - browser-driven Angular UI smokes against SQLite in focused content, participant-entry, activation-roster-warning, review-readiness, open-run, monitor-detail, destructive-action, full, and protected operator modes, plus a Postgres-backed protected UI smoke in the Postgres CI matrix
 - a standalone production Docker image runtime smoke that builds the image, migrates SQLite inside the container, starts the API as the non-root runtime user, and verifies `/readyz`, `/manifest`, and `/app`
@@ -128,6 +128,8 @@ For explicit storage administration, run:
 ```bash
 npm run db:doctor
 npm run db:migrate
+FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/first-slice.json npm run db:doctor:file
+FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/first-slice.json npm run db:migrate:file
 FIRST_SLICE_STORE=sqlite npm run db:doctor:sqlite
 FIRST_SLICE_STORE=sqlite npm run db:migrate:sqlite
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:doctor:postgres
@@ -139,6 +141,8 @@ These commands use the built storage adapters directly and do not require the AP
 Before starting a built runtime, you can run a deployability preflight that verifies compiled API/store artifacts, the Angular browser bundle, the frontend index-to-asset references, optional build metadata, and storage readiness:
 
 ```bash
+FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/preflight.json npm run db:migrate:file:built
+FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/preflight.json npm run preflight:runtime:built
 FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm run db:migrate:sqlite:built
 FIRST_SLICE_STORE=sqlite FIRST_SLICE_SQLITE_FILE=./.data/preflight.sqlite npm run preflight:runtime:built
 FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run preflight:runtime:built
@@ -149,6 +153,8 @@ Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `AP
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 
 ```bash
+npm run db:doctor:file:built
+npm run db:migrate:file:built
 npm run db:doctor:sqlite:built
 npm run db:migrate:sqlite:built
 FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite@127.0.0.1:5433/rewrite_app npm run db:doctor:postgres:built
@@ -540,15 +546,15 @@ For runtime probes:
 - [ci.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/.github/workflows/ci.yml) now verifies:
   - Node 22 typecheck and production build
   - focused unit tests for shared contracts and file-store helpers
-  - built runtime preflight against SQLite and Postgres
-  - metadata-required deployability preflight plus built startup smoke
+  - built runtime preflight against file, SQLite, and Postgres stores
+  - metadata-required file/SQLite deployability preflight plus built startup smoke
   - memory + file + sqlite integration matrix
   - Postgres migration, doctor, startup smoke, and integration against a service database
   - protected browser-driven Angular UI smoke against a Postgres service database
   - file and SQLite startup/shutdown, grouped quick/review/monitor/ops browser suites, full browser, and local-demo smokes as isolated matrix jobs
   - standalone production Docker image runtime smoke with image-time artifact preflight, in-container SQLite migration, non-root API start, and `/readyz`/`/manifest`/`/app` verification
   - Docker compose release smoke with explicit migrate, preflight, and api roles
-- [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/file/SQLite integration plus file/SQLite startup/shutdown, `ci:browser:quick`, `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
+- [package.json](/Users/julian/code/testcenter-rewrite/rewrite-app/package.json) exposes local CI-shaped gates: `ci:static` for typecheck/unit/build/preflight, `ci:storage` for memory/file/SQLite integration plus file/SQLite startup/shutdown, `ci:browser:quick`, `ci:browser:review`, `ci:browser:monitor`, and `ci:browser:ops` for grouped built Angular browser smokes, `ci:deployability` for file/SQLite metadata-required built-runtime preflight and startup smoke, and `ci:postgres` for the Postgres-backed migration/doctor/preflight/startup/integration/UI sequence
 - [Dockerfile](/Users/julian/code/testcenter-rewrite/rewrite-app/Dockerfile) provides a multi-stage production image build, runtime artifact preflight during image creation, non-root runtime user, and image-level `/readyz` healthcheck that follows the container `PORT`
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
