@@ -71,10 +71,31 @@ const readStateFromFile = async (
 ): Promise<PersistedFirstSliceState> => {
   try {
     const raw = await readFile(filePath, "utf8");
-    return {
+    const state = {
       ...createInitialState(),
       ...(JSON.parse(raw) as Partial<PersistedFirstSliceState>)
     };
+    state.participantRosterEntries = Object.fromEntries(
+      Object.entries(state.participantRosterEntries).map(([entryId, entry]) => [
+        entryId,
+        {
+          ...entry,
+          passwordRequired:
+            typeof entry.passwordRequired === "boolean"
+              ? entry.passwordRequired
+              : Boolean(
+                  state.participantRosterPasswordHashes[
+                    participantRosterPasswordKey(
+                      entry.tenantId,
+                      entry.workspaceId,
+                      entry.loginKey
+                    )
+                  ]
+                )
+        }
+      ])
+    );
+    return state;
   } catch (error) {
     if (
       typeof error === "object" &&
