@@ -216,6 +216,59 @@ try {
     { timeout: 15_000 }
   );
   assert.equal(await page.locator("#adminUsername").inputValue(), "demo-admin");
+
+  await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  await page.locator('[data-view-nav="workspace"].is-active').waitFor({
+    timeout: 15_000
+  });
+  await page.locator("#tenantKey").fill("demo-tenant");
+  await page.locator("#tenantKey").dispatchEvent("input");
+  await page.locator("#tenantKey").dispatchEvent("change");
+  await page.locator("#workspaceKey").fill("demo-workspace");
+  await page.locator("#workspaceKey").dispatchEvent("input");
+  await page.locator("#workspaceKey").dispatchEvent("change");
+
+  const tenantDirectoryDownloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Tenant Directory CSV", exact: true })
+    .click();
+  const tenantDirectoryDownload = await tenantDirectoryDownloadPromise;
+  assert.equal(tenantDirectoryDownload.suggestedFilename(), "tenants.csv");
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#tenantDirectoryExportPreview")
+        ?.textContent?.includes("tenantKey,displayName,status,tenantId,createdAt") &&
+      document
+        .querySelector("#tenantDirectoryExportPreview")
+        ?.textContent?.includes("demo-tenant"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
+  const workspaceDirectoryDownloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Workspace Directory CSV", exact: true })
+    .click();
+  const workspaceDirectoryDownload = await workspaceDirectoryDownloadPromise;
+  assert.equal(
+    workspaceDirectoryDownload.suggestedFilename(),
+    "demo-tenant-workspaces.csv"
+  );
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#workspaceDirectoryExportPreview")
+        ?.textContent?.includes(
+          "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt"
+        ) &&
+      document
+        .querySelector("#workspaceDirectoryExportPreview")
+        ?.textContent?.includes("demo-workspace"),
+    undefined,
+    { timeout: 15_000 }
+  );
+
   await page.goto(`${baseUrl}${demoParticipantPath}`, { waitUntil: "networkidle" });
   await page.locator("#participantLoginKey").waitFor({ timeout: 15_000 });
   await page.waitForFunction(

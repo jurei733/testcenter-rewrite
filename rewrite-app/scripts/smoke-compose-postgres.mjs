@@ -236,6 +236,59 @@ const verifyBootstrappedDemo = async baseUrl => {
     throw new Error("Expected demo workspace to have an active content release.");
   }
 
+  const tenantDirectoryCsv = await fetch(`${baseUrl}/api/v1/platform/tenants.csv`, {
+    headers: {
+      authorization: `Bearer ${sessionToken}`
+    }
+  });
+  expectEqual("demo tenant directory CSV status", tenantDirectoryCsv.status, 200);
+  expectEqual(
+    "demo tenant directory CSV content-type",
+    tenantDirectoryCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const tenantDirectoryCsvText = await tenantDirectoryCsv.text();
+  if (
+    !tenantDirectoryCsvText.startsWith(
+      "tenantKey,displayName,status,tenantId,createdAt\n"
+    ) ||
+    !tenantDirectoryCsvText.includes('"demo-tenant","Demo Tenant"')
+  ) {
+    throw new Error("Expected demo tenant directory CSV to contain demo-tenant.");
+  }
+
+  const workspaceDirectoryCsv = await fetch(
+    `${baseUrl}/api/v1/tenants/demo-tenant/workspaces.csv`,
+    {
+      headers: {
+        authorization: `Bearer ${sessionToken}`
+      }
+    }
+  );
+  expectEqual(
+    "demo workspace directory CSV status",
+    workspaceDirectoryCsv.status,
+    200
+  );
+  expectEqual(
+    "demo workspace directory CSV content-type",
+    workspaceDirectoryCsv.headers.get("content-type"),
+    "text/csv; charset=utf-8"
+  );
+  const workspaceDirectoryCsvText = await workspaceDirectoryCsv.text();
+  if (
+    !workspaceDirectoryCsvText.startsWith(
+      "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt\n"
+    ) ||
+    !workspaceDirectoryCsvText.includes(
+      '"demo-tenant","demo-workspace","Demo Workspace"'
+    )
+  ) {
+    throw new Error(
+      "Expected demo workspace directory CSV to contain demo-workspace."
+    );
+  }
+
   const rosterCsv = await fetch(
     `${baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/participant-roster.csv`,
     {
