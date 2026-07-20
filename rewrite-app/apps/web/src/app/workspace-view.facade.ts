@@ -2522,6 +2522,21 @@ export class WorkspaceViewFacade {
     );
   }
 
+  exportTenantDirectoryCsv(): void {
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportTenantDirectoryCsv()
+    );
+  }
+
+  exportWorkspaceDirectoryCsv(): void {
+    if (!this.canUseTenantScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportWorkspaceDirectoryCsv()
+    );
+  }
+
   exportWorkspaceLogCsv(): void {
     if (!this.canUseWorkspaceScope) {
       return;

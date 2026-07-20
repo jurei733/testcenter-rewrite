@@ -1408,6 +1408,22 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedStudyMonitorRunCsv.status, 401);
     assert.equal(rejectedStudyMonitorRunCsv.body.error, "admin_session_missing");
 
+    const rejectedTenantDirectoryCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants.csv"
+    );
+
+    assert.equal(rejectedTenantDirectoryCsv.status, 401);
+    assert.equal(rejectedTenantDirectoryCsv.body.error, "admin_session_missing");
+
+    const rejectedWorkspaceDirectoryCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces.csv"
+    );
+
+    assert.equal(rejectedWorkspaceDirectoryCsv.status, 401);
+    assert.equal(rejectedWorkspaceDirectoryCsv.body.error, "admin_session_missing");
+
     const rejectedOpenRunsCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/open-runs.csv"
@@ -1461,6 +1477,37 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.match(
       overviewCsv.body,
       /"auth-required-tenant","auth-required-workspace","Auth Required","Auth Required Workspace","0","0","0","","","0","0"/
+    );
+
+    const tenantDirectoryCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants.csv",
+      { headers: adminHeaders }
+    );
+
+    assert.equal(tenantDirectoryCsv.status, 200);
+    assert.equal(tenantDirectoryCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(
+      tenantDirectoryCsv.body,
+      /^tenantKey,displayName,status,tenantId,createdAt\n/
+    );
+    assert.match(tenantDirectoryCsv.body, /"auth-required-tenant","Auth Required"/);
+
+    const workspaceDirectoryCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces.csv",
+      { headers: adminHeaders }
+    );
+
+    assert.equal(workspaceDirectoryCsv.status, 200);
+    assert.equal(workspaceDirectoryCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(
+      workspaceDirectoryCsv.body,
+      /^tenantKey,workspaceKey,displayName,status,workspaceId,createdAt\n/
+    );
+    assert.match(
+      workspaceDirectoryCsv.body,
+      /"auth-required-tenant","auth-required-workspace","Auth Required Workspace"/
     );
 
     const workspaceAdmin = await requestJsonAt<{
@@ -1527,6 +1574,19 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedWorkspaceListByWorkspaceAdmin.status, 403);
     assert.equal(
       rejectedWorkspaceListByWorkspaceAdmin.body.error,
+      "admin_role_required"
+    );
+
+    const rejectedWorkspaceDirectoryCsvByWorkspaceAdmin =
+      await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/tenants/auth-required-tenant/workspaces.csv",
+        { headers: workspaceAdminHeaders }
+      );
+
+    assert.equal(rejectedWorkspaceDirectoryCsvByWorkspaceAdmin.status, 403);
+    assert.equal(
+      rejectedWorkspaceDirectoryCsvByWorkspaceAdmin.body.error,
       "admin_role_required"
     );
 
@@ -9498,7 +9558,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     storage: { kind: string; location: string | null };
     capabilities: string[];
     routes: {
+      platform: {
+        exportTenantsCsv: string;
+      };
       workspace: {
+        exportWorkspacesCsv: string;
         exportWorkspaceOverviewCsv: string;
         importParticipantRoster: string;
         listParticipantRoster: string;
@@ -9549,6 +9613,8 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "admin_user_csv_export",
     "admin_audit_read",
     "admin_audit_csv_export",
+    "tenant_directory_csv_export",
+    "workspace_directory_csv_export",
     "workspace_overview_csv_export",
     "source_package_read",
     "source_package_csv_export",
@@ -9585,6 +9651,8 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     );
   }
 
+  assert.match(manifest.routes.platform.exportTenantsCsv, /tenants\.csv/);
+  assert.match(manifest.routes.workspace.exportWorkspacesCsv, /workspaces\.csv/);
   assert.match(manifest.routes.workspace.importParticipantRoster, /participant-roster/);
   assert.match(
     manifest.routes.workspace.exportWorkspaceOverviewCsv,

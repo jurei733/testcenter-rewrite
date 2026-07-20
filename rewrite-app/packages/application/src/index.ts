@@ -70,8 +70,10 @@ import type {
 
 export type PlatformPort = {
   listTenants(): Promise<Tenant[]>;
+  exportTenantsCsv(): Promise<string>;
   createTenant(input: { tenantKey: string; displayName: string }): Promise<Tenant>;
   listWorkspaces(input: { tenantKey: string }): Promise<Workspace[]>;
+  exportWorkspacesCsv(input: { tenantKey: string }): Promise<string>;
   createWorkspace(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -598,8 +600,10 @@ export const firstSliceUseCases = {
   revokeAdminRole: "RevokeAdminRole",
   listAdminAuditEvents: "ListAdminAuditEvents",
   listTenants: "ListTenants",
+  exportTenantsCsv: "ExportTenantsCsv",
   createTenant: "CreateTenant",
   listWorkspaces: "ListWorkspaces",
+  exportWorkspacesCsv: "ExportWorkspacesCsv",
   createWorkspace: "CreateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
   exportWorkspaceOverviewCsv: "ExportWorkspaceOverviewCsv",
@@ -1947,6 +1951,55 @@ const formatSourcePackagesCsv = (input: {
         .map(escapeCsvCell)
         .join(",");
     })
+  ].join("\n") + "\n";
+};
+
+const formatTenantsCsv = (items: Tenant[]): string => {
+  const header = ["tenantKey", "displayName", "status", "tenantId", "createdAt"];
+
+  return [
+    header.join(","),
+    ...items.map(tenant =>
+      [
+        tenant.tenantKey,
+        tenant.displayName,
+        tenant.status,
+        tenant.tenantId,
+        tenant.createdAt
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
+  ].join("\n") + "\n";
+};
+
+const formatWorkspacesCsv = (input: {
+  tenantKey: string;
+  items: Workspace[];
+}): string => {
+  const header = [
+    "tenantKey",
+    "workspaceKey",
+    "displayName",
+    "status",
+    "workspaceId",
+    "createdAt"
+  ];
+
+  return [
+    header.join(","),
+    ...input.items.map(workspace =>
+      [
+        input.tenantKey,
+        workspace.workspaceKey,
+        workspace.displayName,
+        workspace.status,
+        workspace.workspaceId,
+        workspace.createdAt
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    )
   ].join("\n") + "\n";
 };
 
@@ -7499,6 +7552,11 @@ export const createFirstSliceServices = (
             left.tenantKey.localeCompare(right.tenantKey)
         );
       },
+      async exportTenantsCsv() {
+        const tenants = await this.listTenants();
+
+        return formatTenantsCsv(tenants);
+      },
       async createTenant(input) {
         const existingTenant = await repository.getTenantByKey(input.tenantKey);
         if (existingTenant) {
@@ -7526,6 +7584,14 @@ export const createFirstSliceServices = (
             left.createdAt.localeCompare(right.createdAt) ||
             left.workspaceKey.localeCompare(right.workspaceKey)
         );
+      },
+      async exportWorkspacesCsv(input) {
+        const workspaces = await this.listWorkspaces(input);
+
+        return formatWorkspacesCsv({
+          tenantKey: input.tenantKey,
+          items: workspaces
+        });
       },
       async createWorkspace(input) {
         const tenant = await requireTenant(repository, input.tenantKey);

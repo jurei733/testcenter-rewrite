@@ -932,7 +932,9 @@ try {
   await expectButtonSelectorDisabled("#exportWorkspaceOverviewCsvButton");
   await expectButtonSelectorDisabled("#refreshStudyMonitorButton");
   await expectButtonSelectorEnabled("#refreshTenantDirectoryButton");
+  await expectButtonSelectorEnabled("#exportTenantDirectoryCsvButton");
   await expectButtonSelectorDisabled("#refreshWorkspaceDirectoryButton");
+  await expectButtonSelectorDisabled("#exportWorkspaceDirectoryCsvButton");
   await expectButtonSelectorDisabled("#exportStudyMonitorCsvButton");
   await expectButtonSelectorDisabled("#exportParticipantMatrixCsvButton");
   await expectButtonSelectorDisabled("#exportWorkspaceLogCsvButton");
@@ -941,6 +943,7 @@ try {
   await expectButtonSelectorDisabled("#createWorkspaceButton");
   await expectButtonSelectorDisabled("#refreshWorkspaceOverviewButton");
   await expectButtonSelectorEnabled("#refreshWorkspaceDirectoryButton");
+  await expectButtonSelectorEnabled("#exportWorkspaceDirectoryCsvButton");
   await fillAndCommit("#workspaceKey", workspaceKey);
   await expectButtonSelectorEnabled("#createWorkspaceButton");
   await expectButtonSelectorEnabled("#refreshWorkspaceOverviewButton");
@@ -1003,6 +1006,15 @@ try {
     })
     .filter({ hasText: tenantKey })
     .waitFor();
+  const tenantDirectoryDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Tenant Directory CSV");
+  const tenantDirectoryDownload = await tenantDirectoryDownloadPromise;
+  assert.equal(tenantDirectoryDownload.suggestedFilename(), "tenants.csv");
+  await page
+    .locator("#tenantDirectoryExportPreview")
+    .filter({ hasText: "tenantKey,displayName,status,tenantId,createdAt" })
+    .filter({ hasText: tenantKey })
+    .waitFor();
   await clickAction("Refresh Workspace Directory");
   await page
     .locator("article.card")
@@ -1024,6 +1036,20 @@ try {
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
+  const workspaceDirectoryDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Workspace Directory CSV");
+  const workspaceDirectoryDownload = await workspaceDirectoryDownloadPromise;
+  assert.equal(
+    workspaceDirectoryDownload.suggestedFilename(),
+    `${tenantKey}-workspaces.csv`
+  );
+  await page
+    .locator("#workspaceDirectoryExportPreview")
+    .filter({
+      hasText: "tenantKey,workspaceKey,displayName,status,workspaceId,createdAt"
     })
     .filter({ hasText: workspaceKey })
     .waitFor();

@@ -967,11 +967,13 @@ export const productionApiRoutes = {
   },
   platform: {
     listTenants: "/api/v1/platform/tenants",
+    exportTenantsCsv: "/api/v1/platform/tenants.csv",
     createTenant: "/api/v1/platform/tenants"
   },
   workspace: {
     createWorkspace: "/api/v1/tenants/:tenantKey/workspaces",
     listWorkspaces: "/api/v1/tenants/:tenantKey/workspaces",
+    exportWorkspacesCsv: "/api/v1/tenants/:tenantKey/workspaces.csv",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
     exportWorkspaceOverviewCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/workspace-overview.csv",

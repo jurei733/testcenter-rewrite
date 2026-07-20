@@ -69,7 +69,9 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button id="exportWorkspaceOverviewCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceOverviewCsv()">Export Workspace Overview CSV</button>
           <button id="refreshStudyMonitorButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
           <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
+          <button id="exportTenantDirectoryCsvButton" class="ghost" type="button" (click)="view.exportTenantDirectoryCsv()">Export Tenant Directory CSV</button>
           <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
+          <button id="exportWorkspaceDirectoryCsvButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.exportWorkspaceDirectoryCsv()">Export Workspace Directory CSV</button>
           <button id="exportStudyMonitorCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
           <button id="exportParticipantMatrixCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
           <button id="exportStudyMonitorRunCsvButton" class="ghost" type="button" [disabled]="!view.canExportStudyMonitorRunCsv" (click)="view.exportStudyMonitorRunCsv()">Export Run Detail CSV</button>
@@ -385,6 +387,32 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         <p>One-row scope snapshot with active release, import, participant, and open-run pressure counts.</p>
         <pre id="workspaceOverviewExportPreview">{{ view.workspace.workspaceOverviewExportView }}</pre>
       </article>
+
+      <article class="card">
+        <h2>Tenant Directory CSV Export</h2>
+        <p>Platform tenant directory export for operator handoff outside the shell.</p>
+        <pre id="tenantDirectoryExportPreview">{{ view.workspace.tenantDirectoryExportView }}</pre>
+      </article>
+
+      <article class="card">
+        <h2>Workspace Directory CSV Export</h2>
+        <p>Tenant-scoped workspace directory export for scope planning and operator handoff.</p>
+        <pre id="workspaceDirectoryExportPreview">{{ view.workspace.workspaceDirectoryExportView }}</pre>
+      </article>
+
+      <app-json-panel
+        title="Tenant Directory CSV Export"
+        subtitle="Platform Directory"
+        viewId="tenantDirectoryExportView"
+        [content]="view.workspace.tenantDirectoryExportView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Workspace Directory CSV Export"
+        subtitle="Tenant Directory"
+        viewId="workspaceDirectoryExportView"
+        [content]="view.workspace.workspaceDirectoryExportView"
+      ></app-json-panel>
 
       <app-json-panel
         title="Workspace Overview"

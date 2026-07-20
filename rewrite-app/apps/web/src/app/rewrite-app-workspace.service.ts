@@ -295,6 +295,52 @@ export class RewriteAppWorkspaceService {
     );
   }
 
+  async exportTenantDirectoryCsv(): Promise<string> {
+    const csv = await this.requestState.request<string>(
+      "Tenant Directory CSV Export",
+      "GET",
+      productionApiRoutes.platform.exportTenantsCsv
+    );
+
+    this.workspaceState.tenantDirectoryExportView = csv;
+    downloadTextFile({
+      filename: "tenants.csv",
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Tenant Directory Exported",
+      "CSV tenant directory export loaded."
+    );
+    return csv;
+  }
+
+  async exportWorkspaceDirectoryCsv(): Promise<string> {
+    if (!this.hasTenantScope()) {
+      return "";
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Workspace Directory CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportWorkspacesCsv, {
+        tenantKey
+      })
+    );
+
+    this.workspaceState.workspaceDirectoryExportView = csv;
+    downloadTextFile({
+      filename: `${tenantKey || "tenant"}-workspaces.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Workspace Directory Exported",
+      `CSV workspace directory export loaded for ${tenantKey}.`
+    );
+    return csv;
+  }
+
   async exportWorkspaceLogCsv(): Promise<string> {
     if (!this.hasWorkspaceScope()) {
       return "";

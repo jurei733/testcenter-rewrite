@@ -1270,6 +1270,9 @@ const adminSessionRevokePattern = createRoutePattern(
 const workspaceCreatePattern = createRoutePattern(
   productionApiRoutes.workspace.createWorkspace
 );
+const workspaceDirectoryCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportWorkspacesCsv
+);
 const workspaceOverviewPattern = createRoutePattern(
   productionApiRoutes.workspace.getWorkspaceOverview
 );
@@ -1484,9 +1487,22 @@ const resolveOperatorAccessScope = (
     return { kind: "platform" };
   }
 
+  if (method === "GET" && pathname === productionApiRoutes.platform.exportTenantsCsv) {
+    return { kind: "platform" };
+  }
+
   const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
   if ((method === "POST" || method === "GET") && workspaceCreateMatch?.groups) {
     const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
+    return tenantKey ? { kind: "tenant", tenantKey } : null;
+  }
+
+  const workspaceDirectoryCsvExportMatch =
+    workspaceDirectoryCsvExportPattern.exec(pathname);
+  if (method === "GET" && workspaceDirectoryCsvExportMatch?.groups) {
+    const tenantKey = decodeRouteGroup(
+      workspaceDirectoryCsvExportMatch.groups.tenantKey
+    );
     return tenantKey ? { kind: "tenant", tenantKey } : null;
   }
 
@@ -1755,6 +1771,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.platform.listTenants}`;
   }
 
+  if (
+    method === "GET" &&
+    pathname === productionApiRoutes.platform.exportTenantsCsv
+  ) {
+    return `GET ${productionApiRoutes.platform.exportTenantsCsv}`;
+  }
+
   if (method === "GET" && pathname === productionApiRoutes.admin.listUsers) {
     return `GET ${productionApiRoutes.admin.listUsers}`;
   }
@@ -1786,6 +1809,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
   const routeChecks: Array<[string, RegExp, string]> = [
     ["POST", workspaceCreatePattern, productionApiRoutes.workspace.createWorkspace],
     ["GET", workspaceCreatePattern, productionApiRoutes.workspace.listWorkspaces],
+    [
+      "GET",
+      workspaceDirectoryCsvExportPattern,
+      productionApiRoutes.workspace.exportWorkspacesCsv
+    ],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
     [
       "GET",
@@ -2959,6 +2987,15 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.platform.exportTenantsCsv
+      ) {
+        const csv = await services.platform.exportTenantsCsv();
+        sendCsv(response, 200, "tenants.csv", csv);
+        return;
+      }
+
+      if (
         request.method === "POST" &&
         pathname === productionApiRoutes.platform.createTenant
       ) {
@@ -2969,6 +3006,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
+      const workspaceDirectoryCsvExportMatch =
+        workspaceDirectoryCsvExportPattern.exec(pathname);
       if (request.method === "GET" && workspaceCreateMatch?.groups) {
         const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
         if (!tenantKey) {
@@ -2978,6 +3017,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
         const items = await services.platform.listWorkspaces({ tenantKey });
         sendJson<ListWorkspacesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && workspaceDirectoryCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          workspaceDirectoryCsvExportMatch.groups.tenantKey
+        );
+        if (!tenantKey) {
+          sendError(response, 400, "invalid_tenant_key", "tenantKey is required.");
+          return;
+        }
+
+        const csv = await services.platform.exportWorkspacesCsv({ tenantKey });
+        sendCsv(response, 200, `${tenantKey}-workspaces.csv`, csv);
         return;
       }
 
