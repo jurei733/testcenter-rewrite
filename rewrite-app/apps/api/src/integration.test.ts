@@ -1919,11 +1919,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,importedAt,validationWarningCodes,validationWarningMessages\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages\n/
     );
     assert.match(
       rosterCsvText,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student","false"/
     );
 
     const participantSignIn = await requestJsonAt<{
@@ -3598,6 +3598,98 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       ],
       deletedTestRunIds: [resumed.body.testRun.testRunId]
     });
+
+    const protectedRosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        passwordRequired: boolean;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          rosterText: [
+            "loginKey,groupKey,bookletKey,displayName,pw",
+            "protected-demo,group:protected-demo,booklet:demo,Protected Demo,secret-demo"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(protectedRosterImport.status, 201);
+    assert.equal(
+      protectedRosterImport.body.items.find(
+        item => item.loginKey === "protected-demo"
+      )?.passwordRequired,
+      true
+    );
+
+    const protectedSignInWithoutPassword = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "protected-demo"
+      }
+    });
+    assert.equal(protectedSignInWithoutPassword.status, 401);
+    assert.equal(
+      protectedSignInWithoutPassword.body.error,
+      "participant_password_invalid"
+    );
+
+    const protectedSignInWithWrongPassword = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "protected-demo",
+        password: "wrong-secret"
+      }
+    });
+    assert.equal(protectedSignInWithWrongPassword.status, 401);
+    assert.equal(
+      protectedSignInWithWrongPassword.body.error,
+      "participant_password_invalid"
+    );
+
+    const protectedStarterLaunch = await requestJsonAt<{
+      participantSession: {
+        loginKey: string;
+      };
+      participantRosterEntry: {
+        passwordRequired: boolean;
+      } | null;
+      testRun: {
+        bookletKey: string;
+      };
+    }>(isolated.baseUrl, "/api/v1/participant/starter:launch", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "protected-demo",
+        password: "secret-demo"
+      }
+    });
+    assert.equal(protectedStarterLaunch.status, 200);
+    assert.equal(
+      protectedStarterLaunch.body.participantSession.loginKey,
+      "protected-demo"
+    );
+    assert.equal(
+      protectedStarterLaunch.body.participantRosterEntry?.passwordRequired,
+      true
+    );
+    assert.equal(protectedStarterLaunch.body.testRun.bookletKey, "booklet:demo");
   } finally {
     await closeServer(isolated.server);
   }
@@ -7467,6 +7559,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       groupKey: string;
       bookletKey: string | null;
       displayName: string | null;
+      passwordRequired: boolean;
       validationWarnings: Array<{ code: string; message: string }>;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
@@ -7486,6 +7579,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(initialImport.body.updatedCount, 0);
   assert.equal(initialImport.body.items.length, 2);
   assert.equal(initialImport.body.items[0]?.loginKey, "roster-a");
+  assert.equal(initialImport.body.items[0]?.passwordRequired, false);
   assert.equal(initialImport.body.items[1]?.groupKey, "group:roster-b");
   assert.equal(initialImport.body.items[1]?.displayName, "Ben Default");
   assert.deepEqual(
@@ -7499,8 +7593,8 @@ test("workspace participant roster can be imported, updated, and listed", async 
       method: "POST",
       body: {
         rosterText: [
-          "login,booklet,group,name",
-          "roster-alias-a,booklet:alias-a,group:alias-a,Ada Alias",
+          "login,booklet,group,name,pw",
+          "roster-alias-a,booklet:alias-a,group:alias-a,Ada Alias,alias-secret",
           "roster-alias-b\tbooklet:alias-b\tgroup:alias-b\tBen Alias"
         ].join("\n")
       }
@@ -7516,6 +7610,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(aliasRosterA?.groupKey, "group:alias-a");
   assert.equal(aliasRosterA?.bookletKey, "booklet:alias-a");
   assert.equal(aliasRosterA?.displayName, "Ada Alias");
+  assert.equal(aliasRosterA?.passwordRequired, true);
   const aliasRosterB = aliasHeaderImport.body.items.find(
     item => item.loginKey === "roster-alias-b"
   );
@@ -7545,6 +7640,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(updatedRosterA?.groupKey, "group:updated");
   assert.equal(updatedRosterA?.bookletKey, "booklet:updated");
   assert.equal(updatedRosterA?.displayName, "Ada Updated");
+  assert.equal(updatedRosterA?.passwordRequired, false);
   assert.deepEqual(
     updatedRosterA?.validationWarnings.map(warning => warning.code),
     ["active_content_release_missing"]
@@ -7621,6 +7717,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(testcenterLogin?.groupKey, "sample_group");
   assert.equal(testcenterLogin?.bookletKey, "BOOKLET.SAMPLE-1");
   assert.equal(testcenterLogin?.displayName, null);
+  assert.equal(testcenterLogin?.passwordRequired, true);
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
     item => item.loginKey === "test-group-monitor"
   );
@@ -7769,15 +7866,15 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,importedAt,validationWarningCodes,validationWarningMessages\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages\n/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","group:updated","booklet:updated","Ada Updated","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","group:updated","booklet:updated","Ada Updated","false","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","group:alias-a","booklet:alias-a","Ada Alias"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","group:alias-a","booklet:alias-a","Ada Alias","true"/
   );
   assert.match(
     rosterCsvText,

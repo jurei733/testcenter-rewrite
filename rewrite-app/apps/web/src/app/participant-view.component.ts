@@ -97,6 +97,10 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <input id="participantLoginKey" name="participantLoginKey" [(ngModel)]="view.runtime.loginKey" (change)="view.persistState()" />
           </label>
           <label>
+            Password
+            <input id="participantPassword" name="participantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
+          </label>
+          <label>
             Group Key
             <input id="participantRouteGroupKey" name="participantRouteGroupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
           </label>

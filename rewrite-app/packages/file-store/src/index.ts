@@ -34,6 +34,7 @@ type PersistedFirstSliceState = {
   contentReleases: Record<string, ContentRelease>;
   participantSessions: Record<string, ParticipantSession>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
+  participantRosterPasswordHashes: Record<string, string>;
   testRuns: Record<string, TestRun>;
 };
 
@@ -52,11 +53,18 @@ const createInitialState = (): PersistedFirstSliceState => ({
   contentReleases: {},
   participantSessions: {},
   participantRosterEntries: {},
+  participantRosterPasswordHashes: {},
   testRuns: {}
 });
 
 const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
   `${tenantKey}::${workspaceKey}`;
+
+const participantRosterPasswordKey = (
+  tenantId: string,
+  workspaceId: string,
+  loginKey: string
+): string => `${tenantId}::${workspaceId}::${loginKey}`;
 
 const readStateFromFile = async (
   filePath: string
@@ -312,11 +320,29 @@ export const createFileFirstSliceRepository = (
         entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
       );
     },
-    async saveParticipantRosterEntry(participantRosterEntry) {
+    async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
+      const state = await getState();
+      return (
+        state.participantRosterPasswordHashes[
+          participantRosterPasswordKey(tenantId, workspaceId, loginKey)
+        ] ?? null
+      );
+    },
+    async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await mutate(state => {
         state.participantRosterEntries[
           participantRosterEntry.participantRosterEntryId
         ] = participantRosterEntry;
+        const passwordKey = participantRosterPasswordKey(
+          participantRosterEntry.tenantId,
+          participantRosterEntry.workspaceId,
+          participantRosterEntry.loginKey
+        );
+        if (passwordHash) {
+          state.participantRosterPasswordHashes[passwordKey] = passwordHash;
+        } else {
+          delete state.participantRosterPasswordHashes[passwordKey];
+        }
       });
     },
     async getTestRunById(testRunId) {

@@ -32,6 +32,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="participantDisplayName" name="participantDisplayName" readonly [value]="view.runtime.participantDisplayName || 'No saved roster name'" />
           </label>
           <label>
+            Password
+            <input id="runtimeParticipantPassword" name="runtimeParticipantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
+          </label>
+          <label>
             Group Key
             <input id="groupKey" name="groupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
           </label>

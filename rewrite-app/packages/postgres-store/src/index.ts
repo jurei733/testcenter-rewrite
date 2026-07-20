@@ -211,6 +211,8 @@ const mapParticipantRosterEntry = (
           row.display_name === null || row.display_name === undefined
             ? null
             : String(row.display_name),
+        passwordRequired:
+          row.password_hash !== null && row.password_hash !== undefined,
         importedAt: String(row.imported_at)
       }
     : null;
@@ -282,7 +284,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 7;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 8;
 
 const migrations: PostgresMigration[] = [
   {
@@ -520,6 +522,14 @@ const migrations: PostgresMigration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_participant_roster_entries_workspace
         ON participant_roster_entries (tenant_id, workspace_id, login_key);
+    `
+  },
+  {
+    version: 8,
+    name: "add_participant_roster_password_hash",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN IF NOT EXISTS password_hash TEXT;
     `
   }
 ];
@@ -1099,23 +1109,33 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
         mapParticipantRosterEntry
       );
     },
-    async saveParticipantRosterEntry(participantRosterEntry) {
+    async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
+      const result = await pool.query<{ password_hash: string | null }>(
+        `SELECT password_hash
+         FROM participant_roster_entries
+         WHERE tenant_id = $1 AND workspace_id = $2 AND login_key = $3`,
+        [tenantId, workspaceId, loginKey]
+      );
+      return result.rows[0]?.password_hash ?? null;
+    },
+    async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await pool.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           group_key = EXCLUDED.group_key,
           booklet_key = EXCLUDED.booklet_key,
           display_name = EXCLUDED.display_name,
+          password_hash = EXCLUDED.password_hash,
           imported_at = EXCLUDED.imported_at`,
         [
           participantRosterEntry.participantRosterEntryId,
@@ -1125,6 +1145,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.groupKey,
           participantRosterEntry.bookletKey,
           participantRosterEntry.displayName,
+          passwordHash,
           participantRosterEntry.importedAt
         ]
       );

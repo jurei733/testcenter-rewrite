@@ -32,6 +32,7 @@ type InMemoryFirstSliceState = {
   contentReleases: Map<string, ContentRelease>;
   participantSessions: Map<string, ParticipantSession>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
+  participantRosterPasswordHashes: Map<string, string>;
   testRuns: Map<string, TestRun>;
 };
 
@@ -51,11 +52,18 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   contentReleases: new Map(),
   participantSessions: new Map(),
   participantRosterEntries: new Map(),
+  participantRosterPasswordHashes: new Map(),
   testRuns: new Map()
 });
 
 const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
   `${tenantKey}::${workspaceKey}`;
+
+const participantRosterPasswordKey = (
+  tenantId: string,
+  workspaceId: string,
+  loginKey: string
+): string => `${tenantId}::${workspaceId}::${loginKey}`;
 
 export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
@@ -200,11 +208,28 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         entry => entry.tenantId === tenantId && entry.workspaceId === workspaceId
       );
     },
-    async saveParticipantRosterEntry(participantRosterEntry) {
+    async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
+      return (
+        state.participantRosterPasswordHashes.get(
+          participantRosterPasswordKey(tenantId, workspaceId, loginKey)
+        ) ?? null
+      );
+    },
+    async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       state.participantRosterEntries.set(
         participantRosterEntry.participantRosterEntryId,
         participantRosterEntry
       );
+      const passwordKey = participantRosterPasswordKey(
+        participantRosterEntry.tenantId,
+        participantRosterEntry.workspaceId,
+        participantRosterEntry.loginKey
+      );
+      if (passwordHash) {
+        state.participantRosterPasswordHashes.set(passwordKey, passwordHash);
+      } else {
+        state.participantRosterPasswordHashes.delete(passwordKey);
+      }
     },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;

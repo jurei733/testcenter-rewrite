@@ -56,6 +56,7 @@ export type ParsedParticipantRosterEntry = {
   groupKey: string;
   bookletKey: string | null;
   displayName: string | null;
+  password?: string | null;
 };
 
 export type ParticipantRosterSource =
@@ -112,6 +113,15 @@ const rosterHeaderAliases = {
     "participantname",
     "studentname",
     "label"
+  ]),
+  password: new Set([
+    "password",
+    "pw",
+    "passwort",
+    "kennwort",
+    "secret",
+    "accesscode",
+    "accesskey"
   ])
 };
 
@@ -120,6 +130,7 @@ type RosterDelimitedHeader = {
   groupKey: number | null;
   bookletKey: number | null;
   displayName: number | null;
+  password: number | null;
 };
 
 const findRosterHeaderIndex = (
@@ -151,7 +162,8 @@ const readRosterDelimitedHeader = (
     loginKey: loginKeyIndex,
     groupKey: findRosterHeaderIndex(values, rosterHeaderAliases.groupKey),
     bookletKey: findRosterHeaderIndex(values, rosterHeaderAliases.bookletKey),
-    displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName)
+    displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName),
+    password: findRosterHeaderIndex(values, rosterHeaderAliases.password)
   };
 };
 
@@ -198,13 +210,17 @@ const parseDelimitedRosterRows = (
     const displayName = header
       ? readRosterDelimitedValue(values, header.displayName)
       : normalizeRosterTextValue(values[3]);
+    const password = header
+      ? readRosterDelimitedValue(values, header.password)
+      : normalizeRosterTextValue(values[4]);
 
     return [
       {
         loginKey,
         groupKey: groupKey || `group:${loginKey}`,
         bookletKey,
-        displayName
+        displayName,
+        ...(password ? { password } : {})
       }
     ];
   });
@@ -475,6 +491,16 @@ const parseParticipantRosterJsonValue = (
       ) ?? context.bookletKey;
 
     if (loginKey) {
+      const password = readJsonRosterString(
+        objectValue,
+        "password",
+        "pw",
+        "passwort",
+        "kennwort",
+        "secret",
+        "accessCode",
+        "accessKey"
+      );
       entries.push({
         loginKey,
         groupKey: groupKey || `group:${loginKey}`,
@@ -490,7 +516,8 @@ const parseParticipantRosterJsonValue = (
           ),
           readJsonRosterString(objectValue, "firstName", "firstname", "givenName"),
           readJsonRosterString(objectValue, "lastName", "lastname", "familyName")
-        )
+        ),
+        ...(password ? { password } : {})
       });
       return;
     }
@@ -825,12 +852,25 @@ const parseParticipantRosterXmlText = (
           readXmlChildText(content, "lastName", "lastname", "familyName")
       )
     );
+    const password = normalizeRosterTextValue(
+      readXmlAttribute(
+        attributes,
+        "password",
+        "pw",
+        "passwort",
+        "kennwort",
+        "secret",
+        "accessCode",
+        "accessKey"
+      ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
+    );
 
     entries.push({
       loginKey,
       groupKey: groupKey || `group:${loginKey}`,
       bookletKey,
-      displayName
+      displayName,
+      ...(password ? { password } : {})
     });
   }
 
@@ -913,12 +953,25 @@ const parseParticipantRosterXmlText = (
         readXmlAttribute(attributes, "lastName", "lastname", "familyName")
       )
     );
+    const password = normalizeRosterTextValue(
+      readXmlAttribute(
+        attributes,
+        "password",
+        "pw",
+        "passwort",
+        "kennwort",
+        "secret",
+        "accessCode",
+        "accessKey"
+      ) ?? readXmlChildText(content, "password", "pw", "passwort", "kennwort")
+    );
 
     entries.push({
       loginKey,
       groupKey: groupKey || `group:${loginKey}`,
       bookletKey,
-      displayName
+      displayName,
+      ...(password ? { password } : {})
     });
   }
 
@@ -1214,6 +1267,7 @@ export type ParticipantSignInRequest = {
   workspaceKey: string;
   loginKey: string;
   groupKey?: string;
+  password?: string;
 };
 
 export type PublicAdminUser = Omit<AdminUser, "passwordHash">;
@@ -1264,6 +1318,7 @@ export type ParticipantLaunchRequest = {
   loginKey?: string;
   groupKey?: string;
   bookletKey?: string;
+  password?: string;
 };
 
 export type ImportParticipantRosterRequest = {

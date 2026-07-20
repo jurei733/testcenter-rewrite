@@ -41,9 +41,9 @@ describe("parseParticipantRosterText", () => {
     assert.deepEqual(
       parseParticipantRosterText(
         [
-          "login,booklet,group,name",
-          "alias-a,booklet:alias-a,group:alias-a,Ada Alias",
-          "alias-b\tbooklet:alias-b\tgroup:alias-b\tBen Alias",
+          "login,booklet,group,name,pw",
+          "alias-a,booklet:alias-a,group:alias-a,Ada Alias,secret-a",
+          "alias-b\tbooklet:alias-b\tgroup:alias-b\tBen Alias\tsecret-b",
           "alias-c;booklet:alias-c;group:alias-c;Cara Alias"
         ].join("\n")
       ),
@@ -52,13 +52,15 @@ describe("parseParticipantRosterText", () => {
           loginKey: "alias-a",
           groupKey: "group:alias-a",
           bookletKey: "booklet:alias-a",
-          displayName: "Ada Alias"
+          displayName: "Ada Alias",
+          password: "secret-a"
         },
         {
           loginKey: "alias-b",
           groupKey: "group:alias-b",
           bookletKey: "booklet:alias-b",
-          displayName: "Ben Alias"
+          displayName: "Ben Alias",
+          password: "secret-b"
         },
         {
           loginKey: "alias-c",
@@ -168,13 +170,15 @@ describe("parseParticipantRosterText", () => {
           loginKey: "test",
           groupKey: "sample_group",
           bookletKey: "BOOKLET.SAMPLE-1",
-          displayName: null
+          displayName: null,
+          password: "user123"
         },
         {
           loginKey: "test-group-monitor",
           groupKey: "sample_group",
           bookletKey: null,
-          displayName: null
+          displayName: null,
+          password: "user123"
         }
       ]
     );
@@ -195,12 +199,13 @@ describe("parseParticipantRosterText", () => {
                       loginKey: "json-a",
                       displayName: "Json A"
                     },
-                    {
-                      login: "json-b",
-                      booklet: { id: "booklet:override" },
-                      firstName: "Json",
-                      lastName: "B"
-                    }
+                  {
+                    login: "json-b",
+                    booklet: { id: "booklet:override" },
+                    firstName: "Json",
+                    lastName: "B",
+                    password: "json-secret"
+                  }
                   ]
                 }
               ]
@@ -223,7 +228,8 @@ describe("parseParticipantRosterText", () => {
           loginKey: "json-b",
           groupKey: "group:json",
           bookletKey: "booklet:override",
-          displayName: "Json B"
+          displayName: "Json B",
+          password: "json-secret"
         },
         {
           loginKey: "json-c",

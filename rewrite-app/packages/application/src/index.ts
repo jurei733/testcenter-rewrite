@@ -397,6 +397,7 @@ export type ParticipantRuntimePort = {
     workspaceKey: string;
     loginKey: string;
     groupKey?: string;
+    password?: string;
   }): Promise<ParticipantSession>;
   getRuntimeState(input: {
     participantSessionId: string;
@@ -753,8 +754,14 @@ export type FirstSliceRepository = {
     tenantId: string,
     workspaceId: string
   ): Promise<ParticipantRosterEntry[]>;
+  getParticipantRosterPasswordHash(
+    tenantId: string,
+    workspaceId: string,
+    loginKey: string
+  ): Promise<string | null>;
   saveParticipantRosterEntry(
-    participantRosterEntry: ParticipantRosterEntry
+    participantRosterEntry: ParticipantRosterEntry,
+    passwordHash: string | null
   ): Promise<void>;
   getTestRunById(testRunId: string): Promise<TestRun | null>;
   listTestRunsByParticipantSessionId(
@@ -1159,13 +1166,13 @@ const requireAdminCredentialsPassword = (value: unknown): string => {
   return value;
 };
 
-const hashAdminPassword = (password: string): string => {
+const hashPassword = (password: string): string => {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = scryptSync(password, salt, PASSWORD_HASH_KEY_LENGTH);
   return `scrypt$${salt}$${derivedKey.toString("hex")}`;
 };
 
-const verifyAdminPassword = (password: string, passwordHash: string): boolean => {
+const verifyPassword = (password: string, passwordHash: string): boolean => {
   const [scheme, salt, expectedHash] = passwordHash.split("$");
   if (scheme !== "scrypt" || !salt || !expectedHash) {
     return false;
@@ -1179,6 +1186,9 @@ const verifyAdminPassword = (password: string, passwordHash: string): boolean =>
 
   return timingSafeEqual(actual, expected);
 };
+
+const hashAdminPassword = hashPassword;
+const verifyAdminPassword = verifyPassword;
 
 const createAdminSessionToken = (): string => randomBytes(32).toString("base64url");
 
@@ -2157,6 +2167,7 @@ const formatParticipantRosterCsv = (input: {
     "groupKey",
     "bookletKey",
     "displayName",
+    "passwordRequired",
     "importedAt",
     "validationWarningCodes",
     "validationWarningMessages"
@@ -2178,6 +2189,7 @@ const formatParticipantRosterCsv = (input: {
         item.groupKey,
         item.bookletKey ?? "",
         item.displayName ?? "",
+        item.passwordRequired ? "true" : "false",
         item.importedAt,
         item.validationWarnings.map(warning => warning.code).join("|"),
         item.validationWarnings.map(warning => warning.message).join("|")
@@ -8553,10 +8565,14 @@ export const createFirstSliceServices = (
             groupKey: parsedEntry.groupKey,
             bookletKey: parsedEntry.bookletKey,
             displayName: parsedEntry.displayName,
+            passwordRequired: Boolean(parsedEntry.password),
             importedAt: now()
           };
 
-          await repository.saveParticipantRosterEntry(participantRosterEntry);
+          await repository.saveParticipantRosterEntry(
+            participantRosterEntry,
+            parsedEntry.password ? hashPassword(parsedEntry.password) : null
+          );
           entriesByLoginKey.set(parsedEntry.loginKey, participantRosterEntry);
 
           if (existingEntry) {
@@ -9611,6 +9627,24 @@ export const createFirstSliceServices = (
           workspace.workspaceId,
           loginKey
         );
+        if (rosterEntry?.passwordRequired) {
+          const passwordHash = await repository.getParticipantRosterPasswordHash(
+            workspace.tenantId,
+            workspace.workspaceId,
+            loginKey
+          );
+          if (
+            !passwordHash ||
+            typeof input.password !== "string" ||
+            !verifyPassword(input.password, passwordHash)
+          ) {
+            throw new FirstSliceError(
+              401,
+              "participant_password_invalid",
+              `Password for participant '${loginKey}' is required or invalid.`
+            );
+          }
+        }
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           requestedGroupKey || rosterEntry?.groupKey || `group:${loginKey}`;

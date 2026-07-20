@@ -655,7 +655,8 @@ export class ParticipantViewFacade {
         tenantKey: this.workspace.tenantKey.trim() || undefined,
         workspaceKey: this.workspace.workspaceKey.trim(),
         loginKey: this.runtime.loginKey.trim(),
-        groupKey: this.runtime.groupKey.trim() || undefined
+        groupKey: this.runtime.groupKey.trim() || undefined,
+        password: this.runtime.participantPassword || undefined
       } satisfies ParticipantSignInRequest
     );
 
@@ -722,7 +723,8 @@ export class ParticipantViewFacade {
         workspaceKey: this.workspace.workspaceKey.trim(),
         loginKey: this.runtime.loginKey.trim(),
         groupKey: this.runtime.groupKey.trim() || undefined,
-        bookletKey: this.runtime.bookletKey.trim() || undefined
+        bookletKey: this.runtime.bookletKey.trim() || undefined,
+        password: this.runtime.participantPassword || undefined
       } satisfies ParticipantLaunchRequest
     );
 

@@ -143,6 +143,7 @@ export type ParticipantRosterEntry = {
   groupKey: string;
   bookletKey: string | null;
   displayName: string | null;
+  passwordRequired: boolean;
   importedAt: string;
 };
 

@@ -230,6 +230,8 @@ const mapParticipantRosterEntry = (
           row.display_name === null || row.display_name === undefined
             ? null
             : String(row.display_name),
+        passwordRequired:
+          row.password_hash !== null && row.password_hash !== undefined,
         importedAt: String(row.imported_at)
       }
     : null;
@@ -303,7 +305,7 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 13;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 14;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -584,6 +586,14 @@ const sqliteMigrations: SqliteMigration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_participant_roster_entries_workspace
         ON participant_roster_entries (tenant_id, workspace_id, login_key);
+    `
+  },
+  {
+    version: 14,
+    name: "add_participant_roster_password_hash",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN password_hash TEXT;
     `
   }
 ];
@@ -1230,7 +1240,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1239,17 +1249,32 @@ export const createSqliteFirstSliceRepository = (
         .map(row => mapParticipantRosterEntry(row))
         .filter(Boolean) as ParticipantRosterEntry[];
     },
-    async saveParticipantRosterEntry(participantRosterEntry) {
+    async getParticipantRosterPasswordHash(tenantId, workspaceId, loginKey) {
+      const row = database
+        .prepare(
+          `SELECT password_hash
+           FROM participant_roster_entries
+           WHERE tenant_id = ? AND workspace_id = ? AND login_key = ?`
+        )
+        .get(tenantId, workspaceId, loginKey) as
+        | { password_hash?: unknown }
+        | undefined;
+      return row?.password_hash === null || row?.password_hash === undefined
+        ? null
+        : String(row.password_hash);
+    },
+    async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             group_key = excluded.group_key,
             booklet_key = excluded.booklet_key,
             display_name = excluded.display_name,
+            password_hash = excluded.password_hash,
             imported_at = excluded.imported_at`
         )
         .run(
@@ -1260,6 +1285,7 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.groupKey,
           participantRosterEntry.bookletKey,
           participantRosterEntry.displayName,
+          passwordHash,
           participantRosterEntry.importedAt
         );
     },
