@@ -81,6 +81,21 @@ type ParticipantPlayerUnitItem = {
   canOpen: boolean;
 };
 
+export type ParticipantVeronaPlayerState = {
+  playerKey: string;
+  playerHtml: string;
+  testRunId: string;
+  unitKey: string;
+  unitTitle: string;
+  unitDefinition: string;
+  unitDefinitionType: string;
+  savedResponse: string;
+  unitNumber: number;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  canComplete: boolean;
+};
+
 type ParticipantEntryIssue = {
   title: string;
   detail: string;
@@ -121,7 +136,16 @@ export class ParticipantViewFacade {
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
+    "not_saved";
   private copiedSessionEntryLink = "";
+  private pendingVeronaSave: {
+    testRunId: string;
+    unitKey: string;
+    response: string;
+    status: "running" | "paused";
+  } | null = null;
+  private veronaSaveDrainPromise: Promise<void> | null = null;
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -489,6 +513,34 @@ export class ParticipantViewFacade {
     return this.describeParticipantEntryIssue(error);
   }
 
+  get veronaPlayer(): ParticipantVeronaPlayerState | null {
+    const currentState = this.readCurrentRunState();
+    const player = currentState?.currentUnit.player;
+    const unitDefinition = currentState?.currentUnit.unitDefinition?.trim();
+    const unitKey = currentState?.currentUnit.unitKey;
+    if (!currentState || !player?.html.trim() || !unitDefinition || !unitKey) {
+      return null;
+    }
+    const unitIndex = currentState.bookletUnits.findIndex(
+      unit => unit.unitKey === unitKey
+    );
+    return {
+      playerKey: player.playerKey,
+      playerHtml: player.html,
+      testRunId: currentState.testRun.testRunId,
+      unitKey,
+      unitTitle: currentState.currentUnit.displayLabel ?? unitKey,
+      unitDefinition,
+      unitDefinitionType:
+        currentState.currentUnit.unitDefinitionType?.trim() || player.playerKey,
+      savedResponse: currentState.testRun.unitResponses[unitKey] ?? "",
+      unitNumber: Math.max(unitIndex + 1, 1),
+      canGoPrevious: this.player.canGoPreviousUnit,
+      canGoNext: this.player.canGoNextUnit,
+      canComplete: this.player.canComplete
+    };
+  }
+
   get canSignIn(): boolean {
     return Boolean(
       this.workspace.workspaceKey.trim() && this.runtime.loginKey.trim()
@@ -540,6 +592,62 @@ export class ParticipantViewFacade {
         this.runtime.currentUnitResponse
       )
     );
+  }
+
+  saveVeronaResponse(response: string): void {
+    const currentState = this.readCurrentRunState();
+    const unitKey = currentState?.currentUnit.unitKey?.trim();
+    if (
+      !currentState ||
+      !unitKey ||
+      !currentState.availableActions.includes("save_progress")
+    ) {
+      return;
+    }
+
+    this.runtime.currentUnitResponse = response;
+    this.persistState();
+    this.pendingVeronaSave = {
+      testRunId: currentState.testRun.testRunId,
+      unitKey,
+      response,
+      status: currentState.testRun.status === "paused" ? "paused" : "running"
+    };
+    this.scheduleVeronaSaveDrain();
+  }
+
+  retryVeronaSave(): void {
+    if (this.pendingVeronaSave) {
+      this.scheduleVeronaSaveDrain();
+    }
+  }
+
+  navigateFromVerona(target: string): void {
+    switch (target) {
+      case "previous":
+        this.goToPreviousUnit();
+        break;
+      case "next":
+        this.goToNextUnit();
+        break;
+      case "first": {
+        const firstUnit = this.player.unitItems[0];
+        if (firstUnit) {
+          this.goToUnit(firstUnit.unitKey);
+        }
+        break;
+      }
+      case "last": {
+        const lastUnit = this.player.unitItems.at(-1);
+        if (lastUnit) {
+          this.goToUnit(lastUnit.unitKey);
+        }
+        break;
+      }
+      case "end":
+        this.completeRun();
+        break;
+    }
   }
 
   goToPreviousUnit(): void {
@@ -692,6 +800,8 @@ export class ParticipantViewFacade {
   ): void {
     this.copiedSessionEntryLink = "";
     this.assignedBooklets = [];
+    this.pendingVeronaSave = null;
+    this.veronaSaveStatus = "not_saved";
     if (
       !this.runtime.participantSessionId.trim() &&
       !this.runtime.testRunId.trim()
@@ -801,9 +911,63 @@ export class ParticipantViewFacade {
     await this.refreshCurrentStateInternal(true);
   }
 
+  private scheduleVeronaSaveDrain(): void {
+    if (this.veronaSaveDrainPromise) {
+      return;
+    }
+    this.veronaSaveStatus = "saving";
+    const drainPromise = this.drainVeronaSaveQueue().finally(() => {
+      if (this.veronaSaveDrainPromise === drainPromise) {
+        this.veronaSaveDrainPromise = null;
+      }
+      if (this.pendingVeronaSave && this.veronaSaveStatus !== "save_failed") {
+        this.scheduleVeronaSaveDrain();
+      }
+    });
+    this.veronaSaveDrainPromise = drainPromise;
+    this.viewState.onActionAsync(() => drainPromise);
+  }
+
+  private async drainVeronaSaveQueue(): Promise<void> {
+    while (this.pendingVeronaSave) {
+      const save = this.pendingVeronaSave;
+      this.pendingVeronaSave = null;
+      try {
+        const payload = await this.requestState.request<SaveTestRunProgressResponse>(
+          "Verona Auto Save",
+          "POST",
+          resolveRoutePath(productionApiRoutes.participant.saveProgress, {
+            testRunId: save.testRunId
+          }),
+          {
+            currentUnitKey: save.unitKey,
+            status: save.status,
+            unitResponse: save.response
+          } satisfies SaveTestRunProgressRequest,
+          { quiet: true }
+        );
+        this.syncRun(payload.testRun);
+        this.runtime.runtimeMonitorView = prettyPrintJson(
+          payload,
+          this.runtime.runtimeMonitorView
+        );
+      } catch {
+        this.pendingVeronaSave = this.pendingVeronaSave ?? save;
+        this.veronaSaveStatus = "save_failed";
+        this.persistState();
+        return;
+      }
+    }
+
+    this.veronaSaveStatus = "saved";
+    this.persistState();
+    await this.refreshCurrentStateInternal(true);
+  }
+
   private async goToPlayerUnitInternal(
     target: "previous" | "next" | string
   ): Promise<void> {
+    await this.settleVeronaAutoSaveBeforeForegroundAction();
     const player = this.player;
     const targetUnitKey =
       target === "previous"
@@ -850,6 +1014,7 @@ export class ParticipantViewFacade {
   }
 
   private async completeRunInternal(): Promise<void> {
+    await this.settleVeronaAutoSaveBeforeForegroundAction();
     await this.saveCurrentDraftBeforeCompleteInternal();
 
     const payload = await this.requestState.request<{
@@ -892,6 +1057,17 @@ export class ParticipantViewFacade {
       currentUnitKey,
       this.runtime.currentUnitResponse
     );
+  }
+
+  private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<void> {
+    const activeSave = this.veronaSaveDrainPromise;
+    if (activeSave) {
+      await activeSave;
+    }
+    // A failed background save remains queued for an explicit retry. Navigation
+    // and completion perform the same save in the foreground, so use the latest
+    // runtime response there instead of issuing the stale queued request later.
+    this.pendingVeronaSave = null;
   }
 
   private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {

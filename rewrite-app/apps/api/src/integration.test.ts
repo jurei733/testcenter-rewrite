@@ -6519,6 +6519,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
             </resource>
             <resource identifier="UNIT.SAMPLE" href="units/UNIT.SAMPLE.xml" />
             <resource identifier="UNIT.INLINE" href="units/UNIT.INLINE.xml" />
+            <resource identifier="verona-player-simple@6.0" href="players/simple.html" />
           </resources>
         </manifest>
       `
@@ -6553,11 +6554,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     },
     {
       fileName: "export/units/assets/SAMPLE_UNITCONTENTS.HTM",
-      content: `
-        <main>
-          <p>Loaded original Testcenter definition payload.</p>
-        </main>
-      `
+      content: "<main><p>Loaded original Testcenter definition payload.</p></main>"
     },
     {
       fileName: "export/units/UNIT.INLINE.xml",
@@ -6567,11 +6564,16 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
             <Id>UNIT.INLINE</Id>
             <Label>Inline Unit</Label>
           </Metadata>
-          <Definition><![CDATA[
+          <Definition player="verona-player-simple@6.0"><![CDATA[
             <section>Loaded inline Testcenter definition payload.</section>
           ]]></Definition>
         </Unit>
       `
+    },
+    {
+      fileName: "export/players/simple.html",
+      content:
+        '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
     }
   ]);
 
@@ -6605,6 +6607,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     contentReleaseDetail: {
       contentRelease: {
         runtimeSnapshot: {
+          playerEntries?: Array<{ playerKey: string; html: string }>;
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
@@ -6613,6 +6616,9 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
               displayLabel: string;
               description?: string;
               content?: string;
+              playerKey?: string;
+              unitDefinition?: string;
+              unitDefinitionType?: string;
             }>;
           }>;
         };
@@ -6635,15 +6641,30 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
               unitKey: "UNIT.SAMPLE",
               displayLabel: "Referenced definition unit",
               description: "Original Unit Description",
-              content: "Loaded original Testcenter definition payload."
+              content: "Loaded original Testcenter definition payload.",
+              playerKey: "verona-player-simple@6.0",
+              unitDefinition:
+                "<main><p>Loaded original Testcenter definition payload.</p></main>",
+              unitDefinitionType: "verona-player-simple@6.0"
             },
             {
               unitKey: "UNIT.INLINE",
               displayLabel: "Inline definition unit",
               description: "Inline Unit",
-              content: "Loaded inline Testcenter definition payload."
+              content: "Loaded inline Testcenter definition payload.",
+              playerKey: "verona-player-simple@6.0",
+              unitDefinition:
+                "<section>Loaded inline Testcenter definition payload.</section>",
+              unitDefinitionType: "verona-player-simple@6.0"
             }
           ]
+        }
+      ],
+      playerEntries: [
+        {
+          playerKey: "verona-player-simple@6.0",
+          html:
+            '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
         }
       ]
     }

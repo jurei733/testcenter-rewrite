@@ -52,6 +52,8 @@ import type {
   WorkspaceOverview
 } from "@testcenter-rewrite-app/domain";
 
+export * from "./verona-player.js";
+
 export type ParsedParticipantRosterEntry = {
   loginKey: string;
   groupKey: string;

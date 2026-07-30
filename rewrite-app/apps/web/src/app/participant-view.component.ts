@@ -4,11 +4,12 @@ import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { ParticipantViewFacade } from "./participant-view.facade";
+import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
 @Component({
   selector: "app-participant-view",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, VeronaPlayerHostComponent],
   template: `
     <div class="stack">
       <article class="card participant-entry-card">
@@ -231,22 +232,43 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
             <p id="participantRouteCompletionLabel" [class.is-complete]="view.player.isComplete">{{ view.player.completionLabel }}</p>
           </section>
-          <section class="participant-unit-prompt" aria-label="Current unit prompt">
-            <span>Unit Prompt</span>
-            <p id="participantRouteUnitDescription">{{ view.player.unitDescription }}</p>
-            <strong id="participantRouteUnitContent">{{ view.player.unitContent }}</strong>
-          </section>
-          <label>
-            Unit Response
-            <textarea
-              id="participantRouteUnitResponse"
-              name="participantRouteUnitResponse"
-              [disabled]="!view.player.canSaveProgress"
-              [(ngModel)]="view.runtime.currentUnitResponse"
-              (change)="view.persistState()"
-              placeholder="Write the participant response for this unit."
-            ></textarea>
-          </label>
+          <app-verona-player-host
+            *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
+            [playerHtml]="verona.playerHtml"
+            [playerKey]="verona.playerKey"
+            [testRunId]="verona.testRunId"
+            [unitKey]="verona.unitKey"
+            [unitTitle]="verona.unitTitle"
+            [unitDefinition]="verona.unitDefinition"
+            [unitDefinitionType]="verona.unitDefinitionType"
+            [savedResponse]="verona.savedResponse"
+            [unitNumber]="verona.unitNumber"
+            [canGoPrevious]="verona.canGoPrevious"
+            [canGoNext]="verona.canGoNext"
+            [canComplete]="verona.canComplete"
+            [saveStatus]="view.veronaSaveStatus"
+            (responseChange)="view.saveVeronaResponse($event)"
+            (navigationRequest)="view.navigateFromVerona($event)"
+            (retrySave)="view.retryVeronaSave()"
+          ></app-verona-player-host>
+          <ng-template #textResponsePlayer>
+            <section class="participant-unit-prompt" aria-label="Current unit prompt">
+              <span>Unit Prompt</span>
+              <p id="participantRouteUnitDescription">{{ view.player.unitDescription }}</p>
+              <strong id="participantRouteUnitContent">{{ view.player.unitContent }}</strong>
+            </section>
+            <label>
+              Unit Response
+              <textarea
+                id="participantRouteUnitResponse"
+                name="participantRouteUnitResponse"
+                [disabled]="!view.player.canSaveProgress"
+                [(ngModel)]="view.runtime.currentUnitResponse"
+                (change)="view.persistState()"
+                placeholder="Write the participant response for this unit."
+              ></textarea>
+            </label>
+          </ng-template>
           <section
             class="participant-draft-state"
             [class.has-unsaved-response]="view.player.hasUnsavedResponse"

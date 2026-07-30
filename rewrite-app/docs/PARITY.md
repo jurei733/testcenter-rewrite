@@ -20,9 +20,9 @@ Priority:
 
 | Order | Priority | Next capability | Why it is next |
 | --- | --- | --- | --- |
-| 1 | P0 | Verona player host and response bridge | The current participant UI renders normalized prompts and text responses, but cannot run real Verona units. |
-| 2 | P0 | Booklet policy compiler | Timing, navigation locks, completion rules, adaptive states, and execution modes need one explicit runtime policy. |
-| 3 | P0 | Original package validation corpus | Imports accept many shapes, but XSD/API-version/dependency validation must be proven against representative production packages. |
+| 1 | P0 | Booklet policy compiler | Timing, navigation locks, completion rules, adaptive states, and execution modes need one explicit runtime policy. |
+| 2 | P0 | Original package validation corpus | Imports and the Verona bridge accept common shapes, but XSD/API-version/dependency validation must be proven against representative production packages and players. |
+| 3 | P0 | Verona resource and delivery hardening | The basic bridge works; external resources, rich logs/focus events, broader player fixtures, and offline delivery still need parity work. |
 | 4 | P1 | Monitor go-to/unlock/lock commands | Pause, resume, and complete exist; supervised navigation controls do not. |
 | 5 | P1 | Participant access windows and login protection | Valid-from/to/for and participant brute-force protection are still absent. |
 | 6 | P1 | Workspace file administration | Operators still need file browsing, download, dependency-aware deletion, and replacement workflows. |
@@ -41,7 +41,7 @@ Priority:
 | Username with optional password | same | done | P0 | saved roster password hashes and participant sign-in |
 | Two-step extra code | `app-root/code-input` | missing | P1 | no code challenge model |
 | Multiple assigned booklets in source order | `starter.component.ts`, `XMLFileTesttakers.class.php` | done | P0 | all `<Login><Booklet>` values persist; starter exposes available/in-progress/completed state; one session can run them sequentially |
-| Resume after reload/interruption | hot-return E2E flows | partial | P0 | running/paused sessions resume and restore unit/response; player-specific state is not implemented |
+| Resume after reload/interruption | hot-return E2E flows | partial | P0 | running/paused sessions resume and restore unit, Verona unit state, player page state, and response; durable offline recovery is not implemented |
 | Valid-from, valid-to, valid-for | time-limited-access E2E | missing | P1 | no access-window fields or policy |
 | Participant login sink/rate limiting | login-sink E2E | missing | P1 | admin auth is protected, participant auth is not rate limited |
 | Supported-browser warning | `SystemController::getConfig` | missing | P2 | no browser compatibility policy |
@@ -51,10 +51,10 @@ Priority:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
-| Verona player integration | `test-controller`, `unithost` | missing | P0 | normalized prompt/text-response player only |
-| Player API compatibility validation | workspace file admin and unithost | missing | P0 | no Verona API version gate |
+| Verona player integration | `test-controller`, `unithost` | partial | P0 | sandboxed `srcdoc` host imports embedded JSON and Testcenter ZIP players/definitions, exchanges ready/start/state/navigation/runtime-error messages, and visibly fails or reloads; external resources, rich logs/focus handling, and a representative player corpus remain |
+| Player API compatibility validation | workspace file admin and unithost | partial | P0 | runtime ready handshake gates Verona major versions 2–6; static import metadata/schema validation is still missing |
 | Booklet/unit navigation | `test-controller` | partial | P0 | ordered unit rail and persisted current unit; no booklet navigation policy |
-| Response and run-state save | test routes and hot-mode E2E | partial | P0 | response envelope and run state persist; no Verona response envelope or background retry queue |
+| Response and run-state save | test routes and hot-mode E2E | partial | P0 | versioned Verona unit/player-state envelope persists through coalescing autosave, visible retry, navigation, and reload; durable offline background delivery remains |
 | Timed blocks and warnings | time-restrictions E2E | missing | P0 | no timer policy |
 | Presentation/response completion locks | booklet config E2E | missing | P0 | no completion events from a real player |
 | Unlock code and leave-once rules | hot-mode and leave-block E2E | missing | P0 | no block lock model |

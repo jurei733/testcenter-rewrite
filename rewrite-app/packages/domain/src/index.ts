@@ -210,6 +210,12 @@ export type SourcePackage = {
 
 export type SourcePackageContentStructure = {
   bookletEntries: SourcePackageBookletEntry[];
+  playerEntries?: SourcePackagePlayerEntry[];
+};
+
+export type SourcePackagePlayerEntry = {
+  playerKey: string;
+  html: string;
 };
 
 export type SourcePackageBookletEntry = {
@@ -223,6 +229,9 @@ export type SourcePackageUnitEntry = {
   displayLabel: string;
   description?: string;
   content?: string;
+  playerKey?: string;
+  unitDefinition?: string;
+  unitDefinitionType?: string;
 };
 
 export type ImportJob = {
@@ -256,6 +265,12 @@ export type ContentRelease = {
 
 export type ContentReleaseRuntimeSnapshot = {
   bookletEntries: ContentReleaseBookletEntry[];
+  playerEntries?: ContentReleasePlayerEntry[];
+};
+
+export type ContentReleasePlayerEntry = {
+  playerKey: string;
+  html: string;
 };
 
 export type ContentReleaseBookletEntry = {
@@ -269,6 +284,9 @@ export type ContentReleaseUnitEntry = {
   displayLabel: string;
   description?: string;
   content?: string;
+  playerKey?: string;
+  unitDefinition?: string;
+  unitDefinitionType?: string;
 };
 
 export type ParticipantSession = {
@@ -372,6 +390,9 @@ export type ParticipantCurrentRunState = {
     displayLabel: string | null;
     description?: string | null;
     content?: string | null;
+    player?: ContentReleasePlayerEntry | null;
+    unitDefinition?: string | null;
+    unitDefinitionType?: string | null;
   };
   bookletUnits: Array<{
     unitKey: string;

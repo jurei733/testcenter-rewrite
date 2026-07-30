@@ -2858,9 +2858,25 @@ const normalizeUnitContent = (value: unknown): string | undefined => {
   return content || undefined;
 };
 
+const normalizeRuntimeDocument = (value: unknown): string | undefined => {
+  const document = typeof value === "string" ? value.trim() : "";
+  return document || undefined;
+};
+
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
+  const playerEntriesByKey = new Map<
+    string,
+    NonNullable<ContentReleaseRuntimeSnapshot["playerEntries"]>[number]
+  >();
+  for (const playerEntry of contentStructure.playerEntries ?? []) {
+    const playerKey = normalizeManifestToken(playerEntry.playerKey);
+    const html = normalizeRuntimeDocument(playerEntry.html);
+    if (playerKey && html && !playerEntriesByKey.has(playerKey)) {
+      playerEntriesByKey.set(playerKey, { playerKey, html });
+    }
+  }
   const bookletEntriesByKey = new Map<
     string,
     ContentReleaseRuntimeSnapshot["bookletEntries"][number]
@@ -2898,6 +2914,11 @@ const normalizeContentStructure = (
 
       const description = normalizeUnitContent(unitEntry.description);
       const content = normalizeUnitContent(unitEntry.content);
+      const playerKey = normalizeManifestToken(unitEntry.playerKey);
+      const unitDefinition = normalizeRuntimeDocument(unitEntry.unitDefinition);
+      const unitDefinitionType = normalizeManifestToken(
+        unitEntry.unitDefinitionType
+      );
       normalizedBooklet.unitEntries.push({
         unitKey,
         displayLabel: normalizeManifestLabel(
@@ -2906,7 +2927,10 @@ const normalizeContentStructure = (
           unitKey
         ),
         ...(description ? { description } : {}),
-        ...(content ? { content } : {})
+        ...(content ? { content } : {}),
+        ...(playerKey ? { playerKey } : {}),
+        ...(unitDefinition ? { unitDefinition } : {}),
+        ...(unitDefinitionType ? { unitDefinitionType } : {})
       });
       unitKeys.add(unitKey);
     }
@@ -2923,7 +2947,52 @@ const normalizeContentStructure = (
     return null;
   }
 
-  return { bookletEntries };
+  const playerEntries = Array.from(playerEntriesByKey.values());
+  return {
+    bookletEntries,
+    ...(playerEntries.length > 0 ? { playerEntries } : {})
+  };
+};
+
+const collectJsonPlayerEntries = (
+  parsed: unknown
+): NonNullable<SourcePackageContentStructure["playerEntries"]> => {
+  const asPlayerObject = (value: unknown): Record<string, unknown> | null =>
+    typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>)
+      : null;
+  const root = asPlayerObject(parsed);
+  if (!root) {
+    return [];
+  }
+  const rawPlayers = root.playerEntries ?? root.players ?? root.playerResources;
+  const entries = Array.isArray(rawPlayers)
+    ? rawPlayers.map((value, index) => [String(index), value] as const)
+    : Object.entries(asPlayerObject(rawPlayers) ?? {});
+
+  return entries.flatMap(([fallbackKey, rawPlayer]) => {
+    if (typeof rawPlayer === "string") {
+      return rawPlayer.trim()
+        ? [{ playerKey: fallbackKey, html: rawPlayer }]
+        : [];
+    }
+    const player = asPlayerObject(rawPlayer);
+    if (!player) {
+      return [];
+    }
+    const playerKey = String(
+      player.playerKey ??
+        player.playerId ??
+        player.identifier ??
+        player.key ??
+        player.id ??
+        fallbackKey
+    ).trim();
+    const html = normalizeRuntimeDocument(
+      player.html ?? player.srcDoc ?? player.sourceDocument ?? player.content
+    );
+    return playerKey && html ? [{ playerKey, html }] : [];
+  });
 };
 
 const normalizeParsedJsonContentStructure = (
@@ -3627,6 +3696,7 @@ const normalizeParsedJsonContentStructure = (
   }
 
   const contentStructure: SourcePackageContentStructure = {
+    playerEntries: collectJsonPlayerEntries(parsed),
     bookletEntries: rawBooklets
       .map(rawBooklet => {
         if (typeof rawBooklet !== "object" || rawBooklet === null) {
@@ -3728,6 +3798,25 @@ const normalizeParsedJsonContentStructure = (
                   unit.markdown ??
                   unit.html
               );
+              const playerKey = String(
+                unit.playerKey ??
+                  unit.playerId ??
+                  unit.player ??
+                  unit.playerRef ??
+                  unit.playerReference ??
+                  ""
+              ).trim();
+              const unitDefinition = normalizeRuntimeDocument(
+                unit.unitDefinition ??
+                  unit.definitionDocument ??
+                  unit.definitionContent
+              );
+              const unitDefinitionType = String(
+                unit.unitDefinitionType ??
+                  unit.definitionType ??
+                  unit.playerType ??
+                  playerKey
+              ).trim();
               return {
                 unitKey: String(
                   unit.unitKey ??
@@ -3763,7 +3852,10 @@ const normalizeParsedJsonContentStructure = (
                     ""
                 ).trim(),
                 ...(description ? { description } : {}),
-                ...(content ? { content } : {})
+                ...(content ? { content } : {}),
+                ...(playerKey ? { playerKey } : {}),
+                ...(unitDefinition ? { unitDefinition } : {}),
+                ...(unitDefinitionType ? { unitDefinitionType } : {})
               };
             })
             .filter(Boolean) as SourcePackageContentStructure["bookletEntries"][number]["unitEntries"]
@@ -4864,30 +4956,79 @@ const extractZipUnitContent = (sourceDocument: string): string | null => {
   return content || null;
 };
 
-const extractZipUnitDefinitionReference = (
+type ZipUnitDefinition = {
+  playerKey: string | null;
+  reference: string | null;
+  unitDefinition: string | null;
+  unitDefinitionType: string | null;
+};
+
+const extractZipUnitDefinition = (
   sourceDocument: string
-): string | null => {
-  const definitionReferenceMatch = sourceDocument.match(
-    /<((?:[a-zA-Z_][\w.-]*:)?DefinitionRef)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/i
+): ZipUnitDefinition => {
+  const definitionMatch = sourceDocument.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?(DefinitionRef|Definition))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/i
   );
-  if (!definitionReferenceMatch) {
-    return null;
+  if (!definitionMatch) {
+    return {
+      playerKey: null,
+      reference: null,
+      unitDefinition: null,
+      unitDefinitionType: null
+    };
   }
 
-  const attributes = parseXmlAttributes(definitionReferenceMatch[2] ?? "");
-  const reference = normalizeManifestToken(
-    readXmlAttribute(
-      attributes,
-      "href",
-      "path",
-      "src",
-      "uri",
-      "file",
-      "fileName",
-      "filename"
-    ) ?? decodeXmlTextContent(definitionReferenceMatch[3] ?? "")
+  const attributes = parseXmlAttributes(definitionMatch[3] ?? "");
+  const playerKey = normalizeManifestToken(
+    readXmlAttribute(attributes, "player", "playerId", "playerKey", "type")
   );
-  return reference || null;
+  const rawContent = definitionMatch[4] ?? "";
+  const reference =
+    definitionMatch[2]?.toLowerCase() === "definitionref"
+      ? normalizeManifestToken(
+          readXmlAttribute(
+            attributes,
+            "href",
+            "path",
+            "src",
+            "uri",
+            "file",
+            "fileName",
+            "filename"
+          ) ?? decodeXmlTextContent(rawContent)
+        )
+      : "";
+  const cdata = rawContent.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/i)?.[1];
+  const inlineDefinition =
+    definitionMatch[2]?.toLowerCase() === "definition"
+      ? normalizeRuntimeDocument(cdata ?? decodeXmlAttributeValue(rawContent.trim()))
+      : undefined;
+
+  return {
+    playerKey: playerKey || null,
+    reference: reference || null,
+    unitDefinition: inlineDefinition ?? null,
+    unitDefinitionType: playerKey || null
+  };
+};
+
+const findXmlManifestResource = (
+  resources: Map<string, XmlManifestResource>,
+  reference: string | null
+): XmlManifestResource | null => {
+  if (!reference) {
+    return null;
+  }
+  const direct = resources.get(reference);
+  if (direct) {
+    return direct;
+  }
+  const normalizedReference = reference.toLowerCase();
+  return (
+    [...resources.entries()].find(
+      ([identifier]) => identifier.toLowerCase() === normalizedReference
+    )?.[1] ?? null
+  );
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -4971,6 +5112,13 @@ const extractXmlManifestFromZipSourceDocument = (
 const normalizeParsedZipXmlContentStructure = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ContentReleaseRuntimeSnapshot | null => {
+  const manifestResources = collectXmlManifestResources(
+    manifestExtraction.manifestText
+  );
+  const playerEntriesByKey = new Map<
+    string,
+    NonNullable<ContentReleaseRuntimeSnapshot["playerEntries"]>[number]
+  >();
   const bookletUnitContentPathCandidatesByUnitKey = new Map<
     string,
     ZipResourcePathCandidate[]
@@ -4992,9 +5140,7 @@ const normalizeParsedZipXmlContentStructure = (
   let runtimeSnapshot = normalizeParsedXmlContentStructure(
     manifestExtraction.manifestText
   );
-  const referencedBookletEntries = [
-    ...collectXmlManifestResources(manifestExtraction.manifestText).values()
-  ].flatMap(resource => {
+  const referencedBookletEntries = [...manifestResources.values()].flatMap(resource => {
     const referencedEntry = findZipEntryByPath(
       manifestExtraction.entries,
       resolveZipResourcePathCandidates(
@@ -5051,10 +5197,6 @@ const normalizeParsedZipXmlContentStructure = (
     bookletEntries: runtimeSnapshot.bookletEntries.map(bookletEntry => ({
       ...bookletEntry,
       unitEntries: bookletEntry.unitEntries.map(unitEntry => {
-        if (unitEntry.content) {
-          return unitEntry;
-        }
-
         const manifestResourcePathCandidates = (
           contentPathCandidatesByResourceKey.get(unitEntry.unitKey) ?? []
         ).map(resourcePath => ({
@@ -5093,8 +5235,8 @@ const normalizeParsedZipXmlContentStructure = (
           return unitEntry;
         }
 
-        const definitionReference =
-          extractZipUnitDefinitionReference(sourceDocument);
+        const unitDefinition = extractZipUnitDefinition(sourceDocument);
+        const definitionReference = unitDefinition.reference;
         const definitionEntry = definitionReference
           ? findZipEntryByPath(
               manifestExtraction.entries,
@@ -5107,26 +5249,72 @@ const normalizeParsedZipXmlContentStructure = (
         const definitionDocument = definitionEntry
           ? readZipEntryText(manifestExtraction.zipBuffer, definitionEntry)
           : null;
+        const runtimeUnitDefinition = normalizeRuntimeDocument(
+          definitionDocument ?? unitDefinition.unitDefinition
+        );
         const definitionContent = definitionDocument
           ? normalizeUnitContent(decodeXmlTextContent(definitionDocument))
           : null;
         const content =
-          definitionContent ?? extractZipUnitContent(sourceDocument);
-        if (!content) {
-          return unitEntry;
-        }
+          unitEntry.content ??
+          definitionContent ??
+          extractZipUnitContent(sourceDocument);
 
         const description = unitEntry.description
           ? null
           : extractZipUnitDescription(sourceDocument);
+        const playerResource = findXmlManifestResource(
+          manifestResources,
+          unitDefinition.playerKey
+        );
+        const playerEntry = unitDefinition.playerKey
+          ? findZipEntryByPath(
+              manifestExtraction.entries,
+              [
+                ...(playerResource
+                  ? resolveZipResourcePathCandidates(
+                      manifestExtraction.manifestFileName,
+                      playerResource.key
+                    )
+                  : []),
+                ...resolveZipResourcePathCandidates(
+                  referencedEntry.fileName,
+                  unitDefinition.playerKey
+                ),
+                ...resolveZipResourcePathCandidates(
+                  referencedEntry.fileName,
+                  `${unitDefinition.playerKey}.html`
+                )
+              ]
+            )
+          : null;
+        const playerHtml = playerEntry
+          ? readZipEntryText(manifestExtraction.zipBuffer, playerEntry)
+          : null;
+        if (unitDefinition.playerKey && playerHtml) {
+          playerEntriesByKey.set(unitDefinition.playerKey, {
+            playerKey: unitDefinition.playerKey,
+            html: playerHtml
+          });
+        }
 
         return {
           ...unitEntry,
           ...(description ? { description } : {}),
-          content
+          ...(content ? { content } : {}),
+          ...(unitDefinition.playerKey
+            ? { playerKey: unitDefinition.playerKey }
+            : {}),
+          ...(runtimeUnitDefinition ? { unitDefinition: runtimeUnitDefinition } : {}),
+          ...(unitDefinition.unitDefinitionType
+            ? { unitDefinitionType: unitDefinition.unitDefinitionType }
+            : {})
         };
       })
-    }))
+    })),
+    ...(playerEntriesByKey.size > 0
+      ? { playerEntries: [...playerEntriesByKey.values()] }
+      : {})
   };
 };
 
@@ -5356,13 +5544,19 @@ const resolveRuntimeUnit = (
   displayLabel: string | null;
   description?: string | null;
   content?: string | null;
+  player?: NonNullable<ContentReleaseRuntimeSnapshot["playerEntries"]>[number] | null;
+  unitDefinition?: string | null;
+  unitDefinitionType?: string | null;
 } => {
   if (!unitKey) {
     return {
       unitKey: null,
       displayLabel: null,
       description: null,
-      content: null
+      content: null,
+      player: null,
+      unitDefinition: null,
+      unitDefinitionType: null
     };
   }
 
@@ -5378,7 +5572,13 @@ const resolveRuntimeUnit = (
     unitKey,
     displayLabel: unitEntry?.displayLabel ?? toDisplayLabel("Unit", unitKey),
     description: unitEntry?.description ?? null,
-    content: unitEntry?.content ?? null
+    content: unitEntry?.content ?? null,
+    player:
+      contentRelease.runtimeSnapshot.playerEntries?.find(
+        player => player.playerKey === unitEntry?.playerKey
+      ) ?? null,
+    unitDefinition: unitEntry?.unitDefinition ?? null,
+    unitDefinitionType: unitEntry?.unitDefinitionType ?? null
   };
 };
 

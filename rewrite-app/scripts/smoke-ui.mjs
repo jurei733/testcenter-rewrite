@@ -2500,6 +2500,164 @@ try {
   await expectButtonSelectorDisabled("#participantRouteClearSessionButton");
   stopAfter("participant-entry-completed-session-reentry");
 
+  logStep("participant-verona-player");
+  const veronaPlayerKey = "verona-smoke-player@6.0";
+  const veronaBookletKey = "booklet:verona-smoke";
+  const veronaUnitKey = "unit:verona-smoke";
+  const veronaLoginKey = "student-verona-smoke";
+  const veronaPlayerHtml = `<!doctype html>
+    <html><body>
+      <strong id="playerDefinition"></strong>
+      <label>Player answer <input id="playerAnswer" /></label>
+      <script>
+        let sessionId = "";
+        const sendState = () => parent.postMessage({
+          type: "vopStateChangedNotification",
+          sessionId,
+          unitState: {
+            dataParts: { answer: document.querySelector("#playerAnswer").value },
+            presentationProgress: "complete",
+            responseProgress: document.querySelector("#playerAnswer").value ? "complete" : "none",
+            unitStateDataType: "verona-smoke@1"
+          },
+          playerState: { currentPage: "page-1" }
+        }, "*");
+        addEventListener("message", event => {
+          if (event.data?.type !== "vopStartCommand") return;
+          sessionId = event.data.sessionId;
+          document.querySelector("#playerDefinition").textContent = event.data.unitDefinition;
+          document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
+          document.querySelector("#playerAnswer").addEventListener("input", sendState);
+        });
+        addEventListener("DOMContentLoaded", () => parent.postMessage({
+          type: "vopReadyNotification",
+          metadata: { specVersion: "6.0" }
+        }, "*"));
+      <\/script>
+    </body></html>`;
+  const veronaSourcePackageResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "verona-smoke.json",
+        mediaType: "application/json",
+        sourceDocument: JSON.stringify({
+          playerEntries: [{ playerKey: veronaPlayerKey, html: veronaPlayerHtml }],
+          bookletEntries: [
+            {
+              bookletKey: veronaBookletKey,
+              displayLabel: "Verona Smoke Booklet",
+              unitEntries: [
+                {
+                  unitKey: veronaUnitKey,
+                  displayLabel: "Verona Smoke Unit",
+                  playerKey: veronaPlayerKey,
+                  unitDefinition: "Smoke unit definition",
+                  unitDefinitionType: veronaPlayerKey
+                }
+              ]
+            }
+          ]
+        })
+      }
+    }
+  );
+  const veronaSourcePackagePayload = await veronaSourcePackageResponse.json();
+  const veronaImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: veronaSourcePackagePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const veronaImportPayload = await veronaImportResponse.json();
+  const veronaContentReleaseId =
+    veronaImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(veronaContentReleaseId, "Verona smoke import should stage a release.");
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${veronaContentReleaseId}/activate`,
+    { body: { forceActivation: true } }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          {
+            loginKey: veronaLoginKey,
+            groupKey: "group:verona-smoke",
+            bookletKey: veronaBookletKey,
+            displayName: "Verona Smoke Participant"
+          }
+        ]
+      }
+    }
+  );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: veronaLoginKey,
+      bookletKey: veronaBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await veronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor();
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor();
+  await veronaFrame.locator("#playerAnswer").fill("Saved through Verona");
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#participantVeronaSaveStatus")?.textContent?.trim() ===
+      "saved",
+    undefined,
+    { timeout: 15_000 }
+  );
+  const veronaParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(veronaParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+    payload => {
+      const response = payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const parsed = JSON.parse(response);
+        return (
+          parsed.kind === "verona_unit_state" &&
+          parsed.unitState?.dataParts?.answer === "Saved through Verona"
+        );
+      } catch {
+        return false;
+      }
+    }
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      veronaParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  const resumedVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await resumedVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await resumedVeronaFrame
+    .locator("#playerAnswer")
+    .waitFor({ state: "visible" });
+  assert.equal(
+    await resumedVeronaFrame.locator("#playerAnswer").inputValue(),
+    "Saved through Verona"
+  );
+  stopAfter("participant-verona-player");
+
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
   await page.waitForURL(/\/app\/runtime$/);

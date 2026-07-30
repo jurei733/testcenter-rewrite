@@ -1274,6 +1274,91 @@ pre {
   white-space: pre-wrap;
 }
 
+.verona-player-shell {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(31, 92, 84, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.verona-player-shell > header,
+.verona-player-shell > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.verona-player-shell > header {
+  border-bottom: 1px solid rgba(31, 92, 84, 0.12);
+}
+
+.verona-player-shell > footer {
+  min-height: 42px;
+  border-top: 1px solid rgba(31, 92, 84, 0.12);
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.verona-player-shell > header > div:first-child,
+.verona-player-status {
+  display: grid;
+  gap: 2px;
+}
+
+.verona-player-shell > header span,
+.verona-player-status small {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verona-player-status {
+  text-align: right;
+}
+
+.verona-player-status span {
+  color: var(--green-deep);
+  font-weight: 800;
+}
+
+.verona-player-frame-host {
+  position: relative;
+  min-height: min(62vh, 620px);
+  background: white;
+}
+
+.verona-player-frame {
+  display: block;
+  width: 100%;
+  min-height: min(62vh, 620px);
+  border: 0;
+  background: white;
+}
+
+.verona-player-error {
+  display: grid;
+  gap: 8px;
+  margin: 0 14px 14px;
+  padding: 14px;
+  border: 1px solid rgba(196, 82, 47, 0.28);
+  border-radius: var(--radius-lg);
+  background: rgba(196, 82, 47, 0.08);
+  color: var(--accent);
+}
+
+.verona-player-error p {
+  margin: 0;
+  color: var(--ink);
+}
+
 .progress-track {
   overflow: hidden;
   height: 10px;
