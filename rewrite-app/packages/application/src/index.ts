@@ -5680,6 +5680,38 @@ const normalizeParsedZipXmlContentStructure = (
   };
 };
 
+const validateZipXmlEntries = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+): ImportJobDiagnostic[] => {
+  const diagnostics: ImportJobDiagnostic[] = [];
+  for (const entry of manifestExtraction.entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !entry.fileName.toLowerCase().endsWith(".xml")
+    ) {
+      continue;
+    }
+
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    if (sourceDocument === null) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_zip_xml_unreadable",
+          `Source package ZIP entry '${entry.fileName}' could not be read as bounded XML.`
+        )
+      );
+      continue;
+    }
+    diagnostics.push(
+      ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
+    );
+  }
+  return diagnostics;
+};
+
 const deriveRuntimeSnapshotFromSourceDocument = (
   sourcePackage: SourcePackage
 ): {
@@ -5752,11 +5784,15 @@ const deriveRuntimeSnapshotFromSourceDocument = (
       sourcePackage.sourceDocument
     );
     if (manifestExtraction.status === "found") {
+      const diagnostics = validateZipXmlEntries(manifestExtraction);
+      if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
+        return { runtimeSnapshot: null, diagnostics };
+      }
       return {
         runtimeSnapshot: normalizeParsedZipXmlContentStructure(
           manifestExtraction
         ),
-        diagnostics: []
+        diagnostics
       };
     }
 

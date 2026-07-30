@@ -5779,6 +5779,76 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
+  const invalidNestedBookletExpectation = corpus.invalidXml.find(
+    expectation =>
+      expectation.kind === "source-package" &&
+      expectation.fixture.endsWith("Booklet_error.xml")
+  );
+  assert.ok(invalidNestedBookletExpectation);
+  for (const nestedXmlCase of [
+    {
+      fileName: "original-invalid-booklet.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: readFileSync(
+        resolve(
+          originalTestcenterCorpusRoot,
+          invalidNestedBookletExpectation.fixture
+        ),
+        "utf8"
+      ),
+      diagnosticCode: invalidNestedBookletExpectation.diagnosticCode
+    },
+    {
+      fileName: "malformed-xml-dependency.zip",
+      entryFileName: "export/items/malformed.xml",
+      entryDocument: "<item><prompt>Malformed dependency</item>",
+      diagnosticCode: "source_document_xml_malformed"
+    }
+  ]) {
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="BOOKLET.INVALID" href="booklets/Booklet_error.xml" />
+              <resource identifier="UNIT.INVALID" href="items/malformed.xml" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: nestedXmlCase.entryFileName,
+        content: nestedXmlCase.entryDocument
+      }
+    ]);
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: nestedXmlCase.fileName,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.body.importJob.status, "failed", nestedXmlCase.fileName);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === nestedXmlCase.diagnosticCode
+      ),
+      nestedXmlCase.fileName
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
   const unsupportedModeRoster = await requestJson<{
     error: string;
     details: { diagnostics: Array<{ code: string }> };
