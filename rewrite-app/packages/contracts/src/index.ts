@@ -1225,6 +1225,8 @@ export const productionApiRoutes = {
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
+    unlockTestlet:
+      "/api/v1/participant/test-runs/:testRunId/testlets/:testletKey/unlock",
     resumeSession: "/api/v1/participant/sessions/:participantSessionId/resume",
     resumeRun: "/api/v1/participant/test-runs/:testRunId/resume",
     completeRun: "/api/v1/participant/test-runs/:testRunId/complete"
@@ -1442,6 +1444,10 @@ export type SaveTestRunProgressRequest = {
   currentUnitKey?: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
+};
+
+export type UnlockParticipantTestletRequest = {
+  code: string;
 };
 
 export type CreateTenantResponse = {
@@ -1686,6 +1692,10 @@ export type ParticipantCurrentRunStateResponse = {
 };
 
 export type SaveTestRunProgressResponse = {
+  testRun: TestRun;
+};
+
+export type UnlockParticipantTestletResponse = {
   testRun: TestRun;
 };
 

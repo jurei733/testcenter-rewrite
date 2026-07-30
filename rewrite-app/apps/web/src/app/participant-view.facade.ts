@@ -10,7 +10,9 @@ import type {
   ResumeParticipantSessionResponse,
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
-  SaveTestRunProgressResponse
+  SaveTestRunProgressResponse,
+  UnlockParticipantTestletRequest,
+  UnlockParticipantTestletResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
   productionApiRoutes,
@@ -72,6 +74,11 @@ type ParticipantPlayerState = {
   draftStateDetail: string;
   hasUnsavedResponse: boolean;
   navigationNotice: string;
+  nextTestletGate: {
+    testletKey: string;
+    displayLabel: string;
+    prompt: string;
+  } | null;
 };
 
 type ParticipantPlayerUnitItem = {
@@ -146,6 +153,7 @@ export class ParticipantViewFacade {
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
   veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
     "not_saved";
+  testletUnlockCode = "";
   private copiedSessionEntryLink = "";
   private pendingVeronaSave: {
     testRunId: string;
@@ -363,7 +371,8 @@ export class ParticipantViewFacade {
         draftStateLabel: "No response loaded",
         draftStateDetail: "Start or resume a test before writing an answer.",
         hasUnsavedResponse: false,
-        navigationNotice: ""
+        navigationNotice: "",
+        nextTestletGate: null
       };
     }
 
@@ -519,7 +528,8 @@ export class ParticipantViewFacade {
       draftStateLabel,
       draftStateDetail,
       hasUnsavedResponse,
-      navigationNotice: this.describeNavigationDenial(currentState)
+      navigationNotice: this.describeNavigationDenial(currentState),
+      nextTestletGate: currentState.navigation.nextTestletGate
     };
   }
 
@@ -574,6 +584,9 @@ export class ParticipantViewFacade {
     }
     if (reasons.includes("response_incomplete")) {
       return "Complete the required response before moving forward or completing the test.";
+    }
+    if (reasons.includes("testlet_code_required")) {
+      return "Enter the block code before opening the next block.";
     }
     return "";
   }
@@ -711,6 +724,14 @@ export class ParticipantViewFacade {
     }
 
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal(unitKey));
+  }
+
+  unlockNextTestlet(): void {
+    const gate = this.player.nextTestletGate;
+    if (!gate || !this.testletUnlockCode.trim()) {
+      return;
+    }
+    this.viewState.onActionAsync(() => this.unlockNextTestletInternal(gate));
   }
 
   resumeRun(): void {
@@ -1032,6 +1053,27 @@ export class ParticipantViewFacade {
       );
     }
     await this.saveProgressInternal("running", targetUnitKey);
+  }
+
+  private async unlockNextTestletInternal(gate: {
+    testletKey: string;
+  }): Promise<void> {
+    await this.settleVeronaAutoSaveBeforeForegroundAction();
+    const payload = await this.requestState.request<UnlockParticipantTestletResponse>(
+      "Participant Unlock Block",
+      "POST",
+      resolveRoutePath(productionApiRoutes.participant.unlockTestlet, {
+        testRunId: this.runtime.testRunId.trim(),
+        testletKey: gate.testletKey
+      }),
+      {
+        code: this.testletUnlockCode
+      } satisfies UnlockParticipantTestletRequest
+    );
+    this.testletUnlockCode = "";
+    this.syncRun(payload.testRun);
+    this.persistState();
+    await this.refreshCurrentStateInternal(true);
   }
 
   private async resumeRunInternal(): Promise<void> {

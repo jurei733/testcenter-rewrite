@@ -292,6 +292,37 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <strong id="participantRouteCompletionReadinessLabel">{{ view.player.completionReadinessLabel }}</strong>
             <p id="participantRouteCompletionReadinessDetail">{{ view.player.completionReadinessDetail }}</p>
           </section>
+          <section
+            *ngIf="view.player.nextTestletGate as gate"
+            class="participant-testlet-gate"
+            aria-labelledby="participantRouteTestletGateLabel"
+          >
+            <div>
+              <span>Protected Block</span>
+              <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
+              <p id="participantRouteTestletGatePrompt">{{ gate.prompt }}</p>
+            </div>
+            <label>
+              Block Code
+              <input
+                id="participantRouteTestletUnlockCode"
+                name="participantRouteTestletUnlockCode"
+                type="password"
+                autocomplete="off"
+                [(ngModel)]="view.testletUnlockCode"
+                (keyup.enter)="view.unlockNextTestlet()"
+              />
+            </label>
+            <button
+              id="participantRouteTestletUnlockButton"
+              class="primary"
+              type="button"
+              [disabled]="!view.testletUnlockCode.trim()"
+              (click)="view.unlockNextTestlet()"
+            >
+              Open Block
+            </button>
+          </section>
           <p
             *ngIf="view.player.navigationNotice"
             id="participantRouteNavigationNotice"

@@ -74,6 +74,7 @@ export type WorkspaceActivityEventType =
   | "participant_signed_in"
   | "participant_session_resumed"
   | "participant_roster_imported"
+  | "testlet_unlocked"
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
@@ -93,6 +94,7 @@ export const workspaceActivityEventTypes = [
   "participant_signed_in",
   "participant_session_resumed",
   "participant_roster_imported",
+  "testlet_unlocked",
   "test_run_progress_saved",
   "test_run_resumed",
   "test_run_completed",
@@ -222,12 +224,40 @@ export type SourcePackageBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   config?: Record<string, string>;
+  testletEntries?: SourcePackageTestletEntry[];
   unitEntries: SourcePackageUnitEntry[];
+};
+
+export type TestletTimeMaxLeavePolicy = "forbidden" | "confirm" | "allowed";
+
+export type SourcePackageTestletEntry = {
+  testletKey: string;
+  displayLabel: string;
+  parentTestletKey?: string | null;
+  restrictions?: {
+    codeToEnter?: {
+      code: string;
+      prompt: string;
+    };
+    timeMax?: {
+      minutes: number;
+      leave: TestletTimeMaxLeavePolicy;
+    };
+    denyNavigationOnIncomplete?: {
+      presentation: BookletLeaveRestriction;
+      response: BookletLeaveRestriction;
+    };
+    lockAfterLeaving?: {
+      confirm: boolean;
+      scope: "unit" | "testlet";
+    };
+  };
 };
 
 export type SourcePackageUnitEntry = {
   unitKey: string;
   displayLabel: string;
+  testletPath?: string[];
   description?: string;
   content?: string;
   playerKey?: string;
@@ -285,15 +315,19 @@ export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   policy?: BookletRuntimePolicy;
+  testletEntries?: ContentReleaseTestletEntry[];
   unitEntries: ContentReleaseUnitEntry[];
 };
+
+export type ContentReleaseTestletEntry = SourcePackageTestletEntry;
 
 export type BookletLeaveRestriction = "off" | "forward" | "always";
 export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
 export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
 export type BookletNavigationDeniedReason =
   | "presentation_incomplete"
-  | "response_incomplete";
+  | "response_incomplete"
+  | "testlet_code_required";
 
 export type BookletRuntimePolicy = {
   version: 1;
@@ -328,6 +362,7 @@ export type BookletRuntimePolicy = {
 export type ContentReleaseUnitEntry = {
   unitKey: string;
   displayLabel: string;
+  testletPath?: string[];
   description?: string;
   content?: string;
   playerKey?: string;
@@ -356,6 +391,7 @@ export type TestRun = {
   status: TestRunStatus;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
+  unlockedTestletKeys?: string[];
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -431,6 +467,17 @@ export type ParticipantCurrentRunState = {
     bookletKey: string;
     displayLabel: string;
     policy: BookletRuntimePolicy;
+    testlets: Array<{
+      testletKey: string;
+      displayLabel: string;
+      parentTestletKey: string | null;
+      requiresCode: boolean;
+      codePrompt: string | null;
+      timeMax: {
+        minutes: number;
+        leave: TestletTimeMaxLeavePolicy;
+      } | null;
+    }>;
   };
   currentUnit: {
     unitKey: string | null;
@@ -440,6 +487,7 @@ export type ParticipantCurrentRunState = {
     player?: ContentReleasePlayerEntry | null;
     unitDefinition?: string | null;
     unitDefinitionType?: string | null;
+    testletPath: string[];
   };
   resourceBasePath?: string;
   bookletUnits: Array<{
@@ -447,6 +495,7 @@ export type ParticipantCurrentRunState = {
     displayLabel: string;
     description?: string;
     content?: string;
+    testletPath: string[];
   }>;
   booklets: ParticipantRuntimeBooklet[];
   navigation: {
@@ -458,6 +507,11 @@ export type ParticipantCurrentRunState = {
     canPlayerEnd: boolean;
     backwardDeniedReasons: BookletNavigationDeniedReason[];
     forwardDeniedReasons: BookletNavigationDeniedReason[];
+    nextTestletGate: {
+      testletKey: string;
+      displayLabel: string;
+      prompt: string;
+    } | null;
   };
   availableActions: Array<"save_progress" | "resume" | "complete">;
 };

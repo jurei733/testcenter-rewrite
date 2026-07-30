@@ -5428,10 +5428,16 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
+            testletEntries?: Array<{
+              testletKey: string;
+              displayLabel: string;
+              parentTestletKey: string | null;
+            }>;
             unitEntries: Array<{
               unitKey: string;
               displayLabel: string;
               content?: string;
+              testletPath?: string[];
             }>;
           }>;
         };
@@ -6075,6 +6081,18 @@ test("source document import preserves testcenter unit aliases", async () => {
         {
           bookletKey: "BOOKLET.SAMPLE-1",
           displayLabel: "Sample booklet",
+          testletEntries: [
+            {
+              testletKey: "a_testlet_with_restrictions",
+              displayLabel: "First Block",
+              parentTestletKey: null
+            },
+            {
+              testletKey: "another_testlet",
+              displayLabel: "Second Block",
+              parentTestletKey: null
+            }
+          ],
           unitEntries: [
             {
               unitKey: "UNIT.SAMPLE",
@@ -6082,11 +6100,13 @@ test("source document import preserves testcenter unit aliases", async () => {
             },
             {
               unitKey: "UNIT.SAMPLE-2",
-              displayLabel: "A very Simple Sample Unit"
+              displayLabel: "A very Simple Sample Unit",
+              testletPath: ["a_testlet_with_restrictions"]
             },
             {
               unitKey: "an_alias",
-              displayLabel: "Sample Unit again, with Alias"
+              displayLabel: "Sample Unit again, with Alias",
+              testletPath: ["another_testlet"]
             },
             {
               unitKey: "UNIT.INLINE",
@@ -7210,6 +7230,260 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
   assert.equal(unsafeResourcePath.status, 400);
   assert.equal(unsafeResourcePath.body.error, "participant_resource_path_invalid");
+});
+
+test("original Testcenter code-gated testlets require a durable run unlock", async () => {
+  const tenantKey = "integration-tenant-testlet-code";
+  const workspaceKey = "integration-workspace-testlet-code";
+  const bookletKey = "BOOKLET.CODE-GATE";
+  const entryTestletKey = "entry-block";
+  const testletKey = "protected-block";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-code-gate.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Code Gate Booklet</Label></Metadata>
+          <Units>
+            <Testlet id="${entryTestletKey}" label="Entry Block">
+              <Restrictions>
+                <CodeToEnter code="Wolf">Enter the initial block code.</CodeToEnter>
+              </Restrictions>
+              <Unit id="UNIT.INTRO" label="Introduction" />
+            </Testlet>
+            <Testlet id="${testletKey}" label="Protected Block">
+              <Restrictions>
+                <CodeToEnter code="Hase">Enter the supervisor-provided block code.</CodeToEnter>
+                <TimeMax minutes="1.5" leave="confirm" />
+              </Restrictions>
+              <Unit id="UNIT.PROTECTED" label="Protected Unit" />
+            </Testlet>
+            <Unit id="UNIT.FINISH" label="Finish" />
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            testletEntries?: Array<Record<string, unknown>>;
+            unitEntries: Array<{ unitKey: string; testletPath?: string[] }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const importedBooklet =
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0];
+  assert.deepEqual(importedBooklet?.testletEntries, [
+    {
+      testletKey: entryTestletKey,
+      displayLabel: "Entry Block",
+      parentTestletKey: null,
+      restrictions: {
+        codeToEnter: {
+          code: "Wolf",
+          prompt: "Enter the initial block code."
+        }
+      }
+    },
+    {
+      testletKey,
+      displayLabel: "Protected Block",
+      parentTestletKey: null,
+      restrictions: {
+        codeToEnter: {
+          code: "Hase",
+          prompt: "Enter the supervisor-provided block code."
+        },
+        timeMax: { minutes: 1.5, leave: "confirm" }
+      }
+    }
+  ]);
+  assert.deepEqual(
+    importedBooklet?.unitEntries.map(unit => [unit.unitKey, unit.testletPath ?? []]),
+    [
+      ["UNIT.INTRO", [entryTestletKey]],
+      ["UNIT.PROTECTED", [testletKey]],
+      ["UNIT.FINISH", []]
+    ]
+  );
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "code-gate-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  const testRunId = resume.body.testRun.testRunId;
+  assert.equal(resume.body.testRun.currentUnitKey, null);
+
+  const initialState = await requestJson<{
+    currentRunState: {
+      booklet: { testlets: Array<Record<string, unknown>> };
+      navigation: {
+        canGoNext: boolean;
+        forwardDeniedReasons: string[];
+        nextTestletGate: Record<string, unknown> | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(initialState.body.currentRunState.navigation.canGoNext, false);
+  assert.deepEqual(initialState.body.currentRunState.navigation.nextTestletGate, {
+    testletKey: entryTestletKey,
+    displayLabel: "Entry Block",
+    prompt: "Enter the initial block code."
+  });
+  assert.equal(
+    JSON.stringify(initialState.body.currentRunState.booklet.testlets).includes(
+      "Wolf"
+    ),
+    false
+  );
+
+  const blockedInitialJump = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+  });
+  assert.equal(blockedInitialJump.status, 409);
+  assert.equal(blockedInitialJump.body.error, "booklet_navigation_denied");
+  assert.deepEqual(blockedInitialJump.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+
+  const entryUnlock = await requestJson<{
+    testRun: { currentUnitKey: string | null; unlockedTestletKeys?: string[] };
+  }>(
+    `/api/v1/participant/test-runs/${testRunId}/testlets/${entryTestletKey}/unlock`,
+    { method: "POST", body: { code: "Wolf" } }
+  );
+  assert.equal(entryUnlock.status, 200);
+  assert.equal(entryUnlock.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.deepEqual(entryUnlock.body.testRun.unlockedTestletKeys, [entryTestletKey]);
+
+  const stateBeforeUnlock = await requestJson<{
+    currentRunState: {
+      booklet: { testlets: Array<Record<string, unknown>> };
+      navigation: {
+        canGoNext: boolean;
+        forwardDeniedReasons: string[];
+        nextTestletGate: Record<string, unknown> | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(stateBeforeUnlock.body.currentRunState.navigation.canGoNext, false);
+  assert.deepEqual(
+    stateBeforeUnlock.body.currentRunState.navigation.forwardDeniedReasons,
+    ["testlet_code_required"]
+  );
+  assert.deepEqual(stateBeforeUnlock.body.currentRunState.navigation.nextTestletGate, {
+    testletKey,
+    displayLabel: "Protected Block",
+    prompt: "Enter the supervisor-provided block code."
+  });
+  assert.equal(
+    JSON.stringify(stateBeforeUnlock.body.currentRunState.booklet.testlets).includes(
+      "Hase"
+    ),
+    false
+  );
+
+  const blockedNavigation = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+  });
+  assert.equal(blockedNavigation.status, 409);
+  assert.equal(blockedNavigation.body.error, "booklet_navigation_denied");
+  assert.deepEqual(blockedNavigation.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+
+  const wrongCode = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${testRunId}/testlets/${testletKey}/unlock`,
+    { method: "POST", body: { code: "wrong" } }
+  );
+  assert.equal(wrongCode.status, 403);
+  assert.equal(wrongCode.body.error, "testlet_unlock_code_invalid");
+
+  const unlocked = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unlockedTestletKeys?: string[];
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/testlets/${testletKey}/unlock`, {
+    method: "POST",
+    body: { code: "Hase" }
+  });
+  assert.equal(unlocked.status, 200);
+  assert.equal(unlocked.body.testRun.currentUnitKey, "UNIT.PROTECTED");
+  assert.deepEqual(unlocked.body.testRun.unlockedTestletKeys, [
+    entryTestletKey,
+    testletKey
+  ]);
+
+  const stateAfterUnlock = await requestJson<{
+    currentRunState: {
+      currentUnit: { unitKey: string | null; testletPath: string[] };
+      testRun: { unlockedTestletKeys?: string[] };
+      navigation: { nextTestletGate: unknown };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    stateAfterUnlock.body.currentRunState.currentUnit.unitKey,
+    "UNIT.PROTECTED"
+  );
+  assert.deepEqual(
+    stateAfterUnlock.body.currentRunState.currentUnit.testletPath,
+    [testletKey]
+  );
+  assert.deepEqual(stateAfterUnlock.body.currentRunState.testRun.unlockedTestletKeys, [
+    entryTestletKey,
+    testletKey
+  ]);
+  assert.equal(stateAfterUnlock.body.currentRunState.navigation.nextTestletGate, null);
 });
 
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {

@@ -31,6 +31,7 @@ import type {
   ContentReleaseActivationReadiness,
   BookletRuntimePolicy,
   ContentRelease,
+  ContentReleaseBookletEntry,
   ContentReleaseStatus,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -49,6 +50,7 @@ import type {
   SourcePackage,
   SourcePackageStatus,
   SourcePackageContentStructure,
+  SourcePackageTestletEntry,
   Tenant,
   TestRun,
   TestRunStatus,
@@ -433,6 +435,11 @@ export type ParticipantRuntimePort = {
     currentUnitKey?: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
+  }): Promise<TestRun>;
+  unlockTestlet(input: {
+    testRunId: string;
+    testletKey: string;
+    code: string;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
   completeRun(input: { testRunId: string }): Promise<TestRun>;
@@ -1747,7 +1754,10 @@ const getLatestParticipantSessionRun = async (
 
 const normalizeTestRun = (testRun: TestRun): TestRun => ({
   ...testRun,
-  unitResponses: testRun.unitResponses ?? {}
+  unitResponses: testRun.unitResponses ?? {},
+  unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
+    ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
+    : []
 });
 
 const escapeCsvCell = (value: string | null | undefined): string => {
@@ -2920,6 +2930,77 @@ const normalizeContentStructure = (
     if (bookletEntry.config && Object.keys(bookletEntry.config).length > 0) {
       normalizedBooklet.policy = compileBookletRuntimePolicy(bookletEntry.config);
     }
+    const testletEntriesByKey = new Map(
+      (normalizedBooklet.testletEntries ?? []).map(testletEntry => [
+        testletEntry.testletKey,
+        testletEntry
+      ])
+    );
+    for (const testletEntry of bookletEntry.testletEntries ?? []) {
+      const testletKey = normalizeManifestToken(testletEntry.testletKey);
+      if (!testletKey || testletEntriesByKey.has(testletKey)) {
+        continue;
+      }
+      const displayLabel = normalizeManifestLabel(
+        testletEntry.displayLabel,
+        "Block",
+        testletKey
+      );
+      const parentTestletKey = normalizeManifestToken(
+        testletEntry.parentTestletKey
+      );
+      const code = normalizeManifestToken(
+        testletEntry.restrictions?.codeToEnter?.code
+      );
+      const prompt = normalizeUnitContent(
+        testletEntry.restrictions?.codeToEnter?.prompt
+      );
+      const timeMaxMinutes = Number(
+        testletEntry.restrictions?.timeMax?.minutes
+      );
+      const timeMaxLeave = testletEntry.restrictions?.timeMax?.leave;
+      const restrictions: NonNullable<
+        SourcePackageTestletEntry["restrictions"]
+      > = {
+        ...(code
+          ? {
+              codeToEnter: {
+                code,
+                prompt: prompt || "Enter the block code."
+              }
+            }
+          : {}),
+        ...(Number.isFinite(timeMaxMinutes) && timeMaxMinutes > 0
+          ? {
+              timeMax: {
+                minutes: timeMaxMinutes,
+                leave:
+                  timeMaxLeave === "forbidden" || timeMaxLeave === "allowed"
+                    ? timeMaxLeave
+                    : "confirm"
+              }
+            }
+          : {}),
+        ...(testletEntry.restrictions?.denyNavigationOnIncomplete
+          ? {
+              denyNavigationOnIncomplete:
+                testletEntry.restrictions.denyNavigationOnIncomplete
+            }
+          : {}),
+        ...(testletEntry.restrictions?.lockAfterLeaving
+          ? { lockAfterLeaving: testletEntry.restrictions.lockAfterLeaving }
+          : {})
+      };
+      testletEntriesByKey.set(testletKey, {
+        testletKey,
+        displayLabel,
+        parentTestletKey: parentTestletKey || null,
+        ...(Object.keys(restrictions).length > 0 ? { restrictions } : {})
+      });
+    }
+    if (testletEntriesByKey.size > 0) {
+      normalizedBooklet.testletEntries = Array.from(testletEntriesByKey.values());
+    }
     const unitKeys =
       unitKeysByBookletKey.get(bookletKey) ?? new Set<string>();
 
@@ -2946,6 +3027,13 @@ const normalizeContentStructure = (
           "Unit",
           unitKey
         ),
+        ...(Array.isArray(unitEntry.testletPath) && unitEntry.testletPath.length > 0
+          ? {
+              testletPath: unitEntry.testletPath
+                .map(normalizeManifestToken)
+                .filter(Boolean)
+            }
+          : {}),
         ...(description ? { description } : {}),
         ...(content ? { content } : {}),
         ...(playerKey ? { playerKey } : {}),
@@ -4830,11 +4918,179 @@ const readXmlUnitEntryIdentity = (
       ""
   ).trim();
 
+type XmlBookletHierarchy = {
+  testletEntries: SourcePackageTestletEntry[];
+  unitTestletPaths: Map<string, string[]>;
+};
+
+const collectXmlBookletHierarchies = (
+  sourceDocument: string
+): Map<string, XmlBookletHierarchy> => {
+  const hierarchies = new Map<string, XmlBookletHierarchy>();
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError() {
+        // Package payloads can contain non-XML resource files. They are ignored here
+        // and validated by their own import path instead of leaking parser diagnostics.
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return hierarchies;
+  }
+  const root = document?.documentElement;
+  if (!root) {
+    return hierarchies;
+  }
+  const bookletElements = [
+    ...(xmlElementLocalName(root).toLowerCase() === "booklet" ? [root] : []),
+    ...xmlDescendantsNamed(root, "Booklet")
+  ];
+
+  for (const booklet of bookletElements) {
+    const metadata = xmlChildrenNamed(booklet, "Metadata")[0];
+    const bookletKey =
+      booklet.getAttribute("id")?.trim() ||
+      (metadata ? xmlElementText(xmlChildrenNamed(metadata, "Id")[0]) : "");
+    const units = xmlChildrenNamed(booklet, "Units")[0];
+    if (!bookletKey || !units) {
+      continue;
+    }
+    const testletEntries: SourcePackageTestletEntry[] = [];
+    const unitTestletPaths = new Map<string, string[]>();
+
+    const visitContainer = (
+      container: XmlElement,
+      testletPath: string[]
+    ): void => {
+      for (let index = 0; index < container.childNodes.length; index += 1) {
+        const node = container.childNodes.item(index);
+        if (!node || node.nodeType !== 1) {
+          continue;
+        }
+        const element = node as XmlElement;
+        const elementName = xmlElementLocalName(element).toLowerCase();
+        if (elementName === "unit") {
+          const unitKey =
+            element.getAttribute("alias")?.trim() ||
+            element.getAttribute("id")?.trim() ||
+            "";
+          if (unitKey && testletPath.length > 0) {
+            unitTestletPaths.set(unitKey, [...testletPath]);
+          }
+          continue;
+        }
+        if (elementName !== "testlet") {
+          continue;
+        }
+
+        const testletKey = element.getAttribute("id")?.trim() || "";
+        if (!testletKey) {
+          continue;
+        }
+        const restrictionsElement = xmlChildrenNamed(element, "Restrictions")[0];
+        const codeElement = restrictionsElement
+          ? xmlChildrenNamed(restrictionsElement, "CodeToEnter")[0]
+          : undefined;
+        const timeMaxElement = restrictionsElement
+          ? xmlChildrenNamed(restrictionsElement, "TimeMax")[0]
+          : undefined;
+        const denyNavigationElement = restrictionsElement
+          ? xmlChildrenNamed(restrictionsElement, "DenyNavigationOnIncomplete")[0]
+          : undefined;
+        const lockAfterLeavingElement = restrictionsElement
+          ? xmlChildrenNamed(restrictionsElement, "LockAfterLeaving")[0]
+          : undefined;
+        const code = codeElement?.getAttribute("code")?.trim() || "";
+        const timeMaxMinutes = Number(
+          timeMaxElement?.getAttribute("minutes")?.trim() ?? ""
+        );
+        const timeMaxLeave = timeMaxElement?.getAttribute("leave")?.trim();
+        const normalizeLeaveRestriction = (
+          value: string | null
+        ): "off" | "forward" | "always" => {
+          switch (value?.trim().toUpperCase()) {
+            case "ALWAYS":
+              return "always";
+            case "ON":
+              return "forward";
+            default:
+              return "off";
+          }
+        };
+        const lockScope = lockAfterLeavingElement?.getAttribute("scope")?.trim();
+        const restrictions: NonNullable<
+          SourcePackageTestletEntry["restrictions"]
+        > = {
+          ...(code
+            ? {
+                codeToEnter: {
+                  code,
+                  prompt:
+                    xmlElementText(codeElement) || "Enter the block code."
+                }
+              }
+            : {}),
+          ...(Number.isFinite(timeMaxMinutes) && timeMaxMinutes > 0
+            ? {
+                timeMax: {
+                  minutes: timeMaxMinutes,
+                  leave:
+                    timeMaxLeave === "forbidden" || timeMaxLeave === "allowed"
+                      ? timeMaxLeave
+                      : "confirm"
+                }
+              }
+            : {}),
+          ...(denyNavigationElement
+            ? {
+                denyNavigationOnIncomplete: {
+                  presentation: normalizeLeaveRestriction(
+                    denyNavigationElement.getAttribute("presentation")
+                  ),
+                  response: normalizeLeaveRestriction(
+                    denyNavigationElement.getAttribute("response")
+                  )
+                }
+              }
+            : {}),
+          ...(lockAfterLeavingElement
+            ? {
+                lockAfterLeaving: {
+                  confirm:
+                    lockAfterLeavingElement.getAttribute("confirm")?.trim() ===
+                    "true",
+                  scope: lockScope === "unit" ? "unit" : "testlet"
+                }
+              }
+            : {})
+        };
+        testletEntries.push({
+          testletKey,
+          displayLabel:
+            element.getAttribute("label")?.trim() ||
+            toDisplayLabel("Block", testletKey) ||
+            testletKey,
+          parentTestletKey: testletPath.at(-1) ?? null,
+          ...(Object.keys(restrictions).length > 0 ? { restrictions } : {})
+        });
+        visitContainer(element, [...testletPath, testletKey]);
+      }
+    };
+
+    visitContainer(units, []);
+    hierarchies.set(bookletKey, { testletEntries, unitTestletPaths });
+  }
+
+  return hierarchies;
+};
+
 const collectXmlBookletEntries = (
   sourceDocument: string,
   bookletTagNames: string
 ): SourcePackageContentStructure["bookletEntries"] => {
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
+  const hierarchies = collectXmlBookletHierarchies(sourceDocument);
 
   const readBookletConfig = (bookletContent: string): Record<string, string> => {
     const configContent = bookletContent.match(
@@ -4941,8 +5197,7 @@ const collectXmlBookletEntries = (
       });
     }
 
-    bookletEntries.push({
-      bookletKey: String(
+    const bookletKey = String(
         readXmlAttribute(
           bookletAttributes,
           "bookletKey",
@@ -4976,7 +5231,10 @@ const collectXmlBookletEntries = (
             "code"
           ) ??
           ""
-      ).trim(),
+      ).trim();
+    const hierarchy = hierarchies.get(bookletKey);
+    bookletEntries.push({
+      bookletKey,
       displayLabel: String(
         readXmlAttribute(
           bookletAttributes,
@@ -4996,7 +5254,15 @@ const collectXmlBookletEntries = (
           ""
       ).trim(),
       config: readBookletConfig(bookletMatch[3] ?? ""),
-      unitEntries
+      ...(hierarchy?.testletEntries.length
+        ? { testletEntries: hierarchy.testletEntries }
+        : {}),
+      unitEntries: unitEntries.map(unitEntry => {
+        const testletPath = hierarchy?.unitTestletPaths.get(unitEntry.unitKey);
+        return testletPath?.length
+          ? { ...unitEntry, testletPath }
+          : unitEntry;
+      })
     });
   }
 
@@ -6052,7 +6318,7 @@ const buildRuntimeSnapshot = (
 const resolveRuntimeBooklet = (
   contentRelease: ContentRelease,
   bookletKey: string
-): { bookletKey: string; displayLabel: string; policy: BookletRuntimePolicy } => {
+): ParticipantCurrentRunState["booklet"] => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
       candidate => candidate.bookletKey === bookletKey
@@ -6064,15 +6330,59 @@ const resolveRuntimeBooklet = (
     return {
       bookletKey,
       displayLabel: toDisplayLabel("Booklet", bookletKey) ?? bookletKey,
-      policy: compileBookletRuntimePolicy({})
+      policy: compileBookletRuntimePolicy({}),
+      testlets: []
     };
   }
 
   return {
     bookletKey: bookletEntry.bookletKey,
     displayLabel: bookletEntry.displayLabel,
-    policy: bookletEntry.policy ?? compileBookletRuntimePolicy({})
+    policy: bookletEntry.policy ?? compileBookletRuntimePolicy({}),
+    testlets: (bookletEntry.testletEntries ?? []).map(testletEntry => ({
+      testletKey: testletEntry.testletKey,
+      displayLabel: testletEntry.displayLabel,
+      parentTestletKey: testletEntry.parentTestletKey ?? null,
+      requiresCode: Boolean(testletEntry.restrictions?.codeToEnter?.code),
+      codePrompt: testletEntry.restrictions?.codeToEnter?.prompt ?? null,
+      timeMax: testletEntry.restrictions?.timeMax ?? null
+    }))
   };
+};
+
+const findTestletCodeGate = (input: {
+  booklet: ContentReleaseBookletEntry | undefined;
+  testRun: TestRun;
+  firstUnitIndex: number;
+  lastUnitIndex: number;
+}): NonNullable<ParticipantCurrentRunState["navigation"]["nextTestletGate"]> | null => {
+  if (!input.booklet || input.lastUnitIndex < input.firstUnitIndex) {
+    return null;
+  }
+  const unlocked = new Set(input.testRun.unlockedTestletKeys ?? []);
+  for (
+    let unitIndex = Math.max(0, input.firstUnitIndex);
+    unitIndex <= Math.min(input.lastUnitIndex, input.booklet.unitEntries.length - 1);
+    unitIndex += 1
+  ) {
+    const unit = input.booklet.unitEntries[unitIndex];
+    for (const testletKey of unit?.testletPath ?? []) {
+      const testlet = input.booklet.testletEntries?.find(
+        candidate => candidate.testletKey === testletKey
+      );
+      if (
+        testlet?.restrictions?.codeToEnter?.code &&
+        !unlocked.has(testlet.testletKey)
+      ) {
+        return {
+          testletKey: testlet.testletKey,
+          displayLabel: testlet.displayLabel,
+          prompt: testlet.restrictions.codeToEnter.prompt
+        };
+      }
+    }
+  }
+  return null;
 };
 
 const resolveBookletNavigationState = (
@@ -6091,14 +6401,20 @@ const resolveBookletNavigationState = (
     ? testRun.unitResponses[testRun.currentUnitKey] ?? ""
     : "";
   const veronaResponse = parseVeronaUnitResponse(currentResponse);
-  const presentationProgress = veronaResponse
-    ? veronaResponse.unitState.presentationProgress
-    : "complete";
-  const responseProgress = veronaResponse
-    ? veronaResponse.unitState.responseProgress
-    : currentResponse.trim()
+  const presentationProgress =
+    currentIndex < 0
       ? "complete"
-      : "none";
+      : veronaResponse
+        ? veronaResponse.unitState.presentationProgress
+        : "complete";
+  const responseProgress =
+    currentIndex < 0
+      ? "complete"
+      : veronaResponse
+        ? veronaResponse.unitState.responseProgress
+        : currentResponse.trim()
+          ? "complete"
+          : "none";
   const backwardDeniedReasons = bookletNavigationDeniedReasons({
     policy,
     direction: "backward",
@@ -6114,12 +6430,32 @@ const resolveBookletNavigationState = (
   const previousUnitKey =
     currentIndex > 0 ? units[currentIndex - 1]?.unitKey ?? null : null;
   const nextUnitKey =
-    currentIndex >= 0 && currentIndex < units.length - 1
+    currentIndex < 0
+      ? units[0]?.unitKey ?? null
+      : currentIndex < units.length - 1
       ? units[currentIndex + 1]?.unitKey ?? null
       : null;
+  const nextTestletGate = findTestletCodeGate({
+    booklet,
+    testRun,
+    firstUnitIndex: currentIndex + 1,
+    lastUnitIndex: currentIndex + 1
+  });
+  if (nextTestletGate) {
+    forwardDeniedReasons.push("testlet_code_required");
+  }
+  const remainingTestletGate = findTestletCodeGate({
+    booklet,
+    testRun,
+    firstUnitIndex: currentIndex + 1,
+    lastUnitIndex: units.length - 1
+  });
   const isLastUnit = currentIndex >= 0 && currentIndex === units.length - 1;
   const canComplete =
-    testRun.status !== "completed" && forwardDeniedReasons.length === 0;
+    currentIndex >= 0 &&
+    testRun.status !== "completed" &&
+    forwardDeniedReasons.length === 0 &&
+    remainingTestletGate == null;
   const canPlayerEnd =
     canComplete &&
     (policy.navigation.playerEnd === "always" ||
@@ -6139,7 +6475,8 @@ const resolveBookletNavigationState = (
     canComplete,
     canPlayerEnd,
     backwardDeniedReasons,
-    forwardDeniedReasons
+    forwardDeniedReasons,
+    nextTestletGate
   };
 };
 
@@ -6149,16 +6486,18 @@ const requireBookletNavigationAllowed = (input: {
   targetUnitKey: string | null;
 }): void => {
   const currentUnitKey = input.testRun.currentUnitKey;
-  if (!currentUnitKey || !input.targetUnitKey || currentUnitKey === input.targetUnitKey) {
+  if (!input.targetUnitKey || currentUnitKey === input.targetUnitKey) {
     return;
   }
   const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
     candidate => candidate.bookletKey === input.testRun.bookletKey
   );
   const units = booklet?.unitEntries ?? [];
-  const currentIndex = units.findIndex(unit => unit.unitKey === currentUnitKey);
+  const currentIndex = currentUnitKey
+    ? units.findIndex(unit => unit.unitKey === currentUnitKey)
+    : -1;
   const targetIndex = units.findIndex(unit => unit.unitKey === input.targetUnitKey);
-  if (currentIndex < 0 || targetIndex < 0) {
+  if ((currentUnitKey && currentIndex < 0) || targetIndex < 0) {
     return;
   }
   const navigation = resolveBookletNavigationState(
@@ -6170,12 +6509,33 @@ const requireBookletNavigationAllowed = (input: {
     direction === "forward"
       ? navigation.forwardDeniedReasons
       : navigation.backwardDeniedReasons;
+  const directTestletGate =
+    direction === "forward"
+      ? findTestletCodeGate({
+          booklet,
+          testRun: input.testRun,
+          firstUnitIndex: currentIndex + 1,
+          lastUnitIndex: targetIndex
+        })
+      : null;
+  if (
+    directTestletGate &&
+    !deniedReasons.includes("testlet_code_required")
+  ) {
+    deniedReasons.push("testlet_code_required");
+  }
   if (deniedReasons.length > 0) {
     throw new FirstSliceError(
       409,
       "booklet_navigation_denied",
       `Unit '${currentUnitKey}' cannot be left ${direction} because the booklet completion policy is not satisfied.`,
-      { currentUnitKey, targetUnitKey: input.targetUnitKey, direction, deniedReasons }
+      {
+        currentUnitKey,
+        targetUnitKey: input.targetUnitKey,
+        direction,
+        deniedReasons,
+        ...(directTestletGate ? { testletGate: directTestletGate } : {})
+      }
     );
   }
 };
@@ -6192,6 +6552,7 @@ const resolveRuntimeUnit = (
   player?: NonNullable<ContentReleaseRuntimeSnapshot["playerEntries"]>[number] | null;
   unitDefinition?: string | null;
   unitDefinitionType?: string | null;
+  testletPath: string[];
 } => {
   if (!unitKey) {
     return {
@@ -6201,7 +6562,8 @@ const resolveRuntimeUnit = (
       content: null,
       player: null,
       unitDefinition: null,
-      unitDefinitionType: null
+      unitDefinitionType: null,
+      testletPath: []
     };
   }
 
@@ -6223,7 +6585,8 @@ const resolveRuntimeUnit = (
         player => player.playerKey === unitEntry?.playerKey
       ) ?? null,
     unitDefinition: unitEntry?.unitDefinition ?? null,
-    unitDefinitionType: unitEntry?.unitDefinitionType ?? null
+    unitDefinitionType: unitEntry?.unitDefinitionType ?? null,
+    testletPath: unitEntry?.testletPath ?? []
   };
 };
 
@@ -6235,6 +6598,7 @@ const resolveRuntimeBookletUnits = (
   displayLabel: string;
   description?: string;
   content?: string;
+  testletPath: string[];
 }> => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
@@ -6245,6 +6609,7 @@ const resolveRuntimeBookletUnits = (
     bookletEntry?.unitEntries.map(unitEntry => ({
       unitKey: unitEntry.unitKey,
       displayLabel: unitEntry.displayLabel,
+      testletPath: unitEntry.testletPath ?? [],
       ...(unitEntry.description ? { description: unitEntry.description } : {}),
       ...(unitEntry.content ? { content: unitEntry.content } : {})
     })) ?? []
@@ -10965,6 +11330,15 @@ export const createFirstSliceServices = (
         }
 
         const timestamp = now();
+        const firstUnit = selectedBooklet.unitEntries[0];
+        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
+          testletKey =>
+            Boolean(
+              selectedBooklet.testletEntries?.find(
+                testlet => testlet.testletKey === testletKey
+              )?.restrictions?.codeToEnter?.code
+            )
+        );
         const testRun: TestRun = {
           testRunId: idGenerator(),
           participantSessionId: participantSession.participantSessionId,
@@ -10973,8 +11347,11 @@ export const createFirstSliceServices = (
           contentReleaseId: participantSession.contentReleaseId,
           bookletKey: selectedBooklet.bookletKey,
           status: "running",
-          currentUnitKey: selectedBooklet.unitEntries[0]?.unitKey ?? "unit-1",
+          currentUnitKey: firstUnitRequiresCode
+            ? null
+            : firstUnit?.unitKey ?? "unit-1",
           unitResponses: {},
+          unlockedTestletKeys: [],
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
@@ -11126,6 +11503,116 @@ export const createFirstSliceServices = (
           summary: `Progress saved for run '${updatedRun.testRunId}'.`,
           details: {
             status: updatedRun.status,
+            currentUnitKey: updatedRun.currentUnitKey
+          }
+        });
+        return updatedRun;
+      },
+      async unlockTestlet(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const testletKey = String(input.testletKey ?? "").trim();
+        if (!testletKey) {
+          throw new FirstSliceError(
+            400,
+            "testlet_key_required",
+            "testletKey is required."
+          );
+        }
+        if (typeof input.code !== "string" || !input.code.trim()) {
+          throw new FirstSliceError(
+            400,
+            "testlet_unlock_code_required",
+            "A block unlock code is required."
+          );
+        }
+        const storedTestRun = await repository.getTestRunById(testRunId);
+        if (!storedTestRun) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found.`
+          );
+        }
+        const testRun = normalizeTestRun(storedTestRun);
+        if (testRun.status === "completed") {
+          throw new FirstSliceError(
+            409,
+            "test_run_already_completed",
+            `Test run '${testRunId}' is already completed.`
+          );
+        }
+        const contentRelease = await requireContentRelease(
+          repository,
+          testRun.contentReleaseId
+        );
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
+        );
+        const testlet = booklet?.testletEntries?.find(
+          candidate => candidate.testletKey === testletKey
+        );
+        const expectedCode = testlet?.restrictions?.codeToEnter?.code;
+        if (!testlet || !expectedCode) {
+          throw new FirstSliceError(
+            404,
+            "testlet_code_gate_not_found",
+            `Block '${testletKey}' has no code gate in booklet '${testRun.bookletKey}'.`
+          );
+        }
+        if (testRun.unlockedTestletKeys?.includes(testletKey)) {
+          return testRun;
+        }
+        const navigation = resolveBookletNavigationState(contentRelease, testRun);
+        if (navigation.nextTestletGate?.testletKey !== testletKey) {
+          throw new FirstSliceError(
+            409,
+            "testlet_code_gate_not_reachable",
+            `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
+          );
+        }
+        const expectedCodeBuffer = Buffer.from(expectedCode, "utf8");
+        const providedCodeBuffer = Buffer.from(input.code.trim(), "utf8");
+        if (
+          expectedCodeBuffer.length !== providedCodeBuffer.length ||
+          !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)
+        ) {
+          throw new FirstSliceError(
+            403,
+            "testlet_unlock_code_invalid",
+            "The block unlock code is invalid."
+          );
+        }
+        const unlockedRun = normalizeTestRun({
+          ...testRun,
+          unlockedTestletKeys: [
+            ...(testRun.unlockedTestletKeys ?? []),
+            testletKey
+          ],
+          updatedAt: now()
+        });
+        const navigationAfterUnlock = resolveBookletNavigationState(
+          contentRelease,
+          unlockedRun
+        );
+        const updatedRun: TestRun = {
+          ...unlockedRun,
+          ...(navigationAfterUnlock.nextTestletGate == null &&
+          navigationAfterUnlock.forwardDeniedReasons.length === 0 &&
+          navigation.nextUnitKey
+            ? { currentUnitKey: navigation.nextUnitKey }
+            : {})
+        };
+        await repository.saveTestRun(updatedRun);
+        await recordWorkspaceActivity({
+          tenantId: updatedRun.tenantId,
+          workspaceId: updatedRun.workspaceId,
+          eventType: "testlet_unlocked",
+          subjectType: "test_run",
+          subjectId: updatedRun.testRunId,
+          summary: `Block '${testletKey}' unlocked for run '${updatedRun.testRunId}'.`,
+          details: {
+            testletKey,
+            participantSessionId: updatedRun.participantSessionId,
             currentUnitKey: updatedRun.currentUnitKey
           }
         });

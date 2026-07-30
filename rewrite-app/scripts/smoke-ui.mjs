@@ -2514,6 +2514,8 @@ try {
   const veronaPlayerKey = "verona-smoke-player@6.0";
   const veronaBookletKey = "booklet:verona-smoke";
   const veronaUnitKey = "unit:verona-smoke";
+  const veronaTestletKey = "testlet:verona-protected";
+  const veronaTestletCode = "open-verona";
   const veronaLoginKey = "student-verona-smoke";
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
@@ -2613,7 +2615,12 @@ try {
             <Config key="restore_current_page_on_return">ON</Config>
           </BookletConfig>
           <Units>
-            <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
+            <Testlet id="${veronaTestletKey}" label="Protected Verona Block">
+              <Restrictions>
+                <CodeToEnter code="${veronaTestletCode}">Enter the assigned Verona block code.</CodeToEnter>
+              </Restrictions>
+              <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
+            </Testlet>
           </Units>
         </Booklet>
       `
@@ -2698,6 +2705,17 @@ try {
     }).toString()}`,
     { waitUntil: "networkidle" }
   );
+  await page
+    .locator("#participantRouteTestletGateLabel")
+    .filter({ hasText: "Protected Verona Block" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletGatePrompt")
+    .filter({ hasText: "Enter the assigned Verona block code." })
+    .waitFor();
+  assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
+  await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
+  await page.locator("#participantRouteTestletUnlockButton").click();
   const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
   await veronaFrame

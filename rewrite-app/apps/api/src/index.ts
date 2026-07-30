@@ -91,6 +91,8 @@ import {
   type RevokeAdminSessionResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
+  type UnlockParticipantTestletRequest,
+  type UnlockParticipantTestletResponse,
   type ParticipantSignInRequest,
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
@@ -1406,6 +1408,9 @@ const participantResourcePattern =
 const saveProgressPattern = createRoutePattern(
   productionApiRoutes.participant.saveProgress
 );
+const unlockTestletPattern = createRoutePattern(
+  productionApiRoutes.participant.unlockTestlet
+);
 const resumeSessionPattern = createRoutePattern(
   productionApiRoutes.participant.resumeSession
 );
@@ -2009,6 +2014,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
+    ["POST", unlockTestletPattern, productionApiRoutes.participant.unlockTestlet],
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
@@ -4676,6 +4682,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const resumeRunMatch = resumeRunPattern.exec(pathname);
+      const unlockTestletMatch = unlockTestletPattern.exec(pathname);
+      if (request.method === "POST" && unlockTestletMatch?.groups) {
+        const testRunId = decodeRouteGroup(unlockTestletMatch.groups.testRunId);
+        const testletKey = decodeRouteGroup(unlockTestletMatch.groups.testletKey);
+        if (!testRunId || !testletKey) {
+          sendError(
+            response,
+            400,
+            "invalid_testlet_unlock_scope",
+            "testRunId and testletKey are required."
+          );
+          return;
+        }
+        const body = await readRequestJsonBody<UnlockParticipantTestletRequest>();
+        const testRun = await services.participantRuntime.unlockTestlet({
+          testRunId,
+          testletKey,
+          code: body.code
+        });
+        sendJson<UnlockParticipantTestletResponse>(response, 200, { testRun });
+        return;
+      }
+
       if (request.method === "POST" && resumeRunMatch?.groups) {
         const testRunId = decodeRouteGroup(resumeRunMatch.groups.testRunId);
         if (!testRunId) {
