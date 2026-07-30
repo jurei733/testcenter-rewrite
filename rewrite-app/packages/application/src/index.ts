@@ -28,6 +28,7 @@ import type {
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
+  ParticipantRuntimeBooklet,
   ParticipantSession,
   ParticipantSessionScope,
   ParticipantSessionStatus,
@@ -1372,6 +1373,77 @@ const findParticipantRosterEntryByLoginKey = async (
   return entries.find(entry => entry.loginKey === loginKey) ?? null;
 };
 
+const getParticipantRosterBookletKeys = (
+  entry: ParticipantRosterEntry | null | undefined
+): string[] => [
+  ...new Set(
+    (entry?.bookletKeys?.length
+      ? entry.bookletKeys
+      : entry?.bookletKey
+        ? [entry.bookletKey]
+        : []
+    )
+      .map(bookletKey => bookletKey.trim())
+      .filter(Boolean)
+  )
+];
+
+const buildParticipantRuntimeBooklets = (input: {
+  contentRelease: ContentRelease;
+  participantRosterEntry: ParticipantRosterEntry | null;
+  testRuns: TestRun[];
+}): ParticipantRuntimeBooklet[] => {
+  const assignedBookletKeys = getParticipantRosterBookletKeys(
+    input.participantRosterEntry
+  );
+  const allowedBookletKeys = assignedBookletKeys.length
+    ? new Set(assignedBookletKeys)
+    : null;
+
+  return input.contentRelease.runtimeSnapshot.bookletEntries
+    .filter(booklet => !allowedBookletKeys || allowedBookletKeys.has(booklet.bookletKey))
+    .map(booklet => {
+      const bookletRuns = input.testRuns.filter(
+        testRun => testRun.bookletKey === booklet.bookletKey
+      );
+      const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed");
+      const hasCompletedRun = bookletRuns.some(testRun => testRun.status === "completed");
+      return {
+        bookletKey: booklet.bookletKey,
+        displayLabel: booklet.displayLabel,
+        status: hasOpenRun
+          ? "in_progress" as const
+          : hasCompletedRun
+            ? "completed" as const
+            : "available" as const
+      };
+    });
+};
+
+const resolveParticipantSessionStatusAfterCompletion = async (
+  repository: FirstSliceRepository,
+  participantSession: ParticipantSession
+): Promise<ParticipantSessionStatus> => {
+  const [contentRelease, participantRosterEntry, testRuns] = await Promise.all([
+    requireContentRelease(repository, participantSession.contentReleaseId),
+    findParticipantRosterEntryByLoginKey(
+      repository,
+      participantSession.tenantId,
+      participantSession.workspaceId,
+      participantSession.loginKey
+    ),
+    repository.listTestRunsByParticipantSessionId(
+      participantSession.participantSessionId
+    )
+  ]);
+  const hasAvailableBooklet = buildParticipantRuntimeBooklets({
+    contentRelease,
+    participantRosterEntry,
+    testRuns: testRuns.map(normalizeTestRun)
+  }).some(booklet => booklet.status === "available");
+  return hasAvailableBooklet ? "signed_in" : "closed";
+};
+
 const buildParticipantRosterReadItems = (
   entries: ParticipantRosterEntry[],
   activeContentRelease: ContentRelease | undefined
@@ -1387,17 +1459,22 @@ const buildParticipantRosterReadItems = (
       const validationWarnings: WorkspaceParticipantRosterItem["validationWarnings"] =
         [];
 
-      if (entry.bookletKey && !activeContentRelease) {
+      const bookletKeys = getParticipantRosterBookletKeys(entry);
+      if (bookletKeys.length > 0 && !activeContentRelease) {
         validationWarnings.push({
           code: "active_content_release_missing",
           message:
             "Booklet assignment cannot be validated because the workspace has no active content release."
         });
-      } else if (entry.bookletKey && !activeBookletKeys.has(entry.bookletKey)) {
-        validationWarnings.push({
-          code: "booklet_not_found_in_active_release",
-          message: `Booklet '${entry.bookletKey}' is not part of the active content release.`
-        });
+      } else {
+        for (const bookletKey of bookletKeys) {
+          if (!activeBookletKeys.has(bookletKey)) {
+            validationWarnings.push({
+              code: "booklet_not_found_in_active_release",
+              message: `Booklet '${bookletKey}' is not part of the active content release.`
+            });
+          }
+        }
       }
 
       return {
@@ -2170,7 +2247,8 @@ const formatParticipantRosterCsv = (input: {
     "passwordRequired",
     "importedAt",
     "validationWarningCodes",
-    "validationWarningMessages"
+    "validationWarningMessages",
+    "bookletKeys"
   ];
   const rows = [...input.items].sort(
     (left, right) =>
@@ -2192,7 +2270,8 @@ const formatParticipantRosterCsv = (input: {
         item.passwordRequired ? "true" : "false",
         item.importedAt,
         item.validationWarnings.map(warning => warning.code).join("|"),
-        item.validationWarnings.map(warning => warning.message).join("|")
+        item.validationWarnings.map(warning => warning.message).join("|"),
+        getParticipantRosterBookletKeys(item).join("|")
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -5530,29 +5609,27 @@ const buildStudyMonitorUnitProgress = (input: {
     }
   }
   for (const rosterEntry of input.participantRosterEntries ?? []) {
-    const bookletKey = rosterEntry.bookletKey?.trim();
-    if (
-      !bookletKey ||
-      runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)
-    ) {
-      continue;
-    }
-    const booklet = input.contentReleases
-      .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
-      .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
-    if (!booklet) {
-      continue;
-    }
-    for (const unitEntry of booklet.unitEntries) {
-      const progress = ensureProgress(unitEntry.unitKey, unitEntry.displayLabel);
-      progress.rosterExpectedCount += 1;
-      progress.expectedRunCount += 1;
-      progress.missingResponseCount += 1;
-      if (
-        !progress.latestActivityAt ||
-        rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
-      ) {
-        progress.latestActivityAt = rosterEntry.importedAt;
+    for (const bookletKey of getParticipantRosterBookletKeys(rosterEntry)) {
+      if (runLoginKeysByBookletKey.get(bookletKey)?.has(rosterEntry.loginKey)) {
+        continue;
+      }
+      const booklet = input.contentReleases
+        .flatMap(contentRelease => contentRelease.runtimeSnapshot.bookletEntries)
+        .find(bookletEntry => bookletEntry.bookletKey === bookletKey);
+      if (!booklet) {
+        continue;
+      }
+      for (const unitEntry of booklet.unitEntries) {
+        const progress = ensureProgress(unitEntry.unitKey, unitEntry.displayLabel);
+        progress.rosterExpectedCount += 1;
+        progress.expectedRunCount += 1;
+        progress.missingResponseCount += 1;
+        if (
+          !progress.latestActivityAt ||
+          rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
+        ) {
+          progress.latestActivityAt = rosterEntry.importedAt;
+        }
       }
     }
   }
@@ -5691,23 +5768,21 @@ const buildStudyMonitorBookletProgress = (input: {
     }
   }
   for (const rosterEntry of input.participantRosterEntries) {
-    const bookletKey = rosterEntry.bookletKey?.trim();
-    if (!bookletKey) {
-      continue;
-    }
-    const progress = ensureProgress(bookletKey);
-    progress.rosterEntryCount += 1;
-    const sessionLoginKeys =
-      sessionLoginKeysByBookletKey.get(bookletKey) ?? new Set<string>();
-    if (!sessionLoginKeys.has(rosterEntry.loginKey)) {
-      progress.expectedParticipantCount += 1;
-      progress.notStartedCount += 1;
-    }
-    if (
-      !progress.latestActivityAt ||
-      rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
-    ) {
-      progress.latestActivityAt = rosterEntry.importedAt;
+    for (const bookletKey of getParticipantRosterBookletKeys(rosterEntry)) {
+      const progress = ensureProgress(bookletKey);
+      progress.rosterEntryCount += 1;
+      const sessionLoginKeys =
+        sessionLoginKeysByBookletKey.get(bookletKey) ?? new Set<string>();
+      if (!sessionLoginKeys.has(rosterEntry.loginKey)) {
+        progress.expectedParticipantCount += 1;
+        progress.notStartedCount += 1;
+      }
+      if (
+        !progress.latestActivityAt ||
+        rosterEntry.importedAt.localeCompare(progress.latestActivityAt) > 0
+      ) {
+        progress.latestActivityAt = rosterEntry.importedAt;
+      }
     }
   }
 
@@ -8564,6 +8639,9 @@ export const createFirstSliceServices = (
             loginKey: parsedEntry.loginKey,
             groupKey: parsedEntry.groupKey,
             bookletKey: parsedEntry.bookletKey,
+            ...(parsedEntry.bookletKeys?.length
+              ? { bookletKeys: parsedEntry.bookletKeys }
+              : {}),
             displayName: parsedEntry.displayName,
             passwordRequired: Boolean(parsedEntry.password),
             importedAt: now()
@@ -9733,6 +9811,23 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
+        const contentRelease = await requireContentRelease(
+          repository,
+          participantSession.contentReleaseId
+        );
+        const testRuns = (
+          await repository.listTestRunsByParticipantSessionId(
+            participantSession.participantSessionId
+          )
+        ).map(normalizeTestRun);
+        const booklets = buildParticipantRuntimeBooklets({
+          contentRelease,
+          participantRosterEntry,
+          testRuns
+        });
+        const hasAvailableBooklet = booklets.some(
+          booklet => booklet.status === "available"
+        );
 
         if (!latestTestRun) {
           return {
@@ -9740,6 +9835,7 @@ export const createFirstSliceServices = (
             participantRosterEntry,
             scope,
             latestTestRun: null,
+            booklets,
             runtimeStatus: "ready_to_launch",
             availableAction: "launch"
           };
@@ -9751,8 +9847,9 @@ export const createFirstSliceServices = (
             participantRosterEntry,
             scope,
             latestTestRun: normalizeTestRun(latestTestRun),
-            runtimeStatus: "completed",
-            availableAction: "none"
+            booklets,
+            runtimeStatus: hasAvailableBooklet ? "ready_to_launch" : "completed",
+            availableAction: hasAvailableBooklet ? "launch" : "none"
           };
         }
 
@@ -9761,6 +9858,7 @@ export const createFirstSliceServices = (
           participantRosterEntry,
           scope,
           latestTestRun: normalizeTestRun(latestTestRun),
+          booklets,
           runtimeStatus: "in_progress",
           availableAction: "resume"
         };
@@ -9801,6 +9899,11 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
+        const testRuns = (
+          await repository.listTestRunsByParticipantSessionId(
+            participantSession.participantSessionId
+          )
+        ).map(normalizeTestRun);
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
         if (currentTestRun.status === "paused") {
           availableActions.push("resume", "save_progress", "complete");
@@ -9823,6 +9926,11 @@ export const createFirstSliceServices = (
             contentRelease,
             currentTestRun.bookletKey
           ),
+          booklets: buildParticipantRuntimeBooklets({
+            contentRelease,
+            participantRosterEntry,
+            testRuns
+          }),
           availableActions
         };
       },
@@ -9838,14 +9946,6 @@ export const createFirstSliceServices = (
           repository,
           participantSession.contentReleaseId
         );
-
-        if (participantSession.status === "closed") {
-          throw new FirstSliceError(
-            409,
-            "participant_session_closed",
-            `Participant session '${participantSessionId}' is already closed.`
-          );
-        }
 
         const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
           input.bookletKey
@@ -9869,32 +9969,71 @@ export const createFirstSliceServices = (
           return normalizeTestRun(existingRun);
         }
 
-        const rosterEntry = requestedBookletKey
-          ? null
-          : await findParticipantRosterEntryByLoginKey(
-              repository,
-              participantSession.tenantId,
-              participantSession.workspaceId,
-              participantSession.loginKey
-            );
-        const rosterBookletKey = rosterEntry?.bookletKey?.trim() ?? "";
-        const effectiveBookletKey = requestedBookletKey || rosterBookletKey;
+        const rosterEntry = await findParticipantRosterEntryByLoginKey(
+          repository,
+          participantSession.tenantId,
+          participantSession.workspaceId,
+          participantSession.loginKey
+        );
+        const assignedBookletKeys = getParticipantRosterBookletKeys(rosterEntry);
+        if (
+          requestedBookletKey &&
+          assignedBookletKeys.length > 0 &&
+          !assignedBookletKeys.includes(requestedBookletKey)
+        ) {
+          throw new FirstSliceError(
+            403,
+            "booklet_not_assigned",
+            `Booklet '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
+          );
+        }
+        const testRuns = (
+          await repository.listTestRunsByParticipantSessionId(
+            participantSession.participantSessionId
+          )
+        ).map(normalizeTestRun);
+        const runtimeBooklets = buildParticipantRuntimeBooklets({
+          contentRelease,
+          participantRosterEntry: rosterEntry,
+          testRuns
+        });
+        const selectedRuntimeBooklet = requestedBookletKey
+          ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey)
+          : runtimeBooklets.find(booklet => booklet.status === "available");
+        const effectiveBookletKey =
+          requestedBookletKey || selectedRuntimeBooklet?.bookletKey || "";
         const bookletSource = requestedBookletKey
           ? "request"
-          : rosterBookletKey
+          : assignedBookletKeys.length > 0
             ? "participant_roster"
             : "active_release_default";
-        const selectedBooklet = effectiveBookletKey
-          ? contentRelease.runtimeSnapshot.bookletEntries.find(
-              booklet => booklet.bookletKey === effectiveBookletKey
-            )
-          : contentRelease.runtimeSnapshot.bookletEntries[0];
+        const selectedBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          booklet => booklet.bookletKey === effectiveBookletKey
+        );
 
         if (effectiveBookletKey && !selectedBooklet) {
           throw new FirstSliceError(
             404,
             "booklet_not_found",
             `Booklet '${effectiveBookletKey}' was not found in active content release '${contentRelease.contentReleaseId}'.`
+          );
+        }
+        if (selectedRuntimeBooklet?.status === "completed") {
+          throw new FirstSliceError(
+            409,
+            "booklet_already_completed",
+            `Booklet '${effectiveBookletKey}' is already completed in participant session '${participantSessionId}'.`
+          );
+        }
+        if (!selectedBooklet) {
+          throw new FirstSliceError(
+            409,
+            participantSession.status === "closed"
+              ? "participant_session_closed"
+              : "participant_session_has_no_available_booklet",
+            participantSession.status === "closed"
+              ? `Participant session '${participantSessionId}' is already closed.`
+              : `Participant session '${participantSessionId}' has no available booklet.`
           );
         }
 
@@ -9905,10 +10044,9 @@ export const createFirstSliceServices = (
           tenantId: participantSession.tenantId,
           workspaceId: participantSession.workspaceId,
           contentReleaseId: participantSession.contentReleaseId,
-          bookletKey:
-            selectedBooklet?.bookletKey ?? `booklet:${participantSession.loginKey}`,
+          bookletKey: selectedBooklet.bookletKey,
           status: "running",
-          currentUnitKey: selectedBooklet?.unitEntries[0]?.unitKey ?? "unit-1",
+          currentUnitKey: selectedBooklet.unitEntries[0]?.unitKey ?? "unit-1",
           unitResponses: {},
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -9985,18 +10123,6 @@ export const createFirstSliceServices = (
           }
 
           return normalizeTestRun(existingRun);
-        }
-
-        const latestRun = await getLatestParticipantSessionRun(
-          repository,
-          participantSession.participantSessionId
-        );
-        if (latestRun?.status === "completed" || participantSession.status === "closed") {
-          throw new FirstSliceError(
-            409,
-            "participant_session_has_no_resumable_run",
-            `Participant session '${participantSessionId}' has no resumable test run.`
-          );
         }
 
         return this.launch({
@@ -10148,9 +10274,14 @@ export const createFirstSliceServices = (
           testRun.participantSessionId
         );
         if (participantSession) {
+          const nextSessionStatus =
+            await resolveParticipantSessionStatusAfterCompletion(
+              repository,
+              participantSession
+            );
           await repository.saveParticipantSession({
             ...participantSession,
-            status: "closed"
+            status: nextSessionStatus
           });
         }
 
@@ -10305,17 +10436,19 @@ export const createFirstSliceServices = (
                   status: nextStatus,
                   updatedAt: issuedAt
                 };
-        const nextParticipantSession =
-          commandType === "complete" && participantSession.status !== "closed"
-            ? {
-                ...participantSession,
-                status: "closed" as const
-              }
-            : participantSession;
-
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
         }
+        const nextParticipantSession =
+          commandType === "complete"
+            ? {
+                ...participantSession,
+                status: await resolveParticipantSessionStatusAfterCompletion(
+                  repository,
+                  participantSession
+                )
+              }
+            : participantSession;
         if (nextParticipantSession !== participantSession) {
           await repository.saveParticipantSession(nextParticipantSession);
         }

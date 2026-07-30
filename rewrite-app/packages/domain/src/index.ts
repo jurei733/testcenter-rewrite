@@ -142,6 +142,7 @@ export type ParticipantRosterEntry = {
   loginKey: string;
   groupKey: string;
   bookletKey: string | null;
+  bookletKeys?: string[];
   displayName: string | null;
   passwordRequired: boolean;
   importedAt: string;
@@ -346,8 +347,15 @@ export type ParticipantRuntimeState = {
   participantRosterEntry: ParticipantRosterEntry | null;
   scope: ParticipantSessionScope;
   latestTestRun: TestRun | null;
+  booklets: ParticipantRuntimeBooklet[];
   runtimeStatus: ParticipantRuntimeStateStatus;
   availableAction: "launch" | "resume" | "none";
+};
+
+export type ParticipantRuntimeBooklet = {
+  bookletKey: string;
+  displayLabel: string;
+  status: "available" | "in_progress" | "completed";
 };
 
 export type ParticipantCurrentRunState = {
@@ -371,6 +379,7 @@ export type ParticipantCurrentRunState = {
     description?: string;
     content?: string;
   }>;
+  booklets: ParticipantRuntimeBooklet[];
   availableActions: Array<"save_progress" | "resume" | "complete">;
 };
 

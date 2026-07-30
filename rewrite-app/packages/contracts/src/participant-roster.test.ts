@@ -170,6 +170,7 @@ describe("parseParticipantRosterText", () => {
           loginKey: "test",
           groupKey: "sample_group",
           bookletKey: "BOOKLET.SAMPLE-1",
+          bookletKeys: ["BOOKLET.SAMPLE-1", "BOOKLET.SAMPLE-2"],
           displayName: null,
           password: "user123"
         },

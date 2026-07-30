@@ -15,6 +15,7 @@ import type {
   MonitorRunCommandResult,
   MonitorRunCommandType,
   OpenMonitorRun,
+  ParticipantRuntimeBooklet,
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -55,6 +56,7 @@ export type ParsedParticipantRosterEntry = {
   loginKey: string;
   groupKey: string;
   bookletKey: string | null;
+  bookletKeys?: string[];
   displayName: string | null;
   password?: string | null;
 };
@@ -292,6 +294,71 @@ const readXmlChildText = (
     }
   }
   return undefined;
+};
+
+const readXmlChildTexts = (
+  content: string,
+  tagNames: string
+): string[] =>
+  Array.from(
+    content.matchAll(
+      new RegExp(
+        `<((?:[a-zA-Z_][\\w.-]*:)?(?:${tagNames}))\\b[^>]*>([\\s\\S]*?)<\\/\\1>`,
+        "gi"
+      )
+    )
+  )
+    .map(match =>
+      normalizeRosterTextValue(
+        decodeXmlText((match[2] ?? "").replace(/<[^>]+>/g, "").trim())
+      )
+    )
+    .filter((value): value is string => Boolean(value));
+
+const withAdditionalBookletKeys = (
+  bookletKeys: Array<string | null | undefined>
+): Pick<ParsedParticipantRosterEntry, "bookletKey" | "bookletKeys"> => {
+  const normalizedBookletKeys = [
+    ...new Set(bookletKeys.map(normalizeRosterTextValue).filter(Boolean))
+  ] as string[];
+  return {
+    bookletKey: normalizedBookletKeys[0] ?? null,
+    ...(normalizedBookletKeys.length > 1
+      ? { bookletKeys: normalizedBookletKeys }
+      : {})
+  };
+};
+
+const mergeParsedParticipantRosterEntries = (
+  entries: ParsedParticipantRosterEntry[]
+): ParsedParticipantRosterEntry[] => {
+  const mergedEntries = new Map<string, ParsedParticipantRosterEntry>();
+
+  for (const entry of entries) {
+    const existingEntry = mergedEntries.get(entry.loginKey);
+    if (!existingEntry) {
+      mergedEntries.set(entry.loginKey, entry);
+      continue;
+    }
+
+    const bookletAssignment = withAdditionalBookletKeys([
+      ...(existingEntry.bookletKeys ?? [existingEntry.bookletKey]),
+      ...(entry.bookletKeys ?? [entry.bookletKey])
+    ]);
+    mergedEntries.set(entry.loginKey, {
+      ...existingEntry,
+      ...bookletAssignment,
+      groupKey: entry.groupKey || existingEntry.groupKey,
+      displayName: entry.displayName ?? existingEntry.displayName,
+      ...(entry.password
+        ? { password: entry.password }
+        : existingEntry.password
+          ? { password: existingEntry.password }
+          : {})
+    });
+  }
+
+  return Array.from(mergedEntries.values());
 };
 
 const readXmlChildAttribute = (
@@ -868,7 +935,10 @@ const parseParticipantRosterXmlText = (
     entries.push({
       loginKey,
       groupKey: groupKey || `group:${loginKey}`,
-      bookletKey,
+      ...withAdditionalBookletKeys([
+        bookletKey,
+        ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
+      ]),
       displayName,
       ...(password ? { password } : {})
     });
@@ -969,25 +1039,30 @@ const parseParticipantRosterXmlText = (
     entries.push({
       loginKey,
       groupKey: groupKey || `group:${loginKey}`,
-      bookletKey,
+      ...withAdditionalBookletKeys([
+        bookletKey,
+        ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
+      ]),
       displayName,
       ...(password ? { password } : {})
     });
   }
 
-  return entries;
+  return mergeParsedParticipantRosterEntries(entries);
 };
 
 export const parseParticipantRosterText = (
   rosterText: ParticipantRosterSource
 ): ParsedParticipantRosterEntry[] => {
   if (typeof rosterText !== "string") {
-    return parseParticipantRosterJsonValue(rosterText);
+    return mergeParsedParticipantRosterEntries(
+      parseParticipantRosterJsonValue(rosterText)
+    );
   }
 
   const jsonEntries = parseParticipantRosterJsonText(rosterText);
   if (jsonEntries.length > 0) {
-    return jsonEntries;
+    return mergeParsedParticipantRosterEntries(jsonEntries);
   }
 
   const xmlEntries = parseParticipantRosterXmlText(rosterText);
@@ -1558,11 +1633,13 @@ export type ActivateContentReleaseResponse = {
 export type ParticipantSignInResponse = {
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
+  booklets: ParticipantRuntimeBooklet[];
 };
 
 export type ParticipantLaunchResponse = {
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
+  booklets: ParticipantRuntimeBooklet[];
   testRun: TestRun;
 };
 

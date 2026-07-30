@@ -16,6 +16,7 @@ import {
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
+import type { ParticipantRuntimeBooklet } from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
@@ -119,6 +120,7 @@ export class ParticipantViewFacade {
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
+  assignedBooklets: ParticipantRuntimeBooklet[] = [];
   private copiedSessionEntryLink = "";
 
   init(): void {
@@ -634,6 +636,10 @@ export class ParticipantViewFacade {
   private async resumeEntrySessionInternal(
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
+    // A session-only re-entry URL is authoritative. Do not let a booklet from a
+    // previously persisted browser session constrain which assigned booklet the
+    // server resumes next.
+    this.runtime.bookletKey = normalized.bookletKey;
     try {
       await this.resumeSessionInternal({ quiet: true });
       await this.applyEntryDraftAfterResume(normalized);
@@ -662,6 +668,7 @@ export class ParticipantViewFacade {
 
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
+    this.syncRuntimeBooklets(payload.booklets);
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
@@ -684,6 +691,7 @@ export class ParticipantViewFacade {
     message = 'Stored participant session is gone. Use "Start Or Resume".'
   ): void {
     this.copiedSessionEntryLink = "";
+    this.assignedBooklets = [];
     if (
       !this.runtime.participantSessionId.trim() &&
       !this.runtime.testRunId.trim()
@@ -709,7 +717,11 @@ export class ParticipantViewFacade {
   private isParticipantSessionNoLongerResumable(error: unknown): boolean {
     return (
       this.requestState.isApiError(error) &&
-      error.error === "participant_session_has_no_resumable_run"
+      [
+        "participant_session_has_no_resumable_run",
+        "participant_session_closed",
+        "booklet_already_completed"
+      ].includes(error.error)
     );
   }
 
@@ -731,6 +743,7 @@ export class ParticipantViewFacade {
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRun(payload.testRun);
+    this.syncRuntimeBooklets(payload.booklets);
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView
@@ -953,6 +966,7 @@ export class ParticipantViewFacade {
     this.syncParticipantSessionFields(currentState.participantSession);
     this.syncParticipantRosterEntry(currentState.participantRosterEntry);
     this.syncRun(currentState.testRun);
+    this.syncRuntimeBooklets(currentState.booklets);
   }
 
   private syncParticipantRosterEntry(
@@ -960,6 +974,25 @@ export class ParticipantViewFacade {
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
+  }
+
+  private syncRuntimeBooklets(booklets: ParticipantRuntimeBooklet[]): void {
+    this.assignedBooklets = booklets;
+    const selectedBooklet = booklets.find(
+      booklet => booklet.bookletKey === this.runtime.bookletKey.trim()
+    );
+    if (selectedBooklet && selectedBooklet.status !== "completed") {
+      return;
+    }
+
+    const nextBooklet =
+      booklets.find(booklet => booklet.status === "in_progress") ??
+      booklets.find(booklet => booklet.status === "available") ??
+      selectedBooklet ??
+      booklets[0];
+    if (nextBooklet) {
+      this.runtime.bookletKey = nextBooklet.bookletKey;
+    }
   }
 
   private syncCurrentUnitResponse(

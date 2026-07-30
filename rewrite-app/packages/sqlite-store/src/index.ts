@@ -216,7 +216,18 @@ const mapParticipantRosterEntry = (
   row: Record<string, unknown> | undefined
 ): ParticipantRosterEntry | null =>
   row
-    ? {
+    ? (() => {
+        const parsedBookletKeys = (() => {
+          try {
+            const parsed = JSON.parse(String(row.booklet_keys_json ?? "[]"));
+            return Array.isArray(parsed)
+              ? [...new Set(parsed.filter(value => typeof value === "string" && value.trim()))]
+              : [];
+          } catch {
+            return [];
+          }
+        })() as string[];
+        return {
         participantRosterEntryId: String(row.participant_roster_entry_id),
         tenantId: String(row.tenant_id),
         workspaceId: String(row.workspace_id),
@@ -226,6 +237,9 @@ const mapParticipantRosterEntry = (
           row.booklet_key === null || row.booklet_key === undefined
             ? null
             : String(row.booklet_key),
+        ...(parsedBookletKeys.length > 1
+          ? { bookletKeys: parsedBookletKeys }
+          : {}),
         displayName:
           row.display_name === null || row.display_name === undefined
             ? null
@@ -233,7 +247,8 @@ const mapParticipantRosterEntry = (
         passwordRequired:
           row.password_hash !== null && row.password_hash !== undefined,
         importedAt: String(row.imported_at)
-      }
+      };
+      })()
     : null;
 
 const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
@@ -305,7 +320,7 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 14;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 15;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -594,6 +609,14 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE participant_roster_entries
         ADD COLUMN password_hash TEXT;
+    `
+  },
+  {
+    version: 15,
+    name: "add_participant_roster_booklet_keys",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN booklet_keys_json TEXT;
     `
   }
 ];
@@ -1240,7 +1263,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, display_name, password_hash, imported_at
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1267,12 +1290,13 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, display_name, password_hash, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, display_name, password_hash, imported_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             group_key = excluded.group_key,
             booklet_key = excluded.booklet_key,
+            booklet_keys_json = excluded.booklet_keys_json,
             display_name = excluded.display_name,
             password_hash = excluded.password_hash,
             imported_at = excluded.imported_at`
@@ -1284,6 +1308,9 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.loginKey,
           participantRosterEntry.groupKey,
           participantRosterEntry.bookletKey,
+          participantRosterEntry.bookletKeys?.length
+            ? JSON.stringify(participantRosterEntry.bookletKeys)
+            : null,
           participantRosterEntry.displayName,
           passwordHash,
           participantRosterEntry.importedAt

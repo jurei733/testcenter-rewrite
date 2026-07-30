@@ -1057,6 +1057,30 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.participant-booklet-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.participant-booklet-list > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-booklet-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .participant-session-link {
   display: grid;
   grid-template-columns: 1fr auto auto;

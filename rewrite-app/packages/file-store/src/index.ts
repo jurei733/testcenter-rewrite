@@ -80,6 +80,24 @@ const readStateFromFile = async (
         entryId,
         {
           ...entry,
+          bookletKey:
+            entry.bookletKey ??
+            (Array.isArray(entry.bookletKeys) &&
+            typeof entry.bookletKeys[0] === "string"
+              ? entry.bookletKeys[0]
+              : null),
+          ...(Array.isArray(entry.bookletKeys) && entry.bookletKeys.length > 1
+            ? {
+                bookletKeys: [
+                  ...new Set(
+                    entry.bookletKeys.filter(
+                      (bookletKey): bookletKey is string =>
+                        typeof bookletKey === "string" && Boolean(bookletKey.trim())
+                    )
+                  )
+                ]
+              }
+            : { bookletKeys: undefined }),
           passwordRequired:
             typeof entry.passwordRequired === "boolean"
               ? entry.passwordRequired

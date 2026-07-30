@@ -1919,7 +1919,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys\n/
     );
     assert.match(
       rosterCsvText,
@@ -7558,6 +7558,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       loginKey: string;
       groupKey: string;
       bookletKey: string | null;
+      bookletKeys?: string[];
       displayName: string | null;
       passwordRequired: boolean;
       validationWarnings: Array<{ code: string; message: string }>;
@@ -7716,6 +7717,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
   assert.equal(testcenterLogin?.groupKey, "sample_group");
   assert.equal(testcenterLogin?.bookletKey, "BOOKLET.SAMPLE-1");
+  assert.deepEqual(testcenterLogin?.bookletKeys, [
+    "BOOKLET.SAMPLE-1",
+    "BOOKLET.SAMPLE-2"
+  ]);
   assert.equal(testcenterLogin?.displayName, null);
   assert.equal(testcenterLogin?.passwordRequired, true);
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
@@ -7866,7 +7871,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys\n/
   );
   assert.match(
     rosterCsvText,
@@ -8595,6 +8600,41 @@ test("participant session launch can target a specific booklet", async () => {
     }
   );
 
+  const multiBookletRoster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      bookletKey: string | null;
+      bookletKeys?: string[];
+      validationWarnings: Array<{ code: string }>;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: [
+          "<Testtakers>",
+          "  <Group id=\"group:booklet-launch\">",
+          "    <Login mode=\"run-hot-return\" name=\"booklet-launch-student\">",
+          "      <Booklet>booklet:beta</Booklet>",
+          "      <Booklet>booklet:alpha</Booklet>",
+          "    </Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  const multiBookletEntry = multiBookletRoster.body.items.find(
+    item => item.loginKey === "booklet-launch-student"
+  );
+  assert.equal(multiBookletEntry?.bookletKey, "booklet:beta");
+  assert.deepEqual(multiBookletEntry?.bookletKeys, [
+    "booklet:beta",
+    "booklet:alpha"
+  ]);
+  assert.deepEqual(multiBookletEntry?.validationWarnings, []);
+
   const firstSignIn = await requestJson<{
     participantSession: { participantSessionId: string };
   }>("/api/v1/participant/auth/sign-in", {
@@ -8607,7 +8647,12 @@ test("participant session launch can target a specific booklet", async () => {
   });
 
   const betaRun = await requestJson<{
-    testRun: { bookletKey: string; currentUnitKey: string | null; status: string };
+    testRun: {
+      testRunId: string;
+      bookletKey: string;
+      currentUnitKey: string | null;
+      status: string;
+    };
   }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
     {
@@ -8634,6 +8679,67 @@ test("participant session launch can target a specific booklet", async () => {
     conflictingBookletRun.body.error,
     "participant_session_open_run_booklet_conflict"
   );
+
+  const completedBetaRun = await requestJson<{
+    testRun: { status: string };
+  }>(`/api/v1/participant/test-runs/${betaRun.body.testRun.testRunId}/complete`, {
+    method: "POST"
+  });
+  assert.equal(completedBetaRun.status, 200);
+  assert.equal(completedBetaRun.body.testRun.status, "completed");
+
+  const betweenBooklets = await requestJson<{
+    runtimeState: {
+      participantSession: { status: string };
+      runtimeStatus: string;
+      availableAction: string;
+      booklets: Array<{ bookletKey: string; status: string }>;
+    };
+  }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`
+  );
+  assert.equal(betweenBooklets.body.runtimeState.participantSession.status, "signed_in");
+  assert.equal(betweenBooklets.body.runtimeState.runtimeStatus, "ready_to_launch");
+  assert.equal(betweenBooklets.body.runtimeState.availableAction, "launch");
+  assert.deepEqual(
+    betweenBooklets.body.runtimeState.booklets.map(booklet => ({
+      bookletKey: booklet.bookletKey,
+      status: booklet.status
+    })),
+    [
+    { bookletKey: "booklet:alpha", status: "available" },
+    { bookletKey: "booklet:beta", status: "completed" }
+    ]
+  );
+
+  const alphaRun = await requestJson<{
+    testRun: { testRunId: string; bookletKey: string; status: string };
+  }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    {
+      method: "POST",
+      body: { bookletKey: "booklet:alpha" }
+    }
+  );
+  assert.equal(alphaRun.status, 200);
+  assert.equal(alphaRun.body.testRun.bookletKey, "booklet:alpha");
+
+  await requestJson(
+    `/api/v1/participant/test-runs/${alphaRun.body.testRun.testRunId}/complete`,
+    { method: "POST" }
+  );
+  const afterAllBooklets = await requestJson<{
+    runtimeState: {
+      participantSession: { status: string };
+      runtimeStatus: string;
+      availableAction: string;
+    };
+  }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/runtime-state`
+  );
+  assert.equal(afterAllBooklets.body.runtimeState.participantSession.status, "closed");
+  assert.equal(afterAllBooklets.body.runtimeState.runtimeStatus, "completed");
+  assert.equal(afterAllBooklets.body.runtimeState.availableAction, "none");
 
   const directLaunch = await requestJson<{
     participantSession: {

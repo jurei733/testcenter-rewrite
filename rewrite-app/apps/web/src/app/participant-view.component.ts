@@ -106,7 +106,24 @@ import { ParticipantViewFacade } from "./participant-view.facade";
           </label>
           <label>
             Booklet Key
-            <input id="participantRouteBookletKey" name="participantRouteBookletKey" [(ngModel)]="view.runtime.bookletKey" (change)="view.persistState()" />
+            <select
+              *ngIf="view.assignedBooklets.length > 0; else manualBookletKey"
+              id="participantRouteBookletKey"
+              name="participantRouteBookletKey"
+              [(ngModel)]="view.runtime.bookletKey"
+              (change)="view.persistState()"
+            >
+              <option
+                *ngFor="let booklet of view.assignedBooklets"
+                [value]="booklet.bookletKey"
+                [disabled]="booklet.status === 'completed'"
+              >
+                {{ booklet.displayLabel }} · {{ booklet.status }}
+              </option>
+            </select>
+            <ng-template #manualBookletKey>
+              <input id="participantRouteBookletKey" name="participantRouteBookletKey" [(ngModel)]="view.runtime.bookletKey" (change)="view.persistState()" />
+            </ng-template>
           </label>
           <label>
             Session Id
@@ -117,6 +134,24 @@ import { ParticipantViewFacade } from "./participant-view.facade";
             <input id="participantRouteCurrentUnitKey" name="participantRouteCurrentUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
           </label>
         </div>
+        <section class="participant-booklet-list" *ngIf="view.assignedBooklets.length > 1" aria-label="Assigned booklets">
+          <span>Assigned Booklets</span>
+          <div>
+            <button
+              *ngFor="let booklet of view.assignedBooklets"
+              type="button"
+              class="unit-chip"
+              [class.is-current]="booklet.bookletKey === view.runtime.bookletKey"
+              [class.has-response]="booklet.status === 'completed'"
+              [disabled]="booklet.status !== 'available'"
+              [attr.data-booklet-key]="booklet.bookletKey"
+              (click)="view.runtime.bookletKey = booklet.bookletKey; view.persistState()"
+            >
+              <strong>{{ booklet.displayLabel }}</strong>
+              <em>{{ booklet.status }}</em>
+            </button>
+          </div>
+        </section>
         <div class="actions">
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In
