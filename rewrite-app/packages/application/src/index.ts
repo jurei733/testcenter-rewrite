@@ -10047,12 +10047,21 @@ export const createFirstSliceServices = (
           );
         }
 
-        const rosterEntry = await findParticipantRosterEntryByLoginKey(
-          repository,
-          workspace.tenantId,
-          workspace.workspaceId,
-          loginKey
-        );
+        const participantRosterEntries =
+          await repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+        const rosterEntry =
+          participantRosterEntries.find(entry => entry.loginKey === loginKey) ??
+          null;
+        if (participantRosterEntries.length > 0 && !rosterEntry) {
+          throw new FirstSliceError(
+            401,
+            "participant_login_invalid",
+            "Participant login is invalid."
+          );
+        }
         if (rosterEntry?.passwordRequired) {
           const passwordHash = await repository.getParticipantRosterPasswordHash(
             workspace.tenantId,
@@ -10073,7 +10082,7 @@ export const createFirstSliceServices = (
         }
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
-          requestedGroupKey || rosterEntry?.groupKey || `group:${loginKey}`;
+          rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
 
         const reusableSession = (
           await repository.listParticipantSessionsByWorkspace(

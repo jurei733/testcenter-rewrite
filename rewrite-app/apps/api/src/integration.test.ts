@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
+import { resolve } from "node:path";
 import { deflateRawSync } from "node:zlib";
 
 import { createProductionApiServer } from "./index.js";
@@ -8,6 +10,11 @@ import { createProductionApiServer } from "./index.js";
 let server: Awaited<ReturnType<typeof createProductionApiServer>>;
 
 let baseUrl = "";
+
+const originalTestcenterCorpusRoot = resolve(
+  process.cwd(),
+  "test-fixtures/original-testcenter"
+);
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -5458,6 +5465,204 @@ test("source document import accepts JSON QTI assessment sections as booklets", 
   );
 });
 
+test("original Testcenter compatibility corpus imports representative booklets", async () => {
+  type BookletExpectation = {
+    fixture: string;
+    sourcePath: string;
+    bookletKey: string;
+    displayLabel: string;
+    unitKeys: string[];
+    policy: {
+      logPolicy?: string;
+      pagingMode?: string;
+      headerContent?: string;
+      unitMenuEnabled?: boolean;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    sourceCommit: string;
+    booklets: BookletExpectation[];
+  };
+  assert.equal(
+    corpus.sourceCommit,
+    "284a4ffcd9452d56dddd51939707ac7f646c3da7"
+  );
+
+  const tenantKey = "integration-tenant-original-corpus";
+  const workspaceKey = "integration-workspace-original-corpus";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const releaseIdsByBookletKey = new Map<string, string>();
+  for (const expectation of corpus.booklets) {
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: expectation.fixture.split("/").at(-1),
+          mediaType: "application/xml",
+          sourceDocument: readFileSync(
+            resolve(originalTestcenterCorpusRoot, expectation.fixture),
+            "utf8"
+          )
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201, expectation.sourcePath);
+
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201, expectation.sourcePath);
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      expectation.sourcePath
+    );
+    assert.deepEqual(
+      importResult.body.importJob.diagnostics,
+      [],
+      expectation.sourcePath
+    );
+    assert.ok(importResult.body.stagedContentRelease, expectation.sourcePath);
+    releaseIdsByBookletKey.set(
+      expectation.bookletKey,
+      importResult.body.stagedContentRelease.contentReleaseId
+    );
+
+    const contentRelease = await requestJson<{
+      contentReleaseDetail: {
+        contentRelease: {
+          runtimeSnapshot: {
+            bookletEntries: Array<{
+              bookletKey: string;
+              displayLabel: string;
+              policy?: {
+                navigation: { unitMenuEnabled: boolean };
+                player: { logPolicy: string; pagingMode: string };
+                display: { headerContent: string };
+              };
+              unitEntries: Array<{ unitKey: string }>;
+            }>;
+          };
+        };
+      };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}`
+    );
+    assert.equal(contentRelease.status, 200, expectation.sourcePath);
+    const booklet =
+      contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries.find(
+        candidate => candidate.bookletKey === expectation.bookletKey
+      );
+    assert.ok(booklet, expectation.sourcePath);
+    assert.equal(booklet.displayLabel, expectation.displayLabel);
+    assert.deepEqual(
+      booklet.unitEntries.map(unit => unit.unitKey),
+      expectation.unitKeys,
+      expectation.sourcePath
+    );
+    assert.ok(booklet.policy, expectation.sourcePath);
+    if (expectation.policy.logPolicy) {
+      assert.equal(booklet.policy.player.logPolicy, expectation.policy.logPolicy);
+    }
+    if (expectation.policy.pagingMode) {
+      assert.equal(booklet.policy.player.pagingMode, expectation.policy.pagingMode);
+    }
+    if (expectation.policy.headerContent) {
+      assert.equal(
+        booklet.policy.display.headerContent,
+        expectation.policy.headerContent
+      );
+    }
+    if (expectation.policy.unitMenuEnabled !== undefined) {
+      assert.equal(
+        booklet.policy.navigation.unitMenuEnabled,
+        expectation.policy.unitMenuEnabled
+      );
+    }
+  }
+
+  const primaryReleaseId = releaseIdsByBookletKey.get("BOOKLET.SAMPLE-1");
+  assert.ok(primaryReleaseId);
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${primaryReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+
+  const rosterCorpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    roster: {
+      fixture: string;
+      participantLoginKeys: string[];
+      excludedOperationalLoginKeys: string[];
+    };
+  };
+  const rosterImport = await requestJson<{
+    importedCount: number;
+    items: Array<{ loginKey: string }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: readFileSync(
+        resolve(originalTestcenterCorpusRoot, rosterCorpus.roster.fixture),
+        "utf8"
+      )
+    }
+  });
+  assert.equal(rosterImport.status, 201);
+  assert.equal(
+    rosterImport.body.importedCount,
+    rosterCorpus.roster.participantLoginKeys.length
+  );
+  assert.deepEqual(
+    rosterImport.body.items.map(item => item.loginKey),
+    [...rosterCorpus.roster.participantLoginKeys].sort()
+  );
+
+  const operationalLogin = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        tenantKey,
+        workspaceKey,
+        loginKey: rosterCorpus.roster.excludedOperationalLoginKeys[0],
+        password: "user123"
+      }
+    }
+  );
+  assert.equal(operationalLogin.status, 401);
+  assert.equal(operationalLogin.body.error, "participant_login_invalid");
+
+  const participantLogin = await requestJson<{
+    participantSession: { loginKey: string; groupKey: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "test", password: "user123" }
+  });
+  assert.equal(participantLogin.status, 200);
+  assert.equal(participantLogin.body.participantSession.loginKey, "test");
+  assert.equal(participantLogin.body.participantSession.groupKey, "sample_group");
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";
@@ -7936,7 +8141,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
 
   assert.equal(testcenterLoginImport.status, 201);
-  assert.equal(testcenterLoginImport.body.importedCount, 2);
+  assert.equal(testcenterLoginImport.body.importedCount, 1);
   assert.equal(testcenterLoginImport.body.updatedCount, 0);
   const testcenterLogin = testcenterLoginImport.body.items.find(
     item => item.loginKey === "test"
@@ -7952,8 +8157,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
     item => item.loginKey === "test-group-monitor"
   );
-  assert.equal(testcenterMonitorLogin?.groupKey, "sample_group");
-  assert.equal(testcenterMonitorLogin?.bookletKey, null);
+  assert.equal(testcenterMonitorLogin, undefined);
 
   const jsonImport = await requestJson<typeof initialImport.body>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
@@ -8066,7 +8270,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
 
   assert.equal(listedRoster.status, 200);
-  assert.equal(listedRoster.body.items.length, 13);
+  assert.equal(listedRoster.body.items.length, 12);
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
     [
@@ -8081,8 +8285,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       "roster-g",
       "roster-h",
       "roster-i",
-      "test",
-      "test-group-monitor"
+      "test"
     ]
   );
 
@@ -8119,7 +8322,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","sample_group","BOOKLET\.SAMPLE-1",""/
   );
-  assert.match(
+  assert.doesNotMatch(
     rosterCsvText,
     /"integration-tenant-roster","integration-workspace-roster","[^"]+","test-group-monitor","sample_group","",""/
   );
@@ -8845,6 +9048,14 @@ test("participant session launch can target a specific booklet", async () => {
           "      <Booklet>booklet:beta</Booklet>",
           "      <Booklet>booklet:alpha</Booklet>",
           "    </Login>",
+          "    <Login mode=\"run-hot-return\" name=\"unknown-booklet-student\">",
+          "      <Booklet>booklet:alpha</Booklet>",
+          "    </Login>",
+          "  </Group>",
+          "  <Group id=\"group:booklet-launch-direct\">",
+          "    <Login mode=\"run-hot-return\" name=\"direct-booklet-launch-student\">",
+          "      <Booklet>booklet:beta</Booklet>",
+          "    </Login>",
           "  </Group>",
           "</Testtakers>"
         ].join("\n")
@@ -8985,7 +9196,7 @@ test("participant session launch can target a specific booklet", async () => {
       tenantKey,
       workspaceKey,
       loginKey: "direct-booklet-launch-student",
-      groupKey: "group:booklet-launch-direct",
+      groupKey: "group:forged-client-value",
       bookletKey: "booklet:beta"
     }
   });
@@ -9026,8 +9237,8 @@ test("participant session launch can target a specific booklet", async () => {
     }
   );
 
-  assert.equal(unknownBooklet.status, 404);
-  assert.equal(unknownBooklet.body.error, "booklet_not_found");
+  assert.equal(unknownBooklet.status, 403);
+  assert.equal(unknownBooklet.body.error, "booklet_not_assigned");
 });
 
 test("activation guard returns blocking open-run details", async () => {

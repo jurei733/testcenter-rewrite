@@ -20,7 +20,7 @@ Priority:
 
 | Order | Priority | Next capability | Why it is next |
 | --- | --- | --- | --- |
-| 1 | P0 | Original package validation corpus | Imports, BookletConfig policies, and the Verona bridge accept common shapes, but XSD/API-version/dependency validation must be proven against representative production packages and players. |
+| 1 | P0 | Original package validation corpus expansion | A pinned 17.4/17.6 sample corpus now gates booklet sequence/config and Testtakers login-mode compatibility; XSD, ZIP dependency, production-package, and real-player coverage must still be added. |
 | 2 | P0 | Testlet timing, locks, and adaptivity | A versioned booklet policy now governs unit navigation and completion; timed/nested blocks, leave-once locks, unlock codes, and adaptive states need to extend the same model. |
 | 3 | P0 | Verona resource and delivery hardening | The basic bridge works; external resources, rich logs/focus events, broader player fixtures, and offline delivery still need parity work. |
 | 4 | P1 | Monitor go-to/unlock/lock commands | Pause, resume, and complete exist; supervised navigation controls do not. |
@@ -66,8 +66,8 @@ Priority:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
-| JSON/XML/ZIP package intake | `WorkspaceController`, file parsers | partial | P0 | staged immutable releases, retry diagnostics, IMS/Testcenter aliases, referenced ZIP content |
-| Original Testtakers XML | `XMLFileTesttakers.class.php` | partial | P0 | groups, passwords, multiple booklet assignments, and common JSON/CSV variants; modes, codes, access windows, profiles, and custom texts remain |
+| JSON/XML/ZIP package intake | `WorkspaceController`, file parsers | partial | P0 | staged immutable releases, retry diagnostics, IMS/Testcenter aliases, referenced ZIP content, and a pinned original 17.4/17.6 booklet corpus with repeated-unit aliases |
+| Original Testtakers XML | `XMLFileTesttakers.class.php` | partial | P0 | original sample fixture gates participant-versus-operational login modes, groups, passwords, and ordered multiple-booklet assignments; codes, access windows, profiles, custom texts, and operator-account migration remain |
 | XML/XSD validation | file parser classes | missing | P0 | structural normalization exists, schema validation does not |
 | Dependency graph and duplicate protection | `WorkspaceDAO`, files E2E | partial | P1 | import resolves many references, but no operator-visible complete dependency graph or dependency-aware delete |
 | Draft validation before activation | workspace admin | done | P1 | import jobs, persisted diagnostics, staged release readiness, roster warnings, activation guard |

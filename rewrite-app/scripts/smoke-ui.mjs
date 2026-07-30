@@ -329,19 +329,29 @@ try {
     await page.waitForTimeout(50);
   };
   const expectInputValue = async (selector, expectedValue) => {
-    await page.waitForFunction(
-      ([targetSelector, targetValue]) => {
-        const field = document.querySelector(targetSelector);
-        return (
-          (field instanceof HTMLInputElement ||
-            field instanceof HTMLTextAreaElement ||
-            field instanceof HTMLSelectElement) &&
-          field.value === targetValue
-        );
-      },
-      [selector, expectedValue],
-      { timeout: 15_000 }
-    );
+    try {
+      await page.waitForFunction(
+        ([targetSelector, targetValue]) => {
+          const field = document.querySelector(targetSelector);
+          return (
+            (field instanceof HTMLInputElement ||
+              field instanceof HTMLTextAreaElement ||
+              field instanceof HTMLSelectElement) &&
+            field.value === targetValue
+          );
+        },
+        [selector, expectedValue],
+        { timeout: 15_000 }
+      );
+    } catch (error) {
+      const actualValue = await page.locator(selector).inputValue();
+      assert.equal(
+        actualValue,
+        expectedValue,
+        `Expected ${selector} to contain the requested value.`
+      );
+      throw error;
+    }
   };
   const expectRuntimeReviewHandoff = async ({
     loginKey,
@@ -2942,12 +2952,13 @@ try {
     .getByRole("button", { name: /Copied Entry URL:/ })
     .waitFor({ state: "visible" });
   await savedRosterBenCard.getByText("Link copied").waitFor({ state: "visible" });
+  const bookletKeyBeforeRosterSelection = await page.locator("#bookletKey").inputValue();
   await savedRosterBenCard
     .getByRole("button", { name: "Use Roster Entry", exact: true })
     .click({ force: true });
   await expectInputValue("#loginKey", "entry-student-b");
   await expectInputValue("#groupKey", "group:entry-smoke");
-  await expectInputValue("#bookletKey", participantRouteBookletKey);
+  await expectInputValue("#bookletKey", bookletKeyBeforeRosterSelection);
   await expectInputValue("#participantDisplayName", "Ben Entry");
   await savedRosterBenCard
     .getByRole("button", { name: "Open Participant Entry", exact: true })
@@ -3039,14 +3050,14 @@ try {
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "7" })
+    .filter({ hasText: "9" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "7" })
+    .filter({ hasText: "9" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })

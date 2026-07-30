@@ -1,0 +1,72 @@
+{
+  "sourceCommit": "284a4ffcd9452d56dddd51939707ac7f646c3da7",
+  "booklets": [
+    {
+      "fixture": "booklets/Booklet.xml",
+      "sourcePath": "sampledata/Booklet.xml",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "displayLabel": "Sample booklet",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"],
+      "policy": {
+        "logPolicy": "debug",
+        "pagingMode": "concat-scroll-snap",
+        "headerContent": "booklet"
+      }
+    },
+    {
+      "fixture": "booklets/Booklet2.xml",
+      "sourcePath": "sampledata/Booklet2.xml",
+      "bookletKey": "BOOKLET.SAMPLE-2",
+      "displayLabel": "Adaptive Booklet",
+      "unitKeys": [
+        "decision-unit",
+        "professional-unit",
+        "advanced-unit",
+        "beginner-unit",
+        "bonus-unit"
+      ],
+      "policy": {
+        "pagingMode": "separate",
+        "unitMenuEnabled": true
+      }
+    },
+    {
+      "fixture": "booklets/booklet-17.4.xml",
+      "sourcePath": "sampledata/aspect/booklet1.xml",
+      "bookletKey": "booklet1",
+      "displayLabel": "Beispieltestheft 1",
+      "unitKeys": [
+        "testcenter-sample1",
+        "testcenter-sample2",
+        "testcenter-sample3"
+      ],
+      "policy": {
+        "pagingMode": "separate",
+        "headerContent": "unit"
+      }
+    }
+  ],
+  "roster": {
+    "fixture": "rosters/Testtakers.xml",
+    "sourcePath": "sampledata/Testtakers.xml",
+    "participantLoginKeys": [
+      "test",
+      "test-review",
+      "test-trial",
+      "test-demo",
+      "test-simulation",
+      "test-no-pw",
+      "test-no-pw-trial",
+      "test-expired",
+      "test-future"
+    ],
+    "excludedOperationalLoginKeys": [
+      "test-group-monitor",
+      "test-group-monitor-2",
+      "sys-check",
+      "test-study-monitor",
+      "expired-group-monitor",
+      "expired-study-monitor"
+    ]
+  }
+}

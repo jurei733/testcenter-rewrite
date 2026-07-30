@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run original Testcenter compatibility corpus
+        run: npm run test:compatibility:built
+
       - name: Run SQLite runtime preflight
         run: |
           FIRST_SLICE_STORE=sqlite \

@@ -150,7 +150,7 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
-  it("parses Testcenter Login XML roster entries", () => {
+  it("parses participant Testcenter Login entries and excludes operational modes", () => {
     assert.deepEqual(
       parseParticipantRosterText(
         [
@@ -161,6 +161,9 @@ describe("parseParticipantRosterText", () => {
           "      <Booklet>BOOKLET.SAMPLE-2</Booklet>",
           "    </Login>",
           "    <Login mode=\"monitor-group\" name=\"test-group-monitor\" pw=\"user123\" />",
+          "    <Login mode=\"monitor-study\" name=\"test-study-monitor\" pw=\"user123\" />",
+          "    <Login mode=\"sys-check-login\" name=\"test-sys-check\" />",
+          "    <Login mode=\"run-review\" name=\"test-review\" pw=\"user123\"><Booklet>BOOKLET.REVIEW</Booklet></Login>",
           "  </Group>",
           "</Testtakers>"
         ].join("\n")
@@ -175,11 +178,43 @@ describe("parseParticipantRosterText", () => {
           password: "user123"
         },
         {
-          loginKey: "test-group-monitor",
+          loginKey: "test-review",
           groupKey: "sample_group",
-          bookletKey: null,
+          bookletKey: "BOOKLET.REVIEW",
           displayName: null,
           password: "user123"
+        }
+      ]
+    );
+  });
+
+  it("applies Testcenter login modes to JSON roster entries", () => {
+    assert.deepEqual(
+      parseParticipantRosterText({
+        groups: [
+          {
+            id: "group:modes",
+            participants: [
+              { login: "json-run", mode: "run-hot-return" },
+              { login: "json-review", mode: "run-review" },
+              { login: "json-monitor", mode: "monitor-group" },
+              { login: "json-system-check", mode: "sys-check-login" }
+            ]
+          }
+        ]
+      }),
+      [
+        {
+          loginKey: "json-run",
+          groupKey: "group:modes",
+          bookletKey: null,
+          displayName: null
+        },
+        {
+          loginKey: "json-review",
+          groupKey: "group:modes",
+          bookletKey: null,
+          displayName: null
         }
       ]
     );

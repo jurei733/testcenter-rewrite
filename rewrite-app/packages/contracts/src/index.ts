@@ -387,6 +387,11 @@ const normalizeRosterTextValue = (value: string | undefined | null): string | nu
   return normalizedValue ? normalizedValue : null;
 };
 
+const isParticipantRosterMode = (value: string | undefined | null): boolean => {
+  const mode = normalizeRosterTextValue(value)?.toLowerCase();
+  return !mode || mode.startsWith("run-");
+};
+
 const combineRosterDisplayName = (
   displayName: string | null,
   firstName: string | null,
@@ -540,6 +545,7 @@ const parseParticipantRosterJsonValue = (
     const loginKey =
       explicitLoginKey ??
       (childValues.length === 0 ? readJsonRosterString(objectValue, "id") : null);
+    const mode = readJsonRosterString(objectValue, "mode", "loginMode", "testMode");
     const groupKey =
       readJsonRosterString(
         objectValue,
@@ -561,6 +567,9 @@ const parseParticipantRosterJsonValue = (
       ) ?? context.bookletKey;
 
     if (loginKey) {
+      if (!isParticipantRosterMode(mode)) {
+        return;
+      }
       const password = readJsonRosterString(
         objectValue,
         "password",
@@ -843,6 +852,14 @@ const parseParticipantRosterXmlText = (
     if (!loginKey) {
       continue;
     }
+    if (
+      !isParticipantRosterMode(
+        readXmlAttribute(attributes, "mode", "loginMode", "testMode") ??
+          readXmlChildText(content, "mode", "loginMode", "testMode")
+      )
+    ) {
+      continue;
+    }
 
     const groupKey = normalizeRosterTextValue(
       readXmlAttribute(
@@ -948,7 +965,7 @@ const parseParticipantRosterXmlText = (
   }
 
   for (const match of rosterText.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?Login)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g
+    /<((?:[a-zA-Z_][\w.-]*:)?Login)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
   )) {
     const entryOffset = match.index ?? 0;
     const attributes = parseXmlAttributes(match[2] ?? "");
@@ -967,6 +984,13 @@ const parseParticipantRosterXmlText = (
       )
     );
     if (!loginKey) {
+      continue;
+    }
+    if (
+      !isParticipantRosterMode(
+        readXmlAttribute(attributes, "mode", "loginMode", "testMode")
+      )
+    ) {
       continue;
     }
 
