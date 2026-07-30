@@ -2515,11 +2515,25 @@ try {
   const veronaBookletKey = "booklet:verona-smoke";
   const veronaUnitKey = "unit:verona-smoke";
   const veronaLoginKey = "student-verona-smoke";
+  const expectedVeronaResourceContent =
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+  const originalVeronaResourcePackage = Buffer.from(
+    (
+      await readFile(
+        resolve(
+          "test-fixtures/original-testcenter/resources/sample_resource_package.itcr.zip.base64"
+        ),
+        "utf8"
+      )
+    ).trim(),
+    "base64"
+  );
   const veronaPlayerHtml = `<!doctype html>
     <html><body>
       <strong id="playerDefinition"></strong>
       <output id="playerConfig"></output>
       <output id="playerStartPage"></output>
+      <output id="playerResource"></output>
       <label>Player answer <input id="playerAnswer" /></label>
       <button id="playerEnd" type="button">End from player</button>
       <script>
@@ -2543,6 +2557,17 @@ try {
           document.querySelector("#playerStartPage").textContent = String(event.data.playerConfig?.startPage || "");
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
           document.querySelector("#playerAnswer").addEventListener("input", sendState);
+          fetch(event.data.playerConfig.directDownloadUrl + "/sample_resource_package/file.text")
+            .then(response => {
+              if (!response.ok) throw new Error("resource status " + response.status);
+              return response.text();
+            })
+            .then(content => {
+              document.querySelector("#playerResource").textContent = content;
+            })
+            .catch(error => {
+              document.querySelector("#playerResource").textContent = "resource-error: " + error.message;
+            });
         });
         document.querySelector("#playerEnd").addEventListener("click", () => parent.postMessage({
           type: "vopUnitNavigationRequestedNotification",
@@ -2555,39 +2580,73 @@ try {
         }, "*"));
       <\/script>
     </body></html>`;
+  const veronaSourcePackageZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${veronaBookletKey}" href="booklets/Booklet.xml">
+              <dependency identifierref="${veronaUnitKey}" />
+            </resource>
+            <resource identifier="${veronaUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${veronaPlayerKey}" href="players/verona-smoke.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${veronaBookletKey}</Id>
+            <Label>Verona Smoke Booklet</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="force_response_complete">ON</Config>
+            <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
+            <Config key="unit_menu">OFF</Config>
+            <Config key="unit_navibuttons">OFF</Config>
+            <Config key="pagingMode">concat-scroll</Config>
+            <Config key="logPolicy">debug</Config>
+            <Config key="restore_current_page_on_return">ON</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${veronaUnitKey}</Id>
+            <Label>Verona Smoke Unit</Label>
+          </Metadata>
+          <Definition player="${veronaPlayerKey}"><![CDATA[Smoke unit definition]]></Definition>
+          <Dependencies><File for="player">sample_resource_package.itcr.zip</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-smoke.html",
+      content: veronaPlayerHtml
+    },
+    {
+      fileName: "export/resources/sample_resource_package.itcr.zip",
+      content: originalVeronaResourcePackage
+    }
+  ]);
   const veronaSourcePackageResponse = await sendSmokeJson(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
     {
       body: {
-        fileName: "verona-smoke.json",
-        mediaType: "application/json",
-        sourceDocument: JSON.stringify({
-          playerEntries: [{ playerKey: veronaPlayerKey, html: veronaPlayerHtml }],
-          bookletEntries: [
-            {
-              bookletKey: veronaBookletKey,
-              displayLabel: "Verona Smoke Booklet",
-              bookletConfig: {
-                force_response_complete: "ON",
-                allow_player_to_terminate_test: "LAST_UNIT",
-                unit_menu: "OFF",
-                unit_navibuttons: "OFF",
-                pagingMode: "concat-scroll",
-                logPolicy: "debug",
-                restore_current_page_on_return: "ON"
-              },
-              unitEntries: [
-                {
-                  unitKey: veronaUnitKey,
-                  displayLabel: "Verona Smoke Unit",
-                  playerKey: veronaPlayerKey,
-                  unitDefinition: "Smoke unit definition",
-                  unitDefinitionType: veronaPlayerKey
-                }
-              ]
-            }
-          ]
-        })
+        fileName: "verona-resource-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${veronaSourcePackageZip.toString("base64")}`
       }
     }
   );
@@ -2623,6 +2682,13 @@ try {
       }
     }
   );
+  const veronaResourceResponsePromise = page.waitForResponse(response =>
+    response
+      .url()
+      .endsWith(
+        "/resources/sample_resource_package/file.text"
+      )
+  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -2647,6 +2713,20 @@ try {
     .filter({ hasText: '"pagingMode":"concat-scroll"' })
     .filter({ hasText: '"logPolicy":"debug"' })
     .waitFor();
+  await veronaFrame
+    .locator("#playerResource")
+    .filter({ hasText: expectedVeronaResourceContent.trim() })
+    .waitFor({ timeout: 15_000 });
+  const veronaResourceResponse = await veronaResourceResponsePromise;
+  assert.equal(veronaResourceResponse.status(), 200);
+  assert.equal(
+    veronaResourceResponse.headers()["access-control-allow-origin"],
+    "*"
+  );
+  assert.equal(
+    await veronaFrame.locator("#playerResource").textContent(),
+    expectedVeronaResourceContent
+  );
   await page
     .locator("#participantRouteNavigationNotice")
     .filter({ hasText: "Complete the required response" })
@@ -2661,6 +2741,12 @@ try {
     .locator("#participantRouteSessionId")
     .inputValue();
   assert.ok(veronaParticipantSessionId);
+  assert.equal(
+    JSON.parse(
+      (await veronaFrame.locator("#playerConfig").textContent()) ?? "{}"
+    ).directDownloadUrl,
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/resources`
+  );
   await veronaFrame.locator("#playerEnd").click();
   await page.waitForTimeout(250);
   const guardedPlayerEndState = await (

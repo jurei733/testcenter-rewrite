@@ -6968,6 +6968,13 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
             <Id>BOOKLET.SAMPLE-1</Id>
             <Label>Sample booklet</Label>
           </Metadata>
+          <BookletConfig>
+            <Config key="force_response_complete">ON</Config>
+            <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
+            <Config key="pagingMode">concat-scroll</Config>
+            <Config key="logPolicy">debug</Config>
+            <Config key="restore_current_page_on_return">ON</Config>
+          </BookletConfig>
           <Units>
             <Unit id="UNIT.SAMPLE" label="Referenced definition unit" />
             <Unit id="UNIT.INLINE" label="Inline definition unit" />
@@ -7060,6 +7067,17 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
+            policy?: {
+              navigation: {
+                requireResponseComplete: string;
+                playerEnd: string;
+              };
+              player: {
+                pagingMode: string;
+                logPolicy: string;
+                restoreCurrentPageOnReturn: boolean;
+              };
+            };
             unitEntries: Array<{
               unitKey: string;
               displayLabel: string;
@@ -7078,8 +7096,27 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
 
   assert.equal(contentRelease.status, 200);
+  const runtimeSnapshot =
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.navigation, {
+    requirePresentationComplete: "off",
+    requireResponseComplete: "forward",
+    unitMenuEnabled: false,
+    unitControls: "both",
+    playerEnd: "last_unit"
+  });
+  assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
+    logPolicy: "debug",
+    pagingMode: "concat-scroll",
+    restoreCurrentPageOnReturn: true
+  });
   assert.deepEqual(
-    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot,
+    {
+      ...runtimeSnapshot,
+      bookletEntries: runtimeSnapshot.bookletEntries.map(
+        ({ policy: _policy, ...bookletEntry }) => bookletEntry
+      )
+    },
     {
       bookletEntries: [
         {

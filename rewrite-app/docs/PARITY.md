@@ -22,7 +22,7 @@ Priority:
 | --- | --- | --- | --- |
 | 1 | P0 | Original package dependency corpus expansion | A pinned 14.3/15.1/17.4/17.6 corpus now gates successful imports and XSD-backed rejection behavior; complete XSD facets, original multi-file/ZIP dependency bundles, production packages, and more real players must still be added. |
 | 2 | P0 | Testlet timing, locks, and adaptivity | A versioned booklet policy now governs unit navigation and completion; timed/nested blocks, leave-once locks, unlock codes, and adaptive states need to extend the same model. |
-| 3 | P0 | Verona resource and delivery hardening | Original nested `.itcr.zip` packages now reach players through `directDownloadUrl`; loose cross-package workspace resources, rich logs/focus events, broader player fixtures, streaming/range requests, and offline delivery still need parity work. |
+| 3 | P0 | Verona resource and delivery hardening | Original nested `.itcr.zip` packages now reach players through `directDownloadUrl`, including a browser gate for byte-exact fetches from the originless sandbox; loose cross-package workspace resources, rich logs/focus events, broader player fixtures, streaming/range requests, and offline delivery still need parity work. |
 | 4 | P1 | Monitor go-to/unlock/lock commands | Pause, resume, and complete exist; supervised navigation controls do not. |
 | 5 | P1 | Participant access windows and login protection | Valid-from/to/for and participant brute-force protection are still absent. |
 | 6 | P1 | Workspace file administration | Operators still need file browsing, download, dependency-aware deletion, and replacement workflows. |

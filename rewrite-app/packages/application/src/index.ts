@@ -5548,11 +5548,11 @@ const normalizeParsedZipXmlContentStructure = (
       normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
     );
   });
-  const referencedRuntimeSnapshot =
+  // These entries already are normalized runtime booklets. Normalizing them as
+  // source entries again would discard compiled policies from referenced XML.
+  const referencedRuntimeSnapshot: ContentReleaseRuntimeSnapshot | null =
     referencedBookletEntries.length > 0
-      ? normalizeContentStructure({
-          bookletEntries: referencedBookletEntries
-        })
+      ? { bookletEntries: referencedBookletEntries }
       : null;
 
   if (referencedRuntimeSnapshot) {
@@ -5560,9 +5560,7 @@ const normalizeParsedZipXmlContentStructure = (
   }
 
   if (!runtimeSnapshot) {
-    runtimeSnapshot = normalizeContentStructure({
-      bookletEntries: referencedBookletEntries
-    });
+    runtimeSnapshot = referencedRuntimeSnapshot;
     if (!runtimeSnapshot) {
       return null;
     }
