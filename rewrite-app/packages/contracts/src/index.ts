@@ -1087,13 +1087,18 @@ export const parseParticipantRosterText = (
     );
   }
 
+  const trimmedRosterText = rosterText.trimStart();
   const jsonEntries = parseParticipantRosterJsonText(rosterText);
-  if (jsonEntries.length > 0) {
+  if (
+    jsonEntries.length > 0 ||
+    trimmedRosterText.startsWith("{") ||
+    trimmedRosterText.startsWith("[")
+  ) {
     return mergeParsedParticipantRosterEntries(jsonEntries);
   }
 
   const xmlEntries = parseParticipantRosterXmlText(rosterText);
-  if (xmlEntries.length > 0) {
+  if (xmlEntries.length > 0 || trimmedRosterText.startsWith("<")) {
     return xmlEntries;
   }
 

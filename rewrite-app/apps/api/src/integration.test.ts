@@ -5479,11 +5479,23 @@ test("original Testcenter compatibility corpus imports representative booklets",
       unitMenuEnabled?: boolean;
     };
   };
+  type InvalidXmlExpectation = {
+    fixture: string;
+    sourcePath: string;
+    kind: "source-package" | "participant-roster";
+    diagnosticCode: string;
+  };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as {
     sourceCommit: string;
     booklets: BookletExpectation[];
+    roster: {
+      fixture: string;
+      participantLoginKeys: string[];
+      excludedOperationalLoginKeys: string[];
+    };
+    invalidXml: InvalidXmlExpectation[];
   };
   assert.equal(
     corpus.sourceCommit,
@@ -5606,15 +5618,6 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   assert.equal(activation.status, 200);
 
-  const rosterCorpus = JSON.parse(
-    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
-  ) as {
-    roster: {
-      fixture: string;
-      participantLoginKeys: string[];
-      excludedOperationalLoginKeys: string[];
-    };
-  };
   const rosterImport = await requestJson<{
     importedCount: number;
     items: Array<{ loginKey: string }>;
@@ -5622,7 +5625,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     method: "POST",
     body: {
       rosterText: readFileSync(
-        resolve(originalTestcenterCorpusRoot, rosterCorpus.roster.fixture),
+        resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
         "utf8"
       )
     }
@@ -5630,11 +5633,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.equal(rosterImport.status, 201);
   assert.equal(
     rosterImport.body.importedCount,
-    rosterCorpus.roster.participantLoginKeys.length
+    corpus.roster.participantLoginKeys.length
   );
   assert.deepEqual(
     rosterImport.body.items.map(item => item.loginKey),
-    [...rosterCorpus.roster.participantLoginKeys].sort()
+    [...corpus.roster.participantLoginKeys].sort()
   );
 
   const operationalLogin = await requestJson<{ error: string }>(
@@ -5644,7 +5647,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       body: {
         tenantKey,
         workspaceKey,
-        loginKey: rosterCorpus.roster.excludedOperationalLoginKeys[0],
+        loginKey: corpus.roster.excludedOperationalLoginKeys[0],
         password: "user123"
       }
     }
@@ -5661,6 +5664,153 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.equal(participantLogin.status, 200);
   assert.equal(participantLogin.body.participantSession.loginKey, "test");
   assert.equal(participantLogin.body.participantSession.groupKey, "sample_group");
+
+  for (const expectation of corpus.invalidXml) {
+    const fixtureText = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.fixture),
+      "utf8"
+    );
+    if (expectation.kind === "source-package") {
+      const invalidSourcePackage = await requestJson<{
+        sourcePackage: { sourcePackageId: string };
+      }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+        method: "POST",
+        body: {
+          fileName: expectation.fixture.split("/").at(-1),
+          mediaType: "application/xml",
+          sourceDocument: fixtureText
+        }
+      });
+      assert.equal(invalidSourcePackage.status, 201, expectation.sourcePath);
+      const invalidImport = await requestJson<{
+        importJob: {
+          status: string;
+          diagnostics: Array<{ code: string; severity: string }>;
+        };
+        stagedContentRelease: null;
+      }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+        method: "POST",
+        body: {
+          sourcePackageId:
+            invalidSourcePackage.body.sourcePackage.sourcePackageId
+        }
+      });
+      assert.equal(invalidImport.status, 201, expectation.sourcePath);
+      assert.equal(invalidImport.body.importJob.status, "failed", expectation.sourcePath);
+      assert.ok(
+        invalidImport.body.importJob.diagnostics.some(
+          diagnostic =>
+            diagnostic.code === expectation.diagnosticCode &&
+            diagnostic.severity === "error"
+        ),
+        expectation.sourcePath
+      );
+      assert.equal(invalidImport.body.stagedContentRelease, null);
+      continue;
+    }
+
+    const invalidRoster = await requestJson<{
+      error: string;
+      details: { diagnostics: Array<{ code: string; severity: string }> };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+      method: "POST",
+      body: { rosterText: fixtureText }
+    });
+    assert.equal(invalidRoster.status, 400, expectation.sourcePath);
+    assert.equal(invalidRoster.body.error, "participant_roster_xml_invalid");
+    assert.ok(
+      invalidRoster.body.details.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === expectation.diagnosticCode &&
+          diagnostic.severity === "error"
+      ),
+      expectation.sourcePath
+    );
+  }
+
+  const validBookletXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, corpus.booklets[0].fixture),
+    "utf8"
+  );
+  for (const malformedCase of [
+    {
+      fileName: "malformed-original-booklet.xml",
+      sourceDocument: validBookletXml.replace(/<\/Booklet>\s*$/, ""),
+      diagnosticCode: "source_document_xml_malformed"
+    },
+    {
+      fileName: "doctype-original-booklet.xml",
+      sourceDocument: validBookletXml.replace(
+        /(<\?xml[^>]*\?>)/,
+        '$1\n<!DOCTYPE Booklet [<!ENTITY unsafe "not-expanded">]>'
+      ),
+      diagnosticCode: "source_document_xml_doctype_unsupported"
+    },
+    {
+      fileName: "wrong-schema-original-booklet.xml",
+      sourceDocument: validBookletXml.replace("vo_Booklet.xsd", "vo_Unit.xsd"),
+      diagnosticCode: "testcenter_xml_schema_reference_invalid"
+    }
+  ]) {
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: malformedCase.fileName,
+        mediaType: "application/xml",
+        sourceDocument: malformedCase.sourceDocument
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.body.importJob.status, "failed", malformedCase.fileName);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === malformedCase.diagnosticCode
+      ),
+      malformedCase.fileName
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  const unsupportedModeRoster = await requestJson<{
+    error: string;
+    details: { diagnostics: Array<{ code: string }> };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: readFileSync(
+        resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
+        "utf8"
+      ).replace('mode="run-hot-return"', 'mode="run-unknown"')
+    }
+  });
+  assert.equal(unsupportedModeRoster.status, 400);
+  assert.equal(unsupportedModeRoster.body.error, "participant_roster_xml_invalid");
+  assert.ok(
+    unsupportedModeRoster.body.details.diagnostics.some(
+      diagnostic => diagnostic.code === "testcenter_xml_login_mode_invalid"
+    )
+  );
+
+  const operationalOnlyRoster = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText:
+          '<Testtakers><Group id="operators"><Login mode="monitor-study" name="study-monitor" /></Group></Testtakers>'
+      }
+    }
+  );
+  assert.equal(operationalOnlyRoster.status, 400);
+  assert.equal(operationalOnlyRoster.body.error, "participant_roster_empty");
 });
 
 test("source document import accepts testcenter-style XML aliases", async () => {

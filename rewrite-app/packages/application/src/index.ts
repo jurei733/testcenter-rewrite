@@ -1,6 +1,12 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 
+import { DOMParser } from "@xmldom/xmldom";
+import type {
+  Document as XmlDocument,
+  Element as XmlElement
+} from "@xmldom/xmldom";
+
 import {
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
@@ -3961,6 +3967,321 @@ const readXmlChildText = (
   return undefined;
 };
 
+const xmlElementLocalName = (element: XmlElement): string =>
+  element.localName || element.nodeName.split(":").at(-1) || element.nodeName;
+
+const xmlChildElements = (element: XmlElement): XmlElement[] => {
+  const children: XmlElement[] = [];
+  for (let index = 0; index < element.childNodes.length; index += 1) {
+    const child = element.childNodes.item(index);
+    if (child?.nodeType === 1) {
+      children.push(child as XmlElement);
+    }
+  }
+  return children;
+};
+
+const xmlChildrenNamed = (element: XmlElement, name: string): XmlElement[] =>
+  xmlChildElements(element).filter(child => xmlElementLocalName(child) === name);
+
+const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] => {
+  const matches: XmlElement[] = [];
+  const descendants = element.getElementsByTagName("*");
+  for (let index = 0; index < descendants.length; index += 1) {
+    const descendant = descendants.item(index);
+    if (descendant && xmlElementLocalName(descendant) === name) {
+      matches.push(descendant);
+    }
+  }
+  return matches;
+};
+
+const xmlElementText = (element: XmlElement | undefined): string =>
+  String(element?.textContent ?? "").trim();
+
+const validateUniqueTestcenterXmlValues = (
+  values: Array<{ value: string; label: string }>,
+  code: string,
+  sourceFileName: string
+): ImportJobDiagnostic[] => {
+  const seen = new Set<string>();
+  const diagnostics: ImportJobDiagnostic[] = [];
+  for (const item of values) {
+    if (!item.value || !seen.has(item.value)) {
+      if (item.value) {
+        seen.add(item.value);
+      }
+      continue;
+    }
+    diagnostics.push(
+      createImportDiagnostic(
+        code,
+        `Original Testcenter XML '${sourceFileName}' contains duplicate ${item.label} '${item.value}'.`
+      )
+    );
+  }
+  return diagnostics;
+};
+
+const validateTestcenterXmlSourceDocument = (
+  sourceDocument: string,
+  sourceFileName: string
+): ImportJobDiagnostic[] => {
+  if (/<!DOCTYPE\b/i.test(sourceDocument)) {
+    return [
+      createImportDiagnostic(
+        "source_document_xml_doctype_unsupported",
+        `Source package '${sourceFileName}' contains a DOCTYPE declaration, which is not accepted for import.`
+      )
+    ];
+  }
+
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(level, message) {
+        parserErrors.push(`${level}: ${message}`);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch (error) {
+    parserErrors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  if (parserErrors.length > 0 || !document?.documentElement) {
+    return [
+      createImportDiagnostic(
+        "source_document_xml_malformed",
+        `Source package '${sourceFileName}' contained malformed XML${
+          parserErrors[0] ? `: ${parserErrors[0]}` : "."
+        }`
+      )
+    ];
+  }
+
+  const root = document.documentElement;
+  const rootName = xmlElementLocalName(root);
+  const canonicalRootName = ["Booklet", "Unit", "Testtakers", "SysCheck"].find(
+    candidate => candidate.toLowerCase() === rootName.toLowerCase()
+  );
+  if (!canonicalRootName) {
+    return [];
+  }
+
+  const schemaLocation =
+    root.getAttributeNS(
+      "http://www.w3.org/2001/XMLSchema-instance",
+      "noNamespaceSchemaLocation"
+    ) || root.getAttribute("xsi:noNamespaceSchemaLocation");
+  if (!schemaLocation) {
+    return [];
+  }
+
+  const diagnostics: ImportJobDiagnostic[] = [];
+  if (rootName !== canonicalRootName) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_root_invalid",
+        `Original Testcenter XML '${sourceFileName}' must use root element '${canonicalRootName}' with matching case.`
+      )
+    );
+  }
+  if (
+    !new RegExp(
+      `(?:^|/)definitions/vo_${canonicalRootName}\\.xsd(?:[?#].*)?$`,
+      "i"
+    ).test(schemaLocation)
+  ) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_schema_reference_invalid",
+        `Original Testcenter XML '${sourceFileName}' references schema '${schemaLocation}', which does not match '${canonicalRootName}'.`
+      )
+    );
+  }
+
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  if (!metadata) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_metadata_missing",
+        `Original Testcenter XML '${sourceFileName}' requires a direct Metadata element.`
+      )
+    );
+  }
+
+  if (canonicalRootName === "Booklet") {
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_id_missing",
+          `Original Testcenter booklet '${sourceFileName}' requires Metadata/Id.`
+        )
+      );
+    }
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_label_missing",
+          `Original Testcenter booklet '${sourceFileName}' requires Metadata/Label.`
+        )
+      );
+    }
+
+    const units = xmlChildrenNamed(root, "Units")[0];
+    const unitEntries = units ? xmlDescendantsNamed(units, "Unit") : [];
+    if (!units || unitEntries.length === 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_units_missing",
+          `Original Testcenter booklet '${sourceFileName}' requires Units with at least one Unit.`
+        )
+      );
+    }
+    for (const unit of unitEntries) {
+      if (!unit.getAttribute("id")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_id_missing",
+            `Original Testcenter booklet '${sourceFileName}' contains a Unit without an id.`
+          )
+        );
+      }
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        unitEntries.map(unit => {
+          const id = unit.getAttribute("id")?.trim() ?? "";
+          const alias = unit.getAttribute("alias")?.trim() ?? "";
+          return { value: alias || id, label: "unit runtime key" };
+        }),
+        "testcenter_xml_unit_key_duplicate",
+        sourceFileName
+      ),
+      ...validateUniqueTestcenterXmlValues(
+        (units ? xmlDescendantsNamed(units, "Testlet") : []).map(testlet => ({
+          value: testlet.getAttribute("id")?.trim() ?? "",
+          label: "testlet id"
+        })),
+        "testcenter_xml_testlet_id_duplicate",
+        sourceFileName
+      )
+    );
+  }
+
+  if (canonicalRootName === "Unit") {
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_id_missing",
+          `Original Testcenter unit '${sourceFileName}' requires Metadata/Id.`
+        )
+      );
+    }
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_label_missing",
+          `Original Testcenter unit '${sourceFileName}' requires Metadata/Label.`
+        )
+      );
+    }
+    const definitions = [
+      ...xmlChildrenNamed(root, "Definition"),
+      ...xmlChildrenNamed(root, "DefinitionRef")
+    ];
+    if (definitions.length !== 1 || !definitions[0]?.getAttribute("player")?.trim()) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_definition_invalid",
+          `Original Testcenter unit '${sourceFileName}' requires exactly one Definition or DefinitionRef with a player attribute.`
+        )
+      );
+    }
+  }
+
+  if (canonicalRootName === "Testtakers") {
+    const supportedLoginModes = new Set([
+      "run-hot-return",
+      "run-hot-restart",
+      "run-trial",
+      "run-review",
+      "run-demo",
+      "run-simulation",
+      "monitor-group",
+      "monitor-study",
+      "sys-check-login"
+    ]);
+    const groups = xmlChildrenNamed(root, "Group");
+    if (groups.length === 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_groups_missing",
+          `Original Testcenter roster '${sourceFileName}' requires at least one Group.`
+        )
+      );
+    }
+    const logins = groups.flatMap(group => xmlChildrenNamed(group, "Login"));
+    for (const group of groups) {
+      if (!group.getAttribute("id")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_group_id_missing",
+            `Original Testcenter roster '${sourceFileName}' contains a Group without an id.`
+          )
+        );
+      }
+      if (!group.getAttribute("label")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_group_label_missing",
+            `Original Testcenter roster '${sourceFileName}' contains a Group without a label.`
+          )
+        );
+      }
+    }
+    for (const login of logins) {
+      if (!login.getAttribute("name")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_login_name_missing",
+            `Original Testcenter roster '${sourceFileName}' contains a Login without a name.`
+          )
+        );
+      }
+      const mode = login.getAttribute("mode")?.trim();
+      if (mode && !supportedLoginModes.has(mode)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_login_mode_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains unsupported login mode '${mode}'.`
+          )
+        );
+      }
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        groups.map(group => ({
+          value: group.getAttribute("id")?.trim() ?? "",
+          label: "group id"
+        })),
+        "testcenter_xml_group_id_duplicate",
+        sourceFileName
+      ),
+      ...validateUniqueTestcenterXmlValues(
+        logins.map(login => ({
+          value: login.getAttribute("name")?.trim() ?? "",
+          label: "login name"
+        })),
+        "testcenter_xml_login_name_duplicate",
+        sourceFileName
+      )
+    );
+  }
+
+  return diagnostics;
+};
+
 const resolveXmlManifestPath = (...segments: Array<string | undefined>): string => {
   let resolvedPath = "";
 
@@ -5413,9 +5734,16 @@ const deriveRuntimeSnapshotFromSourceDocument = (
     normalizedFileName.endsWith(".manifest") ||
     looksLikeXmlDocument
   ) {
+    const diagnostics = validateTestcenterXmlSourceDocument(
+      sourcePackage.sourceDocument,
+      sourcePackage.fileName
+    );
+    if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
+      return { runtimeSnapshot: null, diagnostics };
+    }
     return {
       runtimeSnapshot: normalizeParsedXmlContentStructure(sourcePackage.sourceDocument),
-      diagnostics: []
+      diagnostics
     };
   }
 
@@ -5497,7 +5825,7 @@ const buildRuntimeSnapshot = (
     if (derivedFromSourceDocument.runtimeSnapshot) {
       return {
         runtimeSnapshot: derivedFromSourceDocument.runtimeSnapshot,
-        diagnostics: []
+        diagnostics: derivedFromSourceDocument.diagnostics
       };
     }
 
@@ -8965,7 +9293,31 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
+        if (
+          typeof input.rosterText === "string" &&
+          input.rosterText.trimStart().startsWith("<")
+        ) {
+          const xmlDiagnostics = validateTestcenterXmlSourceDocument(
+            input.rosterText,
+            "participant-roster.xml"
+          );
+          if (xmlDiagnostics.some(diagnostic => diagnostic.severity === "error")) {
+            throw new FirstSliceError(
+              400,
+              "participant_roster_xml_invalid",
+              "Participant roster XML failed Original Testcenter compatibility validation.",
+              { diagnostics: xmlDiagnostics }
+            );
+          }
+        }
         const parsedEntries = parseParticipantRosterText(input.rosterText);
+        if (parsedEntries.length === 0) {
+          throw new FirstSliceError(
+            400,
+            "participant_roster_empty",
+            "Participant roster did not contain any participant login entries."
+          );
+        }
         const existingEntries =
           await repository.listParticipantRosterEntriesByWorkspace(
             workspace.tenantId,

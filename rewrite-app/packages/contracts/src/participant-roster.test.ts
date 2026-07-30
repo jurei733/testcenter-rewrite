@@ -220,6 +220,17 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("does not reinterpret participant-free XML or JSON documents as delimited rows", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        '<Testtakers><Group id="operators"><Login mode="monitor-study" name="study-monitor" /></Group></Testtakers>'
+      ),
+      []
+    );
+    assert.deepEqual(parseParticipantRosterText({ participants: [] }), []);
+    assert.deepEqual(parseParticipantRosterText('{"participants":[]}'), []);
+  });
+
   it("parses JSON roster entries and inherited group/booklet contexts", () => {
     assert.deepEqual(
       parseParticipantRosterText(

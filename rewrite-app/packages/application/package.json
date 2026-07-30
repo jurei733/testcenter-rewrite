@@ -7,6 +7,7 @@
   "types": "dist/packages/application/src/index.d.ts",
   "dependencies": {
     "@testcenter-rewrite-app/contracts": "0.0.0",
-    "@testcenter-rewrite-app/domain": "0.0.0"
+    "@testcenter-rewrite-app/domain": "0.0.0",
+    "@xmldom/xmldom": "^0.9.10"
   }
 }
