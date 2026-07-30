@@ -419,6 +419,10 @@ export type ParticipantRuntimePort = {
   getCurrentRunState(input: {
     participantSessionId: string;
   }): Promise<ParticipantCurrentRunState>;
+  getResource(input: {
+    participantSessionId: string;
+    resourcePath: string;
+  }): Promise<NonNullable<ContentReleaseRuntimeSnapshot["resourceEntries"]>[number]>;
   launch(input: { participantSessionId: string; bookletKey?: string }): Promise<TestRun>;
   resumeSession(input: {
     participantSessionId: string;
@@ -5130,6 +5134,8 @@ type ZipManifestExtractionResult =
   | { status: "manifest_missing" };
 
 const MAX_EXTRACTED_MANIFEST_BYTES = 5 * 1024 * 1024;
+const MAX_EXTRACTED_RESOURCE_BYTES = 20 * 1024 * 1024;
+const MAX_EXTRACTED_RESOURCE_TOTAL_BYTES = 50 * 1024 * 1024;
 
 const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
   const minimumOffset = Math.max(0, zipBuffer.length - 65557);
@@ -5187,12 +5193,13 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
   return entries;
 };
 
-const readZipEntryText = (
+const readZipEntryBuffer = (
   zipBuffer: Buffer,
-  entry: ZipEntry
-): string | null => {
+  entry: ZipEntry,
+  maxOutputBytes: number
+): Buffer | null => {
   if (
-    entry.uncompressedSize > MAX_EXTRACTED_MANIFEST_BYTES ||
+    entry.uncompressedSize > maxOutputBytes ||
     entry.localHeaderOffset + 30 > zipBuffer.length ||
     zipBuffer.readUInt32LE(entry.localHeaderOffset) !== 0x04034b50
   ) {
@@ -5215,19 +5222,29 @@ const readZipEntryText = (
         ? compressedData
         : entry.compressionMethod === 8
           ? inflateRawSync(compressedData, {
-              maxOutputLength: MAX_EXTRACTED_MANIFEST_BYTES + 1
+              maxOutputLength: maxOutputBytes + 1
             })
           : null;
   } catch {
     return null;
   }
 
-  if (!data || data.length > MAX_EXTRACTED_MANIFEST_BYTES) {
+  if (!data || data.length > maxOutputBytes) {
     return null;
   }
 
-  return data.toString("utf8");
+  return data;
 };
+
+const readZipEntryText = (
+  zipBuffer: Buffer,
+  entry: ZipEntry
+): string | null =>
+  readZipEntryBuffer(
+    zipBuffer,
+    entry,
+    MAX_EXTRACTED_MANIFEST_BYTES
+  )?.toString("utf8") ?? null;
 
 const normalizeZipEntryPath = (path: string): string => {
   const segments: string[] = [];
@@ -5712,6 +5729,113 @@ const validateZipXmlEntries = (
   return diagnostics;
 };
 
+const resourceMediaTypeForPath = (resourcePath: string): string => {
+  const extension = resourcePath.toLowerCase().split(".").at(-1) ?? "";
+  return (
+    {
+      css: "text/css; charset=utf-8",
+      gif: "image/gif",
+      htm: "text/html; charset=utf-8",
+      html: "text/html; charset=utf-8",
+      jpeg: "image/jpeg",
+      jpg: "image/jpeg",
+      js: "text/javascript; charset=utf-8",
+      json: "application/json; charset=utf-8",
+      mp3: "audio/mpeg",
+      mp4: "video/mp4",
+      pdf: "application/pdf",
+      png: "image/png",
+      svg: "image/svg+xml",
+      text: "text/plain; charset=utf-8",
+      txt: "text/plain; charset=utf-8",
+      webm: "video/webm",
+      xml: "application/xml; charset=utf-8"
+    }[extension] ?? "application/octet-stream"
+  );
+};
+
+const extractNestedResourcePackages = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
+): {
+  resourceEntries: NonNullable<ContentReleaseRuntimeSnapshot["resourceEntries"]>;
+  diagnostics: ImportJobDiagnostic[];
+} => {
+  const resourceEntries: NonNullable<
+    ContentReleaseRuntimeSnapshot["resourceEntries"]
+  > = [];
+  const diagnostics: ImportJobDiagnostic[] = [];
+  const seenPaths = new Set<string>();
+  let extractedBytes = 0;
+
+  for (const packageEntry of manifestExtraction.entries.filter(entry =>
+    entry.fileName.toLowerCase().endsWith(".itcr.zip")
+  )) {
+    const packageBuffer = readZipEntryBuffer(
+      manifestExtraction.zipBuffer,
+      packageEntry,
+      MAX_EXTRACTED_RESOURCE_TOTAL_BYTES
+    );
+    if (!packageBuffer || findZipEndOfCentralDirectoryOffset(packageBuffer) < 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_resource_package_invalid",
+          `Resource package ZIP entry '${packageEntry.fileName}' could not be read.`
+        )
+      );
+      continue;
+    }
+
+    const normalizedPackagePath = normalizeZipEntryPath(packageEntry.fileName);
+    const packageFileName = normalizedPackagePath.split("/").at(-1) ?? "";
+    const packageKey = packageFileName.slice(0, -".itcr.zip".length);
+    const nestedEntries = readZipEntries(packageBuffer).filter(
+      entry => !entry.fileName.endsWith("/")
+    );
+    for (const nestedEntry of nestedEntries) {
+      const nestedPath = normalizeZipEntryPath(nestedEntry.fileName);
+      const resourcePath = normalizeZipEntryPath(`${packageKey}/${nestedPath}`);
+      const normalizedLookupPath = resourcePath.toLowerCase();
+      if (!nestedPath || !resourcePath || seenPaths.has(normalizedLookupPath)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_resource_path_invalid",
+            `Resource package '${packageEntry.fileName}' contains an unsafe or duplicate entry '${nestedEntry.fileName}'.`
+          )
+        );
+        continue;
+      }
+
+      const data = readZipEntryBuffer(
+        packageBuffer,
+        nestedEntry,
+        MAX_EXTRACTED_RESOURCE_BYTES
+      );
+      if (
+        !data ||
+        extractedBytes + data.length > MAX_EXTRACTED_RESOURCE_TOTAL_BYTES
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_resource_entry_oversized",
+            `Resource package entry '${resourcePath}' exceeds the bounded extraction limit.`
+          )
+        );
+        continue;
+      }
+
+      extractedBytes += data.length;
+      seenPaths.add(normalizedLookupPath);
+      resourceEntries.push({
+        resourcePath,
+        mediaType: resourceMediaTypeForPath(resourcePath),
+        dataBase64: data.toString("base64")
+      });
+    }
+  }
+
+  return { resourceEntries, diagnostics };
+};
+
 const deriveRuntimeSnapshotFromSourceDocument = (
   sourcePackage: SourcePackage
 ): {
@@ -5784,14 +5908,25 @@ const deriveRuntimeSnapshotFromSourceDocument = (
       sourcePackage.sourceDocument
     );
     if (manifestExtraction.status === "found") {
-      const diagnostics = validateZipXmlEntries(manifestExtraction);
+      const resourceExtraction = extractNestedResourcePackages(manifestExtraction);
+      const diagnostics = [
+        ...validateZipXmlEntries(manifestExtraction),
+        ...resourceExtraction.diagnostics
+      ];
       if (diagnostics.some(diagnostic => diagnostic.severity === "error")) {
         return { runtimeSnapshot: null, diagnostics };
       }
+      const runtimeSnapshot = normalizeParsedZipXmlContentStructure(
+        manifestExtraction
+      );
       return {
-        runtimeSnapshot: normalizeParsedZipXmlContentStructure(
-          manifestExtraction
-        ),
+        runtimeSnapshot:
+          runtimeSnapshot && resourceExtraction.resourceEntries.length > 0
+            ? {
+                ...runtimeSnapshot,
+                resourceEntries: resourceExtraction.resourceEntries
+              }
+            : runtimeSnapshot,
         diagnostics
       };
     }
@@ -10674,6 +10809,11 @@ export const createFirstSliceServices = (
             currentTestRun.bookletKey,
             currentTestRun.currentUnitKey
           ),
+          ...(contentRelease.runtimeSnapshot.resourceEntries?.length
+            ? {
+                resourceBasePath: `/api/v1/participant/sessions/${encodeURIComponent(participantSessionId)}/resources`
+              }
+            : {}),
           bookletUnits: resolveRuntimeBookletUnits(
             contentRelease,
             currentTestRun.bookletKey
@@ -10686,6 +10826,42 @@ export const createFirstSliceServices = (
           navigation,
           availableActions
         };
+      },
+      async getResource(input) {
+        const participantSessionId = normalizeParticipantSessionId(
+          input.participantSessionId
+        );
+        const participantSession = await requireParticipantSession(
+          repository,
+          participantSessionId
+        );
+        const requestedPath = String(input.resourcePath ?? "")
+          .trim()
+          .replace(/^\/+/, "")
+          .replace(/\\/g, "/");
+        const resourcePath = normalizeZipEntryPath(requestedPath);
+        if (!resourcePath || resourcePath !== requestedPath) {
+          throw new FirstSliceError(
+            400,
+            "participant_resource_path_invalid",
+            "Participant resource path is invalid."
+          );
+        }
+        const contentRelease = await requireContentRelease(
+          repository,
+          participantSession.contentReleaseId
+        );
+        const resourceEntry = contentRelease.runtimeSnapshot.resourceEntries?.find(
+          entry => entry.resourcePath.toLowerCase() === resourcePath.toLowerCase()
+        );
+        if (!resourceEntry) {
+          throw new FirstSliceError(
+            404,
+            "participant_resource_not_found",
+            `Participant resource '${resourcePath}' was not found.`
+          );
+        }
+        return resourceEntry;
       },
       async launch(input) {
         const participantSessionId = normalizeParticipantSessionId(

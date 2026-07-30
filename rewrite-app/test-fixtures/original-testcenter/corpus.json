@@ -69,6 +69,21 @@
       "expired-study-monitor"
     ]
   },
+  "resourcePackages": [
+    {
+      "fixture": "resources/sample_resource_package.itcr.zip.base64",
+      "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+      "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e",
+      "packageKey": "sample_resource_package",
+      "resources": [
+        {
+          "path": "file.text",
+          "mediaType": "text/plain; charset=utf-8",
+          "content": "This content was fetched dynamically by the player via directDownloadUrl from resource-package \"sample_resource_package\".\n"
+        }
+      ]
+    }
+  ],
   "invalidXml": [
     {
       "fixture": "invalid/Booklet_error.xml",

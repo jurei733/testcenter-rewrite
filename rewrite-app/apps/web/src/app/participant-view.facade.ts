@@ -93,6 +93,7 @@ export type ParticipantVeronaPlayerState = {
   unitTitle: string;
   unitDefinition: string;
   unitDefinitionType: string;
+  resourceBasePath: string;
   savedResponse: string;
   unitNumber: number;
   canGoPrevious: boolean;
@@ -551,6 +552,7 @@ export class ParticipantViewFacade {
       unitDefinition,
       unitDefinitionType:
         currentState.currentUnit.unitDefinitionType?.trim() || player.playerKey,
+      resourceBasePath: currentState.resourceBasePath?.trim() ?? "",
       savedResponse: currentState.testRun.unitResponses[unitKey] ?? "",
       unitNumber: Math.max(unitIndex + 1, 1),
       canGoPrevious: this.player.canGoPreviousUnit,

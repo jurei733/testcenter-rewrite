@@ -1222,6 +1222,8 @@ export const productionApiRoutes = {
     getRuntimeState: "/api/v1/participant/sessions/:participantSessionId/runtime-state",
     getCurrentRunState:
       "/api/v1/participant/sessions/:participantSessionId/current-state",
+    getResource:
+      "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
     resumeSession: "/api/v1/participant/sessions/:participantSessionId/resume",
     resumeRun: "/api/v1/participant/test-runs/:testRunId/resume",

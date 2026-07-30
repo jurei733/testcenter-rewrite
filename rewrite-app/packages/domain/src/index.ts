@@ -267,11 +267,18 @@ export type ContentRelease = {
 export type ContentReleaseRuntimeSnapshot = {
   bookletEntries: ContentReleaseBookletEntry[];
   playerEntries?: ContentReleasePlayerEntry[];
+  resourceEntries?: ContentReleaseResourceEntry[];
 };
 
 export type ContentReleasePlayerEntry = {
   playerKey: string;
   html: string;
+};
+
+export type ContentReleaseResourceEntry = {
+  resourcePath: string;
+  mediaType: string;
+  dataBase64: string;
 };
 
 export type ContentReleaseBookletEntry = {
@@ -434,6 +441,7 @@ export type ParticipantCurrentRunState = {
     unitDefinition?: string | null;
     unitDefinitionType?: string | null;
   };
+  resourceBasePath?: string;
   bookletUnits: Array<{
     unitKey: string;
     displayLabel: string;

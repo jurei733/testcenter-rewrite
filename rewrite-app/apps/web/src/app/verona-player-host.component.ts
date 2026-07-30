@@ -82,6 +82,7 @@ export class VeronaPlayerHostComponent
   @Input({ required: true }) unitTitle = "";
   @Input({ required: true }) unitDefinition = "";
   @Input() unitDefinitionType = "";
+  @Input() resourceBasePath = "";
   @Input() savedResponse = "";
   @Input() unitNumber = 1;
   @Input() canGoPrevious = false;
@@ -123,6 +124,7 @@ export class VeronaPlayerHostComponent
         changes["unitKey"] ||
         changes["unitDefinition"] ||
         changes["unitDefinitionType"] ||
+        changes["resourceBasePath"] ||
         changes["canGoPrevious"] ||
         changes["canGoNext"] ||
         changes["canComplete"] ||
@@ -259,6 +261,14 @@ export class VeronaPlayerHostComponent
         : {}),
       unitState: persistedResponse?.unitState ?? {},
       playerConfig: {
+        ...(this.resourceBasePath
+          ? {
+              directDownloadUrl: new URL(
+                this.resourceBasePath,
+                window.location.origin
+              ).toString()
+            }
+          : {}),
         enabledNavigationTargets,
         logPolicy: this.logPolicy,
         pagingMode: this.pagingMode,

@@ -831,12 +831,14 @@ const sendAsset = (
   response: ServerResponse,
   statusCode: number,
   contentType: string,
-  body: Buffer
+  body: Buffer,
+  additionalHeaders: Record<string, string> = {}
 ): void => {
   response.writeHead(statusCode, {
     ...securityHeaders,
     "content-type": contentType,
-    "cache-control": "no-cache"
+    "cache-control": "no-cache",
+    ...additionalHeaders
   });
   endResponse(response, body);
 };
@@ -1399,6 +1401,8 @@ const runtimeStatePattern = createRoutePattern(
 const currentRunStatePattern = createRoutePattern(
   productionApiRoutes.participant.getCurrentRunState
 );
+const participantResourcePattern =
+  /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
   productionApiRoutes.participant.saveProgress
 );
@@ -2003,6 +2007,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
@@ -4544,6 +4549,37 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<ParticipantCurrentRunStateResponse>(response, 200, {
           currentRunState
         });
+        return;
+      }
+
+      const participantResourceMatch = participantResourcePattern.exec(pathname);
+      if (request.method === "GET" && participantResourceMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(
+          participantResourceMatch.groups.participantSessionId
+        );
+        const resourcePath = decodeRouteGroup(
+          participantResourceMatch.groups.resourcePath
+        );
+        if (!participantSessionId || !resourcePath) {
+          sendError(
+            response,
+            400,
+            "participant_resource_path_invalid",
+            "participantSessionId and resourcePath are required."
+          );
+          return;
+        }
+        const resource = await services.participantRuntime.getResource({
+          participantSessionId,
+          resourcePath
+        });
+        sendAsset(
+          response,
+          200,
+          resource.mediaType,
+          Buffer.from(resource.dataBase64, "base64"),
+          { "access-control-allow-origin": "*" }
+        );
         return;
       }
 

@@ -22,7 +22,7 @@ Priority:
 | --- | --- | --- | --- |
 | 1 | P0 | Original package dependency corpus expansion | A pinned 14.3/15.1/17.4/17.6 corpus now gates successful imports and XSD-backed rejection behavior; complete XSD facets, original multi-file/ZIP dependency bundles, production packages, and more real players must still be added. |
 | 2 | P0 | Testlet timing, locks, and adaptivity | A versioned booklet policy now governs unit navigation and completion; timed/nested blocks, leave-once locks, unlock codes, and adaptive states need to extend the same model. |
-| 3 | P0 | Verona resource and delivery hardening | The basic bridge works; external resources, rich logs/focus events, broader player fixtures, and offline delivery still need parity work. |
+| 3 | P0 | Verona resource and delivery hardening | Original nested `.itcr.zip` packages now reach players through `directDownloadUrl`; loose cross-package workspace resources, rich logs/focus events, broader player fixtures, streaming/range requests, and offline delivery still need parity work. |
 | 4 | P1 | Monitor go-to/unlock/lock commands | Pause, resume, and complete exist; supervised navigation controls do not. |
 | 5 | P1 | Participant access windows and login protection | Valid-from/to/for and participant brute-force protection are still absent. |
 | 6 | P1 | Workspace file administration | Operators still need file browsing, download, dependency-aware deletion, and replacement workflows. |
@@ -66,7 +66,7 @@ Priority:
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
-| JSON/XML/ZIP package intake | `WorkspaceController`, file parsers | partial | P0 | staged immutable releases, retry diagnostics, IMS/Testcenter aliases, referenced ZIP content, and a pinned original 17.4/17.6 booklet corpus with repeated-unit aliases |
+| JSON/XML/ZIP package intake | `WorkspaceController`, file parsers | partial | P0 | staged immutable releases, retry diagnostics, IMS/Testcenter aliases, referenced ZIP content, nested original `.itcr.zip` extraction/delivery, and a pinned 14.3/15.1/17.4/17.6 corpus; loose multi-upload dependency assembly remains |
 | Original Testtakers XML | `XMLFileTesttakers.class.php` | partial | P0 | original sample fixture gates participant-versus-operational login modes, groups, passwords, and ordered multiple-booklet assignments; codes, access windows, profiles, custom texts, and operator-account migration remain |
 | XML/XSD validation | file parser classes | partial | P0 | well-formed parsing and an executable original-schema compatibility profile now validate top-level XML and every XML entry in ZIP dependency bundles, rejecting wrong roots/metadata, missing identities/definitions, unsupported login modes, and duplicate group/login/testlet/unit runtime keys with stable diagnostics; complete XSD facets and cross-file constraints remain |
 | Dependency graph and duplicate protection | `WorkspaceDAO`, files E2E | partial | P1 | import resolves many references, but no operator-visible complete dependency graph or dependency-aware delete |

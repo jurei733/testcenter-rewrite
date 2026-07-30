@@ -6932,6 +6932,17 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     body: { workspaceKey, displayName: workspaceKey }
   });
 
+  const originalResourcePackage = Buffer.from(
+    readFileSync(
+      resolve(
+        originalTestcenterCorpusRoot,
+        "resources/sample_resource_package.itcr.zip.base64"
+      ),
+      "utf8"
+    ).trim(),
+    "base64"
+  );
+
   const zipPayload = createZipBase64([
     {
       fileName: "export/imsmanifest.xml",
@@ -6974,6 +6985,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
             <Description>Original Unit Description</Description>
           </Metadata>
           <DefinitionRef player="verona-player-simple@6.0">assets/SAMPLE_UNITCONTENTS.HTM</DefinitionRef>
+          <Dependencies><File for="player">sample_resource_package.itcr.zip</File></Dependencies>
         </Unit>
       `
     },
@@ -6999,6 +7011,13 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
       fileName: "export/players/simple.html",
       content:
         '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
+    },
+    {
+      fileName: "export/resources/sample_resource_package.itcr.zip",
+      content: "",
+      compressionMethod: 0,
+      compressedContent: originalResourcePackage,
+      uncompressedSize: originalResourcePackage.length
     }
   ]);
 
@@ -7033,6 +7052,11 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
       contentRelease: {
         runtimeSnapshot: {
           playerEntries?: Array<{ playerKey: string; html: string }>;
+          resourceEntries?: Array<{
+            resourcePath: string;
+            mediaType: string;
+            dataBase64: string;
+          }>;
           bookletEntries: Array<{
             bookletKey: string;
             displayLabel: string;
@@ -7091,9 +7115,64 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
           html:
             '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
         }
+      ],
+      resourceEntries: [
+        {
+          resourcePath: "sample_resource_package/file.text",
+          mediaType: "text/plain; charset=utf-8",
+          dataBase64: Buffer.from(
+            'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n',
+            "utf8"
+          ).toString("base64")
+        }
       ]
     }
   );
+
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "resource-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson(
+    `/api/v1/participant/sessions/${participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey: "BOOKLET.SAMPLE-1" } }
+  );
+  assert.equal(resume.status, 200);
+  const currentState = await requestJson<{
+    currentRunState: { resourceBasePath?: string };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    currentState.body.currentRunState.resourceBasePath,
+    `/api/v1/participant/sessions/${participantSessionId}/resources`
+  );
+  const resourceResponse = await fetch(
+    `${baseUrl}${currentState.body.currentRunState.resourceBasePath}/sample_resource_package/file.text`
+  );
+  assert.equal(resourceResponse.status, 200);
+  assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
+  assert.equal(resourceResponse.headers.get("access-control-allow-origin"), "*");
+  assert.equal(
+    await resourceResponse.text(),
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
+  );
+  const missingResource = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${participantSessionId}/resources/sample_resource_package/missing.text`
+  );
+  assert.equal(missingResource.status, 404);
+  assert.equal(missingResource.body.error, "participant_resource_not_found");
+  const unsafeResourcePath = await requestJson<{ error: string }>(
+    `/api/v1/participant/sessions/${participantSessionId}/resources/%2e%2e%2fsecret.txt`
+  );
+  assert.equal(unsafeResourcePath.status, 400);
+  assert.equal(unsafeResourcePath.body.error, "participant_resource_path_invalid");
 });
 
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {

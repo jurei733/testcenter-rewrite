@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -12,6 +13,10 @@ type OriginalTestcenterCorpus = {
     participantLoginKeys: string[];
     excludedOperationalLoginKeys: string[];
   };
+  resourcePackages: Array<{
+    fixture: string;
+    sha256: string;
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -49,6 +54,17 @@ test("original Testcenter compatibility corpus separates participant and operati
   ]);
   assert.equal(primaryParticipant?.groupKey, "sample_group");
   assert.equal(primaryParticipant?.password, "user123");
+
+  for (const resourcePackage of corpus.resourcePackages) {
+    const packageBuffer = Buffer.from(
+      readFileSync(resolve(corpusRoot, resourcePackage.fixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(
+      createHash("sha256").update(packageBuffer).digest("hex"),
+      resourcePackage.sha256
+    );
+  }
 
   const reviewParticipant = entries.find(entry => entry.loginKey === "test-review");
   assert.deepEqual(reviewParticipant?.bookletKeys, [
