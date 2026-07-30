@@ -6671,6 +6671,211 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
 });
 
+test("original BookletConfig compiles into enforced participant navigation policy", async () => {
+  const tenantKey = "integration-tenant-booklet-policy";
+  const workspaceKey = "integration-workspace-booklet-policy";
+  const bookletKey = "BOOKLET.POLICY";
+  const firstUnitKey = "UNIT.POLICY.1";
+  const secondUnitKey = "UNIT.POLICY.2";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "booklet-policy.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Policy Booklet</Label></Metadata>
+          <BookletConfig>
+            <Config key="force_presentation_complete">ALWAYS</Config>
+            <Config key="force_response_complete">ON</Config>
+            <Config key="unit_menu">FULL</Config>
+            <Config key="unit_navibuttons">FORWARD_ONLY</Config>
+            <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
+            <Config key="pagingMode">concat-scroll</Config>
+            <Config key="logPolicy">debug</Config>
+            <Config key="restore_current_page_on_return">ON</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${firstUnitKey}" label="Policy Unit One" />
+            <Unit id="${secondUnitKey}" label="Policy Unit Two" />
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const activated = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activated.status, 200);
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "policy-participant" }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.currentUnitKey, firstUnitKey);
+  const testRunId = resumed.body.testRun.testRunId;
+
+  const unitResponse = (
+    presentationProgress: "none" | "some" | "complete",
+    responseProgress: "none" | "some" | "complete",
+    currentPage: string
+  ): string =>
+    JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: { presentationProgress, responseProgress },
+      playerState: { currentPage }
+    });
+  const save = (currentUnitKey: string, response?: string) =>
+    requestJson<{
+      testRun?: { currentUnitKey: string | null };
+      error?: string;
+      details?: { deniedReasons?: string[]; direction?: string };
+    }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey,
+        status: "running",
+        ...(response !== undefined ? { unitResponse: response } : {})
+      }
+    });
+  const currentState = () =>
+    requestJson<{
+      currentRunState: {
+        booklet: {
+          policy: {
+            navigation: {
+              requirePresentationComplete: string;
+              requireResponseComplete: string;
+              unitMenuEnabled: boolean;
+              unitControls: string;
+              playerEnd: string;
+            };
+            player: {
+              pagingMode: string;
+              logPolicy: string;
+              restoreCurrentPageOnReturn: boolean;
+            };
+          };
+        };
+        navigation: {
+          canGoPrevious: boolean;
+          canGoNext: boolean;
+          canComplete: boolean;
+          canPlayerEnd: boolean;
+          backwardDeniedReasons: string[];
+          forwardDeniedReasons: string[];
+        };
+        availableActions: string[];
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+
+  assert.equal(
+    (await save(firstUnitKey, unitResponse("some", "none", "page-2"))).status,
+    200
+  );
+  const blockedState = await currentState();
+  assert.deepEqual(blockedState.body.currentRunState.booklet.policy.navigation, {
+    requirePresentationComplete: "always",
+    requireResponseComplete: "forward",
+    unitMenuEnabled: true,
+    unitControls: "forward_only",
+    playerEnd: "last_unit"
+  });
+  assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {
+    logPolicy: "debug",
+    pagingMode: "concat-scroll",
+    restoreCurrentPageOnReturn: true
+  });
+  assert.deepEqual(blockedState.body.currentRunState.navigation.forwardDeniedReasons, [
+    "presentation_incomplete",
+    "response_incomplete"
+  ]);
+  assert.equal(blockedState.body.currentRunState.navigation.canGoNext, false);
+  assert.equal(blockedState.body.currentRunState.navigation.canComplete, false);
+  assert.equal(blockedState.body.currentRunState.availableActions.includes("complete"), false);
+
+  const blockedForward = await save(secondUnitKey);
+  assert.equal(blockedForward.status, 409);
+  assert.equal(blockedForward.body.error, "booklet_navigation_denied");
+  assert.equal(blockedForward.body.details?.direction, "forward");
+  assert.deepEqual(blockedForward.body.details?.deniedReasons, [
+    "presentation_incomplete",
+    "response_incomplete"
+  ]);
+  const blockedCompletion = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${testRunId}/complete`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(blockedCompletion.status, 409);
+  assert.equal(blockedCompletion.body.error, "booklet_completion_denied");
+
+  assert.equal(
+    (await save(firstUnitKey, unitResponse("complete", "complete", "page-3"))).status,
+    200
+  );
+  const readyFirstState = await currentState();
+  assert.equal(readyFirstState.body.currentRunState.navigation.canGoNext, true);
+  assert.equal(readyFirstState.body.currentRunState.navigation.canComplete, true);
+  assert.equal(readyFirstState.body.currentRunState.navigation.canPlayerEnd, false);
+  assert.equal((await save(secondUnitKey)).status, 200);
+  assert.equal(
+    (await save(secondUnitKey, unitResponse("some", "none", "page-1"))).status,
+    200
+  );
+  const blockedBackward = await save(firstUnitKey);
+  assert.equal(blockedBackward.status, 409);
+  assert.deepEqual(blockedBackward.body.details?.deniedReasons, [
+    "presentation_incomplete"
+  ]);
+  assert.equal(blockedBackward.body.details?.direction, "backward");
+
+  assert.equal(
+    (await save(secondUnitKey, unitResponse("complete", "complete", "page-2"))).status,
+    200
+  );
+  const readyLastState = await currentState();
+  assert.equal(readyLastState.body.currentRunState.navigation.canPlayerEnd, true);
+  const completed = await requestJson<{ testRun: { status: string } }>(
+    `/api/v1/participant/test-runs/${testRunId}/complete`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.testRun.status, "completed");
+});
+
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
   const tenantKey = "integration-tenant-zip-xml-base";
   const workspaceKey = "integration-workspace-zip-xml-base";

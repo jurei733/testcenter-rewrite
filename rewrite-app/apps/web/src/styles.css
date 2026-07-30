@@ -1359,6 +1359,17 @@ pre {
   color: var(--ink);
 }
 
+.participant-navigation-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(196, 82, 47, 0.22);
+  border-radius: var(--radius-lg);
+  background: rgba(196, 82, 47, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .progress-track {
   overflow: hidden;
   height: 10px;

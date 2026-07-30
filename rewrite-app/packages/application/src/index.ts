@@ -1,7 +1,13 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 
-import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
+import {
+  bookletNavigationDeniedReasons,
+  compileBookletRuntimePolicy,
+  parseParticipantRosterText,
+  parseVeronaUnitResponse,
+  readBookletConfigValues
+} from "@testcenter-rewrite-app/contracts";
 import type {
   ParticipantRosterSource,
   SourceDocumentSource
@@ -17,6 +23,7 @@ import type {
   AdminUser,
   AdminUserStatus,
   ContentReleaseActivationReadiness,
+  BookletRuntimePolicy,
   ContentRelease,
   ContentReleaseStatus,
   ContentReleaseRuntimeSnapshot,
@@ -2889,7 +2896,7 @@ const normalizeContentStructure = (
       continue;
     }
 
-    const normalizedBooklet =
+    const normalizedBooklet: ContentReleaseRuntimeSnapshot["bookletEntries"][number] =
       bookletEntriesByKey.get(bookletKey) ??
       {
         bookletKey,
@@ -2900,6 +2907,9 @@ const normalizeContentStructure = (
         ),
         unitEntries: []
       };
+    if (bookletEntry.config && Object.keys(bookletEntry.config).length > 0) {
+      normalizedBooklet.policy = compileBookletRuntimePolicy(bookletEntry.config);
+    }
     const unitKeys =
       unitKeysByBookletKey.get(bookletKey) ?? new Set<string>();
 
@@ -3767,6 +3777,12 @@ const normalizeParsedJsonContentStructure = (
               booklet.displayName ??
               ""
           ).trim(),
+          config: readBookletConfigValues(
+            booklet.bookletConfig ??
+              booklet.BookletConfig ??
+              booklet.config ??
+              booklet.settings
+          ),
           unitEntries: rawUnits
             .map(rawUnit => {
               if (typeof rawUnit === "string") {
@@ -4495,6 +4511,30 @@ const collectXmlBookletEntries = (
 ): SourcePackageContentStructure["bookletEntries"] => {
   const bookletEntries: SourcePackageContentStructure["bookletEntries"] = [];
 
+  const readBookletConfig = (bookletContent: string): Record<string, string> => {
+    const configContent = bookletContent.match(
+      /<((?:[a-zA-Z_][\w.-]*:)?BookletConfig)\b[^>]*>([\s\S]*?)<\/\1>/i
+    )?.[2];
+    if (!configContent) {
+      return {};
+    }
+    return Object.fromEntries(
+      [...configContent.matchAll(
+        /<((?:[a-zA-Z_][\w.-]*:)?Config)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+      )].flatMap(configMatch => {
+        const attributes = parseXmlAttributes(configMatch[2] ?? "");
+        const key = normalizeManifestToken(
+          readXmlAttribute(attributes, "key", "name", "id")
+        );
+        const value = normalizeManifestToken(
+          readXmlAttribute(attributes, "value") ??
+            decodeXmlTextContent(configMatch[3] ?? "")
+        );
+        return key ? [[key, value] as const] : [];
+      })
+    );
+  };
+
   for (const bookletMatch of sourceDocument.matchAll(
     new RegExp(
       `<((?:[a-zA-Z_][\\w.-]*:)?(?:${bookletTagNames}))\\b([^>]*)>([\\s\\S]*?)<\\/\\1>`,
@@ -4630,6 +4670,7 @@ const collectXmlBookletEntries = (
           ) ??
           ""
       ).trim(),
+      config: readBookletConfig(bookletMatch[3] ?? ""),
       unitEntries
     });
   }
@@ -5514,7 +5555,7 @@ const buildRuntimeSnapshot = (
 const resolveRuntimeBooklet = (
   contentRelease: ContentRelease,
   bookletKey: string
-): { bookletKey: string; displayLabel: string } => {
+): { bookletKey: string; displayLabel: string; policy: BookletRuntimePolicy } => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
       candidate => candidate.bookletKey === bookletKey
@@ -5525,14 +5566,121 @@ const resolveRuntimeBooklet = (
   if (!bookletEntry) {
     return {
       bookletKey,
-      displayLabel: toDisplayLabel("Booklet", bookletKey) ?? bookletKey
+      displayLabel: toDisplayLabel("Booklet", bookletKey) ?? bookletKey,
+      policy: compileBookletRuntimePolicy({})
     };
   }
 
   return {
     bookletKey: bookletEntry.bookletKey,
-    displayLabel: bookletEntry.displayLabel
+    displayLabel: bookletEntry.displayLabel,
+    policy: bookletEntry.policy ?? compileBookletRuntimePolicy({})
   };
+};
+
+const resolveBookletNavigationState = (
+  contentRelease: ContentRelease,
+  testRun: TestRun
+): ParticipantCurrentRunState["navigation"] => {
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === testRun.bookletKey
+  );
+  const policy = booklet?.policy ?? compileBookletRuntimePolicy({});
+  const units = booklet?.unitEntries ?? [];
+  const currentIndex = units.findIndex(
+    unit => unit.unitKey === testRun.currentUnitKey
+  );
+  const currentResponse = testRun.currentUnitKey
+    ? testRun.unitResponses[testRun.currentUnitKey] ?? ""
+    : "";
+  const veronaResponse = parseVeronaUnitResponse(currentResponse);
+  const presentationProgress = veronaResponse
+    ? veronaResponse.unitState.presentationProgress
+    : "complete";
+  const responseProgress = veronaResponse
+    ? veronaResponse.unitState.responseProgress
+    : currentResponse.trim()
+      ? "complete"
+      : "none";
+  const backwardDeniedReasons = bookletNavigationDeniedReasons({
+    policy,
+    direction: "backward",
+    presentationProgress,
+    responseProgress
+  });
+  const forwardDeniedReasons = bookletNavigationDeniedReasons({
+    policy,
+    direction: "forward",
+    presentationProgress,
+    responseProgress
+  });
+  const previousUnitKey =
+    currentIndex > 0 ? units[currentIndex - 1]?.unitKey ?? null : null;
+  const nextUnitKey =
+    currentIndex >= 0 && currentIndex < units.length - 1
+      ? units[currentIndex + 1]?.unitKey ?? null
+      : null;
+  const isLastUnit = currentIndex >= 0 && currentIndex === units.length - 1;
+  const canComplete =
+    testRun.status !== "completed" && forwardDeniedReasons.length === 0;
+  const canPlayerEnd =
+    canComplete &&
+    (policy.navigation.playerEnd === "always" ||
+      (policy.navigation.playerEnd === "last_unit" && isLastUnit));
+
+  return {
+    previousUnitKey,
+    nextUnitKey,
+    canGoPrevious:
+      testRun.status === "running" &&
+      previousUnitKey != null &&
+      backwardDeniedReasons.length === 0,
+    canGoNext:
+      testRun.status === "running" &&
+      nextUnitKey != null &&
+      forwardDeniedReasons.length === 0,
+    canComplete,
+    canPlayerEnd,
+    backwardDeniedReasons,
+    forwardDeniedReasons
+  };
+};
+
+const requireBookletNavigationAllowed = (input: {
+  contentRelease: ContentRelease;
+  testRun: TestRun;
+  targetUnitKey: string | null;
+}): void => {
+  const currentUnitKey = input.testRun.currentUnitKey;
+  if (!currentUnitKey || !input.targetUnitKey || currentUnitKey === input.targetUnitKey) {
+    return;
+  }
+  const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === input.testRun.bookletKey
+  );
+  const units = booklet?.unitEntries ?? [];
+  const currentIndex = units.findIndex(unit => unit.unitKey === currentUnitKey);
+  const targetIndex = units.findIndex(unit => unit.unitKey === input.targetUnitKey);
+  if (currentIndex < 0 || targetIndex < 0) {
+    return;
+  }
+  const navigation = resolveBookletNavigationState(
+    input.contentRelease,
+    input.testRun
+  );
+  const direction = targetIndex > currentIndex ? "forward" : "backward";
+  const deniedReasons =
+    direction === "forward"
+      ? navigation.forwardDeniedReasons
+      : navigation.backwardDeniedReasons;
+  if (deniedReasons.length > 0) {
+    throw new FirstSliceError(
+      409,
+      "booklet_navigation_denied",
+      `Unit '${currentUnitKey}' cannot be left ${direction} because the booklet completion policy is not satisfied.`,
+      { currentUnitKey, targetUnitKey: input.targetUnitKey, direction, deniedReasons }
+    );
+  }
 };
 
 const resolveRuntimeUnit = (
@@ -10104,11 +10252,18 @@ export const createFirstSliceServices = (
             participantSession.participantSessionId
           )
         ).map(normalizeTestRun);
+        const navigation = resolveBookletNavigationState(
+          contentRelease,
+          currentTestRun
+        );
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
         if (currentTestRun.status === "paused") {
-          availableActions.push("resume", "save_progress", "complete");
+          availableActions.push("resume", "save_progress");
         } else if (currentTestRun.status === "running") {
-          availableActions.push("save_progress", "complete");
+          availableActions.push("save_progress");
+        }
+        if (navigation.canComplete) {
+          availableActions.push("complete");
         }
 
         return {
@@ -10131,6 +10286,7 @@ export const createFirstSliceServices = (
             participantRosterEntry,
             testRuns
           }),
+          navigation,
           availableActions
         };
       },
@@ -10366,6 +10522,11 @@ export const createFirstSliceServices = (
             testRun.bookletKey,
             nextCurrentUnitKey
           );
+          requireBookletNavigationAllowed({
+            contentRelease,
+            testRun,
+            targetUnitKey: nextCurrentUnitKey
+          });
         }
 
         const nextUnitResponses = { ...testRun.unitResponses };
@@ -10458,6 +10619,23 @@ export const createFirstSliceServices = (
         const testRun = normalizeTestRun(storedTestRun);
         if (testRun.status === "completed") {
           return testRun;
+        }
+
+        const contentRelease = await requireContentRelease(
+          repository,
+          testRun.contentReleaseId
+        );
+        const navigation = resolveBookletNavigationState(contentRelease, testRun);
+        if (!navigation.canComplete) {
+          throw new FirstSliceError(
+            409,
+            "booklet_completion_denied",
+            `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: navigation.forwardDeniedReasons
+            }
+          );
         }
 
         const timestamp = now();

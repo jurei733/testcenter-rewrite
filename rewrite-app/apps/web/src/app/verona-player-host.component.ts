@@ -87,6 +87,10 @@ export class VeronaPlayerHostComponent
   @Input() canGoPrevious = false;
   @Input() canGoNext = false;
   @Input() canComplete = false;
+  @Input() logPolicy: "disabled" | "lean" | "rich" | "debug" = "rich";
+  @Input() pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" =
+    "separate";
+  @Input() restoreCurrentPageOnReturn = false;
   @Input() saveStatus = "not_saved";
 
   @Output() readonly responseChange = new EventEmitter<string>();
@@ -118,7 +122,13 @@ export class VeronaPlayerHostComponent
         changes["testRunId"] ||
         changes["unitKey"] ||
         changes["unitDefinition"] ||
-        changes["unitDefinitionType"])
+        changes["unitDefinitionType"] ||
+        changes["canGoPrevious"] ||
+        changes["canGoNext"] ||
+        changes["canComplete"] ||
+        changes["logPolicy"] ||
+        changes["pagingMode"] ||
+        changes["restoreCurrentPageOnReturn"])
     ) {
       this.mountPlayer();
     }
@@ -227,7 +237,9 @@ export class VeronaPlayerHostComponent
     this.status = "ready";
     this.apiVersionLabel = `API ${apiVersion}`;
     const persistedResponse = parseVeronaUnitResponse(this.savedResponse);
-    const startPage = persistedResponse?.playerState?.currentPage;
+    const startPage = this.restoreCurrentPageOnReturn
+      ? persistedResponse?.playerState?.currentPage
+      : undefined;
     const enabledNavigationTargets: VeronaStartCommand["playerConfig"]["enabledNavigationTargets"] = [];
     if (this.canGoPrevious) {
       enabledNavigationTargets.push("previous");
@@ -248,8 +260,8 @@ export class VeronaPlayerHostComponent
       unitState: persistedResponse?.unitState ?? {},
       playerConfig: {
         enabledNavigationTargets,
-        logPolicy: "lean",
-        pagingMode: "separate",
+        logPolicy: this.logPolicy,
+        pagingMode: this.pagingMode,
         stateReportPolicy: "eager",
         unitNumber: this.unitNumber,
         unitTitle: this.unitTitle,
@@ -268,7 +280,13 @@ export class VeronaPlayerHostComponent
       .replace(/^#/, "")
       .trim()
       .toLowerCase();
-    if (["previous", "next", "first", "last", "end"].includes(target)) {
+    const targetEnabled =
+      (target === "previous" && this.canGoPrevious) ||
+      (target === "next" && this.canGoNext) ||
+      (target === "first" && this.canGoPrevious) ||
+      (target === "last" && this.canGoNext) ||
+      (target === "end" && this.canComplete);
+    if (targetEnabled) {
       this.navigationRequest.emit(target);
     }
   }

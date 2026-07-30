@@ -248,7 +248,7 @@ const localDemoBootstrap = {
   sourceFileName: "demo-assessment.xml",
   sourceMediaType: "application/xml",
   sourceDocument:
-    '<assessment><booklet key="booklet:demo" label="Demo Booklet"><unit key="unit-intro" label="Introduction"><description>Demo introduction task</description><prompt>Describe what you see in the demo introduction.</prompt></unit><unit key="unit-practice" label="Practice"><prompt>Save a practice response.</prompt></unit><unit key="unit-finish" label="Finish"><prompt>Complete the demo test.</prompt></unit></booklet></assessment>'
+    '<assessment><booklet key="booklet:demo" label="Demo Booklet"><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><unit key="unit-intro" label="Introduction"><description>Demo introduction task</description><prompt>Describe what you see in the demo introduction.</prompt></unit><unit key="unit-practice" label="Practice"><prompt>Save a practice response.</prompt></unit><unit key="unit-finish" label="Finish"><prompt>Complete the demo test.</prompt></unit></booklet></assessment>'
 } as const;
 
 const bootstrapLocalDemoState = async (input: {

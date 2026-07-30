@@ -246,6 +246,9 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [canGoPrevious]="verona.canGoPrevious"
             [canGoNext]="verona.canGoNext"
             [canComplete]="verona.canComplete"
+            [logPolicy]="verona.logPolicy"
+            [pagingMode]="verona.pagingMode"
+            [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
             [saveStatus]="view.veronaSaveStatus"
             (responseChange)="view.saveVeronaResponse($event)"
             (navigationRequest)="view.navigateFromVerona($event)"
@@ -288,7 +291,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <strong id="participantRouteCompletionReadinessLabel">{{ view.player.completionReadinessLabel }}</strong>
             <p id="participantRouteCompletionReadinessDetail">{{ view.player.completionReadinessDetail }}</p>
           </section>
-          <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.unitItems.length > 0">
+          <p
+            *ngIf="view.player.navigationNotice"
+            id="participantRouteNavigationNotice"
+            class="participant-navigation-notice"
+            role="status"
+          >{{ view.player.navigationNotice }}</p>
+          <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.showUnitMenu && view.player.unitItems.length > 0">
             <header>
               <div>
                 <span>Booklet Units</span>
@@ -317,11 +326,11 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </div>
           </section>
           <div class="actions">
-            <button id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
-            <button id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
+            <button *ngIf="view.player.showPreviousUnitControl" id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
+            <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>
-            <button class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">Complete Test</button>
+            <button id="participantRouteCompleteButton" class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">Complete Test</button>
           </div>
         </div>
       </article>

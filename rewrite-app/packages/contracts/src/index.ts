@@ -53,6 +53,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 export * from "./verona-player.js";
+export * from "./booklet-policy.js";
 
 export type ParsedParticipantRosterEntry = {
   loginKey: string;

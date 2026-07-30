@@ -20,8 +20,8 @@ Priority:
 
 | Order | Priority | Next capability | Why it is next |
 | --- | --- | --- | --- |
-| 1 | P0 | Booklet policy compiler | Timing, navigation locks, completion rules, adaptive states, and execution modes need one explicit runtime policy. |
-| 2 | P0 | Original package validation corpus | Imports and the Verona bridge accept common shapes, but XSD/API-version/dependency validation must be proven against representative production packages and players. |
+| 1 | P0 | Original package validation corpus | Imports, BookletConfig policies, and the Verona bridge accept common shapes, but XSD/API-version/dependency validation must be proven against representative production packages and players. |
+| 2 | P0 | Testlet timing, locks, and adaptivity | A versioned booklet policy now governs unit navigation and completion; timed/nested blocks, leave-once locks, unlock codes, and adaptive states need to extend the same model. |
 | 3 | P0 | Verona resource and delivery hardening | The basic bridge works; external resources, rich logs/focus events, broader player fixtures, and offline delivery still need parity work. |
 | 4 | P1 | Monitor go-to/unlock/lock commands | Pause, resume, and complete exist; supervised navigation controls do not. |
 | 5 | P1 | Participant access windows and login protection | Valid-from/to/for and participant brute-force protection are still absent. |
@@ -53,13 +53,13 @@ Priority:
 | --- | --- | --- | --- | --- |
 | Verona player integration | `test-controller`, `unithost` | partial | P0 | sandboxed `srcdoc` host imports embedded JSON and Testcenter ZIP players/definitions, exchanges ready/start/state/navigation/runtime-error messages, and visibly fails or reloads; external resources, rich logs/focus handling, and a representative player corpus remain |
 | Player API compatibility validation | workspace file admin and unithost | partial | P0 | runtime ready handshake gates Verona major versions 2–6; static import metadata/schema validation is still missing |
-| Booklet/unit navigation | `test-controller` | partial | P0 | ordered unit rail and persisted current unit; no booklet navigation policy |
+| Booklet/unit navigation | `test-controller` | partial | P0 | ordered units and current position persist; imported `BookletConfig` compiles menu/button/player-end rules and server-side forward/backward eligibility, while nested testlet visibility and lock rules remain |
 | Response and run-state save | test routes and hot-mode E2E | partial | P0 | versioned Verona unit/player-state envelope persists through coalescing autosave, visible retry, navigation, and reload; durable offline background delivery remains |
 | Timed blocks and warnings | time-restrictions E2E | missing | P0 | no timer policy |
-| Presentation/response completion locks | booklet config E2E | missing | P0 | no completion events from a real player |
+| Presentation/response completion locks | booklet config E2E | partial | P0 | Verona progress drives visible forward/completion denial and server-side `409` guards with direction-specific reasons; testlet overrides and confirm-mode behavior remain |
 | Unlock code and leave-once rules | hot-mode and leave-block E2E | missing | P0 | no block lock model |
 | Adaptive booklet states | adaptivity E2E | missing | P0 | no adaptive state compiler |
-| Runtime display/fullscreen options | booklet config E2E | missing | P1 | no compiled UI policy |
+| Runtime display/fullscreen options | booklet config E2E | partial | P1 | compiled policy drives unit menu/buttons plus Verona paging/logging/page restore; header, fullscreen, time-left, and silent-mode behavior remain incomplete |
 | Execution modes | `definitions/test-mode.json` | partial | P0 | run/review behavior exists as separate use cases, not as the original mode capability matrix |
 
 ### Import and content administration

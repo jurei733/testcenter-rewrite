@@ -58,6 +58,9 @@ type ParticipantPlayerState = {
   nextStepDetail: string;
   actions: string[];
   canSaveProgress: boolean;
+  showUnitMenu: boolean;
+  showPreviousUnitControl: boolean;
+  showNextUnitControl: boolean;
   canGoPreviousUnit: boolean;
   canGoNextUnit: boolean;
   canResumeRun: boolean;
@@ -68,6 +71,7 @@ type ParticipantPlayerState = {
   draftStateLabel: string;
   draftStateDetail: string;
   hasUnsavedResponse: boolean;
+  navigationNotice: string;
 };
 
 type ParticipantPlayerUnitItem = {
@@ -94,6 +98,9 @@ export type ParticipantVeronaPlayerState = {
   canGoPrevious: boolean;
   canGoNext: boolean;
   canComplete: boolean;
+  logPolicy: "disabled" | "lean" | "rich" | "debug";
+  pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap";
+  restoreCurrentPageOnReturn: boolean;
 };
 
 type ParticipantEntryIssue = {
@@ -342,6 +349,9 @@ export class ParticipantViewFacade {
           : "Enter the assigned workspace and login key first.",
         actions: [],
         canSaveProgress: false,
+        showUnitMenu: false,
+        showPreviousUnitControl: true,
+        showNextUnitControl: true,
         canGoPreviousUnit: false,
         canGoNextUnit: false,
         canResumeRun: false,
@@ -351,7 +361,8 @@ export class ParticipantViewFacade {
         unitResponse: "",
         draftStateLabel: "No response loaded",
         draftStateDetail: "Start or resume a test before writing an answer.",
-        hasUnsavedResponse: false
+        hasUnsavedResponse: false,
+        navigationNotice: ""
       };
     }
 
@@ -369,12 +380,9 @@ export class ParticipantViewFacade {
     const unitKey = currentState.currentUnit.unitKey ?? "";
     const bookletUnits = currentState.bookletUnits ?? [];
     const unitIndex = bookletUnits.findIndex(unit => unit.unitKey === unitKey);
-    const previousUnitKey =
-      unitIndex > 0 ? bookletUnits[unitIndex - 1]?.unitKey ?? null : null;
-    const nextUnitKey =
-      unitIndex >= 0 && unitIndex < bookletUnits.length - 1
-        ? bookletUnits[unitIndex + 1]?.unitKey ?? null
-        : null;
+    const previousUnitKey = currentState.navigation.previousUnitKey;
+    const nextUnitKey = currentState.navigation.nextUnitKey;
+    const policy = currentState.booklet.policy;
     const canNavigateUnits =
       currentState.testRun.status === "running" &&
       availableActions.includes("save_progress");
@@ -401,7 +409,13 @@ export class ParticipantViewFacade {
         ].join(", "),
         isCurrent,
         hasResponse,
-        canOpen: canNavigateUnits && !isCurrent
+        canOpen:
+          canNavigateUnits &&
+          policy.navigation.unitMenuEnabled &&
+          !isCurrent &&
+          (index < unitIndex
+            ? currentState.navigation.backwardDeniedReasons.length === 0
+            : currentState.navigation.forwardDeniedReasons.length === 0)
       };
     });
     const answeredUnitCount = unitItems.filter(unit => unit.hasResponse).length;
@@ -488,8 +502,11 @@ export class ParticipantViewFacade {
       }),
       actions: availableActions,
       canSaveProgress: availableActions.includes("save_progress"),
-      canGoPreviousUnit: canNavigateUnits && previousUnitKey != null,
-      canGoNextUnit: canNavigateUnits && nextUnitKey != null,
+      showUnitMenu: policy.navigation.unitMenuEnabled,
+      showPreviousUnitControl: policy.navigation.unitControls === "both",
+      showNextUnitControl: policy.navigation.unitControls !== "hidden",
+      canGoPreviousUnit: canNavigateUnits && currentState.navigation.canGoPrevious,
+      canGoNextUnit: canNavigateUnits && currentState.navigation.canGoNext,
       canResumeRun: availableActions.includes("resume"),
       canComplete: availableActions.includes("complete"),
       canClearSession: true,
@@ -500,7 +517,8 @@ export class ParticipantViewFacade {
       unitResponse: savedUnitResponse,
       draftStateLabel,
       draftStateDetail,
-      hasUnsavedResponse
+      hasUnsavedResponse,
+      navigationNotice: this.describeNavigationDenial(currentState)
     };
   }
 
@@ -537,8 +555,25 @@ export class ParticipantViewFacade {
       unitNumber: Math.max(unitIndex + 1, 1),
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
-      canComplete: this.player.canComplete
+      canComplete: currentState.navigation.canPlayerEnd,
+      logPolicy: currentState.booklet.policy.player.logPolicy,
+      pagingMode: currentState.booklet.policy.player.pagingMode,
+      restoreCurrentPageOnReturn:
+        currentState.booklet.policy.player.restoreCurrentPageOnReturn
     };
+  }
+
+  private describeNavigationDenial(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"]
+  ): string {
+    const reasons = currentState.navigation.forwardDeniedReasons;
+    if (reasons.includes("presentation_incomplete")) {
+      return "View all required unit content before moving forward or completing the test.";
+    }
+    if (reasons.includes("response_incomplete")) {
+      return "Complete the required response before moving forward or completing the test.";
+    }
+    return "";
   }
 
   get canSignIn(): boolean {
@@ -645,7 +680,9 @@ export class ParticipantViewFacade {
         break;
       }
       case "end":
-        this.completeRun();
+        if (this.veronaPlayer?.canComplete) {
+          this.completeRun();
+        }
         break;
     }
   }

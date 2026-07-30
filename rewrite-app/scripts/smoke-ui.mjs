@@ -24,7 +24,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<assessment><booklet key="booklet:starter" label="Starter"><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></unit></booklet></assessment>';
+  '<assessment><booklet key="booklet:starter" label="Starter"><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></unit></booklet></assessment>';
 let smokeAdminSessionToken = "";
 
 const createStoredZipBuffer = entries => {
@@ -2508,7 +2508,10 @@ try {
   const veronaPlayerHtml = `<!doctype html>
     <html><body>
       <strong id="playerDefinition"></strong>
+      <output id="playerConfig"></output>
+      <output id="playerStartPage"></output>
       <label>Player answer <input id="playerAnswer" /></label>
+      <button id="playerEnd" type="button">End from player</button>
       <script>
         let sessionId = "";
         const sendState = () => parent.postMessage({
@@ -2526,9 +2529,16 @@ try {
           if (event.data?.type !== "vopStartCommand") return;
           sessionId = event.data.sessionId;
           document.querySelector("#playerDefinition").textContent = event.data.unitDefinition;
+          document.querySelector("#playerConfig").textContent = JSON.stringify(event.data.playerConfig);
+          document.querySelector("#playerStartPage").textContent = String(event.data.playerConfig?.startPage || "");
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
           document.querySelector("#playerAnswer").addEventListener("input", sendState);
         });
+        document.querySelector("#playerEnd").addEventListener("click", () => parent.postMessage({
+          type: "vopUnitNavigationRequestedNotification",
+          sessionId,
+          target: "end"
+        }, "*"));
         addEventListener("DOMContentLoaded", () => parent.postMessage({
           type: "vopReadyNotification",
           metadata: { specVersion: "6.0" }
@@ -2547,6 +2557,15 @@ try {
             {
               bookletKey: veronaBookletKey,
               displayLabel: "Verona Smoke Booklet",
+              bookletConfig: {
+                force_response_complete: "ON",
+                allow_player_to_terminate_test: "LAST_UNIT",
+                unit_menu: "OFF",
+                unit_navibuttons: "OFF",
+                pagingMode: "concat-scroll",
+                logPolicy: "debug",
+                restore_current_page_on_return: "ON"
+              },
               unitEntries: [
                 {
                   unitKey: veronaUnitKey,
@@ -2613,6 +2632,33 @@ try {
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: "API 6.0" })
     .waitFor();
+  await veronaFrame
+    .locator("#playerConfig")
+    .filter({ hasText: '"pagingMode":"concat-scroll"' })
+    .filter({ hasText: '"logPolicy":"debug"' })
+    .waitFor();
+  await page
+    .locator("#participantRouteNavigationNotice")
+    .filter({ hasText: "Complete the required response" })
+    .waitFor();
+  assert.equal(
+    await page.locator("#participantRouteCompleteButton").isDisabled(),
+    true
+  );
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
+  const veronaParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(veronaParticipantSessionId);
+  await veronaFrame.locator("#playerEnd").click();
+  await page.waitForTimeout(250);
+  const guardedPlayerEndState = await (
+    await fetch(
+      `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`
+    )
+  ).json();
+  assert.equal(guardedPlayerEndState.currentRunState.testRun.status, "running");
   await veronaFrame.locator("#playerAnswer").fill("Saved through Verona");
   await page.waitForFunction(
     () =>
@@ -2621,10 +2667,6 @@ try {
     undefined,
     { timeout: 15_000 }
   );
-  const veronaParticipantSessionId = await page
-    .locator("#participantRouteSessionId")
-    .inputValue();
-  assert.ok(veronaParticipantSessionId);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
     payload => {
@@ -2641,6 +2683,11 @@ try {
       }
     }
   );
+  await page.locator("#participantRouteNavigationNotice").waitFor({ state: "detached" });
+  assert.equal(
+    await page.locator("#participantRouteCompleteButton").isDisabled(),
+    false
+  );
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
@@ -2655,6 +2702,10 @@ try {
   assert.equal(
     await resumedVeronaFrame.locator("#playerAnswer").inputValue(),
     "Saved through Verona"
+  );
+  assert.equal(
+    await resumedVeronaFrame.locator("#playerStartPage").textContent(),
+    "page-1"
   );
   stopAfter("participant-verona-player");
 

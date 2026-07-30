@@ -221,6 +221,7 @@ export type SourcePackagePlayerEntry = {
 export type SourcePackageBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  config?: Record<string, string>;
   unitEntries: SourcePackageUnitEntry[];
 };
 
@@ -276,7 +277,45 @@ export type ContentReleasePlayerEntry = {
 export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  policy?: BookletRuntimePolicy;
   unitEntries: ContentReleaseUnitEntry[];
+};
+
+export type BookletLeaveRestriction = "off" | "forward" | "always";
+export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
+export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
+export type BookletNavigationDeniedReason =
+  | "presentation_incomplete"
+  | "response_incomplete";
+
+export type BookletRuntimePolicy = {
+  version: 1;
+  sourceConfig: Record<string, string>;
+  navigation: {
+    requirePresentationComplete: BookletLeaveRestriction;
+    requireResponseComplete: BookletLeaveRestriction;
+    unitMenuEnabled: boolean;
+    unitControls: BookletUnitNavigationControls;
+    playerEnd: BookletPlayerEndPolicy;
+  };
+  player: {
+    logPolicy: "disabled" | "lean" | "rich" | "debug";
+    pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap";
+    restoreCurrentPageOnReturn: boolean;
+  };
+  completion: {
+    lockOnTermination: boolean;
+  };
+  display: {
+    headerContent: "none" | "booklet" | "block" | "unit";
+    unitTitle: boolean;
+    fullscreenPrompt: boolean;
+    fullscreenButton: boolean;
+  };
+  timing: {
+    showTimeLeft: boolean;
+    warningMinutes: number[];
+  };
 };
 
 export type ContentReleaseUnitEntry = {
@@ -384,6 +423,7 @@ export type ParticipantCurrentRunState = {
   booklet: {
     bookletKey: string;
     displayLabel: string;
+    policy: BookletRuntimePolicy;
   };
   currentUnit: {
     unitKey: string | null;
@@ -401,6 +441,16 @@ export type ParticipantCurrentRunState = {
     content?: string;
   }>;
   booklets: ParticipantRuntimeBooklet[];
+  navigation: {
+    previousUnitKey: string | null;
+    nextUnitKey: string | null;
+    canGoPrevious: boolean;
+    canGoNext: boolean;
+    canComplete: boolean;
+    canPlayerEnd: boolean;
+    backwardDeniedReasons: BookletNavigationDeniedReason[];
+    forwardDeniedReasons: BookletNavigationDeniedReason[];
+  };
   availableActions: Array<"save_progress" | "resume" | "complete">;
 };
 
