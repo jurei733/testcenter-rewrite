@@ -1737,6 +1737,7 @@ export type IssueMonitorRunCommandRequest = {
   commandType: MonitorRunCommandType;
   actorId?: string | null;
   targetUnitKey?: string | null;
+  remainingSeconds?: number | null;
 };
 
 export type IssueMonitorRunCommandResponse = {

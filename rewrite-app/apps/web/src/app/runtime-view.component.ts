@@ -56,6 +56,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="currentUnitKey" name="currentUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
           </label>
           <label>
+            Monitor Timer Seconds
+            <input id="monitorTimeSeconds" name="monitorTimeSeconds" type="number" min="1" max="86400" step="1" [(ngModel)]="view.runtime.monitorTimeSeconds" (change)="view.persistState()" />
+          </label>
+          <label>
             Review Id
             <input id="reviewId" name="reviewId" placeholder="Filled after creating or selecting a review" [(ngModel)]="view.runtime.reviewId" (change)="view.persistState()" />
           </label>
@@ -98,6 +102,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
               <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
+              <button id="runtimeMonitorSetTestletTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Monitor Set Testlet Time</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
               <button id="runtimeOpenRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.openRuns()">Monitor Open Runs</button>
               <button id="runtimeExportOpenRunsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>

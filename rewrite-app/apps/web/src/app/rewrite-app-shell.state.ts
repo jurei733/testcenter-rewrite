@@ -99,6 +99,7 @@ export interface ShellRuntimeState {
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  monitorTimeSeconds: string;
   currentUnitResponse: string;
   reviewId: string;
   reviewerId: string;
@@ -306,6 +307,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",
+    monitorTimeSeconds: "300",
     currentUnitResponse: "",
     reviewId: "",
     reviewerId: "operator-ui",

@@ -107,6 +107,7 @@ export class RewriteAppRuntimeService {
       | "complete"
       | "goto"
       | "unlock_navigation"
+      | "set_testlet_time"
   ): Promise<void> {
     await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
@@ -123,6 +124,8 @@ export class RewriteAppRuntimeService {
             ? "Monitor Go To Issued"
             : commandType === "unlock_navigation"
               ? "Monitor Navigation Unlocked"
+              : commandType === "set_testlet_time"
+                ? "Monitor Testlet Time Set"
             : "Monitor Complete Issued",
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );

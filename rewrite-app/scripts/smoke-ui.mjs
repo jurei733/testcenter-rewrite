@@ -24,7 +24,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<assessment><booklet key="booklet:starter" label="Starter"><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><unit key="unit-1" label="Entry" /><unit key="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></unit><unit key="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></unit></booklet></assessment>';
+  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
 let smokeAdminSessionToken = "";
 
 const createStoredZipBuffer = entries => {
@@ -3931,6 +3931,25 @@ try {
     testRunId: pausedTestRunId,
     transition: "paused -> running"
   });
+  logStep("monitor-set-testlet-time");
+  await fillAndCommit("#monitorTimeSeconds", "120");
+  await clickSelectorAction(
+    "Monitor Set Testlet Time",
+    "#runtimeMonitorSetTestletTimeButton"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => {
+      const timers = payload?.currentRunState?.testRun?.testletTimers;
+      const timer = timers?.["testlet:timed-paused"];
+      return (
+        payload?.currentRunState?.testRun?.status === "paused" &&
+        timer?.status === "paused" &&
+        timer?.durationSeconds === 120 &&
+        timer?.remainingSeconds === 120
+      );
+    }
+  );
   logStep("resume-run");
   await clickAction("Resume Run");
   await pollJsonWithPredicate(

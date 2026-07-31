@@ -59,6 +59,7 @@ export interface ShellRuntimeActionsHost {
   getParticipantSessionId(): string;
   getTestRunId(): string;
   getCurrentUnitKey(): string;
+  getMonitorTimeSeconds(): string;
   getCurrentUnitResponse(): string;
   getReviewerId(): string;
   getReviewCategory(): string;
@@ -251,6 +252,7 @@ export async function issueMonitorRunCommandAction(
     | "complete"
     | "goto"
     | "unlock_navigation"
+    | "set_testlet_time"
 ): Promise<IssueMonitorRunCommandResponse> {
   const payload = await host.request<IssueMonitorRunCommandResponse>(
     commandType === "pause"
@@ -261,6 +263,8 @@ export async function issueMonitorRunCommandAction(
           ? "Monitor Go To Unit"
           : commandType === "unlock_navigation"
             ? "Monitor Unlock Navigation"
+            : commandType === "set_testlet_time"
+              ? "Monitor Set Testlet Time"
           : "Monitor Complete Run",
     "POST",
     host.getMonitorRunCommandPath(),
@@ -269,7 +273,12 @@ export async function issueMonitorRunCommandAction(
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
         ? { targetUnitKey: host.getCurrentUnitKey().trim() }
-        : {})
+        : commandType === "set_testlet_time"
+          ? {
+              targetUnitKey: host.getCurrentUnitKey().trim(),
+              remainingSeconds: Number(host.getMonitorTimeSeconds())
+            }
+          : {})
     } satisfies IssueMonitorRunCommandRequest
   );
 
@@ -283,6 +292,8 @@ export async function issueMonitorRunCommandAction(
     commandType === "resume" ||
     commandType === "goto" ||
     (commandType === "unlock_navigation" &&
+      payload.command.testRun.status === "running") ||
+    (commandType === "set_testlet_time" &&
       payload.command.testRun.status === "running")
   ) {
     applyResumeRunResult(host.createRuntimePresentationHost(), {

@@ -2170,13 +2170,21 @@ export class ContentViewFacade {
 
     const normalizedMediaType = mediaType.toLowerCase();
     if (normalizedMediaType.includes("xml") || trimmedDocument.startsWith("<")) {
-      const specificBookletCount = Array.from(
+      const primaryBookletCount = Array.from(
         trimmedDocument.matchAll(
-          /<(?:[a-zA-Z_][\w.-]*:)?(?:booklet|testlet|assessmentTest|assessment-test)\b/gi
+          /<(?:[a-zA-Z_][\w.-]*:)?(?:booklet|assessmentTest|assessment-test)\b/gi
         )
       ).length;
-      if (specificBookletCount > 0) {
-        return specificBookletCount;
+      if (primaryBookletCount > 0) {
+        return primaryBookletCount;
+      }
+      const testletCount = Array.from(
+        trimmedDocument.matchAll(
+          /<(?:[a-zA-Z_][\w.-]*:)?testlet\b/gi
+        )
+      ).length;
+      if (testletCount > 0) {
+        return testletCount;
       }
       return Array.from(
         trimmedDocument.matchAll(/<(?:[a-zA-Z_][\w.-]*:)?test\b/gi)

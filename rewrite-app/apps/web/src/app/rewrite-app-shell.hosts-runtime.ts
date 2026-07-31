@@ -78,6 +78,7 @@ export function createRuntimeActionsStateHost(args: {
     getParticipantSessionId: () => args.runtimeState.participantSessionId,
     getTestRunId: () => args.runtimeState.testRunId,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
+    getMonitorTimeSeconds: () => args.runtimeState.monitorTimeSeconds,
     getCurrentUnitResponse: () => args.runtimeState.currentUnitResponse,
     getReviewerId: () => args.runtimeState.reviewerId,
     getReviewCategory: () => args.runtimeState.reviewCategory,

@@ -29,6 +29,7 @@ export type ShellPersistenceTarget = {
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  monitorTimeSeconds: string;
   loginKey: string;
   groupKey: string;
   bookletKey: string;
@@ -145,6 +146,7 @@ export const createPersistedShellState = (
   participantSessionId: target.participantSessionId,
   testRunId: target.testRunId,
   currentUnitKey: target.currentUnitKey,
+  monitorTimeSeconds: target.monitorTimeSeconds,
   loginKey: target.loginKey,
   groupKey: target.groupKey,
   bookletKey: target.bookletKey,
@@ -331,6 +333,10 @@ export const applyHydratedShellState = (
   target.currentUnitKey = hydrateString(
     snapshot.currentUnitKey,
     target.currentUnitKey
+  );
+  target.monitorTimeSeconds = hydrateString(
+    snapshot.monitorTimeSeconds,
+    target.monitorTimeSeconds
   );
   target.loginKey = hydrateString(snapshot.loginKey, target.loginKey);
   target.groupKey = hydrateString(snapshot.groupKey, target.groupKey);

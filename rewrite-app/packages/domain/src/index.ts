@@ -50,13 +50,15 @@ export type MonitorRunCommandType =
   | "resume"
   | "complete"
   | "goto"
-  | "unlock_navigation";
+  | "unlock_navigation"
+  | "set_testlet_time";
 export const monitorRunCommandTypes = [
   "pause",
   "resume",
   "complete",
   "goto",
-  "unlock_navigation"
+  "unlock_navigation",
+  "set_testlet_time"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",

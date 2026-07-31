@@ -487,6 +487,7 @@ export type MonitorControlPort = {
     commandType: MonitorRunCommandType;
     actorId?: string | null;
     targetUnitKey?: string | null;
+    remainingSeconds?: number | null;
   }): Promise<MonitorRunCommandResult>;
 };
 
@@ -932,7 +933,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', 'complete', or 'goto'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'unlock_navigation', or 'set_testlet_time'."
     );
   }
 
@@ -948,6 +949,33 @@ const normalizeMonitorGotoTargetUnitKey = (value: unknown): string => {
     );
   }
   return value.trim();
+};
+
+const normalizeMonitorTimeTargetUnitKey = (value: unknown): string => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new FirstSliceError(
+      400,
+      "monitor_time_target_unit_required",
+      "targetUnitKey is required for a monitor set-testlet-time command."
+    );
+  }
+  return value.trim();
+};
+
+const normalizeMonitorTimeRemainingSeconds = (value: unknown): number => {
+  const remainingSeconds = Number(value);
+  if (
+    !Number.isInteger(remainingSeconds) ||
+    remainingSeconds < 1 ||
+    remainingSeconds > 86_400
+  ) {
+    throw new FirstSliceError(
+      400,
+      "monitor_time_remaining_seconds_invalid",
+      "remainingSeconds must be an integer from 1 through 86400."
+    );
+  }
+  return remainingSeconds;
 };
 
 const normalizeParticipantLoginKey = (value: unknown): string => {
@@ -7052,6 +7080,77 @@ const applyMonitorNavigationUnlock = (input: {
   });
 };
 
+const applyMonitorSetTestletTime = (input: {
+  contentRelease: ContentRelease;
+  testRun: TestRun;
+  targetUnitKey: string;
+  remainingSeconds: number;
+  timestamp: string;
+}): {
+  testRun: TestRun;
+  testletKey: string;
+  previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null;
+} => {
+  const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === input.testRun.bookletKey
+  );
+  const targetUnit = booklet?.unitEntries.find(
+    candidate => candidate.unitKey === input.targetUnitKey
+  );
+  if (!targetUnit) {
+    throw new FirstSliceError(
+      400,
+      "monitor_time_target_unit_invalid",
+      `Unit '${input.targetUnitKey}' does not belong to booklet '${input.testRun.bookletKey}'.`
+    );
+  }
+  const timedTestlet = resolveTimedTestletForUnit(booklet, input.targetUnitKey);
+  if (!timedTestlet) {
+    throw new FirstSliceError(
+      400,
+      "monitor_time_target_not_timed",
+      `Unit '${input.targetUnitKey}' does not belong to a timed testlet.`
+    );
+  }
+
+  const previousTimer =
+    input.testRun.testletTimers?.[timedTestlet.testletKey] ?? null;
+  const currentUnit = booklet?.unitEntries.find(
+    candidate => candidate.unitKey === input.testRun.currentUnitKey
+  );
+  const targetIsCurrent = Boolean(
+    currentUnit?.testletPath?.includes(timedTestlet.testletKey)
+  );
+  const status =
+    input.testRun.status === "running" && targetIsCurrent ? "running" : "paused";
+  const timestampMs = Date.parse(input.timestamp);
+  const expiresAt =
+    status === "running" && Number.isFinite(timestampMs)
+      ? new Date(timestampMs + input.remainingSeconds * 1_000).toISOString()
+      : null;
+  return {
+    testRun: normalizeTestRun({
+      ...input.testRun,
+      testletTimers: {
+        ...(input.testRun.testletTimers ?? {}),
+        [timedTestlet.testletKey]: {
+          testletKey: timedTestlet.testletKey,
+          status,
+          durationSeconds: input.remainingSeconds,
+          remainingSeconds: input.remainingSeconds,
+          startedAt: input.timestamp,
+          expiresAt,
+          updatedAt: input.timestamp,
+          endedAt: null
+        }
+      },
+      updatedAt: input.timestamp
+    }),
+    testletKey: timedTestlet.testletKey,
+    previousTimer
+  };
+};
+
 const resolveActiveTestletTimer = (
   contentRelease: ContentRelease,
   testRun: TestRun,
@@ -12982,6 +13081,12 @@ export const createFirstSliceServices = (
         const targetUnitKey =
           commandType === "goto"
             ? normalizeMonitorGotoTargetUnitKey(input.targetUnitKey)
+            : commandType === "set_testlet_time"
+              ? normalizeMonitorTimeTargetUnitKey(input.targetUnitKey)
+              : null;
+        const remainingSeconds =
+          commandType === "set_testlet_time"
+            ? normalizeMonitorTimeRemainingSeconds(input.remainingSeconds)
             : null;
         const actorId =
           typeof input.actorId === "string" && input.actorId.trim()
@@ -13044,7 +13149,12 @@ export const createFirstSliceServices = (
               ? "completed"
               : commandType === "unlock_navigation"
                 ? testRun.status
+                : commandType === "set_testlet_time"
+                  ? testRun.status
                 : "running";
+        let adjustedTestletKey: string | null = null;
+        let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
+          null;
         const nextTestRun: TestRun =
           commandType === "complete"
             ? {
@@ -13067,6 +13177,21 @@ export const createFirstSliceServices = (
                     testRun,
                     timestamp: issuedAt
                   })
+                : commandType === "set_testlet_time" &&
+                    targetUnitKey &&
+                    remainingSeconds
+                  ? (() => {
+                      const adjusted = applyMonitorSetTestletTime({
+                        contentRelease,
+                        testRun,
+                        targetUnitKey,
+                        remainingSeconds,
+                        timestamp: issuedAt
+                      });
+                      adjustedTestletKey = adjusted.testletKey;
+                      previousTimer = adjusted.previousTimer;
+                      return adjusted.testRun;
+                    })()
                 : transitionTestletTimersForRunStatus(
                     testRun,
                     nextStatus as Extract<TestRunStatus, "running" | "paused">,
@@ -13114,6 +13239,12 @@ export const createFirstSliceServices = (
             completedAt: effectiveNextTestRun.completedAt ?? null,
             previousUnitKey: testRun.currentUnitKey,
             targetUnitKey,
+            targetTestletKey: adjustedTestletKey,
+            previousTimerStatus: previousTimer?.status ?? null,
+            previousRemainingSeconds: previousTimer
+              ? getTestletTimerRemainingSeconds(previousTimer, issuedAt)
+              : null,
+            remainingSeconds,
             previousNavigationUnlocked:
               testRun.monitorNavigationUnlocked === true,
             navigationUnlocked:

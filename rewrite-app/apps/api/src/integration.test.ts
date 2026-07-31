@@ -3854,6 +3854,56 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(resumeCommand.body.command.previousStatus, "paused");
     assert.equal(resumeCommand.body.command.testRun.status, "running");
 
+    const missingTimeTarget = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: { commandType: "set_testlet_time", remainingSeconds: 60 }
+      }
+    );
+    assert.equal(missingTimeTarget.status, 400);
+    assert.equal(
+      missingTimeTarget.body.error,
+      "monitor_time_target_unit_required"
+    );
+
+    const invalidTime = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "set_testlet_time",
+          targetUnitKey: "unit-finish",
+          remainingSeconds: 0
+        }
+      }
+    );
+    assert.equal(invalidTime.status, 400);
+    assert.equal(
+      invalidTime.body.error,
+      "monitor_time_remaining_seconds_invalid"
+    );
+
+    const nonTimedTarget = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "set_testlet_time",
+          targetUnitKey: "unit-finish",
+          remainingSeconds: 60
+        }
+      }
+    );
+    assert.equal(nonTimedTarget.status, 400);
+    assert.equal(nonTimedTarget.body.error, "monitor_time_target_not_timed");
+
     const missingGotoTarget = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
@@ -7889,6 +7939,93 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
+  const restoredTimer = await requestJson<{
+    command: {
+      commandType: string;
+      previousStatus: string;
+      testRun: {
+        status: string;
+        currentUnitKey: string | null;
+        testletTimers?: Record<
+          string,
+          {
+            status: string;
+            durationSeconds: number;
+            remainingSeconds: number;
+            startedAt: string;
+            expiresAt: string | null;
+            updatedAt: string;
+            endedAt: string | null;
+          }
+        >;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "set_testlet_time",
+        targetUnitKey: "UNIT.TIMED",
+        remainingSeconds: 1,
+        actorId: "timer-monitor"
+      }
+    }
+  );
+  assert.equal(restoredTimer.status, 200);
+  assert.equal(restoredTimer.body.command.commandType, "set_testlet_time");
+  assert.equal(restoredTimer.body.command.previousStatus, "running");
+  assert.equal(restoredTimer.body.command.testRun.status, "running");
+  assert.equal(restoredTimer.body.command.testRun.currentUnitKey, "UNIT.FINISH");
+  assert.deepEqual(restoredTimer.body.command.testRun.testletTimers?.[testletKey], {
+    testletKey,
+    status: "paused",
+    durationSeconds: 1,
+    remainingSeconds: 1,
+    startedAt:
+      restoredTimer.body.command.testRun.testletTimers?.[testletKey]?.startedAt,
+    expiresAt: null,
+    updatedAt:
+      restoredTimer.body.command.testRun.testletTimers?.[testletKey]?.updatedAt,
+    endedAt: null
+  });
+  const restoredReentry = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<string, { status: string; expiresAt: string | null }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.TIMED", status: "running" }
+  });
+  assert.equal(restoredReentry.status, 200);
+  assert.equal(restoredReentry.body.testRun.currentUnitKey, "UNIT.TIMED");
+  assert.equal(
+    restoredReentry.body.testRun.testletTimers?.[testletKey]?.status,
+    "running"
+  );
+  assert.match(
+    restoredReentry.body.testRun.testletTimers?.[testletKey]?.expiresAt ?? "",
+    ISO_DATE_REGEX
+  );
+  await delay(1_100);
+  const stateAfterRestoredExpiry = await requestJson<{
+    currentRunState: {
+      currentUnit: { unitKey: string | null };
+      testRun: { testletTimers?: Record<string, { status: string }> };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    stateAfterRestoredExpiry.body.currentRunState.currentUnit.unitKey,
+    "UNIT.FINISH"
+  );
+  assert.equal(
+    stateAfterRestoredExpiry.body.currentRunState.testRun.testletTimers?.[
+      testletKey
+    ]?.status,
+    "expired"
+  );
+
   const monitorReopenedTimer = await requestJson<{
     command: {
       testRun: {
@@ -7943,6 +8080,50 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     ISO_DATE_REGEX
   );
 
+  const monitorActivity = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        details: {
+          commandType?: string;
+          targetUnitKey?: string | null;
+          targetTestletKey?: string | null;
+          previousTimerStatus?: string | null;
+          previousRemainingSeconds?: number | null;
+          remainingSeconds?: number | null;
+          nextStatus?: string;
+        };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=monitor_run_command_issued&limit=10`
+  );
+  const setTimeActivity = monitorActivity.body.items.find(
+    item => item.activityEvent.details.commandType === "set_testlet_time"
+  );
+  assert.ok(setTimeActivity);
+  assert.deepEqual(
+    {
+      commandType: setTimeActivity.activityEvent.details.commandType,
+      targetUnitKey: setTimeActivity.activityEvent.details.targetUnitKey,
+      targetTestletKey: setTimeActivity.activityEvent.details.targetTestletKey,
+      previousTimerStatus:
+        setTimeActivity.activityEvent.details.previousTimerStatus,
+      previousRemainingSeconds:
+        setTimeActivity.activityEvent.details.previousRemainingSeconds,
+      remainingSeconds: setTimeActivity.activityEvent.details.remainingSeconds,
+      nextStatus: setTimeActivity.activityEvent.details.nextStatus
+    },
+    {
+      commandType: "set_testlet_time",
+      targetUnitKey: "UNIT.TIMED",
+      targetTestletKey: testletKey,
+      previousTimerStatus: "expired",
+      previousRemainingSeconds: 0,
+      remainingSeconds: 1,
+      nextStatus: "running"
+    }
+  );
+
   const startedActivity = await requestJson<{
     items: Array<{ activityEvent: { eventType: string } }>;
   }>(
@@ -7954,7 +8135,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_timer_expired`
   );
   assert.equal(startedActivity.body.items.length, 2);
-  assert.equal(expiredActivity.body.items.length, 1);
+  assert.equal(expiredActivity.body.items.length, 2);
 });
 
 test("original Testcenter timed testlets enforce confirm and allowed leave policies", async () => {

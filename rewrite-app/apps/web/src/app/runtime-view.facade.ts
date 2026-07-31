@@ -1995,6 +1995,16 @@ export class RuntimeViewFacade {
     return this.canUseRunActions && this.runtime.currentUnitKey.trim().length > 0;
   }
 
+  get canSetMonitorTestletTime(): boolean {
+    const remainingSeconds = Number(this.runtime.monitorTimeSeconds);
+    return (
+      this.canSaveProgressActions &&
+      Number.isInteger(remainingSeconds) &&
+      remainingSeconds >= 1 &&
+      remainingSeconds <= 86_400
+    );
+  }
+
   get canCreateReviewAction(): boolean {
     return (
       this.canUseRunActions &&
@@ -2371,6 +2381,15 @@ export class RuntimeViewFacade {
     }
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("unlock_navigation")
+    );
+  }
+
+  issueMonitorSetTestletTime(): void {
+    if (!this.canSetMonitorTestletTime) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("set_testlet_time")
     );
   }
 
