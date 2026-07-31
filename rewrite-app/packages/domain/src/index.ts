@@ -554,6 +554,8 @@ export type ParticipantCurrentRunState = {
     startedAt: string;
     expiresAt: string | null;
     leave: TestletTimeMaxLeavePolicy;
+    showTimeLeft: boolean;
+    warningMinutes: number[];
   } | null;
   activeLeaveLock: {
     testletKey: string;

@@ -2623,12 +2623,14 @@ try {
             <Config key="pagingMode">concat-scroll</Config>
             <Config key="logPolicy">debug</Config>
             <Config key="restore_current_page_on_return">ON</Config>
+            <Config key="unit_show_time_left">ON</Config>
+            <Config key="unit_time_left_warnings">1</Config>
           </BookletConfig>
           <Units>
             <Testlet id="${veronaTestletKey}" label="Protected Verona Block">
               <Restrictions>
                 <CodeToEnter code="${veronaTestletCode}">Enter the assigned Verona block code.</CodeToEnter>
-                <TimeMax minutes="1" leave="allowed" />
+                <TimeMax minutes="1.05" leave="allowed" />
                 <DenyNavigationOnIncomplete response="ON" />
                 <LockAfterLeaving confirm="true" scope="unit" />
               </Restrictions>
@@ -2746,9 +2748,13 @@ try {
     .map(Number);
   assert.ok(
     veronaTimerMinutes * 60 + veronaTimerSeconds > 0 &&
-      veronaTimerMinutes * 60 + veronaTimerSeconds <= 60,
+      veronaTimerMinutes * 60 + veronaTimerSeconds <= 63,
     `Expected a live Verona testlet timer, received '${veronaTimerValue}'.`
   );
+  await page
+    .locator("#participantRouteTestletTimerWarning")
+    .filter({ hasText: "1 minute left" })
+    .waitFor({ timeout: 10_000 });
   await page
     .locator("#participantRouteLeaveLockLabel")
     .filter({ hasText: "Verona Smoke Unit" })

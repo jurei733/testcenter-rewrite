@@ -7172,6 +7172,9 @@ const resolveActiveTestletTimer = (
   const testlet = resolveTimedTestletForUnit(booklet, testRun.currentUnitKey);
   const timer = testlet ? testRun.testletTimers?.[testlet.testletKey] : null;
   const timeMax = testlet?.restrictions?.timeMax;
+  const timingPolicy = (
+    booklet?.policy ?? compileBookletRuntimePolicy({})
+  ).timing;
   if (
     !testlet ||
     !timer ||
@@ -7188,7 +7191,9 @@ const resolveActiveTestletTimer = (
     remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
     startedAt: timer.startedAt,
     expiresAt: timer.expiresAt,
-    leave: timeMax.leave
+    leave: timeMax.leave,
+    showTimeLeft: timingPolicy.showTimeLeft,
+    warningMinutes: timingPolicy.warningMinutes
   };
 };
 

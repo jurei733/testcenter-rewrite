@@ -1260,6 +1260,11 @@ pre {
   border-color: rgba(196, 82, 47, 0.22);
 }
 
+.participant-testlet-timer.is-warning {
+  border-color: rgba(196, 82, 47, 0.54);
+  box-shadow: 0 12px 28px rgba(196, 82, 47, 0.12);
+}
+
 .participant-testlet-timer > div:first-child,
 .participant-testlet-timer-value {
   display: grid;
@@ -1308,6 +1313,15 @@ pre {
   border-radius: inherit;
   background: var(--green-deep);
   transition: width 250ms linear;
+}
+
+.participant-testlet-timer .participant-testlet-timer-warning {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(196, 82, 47, 0.1);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .participant-leave-lock {

@@ -297,6 +297,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             id="participantRouteTestletTimer"
             class="participant-testlet-timer"
             [class.is-paused]="timer.status === 'paused'"
+            [class.is-warning]="timer.warningMessage"
             aria-live="polite"
           >
             <div>
@@ -304,13 +305,19 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <strong id="participantRouteTestletTimerLabel">{{ timer.displayLabel }}</strong>
               <p id="participantRouteTestletTimerLeave">{{ timer.leaveLabel }}</p>
             </div>
-            <div class="participant-testlet-timer-value">
+            <div *ngIf="timer.showTimeLeft" class="participant-testlet-timer-value">
               <span>{{ timer.status === "paused" ? "Paused" : "Time remaining" }}</span>
               <strong id="participantRouteTestletTimerValue">{{ timer.remainingLabel }}</strong>
             </div>
-            <div class="participant-testlet-timer-track" aria-hidden="true">
+            <div *ngIf="timer.showTimeLeft" class="participant-testlet-timer-track" aria-hidden="true">
               <span [style.width.%]="timer.progressPercent"></span>
             </div>
+            <p
+              *ngIf="timer.warningMessage"
+              id="participantRouteTestletTimerWarning"
+              class="participant-testlet-timer-warning"
+              role="alert"
+            >{{ timer.warningMessage }}</p>
           </section>
           <section
             *ngIf="view.player.leaveLock as leaveLock"

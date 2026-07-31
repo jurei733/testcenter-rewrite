@@ -12,6 +12,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.navigation.requirePresentationComplete, "off");
   assert.equal(defaults.navigation.playerEnd, "always");
   assert.equal(defaults.navigation.unitControls, "both");
+  assert.equal(defaults.timing.showTimeLeft, false);
   assert.deepEqual(defaults.timing.warningMinutes, [5, 1]);
   assert.equal(
     compileBookletRuntimePolicy({ show_end_button_in_player: "OFF" }).navigation
@@ -29,6 +30,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     logPolicy: "debug",
     restore_current_page_on_return: "ON",
     lock_test_on_termination: "ON",
+    unit_show_time_left: "ON",
     unit_time_left_warnings: "10, 5; 1"
   });
   assert.equal(policy.navigation.requirePresentationComplete, "forward");
@@ -40,6 +42,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.player.logPolicy, "debug");
   assert.equal(policy.player.restoreCurrentPageOnReturn, true);
   assert.equal(policy.completion.lockOnTermination, true);
+  assert.equal(policy.timing.showTimeLeft, true);
   assert.deepEqual(policy.timing.warningMinutes, [10, 5, 1]);
   assert.deepEqual(
     compileBookletRuntimePolicy({ unit_time_left_warnings: "" }).timing

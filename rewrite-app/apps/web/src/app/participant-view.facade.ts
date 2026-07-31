@@ -1,4 +1,4 @@
-import { Injectable, inject } from "@angular/core";
+import { Injectable, inject, signal } from "@angular/core";
 
 import type {
   CompleteTestRunRequest,
@@ -89,6 +89,8 @@ type ParticipantPlayerState = {
     remainingLabel: string;
     progressPercent: number;
     leaveLabel: string;
+    showTimeLeft: boolean;
+    warningMessage: string | null;
   } | null;
   leaveLock: {
     testletKey: string;
@@ -174,10 +176,18 @@ export class ParticipantViewFacade {
   veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
     "not_saved";
   testletUnlockCode = "";
-  timerTick = Date.now();
+  readonly timerTick = signal(Date.now());
   private copiedSessionEntryLink = "";
   private timerTickerHandle: number | null = null;
   private timerExpiryRefreshPending = false;
+  private activeTimerWarning: {
+    testletKey: string;
+    startedAt: string;
+    minutes: number;
+    visibleUntilMs: number;
+  } | null = null;
+  private readonly seenTimerWarnings = new Set<string>();
+  private readonly timerRemainingSeconds = new Map<string, number>();
   private pendingVeronaSave: {
     testRunId: string;
     unitKey: string;
@@ -514,12 +524,18 @@ export class ParticipantViewFacade {
                   0,
                   Math.min(
                     activeTestletTimer.durationSeconds,
-                    Math.ceil((expiresAtMs - this.timerTick) / 1_000)
+                    Math.ceil((expiresAtMs - this.timerTick()) / 1_000)
                   )
                 )
               : activeTestletTimer.remainingSeconds;
           const minutes = Math.floor(remainingSeconds / 60);
           const seconds = remainingSeconds % 60;
+          const activeWarning =
+            this.activeTimerWarning?.testletKey === activeTestletTimer.testletKey &&
+            this.activeTimerWarning.startedAt === activeTestletTimer.startedAt &&
+            this.activeTimerWarning.visibleUntilMs > this.timerTick()
+              ? this.activeTimerWarning
+              : null;
           return {
             testletKey: activeTestletTimer.testletKey,
             displayLabel: activeTestletTimer.displayLabel,
@@ -541,7 +557,11 @@ export class ParticipantViewFacade {
                 ? "This block cannot be left before time expires."
                 : activeTestletTimer.leave === "allowed"
                   ? "Leaving this block closes it immediately."
-                  : "Leaving this block requires confirmation."
+                  : "Leaving this block requires confirmation.",
+            showTimeLeft: activeTestletTimer.showTimeLeft,
+            warningMessage: activeWarning
+              ? `You have ${activeWarning.minutes} minute${activeWarning.minutes === 1 ? "" : "s"} left for this timed block.`
+              : null
           };
         })()
       : null;
@@ -704,15 +724,54 @@ export class ParticipantViewFacade {
       return;
     }
     this.timerTickerHandle = globalThis.window.setInterval(() => {
-      this.timerTick = Date.now();
+      const currentTick = Date.now();
+      this.timerTick.set(currentTick);
       const activeTimer = this.readCurrentRunState()?.activeTestletTimer;
       const expiresAtMs = activeTimer?.expiresAt
         ? Date.parse(activeTimer.expiresAt)
         : Number.NaN;
+      if (activeTimer?.status === "running" && Number.isFinite(expiresAtMs)) {
+        const remainingSeconds = Math.max(
+          0,
+          Math.ceil((expiresAtMs - currentTick) / 1_000)
+        );
+        const timerKey = `${activeTimer.testletKey}:${activeTimer.startedAt}`;
+        const previousRemainingSeconds = this.timerRemainingSeconds.get(timerKey);
+        const warningMinutes = activeTimer.warningMinutes.find(minutes => {
+          const warningSeconds = Math.round(minutes * 60);
+          return (
+            warningSeconds > 0 &&
+            warningSeconds < activeTimer.durationSeconds &&
+            remainingSeconds <= warningSeconds &&
+            (previousRemainingSeconds === undefined
+              ? remainingSeconds === warningSeconds
+              : previousRemainingSeconds > warningSeconds)
+          );
+        });
+        this.timerRemainingSeconds.set(timerKey, remainingSeconds);
+        if (warningMinutes !== undefined) {
+          const warningKey = `${activeTimer.testletKey}:${activeTimer.startedAt}:${warningMinutes}`;
+          if (!this.seenTimerWarnings.has(warningKey)) {
+            this.seenTimerWarnings.add(warningKey);
+            this.activeTimerWarning = {
+              testletKey: activeTimer.testletKey,
+              startedAt: activeTimer.startedAt,
+              minutes: warningMinutes,
+              visibleUntilMs: currentTick + 5_000
+            };
+          }
+        }
+      }
+      if (
+        this.activeTimerWarning &&
+        this.activeTimerWarning.visibleUntilMs <= currentTick
+      ) {
+        this.activeTimerWarning = null;
+      }
       if (
         activeTimer?.status === "running" &&
         Number.isFinite(expiresAtMs) &&
-        expiresAtMs <= this.timerTick &&
+        expiresAtMs <= currentTick &&
         !this.timerExpiryRefreshPending
       ) {
         this.timerExpiryRefreshPending = true;

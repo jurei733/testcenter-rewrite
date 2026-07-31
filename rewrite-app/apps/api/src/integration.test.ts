@@ -7763,6 +7763,10 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       sourceDocument: `
         <Booklet>
           <Metadata><Id>${bookletKey}</Id><Label>Timer Booklet</Label></Metadata>
+          <BookletConfig>
+            <Config key="unit_show_time_left">ON</Config>
+            <Config key="unit_time_left_warnings">1,0.5</Config>
+          </BookletConfig>
           <Units>
             <Unit id="UNIT.INTRO" label="Introduction" />
             <Testlet id="${testletKey}" label="Timed Block">
@@ -7873,6 +7877,8 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       activeTestletTimer: {
         status: string;
         remainingSeconds: number;
+        showTimeLeft: boolean;
+        warningMinutes: number[];
       } | null;
     };
   }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
@@ -7885,7 +7891,9 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     remainingSeconds: 1,
     startedAt: entered.body.testRun.testletTimers?.[testletKey]?.startedAt,
     expiresAt: null,
-    leave: "forbidden"
+    leave: "forbidden",
+    showTimeLeft: true,
+    warningMinutes: [1, 0.5]
   });
 
   const resumed = await requestJson<{
