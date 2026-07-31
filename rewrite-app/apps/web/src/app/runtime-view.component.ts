@@ -97,6 +97,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
+              <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
               <button id="runtimeOpenRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.openRuns()">Monitor Open Runs</button>
               <button id="runtimeExportOpenRunsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>

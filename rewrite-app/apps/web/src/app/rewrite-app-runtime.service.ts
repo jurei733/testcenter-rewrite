@@ -101,7 +101,12 @@ export class RewriteAppRuntimeService {
   }
 
   async issueMonitorRunCommand(
-    commandType: "pause" | "resume" | "complete" | "goto"
+    commandType:
+      | "pause"
+      | "resume"
+      | "complete"
+      | "goto"
+      | "unlock_navigation"
   ): Promise<void> {
     await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
@@ -116,6 +121,8 @@ export class RewriteAppRuntimeService {
           ? "Monitor Resume Issued"
           : commandType === "goto"
             ? "Monitor Go To Issued"
+            : commandType === "unlock_navigation"
+              ? "Monitor Navigation Unlocked"
             : "Monitor Complete Issued",
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );

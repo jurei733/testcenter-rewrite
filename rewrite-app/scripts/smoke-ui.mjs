@@ -3953,6 +3953,17 @@ try {
       Array.isArray(payload.items) &&
       payload.items.length > 0
   );
+  logStep("monitor-unlock-navigation");
+  await clickSelectorAction(
+    "Monitor Unlock Navigation",
+    "#runtimeMonitorUnlockNavigationButton"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.status === "running" &&
+      payload?.currentRunState?.testRun?.monitorNavigationUnlocked === true
+  );
   logStep("monitor-goto-unit");
   await fillAndCommitUntilValue("#currentUnitKey", "unit-1");
   await clickSelectorAction(

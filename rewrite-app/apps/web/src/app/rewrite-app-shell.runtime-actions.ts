@@ -245,7 +245,12 @@ export async function completeRunAction(
 
 export async function issueMonitorRunCommandAction(
   host: ShellRuntimeActionsHost,
-  commandType: "pause" | "resume" | "complete" | "goto"
+  commandType:
+    | "pause"
+    | "resume"
+    | "complete"
+    | "goto"
+    | "unlock_navigation"
 ): Promise<IssueMonitorRunCommandResponse> {
   const payload = await host.request<IssueMonitorRunCommandResponse>(
     commandType === "pause"
@@ -254,6 +259,8 @@ export async function issueMonitorRunCommandAction(
         ? "Monitor Resume Run"
         : commandType === "goto"
           ? "Monitor Go To Unit"
+          : commandType === "unlock_navigation"
+            ? "Monitor Unlock Navigation"
           : "Monitor Complete Run",
     "POST",
     host.getMonitorRunCommandPath(),
@@ -272,14 +279,25 @@ export async function issueMonitorRunCommandAction(
       { testRun: payload.command.testRun },
       "paused"
     );
-  } else if (commandType === "resume" || commandType === "goto") {
+  } else if (
+    commandType === "resume" ||
+    commandType === "goto" ||
+    (commandType === "unlock_navigation" &&
+      payload.command.testRun.status === "running")
+  ) {
     applyResumeRunResult(host.createRuntimePresentationHost(), {
       testRun: payload.command.testRun
     });
-  } else {
+  } else if (commandType === "complete") {
     applyCompleteRunResult(host.createRuntimePresentationHost(), {
       testRun: payload.command.testRun
     });
+  } else {
+    applySaveProgressResult(
+      host.createRuntimePresentationHost(),
+      { testRun: payload.command.testRun },
+      "paused"
+    );
   }
 
   await host.refreshCrossViewStateAfterRuntimeChange();

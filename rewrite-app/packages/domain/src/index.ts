@@ -45,12 +45,18 @@ export const testRunStatuses = [
   "paused",
   "completed"
 ] as const satisfies readonly TestRunStatus[];
-export type MonitorRunCommandType = "pause" | "resume" | "complete" | "goto";
+export type MonitorRunCommandType =
+  | "pause"
+  | "resume"
+  | "complete"
+  | "goto"
+  | "unlock_navigation";
 export const monitorRunCommandTypes = [
   "pause",
   "resume",
   "complete",
-  "goto"
+  "goto",
+  "unlock_navigation"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [
   "admin_user_bootstrapped",
@@ -404,6 +410,7 @@ export type TestRun = {
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
   unlockedTestletKeys?: string[];
+  monitorNavigationUnlocked?: boolean;
   testletTimers?: Record<string, TestletTimerState>;
   lockedTestletKeys?: string[];
   lockedUnitKeys?: string[];

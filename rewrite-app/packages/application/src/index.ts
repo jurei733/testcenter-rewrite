@@ -1824,6 +1824,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
     unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
       ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
       : [],
+    monitorNavigationUnlocked: testRun.monitorNavigationUnlocked === true,
     testletTimers,
     lockedTestletKeys: Array.isArray(testRun.lockedTestletKeys)
       ? [...new Set(testRun.lockedTestletKeys.filter(Boolean))]
@@ -6460,7 +6461,7 @@ const isUnitLeaveLocked = (
   testRun: TestRun,
   unitKey: string | null
 ): boolean => {
-  if (!booklet || !unitKey) {
+  if (!booklet || !unitKey || testRun.monitorNavigationUnlocked) {
     return false;
   }
   if ((testRun.lockedUnitKeys ?? []).includes(unitKey)) {
@@ -6483,7 +6484,7 @@ const resolveCurrentLeaveLock = (
   scope: "unit" | "testlet";
   confirm: boolean;
 } | null => {
-  if (!booklet || !testRun.currentUnitKey) {
+  if (!booklet || !testRun.currentUnitKey || testRun.monitorNavigationUnlocked) {
     return null;
   }
   const currentUnit = booklet.unitEntries.find(
@@ -6571,7 +6572,11 @@ const findTestletCodeGate = (input: {
   firstUnitIndex: number;
   lastUnitIndex: number;
 }): NonNullable<ParticipantCurrentRunState["navigation"]["nextTestletGate"]> | null => {
-  if (!input.booklet || input.lastUnitIndex < input.firstUnitIndex) {
+  if (
+    !input.booklet ||
+    input.testRun.monitorNavigationUnlocked ||
+    input.lastUnitIndex < input.firstUnitIndex
+  ) {
     return null;
   }
   const unlocked = new Set(input.testRun.unlockedTestletKeys ?? []);
@@ -7019,6 +7024,34 @@ const applyMonitorGoto = (input: {
   });
 };
 
+const applyMonitorNavigationUnlock = (input: {
+  contentRelease: ContentRelease;
+  testRun: TestRun;
+  timestamp: string;
+}): TestRun => {
+  const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === input.testRun.bookletKey
+  );
+  const codeProtectedTestletKeys =
+    booklet?.testletEntries
+      ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
+      .map(testlet => testlet.testletKey) ?? [];
+
+  return normalizeTestRun({
+    ...input.testRun,
+    monitorNavigationUnlocked: true,
+    unlockedTestletKeys: Array.from(
+      new Set([
+        ...(input.testRun.unlockedTestletKeys ?? []),
+        ...codeProtectedTestletKeys
+      ])
+    ),
+    lockedTestletKeys: [],
+    lockedUnitKeys: [],
+    updatedAt: input.timestamp
+  });
+};
+
 const resolveActiveTestletTimer = (
   contentRelease: ContentRelease,
   testRun: TestRun,
@@ -7127,18 +7160,22 @@ const resolveBookletNavigationState = (
         : currentResponse.trim()
           ? "complete"
           : "none";
-  const backwardDeniedReasons = bookletNavigationDeniedReasons({
-    policy: completenessPolicy,
-    direction: "backward",
-    presentationProgress,
-    responseProgress
-  });
-  const forwardDeniedReasons = bookletNavigationDeniedReasons({
-    policy: completenessPolicy,
-    direction: "forward",
-    presentationProgress,
-    responseProgress
-  });
+  const backwardDeniedReasons = testRun.monitorNavigationUnlocked
+    ? []
+    : bookletNavigationDeniedReasons({
+        policy: completenessPolicy,
+        direction: "backward",
+        presentationProgress,
+        responseProgress
+      });
+  const forwardDeniedReasons = testRun.monitorNavigationUnlocked
+    ? []
+    : bookletNavigationDeniedReasons({
+        policy: completenessPolicy,
+        direction: "forward",
+        presentationProgress,
+        responseProgress
+      });
   const isUnitInaccessible = (unitKey: string | null): boolean =>
     isUnitLeaveLocked(booklet, testRun, unitKey) ||
     Boolean(findClosedTimedTestlet(booklet, testRun, unitKey));
@@ -12272,6 +12309,7 @@ export const createFirstSliceServices = (
             : firstUnit?.unitKey ?? "unit-1",
           unitResponses: {},
           unlockedTestletKeys: [],
+          monitorNavigationUnlocked: false,
           testletTimers: {},
           lockedTestletKeys: [],
           lockedUnitKeys: [],
@@ -13004,7 +13042,9 @@ export const createFirstSliceServices = (
             ? "paused"
             : commandType === "complete"
               ? "completed"
-              : "running";
+              : commandType === "unlock_navigation"
+                ? testRun.status
+                : "running";
         const nextTestRun: TestRun =
           commandType === "complete"
             ? {
@@ -13021,11 +13061,17 @@ export const createFirstSliceServices = (
                   targetUnitKey,
                   timestamp: issuedAt
                 })
-            : transitionTestletTimersForRunStatus(
-                testRun,
-                nextStatus as Extract<TestRunStatus, "running" | "paused">,
-                issuedAt
-              );
+              : commandType === "unlock_navigation"
+                ? applyMonitorNavigationUnlock({
+                    contentRelease,
+                    testRun,
+                    timestamp: issuedAt
+                  })
+                : transitionTestletTimersForRunStatus(
+                    testRun,
+                    nextStatus as Extract<TestRunStatus, "running" | "paused">,
+                    issuedAt
+                  );
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
         }
@@ -13068,6 +13114,10 @@ export const createFirstSliceServices = (
             completedAt: effectiveNextTestRun.completedAt ?? null,
             previousUnitKey: testRun.currentUnitKey,
             targetUnitKey,
+            previousNavigationUnlocked:
+              testRun.monitorNavigationUnlocked === true,
+            navigationUnlocked:
+              effectiveNextTestRun.monitorNavigationUnlocked === true,
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,

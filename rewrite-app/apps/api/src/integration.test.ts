@@ -3808,6 +3808,32 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(openRunsAfterPause.body.items[0]?.groupKey, "group:student-demo");
     assert.equal(openRunsAfterPause.body.items[0]?.bookletKey, "booklet:demo");
 
+    const unlockNavigationCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousStatus: string;
+        testRun: { status: string; monitorNavigationUnlocked?: boolean };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "unlock_navigation",
+        actorId: "operator-demo"
+      }
+    });
+    assert.equal(unlockNavigationCommand.status, 200);
+    assert.equal(
+      unlockNavigationCommand.body.command.commandType,
+      "unlock_navigation"
+    );
+    assert.equal(unlockNavigationCommand.body.command.previousStatus, "paused");
+    assert.equal(unlockNavigationCommand.body.command.testRun.status, "paused");
+    assert.equal(
+      unlockNavigationCommand.body.command.testRun.monitorNavigationUnlocked,
+      true
+    );
+
     const resumeCommand = await requestJsonAt<{
       command: {
         commandType: string;
@@ -3969,15 +3995,15 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=4",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=5",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
-    assert.equal(commandActivity.body.items.length, 4);
+    assert.equal(commandActivity.body.items.length, 5);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
-      ["complete", "goto", "resume", "pause"]
+      ["complete", "goto", "resume", "unlock_navigation", "pause"]
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
     assert.equal(
@@ -4013,7 +4039,13 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     );
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),
-      ["booklet:demo", "booklet:demo", "booklet:demo", "booklet:demo"]
+      [
+        "booklet:demo",
+        "booklet:demo",
+        "booklet:demo",
+        "booklet:demo",
+        "booklet:demo"
+      ]
     );
   } finally {
     await closeServer(isolated.server);
@@ -7566,11 +7598,13 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     { method: "POST", body: { bookletKey } }
   );
   assert.equal(monitorRun.body.testRun.currentUnitKey, null);
-  const monitorGoto = await requestJson<{
+  const monitorUnlock = await requestJson<{
     command: {
+      commandType: string;
       testRun: {
         currentUnitKey: string | null;
         unlockedTestletKeys?: string[];
+        monitorNavigationUnlocked?: boolean;
       };
     };
   }>(
@@ -7578,20 +7612,35 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     {
       method: "POST",
       body: {
-        commandType: "goto",
-        targetUnitKey: "UNIT.PROTECTED",
+        commandType: "unlock_navigation",
         actorId: "code-monitor"
       }
     }
   );
-  assert.equal(monitorGoto.status, 200);
+  assert.equal(monitorUnlock.status, 200);
+  assert.equal(monitorUnlock.body.command.commandType, "unlock_navigation");
+  assert.equal(monitorUnlock.body.command.testRun.currentUnitKey, null);
   assert.equal(
-    monitorGoto.body.command.testRun.currentUnitKey,
-    "UNIT.PROTECTED"
+    monitorUnlock.body.command.testRun.monitorNavigationUnlocked,
+    true
   );
   assert.deepEqual(
-    monitorGoto.body.command.testRun.unlockedTestletKeys,
-    [testletKey]
+    monitorUnlock.body.command.testRun.unlockedTestletKeys,
+    [entryTestletKey, testletKey]
+  );
+  const monitorUnlockedEntry = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/test-runs/${monitorRun.body.testRun.testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: { currentUnitKey: "UNIT.PROTECTED", status: "running" }
+    }
+  );
+  assert.equal(monitorUnlockedEntry.status, 200);
+  assert.equal(
+    monitorUnlockedEntry.body.testRun.currentUnitKey,
+    "UNIT.PROTECTED"
   );
 });
 
@@ -7802,6 +7851,41 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(blockedReentry.status, 409);
   assert.equal(blockedReentry.body.error, "booklet_navigation_denied");
   assert.deepEqual(blockedReentry.body.details?.deniedReasons, [
+    "testlet_time_closed"
+  ]);
+
+  const monitorUnlock = await requestJson<{
+    command: {
+      testRun: {
+        monitorNavigationUnlocked?: boolean;
+        testletTimers?: Record<string, { status: string }>;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "unlock_navigation",
+        actorId: "timer-monitor"
+      }
+    }
+  );
+  assert.equal(monitorUnlock.status, 200);
+  assert.equal(monitorUnlock.body.command.testRun.monitorNavigationUnlocked, true);
+  assert.equal(
+    monitorUnlock.body.command.testRun.testletTimers?.[testletKey]?.status,
+    "expired"
+  );
+  const stillBlockedReentry = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.TIMED", status: "running" }
+  });
+  assert.equal(stillBlockedReentry.status, 409);
+  assert.deepEqual(stillBlockedReentry.body.details?.deniedReasons, [
     "testlet_time_closed"
   ]);
 
@@ -8326,6 +8410,30 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "UNIT.LOCK.1",
     "UNIT.LOCK.2"
   ]);
+  const monitorUnlock = await requestJson<{
+    command: {
+      commandType: string;
+      testRun: {
+        monitorNavigationUnlocked?: boolean;
+        lockedTestletKeys?: string[];
+        lockedUnitKeys?: string[];
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "unlock_navigation",
+        actorId: "leave-lock-monitor"
+      }
+    }
+  );
+  assert.equal(monitorUnlock.status, 200);
+  assert.equal(monitorUnlock.body.command.commandType, "unlock_navigation");
+  assert.equal(monitorUnlock.body.command.testRun.monitorNavigationUnlocked, true);
+  assert.deepEqual(monitorUnlock.body.command.testRun.lockedTestletKeys, []);
+  assert.deepEqual(monitorUnlock.body.command.testRun.lockedUnitKeys, []);
   const monitorUnlockedNavigation = await requestJson<{
     testRun: { currentUnitKey: string | null };
   }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
@@ -8796,6 +8904,18 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
     "presentation_incomplete",
     "response_incomplete"
   ]);
+  const monitorUnlock = await requestJson<{
+    command: { testRun: { monitorNavigationUnlocked?: boolean } };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: { commandType: "unlock_navigation", actorId: "policy-monitor" }
+    }
+  );
+  assert.equal(monitorUnlock.status, 200);
+  assert.equal(monitorUnlock.body.command.testRun.monitorNavigationUnlocked, true);
+  assert.equal((await save(globalSecondUnitKey)).status, 200);
 });
 
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
