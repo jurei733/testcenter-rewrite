@@ -75,6 +75,8 @@ export type WorkspaceActivityEventType =
   | "participant_session_resumed"
   | "participant_roster_imported"
   | "testlet_unlocked"
+  | "testlet_timer_started"
+  | "testlet_timer_expired"
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
@@ -95,6 +97,8 @@ export const workspaceActivityEventTypes = [
   "participant_session_resumed",
   "participant_roster_imported",
   "testlet_unlocked",
+  "testlet_timer_started",
+  "testlet_timer_expired",
   "test_run_progress_saved",
   "test_run_resumed",
   "test_run_completed",
@@ -327,7 +331,10 @@ export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
 export type BookletNavigationDeniedReason =
   | "presentation_incomplete"
   | "response_incomplete"
-  | "testlet_code_required";
+  | "testlet_code_required"
+  | "testlet_time_leave_forbidden"
+  | "testlet_time_leave_confirmation_required"
+  | "testlet_time_closed";
 
 export type BookletRuntimePolicy = {
   version: 1;
@@ -392,9 +399,27 @@ export type TestRun = {
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
   unlockedTestletKeys?: string[];
+  testletTimers?: Record<string, TestletTimerState>;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+};
+
+export type TestletTimerStatus =
+  | "running"
+  | "paused"
+  | "expired"
+  | "cancelled";
+
+export type TestletTimerState = {
+  testletKey: string;
+  status: TestletTimerStatus;
+  durationSeconds: number;
+  remainingSeconds: number;
+  startedAt: string;
+  expiresAt: string | null;
+  updatedAt: string;
+  endedAt: string | null;
 };
 
 export type WorkspaceActivityEvent = {
@@ -497,6 +522,16 @@ export type ParticipantCurrentRunState = {
     content?: string;
     testletPath: string[];
   }>;
+  activeTestletTimer: {
+    testletKey: string;
+    displayLabel: string;
+    status: Extract<TestletTimerStatus, "running" | "paused">;
+    durationSeconds: number;
+    remainingSeconds: number;
+    startedAt: string;
+    expiresAt: string | null;
+    leave: TestletTimeMaxLeavePolicy;
+  } | null;
   booklets: ParticipantRuntimeBooklet[];
   navigation: {
     previousUnitKey: string | null;

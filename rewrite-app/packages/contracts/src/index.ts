@@ -1444,10 +1444,15 @@ export type SaveTestRunProgressRequest = {
   currentUnitKey?: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
+  confirmTestletTimeLeave?: boolean;
 };
 
 export type UnlockParticipantTestletRequest = {
   code: string;
+};
+
+export type CompleteTestRunRequest = {
+  confirmTestletTimeLeave?: boolean;
 };
 
 export type CreateTenantResponse = {

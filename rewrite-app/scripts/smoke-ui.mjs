@@ -2618,6 +2618,7 @@ try {
             <Testlet id="${veronaTestletKey}" label="Protected Verona Block">
               <Restrictions>
                 <CodeToEnter code="${veronaTestletCode}">Enter the assigned Verona block code.</CodeToEnter>
+                <TimeMax minutes="1" leave="allowed" />
               </Restrictions>
               <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
             </Testlet>
@@ -2716,6 +2717,26 @@ try {
   assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
   await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
   await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantRouteTestletTimerLabel")
+    .filter({ hasText: "Protected Verona Block" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletTimerLeave")
+    .filter({ hasText: "closes it immediately" })
+    .waitFor();
+  const veronaTimerValue = (
+    await page.locator("#participantRouteTestletTimerValue").innerText()
+  ).trim();
+  assert.match(veronaTimerValue, /^[01]:[0-5]\d$/);
+  const [veronaTimerMinutes, veronaTimerSeconds] = veronaTimerValue
+    .split(":")
+    .map(Number);
+  assert.ok(
+    veronaTimerMinutes * 60 + veronaTimerSeconds > 0 &&
+      veronaTimerMinutes * 60 + veronaTimerSeconds <= 60,
+    `Expected a live Verona testlet timer, received '${veronaTimerValue}'.`
+  );
   const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
   await veronaFrame

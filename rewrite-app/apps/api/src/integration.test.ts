@@ -3,6 +3,7 @@ import { after, before, test } from "node:test";
 import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { deflateRawSync } from "node:zlib";
 
 import { createProductionApiServer } from "./index.js";
@@ -7484,6 +7485,425 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     testletKey
   ]);
   assert.equal(stateAfterUnlock.body.currentRunState.navigation.nextTestletGate, null);
+});
+
+test("original Testcenter timed testlets pause durably and close after expiry", async () => {
+  const tenantKey = "integration-tenant-testlet-timer";
+  const workspaceKey = "integration-workspace-testlet-timer";
+  const bookletKey = "BOOKLET.TIMER";
+  const testletKey = "timed-block";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-timer.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Timer Booklet</Label></Metadata>
+          <Units>
+            <Unit id="UNIT.INTRO" label="Introduction" />
+            <Testlet id="${testletKey}" label="Timed Block">
+              <Restrictions>
+                <TimeMax minutes="0.001" leave="forbidden" />
+              </Restrictions>
+              <Unit id="UNIT.TIMED" label="Timed Unit" />
+            </Testlet>
+            <Unit id="UNIT.FINISH" label="Finish" />
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "timer-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  const testRunId = resume.body.testRun.testRunId;
+  assert.equal(resume.body.testRun.currentUnitKey, "UNIT.INTRO");
+
+  const entered = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<
+        string,
+        {
+          status: string;
+          durationSeconds: number;
+          remainingSeconds: number;
+          startedAt: string;
+          expiresAt: string | null;
+        }
+      >;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.TIMED", status: "running" }
+  });
+  assert.equal(entered.status, 200);
+  assert.equal(entered.body.testRun.currentUnitKey, "UNIT.TIMED");
+  assert.equal(entered.body.testRun.testletTimers?.[testletKey]?.status, "running");
+  assert.equal(
+    entered.body.testRun.testletTimers?.[testletKey]?.durationSeconds,
+    1
+  );
+  assert.match(
+    entered.body.testRun.testletTimers?.[testletKey]?.expiresAt ?? "",
+    ISO_DATE_REGEX
+  );
+
+  const blockedLeave = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.FINISH", status: "running" }
+  });
+  assert.equal(blockedLeave.status, 409);
+  assert.equal(blockedLeave.body.error, "booklet_navigation_denied");
+  assert.deepEqual(blockedLeave.body.details?.deniedReasons, [
+    "testlet_time_leave_forbidden"
+  ]);
+
+  const paused = await requestJson<{
+    testRun: {
+      status: string;
+      testletTimers?: Record<
+        string,
+        { status: string; remainingSeconds: number; expiresAt: string | null }
+      >;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { status: "paused" }
+  });
+  assert.equal(paused.status, 200);
+  assert.equal(paused.body.testRun.status, "paused");
+  assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.status, "paused");
+  assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.remainingSeconds, 1);
+  assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.expiresAt, null);
+
+  await delay(1_100);
+  const stateWhilePaused = await requestJson<{
+    currentRunState: {
+      currentUnit: { unitKey: string | null };
+      activeTestletTimer: {
+        status: string;
+        remainingSeconds: number;
+      } | null;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(stateWhilePaused.body.currentRunState.currentUnit.unitKey, "UNIT.TIMED");
+  assert.deepEqual(stateWhilePaused.body.currentRunState.activeTestletTimer, {
+    testletKey,
+    displayLabel: "Timed Block",
+    status: "paused",
+    durationSeconds: 1,
+    remainingSeconds: 1,
+    startedAt: entered.body.testRun.testletTimers?.[testletKey]?.startedAt,
+    expiresAt: null,
+    leave: "forbidden"
+  });
+
+  const resumed = await requestJson<{
+    testRun: {
+      status: string;
+      testletTimers?: Record<string, { status: string; expiresAt: string | null }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/resume`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.testRun.status, "running");
+  assert.equal(resumed.body.testRun.testletTimers?.[testletKey]?.status, "running");
+  assert.match(
+    resumed.body.testRun.testletTimers?.[testletKey]?.expiresAt ?? "",
+    ISO_DATE_REGEX
+  );
+
+  await delay(1_100);
+  const stateAfterExpiry = await requestJson<{
+    currentRunState: {
+      currentUnit: { unitKey: string | null };
+      testRun: {
+        testletTimers?: Record<
+          string,
+          { status: string; remainingSeconds: number; endedAt: string | null }
+        >;
+      };
+      activeTestletTimer: unknown;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(stateAfterExpiry.status, 200);
+  assert.equal(stateAfterExpiry.body.currentRunState.currentUnit.unitKey, "UNIT.FINISH");
+  assert.equal(stateAfterExpiry.body.currentRunState.activeTestletTimer, null);
+  assert.equal(
+    stateAfterExpiry.body.currentRunState.testRun.testletTimers?.[testletKey]?.status,
+    "expired"
+  );
+  assert.equal(
+    stateAfterExpiry.body.currentRunState.testRun.testletTimers?.[testletKey]
+      ?.remainingSeconds,
+    0
+  );
+  assert.match(
+    stateAfterExpiry.body.currentRunState.testRun.testletTimers?.[testletKey]
+      ?.endedAt ?? "",
+    ISO_DATE_REGEX
+  );
+
+  const blockedReentry = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.TIMED", status: "running" }
+  });
+  assert.equal(blockedReentry.status, 409);
+  assert.equal(blockedReentry.body.error, "booklet_navigation_denied");
+  assert.deepEqual(blockedReentry.body.details?.deniedReasons, [
+    "testlet_time_closed"
+  ]);
+
+  const startedActivity = await requestJson<{
+    items: Array<{ activityEvent: { eventType: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_timer_started`
+  );
+  const expiredActivity = await requestJson<{
+    items: Array<{ activityEvent: { eventType: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_timer_expired`
+  );
+  assert.equal(startedActivity.body.items.length, 1);
+  assert.equal(expiredActivity.body.items.length, 1);
+});
+
+test("original Testcenter timed testlets enforce confirm and allowed leave policies", async () => {
+  const tenantKey = "integration-tenant-testlet-time-leave";
+  const workspaceKey = "integration-workspace-testlet-time-leave";
+  const bookletKey = "BOOKLET.TIME-LEAVE";
+  const confirmNavigationTestletKey = "confirm-navigation-block";
+  const allowedTestletKey = "allowed-block";
+  const confirmCompletionTestletKey = "confirm-completion-block";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-time-leave.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Time Leave Booklet</Label></Metadata>
+          <Units>
+            <Unit id="UNIT.INTRO" label="Introduction" />
+            <Testlet id="${confirmNavigationTestletKey}" label="Confirm Navigation">
+              <Restrictions>
+                <TimeMax minutes="5" leave="confirm" />
+              </Restrictions>
+              <Unit id="UNIT.CONFIRM.NAVIGATION" label="Confirm Navigation Unit" />
+            </Testlet>
+            <Unit id="UNIT.BETWEEN" label="Between" />
+            <Testlet id="${allowedTestletKey}" label="Allowed Leave">
+              <Restrictions>
+                <TimeMax minutes="5" leave="allowed" />
+              </Restrictions>
+              <Unit id="UNIT.ALLOWED" label="Allowed Unit" />
+            </Testlet>
+            <Testlet id="${confirmCompletionTestletKey}" label="Confirm Completion">
+              <Restrictions>
+                <TimeMax minutes="5" leave="confirm" />
+              </Restrictions>
+              <Unit id="UNIT.CONFIRM.COMPLETION" label="Confirm Completion Unit" />
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "time-leave-participant" }
+  });
+  const resume = await requestJson<{
+    testRun: { testRunId: string };
+  }>(
+    `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey } }
+  );
+  const testRunId = resume.body.testRun.testRunId;
+
+  const enterConfirmNavigation = await requestJson<{
+    testRun: {
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.CONFIRM.NAVIGATION", status: "running" }
+  });
+  assert.equal(
+    enterConfirmNavigation.body.testRun.testletTimers?.[
+      confirmNavigationTestletKey
+    ]?.status,
+    "running"
+  );
+
+  const unconfirmedNavigation = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.BETWEEN", status: "running" }
+  });
+  assert.equal(unconfirmedNavigation.status, 409);
+  assert.equal(unconfirmedNavigation.body.error, "booklet_navigation_denied");
+  assert.deepEqual(unconfirmedNavigation.body.details?.deniedReasons, [
+    "testlet_time_leave_confirmation_required"
+  ]);
+
+  const confirmedNavigation = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.BETWEEN",
+      status: "running",
+      confirmTestletTimeLeave: true
+    }
+  });
+  assert.equal(confirmedNavigation.body.testRun.currentUnitKey, "UNIT.BETWEEN");
+  assert.equal(
+    confirmedNavigation.body.testRun.testletTimers?.[
+      confirmNavigationTestletKey
+    ]?.status,
+    "cancelled"
+  );
+
+  const blockedReentry = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.CONFIRM.NAVIGATION", status: "running" }
+  });
+  assert.equal(blockedReentry.status, 409);
+  assert.deepEqual(blockedReentry.body.details?.deniedReasons, [
+    "testlet_time_closed"
+  ]);
+
+  await requestJson(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.ALLOWED", status: "running" }
+  });
+  const leftAllowedBlock = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.CONFIRM.COMPLETION", status: "running" }
+  });
+  assert.equal(
+    leftAllowedBlock.body.testRun.testletTimers?.[allowedTestletKey]?.status,
+    "cancelled"
+  );
+  assert.equal(
+    leftAllowedBlock.body.testRun.testletTimers?.[
+      confirmCompletionTestletKey
+    ]?.status,
+    "running"
+  );
+
+  const unconfirmedCompletion = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/complete`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(unconfirmedCompletion.status, 409);
+  assert.equal(unconfirmedCompletion.body.error, "booklet_completion_denied");
+  assert.deepEqual(unconfirmedCompletion.body.details?.deniedReasons, [
+    "testlet_time_leave_confirmation_required"
+  ]);
+
+  const confirmedCompletion = await requestJson<{
+    testRun: {
+      status: string;
+      testletTimers?: Record<string, { status: string }>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/complete`, {
+    method: "POST",
+    body: { confirmTestletTimeLeave: true }
+  });
+  assert.equal(confirmedCompletion.status, 200);
+  assert.equal(confirmedCompletion.body.testRun.status, "completed");
+  assert.equal(
+    confirmedCompletion.body.testRun.testletTimers?.[
+      confirmCompletionTestletKey
+    ]?.status,
+    "cancelled"
+  );
 });
 
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {

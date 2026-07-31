@@ -24,6 +24,7 @@ import {
   type AssignAdminRoleResponse,
   type BootstrapAdminUserRequest,
   type BootstrapAdminUserResponse,
+  type CompleteTestRunRequest,
   type CompleteTestRunResponse,
   type CreateAdminUserRequest,
   type CreateAdminUserResponse,
@@ -4675,7 +4676,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           testRunId,
           currentUnitKey: body.currentUnitKey,
           status: body.status,
-          unitResponse: body.unitResponse
+          unitResponse: body.unitResponse,
+          confirmTestletTimeLeave: body.confirmTestletTimeLeave
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
         return;
@@ -4727,8 +4729,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const body =
+          await readOptionalRequestJsonBody<CompleteTestRunRequest>();
         const testRun = await services.participantRuntime.completeRun({
-          testRunId
+          testRunId,
+          confirmTestletTimeLeave: body?.confirmTestletTimeLeave
         });
         sendJson<CompleteTestRunResponse>(response, 200, { testRun });
         return;

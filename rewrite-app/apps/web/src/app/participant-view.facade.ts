@@ -1,6 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  CompleteTestRunRequest,
   ParticipantCurrentRunStateResponse,
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
@@ -79,6 +80,16 @@ type ParticipantPlayerState = {
     displayLabel: string;
     prompt: string;
   } | null;
+  testletTimer: {
+    testletKey: string;
+    displayLabel: string;
+    status: "running" | "paused";
+    leave: "forbidden" | "confirm" | "allowed";
+    remainingSeconds: number;
+    remainingLabel: string;
+    progressPercent: number;
+    leaveLabel: string;
+  } | null;
 };
 
 type ParticipantPlayerUnitItem = {
@@ -154,7 +165,10 @@ export class ParticipantViewFacade {
   veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
     "not_saved";
   testletUnlockCode = "";
+  timerTick = Date.now();
   private copiedSessionEntryLink = "";
+  private timerTickerHandle: number | null = null;
+  private timerExpiryRefreshPending = false;
   private pendingVeronaSave: {
     testRunId: string;
     unitKey: string;
@@ -165,6 +179,14 @@ export class ParticipantViewFacade {
 
   init(): void {
     this.viewState.setActiveView("participant");
+    this.startTimerTicker();
+  }
+
+  destroy(): void {
+    if (this.timerTickerHandle != null) {
+      globalThis.window?.clearInterval(this.timerTickerHandle);
+      this.timerTickerHandle = null;
+    }
   }
 
   persistState(): void {
@@ -372,7 +394,8 @@ export class ParticipantViewFacade {
         draftStateDetail: "Start or resume a test before writing an answer.",
         hasUnsavedResponse: false,
         navigationNotice: "",
-        nextTestletGate: null
+        nextTestletGate: null,
+        testletTimer: null
       };
     }
 
@@ -464,6 +487,50 @@ export class ParticipantViewFacade {
     const displayNameLabel =
       currentState.participantRosterEntry?.displayName?.trim() ||
       currentState.participantSession.loginKey;
+    const activeTestletTimer = currentState.activeTestletTimer;
+    const testletTimer = activeTestletTimer
+      ? (() => {
+          const expiresAtMs = activeTestletTimer.expiresAt
+            ? Date.parse(activeTestletTimer.expiresAt)
+            : Number.NaN;
+          const remainingSeconds =
+            activeTestletTimer.status === "running" &&
+            Number.isFinite(expiresAtMs)
+              ? Math.max(
+                  0,
+                  Math.min(
+                    activeTestletTimer.durationSeconds,
+                    Math.ceil((expiresAtMs - this.timerTick) / 1_000)
+                  )
+                )
+              : activeTestletTimer.remainingSeconds;
+          const minutes = Math.floor(remainingSeconds / 60);
+          const seconds = remainingSeconds % 60;
+          return {
+            testletKey: activeTestletTimer.testletKey,
+            displayLabel: activeTestletTimer.displayLabel,
+            status: activeTestletTimer.status,
+            leave: activeTestletTimer.leave,
+            remainingSeconds,
+            remainingLabel: `${minutes}:${String(seconds).padStart(2, "0")}`,
+            progressPercent: Math.max(
+              0,
+              Math.min(
+                100,
+                Math.round(
+                  (remainingSeconds / activeTestletTimer.durationSeconds) * 100
+                )
+              )
+            ),
+            leaveLabel:
+              activeTestletTimer.leave === "forbidden"
+                ? "This block cannot be left before time expires."
+                : activeTestletTimer.leave === "allowed"
+                  ? "Leaving this block closes it immediately."
+                  : "Leaving this block requires confirmation."
+          };
+        })()
+      : null;
 
     return {
       headline: unitLabel,
@@ -529,7 +596,8 @@ export class ParticipantViewFacade {
       draftStateDetail,
       hasUnsavedResponse,
       navigationNotice: this.describeNavigationDenial(currentState),
-      nextTestletGate: currentState.navigation.nextTestletGate
+      nextTestletGate: currentState.navigation.nextTestletGate,
+      testletTimer
     };
   }
 
@@ -588,7 +656,40 @@ export class ParticipantViewFacade {
     if (reasons.includes("testlet_code_required")) {
       return "Enter the block code before opening the next block.";
     }
+    if (reasons.includes("testlet_time_leave_forbidden")) {
+      return "This timed block cannot be left before its time expires.";
+    }
+    if (reasons.includes("testlet_time_leave_confirmation_required")) {
+      return "Confirm leaving the timed block before continuing.";
+    }
+    if (reasons.includes("testlet_time_closed")) {
+      return "This timed block is closed and cannot be opened again.";
+    }
     return "";
+  }
+
+  private startTimerTicker(): void {
+    if (this.timerTickerHandle != null || !globalThis.window) {
+      return;
+    }
+    this.timerTickerHandle = globalThis.window.setInterval(() => {
+      this.timerTick = Date.now();
+      const activeTimer = this.readCurrentRunState()?.activeTestletTimer;
+      const expiresAtMs = activeTimer?.expiresAt
+        ? Date.parse(activeTimer.expiresAt)
+        : Number.NaN;
+      if (
+        activeTimer?.status === "running" &&
+        Number.isFinite(expiresAtMs) &&
+        expiresAtMs <= this.timerTick &&
+        !this.timerExpiryRefreshPending
+      ) {
+        this.timerExpiryRefreshPending = true;
+        void this.refreshCurrentStateInternal(true).finally(() => {
+          this.timerExpiryRefreshPending = false;
+        });
+      }
+    }, 250);
   }
 
   get canSignIn(): boolean {
@@ -748,6 +849,16 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const confirmTestletTimeLeave =
+      player.testletTimer?.leave === "confirm";
+    if (
+      confirmTestletTimeLeave &&
+      !globalThis.window?.confirm(
+        `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
+      )
+    ) {
+      return;
+    }
     if (
       !player.isComplete &&
       player.completionReadinessState !== "ready" &&
@@ -757,7 +868,9 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
-    this.viewState.onActionAsync(() => this.completeRunInternal());
+    this.viewState.onActionAsync(() =>
+      this.completeRunInternal(confirmTestletTimeLeave)
+    );
   }
 
   clearSession(): void {
@@ -947,7 +1060,8 @@ export class ParticipantViewFacade {
   private async saveProgressInternal(
     status: "paused" | "running",
     currentUnitKey = this.runtime.currentUnitKey.trim() || undefined,
-    unitResponse?: string | null
+    unitResponse?: string | null,
+    confirmTestletTimeLeave = false
   ): Promise<void> {
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
@@ -958,7 +1072,8 @@ export class ParticipantViewFacade {
       {
         currentUnitKey,
         status,
-        unitResponse
+        unitResponse,
+        confirmTestletTimeLeave
       } satisfies SaveTestRunProgressRequest
     );
 
@@ -1044,6 +1159,25 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const currentState = this.readCurrentRunState();
+    const activeTimer = player.testletTimer;
+    const targetTestletPath =
+      currentState?.bookletUnits.find(
+        unit => unit.unitKey === targetUnitKey
+      )?.testletPath ?? [];
+    const leavesActiveTimedBlock =
+      activeTimer != null &&
+      !targetTestletPath.includes(activeTimer.testletKey);
+    const confirmTestletTimeLeave =
+      leavesActiveTimedBlock && activeTimer.leave === "confirm";
+    if (
+      confirmTestletTimeLeave &&
+      !globalThis.window?.confirm(
+        `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
+      )
+    ) {
+      return;
+    }
     const currentUnitKey = this.runtime.currentUnitKey.trim();
     if (currentUnitKey) {
       await this.saveProgressInternal(
@@ -1052,7 +1186,12 @@ export class ParticipantViewFacade {
         this.runtime.currentUnitResponse
       );
     }
-    await this.saveProgressInternal("running", targetUnitKey);
+    await this.saveProgressInternal(
+      "running",
+      targetUnitKey,
+      undefined,
+      confirmTestletTimeLeave
+    );
   }
 
   private async unlockNextTestletInternal(gate: {
@@ -1094,7 +1233,9 @@ export class ParticipantViewFacade {
     await this.refreshCurrentStateInternal(true);
   }
 
-  private async completeRunInternal(): Promise<void> {
+  private async completeRunInternal(
+    confirmTestletTimeLeave = false
+  ): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
     await this.saveCurrentDraftBeforeCompleteInternal();
 
@@ -1110,7 +1251,10 @@ export class ParticipantViewFacade {
       "POST",
       resolveRoutePath(productionApiRoutes.participant.completeRun, {
         testRunId: this.runtime.testRunId.trim()
-      })
+      }),
+      {
+        confirmTestletTimeLeave
+      } satisfies CompleteTestRunRequest
     );
 
     this.syncRun(payload.testRun);

@@ -435,6 +435,7 @@ export type ParticipantRuntimePort = {
     currentUnitKey?: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
+    confirmTestletTimeLeave?: boolean;
   }): Promise<TestRun>;
   unlockTestlet(input: {
     testRunId: string;
@@ -442,7 +443,10 @@ export type ParticipantRuntimePort = {
     code: string;
   }): Promise<TestRun>;
   resumeRun(input: { testRunId: string }): Promise<TestRun>;
-  completeRun(input: { testRunId: string }): Promise<TestRun>;
+  completeRun(input: {
+    testRunId: string;
+    confirmTestletTimeLeave?: boolean;
+  }): Promise<TestRun>;
 };
 
 export type MonitorReadPort = {
@@ -823,7 +827,9 @@ const ADMIN_ROLES: AdminRole[] = [
   "workspace_admin"
 ];
 const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
-const TEST_RUN_PROGRESS_STATUSES: TestRunStatus[] = ["running", "paused"];
+const TEST_RUN_PROGRESS_STATUSES: Array<
+  Extract<TestRunStatus, "running" | "paused">
+> = ["running", "paused"];
 
 type AdminRoleAssignmentInput = {
   role: AdminRole;
@@ -895,10 +901,14 @@ const normalizeAdminUserStatus = (value: unknown): AdminUserStatus => {
   return value as AdminUserStatus;
 };
 
-const normalizeTestRunProgressStatus = (value: unknown): TestRunStatus => {
+const normalizeTestRunProgressStatus = (
+  value: unknown
+): Extract<TestRunStatus, "running" | "paused"> => {
   if (
     typeof value !== "string" ||
-    !TEST_RUN_PROGRESS_STATUSES.includes(value as TestRunStatus)
+    !TEST_RUN_PROGRESS_STATUSES.includes(
+      value as Extract<TestRunStatus, "running" | "paused">
+    )
   ) {
     throw new FirstSliceError(
       400,
@@ -907,7 +917,7 @@ const normalizeTestRunProgressStatus = (value: unknown): TestRunStatus => {
     );
   }
 
-  return value as TestRunStatus;
+  return value as Extract<TestRunStatus, "running" | "paused">;
 };
 
 const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType => {
@@ -1752,13 +1762,56 @@ const getLatestParticipantSessionRun = async (
   );
 };
 
-const normalizeTestRun = (testRun: TestRun): TestRun => ({
-  ...testRun,
-  unitResponses: testRun.unitResponses ?? {},
-  unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
-    ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
-    : []
-});
+const normalizeTestRun = (testRun: TestRun): TestRun => {
+  const testletTimers = Object.fromEntries(
+    Object.entries(testRun.testletTimers ?? {}).flatMap(([testletKey, timer]) => {
+      const normalizedTestletKey = String(timer?.testletKey ?? testletKey).trim();
+      const status =
+        timer?.status === "running" ||
+        timer?.status === "paused" ||
+        timer?.status === "expired" ||
+        timer?.status === "cancelled"
+          ? timer.status
+          : null;
+      const durationSeconds = Number(timer?.durationSeconds);
+      const remainingSeconds = Number(timer?.remainingSeconds);
+      if (
+        !normalizedTestletKey ||
+        !status ||
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0
+      ) {
+        return [];
+      }
+      return [
+        [
+          normalizedTestletKey,
+          {
+            testletKey: normalizedTestletKey,
+            status,
+            durationSeconds: Math.max(1, Math.ceil(durationSeconds)),
+            remainingSeconds: Number.isFinite(remainingSeconds)
+              ? Math.max(0, Math.ceil(remainingSeconds))
+              : Math.max(1, Math.ceil(durationSeconds)),
+            startedAt: timer.startedAt || testRun.createdAt,
+            expiresAt: timer.expiresAt ?? null,
+            updatedAt: timer.updatedAt || testRun.updatedAt,
+            endedAt: timer.endedAt ?? null
+          }
+        ]
+      ];
+    })
+  ) as NonNullable<TestRun["testletTimers"]>;
+
+  return {
+    ...testRun,
+    unitResponses: testRun.unitResponses ?? {},
+    unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
+      ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
+      : [],
+    testletTimers
+  };
+};
 
 const escapeCsvCell = (value: string | null | undefined): string => {
   const normalizedValue = value ?? "";
@@ -6385,6 +6438,379 @@ const findTestletCodeGate = (input: {
   return null;
 };
 
+const resolveTimedTestletForUnit = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  unitKey: string | null
+): SourcePackageTestletEntry | null => {
+  if (!booklet || !unitKey) {
+    return null;
+  }
+  const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
+  for (const testletKey of unit?.testletPath ?? []) {
+    const testlet = booklet.testletEntries?.find(
+      candidate => candidate.testletKey === testletKey
+    );
+    if (testlet?.restrictions?.timeMax?.minutes) {
+      return testlet;
+    }
+  }
+  return null;
+};
+
+const getTestletTimerRemainingSeconds = (
+  timer: NonNullable<TestRun["testletTimers"]>[string],
+  timestamp: string
+): number => {
+  if (timer.status !== "running" || !timer.expiresAt) {
+    return Math.max(0, Math.ceil(timer.remainingSeconds));
+  }
+  const expiresAtMs = Date.parse(timer.expiresAt);
+  const timestampMs = Date.parse(timestamp);
+  if (!Number.isFinite(expiresAtMs) || !Number.isFinite(timestampMs)) {
+    return Math.max(0, Math.ceil(timer.remainingSeconds));
+  }
+  return Math.max(0, Math.ceil((expiresAtMs - timestampMs) / 1_000));
+};
+
+const activateCurrentTestletTimer = (
+  contentRelease: ContentRelease,
+  testRun: TestRun,
+  timestamp: string
+): { testRun: TestRun; startedTestletKey: string | null } => {
+  if (testRun.status !== "running" || !testRun.currentUnitKey) {
+    return { testRun, startedTestletKey: null };
+  }
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === testRun.bookletKey
+  );
+  const timedTestlet = resolveTimedTestletForUnit(
+    booklet,
+    testRun.currentUnitKey
+  );
+  const timeMax = timedTestlet?.restrictions?.timeMax;
+  if (!timedTestlet || !timeMax) {
+    return { testRun, startedTestletKey: null };
+  }
+  const existingTimer = testRun.testletTimers?.[timedTestlet.testletKey];
+  if (existingTimer?.status === "running") {
+    return { testRun, startedTestletKey: null };
+  }
+  if (existingTimer?.status === "expired" || existingTimer?.status === "cancelled") {
+    return { testRun, startedTestletKey: null };
+  }
+  const timestampMs = Date.parse(timestamp);
+  const durationSeconds = existingTimer
+    ? Math.max(1, existingTimer.durationSeconds)
+    : Math.max(1, Math.ceil(timeMax.minutes * 60));
+  const remainingSeconds = existingTimer
+    ? Math.max(1, existingTimer.remainingSeconds)
+    : durationSeconds;
+  const expiresAt = Number.isFinite(timestampMs)
+    ? new Date(timestampMs + remainingSeconds * 1_000).toISOString()
+    : timestamp;
+  return {
+    testRun: normalizeTestRun({
+      ...testRun,
+      testletTimers: {
+        ...(testRun.testletTimers ?? {}),
+        [timedTestlet.testletKey]: {
+          testletKey: timedTestlet.testletKey,
+          status: "running",
+          durationSeconds,
+          remainingSeconds,
+          startedAt: existingTimer?.startedAt ?? timestamp,
+          expiresAt,
+          updatedAt: timestamp,
+          endedAt: null
+        }
+      },
+      updatedAt: timestamp
+    }),
+    startedTestletKey: existingTimer ? null : timedTestlet.testletKey
+  };
+};
+
+const transitionTestletTimersForRunStatus = (
+  testRun: TestRun,
+  nextStatus: Extract<TestRun["status"], "running" | "paused">,
+  timestamp: string
+): TestRun => {
+  if (testRun.status === nextStatus) {
+    return testRun;
+  }
+  const timestampMs = Date.parse(timestamp);
+  const testletTimers = Object.fromEntries(
+    Object.entries(testRun.testletTimers ?? {}).map(([testletKey, timer]) => {
+      if (nextStatus === "paused" && timer.status === "running") {
+        const remainingSeconds = getTestletTimerRemainingSeconds(timer, timestamp);
+        return [
+          testletKey,
+          {
+            ...timer,
+            status: "paused",
+            remainingSeconds,
+            expiresAt: null,
+            updatedAt: timestamp
+          }
+        ];
+      }
+      if (
+        nextStatus === "running" &&
+        timer.status === "paused" &&
+        remainingSecondsForTimer(timer) > 0
+      ) {
+        const remainingSeconds = remainingSecondsForTimer(timer);
+        return [
+          testletKey,
+          {
+            ...timer,
+            status: "running",
+            remainingSeconds,
+            expiresAt: Number.isFinite(timestampMs)
+              ? new Date(timestampMs + remainingSeconds * 1_000).toISOString()
+              : timestamp,
+            updatedAt: timestamp
+          }
+        ];
+      }
+      return [testletKey, timer];
+    })
+  );
+  return normalizeTestRun({
+    ...testRun,
+    status: nextStatus,
+    testletTimers,
+    updatedAt: timestamp
+  });
+};
+
+const closeRunningTestletTimers = (
+  testRun: TestRun,
+  timestamp: string
+): TestRun => {
+  const testletTimers = Object.fromEntries(
+    Object.entries(testRun.testletTimers ?? {}).map(([testletKey, timer]) => [
+      testletKey,
+      timer.status === "running" || timer.status === "paused"
+        ? {
+            ...timer,
+            status: "cancelled",
+            remainingSeconds: 0,
+            expiresAt: null,
+            updatedAt: timestamp,
+            endedAt: timestamp
+          }
+        : timer
+    ])
+  ) as NonNullable<TestRun["testletTimers"]>;
+  return normalizeTestRun({ ...testRun, testletTimers });
+};
+
+const remainingSecondsForTimer = (
+  timer: NonNullable<TestRun["testletTimers"]>[string]
+): number => Math.max(0, Math.ceil(timer.remainingSeconds));
+
+const reconcileExpiredTestletTimers = (
+  contentRelease: ContentRelease,
+  testRun: TestRun,
+  timestamp: string
+): { testRun: TestRun; expiredTestletKeys: string[] } => {
+  if (testRun.status !== "running") {
+    return { testRun, expiredTestletKeys: [] };
+  }
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === testRun.bookletKey
+  );
+  if (!booklet) {
+    return { testRun, expiredTestletKeys: [] };
+  }
+  const expiredTestletKeys = Object.values(testRun.testletTimers ?? {})
+    .filter(
+      timer =>
+        timer.status === "running" &&
+        getTestletTimerRemainingSeconds(timer, timestamp) === 0
+    )
+    .map(timer => timer.testletKey);
+  if (expiredTestletKeys.length === 0) {
+    return { testRun, expiredTestletKeys };
+  }
+  const testletTimers = { ...(testRun.testletTimers ?? {}) };
+  for (const testletKey of expiredTestletKeys) {
+    const timer = testletTimers[testletKey];
+    if (!timer) {
+      continue;
+    }
+    testletTimers[testletKey] = {
+      ...timer,
+      status: "expired",
+      remainingSeconds: 0,
+      expiresAt: null,
+      updatedAt: timestamp,
+      endedAt: timestamp
+    };
+  }
+
+  let currentUnitKey = testRun.currentUnitKey;
+  let status: TestRun["status"] = testRun.status;
+  let completedAt = testRun.completedAt;
+  const activeExpiredTestletKey = expiredTestletKeys.find(testletKey =>
+    booklet.unitEntries
+      .find(unit => unit.unitKey === testRun.currentUnitKey)
+      ?.testletPath?.includes(testletKey)
+  );
+  if (activeExpiredTestletKey) {
+    const lastTimedUnitIndex = booklet.unitEntries.reduce(
+      (lastIndex, unit, index) =>
+        unit.testletPath?.includes(activeExpiredTestletKey) ? index : lastIndex,
+      -1
+    );
+    const nextUnit = booklet.unitEntries[lastTimedUnitIndex + 1] ?? null;
+    if (nextUnit) {
+      const nextGate = findTestletCodeGate({
+        booklet,
+        testRun: { ...testRun, testletTimers },
+        firstUnitIndex: lastTimedUnitIndex + 1,
+        lastUnitIndex: lastTimedUnitIndex + 1
+      });
+      currentUnitKey = nextGate
+        ? booklet.unitEntries[lastTimedUnitIndex]?.unitKey ?? null
+        : nextUnit.unitKey;
+    } else {
+      currentUnitKey = null;
+      status = "completed";
+      completedAt = timestamp;
+    }
+  }
+  return {
+    testRun: normalizeTestRun({
+      ...testRun,
+      status,
+      currentUnitKey,
+      testletTimers,
+      updatedAt: timestamp,
+      completedAt
+    }),
+    expiredTestletKeys
+  };
+};
+
+const findClosedTimedTestlet = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun,
+  unitKey: string | null
+): SourcePackageTestletEntry | null => {
+  if (!booklet || !unitKey) {
+    return null;
+  }
+  const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
+  for (const testletKey of unit?.testletPath ?? []) {
+    const timer = testRun.testletTimers?.[testletKey];
+    if (timer?.status === "expired" || timer?.status === "cancelled") {
+      return (
+        booklet.testletEntries?.find(
+          candidate => candidate.testletKey === testletKey
+        ) ?? null
+      );
+    }
+  }
+  return null;
+};
+
+const resolveLeavingTimedTestlet = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun,
+  targetUnitKey: string | null
+): SourcePackageTestletEntry | null => {
+  const timedTestlet = resolveTimedTestletForUnit(
+    booklet,
+    testRun.currentUnitKey
+  );
+  const timer = timedTestlet
+    ? testRun.testletTimers?.[timedTestlet.testletKey]
+    : null;
+  if (
+    !timedTestlet ||
+    !timer ||
+    (timer.status !== "running" && timer.status !== "paused")
+  ) {
+    return null;
+  }
+  if (!targetUnitKey) {
+    return timedTestlet;
+  }
+  const targetUnit = booklet?.unitEntries.find(
+    candidate => candidate.unitKey === targetUnitKey
+  );
+  return (targetUnit?.testletPath ?? []).includes(timedTestlet.testletKey)
+    ? null
+    : timedTestlet;
+};
+
+const isLeavingForbiddenTimedTestlet = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun,
+  targetUnitKey: string | null
+): boolean =>
+  resolveLeavingTimedTestlet(booklet, testRun, targetUnitKey)?.restrictions
+    ?.timeMax?.leave === "forbidden";
+
+const cancelTestletTimerAfterLeave = (
+  testRun: TestRun,
+  testletKey: string,
+  timestamp: string
+): TestRun => {
+  const timer = testRun.testletTimers?.[testletKey];
+  if (!timer || (timer.status !== "running" && timer.status !== "paused")) {
+    return testRun;
+  }
+  return normalizeTestRun({
+    ...testRun,
+    testletTimers: {
+      ...(testRun.testletTimers ?? {}),
+      [testletKey]: {
+        ...timer,
+        status: "cancelled",
+        remainingSeconds: 0,
+        expiresAt: null,
+        updatedAt: timestamp,
+        endedAt: timestamp
+      }
+    },
+    updatedAt: timestamp
+  });
+};
+
+const resolveActiveTestletTimer = (
+  contentRelease: ContentRelease,
+  testRun: TestRun,
+  timestamp: string
+): ParticipantCurrentRunState["activeTestletTimer"] => {
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === testRun.bookletKey
+  );
+  const testlet = resolveTimedTestletForUnit(booklet, testRun.currentUnitKey);
+  const timer = testlet ? testRun.testletTimers?.[testlet.testletKey] : null;
+  const timeMax = testlet?.restrictions?.timeMax;
+  if (
+    !testlet ||
+    !timer ||
+    !timeMax ||
+    (timer.status !== "running" && timer.status !== "paused")
+  ) {
+    return null;
+  }
+  return {
+    testletKey: testlet.testletKey,
+    displayLabel: testlet.displayLabel,
+    status: timer.status,
+    durationSeconds: timer.durationSeconds,
+    remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
+    startedAt: timer.startedAt,
+    expiresAt: timer.expiresAt,
+    leave: timeMax.leave
+  };
+};
+
 const resolveBookletNavigationState = (
   contentRelease: ContentRelease,
   testRun: TestRun
@@ -6444,6 +6870,30 @@ const resolveBookletNavigationState = (
   if (nextTestletGate) {
     forwardDeniedReasons.push("testlet_code_required");
   }
+  if (
+    findClosedTimedTestlet(booklet, testRun, previousUnitKey) &&
+    !backwardDeniedReasons.includes("testlet_time_closed")
+  ) {
+    backwardDeniedReasons.push("testlet_time_closed");
+  }
+  if (
+    findClosedTimedTestlet(booklet, testRun, nextUnitKey) &&
+    !forwardDeniedReasons.includes("testlet_time_closed")
+  ) {
+    forwardDeniedReasons.push("testlet_time_closed");
+  }
+  if (
+    isLeavingForbiddenTimedTestlet(booklet, testRun, nextUnitKey) &&
+    !forwardDeniedReasons.includes("testlet_time_leave_forbidden")
+  ) {
+    forwardDeniedReasons.push("testlet_time_leave_forbidden");
+  }
+  if (
+    isLeavingForbiddenTimedTestlet(booklet, testRun, previousUnitKey) &&
+    !backwardDeniedReasons.includes("testlet_time_leave_forbidden")
+  ) {
+    backwardDeniedReasons.push("testlet_time_leave_forbidden");
+  }
   const remainingTestletGate = findTestletCodeGate({
     booklet,
     testRun,
@@ -6455,7 +6905,8 @@ const resolveBookletNavigationState = (
     currentIndex >= 0 &&
     testRun.status !== "completed" &&
     forwardDeniedReasons.length === 0 &&
-    remainingTestletGate == null;
+    remainingTestletGate == null &&
+    !isLeavingForbiddenTimedTestlet(booklet, testRun, null);
   const canPlayerEnd =
     canComplete &&
     (policy.navigation.playerEnd === "always" ||
@@ -6484,6 +6935,7 @@ const requireBookletNavigationAllowed = (input: {
   contentRelease: ContentRelease;
   testRun: TestRun;
   targetUnitKey: string | null;
+  confirmTestletTimeLeave?: boolean;
 }): void => {
   const currentUnitKey = input.testRun.currentUnitKey;
   if (!input.targetUnitKey || currentUnitKey === input.targetUnitKey) {
@@ -6523,6 +6975,39 @@ const requireBookletNavigationAllowed = (input: {
     !deniedReasons.includes("testlet_code_required")
   ) {
     deniedReasons.push("testlet_code_required");
+  }
+  const closedTimedTestlet = findClosedTimedTestlet(
+    booklet,
+    input.testRun,
+    input.targetUnitKey
+  );
+  if (
+    closedTimedTestlet &&
+    !deniedReasons.includes("testlet_time_closed")
+  ) {
+    deniedReasons.push("testlet_time_closed");
+  }
+  if (
+    isLeavingForbiddenTimedTestlet(
+      booklet,
+      input.testRun,
+      input.targetUnitKey
+    ) &&
+    !deniedReasons.includes("testlet_time_leave_forbidden")
+  ) {
+    deniedReasons.push("testlet_time_leave_forbidden");
+  }
+  const leavingTimedTestlet = resolveLeavingTimedTestlet(
+    booklet,
+    input.testRun,
+    input.targetUnitKey
+  );
+  if (
+    leavingTimedTestlet?.restrictions?.timeMax?.leave === "confirm" &&
+    !input.confirmTestletTimeLeave &&
+    !deniedReasons.includes("testlet_time_leave_confirmation_required")
+  ) {
+    deniedReasons.push("testlet_time_leave_confirmation_required");
   }
   if (deniedReasons.length > 0) {
     throw new FirstSliceError(
@@ -8125,6 +8610,94 @@ export const createFirstSliceServices = (
     });
   };
 
+  const persistEffectiveTestletTimerState = async (input: {
+    contentRelease: ContentRelease;
+    testRun: TestRun;
+    timestamp: string;
+  }): Promise<TestRun> => {
+    const normalizedRun = normalizeTestRun(input.testRun);
+    const reconciled = reconcileExpiredTestletTimers(
+      input.contentRelease,
+      normalizedRun,
+      input.timestamp
+    );
+    const activated = activateCurrentTestletTimer(
+      input.contentRelease,
+      reconciled.testRun,
+      input.timestamp
+    );
+    const effectiveRun = activated.testRun;
+    const changed =
+      effectiveRun !== normalizedRun ||
+      reconciled.expiredTestletKeys.length > 0 ||
+      activated.startedTestletKey != null;
+    if (changed) {
+      await repository.saveTestRun(effectiveRun);
+    }
+    if (activated.startedTestletKey) {
+      const timer = effectiveRun.testletTimers?.[activated.startedTestletKey];
+      await recordWorkspaceActivity({
+        tenantId: effectiveRun.tenantId,
+        workspaceId: effectiveRun.workspaceId,
+        eventType: "testlet_timer_started",
+        subjectType: "test_run",
+        subjectId: effectiveRun.testRunId,
+        summary: `Timed block '${activated.startedTestletKey}' started for run '${effectiveRun.testRunId}'.`,
+        details: {
+          testletKey: activated.startedTestletKey,
+          durationSeconds: timer?.durationSeconds ?? null,
+          expiresAt: timer?.expiresAt ?? null,
+          currentUnitKey: effectiveRun.currentUnitKey
+        }
+      });
+    }
+    for (const testletKey of reconciled.expiredTestletKeys) {
+      await recordWorkspaceActivity({
+        tenantId: effectiveRun.tenantId,
+        workspaceId: effectiveRun.workspaceId,
+        eventType: "testlet_timer_expired",
+        subjectType: "test_run",
+        subjectId: effectiveRun.testRunId,
+        summary: `Timed block '${testletKey}' expired for run '${effectiveRun.testRunId}'.`,
+        details: {
+          testletKey,
+          currentUnitKey: effectiveRun.currentUnitKey,
+          runStatus: effectiveRun.status
+        }
+      });
+    }
+    if (
+      input.testRun.status !== "completed" &&
+      effectiveRun.status === "completed"
+    ) {
+      const participantSession = await repository.getParticipantSessionById(
+        effectiveRun.participantSessionId
+      );
+      if (participantSession) {
+        await repository.saveParticipantSession({
+          ...participantSession,
+          status: await resolveParticipantSessionStatusAfterCompletion(
+            repository,
+            participantSession
+          )
+        });
+      }
+      await recordWorkspaceActivity({
+        tenantId: effectiveRun.tenantId,
+        workspaceId: effectiveRun.workspaceId,
+        eventType: "test_run_completed",
+        subjectType: "test_run",
+        subjectId: effectiveRun.testRunId,
+        summary: `Run '${effectiveRun.testRunId}' completed after its final timed block expired.`,
+        details: {
+          completedAt: effectiveRun.completedAt,
+          reason: "testlet_timer_expired"
+        }
+      });
+    }
+    return effectiveRun;
+  };
+
   const recordAdminAuditEvent = async (input: {
     eventType: AdminAuditEvent["eventType"];
     actorAdminUserId?: string | null;
@@ -8958,10 +9531,27 @@ export const createFirstSliceServices = (
             workspace.tenantId,
             workspace.workspaceId
           );
-        const testRuns = await repository.listTestRunsByWorkspace(
+        const storedTestRuns = await repository.listTestRunsByWorkspace(
           workspace.tenantId,
           workspace.workspaceId
         );
+        const timestamp = now();
+        const testRuns: TestRun[] = [];
+        for (const storedTestRun of storedTestRuns) {
+          const contentRelease = contentReleases.find(
+            candidate =>
+              candidate.contentReleaseId === storedTestRun.contentReleaseId
+          );
+          testRuns.push(
+            contentRelease && storedTestRun.status !== "completed"
+              ? await persistEffectiveTestletTimerState({
+                  contentRelease,
+                  testRun: storedTestRun,
+                  timestamp
+                })
+              : normalizeTestRun(storedTestRun)
+          );
+        }
         const latestImportJobAt =
           importJobs
             .map(importJob => importJob.createdAt)
@@ -11131,11 +11721,17 @@ export const createFirstSliceServices = (
           );
         }
 
-        const currentTestRun = normalizeTestRun(latestTestRun);
+        const storedCurrentTestRun = normalizeTestRun(latestTestRun);
         const contentRelease = await requireContentRelease(
           repository,
-          currentTestRun.contentReleaseId
+          storedCurrentTestRun.contentReleaseId
         );
+        const currentTimestamp = now();
+        const currentTestRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: storedCurrentTestRun,
+          timestamp: currentTimestamp
+        });
         const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
           repository,
           participantSession.tenantId,
@@ -11180,6 +11776,11 @@ export const createFirstSliceServices = (
           bookletUnits: resolveRuntimeBookletUnits(
             contentRelease,
             currentTestRun.bookletKey
+          ),
+          activeTestletTimer: resolveActiveTestletTimer(
+            contentRelease,
+            currentTestRun,
+            currentTimestamp
           ),
           booklets: buildParticipantRuntimeBooklets({
             contentRelease,
@@ -11352,30 +11953,36 @@ export const createFirstSliceServices = (
             : firstUnit?.unitKey ?? "unit-1",
           unitResponses: {},
           unlockedTestletKeys: [],
+          testletTimers: {},
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
         };
         await repository.saveTestRun(testRun);
+        const effectiveTestRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun,
+          timestamp
+        });
         await repository.saveParticipantSession({
           ...participantSession,
           status: "launched"
         });
         await recordWorkspaceActivity({
-          tenantId: testRun.tenantId,
-          workspaceId: testRun.workspaceId,
+          tenantId: effectiveTestRun.tenantId,
+          workspaceId: effectiveTestRun.workspaceId,
           eventType: "participant_session_resumed",
           subjectType: "test_run",
-          subjectId: testRun.testRunId,
+          subjectId: effectiveTestRun.testRunId,
           summary: `Participant session '${participantSession.participantSessionId}' started a run.`,
           details: {
             participantSessionId: participantSession.participantSessionId,
-            bookletKey: testRun.bookletKey,
-            currentUnitKey: testRun.currentUnitKey,
+            bookletKey: effectiveTestRun.bookletKey,
+            currentUnitKey: effectiveTestRun.currentUnitKey,
             bookletSource
           }
         });
-        return testRun;
+        return effectiveTestRun;
       },
       async resumeSession(input) {
         const participantSessionId = normalizeParticipantSessionId(
@@ -11405,25 +12012,35 @@ export const createFirstSliceServices = (
           }
 
           if (existingRun.status === "paused") {
-            const resumedRun: TestRun = {
-              ...normalizeTestRun(existingRun),
-              status: "running",
-              updatedAt: now()
-            };
+            const timestamp = now();
+            const contentRelease = await requireContentRelease(
+              repository,
+              existingRun.contentReleaseId
+            );
+            const resumedRun = transitionTestletTimersForRunStatus(
+              normalizeTestRun(existingRun),
+              "running",
+              timestamp
+            );
             await repository.saveTestRun(resumedRun);
+            const effectiveRun = await persistEffectiveTestletTimerState({
+              contentRelease,
+              testRun: resumedRun,
+              timestamp
+            });
             await recordWorkspaceActivity({
-              tenantId: resumedRun.tenantId,
-              workspaceId: resumedRun.workspaceId,
+              tenantId: effectiveRun.tenantId,
+              workspaceId: effectiveRun.workspaceId,
               eventType: "participant_session_resumed",
               subjectType: "test_run",
-              subjectId: resumedRun.testRunId,
+              subjectId: effectiveRun.testRunId,
               summary: `Participant session '${participantSession.participantSessionId}' resumed an existing run.`,
               details: {
                 participantSessionId: participantSession.participantSessionId,
-                currentUnitKey: resumedRun.currentUnitKey
+                currentUnitKey: effectiveRun.currentUnitKey
               }
             });
-            return resumedRun;
+            return effectiveRun;
           }
 
           return normalizeTestRun(existingRun);
@@ -11446,7 +12063,16 @@ export const createFirstSliceServices = (
           );
         }
 
-        const testRun = normalizeTestRun(storedTestRun);
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: normalizeTestRun(storedTestRun),
+          timestamp
+        });
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -11460,11 +12086,8 @@ export const createFirstSliceServices = (
           ? normalizeOptionalCurrentUnitKey(input.currentUnitKey)
           : testRun.currentUnitKey;
         const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        let navigationTestRun = testRun;
         if (nextCurrentUnitKey) {
-          const contentRelease = await requireContentRelease(
-            repository,
-            testRun.contentReleaseId
-          );
           requireRuntimeUnitForBooklet(
             contentRelease,
             testRun.bookletKey,
@@ -11473,40 +12096,72 @@ export const createFirstSliceServices = (
           requireBookletNavigationAllowed({
             contentRelease,
             testRun,
-            targetUnitKey: nextCurrentUnitKey
+            targetUnitKey: nextCurrentUnitKey,
+            confirmTestletTimeLeave: input.confirmTestletTimeLeave
           });
+          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === testRun.bookletKey
+          );
+          const leavingTimedTestlet = resolveLeavingTimedTestlet(
+            booklet,
+            testRun,
+            nextCurrentUnitKey
+          );
+          const leavePolicy =
+            leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+          if (
+            leavingTimedTestlet &&
+            (leavePolicy === "allowed" ||
+              (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
+          ) {
+            navigationTestRun = cancelTestletTimerAfterLeave(
+              testRun,
+              leavingTimedTestlet.testletKey,
+              timestamp
+            );
+          }
         }
 
-        const nextUnitResponses = { ...testRun.unitResponses };
+        const nextUnitResponses = { ...navigationTestRun.unitResponses };
         const responseUnitKey = hasCurrentUnitKeyInput
           ? nextCurrentUnitKey
-          : testRun.currentUnitKey;
+          : navigationTestRun.currentUnitKey;
         if (responseUnitKey && nextUnitResponse != null) {
           nextUnitResponses[responseUnitKey] = nextUnitResponse;
         }
         const nextStatus = normalizeTestRunProgressStatus(input.status);
+        const statusAdjustedRun = transitionTestletTimersForRunStatus(
+          navigationTestRun,
+          nextStatus,
+          timestamp
+        );
 
         const updatedRun: TestRun = {
-          ...testRun,
+          ...statusAdjustedRun,
           status: nextStatus,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
-          updatedAt: now()
+          updatedAt: timestamp
         };
         await repository.saveTestRun(updatedRun);
+        const effectiveRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: updatedRun,
+          timestamp
+        });
         await recordWorkspaceActivity({
-          tenantId: updatedRun.tenantId,
-          workspaceId: updatedRun.workspaceId,
+          tenantId: effectiveRun.tenantId,
+          workspaceId: effectiveRun.workspaceId,
           eventType: "test_run_progress_saved",
           subjectType: "test_run",
-          subjectId: updatedRun.testRunId,
-          summary: `Progress saved for run '${updatedRun.testRunId}'.`,
+          subjectId: effectiveRun.testRunId,
+          summary: `Progress saved for run '${effectiveRun.testRunId}'.`,
           details: {
-            status: updatedRun.status,
-            currentUnitKey: updatedRun.currentUnitKey
+            status: effectiveRun.status,
+            currentUnitKey: effectiveRun.currentUnitKey
           }
         });
-        return updatedRun;
+        return effectiveRun;
       },
       async unlockTestlet(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -11533,7 +12188,16 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
-        const testRun = normalizeTestRun(storedTestRun);
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: normalizeTestRun(storedTestRun),
+          timestamp
+        });
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -11541,10 +12205,6 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' is already completed.`
           );
         }
-        const contentRelease = await requireContentRelease(
-          repository,
-          testRun.contentReleaseId
-        );
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
@@ -11588,7 +12248,7 @@ export const createFirstSliceServices = (
             ...(testRun.unlockedTestletKeys ?? []),
             testletKey
           ],
-          updatedAt: now()
+          updatedAt: timestamp
         });
         const navigationAfterUnlock = resolveBookletNavigationState(
           contentRelease,
@@ -11603,20 +12263,25 @@ export const createFirstSliceServices = (
             : {})
         };
         await repository.saveTestRun(updatedRun);
+        const effectiveRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: updatedRun,
+          timestamp
+        });
         await recordWorkspaceActivity({
-          tenantId: updatedRun.tenantId,
-          workspaceId: updatedRun.workspaceId,
+          tenantId: effectiveRun.tenantId,
+          workspaceId: effectiveRun.workspaceId,
           eventType: "testlet_unlocked",
           subjectType: "test_run",
-          subjectId: updatedRun.testRunId,
-          summary: `Block '${testletKey}' unlocked for run '${updatedRun.testRunId}'.`,
+          subjectId: effectiveRun.testRunId,
+          summary: `Block '${testletKey}' unlocked for run '${effectiveRun.testRunId}'.`,
           details: {
             testletKey,
-            participantSessionId: updatedRun.participantSessionId,
-            currentUnitKey: updatedRun.currentUnitKey
+            participantSessionId: effectiveRun.participantSessionId,
+            currentUnitKey: effectiveRun.currentUnitKey
           }
         });
-        return updatedRun;
+        return effectiveRun;
       },
       async resumeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -11630,7 +12295,16 @@ export const createFirstSliceServices = (
           );
         }
 
-        const testRun = normalizeTestRun(storedTestRun);
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: normalizeTestRun(storedTestRun),
+          timestamp
+        });
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -11643,24 +12317,29 @@ export const createFirstSliceServices = (
           return testRun;
         }
 
-        const resumedRun: TestRun = {
-          ...testRun,
-          status: "running",
-          updatedAt: now()
-        };
+        const resumedRun = transitionTestletTimersForRunStatus(
+          testRun,
+          "running",
+          timestamp
+        );
         await repository.saveTestRun(resumedRun);
+        const effectiveRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: resumedRun,
+          timestamp
+        });
         await recordWorkspaceActivity({
-          tenantId: resumedRun.tenantId,
-          workspaceId: resumedRun.workspaceId,
+          tenantId: effectiveRun.tenantId,
+          workspaceId: effectiveRun.workspaceId,
           eventType: "test_run_resumed",
           subjectType: "test_run",
-          subjectId: resumedRun.testRunId,
-          summary: `Run '${resumedRun.testRunId}' resumed.`,
+          subjectId: effectiveRun.testRunId,
+          summary: `Run '${effectiveRun.testRunId}' resumed.`,
           details: {
-            currentUnitKey: resumedRun.currentUnitKey
+            currentUnitKey: effectiveRun.currentUnitKey
           }
         });
-        return resumedRun;
+        return effectiveRun;
       },
       async completeRun(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
@@ -11674,31 +12353,73 @@ export const createFirstSliceServices = (
           );
         }
 
-        const testRun = normalizeTestRun(storedTestRun);
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        const timestamp = now();
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: normalizeTestRun(storedTestRun),
+          timestamp
+        });
         if (testRun.status === "completed") {
           return testRun;
         }
-
-        const contentRelease = await requireContentRelease(
-          repository,
-          testRun.contentReleaseId
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
         );
-        const navigation = resolveBookletNavigationState(contentRelease, testRun);
+        const leavingTimedTestlet = resolveLeavingTimedTestlet(
+          booklet,
+          testRun,
+          null
+        );
+        const leavePolicy =
+          leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
+        if (
+          leavePolicy === "confirm" &&
+          !input.confirmTestletTimeLeave
+        ) {
+          throw new FirstSliceError(
+            409,
+            "booklet_completion_denied",
+            `Run '${testRunId}' cannot be completed without confirming that the active timed block will be closed.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: [
+                "testlet_time_leave_confirmation_required"
+              ]
+            }
+          );
+        }
+        const completionBaseRun =
+          leavingTimedTestlet &&
+          (leavePolicy === "allowed" ||
+            (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
+            ? cancelTestletTimerAfterLeave(
+                testRun,
+                leavingTimedTestlet.testletKey,
+                timestamp
+              )
+            : testRun;
+        const navigation = resolveBookletNavigationState(
+          contentRelease,
+          completionBaseRun
+        );
         if (!navigation.canComplete) {
           throw new FirstSliceError(
             409,
             "booklet_completion_denied",
             `Run '${testRunId}' cannot be completed because the current unit completion policy is not satisfied.`,
             {
-              currentUnitKey: testRun.currentUnitKey,
+              currentUnitKey: completionBaseRun.currentUnitKey,
               deniedReasons: navigation.forwardDeniedReasons
             }
           );
         }
 
-        const timestamp = now();
         const completedRun: TestRun = {
-          ...testRun,
+          ...closeRunningTestletTimers(completionBaseRun, timestamp),
           status: "completed",
           currentUnitKey: null,
           updatedAt: timestamp,
@@ -11743,10 +12464,31 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const testRuns = await repository.listTestRunsByWorkspace(
+        const storedTestRuns = await repository.listTestRunsByWorkspace(
           workspace.tenantId,
           workspace.workspaceId
         );
+        const contentReleases = await repository.listContentReleasesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        );
+        const timestamp = now();
+        const testRuns: TestRun[] = [];
+        for (const storedTestRun of storedTestRuns) {
+          const contentRelease = contentReleases.find(
+            candidate =>
+              candidate.contentReleaseId === storedTestRun.contentReleaseId
+          );
+          testRuns.push(
+            contentRelease && storedTestRun.status !== "completed"
+              ? await persistEffectiveTestletTimerState({
+                  contentRelease,
+                  testRun: storedTestRun,
+                  timestamp
+                })
+              : normalizeTestRun(storedTestRun)
+          );
+        }
         const participantSessions =
           await repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
@@ -11819,10 +12561,10 @@ export const createFirstSliceServices = (
           );
         }
 
-        const testRun = normalizeTestRun(storedTestRun);
+        const storedNormalizedRun = normalizeTestRun(storedTestRun);
         if (
-          testRun.tenantId !== workspace.tenantId ||
-          testRun.workspaceId !== workspace.workspaceId
+          storedNormalizedRun.tenantId !== workspace.tenantId ||
+          storedNormalizedRun.workspaceId !== workspace.workspaceId
         ) {
           throw new FirstSliceError(
             404,
@@ -11831,6 +12573,16 @@ export const createFirstSliceServices = (
           );
         }
 
+        const issuedAt = now();
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedNormalizedRun.contentReleaseId
+        );
+        const testRun = await persistEffectiveTestletTimerState({
+          contentRelease,
+          testRun: storedNormalizedRun,
+          timestamp: issuedAt
+        });
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -11849,7 +12601,6 @@ export const createFirstSliceServices = (
           workspace.workspaceId,
           participantSession.loginKey
         );
-        const issuedAt = now();
         const nextStatus: TestRunStatus =
           commandType === "pause"
             ? "paused"
@@ -11859,22 +12610,28 @@ export const createFirstSliceServices = (
         const nextTestRun: TestRun =
           commandType === "complete"
             ? {
-                ...testRun,
+                ...closeRunningTestletTimers(testRun, issuedAt),
                 status: "completed",
                 currentUnitKey: null,
                 updatedAt: issuedAt,
                 completedAt: issuedAt
               }
-            : testRun.status === nextStatus
-              ? testRun
-              : {
-                  ...testRun,
-                  status: nextStatus,
-                  updatedAt: issuedAt
-                };
+            : transitionTestletTimersForRunStatus(
+                testRun,
+                nextStatus as Extract<TestRunStatus, "running" | "paused">,
+                issuedAt
+              );
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
         }
+        const effectiveNextTestRun =
+          commandType === "complete"
+            ? nextTestRun
+            : await persistEffectiveTestletTimerState({
+                contentRelease,
+                testRun: nextTestRun,
+                timestamp: issuedAt
+              });
         const nextParticipantSession =
           commandType === "complete"
             ? {
@@ -11902,8 +12659,8 @@ export const createFirstSliceServices = (
             commandId,
             commandType,
             previousStatus: testRun.status,
-            nextStatus: nextTestRun.status,
-            completedAt: nextTestRun.completedAt ?? null,
+            nextStatus: effectiveNextTestRun.status,
+            completedAt: effectiveNextTestRun.completedAt ?? null,
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
@@ -11918,7 +12675,7 @@ export const createFirstSliceServices = (
           actorId,
           issuedAt,
           previousStatus: testRun.status,
-          testRun: nextTestRun,
+          testRun: effectiveNextTestRun,
           participantSession: nextParticipantSession
         };
       }

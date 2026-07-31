@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
-import type { OnInit } from "@angular/core";
+import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { ParticipantViewFacade } from "./participant-view.facade";
@@ -293,6 +293,26 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <p id="participantRouteCompletionReadinessDetail">{{ view.player.completionReadinessDetail }}</p>
           </section>
           <section
+            *ngIf="view.player.testletTimer as timer"
+            id="participantRouteTestletTimer"
+            class="participant-testlet-timer"
+            [class.is-paused]="timer.status === 'paused'"
+            aria-live="polite"
+          >
+            <div>
+              <span>Timed Block</span>
+              <strong id="participantRouteTestletTimerLabel">{{ timer.displayLabel }}</strong>
+              <p id="participantRouteTestletTimerLeave">{{ timer.leaveLabel }}</p>
+            </div>
+            <div class="participant-testlet-timer-value">
+              <span>{{ timer.status === "paused" ? "Paused" : "Time remaining" }}</span>
+              <strong id="participantRouteTestletTimerValue">{{ timer.remainingLabel }}</strong>
+            </div>
+            <div class="participant-testlet-timer-track" aria-hidden="true">
+              <span [style.width.%]="timer.progressPercent"></span>
+            </div>
+          </section>
+          <section
             *ngIf="view.player.nextTestletGate as gate"
             class="participant-testlet-gate"
             aria-labelledby="participantRouteTestletGateLabel"
@@ -369,7 +389,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
     </div>
   `
 })
-export class ParticipantViewComponent implements OnInit {
+export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
 
   ngOnInit(): void {
@@ -385,5 +405,9 @@ export class ParticipantViewComponent implements OnInit {
       currentUnitKey: query.get("currentUnitKey"),
       unitResponse: query.get("unitResponse")
     });
+  }
+
+  ngOnDestroy(): void {
+    this.view.destroy();
   }
 }

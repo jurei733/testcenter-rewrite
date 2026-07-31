@@ -1243,6 +1243,73 @@ pre {
   color: var(--muted);
 }
 
+.participant-testlet-timer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 20px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid rgba(31, 92, 84, 0.24);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(31, 92, 84, 0.14), transparent 36%),
+    rgba(255, 255, 255, 0.82);
+}
+
+.participant-testlet-timer.is-paused {
+  border-color: rgba(196, 82, 47, 0.22);
+}
+
+.participant-testlet-timer > div:first-child,
+.participant-testlet-timer-value {
+  display: grid;
+  gap: 4px;
+}
+
+.participant-testlet-timer span {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-testlet-timer strong {
+  color: var(--green-deep);
+}
+
+.participant-testlet-timer p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.participant-testlet-timer-value {
+  min-width: 110px;
+  text-align: right;
+}
+
+.participant-testlet-timer-value strong {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(24px, 4vw, 38px);
+  letter-spacing: 0.04em;
+}
+
+.participant-testlet-timer-track {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(31, 92, 84, 0.12);
+}
+
+.participant-testlet-timer-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green-deep);
+  transition: width 250ms linear;
+}
+
 .participant-testlet-gate {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.55fr) auto;
@@ -1279,6 +1346,14 @@ pre {
 }
 
 @media (max-width: 760px) {
+  .participant-testlet-timer {
+    grid-template-columns: 1fr;
+  }
+
+  .participant-testlet-timer-value {
+    text-align: left;
+  }
+
   .participant-testlet-gate {
     grid-template-columns: 1fr;
   }
