@@ -245,19 +245,24 @@ export async function completeRunAction(
 
 export async function issueMonitorRunCommandAction(
   host: ShellRuntimeActionsHost,
-  commandType: "pause" | "resume" | "complete"
+  commandType: "pause" | "resume" | "complete" | "goto"
 ): Promise<IssueMonitorRunCommandResponse> {
   const payload = await host.request<IssueMonitorRunCommandResponse>(
     commandType === "pause"
       ? "Monitor Pause Run"
       : commandType === "resume"
         ? "Monitor Resume Run"
-        : "Monitor Complete Run",
+        : commandType === "goto"
+          ? "Monitor Go To Unit"
+          : "Monitor Complete Run",
     "POST",
     host.getMonitorRunCommandPath(),
     {
       commandType,
-      actorId: host.getReviewerId().trim() || undefined
+      actorId: host.getReviewerId().trim() || undefined,
+      ...(commandType === "goto"
+        ? { targetUnitKey: host.getCurrentUnitKey().trim() }
+        : {})
     } satisfies IssueMonitorRunCommandRequest
   );
 
@@ -267,7 +272,7 @@ export async function issueMonitorRunCommandAction(
       { testRun: payload.command.testRun },
       "paused"
     );
-  } else if (commandType === "resume") {
+  } else if (commandType === "resume" || commandType === "goto") {
     applyResumeRunResult(host.createRuntimePresentationHost(), {
       testRun: payload.command.testRun
     });

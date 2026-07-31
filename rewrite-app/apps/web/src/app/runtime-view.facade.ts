@@ -2356,6 +2356,15 @@ export class RuntimeViewFacade {
     );
   }
 
+  issueMonitorGoto(): void {
+    if (!this.canSaveProgressActions) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("goto")
+    );
+  }
+
   openRuns(): void {
     if (!this.canUseWorkspaceScope) {
       return;

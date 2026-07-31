@@ -4794,7 +4794,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey,
           testRunId,
           commandType: body.commandType,
-          actorId: body.actorId
+          actorId: body.actorId,
+          targetUnitKey: body.targetUnitKey
         });
         sendJson<IssueMonitorRunCommandResponse>(response, 200, { command });
         return;

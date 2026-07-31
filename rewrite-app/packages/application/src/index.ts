@@ -486,6 +486,7 @@ export type MonitorControlPort = {
     testRunId: string;
     commandType: MonitorRunCommandType;
     actorId?: string | null;
+    targetUnitKey?: string | null;
   }): Promise<MonitorRunCommandResult>;
 };
 
@@ -931,11 +932,22 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', or 'complete'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', or 'goto'."
     );
   }
 
   return value as MonitorRunCommandType;
+};
+
+const normalizeMonitorGotoTargetUnitKey = (value: unknown): string => {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new FirstSliceError(
+      400,
+      "monitor_goto_target_unit_required",
+      "targetUnitKey is required for a monitor goto command."
+    );
+  }
+  return value.trim();
 };
 
 const normalizeParticipantLoginKey = (value: unknown): string => {
@@ -6933,6 +6945,80 @@ const cancelTestletTimerAfterLeave = (
   });
 };
 
+const applyMonitorGoto = (input: {
+  contentRelease: ContentRelease;
+  testRun: TestRun;
+  targetUnitKey: string;
+  timestamp: string;
+}): TestRun => {
+  const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === input.testRun.bookletKey
+  );
+  const targetUnit = booklet?.unitEntries.find(
+    candidate => candidate.unitKey === input.targetUnitKey
+  );
+  if (!targetUnit) {
+    throw new FirstSliceError(
+      400,
+      "monitor_goto_target_unit_invalid",
+      `Unit '${input.targetUnitKey}' does not belong to booklet '${input.testRun.bookletKey}'.`
+    );
+  }
+
+  let nextRun = transitionTestletTimersForRunStatus(
+    input.testRun,
+    "running",
+    input.timestamp
+  );
+  const currentTimedTestlet = resolveTimedTestletForUnit(
+    booklet,
+    nextRun.currentUnitKey
+  );
+  const targetTimedTestlet = resolveTimedTestletForUnit(
+    booklet,
+    input.targetUnitKey
+  );
+  if (
+    currentTimedTestlet &&
+    currentTimedTestlet.testletKey !== targetTimedTestlet?.testletKey
+  ) {
+    nextRun = cancelTestletTimerAfterLeave(
+      nextRun,
+      currentTimedTestlet.testletKey,
+      input.timestamp
+    );
+  }
+  if (
+    targetTimedTestlet &&
+    targetTimedTestlet.testletKey !== currentTimedTestlet?.testletKey
+  ) {
+    const testletTimers = { ...(nextRun.testletTimers ?? {}) };
+    delete testletTimers[targetTimedTestlet.testletKey];
+    nextRun = normalizeTestRun({
+      ...nextRun,
+      testletTimers,
+      updatedAt: input.timestamp
+    });
+  }
+
+  const targetTestletKeys = targetUnit.testletPath ?? [];
+  return normalizeTestRun({
+    ...nextRun,
+    status: "running",
+    currentUnitKey: input.targetUnitKey,
+    unlockedTestletKeys: Array.from(
+      new Set([...(nextRun.unlockedTestletKeys ?? []), ...targetTestletKeys])
+    ),
+    lockedTestletKeys: (nextRun.lockedTestletKeys ?? []).filter(
+      testletKey => !targetTestletKeys.includes(testletKey)
+    ),
+    lockedUnitKeys: (nextRun.lockedUnitKeys ?? []).filter(
+      unitKey => unitKey !== input.targetUnitKey
+    ),
+    updatedAt: input.timestamp
+  });
+};
+
 const resolveActiveTestletTimer = (
   contentRelease: ContentRelease,
   testRun: TestRun,
@@ -12855,6 +12941,10 @@ export const createFirstSliceServices = (
         );
         const testRunId = normalizeTestRunId(input.testRunId);
         const commandType = normalizeMonitorRunCommandType(input.commandType);
+        const targetUnitKey =
+          commandType === "goto"
+            ? normalizeMonitorGotoTargetUnitKey(input.targetUnitKey)
+            : null;
         const actorId =
           typeof input.actorId === "string" && input.actorId.trim()
             ? input.actorId.trim()
@@ -12912,9 +13002,9 @@ export const createFirstSliceServices = (
         const nextStatus: TestRunStatus =
           commandType === "pause"
             ? "paused"
-            : commandType === "resume"
-              ? "running"
-              : "completed";
+            : commandType === "complete"
+              ? "completed"
+              : "running";
         const nextTestRun: TestRun =
           commandType === "complete"
             ? {
@@ -12924,6 +13014,13 @@ export const createFirstSliceServices = (
                 updatedAt: issuedAt,
                 completedAt: issuedAt
               }
+            : commandType === "goto" && targetUnitKey
+              ? applyMonitorGoto({
+                  contentRelease,
+                  testRun,
+                  targetUnitKey,
+                  timestamp: issuedAt
+                })
             : transitionTestletTimersForRunStatus(
                 testRun,
                 nextStatus as Extract<TestRunStatus, "running" | "paused">,
@@ -12969,6 +13066,8 @@ export const createFirstSliceServices = (
             previousStatus: testRun.status,
             nextStatus: effectiveNextTestRun.status,
             completedAt: effectiveNextTestRun.completedAt ?? null,
+            previousUnitKey: testRun.currentUnitKey,
+            targetUnitKey,
             participantSessionId: participantSession.participantSessionId,
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,

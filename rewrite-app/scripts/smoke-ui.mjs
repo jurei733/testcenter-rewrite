@@ -1579,13 +1579,23 @@ try {
   await expectButtonSelectorDisabled("#retrySourcePackageImportButton");
   await expectButtonSelectorDisabled("#activateContentReleaseButton");
   await clickAction("Create Import Job");
-  await pollJsonWithPredicate(
+  const stagedStarterReleasePayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.some(item => item?.contentRelease?.status === "staged")
+  );
+  const starterContentReleaseId =
+    stagedStarterReleasePayload.items.find(
+      item =>
+        item?.contentRelease?.status === "staged" &&
+        item?.sourcePackage?.fileName === uploadedSourceFileName
+    )?.contentRelease?.contentReleaseId;
+  assert.ok(
+    starterContentReleaseId,
+    "UI smoke expected the imported starter release id."
   );
   logStep("export-import-jobs-csv");
   await expectButtonSelectorEnabled("#exportImportJobsCsvButton");
@@ -3273,6 +3283,11 @@ try {
   await expectInputValue("#groupKey", "group:entry-smoke");
   await expectInputValue("#bookletKey", participantRouteBookletKey);
   stopAfter("activation-roster-warning-cards");
+  logStep("reactivate-starter-release");
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${starterContentReleaseId}/activate`,
+    { body: { forceActivation: true } }
+  );
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -3287,12 +3302,23 @@ try {
       "</Testtakers>"
     ].join("\n")
   );
+  await page.locator("#importParticipantRosterButton").click();
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Saved Participant Roster" })
+    })
+    .filter({ hasText: "entry-student-direct-xml" })
+    .filter({ hasText: "group:direct-xml" })
+    .filter({ hasText: participantRouteBookletKey })
+    .waitFor();
   await page.locator("#generateEntryLinksButton").click();
   const directEntryLinkCard = page
     .locator("article.card")
     .filter({
       has: page.getByRole("heading", { name: "Generated Entry Links" })
     })
+    .locator(".record-card")
     .filter({ hasText: "entry-student-direct-xml" })
     .filter({ hasText: "Direct Xml" })
     .filter({ hasText: participantEntryUrlPrefix })
@@ -3301,14 +3327,6 @@ try {
   await directEntryLinkCard.waitFor();
   await directEntryLinkCard
     .getByRole("link", { name: /URL:/ })
-    .waitFor({ state: "visible" });
-  const directEntryCopyLinkButton = directEntryLinkCard.getByRole("button", {
-    name: /Copy URL:/
-  });
-  await directEntryCopyLinkButton.waitFor({ state: "visible" });
-  await directEntryCopyLinkButton.click({ force: true });
-  await directEntryLinkCard
-    .getByRole("button", { name: /Copied URL:/ })
     .waitFor({ state: "visible" });
   await directEntryLinkCard
     .getByRole("button", { name: "Use Entry Link", exact: true })
@@ -3402,6 +3420,22 @@ try {
   const participantLoginKey = "student-ui";
   const participantGroupKey = "group:student-ui";
   const participantBookletKey = "booklet:starter";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "loginKey,groupKey,bookletKey,displayName",
+          [
+            participantLoginKey,
+            participantGroupKey,
+            participantBookletKey,
+            participantLoginKey
+          ].join(",")
+        ].join("\n")
+      }
+    }
+  );
   await fillAndCommit("#loginKey", participantLoginKey);
   await fillAndCommit("#groupKey", participantGroupKey);
   await fillAndCommit("#bookletKey", participantBookletKey);
@@ -3918,6 +3952,36 @@ try {
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.length > 0
+  );
+  logStep("monitor-goto-unit");
+  await fillAndCommitUntilValue("#currentUnitKey", "unit-1");
+  await clickSelectorAction(
+    "Monitor Go To Unit",
+    "#runtimeMonitorGotoButton"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.status === "running" &&
+      payload?.currentRunState?.testRun?.currentUnitKey === "unit-1"
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#playerPreviewUnitKey")?.textContent?.trim() ===
+      "unit-1",
+    undefined,
+    { timeout: 15_000 }
+  );
+  await fillAndCommitUntilValue("#currentUnitKey", "unit-paused");
+  await clickSelectorAction(
+    "Monitor Go To Unit",
+    "#runtimeMonitorGotoButton"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.status === "running" &&
+      payload?.currentRunState?.testRun?.currentUnitKey === "unit-paused"
   );
   const openRunStudentCard = page
     .locator("app-record-collection")

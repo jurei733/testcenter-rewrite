@@ -1736,6 +1736,7 @@ export type MonitorOpenRunsQuery = {
 export type IssueMonitorRunCommandRequest = {
   commandType: MonitorRunCommandType;
   actorId?: string | null;
+  targetUnitKey?: string | null;
 };
 
 export type IssueMonitorRunCommandResponse = {

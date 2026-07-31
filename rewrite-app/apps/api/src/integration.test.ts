@@ -3828,6 +3828,67 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(resumeCommand.body.command.previousStatus, "paused");
     assert.equal(resumeCommand.body.command.testRun.status, "running");
 
+    const missingGotoTarget = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "goto",
+          actorId: "operator-demo"
+        }
+      }
+    );
+    assert.equal(missingGotoTarget.status, 400);
+    assert.equal(
+      missingGotoTarget.body.error,
+      "monitor_goto_target_unit_required"
+    );
+
+    const invalidGotoTarget = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "goto",
+          targetUnitKey: "unit-missing",
+          actorId: "operator-demo"
+        }
+      }
+    );
+    assert.equal(invalidGotoTarget.status, 400);
+    assert.equal(
+      invalidGotoTarget.body.error,
+      "monitor_goto_target_unit_invalid"
+    );
+
+    const gotoCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousStatus: string;
+        testRun: { status: string; currentUnitKey: string | null };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "goto",
+        targetUnitKey: "unit-finish",
+        actorId: "operator-demo"
+      }
+    });
+    assert.equal(gotoCommand.status, 200);
+    assert.equal(gotoCommand.body.command.commandType, "goto");
+    assert.equal(gotoCommand.body.command.previousStatus, "running");
+    assert.equal(gotoCommand.body.command.testRun.status, "running");
+    assert.equal(
+      gotoCommand.body.command.testRun.currentUnitKey,
+      "unit-finish"
+    );
+
     const completeCommand = await requestJsonAt<{
       command: {
         commandType: string;
@@ -3896,6 +3957,8 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             previousStatus?: string;
             nextStatus?: string;
             completedAt?: string | null;
+            previousUnitKey?: string | null;
+            targetUnitKey?: string | null;
             participantSessionId?: string;
             loginKey?: string;
             groupKey?: string;
@@ -3906,15 +3969,15 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=3",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=4",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
-    assert.equal(commandActivity.body.items.length, 3);
+    assert.equal(commandActivity.body.items.length, 4);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
-      ["complete", "resume", "pause"]
+      ["complete", "goto", "resume", "pause"]
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
     assert.equal(
@@ -3944,9 +4007,13 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       commandActivity.body.items[0]?.activityEvent.details.displayName,
       "Demo Student"
     );
+    assert.equal(
+      commandActivity.body.items[1]?.activityEvent.details.targetUnitKey,
+      "unit-finish"
+    );
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),
-      ["booklet:demo", "booklet:demo", "booklet:demo"]
+      ["booklet:demo", "booklet:demo", "booklet:demo", "booklet:demo"]
     );
   } finally {
     await closeServer(isolated.server);
@@ -7485,6 +7552,47 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     testletKey
   ]);
   assert.equal(stateAfterUnlock.body.currentRunState.navigation.nextTestletGate, null);
+
+  const monitorParticipant = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "monitor-code-override" }
+  });
+  const monitorRun = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(
+    `/api/v1/participant/sessions/${monitorParticipant.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey } }
+  );
+  assert.equal(monitorRun.body.testRun.currentUnitKey, null);
+  const monitorGoto = await requestJson<{
+    command: {
+      testRun: {
+        currentUnitKey: string | null;
+        unlockedTestletKeys?: string[];
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${monitorRun.body.testRun.testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "goto",
+        targetUnitKey: "UNIT.PROTECTED",
+        actorId: "code-monitor"
+      }
+    }
+  );
+  assert.equal(monitorGoto.status, 200);
+  assert.equal(
+    monitorGoto.body.command.testRun.currentUnitKey,
+    "UNIT.PROTECTED"
+  );
+  assert.deepEqual(
+    monitorGoto.body.command.testRun.unlockedTestletKeys,
+    [testletKey]
+  );
 });
 
 test("original Testcenter timed testlets pause durably and close after expiry", async () => {
@@ -7697,6 +7805,60 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "testlet_time_closed"
   ]);
 
+  const monitorReopenedTimer = await requestJson<{
+    command: {
+      testRun: {
+        currentUnitKey: string | null;
+        status: string;
+        testletTimers?: Record<
+          string,
+          {
+            status: string;
+            durationSeconds: number;
+            remainingSeconds: number;
+            expiresAt: string | null;
+          }
+        >;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "goto",
+        targetUnitKey: "UNIT.TIMED",
+        actorId: "timer-monitor"
+      }
+    }
+  );
+  assert.equal(monitorReopenedTimer.status, 200);
+  assert.equal(
+    monitorReopenedTimer.body.command.testRun.currentUnitKey,
+    "UNIT.TIMED"
+  );
+  assert.equal(monitorReopenedTimer.body.command.testRun.status, "running");
+  assert.equal(
+    monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
+      ?.status,
+    "running"
+  );
+  assert.equal(
+    monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
+      ?.durationSeconds,
+    1
+  );
+  assert.equal(
+    monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
+      ?.remainingSeconds,
+    1
+  );
+  assert.match(
+    monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
+      ?.expiresAt ?? "",
+    ISO_DATE_REGEX
+  );
+
   const startedActivity = await requestJson<{
     items: Array<{ activityEvent: { eventType: string } }>;
   }>(
@@ -7707,7 +7869,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_timer_expired`
   );
-  assert.equal(startedActivity.body.items.length, 1);
+  assert.equal(startedActivity.body.items.length, 2);
   assert.equal(expiredActivity.body.items.length, 1);
 });
 
@@ -8126,6 +8288,54 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
   assert.deepEqual(blockedTestletReentry.body.details?.deniedReasons, [
     "testlet_leave_locked"
   ]);
+
+  const monitorGoto = await requestJson<{
+    command: {
+      commandType: string;
+      actorId: string | null;
+      previousStatus: string;
+      testRun: {
+        status: string;
+        currentUnitKey: string | null;
+        lockedTestletKeys?: string[];
+        lockedUnitKeys?: string[];
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "goto",
+        targetUnitKey: "UNIT.BLOCK.1",
+        actorId: "leave-lock-monitor"
+      }
+    }
+  );
+  assert.equal(monitorGoto.status, 200);
+  assert.equal(monitorGoto.body.command.commandType, "goto");
+  assert.equal(monitorGoto.body.command.actorId, "leave-lock-monitor");
+  assert.equal(monitorGoto.body.command.previousStatus, "running");
+  assert.equal(monitorGoto.body.command.testRun.status, "running");
+  assert.equal(
+    monitorGoto.body.command.testRun.currentUnitKey,
+    "UNIT.BLOCK.1"
+  );
+  assert.deepEqual(monitorGoto.body.command.testRun.lockedTestletKeys, []);
+  assert.deepEqual(monitorGoto.body.command.testRun.lockedUnitKeys, [
+    "UNIT.LOCK.1",
+    "UNIT.LOCK.2"
+  ]);
+  const monitorUnlockedNavigation = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.BLOCK.2", status: "running" }
+  });
+  assert.equal(
+    monitorUnlockedNavigation.body.testRun.currentUnitKey,
+    "UNIT.BLOCK.2"
+  );
 
   const completionSignIn = await requestJson<{
     participantSession: { participantSessionId: string };
