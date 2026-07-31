@@ -7906,6 +7906,270 @@ test("original Testcenter timed testlets enforce confirm and allowed leave polic
   );
 });
 
+test("original Testcenter leave locks persist for unit and testlet scopes", async () => {
+  const tenantKey = "integration-tenant-testlet-leave-lock";
+  const workspaceKey = "integration-workspace-testlet-leave-lock";
+  const bookletKey = "BOOKLET.LEAVE-LOCK";
+  const unitLockTestletKey = "unit-lock-block";
+  const testletLockTestletKey = "testlet-lock-block";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-leave-lock.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Leave Lock Booklet</Label></Metadata>
+          <Units>
+            <Testlet id="${unitLockTestletKey}" label="Unit Lock Block">
+              <Restrictions>
+                <LockAfterLeaving confirm="true" scope="unit" />
+              </Restrictions>
+              <Unit id="UNIT.LOCK.1" label="Lock Unit One" />
+              <Unit id="UNIT.LOCK.2" label="Lock Unit Two" />
+            </Testlet>
+            <Testlet id="${testletLockTestletKey}" label="Testlet Lock Block">
+              <Restrictions>
+                <LockAfterLeaving confirm="false" scope="testlet" />
+              </Restrictions>
+              <Unit id="UNIT.BLOCK.1" label="Block Unit One" />
+              <Unit id="UNIT.BLOCK.2" label="Block Unit Two" />
+            </Testlet>
+            <Unit id="UNIT.FINISH" label="Finish" />
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "leave-lock-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  const testRunId = resume.body.testRun.testRunId;
+  assert.equal(resume.body.testRun.currentUnitKey, "UNIT.LOCK.1");
+
+  const initialState = await requestJson<{
+    currentRunState: {
+      activeLeaveLock: {
+        scope: string;
+        confirm: boolean;
+        unitKey: string;
+      } | null;
+      booklet: {
+        testlets: Array<{
+          testletKey: string;
+          lockAfterLeaving: { scope: string; confirm: boolean } | null;
+        }>;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(initialState.body.currentRunState.activeLeaveLock, {
+    testletKey: unitLockTestletKey,
+    displayLabel: "Unit Lock Block",
+    unitKey: "UNIT.LOCK.1",
+    unitDisplayLabel: "Lock Unit One",
+    scope: "unit",
+    confirm: true
+  });
+  assert.deepEqual(
+    initialState.body.currentRunState.booklet.testlets.map(testlet => [
+      testlet.testletKey,
+      testlet.lockAfterLeaving
+    ]),
+    [
+      [unitLockTestletKey, { confirm: true, scope: "unit" }],
+      [testletLockTestletKey, { confirm: false, scope: "testlet" }]
+    ]
+  );
+
+  const unconfirmedUnitLeave = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.LOCK.2", status: "running" }
+  });
+  assert.equal(unconfirmedUnitLeave.status, 409);
+  assert.deepEqual(unconfirmedUnitLeave.body.details?.deniedReasons, [
+    "testlet_leave_confirmation_required"
+  ]);
+
+  const firstUnitLeave = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      lockedUnitKeys?: string[];
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.LOCK.2",
+      status: "running",
+      confirmTestletLeaveLock: true
+    }
+  });
+  assert.equal(firstUnitLeave.body.testRun.currentUnitKey, "UNIT.LOCK.2");
+  assert.deepEqual(firstUnitLeave.body.testRun.lockedUnitKeys, ["UNIT.LOCK.1"]);
+
+  const blockedUnitReentry = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.LOCK.1", status: "running" }
+  });
+  assert.equal(blockedUnitReentry.status, 409);
+  assert.deepEqual(blockedUnitReentry.body.details?.deniedReasons, [
+    "testlet_leave_locked"
+  ]);
+
+  await requestJson(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.BLOCK.1",
+      status: "running",
+      confirmTestletLeaveLock: true
+    }
+  });
+  const withinTestlet = await requestJson<{
+    testRun: { lockedTestletKeys?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.BLOCK.2", status: "running" }
+  });
+  assert.deepEqual(withinTestlet.body.testRun.lockedTestletKeys, []);
+
+  const leftTestlet = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      lockedTestletKeys?: string[];
+      lockedUnitKeys?: string[];
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.FINISH", status: "running" }
+  });
+  assert.equal(leftTestlet.body.testRun.currentUnitKey, "UNIT.FINISH");
+  assert.deepEqual(leftTestlet.body.testRun.lockedTestletKeys, [
+    testletLockTestletKey
+  ]);
+  assert.deepEqual(leftTestlet.body.testRun.lockedUnitKeys, [
+    "UNIT.LOCK.1",
+    "UNIT.LOCK.2"
+  ]);
+
+  const stateAfterReload = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string; isLocked: boolean }>;
+      navigation: { previousUnitKey: string | null; canGoPrevious: boolean };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    stateAfterReload.body.currentRunState.bookletUnits.map(unit => [
+      unit.unitKey,
+      unit.isLocked
+    ]),
+    [
+      ["UNIT.LOCK.1", true],
+      ["UNIT.LOCK.2", true],
+      ["UNIT.BLOCK.1", true],
+      ["UNIT.BLOCK.2", true],
+      ["UNIT.FINISH", false]
+    ]
+  );
+  assert.equal(
+    stateAfterReload.body.currentRunState.navigation.previousUnitKey,
+    null
+  );
+  assert.equal(stateAfterReload.body.currentRunState.navigation.canGoPrevious, false);
+
+  const blockedTestletReentry = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.BLOCK.1", status: "running" }
+  });
+  assert.equal(blockedTestletReentry.status, 409);
+  assert.deepEqual(blockedTestletReentry.body.details?.deniedReasons, [
+    "testlet_leave_locked"
+  ]);
+
+  const completionSignIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "leave-lock-completion" }
+  });
+  const completionResume = await requestJson<{
+    testRun: { testRunId: string };
+  }>(
+    `/api/v1/participant/sessions/${completionSignIn.body.participantSession.participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey } }
+  );
+  const completionRunId = completionResume.body.testRun.testRunId;
+  const unconfirmedCompletion = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${completionRunId}/complete`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(unconfirmedCompletion.status, 409);
+  assert.deepEqual(unconfirmedCompletion.body.details?.deniedReasons, [
+    "testlet_leave_confirmation_required"
+  ]);
+  const confirmedCompletion = await requestJson<{
+    testRun: { status: string; lockedUnitKeys?: string[] };
+  }>(`/api/v1/participant/test-runs/${completionRunId}/complete`, {
+    method: "POST",
+    body: { confirmTestletLeaveLock: true }
+  });
+  assert.equal(confirmedCompletion.body.testRun.status, "completed");
+  assert.deepEqual(confirmedCompletion.body.testRun.lockedUnitKeys, [
+    "UNIT.LOCK.1"
+  ]);
+
+  const lockActivities = await requestJson<{
+    items: Array<{ activityEvent: { eventType: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_leave_lock_activated`
+  );
+  assert.equal(lockActivities.body.items.length, 4);
+});
+
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {
   const tenantKey = "integration-tenant-booklet-policy";
   const workspaceKey = "integration-workspace-booklet-policy";

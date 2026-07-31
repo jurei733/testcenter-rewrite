@@ -2619,6 +2619,7 @@ try {
               <Restrictions>
                 <CodeToEnter code="${veronaTestletCode}">Enter the assigned Verona block code.</CodeToEnter>
                 <TimeMax minutes="1" leave="allowed" />
+                <LockAfterLeaving confirm="true" scope="unit" />
               </Restrictions>
               <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />
             </Testlet>
@@ -2737,6 +2738,14 @@ try {
       veronaTimerMinutes * 60 + veronaTimerSeconds <= 60,
     `Expected a live Verona testlet timer, received '${veronaTimerValue}'.`
   );
+  await page
+    .locator("#participantRouteLeaveLockLabel")
+    .filter({ hasText: "Verona Smoke Unit" })
+    .waitFor();
+  await page
+    .locator("#participantRouteLeaveLockDetail")
+    .filter({ hasText: "cannot be opened again" })
+    .waitFor();
   const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
   await veronaFrame

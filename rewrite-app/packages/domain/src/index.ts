@@ -77,6 +77,7 @@ export type WorkspaceActivityEventType =
   | "testlet_unlocked"
   | "testlet_timer_started"
   | "testlet_timer_expired"
+  | "testlet_leave_lock_activated"
   | "test_run_progress_saved"
   | "test_run_resumed"
   | "test_run_completed"
@@ -99,6 +100,7 @@ export const workspaceActivityEventTypes = [
   "testlet_unlocked",
   "testlet_timer_started",
   "testlet_timer_expired",
+  "testlet_leave_lock_activated",
   "test_run_progress_saved",
   "test_run_resumed",
   "test_run_completed",
@@ -334,7 +336,9 @@ export type BookletNavigationDeniedReason =
   | "testlet_code_required"
   | "testlet_time_leave_forbidden"
   | "testlet_time_leave_confirmation_required"
-  | "testlet_time_closed";
+  | "testlet_time_closed"
+  | "testlet_leave_confirmation_required"
+  | "testlet_leave_locked";
 
 export type BookletRuntimePolicy = {
   version: 1;
@@ -400,6 +404,8 @@ export type TestRun = {
   unitResponses: Record<string, string>;
   unlockedTestletKeys?: string[];
   testletTimers?: Record<string, TestletTimerState>;
+  lockedTestletKeys?: string[];
+  lockedUnitKeys?: string[];
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -502,6 +508,10 @@ export type ParticipantCurrentRunState = {
         minutes: number;
         leave: TestletTimeMaxLeavePolicy;
       } | null;
+      lockAfterLeaving: {
+        confirm: boolean;
+        scope: "unit" | "testlet";
+      } | null;
     }>;
   };
   currentUnit: {
@@ -521,6 +531,7 @@ export type ParticipantCurrentRunState = {
     description?: string;
     content?: string;
     testletPath: string[];
+    isLocked: boolean;
   }>;
   activeTestletTimer: {
     testletKey: string;
@@ -531,6 +542,14 @@ export type ParticipantCurrentRunState = {
     startedAt: string;
     expiresAt: string | null;
     leave: TestletTimeMaxLeavePolicy;
+  } | null;
+  activeLeaveLock: {
+    testletKey: string;
+    displayLabel: string;
+    unitKey: string;
+    unitDisplayLabel: string;
+    scope: "unit" | "testlet";
+    confirm: boolean;
   } | null;
   booklets: ParticipantRuntimeBooklet[];
   navigation: {

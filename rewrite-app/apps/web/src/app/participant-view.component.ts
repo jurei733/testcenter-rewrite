@@ -313,6 +313,18 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </div>
           </section>
           <section
+            *ngIf="view.player.leaveLock as leaveLock"
+            id="participantRouteLeaveLock"
+            class="participant-leave-lock"
+          >
+            <span>Locks after leaving</span>
+            <strong id="participantRouteLeaveLockLabel">
+              {{ leaveLock.scope === "unit" ? leaveLock.unitDisplayLabel : leaveLock.displayLabel }}
+            </strong>
+            <p id="participantRouteLeaveLockDetail">{{ leaveLock.detail }}</p>
+            <small *ngIf="leaveLock.confirm">You will be asked to confirm before leaving.</small>
+          </section>
+          <section
             *ngIf="view.player.nextTestletGate as gate"
             class="participant-testlet-gate"
             aria-labelledby="participantRouteTestletGateLabel"

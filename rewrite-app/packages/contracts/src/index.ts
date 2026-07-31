@@ -1445,6 +1445,7 @@ export type SaveTestRunProgressRequest = {
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
   confirmTestletTimeLeave?: boolean;
+  confirmTestletLeaveLock?: boolean;
 };
 
 export type UnlockParticipantTestletRequest = {
@@ -1453,6 +1454,7 @@ export type UnlockParticipantTestletRequest = {
 
 export type CompleteTestRunRequest = {
   confirmTestletTimeLeave?: boolean;
+  confirmTestletLeaveLock?: boolean;
 };
 
 export type CreateTenantResponse = {

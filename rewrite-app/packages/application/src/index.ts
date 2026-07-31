@@ -436,6 +436,7 @@ export type ParticipantRuntimePort = {
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
     confirmTestletTimeLeave?: boolean;
+    confirmTestletLeaveLock?: boolean;
   }): Promise<TestRun>;
   unlockTestlet(input: {
     testRunId: string;
@@ -446,6 +447,7 @@ export type ParticipantRuntimePort = {
   completeRun(input: {
     testRunId: string;
     confirmTestletTimeLeave?: boolean;
+    confirmTestletLeaveLock?: boolean;
   }): Promise<TestRun>;
 };
 
@@ -1809,7 +1811,13 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
     unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
       ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
       : [],
-    testletTimers
+    testletTimers,
+    lockedTestletKeys: Array.isArray(testRun.lockedTestletKeys)
+      ? [...new Set(testRun.lockedTestletKeys.filter(Boolean))]
+      : [],
+    lockedUnitKeys: Array.isArray(testRun.lockedUnitKeys)
+      ? [...new Set(testRun.lockedUnitKeys.filter(Boolean))]
+      : []
   };
 };
 
@@ -6398,9 +6406,121 @@ const resolveRuntimeBooklet = (
       parentTestletKey: testletEntry.parentTestletKey ?? null,
       requiresCode: Boolean(testletEntry.restrictions?.codeToEnter?.code),
       codePrompt: testletEntry.restrictions?.codeToEnter?.prompt ?? null,
-      timeMax: testletEntry.restrictions?.timeMax ?? null
+      timeMax: testletEntry.restrictions?.timeMax ?? null,
+      lockAfterLeaving:
+        testletEntry.restrictions?.lockAfterLeaving ?? null
     }))
   };
+};
+
+const isUnitLeaveLocked = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun,
+  unitKey: string | null
+): boolean => {
+  if (!booklet || !unitKey) {
+    return false;
+  }
+  if ((testRun.lockedUnitKeys ?? []).includes(unitKey)) {
+    return true;
+  }
+  const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
+  const lockedTestlets = new Set(testRun.lockedTestletKeys ?? []);
+  return (unit?.testletPath ?? []).some(testletKey =>
+    lockedTestlets.has(testletKey)
+  );
+};
+
+const resolveCurrentLeaveLock = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun,
+  targetUnitKey: string | null
+): {
+  testlet: SourcePackageTestletEntry;
+  unit: NonNullable<ContentReleaseBookletEntry["unitEntries"][number]>;
+  scope: "unit" | "testlet";
+  confirm: boolean;
+} | null => {
+  if (!booklet || !testRun.currentUnitKey) {
+    return null;
+  }
+  const currentUnit = booklet.unitEntries.find(
+    candidate => candidate.unitKey === testRun.currentUnitKey
+  );
+  const parentTestletKey = currentUnit?.testletPath?.at(-1);
+  const testlet = booklet.testletEntries?.find(
+    candidate => candidate.testletKey === parentTestletKey
+  );
+  const restriction = testlet?.restrictions?.lockAfterLeaving;
+  if (!currentUnit || !testlet || !restriction) {
+    return null;
+  }
+  if (!targetUnitKey) {
+    return {
+      testlet,
+      unit: currentUnit,
+      scope: restriction.scope,
+      confirm: restriction.confirm
+    };
+  }
+  if (targetUnitKey === currentUnit.unitKey) {
+    return null;
+  }
+  if (restriction.scope === "testlet") {
+    const targetUnit = booklet.unitEntries.find(
+      candidate => candidate.unitKey === targetUnitKey
+    );
+    if (targetUnit?.testletPath?.at(-1) === testlet.testletKey) {
+      return null;
+    }
+  }
+  return {
+    testlet,
+    unit: currentUnit,
+    scope: restriction.scope,
+    confirm: restriction.confirm
+  };
+};
+
+const activateCurrentLeaveLock = (
+  testRun: TestRun,
+  leaveLock: NonNullable<ReturnType<typeof resolveCurrentLeaveLock>>
+): TestRun =>
+  normalizeTestRun({
+    ...testRun,
+    ...(leaveLock.scope === "testlet"
+      ? {
+          lockedTestletKeys: [
+            ...(testRun.lockedTestletKeys ?? []),
+            leaveLock.testlet.testletKey
+          ]
+        }
+      : {
+          lockedUnitKeys: [
+            ...(testRun.lockedUnitKeys ?? []),
+            leaveLock.unit.unitKey
+          ]
+        })
+  });
+
+const resolveActiveLeaveLock = (
+  contentRelease: ContentRelease,
+  testRun: TestRun
+): ParticipantCurrentRunState["activeLeaveLock"] => {
+  const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === testRun.bookletKey
+  );
+  const leaveLock = resolveCurrentLeaveLock(booklet, testRun, null);
+  return leaveLock
+    ? {
+        testletKey: leaveLock.testlet.testletKey,
+        displayLabel: leaveLock.testlet.displayLabel,
+        unitKey: leaveLock.unit.unitKey,
+        unitDisplayLabel: leaveLock.unit.displayLabel,
+        scope: leaveLock.scope,
+        confirm: leaveLock.confirm
+      }
+    : null;
 };
 
 const findTestletCodeGate = (input: {
@@ -6419,6 +6539,9 @@ const findTestletCodeGate = (input: {
     unitIndex += 1
   ) {
     const unit = input.booklet.unitEntries[unitIndex];
+    if (isUnitLeaveLocked(input.booklet, input.testRun, unit?.unitKey ?? null)) {
+      continue;
+    }
     for (const testletKey of unit?.testletPath ?? []) {
       const testlet = input.booklet.testletEntries?.find(
         candidate => candidate.testletKey === testletKey
@@ -6853,34 +6976,39 @@ const resolveBookletNavigationState = (
     presentationProgress,
     responseProgress
   });
+  const isUnitInaccessible = (unitKey: string | null): boolean =>
+    isUnitLeaveLocked(booklet, testRun, unitKey) ||
+    Boolean(findClosedTimedTestlet(booklet, testRun, unitKey));
+  let previousUnitIndex = -1;
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    if (!isUnitInaccessible(units[index]?.unitKey ?? null)) {
+      previousUnitIndex = index;
+      break;
+    }
+  }
+  let nextUnitIndex = -1;
+  for (
+    let index = Math.max(currentIndex + 1, 0);
+    index < units.length;
+    index += 1
+  ) {
+    if (!isUnitInaccessible(units[index]?.unitKey ?? null)) {
+      nextUnitIndex = index;
+      break;
+    }
+  }
   const previousUnitKey =
-    currentIndex > 0 ? units[currentIndex - 1]?.unitKey ?? null : null;
+    previousUnitIndex >= 0 ? units[previousUnitIndex]?.unitKey ?? null : null;
   const nextUnitKey =
-    currentIndex < 0
-      ? units[0]?.unitKey ?? null
-      : currentIndex < units.length - 1
-      ? units[currentIndex + 1]?.unitKey ?? null
-      : null;
+    nextUnitIndex >= 0 ? units[nextUnitIndex]?.unitKey ?? null : null;
   const nextTestletGate = findTestletCodeGate({
     booklet,
     testRun,
     firstUnitIndex: currentIndex + 1,
-    lastUnitIndex: currentIndex + 1
+    lastUnitIndex: nextUnitIndex >= 0 ? nextUnitIndex : currentIndex + 1
   });
   if (nextTestletGate) {
     forwardDeniedReasons.push("testlet_code_required");
-  }
-  if (
-    findClosedTimedTestlet(booklet, testRun, previousUnitKey) &&
-    !backwardDeniedReasons.includes("testlet_time_closed")
-  ) {
-    backwardDeniedReasons.push("testlet_time_closed");
-  }
-  if (
-    findClosedTimedTestlet(booklet, testRun, nextUnitKey) &&
-    !forwardDeniedReasons.includes("testlet_time_closed")
-  ) {
-    forwardDeniedReasons.push("testlet_time_closed");
   }
   if (
     isLeavingForbiddenTimedTestlet(booklet, testRun, nextUnitKey) &&
@@ -6936,6 +7064,7 @@ const requireBookletNavigationAllowed = (input: {
   testRun: TestRun;
   targetUnitKey: string | null;
   confirmTestletTimeLeave?: boolean;
+  confirmTestletLeaveLock?: boolean;
 }): void => {
   const currentUnitKey = input.testRun.currentUnitKey;
   if (!input.targetUnitKey || currentUnitKey === input.targetUnitKey) {
@@ -6988,6 +7117,12 @@ const requireBookletNavigationAllowed = (input: {
     deniedReasons.push("testlet_time_closed");
   }
   if (
+    isUnitLeaveLocked(booklet, input.testRun, input.targetUnitKey) &&
+    !deniedReasons.includes("testlet_leave_locked")
+  ) {
+    deniedReasons.push("testlet_leave_locked");
+  }
+  if (
     isLeavingForbiddenTimedTestlet(
       booklet,
       input.testRun,
@@ -7008,6 +7143,19 @@ const requireBookletNavigationAllowed = (input: {
     !deniedReasons.includes("testlet_time_leave_confirmation_required")
   ) {
     deniedReasons.push("testlet_time_leave_confirmation_required");
+  }
+  const leavingLock = resolveCurrentLeaveLock(
+    booklet,
+    input.testRun,
+    input.targetUnitKey
+  );
+  if (
+    leavingLock?.confirm &&
+    !input.confirmTestletLeaveLock &&
+    deniedReasons.length === 0 &&
+    !deniedReasons.includes("testlet_leave_confirmation_required")
+  ) {
+    deniedReasons.push("testlet_leave_confirmation_required");
   }
   if (deniedReasons.length > 0) {
     throw new FirstSliceError(
@@ -7077,13 +7225,15 @@ const resolveRuntimeUnit = (
 
 const resolveRuntimeBookletUnits = (
   contentRelease: ContentRelease,
-  bookletKey: string
+  bookletKey: string,
+  testRun: TestRun
 ): Array<{
   unitKey: string;
   displayLabel: string;
   description?: string;
   content?: string;
   testletPath: string[];
+  isLocked: boolean;
 }> => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
@@ -7095,6 +7245,7 @@ const resolveRuntimeBookletUnits = (
       unitKey: unitEntry.unitKey,
       displayLabel: unitEntry.displayLabel,
       testletPath: unitEntry.testletPath ?? [],
+      isLocked: isUnitLeaveLocked(bookletEntry, testRun, unitEntry.unitKey),
       ...(unitEntry.description ? { description: unitEntry.description } : {}),
       ...(unitEntry.content ? { content: unitEntry.content } : {})
     })) ?? []
@@ -11775,12 +11926,17 @@ export const createFirstSliceServices = (
             : {}),
           bookletUnits: resolveRuntimeBookletUnits(
             contentRelease,
-            currentTestRun.bookletKey
+            currentTestRun.bookletKey,
+            currentTestRun
           ),
           activeTestletTimer: resolveActiveTestletTimer(
             contentRelease,
             currentTestRun,
             currentTimestamp
+          ),
+          activeLeaveLock: resolveActiveLeaveLock(
+            contentRelease,
+            currentTestRun
           ),
           booklets: buildParticipantRuntimeBooklets({
             contentRelease,
@@ -11954,6 +12110,8 @@ export const createFirstSliceServices = (
           unitResponses: {},
           unlockedTestletKeys: [],
           testletTimers: {},
+          lockedTestletKeys: [],
+          lockedUnitKeys: [],
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
@@ -12087,6 +12245,9 @@ export const createFirstSliceServices = (
           : testRun.currentUnitKey;
         const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
         let navigationTestRun = testRun;
+        let activatedLeaveLock: ReturnType<
+          typeof resolveCurrentLeaveLock
+        > = null;
         if (nextCurrentUnitKey) {
           requireRuntimeUnitForBooklet(
             contentRelease,
@@ -12097,7 +12258,8 @@ export const createFirstSliceServices = (
             contentRelease,
             testRun,
             targetUnitKey: nextCurrentUnitKey,
-            confirmTestletTimeLeave: input.confirmTestletTimeLeave
+            confirmTestletTimeLeave: input.confirmTestletTimeLeave,
+            confirmTestletLeaveLock: input.confirmTestletLeaveLock
           });
           const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
             candidate => candidate.bookletKey === testRun.bookletKey
@@ -12115,9 +12277,20 @@ export const createFirstSliceServices = (
               (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
           ) {
             navigationTestRun = cancelTestletTimerAfterLeave(
-              testRun,
+              navigationTestRun,
               leavingTimedTestlet.testletKey,
               timestamp
+            );
+          }
+          activatedLeaveLock = resolveCurrentLeaveLock(
+            booklet,
+            testRun,
+            nextCurrentUnitKey
+          );
+          if (activatedLeaveLock) {
+            navigationTestRun = activateCurrentLeaveLock(
+              navigationTestRun,
+              activatedLeaveLock
             );
           }
         }
@@ -12161,6 +12334,25 @@ export const createFirstSliceServices = (
             currentUnitKey: effectiveRun.currentUnitKey
           }
         });
+        if (activatedLeaveLock) {
+          await recordWorkspaceActivity({
+            tenantId: effectiveRun.tenantId,
+            workspaceId: effectiveRun.workspaceId,
+            eventType: "testlet_leave_lock_activated",
+            subjectType: "test_run",
+            subjectId: effectiveRun.testRunId,
+            summary:
+              activatedLeaveLock.scope === "testlet"
+                ? `Block '${activatedLeaveLock.testlet.testletKey}' locked after it was left.`
+                : `Unit '${activatedLeaveLock.unit.unitKey}' locked after it was left.`,
+            details: {
+              scope: activatedLeaveLock.scope,
+              testletKey: activatedLeaveLock.testlet.testletKey,
+              unitKey: activatedLeaveLock.unit.unitKey,
+              nextUnitKey: effectiveRun.currentUnitKey
+            }
+          });
+        }
         return effectiveRun;
       },
       async unlockTestlet(input) {
@@ -12392,7 +12584,24 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const completionBaseRun =
+        const leavingLock = resolveCurrentLeaveLock(booklet, testRun, null);
+        if (
+          leavingLock?.confirm &&
+          !input.confirmTestletLeaveLock
+        ) {
+          throw new FirstSliceError(
+            409,
+            "booklet_completion_denied",
+            `Run '${testRunId}' cannot be completed without confirming that the active leave lock will be applied.`,
+            {
+              currentUnitKey: testRun.currentUnitKey,
+              deniedReasons: [
+                "testlet_leave_confirmation_required"
+              ]
+            }
+          );
+        }
+        const timeAdjustedCompletionRun =
           leavingTimedTestlet &&
           (leavePolicy === "allowed" ||
             (leavePolicy === "confirm" && input.confirmTestletTimeLeave))
@@ -12402,6 +12611,9 @@ export const createFirstSliceServices = (
                 timestamp
               )
             : testRun;
+        const completionBaseRun = leavingLock
+          ? activateCurrentLeaveLock(timeAdjustedCompletionRun, leavingLock)
+          : timeAdjustedCompletionRun;
         const navigation = resolveBookletNavigationState(
           contentRelease,
           completionBaseRun
@@ -12453,6 +12665,25 @@ export const createFirstSliceServices = (
             completedAt: completedRun.completedAt
           }
         });
+        if (leavingLock) {
+          await recordWorkspaceActivity({
+            tenantId: completedRun.tenantId,
+            workspaceId: completedRun.workspaceId,
+            eventType: "testlet_leave_lock_activated",
+            subjectType: "test_run",
+            subjectId: completedRun.testRunId,
+            summary:
+              leavingLock.scope === "testlet"
+                ? `Block '${leavingLock.testlet.testletKey}' locked during participant completion.`
+                : `Unit '${leavingLock.unit.unitKey}' locked during participant completion.`,
+            details: {
+              scope: leavingLock.scope,
+              testletKey: leavingLock.testlet.testletKey,
+              unitKey: leavingLock.unit.unitKey,
+              reason: "participant_completion"
+            }
+          });
+        }
 
         return completedRun;
       }

@@ -4677,7 +4677,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           currentUnitKey: body.currentUnitKey,
           status: body.status,
           unitResponse: body.unitResponse,
-          confirmTestletTimeLeave: body.confirmTestletTimeLeave
+          confirmTestletTimeLeave: body.confirmTestletTimeLeave,
+          confirmTestletLeaveLock: body.confirmTestletLeaveLock
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
         return;
@@ -4733,7 +4734,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           await readOptionalRequestJsonBody<CompleteTestRunRequest>();
         const testRun = await services.participantRuntime.completeRun({
           testRunId,
-          confirmTestletTimeLeave: body?.confirmTestletTimeLeave
+          confirmTestletTimeLeave: body?.confirmTestletTimeLeave,
+          confirmTestletLeaveLock: body?.confirmTestletLeaveLock
         });
         sendJson<CompleteTestRunResponse>(response, 200, { testRun });
         return;

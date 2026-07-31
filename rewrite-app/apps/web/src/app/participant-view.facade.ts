@@ -90,6 +90,15 @@ type ParticipantPlayerState = {
     progressPercent: number;
     leaveLabel: string;
   } | null;
+  leaveLock: {
+    testletKey: string;
+    displayLabel: string;
+    unitKey: string;
+    unitDisplayLabel: string;
+    scope: "unit" | "testlet";
+    confirm: boolean;
+    detail: string;
+  } | null;
 };
 
 type ParticipantPlayerUnitItem = {
@@ -395,7 +404,8 @@ export class ParticipantViewFacade {
         hasUnsavedResponse: false,
         navigationNotice: "",
         nextTestletGate: null,
-        testletTimer: null
+        testletTimer: null,
+        leaveLock: null
       };
     }
 
@@ -427,7 +437,9 @@ export class ParticipantViewFacade {
         ? hasResponse
           ? "Current answered"
           : "Current"
-        : hasResponse
+        : unit.isLocked
+          ? "Locked"
+          : hasResponse
           ? "Answered"
           : "Open";
       return {
@@ -438,7 +450,8 @@ export class ParticipantViewFacade {
         accessibilityLabel: [
           `Unit ${index + 1}: ${label}`,
           isCurrent ? "current" : "not current",
-          hasResponse ? "answered" : "unanswered"
+          hasResponse ? "answered" : "unanswered",
+          unit.isLocked ? "locked" : "available"
         ].join(", "),
         isCurrent,
         hasResponse,
@@ -446,6 +459,7 @@ export class ParticipantViewFacade {
           canNavigateUnits &&
           policy.navigation.unitMenuEnabled &&
           !isCurrent &&
+          !unit.isLocked &&
           (index < unitIndex
             ? currentState.navigation.backwardDeniedReasons.length === 0
             : currentState.navigation.forwardDeniedReasons.length === 0)
@@ -531,6 +545,16 @@ export class ParticipantViewFacade {
           };
         })()
       : null;
+    const activeLeaveLock = currentState.activeLeaveLock;
+    const leaveLock = activeLeaveLock
+      ? {
+          ...activeLeaveLock,
+          detail:
+            activeLeaveLock.scope === "unit"
+              ? `After leaving, "${activeLeaveLock.unitDisplayLabel}" cannot be opened again.`
+              : `After leaving, the block "${activeLeaveLock.displayLabel}" cannot be opened again.`
+        }
+      : null;
 
     return {
       headline: unitLabel,
@@ -597,7 +621,8 @@ export class ParticipantViewFacade {
       hasUnsavedResponse,
       navigationNotice: this.describeNavigationDenial(currentState),
       nextTestletGate: currentState.navigation.nextTestletGate,
-      testletTimer
+      testletTimer,
+      leaveLock
     };
   }
 
@@ -664,6 +689,12 @@ export class ParticipantViewFacade {
     }
     if (reasons.includes("testlet_time_closed")) {
       return "This timed block is closed and cannot be opened again.";
+    }
+    if (reasons.includes("testlet_leave_confirmation_required")) {
+      return "Confirm leaving before the unit or block is locked.";
+    }
+    if (reasons.includes("testlet_leave_locked")) {
+      return "This unit or block was locked after it was left.";
     }
     return "";
   }
@@ -859,6 +890,16 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
+    const confirmTestletLeaveLock =
+      player.leaveLock?.confirm === true;
+    if (
+      confirmTestletLeaveLock &&
+      !globalThis.window?.confirm(
+        `${player.leaveLock?.detail} Continue?`
+      )
+    ) {
+      return;
+    }
     if (
       !player.isComplete &&
       player.completionReadinessState !== "ready" &&
@@ -869,7 +910,10 @@ export class ParticipantViewFacade {
       return;
     }
     this.viewState.onActionAsync(() =>
-      this.completeRunInternal(confirmTestletTimeLeave)
+      this.completeRunInternal(
+        confirmTestletTimeLeave,
+        confirmTestletLeaveLock
+      )
     );
   }
 
@@ -1061,7 +1105,8 @@ export class ParticipantViewFacade {
     status: "paused" | "running",
     currentUnitKey = this.runtime.currentUnitKey.trim() || undefined,
     unitResponse?: string | null,
-    confirmTestletTimeLeave = false
+    confirmTestletTimeLeave = false,
+    confirmTestletLeaveLock = false
   ): Promise<void> {
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
@@ -1073,7 +1118,8 @@ export class ParticipantViewFacade {
         currentUnitKey,
         status,
         unitResponse,
-        confirmTestletTimeLeave
+        confirmTestletTimeLeave,
+        confirmTestletLeaveLock
       } satisfies SaveTestRunProgressRequest
     );
 
@@ -1178,6 +1224,21 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
+    const activeLeaveLock = player.leaveLock;
+    const leavesLockScope =
+      activeLeaveLock != null &&
+      (activeLeaveLock.scope === "unit" ||
+        targetTestletPath.at(-1) !== activeLeaveLock.testletKey);
+    const confirmTestletLeaveLock =
+      leavesLockScope && activeLeaveLock?.confirm === true;
+    if (
+      confirmTestletLeaveLock &&
+      !globalThis.window?.confirm(
+        `${activeLeaveLock.detail} Continue?`
+      )
+    ) {
+      return;
+    }
     const currentUnitKey = this.runtime.currentUnitKey.trim();
     if (currentUnitKey) {
       await this.saveProgressInternal(
@@ -1190,7 +1251,8 @@ export class ParticipantViewFacade {
       "running",
       targetUnitKey,
       undefined,
-      confirmTestletTimeLeave
+      confirmTestletTimeLeave,
+      confirmTestletLeaveLock
     );
   }
 
@@ -1234,7 +1296,8 @@ export class ParticipantViewFacade {
   }
 
   private async completeRunInternal(
-    confirmTestletTimeLeave = false
+    confirmTestletTimeLeave = false,
+    confirmTestletLeaveLock = false
   ): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
     await this.saveCurrentDraftBeforeCompleteInternal();
@@ -1253,7 +1316,8 @@ export class ParticipantViewFacade {
         testRunId: this.runtime.testRunId.trim()
       }),
       {
-        confirmTestletTimeLeave
+        confirmTestletTimeLeave,
+        confirmTestletLeaveLock
       } satisfies CompleteTestRunRequest
     );
 
