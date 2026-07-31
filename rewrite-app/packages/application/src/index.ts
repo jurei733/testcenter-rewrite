@@ -28,8 +28,9 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
-  ContentReleaseActivationReadiness,
+  BookletLeaveRestriction,
   BookletRuntimePolicy,
+  ContentReleaseActivationReadiness,
   ContentRelease,
   ContentReleaseBookletEntry,
   ContentReleaseStatus,
@@ -3020,6 +3021,27 @@ const normalizeContentStructure = (
         testletEntry.restrictions?.timeMax?.minutes
       );
       const timeMaxLeave = testletEntry.restrictions?.timeMax?.leave;
+      const normalizeLeaveRestriction = (
+        value: unknown
+      ): BookletLeaveRestriction | undefined => {
+        switch (String(value ?? "").trim().toLowerCase()) {
+          case "always":
+            return "always";
+          case "on":
+          case "forward":
+            return "forward";
+          case "off":
+            return "off";
+          default:
+            return undefined;
+        }
+      };
+      const denyPresentation = normalizeLeaveRestriction(
+        testletEntry.restrictions?.denyNavigationOnIncomplete?.presentation
+      );
+      const denyResponse = normalizeLeaveRestriction(
+        testletEntry.restrictions?.denyNavigationOnIncomplete?.response
+      );
       const restrictions: NonNullable<
         SourcePackageTestletEntry["restrictions"]
       > = {
@@ -3042,10 +3064,12 @@ const normalizeContentStructure = (
               }
             }
           : {}),
-        ...(testletEntry.restrictions?.denyNavigationOnIncomplete
+        ...(denyPresentation || denyResponse
           ? {
-              denyNavigationOnIncomplete:
-                testletEntry.restrictions.denyNavigationOnIncomplete
+              denyNavigationOnIncomplete: {
+                ...(denyPresentation ? { presentation: denyPresentation } : {}),
+                ...(denyResponse ? { response: denyResponse } : {})
+              }
             }
           : {}),
         ...(testletEntry.restrictions?.lockAfterLeaving
@@ -5069,16 +5093,24 @@ const collectXmlBookletHierarchies = (
         const timeMaxLeave = timeMaxElement?.getAttribute("leave")?.trim();
         const normalizeLeaveRestriction = (
           value: string | null
-        ): "off" | "forward" | "always" => {
+        ): BookletLeaveRestriction | undefined => {
           switch (value?.trim().toUpperCase()) {
             case "ALWAYS":
               return "always";
             case "ON":
               return "forward";
-            default:
+            case "OFF":
               return "off";
+            default:
+              return undefined;
           }
         };
+        const denyPresentation = normalizeLeaveRestriction(
+          denyNavigationElement?.getAttribute("presentation") ?? null
+        );
+        const denyResponse = normalizeLeaveRestriction(
+          denyNavigationElement?.getAttribute("response") ?? null
+        );
         const lockScope = lockAfterLeavingElement?.getAttribute("scope")?.trim();
         const restrictions: NonNullable<
           SourcePackageTestletEntry["restrictions"]
@@ -5103,15 +5135,13 @@ const collectXmlBookletHierarchies = (
                 }
               }
             : {}),
-          ...(denyNavigationElement
+          ...(denyPresentation || denyResponse
             ? {
                 denyNavigationOnIncomplete: {
-                  presentation: normalizeLeaveRestriction(
-                    denyNavigationElement.getAttribute("presentation")
-                  ),
-                  response: normalizeLeaveRestriction(
-                    denyNavigationElement.getAttribute("response")
-                  )
+                  ...(denyPresentation
+                    ? { presentation: denyPresentation }
+                    : {}),
+                  ...(denyResponse ? { response: denyResponse } : {})
                 }
               }
             : {}),
@@ -6934,6 +6964,48 @@ const resolveActiveTestletTimer = (
   };
 };
 
+const resolveTestletCompletenessPolicy = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  currentUnitKey: string | null,
+  policy: BookletRuntimePolicy
+): BookletRuntimePolicy => {
+  const currentUnit = booklet?.unitEntries.find(
+    unit => unit.unitKey === currentUnitKey
+  );
+  const testletPath = currentUnit?.testletPath ?? [];
+  const resolveRestriction = (
+    field: "presentation" | "response",
+    fallback: BookletLeaveRestriction
+  ): BookletLeaveRestriction => {
+    for (let index = testletPath.length - 1; index >= 0; index -= 1) {
+      const testlet = booklet?.testletEntries?.find(
+        entry => entry.testletKey === testletPath[index]
+      );
+      const restriction =
+        testlet?.restrictions?.denyNavigationOnIncomplete?.[field];
+      if (restriction) {
+        return restriction;
+      }
+    }
+    return fallback;
+  };
+
+  return {
+    ...policy,
+    navigation: {
+      ...policy.navigation,
+      requirePresentationComplete: resolveRestriction(
+        "presentation",
+        policy.navigation.requirePresentationComplete
+      ),
+      requireResponseComplete: resolveRestriction(
+        "response",
+        policy.navigation.requireResponseComplete
+      )
+    }
+  };
+};
+
 const resolveBookletNavigationState = (
   contentRelease: ContentRelease,
   testRun: TestRun
@@ -6942,6 +7014,11 @@ const resolveBookletNavigationState = (
     candidate => candidate.bookletKey === testRun.bookletKey
   );
   const policy = booklet?.policy ?? compileBookletRuntimePolicy({});
+  const completenessPolicy = resolveTestletCompletenessPolicy(
+    booklet,
+    testRun.currentUnitKey,
+    policy
+  );
   const units = booklet?.unitEntries ?? [];
   const currentIndex = units.findIndex(
     unit => unit.unitKey === testRun.currentUnitKey
@@ -6965,13 +7042,13 @@ const resolveBookletNavigationState = (
           ? "complete"
           : "none";
   const backwardDeniedReasons = bookletNavigationDeniedReasons({
-    policy,
+    policy: completenessPolicy,
     direction: "backward",
     presentationProgress,
     responseProgress
   });
   const forwardDeniedReasons = bookletNavigationDeniedReasons({
-    policy,
+    policy: completenessPolicy,
     direction: "forward",
     presentationProgress,
     responseProgress

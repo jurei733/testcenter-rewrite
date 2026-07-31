@@ -2606,7 +2606,7 @@ try {
             <Label>Verona Smoke Booklet</Label>
           </Metadata>
           <BookletConfig>
-            <Config key="force_response_complete">ON</Config>
+            <Config key="force_response_complete">OFF</Config>
             <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
             <Config key="unit_menu">OFF</Config>
             <Config key="unit_navibuttons">OFF</Config>
@@ -2619,6 +2619,7 @@ try {
               <Restrictions>
                 <CodeToEnter code="${veronaTestletCode}">Enter the assigned Verona block code.</CodeToEnter>
                 <TimeMax minutes="1" leave="allowed" />
+                <DenyNavigationOnIncomplete response="ON" />
                 <LockAfterLeaving confirm="true" scope="unit" />
               </Restrictions>
               <Unit id="${veronaUnitKey}" label="Verona Smoke Unit" />

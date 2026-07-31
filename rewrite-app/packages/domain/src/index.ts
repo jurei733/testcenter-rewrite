@@ -250,8 +250,8 @@ export type SourcePackageTestletEntry = {
       leave: TestletTimeMaxLeavePolicy;
     };
     denyNavigationOnIncomplete?: {
-      presentation: BookletLeaveRestriction;
-      response: BookletLeaveRestriction;
+      presentation?: BookletLeaveRestriction;
+      response?: BookletLeaveRestriction;
     };
     lockAfterLeaving?: {
       confirm: boolean;

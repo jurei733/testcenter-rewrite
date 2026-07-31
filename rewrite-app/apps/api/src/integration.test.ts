@@ -8375,6 +8375,219 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.equal(completed.body.testRun.status, "completed");
 });
 
+test("original Testlet completeness restrictions override BookletConfig by dimension", async () => {
+  const tenantKey = "integration-tenant-testlet-completeness";
+  const workspaceKey = "integration-workspace-testlet-completeness";
+  const bookletKey = "BOOKLET.TESTLET-COMPLETENESS";
+  const firstUnitKey = "UNIT.OVERRIDE.1";
+  const secondUnitKey = "UNIT.OVERRIDE.2";
+  const globalFirstUnitKey = "UNIT.GLOBAL.1";
+  const globalSecondUnitKey = "UNIT.GLOBAL.2";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "booklet-testlet-completeness.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata>
+            <Id>${bookletKey}</Id>
+            <Label>Testlet Completeness Booklet</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="force_presentation_complete">ALWAYS</Config>
+            <Config key="force_response_complete">ON</Config>
+          </BookletConfig>
+          <Units>
+            <Testlet id="outer-override" label="Outer Override">
+              <Restrictions>
+                <DenyNavigationOnIncomplete presentation="OFF" />
+              </Restrictions>
+              <Testlet id="inner-override" label="Inner Override">
+                <Restrictions>
+                  <DenyNavigationOnIncomplete response="ALWAYS" />
+                </Restrictions>
+                <Unit id="${firstUnitKey}" label="Override One" />
+                <Unit id="${secondUnitKey}" label="Override Two" />
+              </Testlet>
+            </Testlet>
+            <Testlet id="global-fallback" label="Global Fallback">
+              <Unit id="${globalFirstUnitKey}" label="Global One" />
+              <Unit id="${globalSecondUnitKey}" label="Global Two" />
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const contentRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            testletEntries?: Array<{
+              testletKey: string;
+              restrictions?: {
+                denyNavigationOnIncomplete?: {
+                  presentation?: string;
+                  response?: string;
+                };
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  assert.deepEqual(
+    contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.testletEntries?.map(testlet => [
+        testlet.testletKey,
+        testlet.restrictions?.denyNavigationOnIncomplete ?? null
+      ]),
+    [
+      ["outer-override", { presentation: "off" }],
+      ["inner-override", { response: "always" }],
+      ["global-fallback", null]
+    ]
+  );
+
+  const activated = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activated.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "testlet-completeness-participant"
+    }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resumed.body.testRun.currentUnitKey, firstUnitKey);
+  const testRunId = resumed.body.testRun.testRunId;
+  const response = (
+    presentationProgress: "some" | "complete",
+    responseProgress: "none" | "some" | "complete"
+  ) =>
+    JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: { presentationProgress, responseProgress },
+      playerState: {}
+    });
+  const save = (currentUnitKey: string, unitResponse?: string) =>
+    requestJson<{
+      testRun?: { currentUnitKey: string | null };
+      error?: string;
+      details?: { direction?: string; deniedReasons?: string[] };
+    }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey,
+        status: "running",
+        ...(unitResponse !== undefined ? { unitResponse } : {})
+      }
+    });
+  const currentState = () =>
+    requestJson<{
+      currentRunState: {
+        navigation: {
+          backwardDeniedReasons: string[];
+          forwardDeniedReasons: string[];
+        };
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+
+  assert.equal(
+    (await save(firstUnitKey, response("some", "none"))).status,
+    200
+  );
+  assert.deepEqual(
+    (await currentState()).body.currentRunState.navigation.forwardDeniedReasons,
+    ["response_incomplete"]
+  );
+  const blockedOverrideForward = await save(secondUnitKey);
+  assert.equal(blockedOverrideForward.status, 409);
+  assert.deepEqual(blockedOverrideForward.body.details?.deniedReasons, [
+    "response_incomplete"
+  ]);
+
+  assert.equal(
+    (await save(firstUnitKey, response("some", "complete"))).status,
+    200
+  );
+  assert.equal((await save(secondUnitKey)).status, 200);
+  assert.equal(
+    (await save(secondUnitKey, response("some", "some"))).status,
+    200
+  );
+  const blockedOverrideBackward = await save(firstUnitKey);
+  assert.equal(blockedOverrideBackward.status, 409);
+  assert.equal(blockedOverrideBackward.body.details?.direction, "backward");
+  assert.deepEqual(blockedOverrideBackward.body.details?.deniedReasons, [
+    "response_incomplete"
+  ]);
+
+  assert.equal(
+    (await save(secondUnitKey, response("some", "complete"))).status,
+    200
+  );
+  assert.equal((await save(globalFirstUnitKey)).status, 200);
+  assert.equal(
+    (await save(globalFirstUnitKey, response("some", "none"))).status,
+    200
+  );
+  const globalState = await currentState();
+  assert.deepEqual(
+    globalState.body.currentRunState.navigation.forwardDeniedReasons,
+    ["presentation_incomplete", "response_incomplete"]
+  );
+  assert.deepEqual(
+    globalState.body.currentRunState.navigation.backwardDeniedReasons,
+    ["presentation_incomplete"]
+  );
+  const blockedGlobalForward = await save(globalSecondUnitKey);
+  assert.equal(blockedGlobalForward.status, 409);
+  assert.deepEqual(blockedGlobalForward.body.details?.deniedReasons, [
+    "presentation_incomplete",
+    "response_incomplete"
+  ]);
+});
+
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {
   const tenantKey = "integration-tenant-zip-xml-base";
   const workspaceKey = "integration-workspace-zip-xml-base";
