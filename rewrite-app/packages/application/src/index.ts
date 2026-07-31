@@ -933,7 +933,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'unlock_navigation', or 'set_testlet_time'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
     );
   }
 
@@ -7080,6 +7080,16 @@ const applyMonitorNavigationUnlock = (input: {
   });
 };
 
+const applyMonitorNavigationLock = (input: {
+  testRun: TestRun;
+  timestamp: string;
+}): TestRun =>
+  normalizeTestRun({
+    ...input.testRun,
+    monitorNavigationUnlocked: false,
+    updatedAt: input.timestamp
+  });
+
 const applyMonitorSetTestletTime = (input: {
   contentRelease: ContentRelease;
   testRun: TestRun;
@@ -13149,6 +13159,8 @@ export const createFirstSliceServices = (
               ? "completed"
               : commandType === "unlock_navigation"
                 ? testRun.status
+                : commandType === "lock_navigation"
+                  ? testRun.status
                 : commandType === "set_testlet_time"
                   ? testRun.status
                 : "running";
@@ -13177,6 +13189,11 @@ export const createFirstSliceServices = (
                     testRun,
                     timestamp: issuedAt
                   })
+                : commandType === "lock_navigation"
+                  ? applyMonitorNavigationLock({
+                      testRun,
+                      timestamp: issuedAt
+                    })
                 : commandType === "set_testlet_time" &&
                     targetUnitKey &&
                     remainingSeconds

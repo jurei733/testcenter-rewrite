@@ -107,6 +107,7 @@ export class RewriteAppRuntimeService {
       | "complete"
       | "goto"
       | "unlock_navigation"
+      | "lock_navigation"
       | "set_testlet_time"
   ): Promise<void> {
     await issueMonitorRunCommandAction(
@@ -124,6 +125,8 @@ export class RewriteAppRuntimeService {
             ? "Monitor Go To Issued"
             : commandType === "unlock_navigation"
               ? "Monitor Navigation Unlocked"
+              : commandType === "lock_navigation"
+                ? "Monitor Navigation Locked"
               : commandType === "set_testlet_time"
                 ? "Monitor Testlet Time Set"
             : "Monitor Complete Issued",

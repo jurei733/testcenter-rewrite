@@ -3834,6 +3834,32 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       true
     );
 
+    const lockNavigationCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousStatus: string;
+        testRun: { status: string; monitorNavigationUnlocked?: boolean };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "lock_navigation",
+        actorId: "operator-demo"
+      }
+    });
+    assert.equal(lockNavigationCommand.status, 200);
+    assert.equal(
+      lockNavigationCommand.body.command.commandType,
+      "lock_navigation"
+    );
+    assert.equal(lockNavigationCommand.body.command.previousStatus, "paused");
+    assert.equal(lockNavigationCommand.body.command.testRun.status, "paused");
+    assert.equal(
+      lockNavigationCommand.body.command.testRun.monitorNavigationUnlocked,
+      false
+    );
+
     const resumeCommand = await requestJsonAt<{
       command: {
         commandType: string;
@@ -4035,6 +4061,8 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             completedAt?: string | null;
             previousUnitKey?: string | null;
             targetUnitKey?: string | null;
+            previousNavigationUnlocked?: boolean;
+            navigationUnlocked?: boolean;
             participantSessionId?: string;
             loginKey?: string;
             groupKey?: string;
@@ -4045,15 +4073,22 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=5",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=6",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
-    assert.equal(commandActivity.body.items.length, 5);
+    assert.equal(commandActivity.body.items.length, 6);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
-      ["complete", "goto", "resume", "unlock_navigation", "pause"]
+      [
+        "complete",
+        "goto",
+        "resume",
+        "lock_navigation",
+        "unlock_navigation",
+        "pause"
+      ]
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.actorId, "operator-demo");
     assert.equal(
@@ -4087,9 +4122,19 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       commandActivity.body.items[1]?.activityEvent.details.targetUnitKey,
       "unit-finish"
     );
+    assert.equal(
+      commandActivity.body.items[3]?.activityEvent.details
+        .previousNavigationUnlocked,
+      true
+    );
+    assert.equal(
+      commandActivity.body.items[3]?.activityEvent.details.navigationUnlocked,
+      false
+    );
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),
       [
+        "booklet:demo",
         "booklet:demo",
         "booklet:demo",
         "booklet:demo",
@@ -9097,6 +9142,26 @@ test("original Testlet completeness restrictions override BookletConfig by dimen
   assert.equal(monitorUnlock.status, 200);
   assert.equal(monitorUnlock.body.command.testRun.monitorNavigationUnlocked, true);
   assert.equal((await save(globalSecondUnitKey)).status, 200);
+  assert.equal(
+    (await save(globalSecondUnitKey, response("some", "none"))).status,
+    200
+  );
+  const monitorLock = await requestJson<{
+    command: { testRun: { monitorNavigationUnlocked?: boolean } };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: { commandType: "lock_navigation", actorId: "policy-monitor" }
+    }
+  );
+  assert.equal(monitorLock.status, 200);
+  assert.equal(monitorLock.body.command.testRun.monitorNavigationUnlocked, false);
+  const blockedAfterMonitorLock = await save(globalFirstUnitKey);
+  assert.equal(blockedAfterMonitorLock.status, 409);
+  assert.deepEqual(blockedAfterMonitorLock.body.details?.deniedReasons, [
+    "presentation_incomplete"
+  ]);
 });
 
 test("source document import resolves IMS xml:base paths for ZIP unit content", async () => {

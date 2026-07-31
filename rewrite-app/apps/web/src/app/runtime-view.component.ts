@@ -102,6 +102,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
               <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
+              <button id="runtimeMonitorLockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Monitor Lock Navigation</button>
               <button id="runtimeMonitorSetTestletTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Monitor Set Testlet Time</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
               <button id="runtimeOpenRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.openRuns()">Monitor Open Runs</button>
@@ -643,7 +644,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Monitor Command History"
-        subtitle="Persisted operator command acknowledgements for pause, resume, go-to, and complete."
+        subtitle="Persisted operator command acknowledgements for lifecycle and navigation control."
         [items]="view.monitorCommandHistoryItems"
         (itemAction)="view.selectTestRun($event)"
         emptyState="No monitor commands have been issued yet."

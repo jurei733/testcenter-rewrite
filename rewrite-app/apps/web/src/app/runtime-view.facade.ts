@@ -2384,6 +2384,15 @@ export class RuntimeViewFacade {
     );
   }
 
+  issueMonitorLockNavigation(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("lock_navigation")
+    );
+  }
+
   issueMonitorSetTestletTime(): void {
     if (!this.canSetMonitorTestletTime) {
       return;

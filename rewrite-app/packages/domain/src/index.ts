@@ -51,6 +51,7 @@ export type MonitorRunCommandType =
   | "complete"
   | "goto"
   | "unlock_navigation"
+  | "lock_navigation"
   | "set_testlet_time";
 export const monitorRunCommandTypes = [
   "pause",
@@ -58,6 +59,7 @@ export const monitorRunCommandTypes = [
   "complete",
   "goto",
   "unlock_navigation",
+  "lock_navigation",
   "set_testlet_time"
 ] as const satisfies readonly MonitorRunCommandType[];
 export const adminAuditEventTypes = [

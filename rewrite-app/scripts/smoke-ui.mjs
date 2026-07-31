@@ -3983,6 +3983,17 @@ try {
       payload?.currentRunState?.testRun?.status === "running" &&
       payload?.currentRunState?.testRun?.monitorNavigationUnlocked === true
   );
+  logStep("monitor-lock-navigation");
+  await clickSelectorAction(
+    "Monitor Lock Navigation",
+    "#runtimeMonitorLockNavigationButton"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.status === "running" &&
+      payload?.currentRunState?.testRun?.monitorNavigationUnlocked === false
+  );
   logStep("monitor-goto-unit");
   await fillAndCommitUntilValue("#currentUnitKey", "unit-1");
   await clickSelectorAction(
