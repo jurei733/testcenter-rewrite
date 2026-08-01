@@ -10823,7 +10823,14 @@ test("original coding schemes derive adaptive variables server-side", async () =
       stateKey: "route",
       displayLabel: "Server-coded route",
       optionKey: "professional",
-      optionLabel: "Professional"
+      optionLabel: "Professional",
+      automaticOptionKey: "professional",
+      automaticOptionLabel: "Professional",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "professional", displayLabel: "Professional" },
+        { optionKey: "basic", displayLabel: "Basic" }
+      ]
     }
   ]);
 });
@@ -12418,6 +12425,14 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
             <Id>${bookletKey}</Id>
             <Label>Execution Modes</Label>
           </Metadata>
+          <States>
+            <State id="route" label="Adaptive Route">
+              <Option id="alternate" label="Alternate">
+                <If><Value of="decision" from="UNIT.INTRO"/><Is equal="alternate"/></If>
+              </Option>
+              <Option id="basic" label="Basic" />
+            </State>
+          </States>
           <Units>
             <Unit id="UNIT.INTRO" label="Introduction" />
             <Testlet id="${protectedTestletKey}" label="Protected Testlet">
@@ -12426,6 +12441,14 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
                 <TimeMax minutes="5" leave="forbidden" />
               </Restrictions>
               <Unit id="UNIT.PROTECTED" label="Protected Unit" />
+            </Testlet>
+            <Testlet id="basic-route" label="Basic Route">
+              <Restrictions><Show if="route" is="basic" /></Restrictions>
+              <Unit id="UNIT.BASIC" alias="basic-unit" label="Basic Unit" />
+            </Testlet>
+            <Testlet id="alternate-route" label="Alternate Route">
+              <Restrictions><Show if="route" is="alternate" /></Restrictions>
+              <Unit id="UNIT.ALTERNATE" alias="alternate-unit" label="Alternate Unit" />
             </Testlet>
             <Unit id="UNIT.FINISH" label="Finish" />
           </Units>
@@ -12521,6 +12544,13 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
             timing: { showTimeLeft: boolean };
           };
         };
+        adaptiveStates: Array<{
+          stateKey: string;
+          optionKey: string;
+          automaticOptionKey: string;
+          overrideOptionKey: string | null;
+        }>;
+        bookletUnits: Array<{ unitKey: string }>;
       };
     }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
     assert.equal(state.status, 200);
@@ -12558,6 +12588,95 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   });
   assert.deepEqual(demo.testRun.unlockedTestletKeys, [protectedTestletKey]);
   assert.deepEqual(demo.testRun.testletTimers, {});
+  assert.equal(
+    demo.currentRunState.availableActions.includes("change_state_options"),
+    true
+  );
+  assert.equal(demo.currentRunState.adaptiveStates[0]?.stateKey, "route");
+  assert.equal(demo.currentRunState.adaptiveStates[0]?.optionKey, "basic");
+  assert.equal(
+    demo.currentRunState.adaptiveStates[0]?.automaticOptionKey,
+    "basic"
+  );
+  assert.equal(demo.currentRunState.adaptiveStates[0]?.overrideOptionKey, null);
+  const invalidDemoRoute = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${demo.testRunId}/adaptive-states/route`,
+    { method: "POST", body: { optionKey: "unknown" } }
+  );
+  assert.equal(invalidDemoRoute.status, 400);
+  assert.equal(
+    invalidDemoRoute.body.error,
+    "participant_adaptive_state_option_invalid"
+  );
+  const selectedDemoRoute = await requestJson<{
+    testRun: {
+      bookletStates: Record<string, string>;
+      bookletStateOverrides: Record<string, string>;
+    };
+  }>(
+    `/api/v1/participant/test-runs/${demo.testRunId}/adaptive-states/route`,
+    { method: "POST", body: { optionKey: "alternate" } }
+  );
+  assert.equal(selectedDemoRoute.status, 200);
+  assert.deepEqual(selectedDemoRoute.body.testRun.bookletStates, {
+    route: "alternate"
+  });
+  assert.deepEqual(selectedDemoRoute.body.testRun.bookletStateOverrides, {
+    route: "alternate"
+  });
+  const savedDemoProgress = await requestJson<{
+    testRun: {
+      bookletStates: Record<string, string>;
+      bookletStateOverrides: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.INTRO",
+      unitResponse: "automatic evaluation must not replace the override",
+      status: "running"
+    }
+  });
+  assert.deepEqual(savedDemoProgress.body.testRun.bookletStates, {
+    route: "alternate"
+  });
+  assert.deepEqual(savedDemoProgress.body.testRun.bookletStateOverrides, {
+    route: "alternate"
+  });
+  const selectedDemoState = await requestJson<{
+    currentRunState: {
+      adaptiveStates: Array<{
+        optionKey: string;
+        automaticOptionKey: string;
+        overrideOptionKey: string | null;
+      }>;
+      bookletUnits: Array<{ unitKey: string }>;
+    };
+  }>(`/api/v1/participant/sessions/${demo.participantSessionId}/current-state`);
+  assert.equal(
+    selectedDemoState.body.currentRunState.adaptiveStates[0]?.optionKey,
+    "alternate"
+  );
+  assert.equal(
+    selectedDemoState.body.currentRunState.adaptiveStates[0]?.automaticOptionKey,
+    "basic"
+  );
+  assert.equal(
+    selectedDemoState.body.currentRunState.adaptiveStates[0]?.overrideOptionKey,
+    "alternate"
+  );
+  assert.equal(
+    selectedDemoState.body.currentRunState.bookletUnits.some(
+      unit => unit.unitKey === "alternate-unit"
+    ),
+    true
+  );
+  assert.equal(
+    selectedDemoState.body.currentRunState.bookletUnits.some(
+      unit => unit.unitKey === "basic-unit"
+    ),
+    false
+  );
 
   const review = await start("mode-review");
   assert.equal(review.currentRunState.executionMode.saveResponses, false);
@@ -12572,6 +12691,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(review.testRun.unlockedTestletKeys, [protectedTestletKey]);
   assert.deepEqual(review.testRun.testletTimers, {});
   assert.equal(review.currentRunState.availableActions.includes("review"), true);
+  assert.equal(
+    review.currentRunState.availableActions.includes("change_state_options"),
+    true
+  );
   const createdParticipantReview = await requestJson<{
     review: {
       reviewId: string;
@@ -12696,6 +12819,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(trial.currentRunState.executionMode.forceTimeRestrictions, false);
   assert.equal(trial.currentRunState.executionMode.receiveRemoteCommands, false);
   assert.equal(trial.currentRunState.availableActions.includes("review"), true);
+  assert.equal(
+    trial.currentRunState.availableActions.includes("change_state_options"),
+    true
+  );
   assert.equal(
     trial.currentRunState.booklet.policy.navigation.unitMenuEnabled,
     true
@@ -12899,6 +13026,33 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     "run-trial"
   );
   assert.equal(visibleTrialRun.body.studyMonitorRun.reviewCount, 1);
+
+  const hotReturnRun = await requestJson<{
+    testRun: { testRunId: string };
+  }>(
+    `/api/v1/participant/sessions/${hotReturnFirst.body.participantSession.participantSessionId}/resume`,
+    { method: "POST" }
+  );
+  const hotReturnState = await requestJson<{
+    currentRunState: { availableActions: string[] };
+  }>(
+    `/api/v1/participant/sessions/${hotReturnFirst.body.participantSession.participantSessionId}/current-state`
+  );
+  assert.equal(
+    hotReturnState.body.currentRunState.availableActions.includes(
+      "change_state_options"
+    ),
+    false
+  );
+  const deniedHotStateChange = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/adaptive-states/route`,
+    { method: "POST", body: { optionKey: "alternate" } }
+  );
+  assert.equal(deniedHotStateChange.status, 403);
+  assert.equal(
+    deniedHotStateChange.body.error,
+    "participant_state_option_change_not_allowed"
+  );
 });
 
 test("participant launch rejects closed sessions after completion", async () => {

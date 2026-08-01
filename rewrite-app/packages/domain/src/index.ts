@@ -745,6 +745,8 @@ export type TestRun = {
   presetBookletStates?: Record<string, string>;
   /** Server-authoritative equivalent of the original persisted BOOKLET_STATES test state. */
   bookletStates?: Record<string, string>;
+  /** Participant-selected state options that take precedence over automatic evaluation. */
+  bookletStateOverrides?: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
@@ -929,6 +931,13 @@ export type ParticipantCurrentRunState = {
     displayLabel: string;
     optionKey: string;
     optionLabel: string;
+    automaticOptionKey: string;
+    automaticOptionLabel: string;
+    overrideOptionKey: string | null;
+    options: Array<{
+      optionKey: string;
+      displayLabel: string;
+    }>;
   }>;
   activeTestletTimer: {
     testletKey: string;
@@ -966,7 +975,9 @@ export type ParticipantCurrentRunState = {
       prompt: string;
     } | null;
   };
-  availableActions: Array<"save_progress" | "resume" | "complete" | "review">;
+  availableActions: Array<
+    "save_progress" | "resume" | "complete" | "review" | "change_state_options"
+  >;
 };
 
 export type WorkspaceOverview = {

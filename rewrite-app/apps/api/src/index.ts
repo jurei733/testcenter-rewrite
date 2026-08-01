@@ -114,6 +114,8 @@ import {
   type RevokeAdminSessionResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
+  type SelectParticipantAdaptiveStateRequest,
+  type SelectParticipantAdaptiveStateResponse,
   type UnlockParticipantTestletRequest,
   type UnlockParticipantTestletResponse,
   type ParticipantSignInRequest,
@@ -1622,6 +1624,9 @@ const participantResourcePattern =
 const saveProgressPattern = createRoutePattern(
   productionApiRoutes.participant.saveProgress
 );
+const selectAdaptiveStatePattern = createRoutePattern(
+  productionApiRoutes.participant.selectAdaptiveState
+);
 const participantReviewListPattern = createRoutePattern(
   productionApiRoutes.participant.listReviews
 );
@@ -2323,6 +2328,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
+    [
+      "POST",
+      selectAdaptiveStatePattern,
+      productionApiRoutes.participant.selectAdaptiveState
+    ],
     ["GET", participantReviewListPattern, productionApiRoutes.participant.listReviews],
     ["POST", participantReviewListPattern, productionApiRoutes.participant.createReview],
     ["PATCH", participantReviewDetailPattern, productionApiRoutes.participant.updateReview],
@@ -5532,6 +5542,36 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           logs: body.logs
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const selectAdaptiveStateMatch =
+        selectAdaptiveStatePattern.exec(pathname);
+      if (request.method === "POST" && selectAdaptiveStateMatch?.groups) {
+        const testRunId = decodeRouteGroup(
+          selectAdaptiveStateMatch.groups.testRunId
+        );
+        const stateKey = decodeRouteGroup(
+          selectAdaptiveStateMatch.groups.stateKey
+        );
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+        if (!stateKey) {
+          sendError(response, 400, "participant_state_key_required", "stateKey is required.");
+          return;
+        }
+        const body =
+          await readRequestJsonBody<SelectParticipantAdaptiveStateRequest>();
+        const testRun = await services.participantRuntime.selectAdaptiveState({
+          testRunId,
+          stateKey,
+          optionKey: body.optionKey
+        });
+        sendJson<SelectParticipantAdaptiveStateResponse>(response, 200, {
+          testRun
+        });
         return;
       }
 

@@ -3538,7 +3538,8 @@ try {
             loginKey: originalAdaptiveLoginKey,
             groupKey: "group:original-adaptive-smoke",
             bookletKey: originalAdaptiveBookletKey,
-            displayName: "Original Adaptive Smoke Participant"
+            displayName: "Original Adaptive Smoke Participant",
+            executionMode: "run-trial"
           }
         ]
       }
@@ -3621,6 +3622,46 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await page.waitForFunction(() =>
+    Boolean(document.querySelector("#participantRouteAdaptiveState-level"))
+  );
+  await page.evaluate(() => {
+    const select = document.querySelector("#participantRouteAdaptiveState-level");
+    if (!(select instanceof HTMLSelectElement)) {
+      throw new Error("Adaptive level selector is unavailable.");
+    }
+    select.value = "beginner";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page
+    .locator("#participantRouteAdaptiveStateFeedback")
+    .filter({ hasText: "leicht" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.bookletStates?.level === "beginner" &&
+      payload.currentRunState.testRun.bookletStateOverrides?.level === "beginner" &&
+      payload.currentRunState.adaptiveStates?.find(
+        state => state.stateKey === "level"
+      )?.automaticOptionKey === "professional"
+  );
+  await page.waitForFunction(
+    () => {
+      const unitKeys = [
+        ...document.querySelectorAll(
+          "#participantRouteUnitRail [data-unit-key]"
+        )
+      ].map(element => element.getAttribute("data-unit-key"));
+      return (
+        unitKeys.length === 2 &&
+        unitKeys[0] === "decision-unit" &&
+        unitKeys[1] === "beginner-unit"
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalAdaptiveParticipantSessionId
@@ -3640,6 +3681,10 @@ try {
   assert.equal(
     await resumedOriginalAdaptiveFrame.locator("#var2").inputValue(),
     "a"
+  );
+  assert.equal(
+    await page.locator("#participantRouteAdaptiveState-level").inputValue(),
+    "beginner"
   );
   stopAfter("participant-verona-player");
 

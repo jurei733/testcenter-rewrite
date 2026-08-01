@@ -284,6 +284,38 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <p id="participantRouteMissingLabel">{{ view.player.missingResponseLabel }}</p>
             <p id="participantRouteCompletionLabel" [class.is-complete]="view.player.isComplete">{{ view.player.completionLabel }}</p>
           </section>
+          <section
+            *ngIf="view.canChangeAdaptiveStates"
+            id="participantRouteAdaptiveStates"
+            class="participant-adaptive-states"
+            aria-labelledby="participantRouteAdaptiveStatesTitle"
+          >
+            <header>
+              <div>
+                <span>Adaptive Routing</span>
+                <strong id="participantRouteAdaptiveStatesTitle">Choose the booklet path</strong>
+                <p>The automatic route remains visible while your selection controls which units are available.</p>
+              </div>
+            </header>
+            <label *ngFor="let state of view.adaptiveStates" class="participant-adaptive-state">
+              <span>{{ state.displayLabel }}</span>
+              <select
+                [attr.id]="'participantRouteAdaptiveState-' + state.stateKey"
+                [attr.data-state-key]="state.stateKey"
+                [ngModel]="state.overrideOptionKey ?? ''"
+                [disabled]="!!view.adaptiveStateChangePending"
+                (ngModelChange)="view.selectAdaptiveState(state.stateKey, $event)"
+              >
+                <option value="" disabled>Automatic ({{ state.automaticOptionLabel }})</option>
+                <option *ngFor="let option of state.options" [value]="option.optionKey">{{ option.displayLabel }}</option>
+              </select>
+              <small>
+                Automatic: {{ state.automaticOptionLabel }}
+                <ng-container *ngIf="state.overrideOptionKey"> · Manual selection active</ng-container>
+              </small>
+            </label>
+            <p *ngIf="view.adaptiveStateFeedback" id="participantRouteAdaptiveStateFeedback" class="participant-adaptive-state-feedback" role="status">{{ view.adaptiveStateFeedback }}</p>
+          </section>
           <app-verona-player-host
             *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
             [playerHtml]="verona.playerHtml"

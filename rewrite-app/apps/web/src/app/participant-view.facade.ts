@@ -16,6 +16,8 @@ import type {
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
   SaveTestRunProgressResponse,
+  SelectParticipantAdaptiveStateRequest,
+  SelectParticipantAdaptiveStateResponse,
   UnlockParticipantTestletRequest,
   UnlockParticipantTestletResponse,
   UpdateParticipantReviewRequest
@@ -204,6 +206,8 @@ export class ParticipantViewFacade {
   editingReviewId = "";
   editingReviewUnitKey: string | null = null;
   reviewFeedback = "";
+  adaptiveStateFeedback = "";
+  adaptiveStateChangePending = "";
   readonly reviewCategories = ["general", "technical", "content", "design"];
   readonly timerTick = signal(Date.now());
   readonly fullscreenActive = signal(false);
@@ -975,6 +979,27 @@ export class ParticipantViewFacade {
     return Boolean(this.runtime.participantSessionId.trim());
   }
 
+  get adaptiveStates(): ParticipantCurrentRunStateResponse["currentRunState"]["adaptiveStates"] {
+    return this.readCurrentRunState()?.adaptiveStates ?? [];
+  }
+
+  get canChangeAdaptiveStates(): boolean {
+    return Boolean(
+      this.readCurrentRunState()?.availableActions.includes(
+        "change_state_options"
+      ) && this.adaptiveStates.length > 0
+    );
+  }
+
+  selectAdaptiveState(stateKey: string, optionKey: string): void {
+    if (!this.canChangeAdaptiveStates || this.adaptiveStateChangePending) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.selectAdaptiveStateInternal(stateKey, optionKey)
+    );
+  }
+
   resumeSession(): void {
     if (!this.canStartOrResume) {
       return;
@@ -1363,6 +1388,8 @@ export class ParticipantViewFacade {
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
+    this.adaptiveStateFeedback = "";
+    this.adaptiveStateChangePending = "";
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
     this.runtime.currentRunStateView = prettyPrintJson(
@@ -1388,6 +1415,8 @@ export class ParticipantViewFacade {
     this.participantReviews = [];
     this.resetReviewEditor();
     this.reviewFeedback = "";
+    this.adaptiveStateFeedback = "";
+    this.adaptiveStateChangePending = "";
     this.pendingVeronaSave = null;
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
@@ -1857,6 +1886,41 @@ export class ParticipantViewFacade {
         { quiet }
       );
     this.participantReviews = payload.items;
+  }
+
+  private async selectAdaptiveStateInternal(
+    stateKey: string,
+    optionKey: string
+  ): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (
+      !currentState ||
+      !currentState.availableActions.includes("change_state_options")
+    ) {
+      return;
+    }
+    this.adaptiveStateChangePending = stateKey;
+    this.adaptiveStateFeedback = "Saving adaptive route…";
+    try {
+      await this.requestState.request<SelectParticipantAdaptiveStateResponse>(
+        "Select Adaptive Route",
+        "POST",
+        resolveRoutePath(productionApiRoutes.participant.selectAdaptiveState, {
+          testRunId: currentState.testRun.testRunId,
+          stateKey
+        }),
+        { optionKey } satisfies SelectParticipantAdaptiveStateRequest
+      );
+      await this.refreshCurrentStateInternal(true);
+      const selectedState = this.adaptiveStates.find(
+        state => state.stateKey === stateKey
+      );
+      this.adaptiveStateFeedback = selectedState
+        ? `${selectedState.displayLabel}: ${selectedState.optionLabel} selected.`
+        : "Adaptive route saved.";
+    } finally {
+      this.adaptiveStateChangePending = "";
+    }
   }
 
   private async saveReviewInternal(): Promise<void> {

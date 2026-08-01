@@ -572,6 +572,11 @@ export type ParticipantRuntimePort = {
       entries: ParticipantTestLogEntryInput[];
     }>;
   }): Promise<TestRun>;
+  selectAdaptiveState(input: {
+    testRunId: string;
+    stateKey: string;
+    optionKey: string;
+  }): Promise<TestRun>;
   listReviews(input: { testRunId: string }): Promise<WorkspaceReview[]>;
   createReview(input: {
     testRunId: string;
@@ -2542,6 +2547,17 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
     ),
     bookletStates: Object.fromEntries(
       Object.entries(testRun.bookletStates ?? {}).flatMap(
+        ([stateKey, optionKey]) => {
+          const normalizedStateKey = stateKey.trim();
+          const normalizedOptionKey = String(optionKey ?? "").trim();
+          return normalizedStateKey && normalizedOptionKey
+            ? [[normalizedStateKey, normalizedOptionKey]]
+            : [];
+        }
+      )
+    ),
+    bookletStateOverrides: Object.fromEntries(
+      Object.entries(testRun.bookletStateOverrides ?? {}).flatMap(
         ([stateKey, optionKey]) => {
           const normalizedStateKey = stateKey.trim();
           const normalizedOptionKey = String(optionKey ?? "").trim();
@@ -8551,11 +8567,23 @@ const evaluateAdaptiveStates = (
     const presetOption = presetOptionKey
       ? state.options.find(option => option.optionKey === presetOptionKey)
       : undefined;
+    const overrideOptionKey = testRun.bookletStateOverrides?.[state.stateKey];
+    const overrideOption = overrideOptionKey
+      ? state.options.find(option => option.optionKey === overrideOptionKey)
+      : undefined;
+    const effectiveOption = overrideOption ?? presetOption ?? selected;
     return {
       stateKey: state.stateKey,
       displayLabel: state.displayLabel,
-      optionKey: presetOptionKey || selected.optionKey,
-      optionLabel: presetOption?.displayLabel ?? presetOptionKey ?? selected.displayLabel
+      optionKey: effectiveOption.optionKey,
+      optionLabel: effectiveOption.displayLabel,
+      automaticOptionKey: selected.optionKey,
+      automaticOptionLabel: selected.displayLabel,
+      overrideOptionKey: overrideOption?.optionKey ?? null,
+      options: state.options.map(option => ({
+        optionKey: option.optionKey,
+        displayLabel: option.displayLabel
+      }))
     };
   });
 };
@@ -15788,6 +15816,13 @@ export const createFirstSliceServices = (
         if (executionMode.canReview) {
           availableActions.push("review");
         }
+        if (
+          executionMode.canChangeStateOptions &&
+          currentTestRun.status !== "completed" &&
+          (currentBooklet?.stateEntries?.length ?? 0) > 0
+        ) {
+          availableActions.push("change_state_options");
+        }
 
         return {
           participantSession,
@@ -15848,6 +15883,104 @@ export const createFirstSliceServices = (
           navigation,
           availableActions
         };
+      },
+      async selectAdaptiveState(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const storedTestRun = await repository.getTestRunById(testRunId);
+        if (!storedTestRun) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found.`
+          );
+        }
+        const testRun = normalizeTestRun(storedTestRun);
+        const participantSession = await requireAccessibleParticipantSession(
+          testRun.participantSessionId
+        );
+        const executionMode = resolveParticipantExecutionMode(
+          testRun.executionMode ?? participantSession.executionMode
+        );
+        if (!executionMode.canChangeStateOptions) {
+          throw new FirstSliceError(
+            403,
+            "participant_state_option_change_not_allowed",
+            `Execution mode '${executionMode.mode}' does not allow adaptive state choices.`
+          );
+        }
+        if (testRun.status === "completed") {
+          throw new FirstSliceError(
+            409,
+            "test_run_already_completed",
+            `Test run '${testRunId}' is already completed.`
+          );
+        }
+        const stateKey = String(input.stateKey ?? "").trim();
+        if (!stateKey) {
+          throw new FirstSliceError(
+            400,
+            "participant_state_key_required",
+            "stateKey is required."
+          );
+        }
+        const optionKey = String(input.optionKey ?? "").trim();
+        if (!optionKey) {
+          throw new FirstSliceError(
+            400,
+            "participant_state_option_key_required",
+            "optionKey is required."
+          );
+        }
+        const contentRelease = await requireContentRelease(
+          repository,
+          testRun.contentReleaseId
+        );
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
+        );
+        const state = booklet?.stateEntries?.find(
+          candidate => candidate.stateKey === stateKey
+        );
+        if (!state) {
+          throw new FirstSliceError(
+            404,
+            "participant_adaptive_state_not_found",
+            `Adaptive state '${stateKey}' was not found in booklet '${testRun.bookletKey}'.`
+          );
+        }
+        if (!state.options.some(option => option.optionKey === optionKey)) {
+          throw new FirstSliceError(
+            400,
+            "participant_adaptive_state_option_invalid",
+            `Option '${optionKey}' is not valid for adaptive state '${stateKey}'.`
+          );
+        }
+        const timestamp = now();
+        const updatedRun = withEvaluatedBookletStates(booklet, {
+          ...testRun,
+          bookletStateOverrides: {
+            ...(testRun.bookletStateOverrides ?? {}),
+            [stateKey]: optionKey
+          },
+          updatedAt: timestamp
+        });
+        await repository.saveTestRun(updatedRun);
+        await recordWorkspaceActivity({
+          tenantId: updatedRun.tenantId,
+          workspaceId: updatedRun.workspaceId,
+          eventType: "test_run_progress_saved",
+          actorId: participantSession.loginKey,
+          subjectType: "test_run",
+          subjectId: updatedRun.testRunId,
+          summary: `Participant selected adaptive state '${stateKey}=${optionKey}'.`,
+          details: {
+            participantSessionId: updatedRun.participantSessionId,
+            stateKey,
+            optionKey,
+            participantStateOverride: true
+          }
+        });
+        return updatedRun;
       },
       async listReviews(input) {
         const { testRun } = await requireParticipantReviewContext(input.testRunId);

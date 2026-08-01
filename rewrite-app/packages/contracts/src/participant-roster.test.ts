@@ -286,6 +286,7 @@ describe("parseParticipantRosterText", () => {
             participants: [
               { login: "json-run", mode: "run-hot-return" },
               { login: "json-review", mode: "run-review" },
+              { login: "json-trial", executionMode: "run-trial" },
               { login: "json-monitor", mode: "monitor-group" },
               { login: "json-system-check", mode: "sys-check-login" }
             ]
@@ -303,6 +304,13 @@ describe("parseParticipantRosterText", () => {
         {
           loginKey: "json-review",
           executionMode: "run-review",
+          groupKey: "group:modes",
+          bookletKey: null,
+          displayName: null
+        },
+        {
+          loginKey: "json-trial",
+          executionMode: "run-trial",
           groupKey: "group:modes",
           bookletKey: null,
           displayName: null

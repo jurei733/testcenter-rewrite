@@ -782,7 +782,13 @@ const parseParticipantRosterJsonValue = (
     const loginKey =
       explicitLoginKey ??
       (childValues.length === 0 ? readJsonRosterString(objectValue, "id") : null);
-    const mode = readJsonRosterString(objectValue, "mode", "loginMode", "testMode");
+    const mode = readJsonRosterString(
+      objectValue,
+      "mode",
+      "loginMode",
+      "testMode",
+      "executionMode"
+    );
     const executionMode = normalizeParticipantExecutionMode(mode);
     const groupKey =
       readJsonRosterString(
@@ -1600,6 +1606,8 @@ export const productionApiRoutes = {
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
+    selectAdaptiveState:
+      "/api/v1/participant/test-runs/:testRunId/adaptive-states/:stateKey",
     listReviews: "/api/v1/participant/test-runs/:testRunId/reviews",
     createReview: "/api/v1/participant/test-runs/:testRunId/reviews",
     updateReview:
@@ -1869,6 +1877,10 @@ export type SaveTestRunProgressRequest = {
     originalUnitId?: string | null;
     entries: ParticipantTestLogEntryInput[];
   }>;
+};
+
+export type SelectParticipantAdaptiveStateRequest = {
+  optionKey: string;
 };
 
 export type CreateParticipantReviewRequest = {
@@ -2189,6 +2201,10 @@ export type ParticipantCurrentRunStateResponse = {
 };
 
 export type SaveTestRunProgressResponse = {
+  testRun: TestRun;
+};
+
+export type SelectParticipantAdaptiveStateResponse = {
   testRun: TestRun;
 };
 
