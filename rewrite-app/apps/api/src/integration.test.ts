@@ -3605,11 +3605,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","booklet:demo","\{\}","running","unit-practice","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","booklet:demo","\{\}","running","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -10918,6 +10918,11 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const openRunsWithTimer = await requestJson<{
     items: Array<{
       testRunId: string;
+      bookletLabel: string;
+      currentUnitKey: string | null;
+      currentUnitLabel: string | null;
+      currentBlockKey: string | null;
+      currentBlockLabel: string | null;
       activeTestletTimer: {
         testletKey: string;
         displayLabel: string;
@@ -10936,6 +10941,22 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${testRunId}`
   );
   assert.equal(openRunsWithTimer.status, 200);
+  assert.deepEqual(
+    {
+      bookletLabel: openRunsWithTimer.body.items[0]?.bookletLabel,
+      currentUnitKey: openRunsWithTimer.body.items[0]?.currentUnitKey,
+      currentUnitLabel: openRunsWithTimer.body.items[0]?.currentUnitLabel,
+      currentBlockKey: openRunsWithTimer.body.items[0]?.currentBlockKey,
+      currentBlockLabel: openRunsWithTimer.body.items[0]?.currentBlockLabel
+    },
+    {
+      bookletLabel: "Timer Booklet",
+      currentUnitKey: "UNIT.TIMED",
+      currentUnitLabel: "Timed Unit",
+      currentBlockKey: testletKey,
+      currentBlockLabel: "Timed Block"
+    }
+  );
   const monitorTimer = openRunsWithTimer.body.items[0]?.activeTestletTimer;
   assert.ok(monitorTimer);
   assert.deepEqual(
@@ -10978,7 +10999,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
 

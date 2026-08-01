@@ -2963,6 +2963,10 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     )
     .map(testRun => {
       const normalizedTestRun = normalizeTestRun(testRun);
+      const location = resolveOpenMonitorRunLocation(
+        input.activeContentRelease,
+        normalizedTestRun
+      );
       const testletTimers = buildMonitorTestletTimers(
         input.activeContentRelease,
         normalizedTestRun,
@@ -2989,11 +2993,15 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
             ) ?? null
           : null,
         bookletKey: testRun.bookletKey,
+        bookletLabel: location.bookletLabel,
         bookletAssignmentKey:
           testRun.bookletAssignmentKey ?? testRun.bookletKey,
         bookletStates: normalizedTestRun.bookletStates ?? {},
         status: normalizedTestRun.status,
         currentUnitKey: normalizedTestRun.currentUnitKey,
+        currentUnitLabel: location.currentUnitLabel,
+        currentBlockKey: location.currentBlockKey,
+        currentBlockLabel: location.currentBlockLabel,
         activeTestletTimer:
           testletTimers.find(
             timer =>
@@ -3003,6 +3011,31 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         updatedAt: normalizedTestRun.updatedAt
       };
     });
+};
+
+const resolveOpenMonitorRunLocation = (
+  contentRelease: ContentRelease | null,
+  testRun: TestRun
+): Pick<
+  OpenMonitorRun,
+  "bookletLabel" | "currentUnitLabel" | "currentBlockKey" | "currentBlockLabel"
+> => {
+  const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+    entry => entry.bookletKey === testRun.bookletKey
+  );
+  const unit = booklet?.unitEntries.find(
+    entry => entry.unitKey === testRun.currentUnitKey
+  );
+  const currentBlockKey = unit?.testletPath?.at(-1) ?? null;
+  const currentBlock = currentBlockKey
+    ? booklet?.testletEntries?.find(entry => entry.testletKey === currentBlockKey)
+    : null;
+  return {
+    bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
+    currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
+    currentBlockKey,
+    currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey
+  };
 };
 
 const getLatestParticipantSessionRun = async (
@@ -4197,10 +4230,14 @@ const formatOpenMonitorRunsCsv = (input: {
     "groupKey",
     "executionMode",
     "bookletKey",
+    "bookletLabel",
     "bookletAssignmentKey",
     "bookletStates",
     "status",
     "currentUnitKey",
+    "currentUnitLabel",
+    "currentBlockKey",
+    "currentBlockLabel",
     "activeTestletTimer",
     "updatedAt",
     "rosterBookletKey",
@@ -4219,10 +4256,14 @@ const formatOpenMonitorRunsCsv = (input: {
         item.groupKey,
         item.executionMode,
         item.bookletKey,
+        item.bookletLabel ?? item.bookletKey,
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
         item.status,
         item.currentUnitKey ?? "",
+        item.currentUnitLabel ?? "",
+        item.currentBlockKey ?? "",
+        item.currentBlockLabel ?? "",
         item.activeTestletTimer
           ? JSON.stringify(item.activeTestletTimer)
           : "",
@@ -19511,6 +19552,10 @@ export const createFirstSliceServices = (
                 candidate =>
                   candidate.participantSessionId === testRun.participantSessionId
               ) ?? null;
+            const location = resolveOpenMonitorRunLocation(
+              contentRelease,
+              testRun
+            );
 
             return {
               testRunId: testRun.testRunId,
@@ -19526,11 +19571,15 @@ export const createFirstSliceServices = (
                   ) ?? null
                 : null,
               bookletKey: testRun.bookletKey,
+              bookletLabel: location.bookletLabel,
               bookletAssignmentKey:
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
               status: testRun.status,
               currentUnitKey: testRun.currentUnitKey,
+              currentUnitLabel: location.currentUnitLabel,
+              currentBlockKey: location.currentBlockKey,
+              currentBlockLabel: location.currentBlockLabel,
               activeTestletTimer:
                 testletTimers.find(
                   timer =>

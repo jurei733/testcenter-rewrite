@@ -882,10 +882,14 @@ export type OpenMonitorRun = {
   executionMode: ParticipantExecutionMode;
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
+  bookletLabel?: string;
   bookletAssignmentKey: string;
   bookletStates: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
+  currentUnitLabel?: string | null;
+  currentBlockKey?: string | null;
+  currentBlockLabel?: string | null;
   activeTestletTimer: MonitorTestletTimer | null;
   updatedAt: string;
 };

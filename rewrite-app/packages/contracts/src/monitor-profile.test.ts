@@ -77,17 +77,22 @@ test("monitor profiles apply original exclusion and inverted inclusion filters",
   );
 });
 
-test("monitor profiles hide pending runs and ignore unavailable original fields", () => {
+test("monitor profiles hide pending runs and filter projected block labels", () => {
   const created = createOpenRun("created-ui", "created");
   const running = createOpenRun("running-ui", "running");
+  running.currentBlockKey = "block:intro";
+  running.currentBlockLabel = "Introduction";
+  const other = createOpenRun("other-ui", "running");
+  other.currentBlockKey = "block:tasks";
+  other.currentBlockLabel = "Tasks";
   const profile: MonitorViewProfile = {
     ...baseProfile,
     filters: [
       {
         target: "blockLabel",
-        value: "Unavailable block",
+        value: "Introduction",
         subValue: null,
-        label: "Unavailable field",
+        label: "Hide introduction",
         type: "equal",
         not: false
       }
@@ -96,10 +101,10 @@ test("monitor profiles hide pending runs and ignore unavailable original fields"
   };
 
   assert.deepEqual(
-    filterOpenMonitorRunsByProfile([created, running], profile).map(
+    filterOpenMonitorRunsByProfile([created, running, other], profile).map(
       run => run.loginKey
     ),
-    ["running-ui"]
+    ["other-ui"]
   );
   assert.equal(
     filterOpenMonitorRunsByProfile([created, running], null).length,

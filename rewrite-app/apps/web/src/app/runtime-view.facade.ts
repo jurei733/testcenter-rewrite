@@ -1878,16 +1878,36 @@ export class RuntimeViewFacade {
             ...(profile?.settings.bookletColumn === "hide"
               ? []
               : [
-                  { label: "Booklet", value: openRun.bookletKey },
+                  {
+                    label: "Booklet",
+                    value: openRun.bookletLabel ?? openRun.bookletKey
+                  },
                   {
                     label: "Booklet Assignment",
                     value: openRun.bookletAssignmentKey
                   }
                 ]),
             ...this.monitorBookletStateRows(openRun, profile),
+            ...(profile?.settings.blockColumn === "show"
+              ? [
+                  {
+                    label: "Current Block",
+                    value:
+                      openRun.currentBlockLabel ??
+                      openRun.currentBlockKey ??
+                      "none"
+                  }
+                ]
+              : []),
             ...(profile?.settings.unitColumn === "hide"
               ? []
-              : [{ label: "Current Unit", value: openRun.currentUnitKey ?? "none" }]),
+              : [
+                  {
+                    label: "Current Unit",
+                    value:
+                      openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "none"
+                  }
+                ]),
             ...(profile?.settings.view === "small"
               ? []
               : [

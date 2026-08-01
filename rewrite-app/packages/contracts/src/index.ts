@@ -2129,12 +2129,22 @@ const monitorProfileFilterExcludesRun = (
       subject = openRun.executionMode;
       break;
     case "bookletId":
-    case "bookletLabel":
       subject = openRun.bookletKey;
       break;
+    case "bookletLabel":
+      subject = openRun.bookletLabel ?? openRun.bookletKey;
+      break;
     case "unitId":
-    case "unitLabel":
       subject = openRun.currentUnitKey ?? "";
+      break;
+    case "unitLabel":
+      subject = openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "";
+      break;
+    case "blockId":
+      subject = openRun.currentBlockKey ?? "";
+      break;
+    case "blockLabel":
+      subject = openRun.currentBlockLabel ?? openRun.currentBlockKey ?? "";
       break;
     case "state":
       subject = openRun.status;

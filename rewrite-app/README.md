@@ -43,7 +43,9 @@ non-escalating `group_monitor`, `study_monitor`, and `system_check` accounts wit
 the resolved monitor profiles attached to their scoped role. Monitor sign-in
 restores those profiles, offers the original alternatives for selection, applies
 supported original run filters, and uses the selected column/density settings in
-the open-run view. The profile JSON is persisted by file, SQLite, and PostgreSQL
+the open-run view. Booklet, block, and unit IDs and labels are resolved from the
+immutable release snapshot for profile filtering, display, and CSV export. The
+profile JSON is persisted by file, SQLite, and PostgreSQL
 stores and is never inferred from the redacted source password. Supported candidates can prepare that account form in
 one action and complete creation after a newly assigned password is entered;
 the source password is deliberately never exposed or copied. Imported
