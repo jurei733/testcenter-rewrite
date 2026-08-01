@@ -47,6 +47,7 @@ export type PersistedShellState = {
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  monitorTargetUnitKey: string;
   monitorTimeSeconds: string;
   loginKey: string;
   groupKey: string;

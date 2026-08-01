@@ -117,6 +117,7 @@ export interface ShellRuntimeState {
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
+  monitorTargetUnitKey: string;
   monitorTimeSeconds: string;
   currentUnitResponse: string;
   reviewId: string;
@@ -341,6 +342,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",
+    monitorTargetUnitKey: "unit-1",
     monitorTimeSeconds: "300",
     currentUnitResponse: "",
     reviewId: "",

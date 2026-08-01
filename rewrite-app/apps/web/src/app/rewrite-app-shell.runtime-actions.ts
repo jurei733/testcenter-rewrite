@@ -63,6 +63,7 @@ export interface ShellRuntimeActionsHost {
   getParticipantSessionId(): string;
   getTestRunId(): string;
   getCurrentUnitKey(): string;
+  getMonitorTargetUnitKey(): string;
   getMonitorTimeSeconds(): string;
   getCurrentUnitResponse(): string;
   getReviewerId(): string;
@@ -281,10 +282,10 @@ export async function issueMonitorRunCommandAction(
       commandType,
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
-        ? { targetUnitKey: host.getCurrentUnitKey().trim() }
+        ? { targetUnitKey: host.getMonitorTargetUnitKey().trim() }
         : commandType === "set_testlet_time"
           ? {
-              targetUnitKey: host.getCurrentUnitKey().trim(),
+              targetUnitKey: host.getMonitorTargetUnitKey().trim(),
               remainingSeconds: Number(host.getMonitorTimeSeconds())
             }
           : {})
@@ -347,10 +348,10 @@ export async function issueMonitorRunCommandsAction(
       commandType,
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
-        ? { targetUnitKey: host.getCurrentUnitKey().trim() }
+        ? { targetUnitKey: host.getMonitorTargetUnitKey().trim() }
         : commandType === "set_testlet_time"
           ? {
-              targetUnitKey: host.getCurrentUnitKey().trim(),
+              targetUnitKey: host.getMonitorTargetUnitKey().trim(),
               remainingSeconds: Number(host.getMonitorTimeSeconds())
             }
           : {})

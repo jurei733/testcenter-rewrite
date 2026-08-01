@@ -84,6 +84,7 @@ export function createRuntimeActionsStateHost(args: {
     getParticipantSessionId: () => args.runtimeState.participantSessionId,
     getTestRunId: () => args.runtimeState.testRunId,
     getCurrentUnitKey: () => args.runtimeState.currentUnitKey,
+    getMonitorTargetUnitKey: () => args.runtimeState.monitorTargetUnitKey,
     getMonitorTimeSeconds: () => args.runtimeState.monitorTimeSeconds,
     getCurrentUnitResponse: () => args.runtimeState.currentUnitResponse,
     getReviewerId: () => args.runtimeState.reviewerId,

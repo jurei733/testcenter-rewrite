@@ -1963,7 +1963,10 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatchGoto(): boolean {
-    return this.canIssueMonitorBatch && Boolean(this.runtime.currentUnitKey.trim());
+    return (
+      this.canIssueMonitorBatch &&
+      Boolean(this.runtime.monitorTargetUnitKey.trim())
+    );
   }
 
   get canIssueMonitorBatchTime(): boolean {
@@ -2482,10 +2485,17 @@ export class RuntimeViewFacade {
     return this.canUseRunActions && this.runtime.currentUnitKey.trim().length > 0;
   }
 
+  get canIssueMonitorGoto(): boolean {
+    return (
+      this.canUseRunActions &&
+      this.runtime.monitorTargetUnitKey.trim().length > 0
+    );
+  }
+
   get canSetMonitorTestletTime(): boolean {
     const remainingSeconds = Number(this.runtime.monitorTimeSeconds);
     return (
-      this.canSaveProgressActions &&
+      this.canIssueMonitorGoto &&
       Number.isInteger(remainingSeconds) &&
       remainingSeconds >= 1 &&
       remainingSeconds <= 86_400
@@ -2856,7 +2866,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorGoto(): void {
-    if (!this.canSaveProgressActions) {
+    if (!this.canIssueMonitorGoto) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2925,9 +2935,9 @@ export class RuntimeViewFacade {
     }
     const targetDescription =
       commandType === "goto"
-        ? ` to unit ${this.runtime.currentUnitKey.trim()}`
+        ? ` to unit ${this.runtime.monitorTargetUnitKey.trim()}`
         : commandType === "set_testlet_time"
-          ? ` for unit ${this.runtime.currentUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
+          ? ` for unit ${this.runtime.monitorTargetUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
           : "";
     if (
       !globalThis.confirm(
@@ -3250,6 +3260,7 @@ export class RuntimeViewFacade {
     this.runtime.testRunId = testRunId;
     if (item.actionPayload?.currentUnitKey != null) {
       this.runtime.currentUnitKey = item.actionPayload.currentUnitKey;
+      this.runtime.monitorTargetUnitKey = item.actionPayload.currentUnitKey;
     }
     if (item.actionPayload?.loginKey) {
       this.runtime.loginKey = item.actionPayload.loginKey;
@@ -3279,7 +3290,9 @@ export class RuntimeViewFacade {
     }
 
     this.viewState.onActionAsync(async () => {
-      await this.runtimeService.loadParticipantSessionDetail();
+      if (!this.isMonitorOnlySession) {
+        await this.runtimeService.loadParticipantSessionDetail();
+      }
       await this.runtimeService.refreshRuntimeReads(true);
     });
   }

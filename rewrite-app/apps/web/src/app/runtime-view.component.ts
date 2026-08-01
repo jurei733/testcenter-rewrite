@@ -91,7 +91,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Target Unit
-            <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
+            <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()" />
           </label>
           <label>
             Timer Seconds
@@ -104,7 +104,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
           <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Pause</button>
           <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Resume</button>
-          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Go To Unit</button>
+          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Unit</button>
           <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
           <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
@@ -154,6 +154,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="currentUnitKey" name="currentUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
           </label>
           <label>
+            Monitor Target Unit
+            <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()" />
+          </label>
+          <label>
             Monitor Timer Seconds
             <input id="monitorTimeSeconds" name="monitorTimeSeconds" type="number" min="1" max="86400" step="1" [(ngModel)]="view.runtime.monitorTimeSeconds" (change)="view.persistState()" />
           </label>
@@ -198,7 +202,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <div class="actions">
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
-              <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
+              <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
               <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
               <button id="runtimeMonitorLockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Monitor Lock Navigation</button>
               <button id="runtimeMonitorSetTestletTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Monitor Set Testlet Time</button>
@@ -735,7 +739,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
           <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
           <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>
-          <button id="monitorBatchGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchGoto" (click)="view.issueMonitorBatchCommand('goto')">Go To Current Unit</button>
+          <button id="monitorBatchGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchGoto" (click)="view.issueMonitorBatchCommand('goto')">Go To Target Unit</button>
           <button id="monitorBatchUnlockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_navigation')">Unlock Selected</button>
           <button id="monitorBatchLockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_navigation')">Lock Selected</button>
           <button id="monitorBatchSetTimeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchTime" (click)="view.issueMonitorBatchCommand('set_testlet_time')">Set Time On Selected</button>

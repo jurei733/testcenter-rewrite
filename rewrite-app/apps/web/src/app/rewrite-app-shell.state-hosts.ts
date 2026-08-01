@@ -234,6 +234,12 @@ export function createShellPersistenceStateHost(args: {
     set currentUnitKey(nextValue) {
       args.runtimeState.currentUnitKey = nextValue;
     },
+    get monitorTargetUnitKey() {
+      return args.runtimeState.monitorTargetUnitKey;
+    },
+    set monitorTargetUnitKey(nextValue) {
+      args.runtimeState.monitorTargetUnitKey = nextValue;
+    },
     get monitorTimeSeconds() {
       return args.runtimeState.monitorTimeSeconds;
     },
