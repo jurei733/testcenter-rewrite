@@ -4584,6 +4584,8 @@ try {
       tenantKey
     )}&workspaceKey=${encodeURIComponent(workspaceKey)}`
   );
+  await page.locator("#systemCheckLoginRequiredStatus").waitFor();
+  assert.equal(await page.locator("#loadSystemChecksButton").count(), 0);
   await fillAndCommit("#systemCheckUsername", systemCheckUsername);
   await fillAndCommit("#systemCheckPassword", systemCheckPassword);
   await page.locator("#systemCheckSignInButton").click();
@@ -4598,6 +4600,7 @@ try {
   await page.waitForURL(/\/app\/system-check$/);
   await page.locator("#systemCheckSignOutButton").click();
   await page.locator("#systemCheckSignInButton").waitFor();
+  await page.locator("#systemCheckLoginRequiredStatus").waitFor();
   await page.goto(`${baseUrl}/app/ops`);
   await fillAndCommit("#adminUsername", adminUsername);
   await fillAndCommit("#adminPassword", adminPassword);

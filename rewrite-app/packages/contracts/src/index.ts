@@ -1796,6 +1796,7 @@ export const productionApiRoutes = {
   system: {
     getRuntimeDiagnostics: "/diagnostics/runtime",
     getRuntimeConfig: "/diagnostics/config",
+    getSystemCheckAccess: "/api/v1/system-check/access",
     downloadSpeedTestPackage: "/speed-test/random-package/:size",
     uploadSpeedTestPackage: "/speed-test/random-package"
   }
@@ -2388,6 +2389,18 @@ export type ActivateContentReleaseResponse = {
 
 export type ListSystemChecksResponse = {
   items: WorkspaceSystemCheck[];
+};
+
+export type SystemCheckAccessMode = "anonymous_key" | "login_required";
+
+export type SystemCheckAuthorizedScope = {
+  tenantKey: string;
+  workspaceKey: string;
+};
+
+export type GetSystemCheckAccessResponse = {
+  accessMode: SystemCheckAccessMode;
+  authorizedScopes: SystemCheckAuthorizedScope[];
 };
 
 export type GetSystemCheckResponse = {

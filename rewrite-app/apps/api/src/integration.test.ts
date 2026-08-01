@@ -18787,6 +18787,35 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(wrongKey.status, 403);
   assert.equal(wrongKey.body.error, "system_check_save_key_invalid");
 
+  const saved = await requestJson<{
+    report: {
+      systemCheckReportId: string;
+      checkId: string;
+      checkLabel: string;
+      title: string;
+      environment: unknown[];
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    {
+      method: "POST",
+      body: { ...reportBody, keyPhrase: "SAVEME" }
+    }
+  );
+  assert.equal(saved.status, 201);
+  assert.equal(saved.body.report.checkId, "SYSCHECK.SAMPLE");
+  assert.equal(saved.body.report.checkLabel, "System-Check Beispiel");
+  assert.equal(saved.body.report.title, "SAMPLE SYS-CHECK REPORT");
+  assert.equal(saved.body.report.environment.length, 1);
+
+  const anonymousSystemCheckAccess = await requestJson<{
+    accessMode: string;
+    authorizedScopes: unknown[];
+  }>("/api/v1/system-check/access");
+  assert.equal(anonymousSystemCheckAccess.status, 200);
+  assert.equal(anonymousSystemCheckAccess.body.accessMode, "anonymous_key");
+  assert.deepEqual(anonymousSystemCheckAccess.body.authorizedScopes, []);
+
   const platformAdminBootstrap = await requestJson<{ error?: string }>(
     "/api/v1/admin/auth/bootstrap",
     {
@@ -18864,6 +18893,42 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     secondSystemCheckSignIn.body.sessionToken,
     systemCheckSignIn.body.sessionToken
   );
+  const protectedSystemCheckAccess = await requestJson<{
+    accessMode: string;
+    authorizedScopes: Array<{ tenantKey: string; workspaceKey: string }>;
+  }>("/api/v1/system-check/access", {
+    headers: {
+      authorization: `Bearer ${systemCheckSignIn.body.sessionToken}`
+    }
+  });
+  assert.equal(protectedSystemCheckAccess.status, 200);
+  assert.equal(protectedSystemCheckAccess.body.accessMode, "login_required");
+  assert.deepEqual(protectedSystemCheckAccess.body.authorizedScopes, [
+    { tenantKey, workspaceKey }
+  ]);
+  const signedOutProtectedSystemCheckAccess = await requestJson<{
+    accessMode: string;
+    authorizedScopes: unknown[];
+  }>("/api/v1/system-check/access");
+  assert.equal(signedOutProtectedSystemCheckAccess.status, 200);
+  assert.equal(
+    signedOutProtectedSystemCheckAccess.body.accessMode,
+    "login_required"
+  );
+  assert.deepEqual(
+    signedOutProtectedSystemCheckAccess.body.authorizedScopes,
+    []
+  );
+  const rejectedPlatformAdminAccess = await requestJson<{ error: string }>(
+    "/api/v1/system-check/access",
+    {
+      headers: {
+        authorization: `Bearer ${platformAdminSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(rejectedPlatformAdminAccess.status, 403);
+  assert.equal(rejectedPlatformAdminAccess.body.error, "admin_role_required");
   const rejectedPlatformAdminReport = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
     {
@@ -18913,26 +18978,18 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(rejectedSystemCheckAdminRead.status, 403);
   assert.equal(rejectedSystemCheckAdminRead.body.error, "admin_role_required");
 
-  const saved = await requestJson<{
-    report: {
-      systemCheckReportId: string;
-      checkId: string;
-      checkLabel: string;
-      title: string;
-      environment: unknown[];
-    };
-  }>(
+  const rejectedAnonymousKeyReport = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
     {
       method: "POST",
       body: { ...reportBody, keyPhrase: "SAVEME" }
     }
   );
-  assert.equal(saved.status, 201);
-  assert.equal(saved.body.report.checkId, "SYSCHECK.SAMPLE");
-  assert.equal(saved.body.report.checkLabel, "System-Check Beispiel");
-  assert.equal(saved.body.report.title, "SAMPLE SYS-CHECK REPORT");
-  assert.equal(saved.body.report.environment.length, 1);
+  assert.equal(rejectedAnonymousKeyReport.status, 401);
+  assert.equal(
+    rejectedAnonymousKeyReport.body.error,
+    "system_check_login_required"
+  );
 
   const secondSaved = await requestJson<{
     report: { systemCheckReportId: string };
@@ -18940,10 +18997,13 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
     {
       method: "POST",
+      headers: {
+        authorization: `Bearer ${secondSystemCheckSignIn.body.sessionToken}`
+      },
       body: {
         ...reportBody,
         title: "SECOND SYS-CHECK REPORT",
-        keyPhrase: "SAVEME",
+        keyPhrase: undefined,
         environment: [
           {
             id: "os",

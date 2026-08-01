@@ -58,6 +58,7 @@ import {
   type ListReviewsResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
+  type GetSystemCheckAccessResponse,
   type GetSourcePackageResponse,
   type GetSourcePackageDeletionReadinessResponse,
   type GetStudyMonitorBookletResponse,
@@ -1875,6 +1876,58 @@ const hasSystemCheckAccess = async (input: {
   );
 };
 
+const listSystemCheckRoleAssignments = async (
+  repository: FirstSliceRepository
+): Promise<AdminRoleAssignment[]> => {
+  const adminUsers = await repository.listAdminUsers();
+  const roleAssignments = await Promise.all(
+    adminUsers.map(adminUser =>
+      repository.listAdminRoleAssignmentsByUserId(adminUser.adminUserId)
+    )
+  );
+  return roleAssignments
+    .flat()
+    .filter(roleAssignment => roleAssignment.role === "system_check");
+};
+
+const resolveSystemCheckAuthorizedScopes = async (
+  repository: FirstSliceRepository,
+  roleAssignments: AdminRoleAssignment[]
+): Promise<GetSystemCheckAccessResponse["authorizedScopes"]> => {
+  const tenants = await repository.listTenants();
+  const workspacesByTenant = await Promise.all(
+    tenants.map(async tenant => ({
+      tenant,
+      workspaces: await repository.listWorkspacesByTenantId(tenant.tenantId)
+    }))
+  );
+  const scopes = new Map<string, GetSystemCheckAccessResponse["authorizedScopes"][number]>();
+  for (const roleAssignment of roleAssignments) {
+    if (!roleAssignment.tenantId || !roleAssignment.workspaceId) {
+      continue;
+    }
+    const tenantEntry = workspacesByTenant.find(
+      entry => entry.tenant.tenantId === roleAssignment.tenantId
+    );
+    const workspace = tenantEntry?.workspaces.find(
+      item => item.workspaceId === roleAssignment.workspaceId
+    );
+    if (!tenantEntry || !workspace) {
+      continue;
+    }
+    const scope = {
+      tenantKey: tenantEntry.tenant.tenantKey,
+      workspaceKey: workspace.workspaceKey
+    };
+    scopes.set(`${scope.tenantKey}\u0000${scope.workspaceKey}`, scope);
+  }
+  return Array.from(scopes.values()).sort(
+    (left, right) =>
+      left.tenantKey.localeCompare(right.tenantKey) ||
+      left.workspaceKey.localeCompare(right.workspaceKey)
+  );
+};
+
 type MonitorRouteScope =
   | { kind: "workspace_monitor" }
   | { kind: "study_workspace" }
@@ -2190,6 +2243,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.system.getRuntimeConfig) {
     return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
+  }
+
+  if (
+    method === "GET" &&
+    pathname === productionApiRoutes.system.getSystemCheckAccess
+  ) {
+    return `GET ${productionApiRoutes.system.getSystemCheckAccess}`;
   }
 
   if (method === "GET" && systemCheckSpeedTestDownloadPattern.test(pathname)) {
@@ -3324,6 +3384,45 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             },
             environment: runtime.config.environment
           }
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        pathname === productionApiRoutes.system.getSystemCheckAccess
+      ) {
+        const allSystemCheckRoles = await listSystemCheckRoleAssignments(
+          runtime.repository
+        );
+        const sessionToken = readBearerToken(request);
+        let authorizedScopes: GetSystemCheckAccessResponse["authorizedScopes"] = [];
+        if (sessionToken) {
+          const { roleAssignments } = await services.adminAuth.getCurrentSession({
+            sessionToken
+          });
+          const systemCheckRoles = roleAssignments.filter(
+            roleAssignment => roleAssignment.role === "system_check"
+          );
+          if (systemCheckRoles.length === 0) {
+            sendError(
+              response,
+              403,
+              "admin_role_required",
+              "The admin session does not have dedicated system-check access.",
+              { requiredRoles: ["system_check"] }
+            );
+            return;
+          }
+          authorizedScopes = await resolveSystemCheckAuthorizedScopes(
+            runtime.repository,
+            systemCheckRoles
+          );
+        }
+        sendJson<GetSystemCheckAccessResponse>(response, 200, {
+          accessMode:
+            allSystemCheckRoles.length > 0 ? "login_required" : "anonymous_key",
+          authorizedScopes
         });
         return;
       }
@@ -5647,6 +5746,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             return;
           }
           authenticatedLoginName = adminUser.username;
+        } else if (
+          (await listSystemCheckRoleAssignments(runtime.repository)).length > 0
+        ) {
+          sendError(
+            response,
+            401,
+            "system_check_login_required",
+            "A dedicated system-check login is required while system-check login mode is active."
+          );
+          return;
         }
         const body = await readRequestJsonBody<SaveSystemCheckReportRequest>();
         const report = await services.systemCheck.saveSystemCheckReport({

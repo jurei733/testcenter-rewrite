@@ -55,7 +55,9 @@ Migrated `system_check` accounts sign in directly on the System Check page,
 may keep multiple device sessions active, and save reports under the login name
 without receiving the configured report key. Their bearer session is accepted
 only for the assigned workspace's report-save route; administrative and monitor
-reads remain unavailable.
+reads remain unavailable. As in the original application, configuring any such
+account switches the installation from anonymous report-key saving to required
+system-check login mode; the API enforces that switch as well as the Angular UI.
 
 ## Workspace Shape
 

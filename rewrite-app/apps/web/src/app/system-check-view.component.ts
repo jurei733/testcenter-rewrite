@@ -7,6 +7,7 @@ import { ActivatedRoute } from "@angular/router";
 import {
   productionApiRoutes,
   resolveRoutePath,
+  type GetSystemCheckAccessResponse,
   type GetSystemCheckResponse,
   type GetSystemCheckReportStatisticsResponse,
   type ListSystemCheckReportsResponse,
@@ -14,6 +15,8 @@ import {
   type DeleteSystemCheckReportsResponse,
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
+  type SystemCheckAccessMode,
+  type SystemCheckAuthorizedScope,
   type SystemCheckSpeedTestUploadResponse
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -75,12 +78,13 @@ type ThroughputResult = {
           <span class="eyebrow">Protected system check</span>
           <h2 id="systemCheckSignedInUser">Signed in as {{ signedInUsername }}</h2>
           <p>This workspace login authorizes report saving without a separate report key.</p>
-          <button id="systemCheckSignOutButton" class="ghost" type="button" [disabled]="busy" (click)="signOutSystemCheck()">Sign Out</button>
+          <button id="systemCheckSignOutButton" class="ghost" type="button" [disabled]="busy || systemCheckAuthenticationBusy" (click)="signOutSystemCheck()">Sign Out</button>
         </ng-container>
         <ng-template #systemCheckSignIn>
-          <span class="eyebrow">Optional workspace login</span>
+          <span class="eyebrow">{{ systemCheckLoginRequired ? 'Protected workspace login' : 'Optional workspace login' }}</span>
           <h2>Use a protected system-check account</h2>
-          <p>Imported <code>sys-check-login</code> accounts can save reports under their login name without entering the report key.</p>
+          <p *ngIf="systemCheckLoginRequired" id="systemCheckLoginRequiredStatus">This installation uses dedicated system-check accounts. Sign in to select and run the assigned workspace checks.</p>
+          <p *ngIf="!systemCheckLoginRequired">Imported <code>sys-check-login</code> accounts can save reports under their login name without entering the report key.</p>
           <div class="form-grid">
             <label>Login name<input id="systemCheckUsername" autocomplete="username" [(ngModel)]="systemCheckUsername" /></label>
             <label>Password<input id="systemCheckPassword" type="password" autocomplete="current-password" [(ngModel)]="systemCheckPassword" /></label>
@@ -89,7 +93,7 @@ type ThroughputResult = {
         </ng-template>
       </article>
 
-      <article class="card" *ngIf="!systemCheck">
+      <article class="card" *ngIf="!systemCheck && canUseSystemChecks">
         <h2>Choose a system check</h2>
         <div class="form-grid">
           <label>Tenant Key<input id="systemCheckTenantKey" [(ngModel)]="tenantKey" /></label>
@@ -370,6 +374,8 @@ export class SystemCheckViewComponent implements OnInit {
   reportKey = "";
   systemCheckUsername = "";
   systemCheckPassword = "";
+  systemCheckAccessMode: SystemCheckAccessMode = "anonymous_key";
+  authorizedSystemCheckScopes: SystemCheckAuthorizedScope[] = [];
   savedReport: SystemCheckReport | null = null;
   operatorReports: SystemCheckReport[] = [];
   operatorStatistics: SystemCheckReportStatistics[] = [];
@@ -377,10 +383,11 @@ export class SystemCheckViewComponent implements OnInit {
   selectedOperatorReport: SystemCheckReport | null = null;
   operatorStatusMessage = "";
   busy = false;
+  systemCheckAuthenticationBusy = false;
   errorMessage = "";
   questionnaireIssue = "";
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.viewState.setActiveView("system-check");
     this.tenantKey =
       this.route.snapshot.queryParamMap.get("tenantKey")?.trim() || this.tenantKey;
@@ -388,13 +395,26 @@ export class SystemCheckViewComponent implements OnInit {
       this.route.snapshot.queryParamMap.get("workspaceKey")?.trim() ||
       this.workspaceKey;
     const checkId = this.route.snapshot.queryParamMap.get("checkId")?.trim();
+    await this.loadSystemCheckAccess();
     if (this.canLoad) {
-      void this.loadSystemChecks(checkId || undefined);
+      await this.loadSystemChecks(checkId || undefined);
     }
   }
 
   get canLoad(): boolean {
-    return Boolean(this.tenantKey.trim() && this.workspaceKey.trim());
+    return Boolean(
+      this.canUseSystemChecks &&
+      this.tenantKey.trim() &&
+      this.workspaceKey.trim()
+    );
+  }
+
+  get systemCheckLoginRequired(): boolean {
+    return this.systemCheckAccessMode === "login_required";
+  }
+
+  get canUseSystemChecks(): boolean {
+    return !this.systemCheckLoginRequired || this.isSystemCheckSession;
   }
 
   get steps(): SystemCheckStep[] {
@@ -524,27 +544,63 @@ export class SystemCheckViewComponent implements OnInit {
 
   async signInSystemCheck(): Promise<void> {
     if (!this.canSignInSystemCheck) return;
-    await this.run(async () => {
-      if (this.hasAdminSession) {
-        await this.opsService.signOutAdmin();
+    this.systemCheckAuthenticationBusy = true;
+    let signedIn = false;
+    try {
+      await this.run(async () => {
+        if (this.hasAdminSession) {
+          await this.opsService.signOutAdmin();
+        }
+        this.uiState.ops.adminUsername = this.systemCheckUsername.trim();
+        this.uiState.ops.adminPassword = this.systemCheckPassword;
+        await this.opsService.signInAdmin();
+        this.systemCheckPassword = "";
+        if (!this.isSystemCheckSession) {
+          await this.opsService.signOutAdmin();
+          throw new Error(
+            "This account does not have dedicated system-check access."
+          );
+        }
+        signedIn = true;
+      });
+      if (!signedIn) return;
+      await this.loadSystemCheckAccess();
+      const firstScope = this.authorizedSystemCheckScopes[0];
+      if (!firstScope) {
+        this.errorMessage = "This system-check account has no available workspace scope.";
+        return;
       }
-      this.uiState.ops.adminUsername = this.systemCheckUsername.trim();
-      this.uiState.ops.adminPassword = this.systemCheckPassword;
-      await this.opsService.signInAdmin();
-      this.systemCheckPassword = "";
-      if (!this.isSystemCheckSession) {
-        await this.opsService.signOutAdmin();
-        throw new Error(
-          "This account does not have dedicated system-check access."
-        );
-      }
-    });
+      this.tenantKey = firstScope.tenantKey;
+      this.workspaceKey = firstScope.workspaceKey;
+      await this.loadSystemChecks();
+    } finally {
+      this.systemCheckAuthenticationBusy = false;
+      this.changeDetectorRef.detectChanges();
+    }
   }
 
   async signOutSystemCheck(): Promise<void> {
     await this.run(async () => {
       await this.opsService.signOutAdmin();
       this.systemCheckPassword = "";
+      this.systemCheck = null;
+      this.systemChecks = [];
+      this.authorizedSystemCheckScopes = [];
+    });
+    await this.loadSystemCheckAccess();
+  }
+
+  async loadSystemCheckAccess(): Promise<void> {
+    await this.run(async () => {
+      const headers = this.isSystemCheckSession ? this.adminHeaders : undefined;
+      const { payload } = await this.api.send<GetSystemCheckAccessResponse>(
+        "GET",
+        productionApiRoutes.system.getSystemCheckAccess,
+        undefined,
+        headers ?? {}
+      );
+      this.systemCheckAccessMode = payload.accessMode;
+      this.authorizedSystemCheckScopes = payload.authorizedScopes;
     });
   }
 
