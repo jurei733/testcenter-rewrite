@@ -7,6 +7,8 @@ import type {
   ImportParticipantRosterResponse,
   IssueMonitorRunCommandRequest,
   IssueMonitorRunCommandResponse,
+  IssueMonitorRunCommandsRequest,
+  IssueMonitorRunCommandsResponse,
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
   ParticipantSignInRequest,
@@ -43,6 +45,7 @@ export interface ShellRuntimeActionsHost {
   getResumeRunPath(): string;
   getCompleteRunPath(): string;
   getMonitorRunCommandPath(): string;
+  getMonitorRunCommandsPath(): string;
   getDeleteGroupResultsPath(): string;
   getCreateReviewPath(): string;
   getUpdateReviewPath(): string;
@@ -316,6 +319,40 @@ export async function issueMonitorRunCommandAction(
     );
   }
 
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}
+
+export async function issueMonitorRunCommandsAction(
+  host: ShellRuntimeActionsHost,
+  testRunIds: string[],
+  commandType:
+    | "pause"
+    | "resume"
+    | "complete"
+    | "goto"
+    | "unlock_navigation"
+    | "lock_navigation"
+    | "set_testlet_time"
+): Promise<IssueMonitorRunCommandsResponse> {
+  const payload = await host.request<IssueMonitorRunCommandsResponse>(
+    `Monitor ${commandType} ${testRunIds.length} Runs`,
+    "POST",
+    host.getMonitorRunCommandsPath(),
+    {
+      testRunIds,
+      commandType,
+      actorId: host.getReviewerId().trim() || undefined,
+      ...(commandType === "goto"
+        ? { targetUnitKey: host.getCurrentUnitKey().trim() }
+        : commandType === "set_testlet_time"
+          ? {
+              targetUnitKey: host.getCurrentUnitKey().trim(),
+              remainingSeconds: Number(host.getMonitorTimeSeconds())
+            }
+          : {})
+    } satisfies IssueMonitorRunCommandsRequest
+  );
   await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;
 }

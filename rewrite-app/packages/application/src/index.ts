@@ -497,6 +497,24 @@ export type MonitorControlPort = {
     targetUnitKey?: string | null;
     remainingSeconds?: number | null;
   }): Promise<MonitorRunCommandResult>;
+  issueRunCommands(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    testRunIds: string[];
+    commandType: MonitorRunCommandType;
+    actorId?: string | null;
+    targetUnitKey?: string | null;
+    remainingSeconds?: number | null;
+  }): Promise<{
+    commands: MonitorRunCommandResult[];
+    failures: Array<{
+      testRunId: string;
+      statusCode: number;
+      error: string;
+      message: string;
+      details: unknown;
+    }>;
+  }>;
 };
 
 export type AdminAuthPort = {
@@ -14931,6 +14949,43 @@ export const createFirstSliceServices = (
           testRun: effectiveNextTestRun,
           participantSession: nextParticipantSession
         };
+      },
+      async issueRunCommands(input) {
+        const commands: MonitorRunCommandResult[] = [];
+        const failures: Array<{
+          testRunId: string;
+          statusCode: number;
+          error: string;
+          message: string;
+          details: unknown;
+        }> = [];
+        for (const testRunId of input.testRunIds) {
+          try {
+            commands.push(
+              await this.issueRunCommand({
+                tenantKey: input.tenantKey,
+                workspaceKey: input.workspaceKey,
+                testRunId,
+                commandType: input.commandType,
+                actorId: input.actorId,
+                targetUnitKey: input.targetUnitKey,
+                remainingSeconds: input.remainingSeconds
+              })
+            );
+          } catch (error) {
+            if (!(error instanceof FirstSliceError)) {
+              throw error;
+            }
+            failures.push({
+              testRunId,
+              statusCode: error.statusCode,
+              error: error.errorCode,
+              message: error.message,
+              details: error.details
+            });
+          }
+        }
+        return { commands, failures };
       }
     }
   };

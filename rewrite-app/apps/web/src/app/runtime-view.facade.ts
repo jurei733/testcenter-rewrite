@@ -66,6 +66,7 @@ export class RuntimeViewFacade {
   private readonly runtimeService = inject(RewriteAppRuntimeService);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly monitorBatchSelection = new Set<string>();
 
   readonly runtime = this.uiState.runtime;
   readonly participantSessionStatusOptions = participantSessionStatuses;
@@ -1549,6 +1550,9 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
+        const batchSelected = this.monitorBatchSelection.has(
+          openRun.testRunId
+        );
         const bookletStates = Object.entries(openRun.bookletStates).map(
           ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
         );
@@ -1563,7 +1567,8 @@ export class RuntimeViewFacade {
             bookletStates.length > 0
               ? `${bookletStates.length} booklet state${bookletStates.length === 1 ? "" : "s"}`
               : "no booklet states",
-            openRun.participantRosterEntry ? "roster" : "ad hoc"
+            openRun.participantRosterEntry ? "roster" : "ad hoc",
+            batchSelected ? "batch selected" : "not in batch"
           ],
           rows: [
             {
@@ -1612,9 +1617,43 @@ export class RuntimeViewFacade {
             groupKey: openRun.groupKey,
             bookletKey: openRun.bookletKey,
             displayName: displayName ?? ""
-          }
+          },
+          actions: [
+            {
+              label: batchSelected ? "Remove from Batch" : "Add to Batch",
+              payload: {
+                monitorBatchCommand: "toggle",
+                testRunId: openRun.testRunId
+              }
+            }
+          ]
         };
       }) ?? []
+    );
+  }
+
+  get monitorBatchRunIds(): string[] {
+    return [...this.monitorBatchSelection];
+  }
+
+  get monitorBatchCount(): number {
+    return this.monitorBatchSelection.size;
+  }
+
+  get canIssueMonitorBatch(): boolean {
+    return this.canUseWorkspaceScope && this.monitorBatchCount > 0;
+  }
+
+  get canIssueMonitorBatchGoto(): boolean {
+    return this.canIssueMonitorBatch && Boolean(this.runtime.currentUnitKey.trim());
+  }
+
+  get canIssueMonitorBatchTime(): boolean {
+    const seconds = Number(this.runtime.monitorTimeSeconds);
+    return (
+      this.canIssueMonitorBatchGoto &&
+      Number.isInteger(seconds) &&
+      seconds > 0
     );
   }
 
@@ -2519,6 +2558,61 @@ export class RuntimeViewFacade {
     );
   }
 
+  selectAllVisibleMonitorRuns(): void {
+    const payload = parseJsonDocument<MonitorOpenRunsResponse>(
+      this.runtime.openRunsView
+    );
+    for (const openRun of payload?.items ?? []) {
+      this.monitorBatchSelection.add(openRun.testRunId);
+    }
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  clearMonitorBatchSelection(): void {
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  issueMonitorBatchCommand(
+    commandType:
+      | "pause"
+      | "resume"
+      | "complete"
+      | "goto"
+      | "unlock_navigation"
+      | "lock_navigation"
+      | "set_testlet_time"
+  ): void {
+    const testRunIds = this.monitorBatchRunIds;
+    if (testRunIds.length === 0) {
+      return;
+    }
+    const targetDescription =
+      commandType === "goto"
+        ? ` to unit ${this.runtime.currentUnitKey.trim()}`
+        : commandType === "set_testlet_time"
+          ? ` for unit ${this.runtime.currentUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
+          : "";
+    if (
+      !globalThis.confirm(
+        `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`
+      )
+    ) {
+      return;
+    }
+
+    this.viewState.onActionAsync(async () => {
+      const result = await this.runtimeService.issueMonitorRunCommands(
+        testRunIds,
+        commandType
+      );
+      for (const command of result.commands) {
+        this.monitorBatchSelection.delete(command.testRun.testRunId);
+      }
+      this.uiState.renderVersion.update(version => version + 1);
+    });
+  }
+
   openRuns(): void {
     if (!this.canUseWorkspaceScope) {
       return;
@@ -2804,6 +2898,15 @@ export class RuntimeViewFacade {
   selectTestRun(item: RecordCollectionItem): void {
     const testRunId = item.actionPayload?.testRunId?.trim();
     if (!testRunId) {
+      return;
+    }
+    if (item.actionPayload?.monitorBatchCommand === "toggle") {
+      if (this.monitorBatchSelection.has(testRunId)) {
+        this.monitorBatchSelection.delete(testRunId);
+      } else {
+        this.monitorBatchSelection.add(testRunId);
+      }
+      this.uiState.renderVersion.update(version => version + 1);
       return;
     }
 

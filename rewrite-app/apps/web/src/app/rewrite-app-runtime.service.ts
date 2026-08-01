@@ -1,6 +1,9 @@
 import { Injectable, inject } from "@angular/core";
 
-import { type GetParticipantSessionResponse } from "@testcenter-rewrite-app/contracts";
+import {
+  type GetParticipantSessionResponse,
+  type IssueMonitorRunCommandsResponse
+} from "@testcenter-rewrite-app/contracts";
 import {
   createParticipantHappyPathFlowHost
 } from "./rewrite-app-shell.hosts";
@@ -15,6 +18,7 @@ import {
   deleteReviewAction,
   importParticipantRosterAction,
   issueMonitorRunCommandAction,
+  issueMonitorRunCommandsAction,
   participantLaunchAction,
   participantSignInAction,
   resumeParticipantSessionAction,
@@ -132,6 +136,31 @@ export class RewriteAppRuntimeService {
             : "Monitor Complete Issued",
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );
+  }
+
+  async issueMonitorRunCommands(
+    testRunIds: string[],
+    commandType:
+      | "pause"
+      | "resume"
+      | "complete"
+      | "goto"
+      | "unlock_navigation"
+      | "lock_navigation"
+      | "set_testlet_time"
+  ): Promise<IssueMonitorRunCommandsResponse> {
+    const result = await issueMonitorRunCommandsAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      ),
+      testRunIds,
+      commandType
+    );
+    this.feedback.rememberActivity(
+      "Monitor Batch Command Issued",
+      `${commandType}: ${result.succeededCount} succeeded, ${result.failedCount} failed.`
+    );
+    return result;
   }
 
   async refreshRuntimeReads(quiet = false): Promise<void> {

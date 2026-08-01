@@ -23,13 +23,12 @@ Priority:
 | 1 | P0 | Original package dependency corpus expansion | A pinned 14.3/15.1/17.4/17.6 corpus now gates successful imports, XSD-backed rejection behavior, and an executable original `Booklet2.xml` + `Unit2.xml` + coding scheme + Verona 6 multi-file ZIP; complete XSD facets, production packages, additional dependency topologies, and more real players must still be added. |
 | 2 | P0 | Testlet adaptivity | Original adaptive state definitions, condition aggregations, persisted `BOOKLET_STATES`, `Show` routing, nested `Testlet` paths, participant-assignment state presets and same-booklet preset variants, server-side IQB coding-scheme derivation, `CodeToEnter` gates, server-authoritative `TimeMax` execution with configured warnings, durable `LockAfterLeaving` rules, and dimension-wise `DenyNavigationOnIncomplete` inheritance now extend the versioned runtime model; the pinned original adaptive sample runs end-to-end, while production schemes, subforms, and edge-status fixtures remain. |
 | 3 | P0 | Verona resource and delivery hardening | Original nested `.itcr.zip` packages now reach players through `directDownloadUrl`, including a browser gate for byte-exact fetches from the originless sandbox; the pinned original Verona 6 sample also runs its real unit definition in the Angular host, persists raw responses, drives adaptive routing, and restores them after reload. Bundled JSON-LD metadata is checked for player type, supported API version, and reference/version/id consistency; loose cross-package workspace resources, metadata-absent legacy packages, rich logs/focus events, broader player fixtures, streaming/range requests, and offline delivery still need parity work. |
-| 4 | P1 | Monitor bulk commands | Pause, resume, complete, audited go-to, whole-run navigation unlock/re-lock, and operator-selected time restoration now exist; multi-run dispatch remains. |
-| 5 | P1 | Two-step participant code | Password login and durable login-sink parity are complete; the original optional second code challenge still needs a model and participant flow. |
-| 6 | P1 | Workspace file administration | Operators still need file browsing, download, dependency-aware deletion, and replacement workflows. |
-| 7 | P1 | System check | The original device/network/questionnaire/player verification flow is absent. |
-| 8 | P1 | Log and system-check exports | Response, review, monitor, roster, directory, and activity exports exist; original report coverage is incomplete. |
-| 9 | P2 | Attachments and QR capture | Operationally valuable but separable from the first controlled digital-only rollout. |
-| 10 | P2 | Branding, custom texts, maintenance banner, themes | Needed for broad tenant rollout after core test integrity is proven. |
+| 4 | P1 | Two-step participant code | Password login and durable login-sink parity are complete; the original optional second code challenge still needs a model and participant flow. |
+| 5 | P1 | Workspace file administration | Operators still need file browsing, download, dependency-aware deletion, and replacement workflows. |
+| 6 | P1 | System check | The original device/network/questionnaire/player verification flow is absent. |
+| 7 | P1 | Log and system-check exports | Response, review, monitor, roster, directory, and activity exports exist; original report coverage is incomplete. |
+| 8 | P2 | Attachments and QR capture | Operationally valuable but separable from the first controlled digital-only rollout. |
+| 9 | P2 | Branding, custom texts, maintenance banner, themes | Needed for broad tenant rollout after core test integrity is proven. |
 
 ## Capability matrix
 
@@ -81,9 +80,9 @@ Priority:
 | Participant-by-unit drill-down | study monitor | done | P1 | matrix, filtered drill-downs, response/review handoff, CSV exports, and a 200-row source window kept separate from the operator-selected visible-card limit |
 | Near-real-time refresh | broadcaster/group monitor | partial | P1 | frontend polling/refresh; no push channel or explicit connection state |
 | Pause/resume/complete | monitor routes | done | P1 | command API, activity trail, UI controls, open-run smoke coverage |
-| Go-to block, unlock, lock | monitor routes and E2E | partial | P1 | audited go-to sets the run to running, targets an exact unit, bypasses completion navigation guards, clears target code/leave locks, and reopens closed timed blocks with their configured duration; whole-run unlock/re-lock preserves run status and controls the durable bypass for code, leave-lock, and completeness guards without reopening elapsed timed blocks or reconstructing consumed one-time gates; selected timed units accept replacement rest time that runs immediately only when current and otherwise waits for re-entry; multi-run dispatch remains |
+| Go-to block, unlock, lock | monitor routes and E2E | done | P1 | audited go-to sets runs to running, targets an exact unit, bypasses completion navigation guards, clears target code/leave locks, and reopens closed timed blocks with their configured duration; whole-run unlock/re-lock preserves status and controls the durable bypass for code, leave-lock, and completeness guards; selected timed units accept replacement rest time, and every command supports bounded multi-run dispatch with per-run results |
 | Profiles, filters, columns, view density | monitor profiles E2E | partial | P2 | rich filters exist; saved profiles and configurable columns do not |
-| Command audit trail and bulk safety | monitor behavior | partial | P1 | actor/time/details are persisted; no multi-run preview/confirmation workflow |
+| Command audit trail and bulk safety | monitor behavior | done | P1 | exact selected run ids are previewed before confirmation; the bounded bulk API deduplicates ids, returns per-run successes/failures, retains failed selections for retry, and preserves an actor/time/details activity event for every successful command |
 
 ### Results, review, admin, and operations
 

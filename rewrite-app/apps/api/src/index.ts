@@ -62,6 +62,8 @@ import {
   type ImportParticipantRosterResponse,
   type IssueMonitorRunCommandRequest,
   type IssueMonitorRunCommandResponse,
+  type IssueMonitorRunCommandsRequest,
+  type IssueMonitorRunCommandsResponse,
   type ListAdminAuditEventsResponse,
   type ListAdminSessionsResponse,
   type ListWorkspaceActivityEventsResponse,
@@ -1453,6 +1455,9 @@ const monitorOpenRunsPattern = createRoutePattern(
 const monitorRunCommandPattern = createRoutePattern(
   productionApiRoutes.monitor.issueRunCommand
 );
+const monitorRunCommandsPattern = createRoutePattern(
+  productionApiRoutes.monitor.issueRunCommands
+);
 
 type OperatorAccessScope =
   | { kind: "platform" }
@@ -1504,6 +1509,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", contentReleaseActivationReadinessPattern],
   ["POST", contentReleaseActivatePattern],
   ["GET", monitorOpenRunsPattern],
+  ["POST", monitorRunCommandsPattern],
   ["POST", monitorRunCommandPattern]
 ];
 
@@ -2046,6 +2052,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
     ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
+    ["POST", monitorRunCommandsPattern, productionApiRoutes.monitor.issueRunCommands],
     ["POST", monitorRunCommandPattern, productionApiRoutes.monitor.issueRunCommand]
   ];
 
@@ -4798,6 +4805,76 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const monitorRunCommandMatch = monitorRunCommandPattern.exec(pathname);
+      const monitorRunCommandsMatch = monitorRunCommandsPattern.exec(pathname);
+      if (request.method === "POST" && monitorRunCommandsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          monitorRunCommandsMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          monitorRunCommandsMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_monitor_bulk_command_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<IssueMonitorRunCommandsRequest>();
+        if (!Array.isArray(body.testRunIds)) {
+          sendError(
+            response,
+            400,
+            "monitor_bulk_test_run_ids_invalid",
+            "testRunIds must be an array containing 1 to 100 run ids."
+          );
+          return;
+        }
+        const normalizedTestRunIds = [
+          ...new Set(
+            body.testRunIds.map(testRunId =>
+              typeof testRunId === "string" ? testRunId.trim() : ""
+            )
+          )
+        ];
+        if (
+          normalizedTestRunIds.length === 0 ||
+          normalizedTestRunIds.length > 100 ||
+          normalizedTestRunIds.some(testRunId => !testRunId)
+        ) {
+          sendError(
+            response,
+            400,
+            "monitor_bulk_test_run_ids_invalid",
+            "testRunIds must contain 1 to 100 non-empty run ids."
+          );
+          return;
+        }
+
+        const { commands, failures } =
+          await services.monitorControl.issueRunCommands({
+            tenantKey,
+            workspaceKey,
+            testRunIds: normalizedTestRunIds,
+            commandType: body.commandType,
+            actorId: body.actorId,
+            targetUnitKey: body.targetUnitKey,
+            remainingSeconds: body.remainingSeconds
+          });
+
+        sendJson<IssueMonitorRunCommandsResponse>(response, 200, {
+          requestedCount: normalizedTestRunIds.length,
+          succeededCount: commands.length,
+          failedCount: failures.length,
+          commands,
+          failures
+        });
+        return;
+      }
+
       if (request.method === "POST" && monitorRunCommandMatch?.groups) {
         const tenantKey = decodeRouteGroup(
           monitorRunCommandMatch.groups.tenantKey

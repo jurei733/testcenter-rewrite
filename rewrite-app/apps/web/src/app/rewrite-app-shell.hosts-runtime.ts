@@ -37,6 +37,11 @@ export function createRuntimeActionsStateHost(args: {
         workspaceKey: args.workspaceState.workspaceKey.trim(),
         testRunId: args.runtimeState.testRunId.trim()
       }),
+    getMonitorRunCommandsPath: () =>
+      resolveRoutePath(productionApiRoutes.monitor.issueRunCommands, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
     getDeleteGroupResultsPath: () =>
       resolveRoutePath(productionApiRoutes.workspace.deleteGroupResults, {
         tenantKey: args.workspaceState.tenantKey.trim(),

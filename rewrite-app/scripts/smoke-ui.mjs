@@ -4248,6 +4248,60 @@ try {
     .filter({ hasText: operatorParticipantSessionLink })
     .filter({ hasText: pausedTestRunId });
   await openRunStudentCard.waitFor();
+  logStep("monitor-bulk-pause-resume");
+  await openRunStudentCard
+    .getByRole("button", { name: "Add to Batch" })
+    .click();
+  const monitorBatchCard = page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Monitor Batch Command Preview" }) });
+  await monitorBatchCard
+    .filter({ hasText: "1 selected run" })
+    .filter({ hasText: pausedTestRunId })
+    .waitFor();
+  page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /pause.*1 selected run/i);
+    await dialog.accept();
+  });
+  const bulkPauseResponsePromise = page.waitForResponse(
+    response =>
+      response.url().endsWith("/monitor/open-runs/commands") &&
+      response.request().method() === "POST"
+  );
+  await page.locator("#monitorBatchPauseButton").click();
+  const bulkPauseResponse = await bulkPauseResponsePromise;
+  assert.equal(bulkPauseResponse.status(), 200);
+  const bulkPausePayload = await bulkPauseResponse.json();
+  assert.equal(bulkPausePayload.succeededCount, 1);
+  assert.equal(bulkPausePayload.failedCount, 0);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.status === "paused"
+  );
+  await monitorBatchCard.filter({ hasText: "0 selected runs" }).waitFor();
+  await openRunStudentCard
+    .getByRole("button", { name: "Add to Batch" })
+    .click();
+  page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /resume.*1 selected run/i);
+    await dialog.accept();
+  });
+  const bulkResumeResponsePromise = page.waitForResponse(
+    response =>
+      response.url().endsWith("/monitor/open-runs/commands") &&
+      response.request().method() === "POST"
+  );
+  await page.locator("#monitorBatchResumeButton").click();
+  const bulkResumeResponse = await bulkResumeResponsePromise;
+  assert.equal(bulkResumeResponse.status(), 200);
+  const bulkResumePayload = await bulkResumeResponse.json();
+  assert.equal(bulkResumePayload.succeededCount, 1);
+  assert.equal(bulkResumePayload.failedCount, 0);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.status === "running"
+  );
+  stopAfter("monitor-bulk-pause-resume");
   logStep("open-run-select-sync");
   await fillAndCommit("#detailedResponseLoginFilter", "stale-login");
   await selectAndCommit("#detailedResponseStatusFilter", "paused");

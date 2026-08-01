@@ -614,6 +614,28 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article class="card">
+        <h2>Monitor Batch Command Preview</h2>
+        <p>Select visible open runs, review the exact run ids, then confirm one command for the batch. Per-run failures remain selected for correction or retry.</p>
+        <div class="record-collection-summary" role="status" aria-live="polite">
+          {{ view.monitorBatchCount }} selected run{{ view.monitorBatchCount === 1 ? "" : "s" }}
+        </div>
+        <ul *ngIf="view.monitorBatchRunIds.length > 0">
+          <li *ngFor="let testRunId of view.monitorBatchRunIds"><code>{{ testRunId }}</code></li>
+        </ul>
+        <div class="actions">
+          <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.selectAllVisibleMonitorRuns()">Select All Visible</button>
+          <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
+          <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
+          <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>
+          <button id="monitorBatchGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchGoto" (click)="view.issueMonitorBatchCommand('goto')">Go To Current Unit</button>
+          <button id="monitorBatchUnlockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_navigation')">Unlock Selected</button>
+          <button id="monitorBatchLockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_navigation')">Lock Selected</button>
+          <button id="monitorBatchSetTimeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchTime" (click)="view.issueMonitorBatchCommand('set_testlet_time')">Set Time On Selected</button>
+          <button id="monitorBatchCompleteButton" class="danger" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('complete')">Complete Selected</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Open Monitor Runs"
         subtitle="Runs that currently keep the activation guard active."

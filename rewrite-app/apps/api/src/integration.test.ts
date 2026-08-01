@@ -14290,3 +14290,156 @@ test("password-protected participant logins use a shared persistent login sink",
     await closeServer(isolated.server);
   }
 });
+
+test("monitor bulk commands report per-run successes and failures", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false"
+  });
+
+  try {
+    const rosterImport = await requestJsonAt<{ updatedCount: number }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: [
+            "loginKey,groupKey,bookletKey,displayName",
+            "bulk-one,group:bulk,booklet:demo,Bulk One",
+            "bulk-two,group:bulk,booklet:demo,Bulk Two"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+
+    const runIds: string[] = [];
+    for (const loginKey of ["bulk-one", "bulk-two"]) {
+      const signIn = await requestJsonAt<{
+        participantSession: { participantSessionId: string };
+      }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey
+        }
+      });
+      assert.equal(signIn.status, 200);
+      const resumed = await requestJsonAt<{
+        testRun: { testRunId: string; status: string };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${signIn.body.participantSession.participantSessionId}/resume`,
+        { method: "POST" }
+      );
+      assert.equal(resumed.status, 200);
+      runIds.push(resumed.body.testRun.testRunId);
+    }
+
+    const invalidBulk = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: { commandType: "pause", testRunIds: [] }
+      }
+    );
+    assert.equal(invalidBulk.status, 400);
+    assert.equal(invalidBulk.body.error, "monitor_bulk_test_run_ids_invalid");
+
+    const paused = await requestJsonAt<{
+      requestedCount: number;
+      succeededCount: number;
+      failedCount: number;
+      commands: Array<{
+        commandType: string;
+        actorId: string | null;
+        testRun: { testRunId: string; status: string };
+      }>;
+      failures: Array<{
+        testRunId: string;
+        statusCode: number;
+        error: string;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "pause",
+          actorId: "bulk-operator",
+          testRunIds: [runIds[0], "missing-bulk-run", runIds[1], runIds[0]]
+        }
+      }
+    );
+    assert.equal(paused.status, 200);
+    assert.equal(paused.body.requestedCount, 3);
+    assert.equal(paused.body.succeededCount, 2);
+    assert.equal(paused.body.failedCount, 1);
+    assert.deepEqual(
+      paused.body.commands.map(command => command.testRun.testRunId),
+      runIds
+    );
+    assert.equal(
+      paused.body.commands.every(command => command.testRun.status === "paused"),
+      true
+    );
+    assert.equal(
+      paused.body.commands.every(command => command.actorId === "bulk-operator"),
+      true
+    );
+    assert.equal(paused.body.failures[0]?.testRunId, "missing-bulk-run");
+    assert.equal(paused.body.failures[0]?.statusCode, 404);
+    assert.equal(paused.body.failures[0]?.error, "test_run_not_found");
+
+    const resumed = await requestJsonAt<{
+      succeededCount: number;
+      failedCount: number;
+      commands: Array<{ testRun: { status: string } }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "resume",
+          actorId: "bulk-operator",
+          testRunIds: runIds
+        }
+      }
+    );
+    assert.equal(resumed.status, 200);
+    assert.equal(resumed.body.succeededCount, 2);
+    assert.equal(resumed.body.failedCount, 0);
+    assert.equal(
+      resumed.body.commands.every(command => command.testRun.status === "running"),
+      true
+    );
+
+    const commandHistory = await requestJsonAt<{
+      items: Array<{
+        activityEvent: { actorId: string | null; subjectId: string | null };
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=10"
+    );
+    assert.equal(commandHistory.status, 200);
+    const bulkCommandHistory = commandHistory.body.items.filter(
+      item => item.activityEvent.actorId === "bulk-operator"
+    );
+    assert.equal(bulkCommandHistory.length, 4);
+    assert.deepEqual(
+      bulkCommandHistory
+        .map(item => item.activityEvent.subjectId)
+        .sort(),
+      [...runIds, ...runIds].sort()
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});

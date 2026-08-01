@@ -1506,6 +1506,8 @@ export const productionApiRoutes = {
   },
   monitor: {
     openRuns: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs",
+    issueRunCommands:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/commands",
     issueRunCommand:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/:testRunId/commands"
   },
@@ -2015,6 +2017,26 @@ export type IssueMonitorRunCommandRequest = {
 
 export type IssueMonitorRunCommandResponse = {
   command: MonitorRunCommandResult;
+};
+
+export type IssueMonitorRunCommandsRequest = IssueMonitorRunCommandRequest & {
+  testRunIds: string[];
+};
+
+export type MonitorRunCommandFailure = {
+  testRunId: string;
+  statusCode: number;
+  error: string;
+  message: string;
+  details: unknown;
+};
+
+export type IssueMonitorRunCommandsResponse = {
+  requestedCount: number;
+  succeededCount: number;
+  failedCount: number;
+  commands: MonitorRunCommandResult[];
+  failures: MonitorRunCommandFailure[];
 };
 
 export type RuntimeOperationalEvent = {
