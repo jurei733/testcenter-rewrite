@@ -10941,6 +10941,126 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
   }
 });
 
+test("metadata-free Verona players use an explicit legacy compatibility policy", async () => {
+  const tenantKey = "integration-tenant-player-metadata-legacy";
+  const workspaceKey = "integration-workspace-player-metadata-legacy";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const cases = [
+    {
+      name: "versioned-supported",
+      playerKey: "legacy-player@5.2",
+      runtimeVersion: "5.2",
+      expectedStatus: "completed",
+      expectedSeverity: "warning",
+      expectedCode: "source_document_player_metadata_missing"
+    },
+    {
+      name: "unversioned",
+      playerKey: "legacy-player",
+      runtimeVersion: "4.0",
+      expectedStatus: "completed",
+      expectedSeverity: "warning",
+      expectedCode: "source_document_player_metadata_missing"
+    },
+    {
+      name: "versioned-unsupported",
+      playerKey: "legacy-player@7.0",
+      runtimeVersion: "7.0",
+      expectedStatus: "failed",
+      expectedSeverity: "error",
+      expectedCode: "source_document_player_api_version_unsupported"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const bookletKey = `BOOKLET.LEGACY.${testCase.name}`;
+    const unitKey = `UNIT.LEGACY.${testCase.name}`;
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest>
+            <resources>
+              <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${unitKey}" href="units/Unit.xml" />
+              <resource identifier="${testCase.playerKey}" href="players/player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>${bookletKey}</Id><Label>Legacy Player Booklet</Label></Metadata>
+            <Units><Unit id="${unitKey}" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>${unitKey}</Id><Label>Legacy Player Unit</Label></Metadata>
+            <Definition player="${testCase.playerKey}"><![CDATA[<p>Legacy player unit</p>]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/player.html",
+        content: `<!doctype html><script>
+          addEventListener("DOMContentLoaded", () => parent.postMessage({
+            type: "vopReadyNotification",
+            apiVersion: "${testCase.runtimeVersion}"
+          }, "*"));
+        </script><main>Metadata-free legacy player</main>`
+      }
+    ]);
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `player-metadata-${testCase.name}.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; severity: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+
+    assert.equal(importResult.status, 201);
+    assert.equal(importResult.body.importJob.status, testCase.expectedStatus);
+    assert.equal(
+      importResult.body.stagedContentRelease !== null,
+      testCase.expectedStatus === "completed"
+    );
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === testCase.expectedCode &&
+          diagnostic.severity === testCase.expectedSeverity
+      )
+    );
+  }
+});
+
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {
   const tenantKey = "integration-tenant-booklet-policy";
   const workspaceKey = "integration-workspace-booklet-policy";

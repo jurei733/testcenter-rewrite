@@ -3732,9 +3732,10 @@ const toDisplayLabel = (prefix: string, key: string | null): string | null => {
 
 const createImportDiagnostic = (
   code: string,
-  message: string
+  message: string,
+  severity: ImportJobDiagnostic["severity"] = "error"
 ): ImportJobDiagnostic => ({
-  severity: "error",
+  severity,
   code,
   message
 });
@@ -7666,6 +7667,34 @@ const validateZipXmlEntries = (
                 `Verona player ZIP entry '${playerEntry.fileName}' ${metadata.reason}.`
               )
             );
+          } else if (metadata.status === "missing") {
+            const playerReference = parseVeronaPlayerReference(
+              unitDefinition.playerKey
+            );
+            const referencedSpecVersion = playerReference.specVersion
+              ? normalizeVeronaSpecVersion(playerReference.specVersion)
+              : null;
+            if (
+              referencedSpecVersion &&
+              !isSupportedVeronaPlayerApiVersion(referencedSpecVersion)
+            ) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "source_document_player_api_version_unsupported",
+                  `Unit ZIP entry '${entry.fileName}' references unsupported Verona player API version '${playerReference.specVersion}', and '${playerEntry.fileName}' has no application/ld+json metadata to provide a compatible version.`
+                )
+              );
+            } else {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "source_document_player_metadata_missing",
+                  referencedSpecVersion
+                    ? `Verona player ZIP entry '${playerEntry.fileName}' has no application/ld+json metadata; legacy compatibility is inferred from unit reference '${unitDefinition.playerKey}' and remains gated by the runtime ready handshake.`
+                    : `Verona player ZIP entry '${playerEntry.fileName}' has no application/ld+json metadata and unit reference '${unitDefinition.playerKey}' has no numeric API version; import is allowed for legacy compatibility and the runtime ready handshake must confirm a supported version.`,
+                  "warning"
+                )
+              );
+            }
           } else if (
             metadata.status === "valid" &&
             !isSupportedVeronaPlayerApiVersion(metadata.specVersion)

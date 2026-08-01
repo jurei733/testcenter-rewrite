@@ -3083,6 +3083,14 @@ try {
     }
   );
   const veronaImportPayload = await veronaImportResponse.json();
+  assert.ok(
+    veronaImportPayload.importJob?.diagnostics?.some(
+      diagnostic =>
+        diagnostic.code === "source_document_player_metadata_missing" &&
+        diagnostic.severity === "warning"
+    ),
+    "Metadata-free Verona player import should retain a legacy compatibility warning."
+  );
   const veronaContentReleaseId =
     veronaImportPayload.stagedContentRelease?.contentReleaseId;
   assert.ok(veronaContentReleaseId, "Verona smoke import should stage a release.");
