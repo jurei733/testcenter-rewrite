@@ -21,7 +21,12 @@ import type {
   ParticipantRosterSource,
   SourceDocumentSource
 } from "@testcenter-rewrite-app/contracts";
-import { monitorRunCommandTypes } from "@testcenter-rewrite-app/domain";
+import {
+  defaultParticipantExecutionMode,
+  monitorRunCommandTypes,
+  participantExecutionModeDefinitions,
+  participantExecutionModes
+} from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
   AdminAuditEventType,
@@ -48,6 +53,8 @@ import type {
   MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantExecutionMode,
+  ParticipantExecutionModeDefinition,
   ParticipantLoginAttempt,
   ParticipantTestLog,
   ParticipantTestLogEntryInput,
@@ -2386,45 +2393,53 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       testRun.status !== "completed"
   );
 
-  return openRuns.map(testRun => {
-    const normalizedTestRun = normalizeTestRun(testRun);
-    const testletTimers = buildMonitorTestletTimers(
-      input.activeContentRelease,
-      normalizedTestRun,
-      input.timestamp
-    );
-    const participantSession =
-      participantSessions.find(
-        currentParticipantSession =>
-          currentParticipantSession.participantSessionId ===
-      testRun.participantSessionId
-      ) ?? null;
+  return openRuns
+    .filter(
+      testRun =>
+        resolveParticipantExecutionMode(testRun.executionMode).monitorable
+    )
+    .map(testRun => {
+      const normalizedTestRun = normalizeTestRun(testRun);
+      const testletTimers = buildMonitorTestletTimers(
+        input.activeContentRelease,
+        normalizedTestRun,
+        input.timestamp
+      );
+      const participantSession =
+        participantSessions.find(
+          currentParticipantSession =>
+            currentParticipantSession.participantSessionId ===
+            testRun.participantSessionId
+        ) ?? null;
 
-    return {
-      testRunId: testRun.testRunId,
-      participantSessionId: testRun.participantSessionId,
-      loginKey: participantSession?.loginKey ?? "unknown",
-      groupKey: participantSession?.groupKey ?? "unknown",
-      participantRosterEntry: participantSession
-        ? participantRosterEntries.find(
-            entry => entry.loginKey === participantSession.loginKey
-          ) ?? null
-        : null,
-      bookletKey: testRun.bookletKey,
-      bookletAssignmentKey:
-        testRun.bookletAssignmentKey ?? testRun.bookletKey,
-      bookletStates: normalizedTestRun.bookletStates ?? {},
-      status: normalizedTestRun.status,
-      currentUnitKey: normalizedTestRun.currentUnitKey,
-      activeTestletTimer:
-        testletTimers.find(
-          timer =>
-            timer.current &&
-            (timer.status === "running" || timer.status === "paused")
-        ) ?? null,
-      updatedAt: normalizedTestRun.updatedAt
-    };
-  });
+      return {
+        testRunId: testRun.testRunId,
+        participantSessionId: testRun.participantSessionId,
+        loginKey: participantSession?.loginKey ?? "unknown",
+        groupKey: participantSession?.groupKey ?? "unknown",
+        executionMode: normalizeParticipantExecutionMode(
+          normalizedTestRun.executionMode
+        ),
+        participantRosterEntry: participantSession
+          ? participantRosterEntries.find(
+              entry => entry.loginKey === participantSession.loginKey
+            ) ?? null
+          : null,
+        bookletKey: testRun.bookletKey,
+        bookletAssignmentKey:
+          testRun.bookletAssignmentKey ?? testRun.bookletKey,
+        bookletStates: normalizedTestRun.bookletStates ?? {},
+        status: normalizedTestRun.status,
+        currentUnitKey: normalizedTestRun.currentUnitKey,
+        activeTestletTimer:
+          testletTimers.find(
+            timer =>
+              timer.current &&
+              (timer.status === "running" || timer.status === "paused")
+          ) ?? null,
+        updatedAt: normalizedTestRun.updatedAt
+      };
+    });
 };
 
 const getLatestParticipantSessionRun = async (
@@ -2487,6 +2502,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
 
   return {
     ...testRun,
+    executionMode: normalizeParticipantExecutionMode(testRun.executionMode),
     bookletAssignmentKey:
       String(testRun.bookletAssignmentKey ?? "").trim() || testRun.bookletKey,
     presetBookletStates: Object.fromEntries(
@@ -2525,6 +2541,35 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       : []
   };
 };
+
+const normalizeParticipantExecutionMode = (
+  value: unknown
+): ParticipantExecutionMode =>
+  typeof value === "string" &&
+  participantExecutionModes.includes(value as ParticipantExecutionMode)
+    ? (value as ParticipantExecutionMode)
+    : defaultParticipantExecutionMode;
+
+const resolveParticipantExecutionMode = (
+  value: unknown
+): ParticipantExecutionModeDefinition =>
+  participantExecutionModeDefinitions[normalizeParticipantExecutionMode(value)];
+
+const applyParticipantExecutionModeToBookletPolicy = (
+  policy: BookletRuntimePolicy,
+  executionMode: ParticipantExecutionModeDefinition
+): BookletRuntimePolicy => ({
+  ...policy,
+  navigation: {
+    ...policy.navigation,
+    unitMenuEnabled:
+      policy.navigation.unitMenuEnabled || executionMode.showUnitMenu
+  },
+  timing: {
+    ...policy.timing,
+    showTimeLeft: policy.timing.showTimeLeft || executionMode.showTimeLeft
+  }
+});
 
 const escapeCsvCell = (value: string | null | undefined): string => {
   const normalizedValue = value ?? "";
@@ -3143,6 +3188,7 @@ const formatParticipantRosterCsv = (input: {
     "workspaceKey",
     "participantRosterEntryId",
     "loginKey",
+    "executionMode",
     "groupKey",
     "bookletKey",
     "displayName",
@@ -3171,6 +3217,7 @@ const formatParticipantRosterCsv = (input: {
         input.workspaceKey,
         item.participantRosterEntryId,
         item.loginKey,
+        normalizeParticipantExecutionMode(item.executionMode),
         item.groupKey,
         item.bookletKey ?? "",
         item.displayName ?? "",
@@ -3202,6 +3249,7 @@ const formatParticipantSessionsCsv = (input: {
     "participantSessionId",
     "loginKey",
     "groupKey",
+    "executionMode",
     "sessionStatus",
     "createdAt",
     "contentReleaseId",
@@ -3225,6 +3273,11 @@ const formatParticipantSessionsCsv = (input: {
         item.participantSession.participantSessionId,
         item.participantSession.loginKey,
         item.participantSession.groupKey,
+        normalizeParticipantExecutionMode(
+          item.latestTestRun?.executionMode ??
+            item.participantSession.executionMode ??
+            item.participantRosterEntry?.executionMode
+        ),
         item.participantSession.status,
         item.participantSession.createdAt,
         item.participantSession.contentReleaseId,
@@ -3563,6 +3616,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "testRunId",
     "loginKey",
     "groupKey",
+    "executionMode",
     "bookletKey",
     "bookletAssignmentKey",
     "bookletStates",
@@ -3584,6 +3638,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.testRunId,
         item.loginKey,
         item.groupKey,
+        item.executionMode,
         item.bookletKey,
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
@@ -9276,6 +9331,7 @@ const resolveActiveTestletTimer = (
   const timingPolicy = (
     booklet?.policy ?? compileBookletRuntimePolicy({})
   ).timing;
+  const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
   if (
     !testlet ||
     !timer ||
@@ -9293,7 +9349,7 @@ const resolveActiveTestletTimer = (
     startedAt: timer.startedAt,
     expiresAt: timer.expiresAt,
     leave: timeMax.leave,
-    showTimeLeft: timingPolicy.showTimeLeft,
+    showTimeLeft: timingPolicy.showTimeLeft || executionMode.showTimeLeft,
     warningMinutes: timingPolicy.warningMinutes
   };
 };
@@ -9389,6 +9445,7 @@ const resolveBookletNavigationState = (
     candidate => candidate.bookletKey === testRun.bookletKey
   );
   const policy = booklet?.policy ?? compileBookletRuntimePolicy({});
+  const executionMode = resolveParticipantExecutionMode(testRun.executionMode);
   const completenessPolicy = resolveTestletCompletenessPolicy(
     booklet,
     testRun.currentUnitKey,
@@ -9416,7 +9473,9 @@ const resolveBookletNavigationState = (
         : currentResponse.trim()
           ? "complete"
           : "none";
-  const backwardDeniedReasons = testRun.monitorNavigationUnlocked
+  const restrictionsBypassed =
+    testRun.monitorNavigationUnlocked || !executionMode.forceNaviRestrictions;
+  const backwardDeniedReasons = restrictionsBypassed
     ? []
     : bookletNavigationDeniedReasons({
         policy: completenessPolicy,
@@ -9424,7 +9483,7 @@ const resolveBookletNavigationState = (
         presentationProgress,
         responseProgress
       });
-  const forwardDeniedReasons = testRun.monitorNavigationUnlocked
+  const forwardDeniedReasons = restrictionsBypassed
     ? []
     : bookletNavigationDeniedReasons({
         policy: completenessPolicy,
@@ -9433,8 +9492,9 @@ const resolveBookletNavigationState = (
         responseProgress
       });
   const isUnitInaccessible = (unitKey: string | null): boolean =>
-    isUnitLeaveLocked(booklet, testRun, unitKey) ||
-    Boolean(findClosedTimedTestlet(booklet, testRun, unitKey));
+    executionMode.forceNaviRestrictions &&
+    (isUnitLeaveLocked(booklet, testRun, unitKey) ||
+      Boolean(findClosedTimedTestlet(booklet, testRun, unitKey)));
   let previousUnitIndex = -1;
   for (let index = currentIndex - 1; index >= 0; index -= 1) {
     if (!isUnitInaccessible(units[index]?.unitKey ?? null)) {
@@ -9457,49 +9517,56 @@ const resolveBookletNavigationState = (
     previousUnitIndex >= 0 ? units[previousUnitIndex]?.unitKey ?? null : null;
   const nextUnitKey =
     nextUnitIndex >= 0 ? units[nextUnitIndex]?.unitKey ?? null : null;
-  const nextTestletGate = findTestletCodeGate({
-    booklet,
-    testRun,
-    firstUnitIndex:
-      (booklet?.unitEntries.findIndex(
-        unit => unit.unitKey === testRun.currentUnitKey
-      ) ?? -1) + 1,
-    lastUnitIndex:
-      booklet?.unitEntries.findIndex(
-        unit => unit.unitKey === nextUnitKey
-      ) ?? -1
-  });
+  const nextTestletGate = restrictionsBypassed
+    ? null
+    : findTestletCodeGate({
+        booklet,
+        testRun,
+        firstUnitIndex:
+          (booklet?.unitEntries.findIndex(
+            unit => unit.unitKey === testRun.currentUnitKey
+          ) ?? -1) + 1,
+        lastUnitIndex:
+          booklet?.unitEntries.findIndex(
+            unit => unit.unitKey === nextUnitKey
+          ) ?? -1
+      });
   if (nextTestletGate) {
     forwardDeniedReasons.push("testlet_code_required");
   }
   if (
+    executionMode.forceTimeRestrictions &&
     isLeavingForbiddenTimedTestlet(booklet, testRun, nextUnitKey) &&
     !forwardDeniedReasons.includes("testlet_time_leave_forbidden")
   ) {
     forwardDeniedReasons.push("testlet_time_leave_forbidden");
   }
   if (
+    executionMode.forceTimeRestrictions &&
     isLeavingForbiddenTimedTestlet(booklet, testRun, previousUnitKey) &&
     !backwardDeniedReasons.includes("testlet_time_leave_forbidden")
   ) {
     backwardDeniedReasons.push("testlet_time_leave_forbidden");
   }
-  const remainingTestletGate = findTestletCodeGate({
-    booklet,
-    testRun,
-    firstUnitIndex:
-      (booklet?.unitEntries.findIndex(
-        unit => unit.unitKey === testRun.currentUnitKey
-      ) ?? -1) + 1,
-    lastUnitIndex: (booklet?.unitEntries.length ?? 0) - 1
-  });
+  const remainingTestletGate = restrictionsBypassed
+    ? null
+    : findTestletCodeGate({
+        booklet,
+        testRun,
+        firstUnitIndex:
+          (booklet?.unitEntries.findIndex(
+            unit => unit.unitKey === testRun.currentUnitKey
+          ) ?? -1) + 1,
+        lastUnitIndex: (booklet?.unitEntries.length ?? 0) - 1
+      });
   const isLastUnit = currentIndex >= 0 && currentIndex === units.length - 1;
   const canComplete =
     currentIndex >= 0 &&
     testRun.status !== "completed" &&
     forwardDeniedReasons.length === 0 &&
     remainingTestletGate == null &&
-    !isLeavingForbiddenTimedTestlet(booklet, testRun, null);
+    (!executionMode.forceTimeRestrictions ||
+      !isLeavingForbiddenTimedTestlet(booklet, testRun, null));
   const canPlayerEnd =
     canComplete &&
     (policy.navigation.playerEnd === "always" ||
@@ -9538,6 +9605,9 @@ const requireBookletNavigationAllowed = (input: {
   const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
     candidate => candidate.bookletKey === input.testRun.bookletKey
   );
+  const executionMode = resolveParticipantExecutionMode(
+    input.testRun.executionMode
+  );
   const units = booklet?.unitEntries ?? [];
   const currentIndex = currentUnitKey
     ? units.findIndex(unit => unit.unitKey === currentUnitKey)
@@ -9561,6 +9631,22 @@ const requireBookletNavigationAllowed = (input: {
   ).some(unit => unit.unitKey === input.targetUnitKey);
   if (!targetIsVisible) {
     deniedReasons.push("adaptive_unit_hidden");
+  }
+  if (!executionMode.forceNaviRestrictions) {
+    if (deniedReasons.length > 0) {
+      throw new FirstSliceError(
+        409,
+        "booklet_navigation_denied",
+        `Unit '${input.targetUnitKey}' is not part of the active booklet route.`,
+        {
+          currentUnitKey,
+          targetUnitKey: input.targetUnitKey,
+          direction,
+          deniedReasons
+        }
+      );
+    }
+    return;
   }
   const directTestletGate =
     direction === "forward"
@@ -11382,6 +11468,12 @@ export const createFirstSliceServices = (
     timestamp: string;
   }): Promise<TestRun> => {
     const normalizedRun = normalizeTestRun(input.testRun);
+    if (
+      !resolveParticipantExecutionMode(normalizedRun.executionMode)
+        .forceTimeRestrictions
+    ) {
+      return normalizedRun;
+    }
     const reconciled = reconcileExpiredTestletTimers(
       input.contentRelease,
       normalizedRun,
@@ -13778,6 +13870,10 @@ export const createFirstSliceServices = (
             tenantId: workspace.tenantId,
             workspaceId: workspace.workspaceId,
             loginKey: parsedEntry.loginKey,
+            executionMode:
+              parsedEntry.executionMode ??
+              existingEntry?.executionMode ??
+              defaultParticipantExecutionMode,
             groupKey: parsedEntry.groupKey,
             bookletKey: parsedEntry.bookletKey,
             ...(parsedEntry.bookletKeys?.length
@@ -15229,6 +15325,9 @@ export const createFirstSliceServices = (
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
+        const executionMode = resolveParticipantExecutionMode(
+          rosterEntry?.executionMode
+        );
 
         const workspaceParticipantSessions =
           await repository.listParticipantSessionsByWorkspace(
@@ -15250,18 +15349,25 @@ export const createFirstSliceServices = (
         );
         assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
 
-        const reusableSession = workspaceParticipantSessions
-          .filter(
-            participantSession =>
-              participantSession.loginKey === loginKey &&
-              participantSession.groupKey === groupKey &&
-              (participantSession.participantCode ?? null) ===
-                effectiveParticipantCode &&
-              participantSession.contentReleaseId ===
-                activeRelease.contentReleaseId &&
-              participantSession.status !== "closed"
-          )
-          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+        const reusableSession = executionMode.alwaysNewSession
+          ? undefined
+          : workspaceParticipantSessions
+              .filter(
+                participantSession =>
+                  participantSession.loginKey === loginKey &&
+                  participantSession.groupKey === groupKey &&
+                  (participantSession.participantCode ?? null) ===
+                    effectiveParticipantCode &&
+                  participantSession.contentReleaseId ===
+                    activeRelease.contentReleaseId &&
+                  normalizeParticipantExecutionMode(
+                    participantSession.executionMode
+                  ) === executionMode.mode &&
+                  participantSession.status !== "closed"
+              )
+              .sort((left, right) =>
+                right.createdAt.localeCompare(left.createdAt)
+              )[0];
 
         if (reusableSession) {
           await recordWorkspaceActivity({
@@ -15276,6 +15382,7 @@ export const createFirstSliceServices = (
               groupKey: reusableSession.groupKey,
               contentReleaseId: reusableSession.contentReleaseId,
               participantCodeRequired: codeRequired,
+              executionMode: executionMode.mode,
               rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
               reused: true
             }
@@ -15291,6 +15398,7 @@ export const createFirstSliceServices = (
           loginKey,
           groupKey,
           participantCode: effectiveParticipantCode,
+          executionMode: executionMode.mode,
           status: "signed_in",
           validUntil,
           createdAt: signInTimestamp
@@ -15308,6 +15416,7 @@ export const createFirstSliceServices = (
             groupKey: participantSession.groupKey,
             contentReleaseId: participantSession.contentReleaseId,
             participantCodeRequired: codeRequired,
+            executionMode: executionMode.mode,
             rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
           }
         });
@@ -15357,12 +15466,18 @@ export const createFirstSliceServices = (
         const hasAvailableBooklet = booklets.some(
           booklet => booklet.status === "available"
         );
+        const executionMode = resolveParticipantExecutionMode(
+          latestTestRun?.executionMode ??
+            participantSession.executionMode ??
+            participantRosterEntry?.executionMode
+        );
 
         if (!latestTestRun) {
           return {
             participantSession,
             participantRosterEntry: publicParticipantRosterEntry,
             scope,
+            executionMode,
             latestTestRun: null,
             booklets,
             runtimeStatus: "ready_to_launch",
@@ -15375,6 +15490,7 @@ export const createFirstSliceServices = (
             participantSession,
             participantRosterEntry: publicParticipantRosterEntry,
             scope,
+            executionMode,
             latestTestRun: normalizeTestRun(latestTestRun),
             booklets,
             runtimeStatus: hasAvailableBooklet ? "ready_to_launch" : "completed",
@@ -15386,6 +15502,7 @@ export const createFirstSliceServices = (
           participantSession,
           participantRosterEntry: publicParticipantRosterEntry,
           scope,
+          executionMode,
           latestTestRun: normalizeTestRun(latestTestRun),
           booklets,
           runtimeStatus: "in_progress",
@@ -15455,6 +15572,9 @@ export const createFirstSliceServices = (
           currentTestRun
         );
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
+        const executionMode = resolveParticipantExecutionMode(
+          currentTestRun.executionMode ?? participantSession.executionMode
+        );
         if (currentTestRun.status === "paused") {
           availableActions.push("resume", "save_progress");
         } else if (currentTestRun.status === "running") {
@@ -15471,8 +15591,21 @@ export const createFirstSliceServices = (
             participantSession.participantCode
           ),
           scope,
+          executionMode,
           testRun: currentTestRun,
-          booklet: resolveRuntimeBooklet(contentRelease, currentTestRun.bookletKey),
+          booklet: (() => {
+            const runtimeBooklet = resolveRuntimeBooklet(
+              contentRelease,
+              currentTestRun.bookletKey
+            );
+            return {
+              ...runtimeBooklet,
+              policy: applyParticipantExecutionModeToBookletPolicy(
+                runtimeBooklet.policy,
+                executionMode
+              )
+            };
+          })(),
           currentUnit: resolveRuntimeUnit(
             contentRelease,
             currentTestRun.bookletKey,
@@ -15660,6 +15793,9 @@ export const createFirstSliceServices = (
         }
 
         const timestamp = now();
+        const executionMode = resolveParticipantExecutionMode(
+          participantSession.executionMode ?? rosterEntry?.executionMode
+        );
         const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
           testRunId: idGenerator(),
           participantSessionId: participantSession.participantSessionId,
@@ -15667,13 +15803,18 @@ export const createFirstSliceServices = (
           workspaceId: participantSession.workspaceId,
           contentReleaseId: participantSession.contentReleaseId,
           bookletKey: selectedBooklet.bookletKey,
+          executionMode: executionMode.mode,
           bookletAssignmentKey:
             selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
           presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
           status: "running",
           currentUnitKey: null,
           unitResponses: {},
-          unlockedTestletKeys: [],
+          unlockedTestletKeys: executionMode.presetCode
+            ? selectedBooklet.testletEntries
+                ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
+                .map(testlet => testlet.testletKey) ?? []
+            : [],
           monitorNavigationUnlocked: false,
           testletTimers: {},
           lockedTestletKeys: [],
@@ -15686,7 +15827,10 @@ export const createFirstSliceServices = (
           selectedBooklet,
           initialTestRun
         )[0];
-        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
+        const firstUnitRequiresCode =
+          executionMode.forceNaviRestrictions &&
+          !executionMode.presetCode &&
+          (firstUnit?.testletPath ?? []).some(
           testletKey =>
             Boolean(
               selectedBooklet.testletEntries?.find(
@@ -15706,8 +15850,9 @@ export const createFirstSliceServices = (
           testRun,
           timestamp
         });
-        await repository.saveParticipantTestLogs(
-          buildParticipantTestLogs({
+        if (executionMode.saveResponses) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
             testRun: effectiveTestRun,
             batches: [{
               entries: [
@@ -15725,8 +15870,9 @@ export const createFirstSliceServices = (
                   : [])
               ]
             }]
-          })
-        );
+            })
+          );
+        }
         await repository.saveParticipantSession({
           ...participantSession,
           status: "launched"
@@ -15859,6 +16005,9 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        const executionMode = resolveParticipantExecutionMode(
+          testRun.executionMode
+        );
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
@@ -15892,11 +16041,13 @@ export const createFirstSliceServices = (
             confirmTestletTimeLeave: input.confirmTestletTimeLeave,
             confirmTestletLeaveLock: input.confirmTestletLeaveLock
           });
-          const leavingTimedTestlet = resolveLeavingTimedTestlet(
-            booklet,
-            testRun,
-            nextCurrentUnitKey
-          );
+          const leavingTimedTestlet = executionMode.forceTimeRestrictions
+            ? resolveLeavingTimedTestlet(
+                booklet,
+                testRun,
+                nextCurrentUnitKey
+              )
+            : null;
           const leavePolicy =
             leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
           if (
@@ -15910,11 +16061,13 @@ export const createFirstSliceServices = (
               timestamp
             );
           }
-          activatedLeaveLock = resolveCurrentLeaveLock(
-            booklet,
-            testRun,
-            nextCurrentUnitKey
-          );
+          activatedLeaveLock = executionMode.forceNaviRestrictions
+            ? resolveCurrentLeaveLock(
+                booklet,
+                testRun,
+                nextCurrentUnitKey
+              )
+            : null;
           if (activatedLeaveLock) {
             navigationTestRun = activateCurrentLeaveLock(
               navigationTestRun,
@@ -15927,7 +16080,11 @@ export const createFirstSliceServices = (
         const responseUnitKey = hasCurrentUnitKeyInput
           ? nextCurrentUnitKey
           : navigationTestRun.currentUnitKey;
-        if (responseUnitKey && nextUnitResponse != null) {
+        if (
+          executionMode.saveResponses &&
+          responseUnitKey &&
+          nextUnitResponse != null
+        ) {
           nextUnitResponses[responseUnitKey] = nextUnitResponse;
         }
         const nextStatus = normalizeTestRunProgressStatus(input.status);
@@ -15979,12 +16136,16 @@ export const createFirstSliceServices = (
             }]
           });
         }
-        const participantTestLogs = buildParticipantTestLogs({
-          testRun: updatedRun,
-          batches: [...incomingLogBatches, ...runtimeLogBatches]
-        });
+        const participantTestLogs = executionMode.saveResponses
+          ? buildParticipantTestLogs({
+              testRun: updatedRun,
+              batches: [...incomingLogBatches, ...runtimeLogBatches]
+            })
+          : [];
         await repository.saveTestRun(updatedRun);
-        await repository.saveParticipantTestLogs(participantTestLogs);
+        if (participantTestLogs.length > 0) {
+          await repository.saveParticipantTestLogs(participantTestLogs);
+        }
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: updatedRun,
@@ -16000,7 +16161,9 @@ export const createFirstSliceServices = (
           details: {
             status: effectiveRun.status,
             currentUnitKey: effectiveRun.currentUnitKey,
-            bookletStates: effectiveRun.bookletStates
+            bookletStates: effectiveRun.bookletStates,
+            executionMode: executionMode.mode,
+            responsesPersisted: executionMode.saveResponses
           }
         });
         if (activatedLeaveLock) {
@@ -16205,8 +16368,9 @@ export const createFirstSliceServices = (
           timestamp
         );
         await repository.saveTestRun(resumedRun);
-        await repository.saveParticipantTestLogs(
-          buildParticipantTestLogs({
+        if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
             testRun: resumedRun,
             batches: [{
               entries: [{
@@ -16215,8 +16379,9 @@ export const createFirstSliceServices = (
                 content: "RUNNING"
               }]
             }]
-          })
-        );
+            })
+          );
+        }
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: resumedRun,
@@ -16267,11 +16432,12 @@ export const createFirstSliceServices = (
         const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
           candidate => candidate.bookletKey === testRun.bookletKey
         );
-        const leavingTimedTestlet = resolveLeavingTimedTestlet(
-          booklet,
-          testRun,
-          null
+        const executionMode = resolveParticipantExecutionMode(
+          testRun.executionMode
         );
+        const leavingTimedTestlet = executionMode.forceTimeRestrictions
+          ? resolveLeavingTimedTestlet(booklet, testRun, null)
+          : null;
         const leavePolicy =
           leavingTimedTestlet?.restrictions?.timeMax?.leave ?? null;
         if (
@@ -16290,7 +16456,9 @@ export const createFirstSliceServices = (
             }
           );
         }
-        const leavingLock = resolveCurrentLeaveLock(booklet, testRun, null);
+        const leavingLock = executionMode.forceNaviRestrictions
+          ? resolveCurrentLeaveLock(booklet, testRun, null)
+          : null;
         if (
           leavingLock?.confirm &&
           !input.confirmTestletLeaveLock
@@ -16344,8 +16512,9 @@ export const createFirstSliceServices = (
           completedAt: timestamp
         };
         await repository.saveTestRun(completedRun);
-        await repository.saveParticipantTestLogs(
-          buildParticipantTestLogs({
+        if (executionMode.saveResponses) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
             testRun: completedRun,
             batches: [{
               entries: [{
@@ -16354,8 +16523,9 @@ export const createFirstSliceServices = (
                 content: "TERMINATED"
               }]
             }]
-          })
-        );
+            })
+          );
+        }
 
         const participantSession = await repository.getParticipantSessionById(
           testRun.participantSessionId
@@ -16451,6 +16621,10 @@ export const createFirstSliceServices = (
 
         const items = testRuns
           .filter(testRun => testRun.status !== "completed")
+          .filter(
+            testRun =>
+              resolveParticipantExecutionMode(testRun.executionMode).monitorable
+          )
           .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
           .map<OpenMonitorRun>(testRun => {
             const contentRelease = contentReleases.find(
@@ -16473,6 +16647,9 @@ export const createFirstSliceServices = (
               participantSessionId: testRun.participantSessionId,
               loginKey: participantSession?.loginKey ?? "unknown-login",
               groupKey: participantSession?.groupKey ?? "unknown-group",
+              executionMode: normalizeParticipantExecutionMode(
+                testRun.executionMode
+              ),
               participantRosterEntry: participantSession
                 ? participantRosterEntries.find(
                     entry => entry.loginKey === participantSession.loginKey
@@ -16547,6 +16724,18 @@ export const createFirstSliceServices = (
             404,
             "test_run_not_found",
             `Test run '${testRunId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const executionMode = resolveParticipantExecutionMode(
+          storedNormalizedRun.executionMode
+        );
+        if (!executionMode.receiveRemoteCommands) {
+          throw new FirstSliceError(
+            409,
+            "monitor_run_commands_disabled",
+            `Execution mode '${executionMode.mode}' does not accept monitor commands.`,
+            { executionMode: executionMode.mode }
           );
         }
 

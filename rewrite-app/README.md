@@ -23,6 +23,11 @@ The first production slice is intentionally narrow:
 7. persisted test-run lifecycle read/write seams
 8. monitor read visibility and operator control for open runs
 
+Participant Testtakers imports retain the original six execution modes. Their
+session-reuse, response persistence, navigation/time restrictions, participant
+display, monitor visibility, and remote-command policies are enforced from one
+versioned domain matrix across every storage adapter.
+
 ## Workspace Shape
 
 ```text

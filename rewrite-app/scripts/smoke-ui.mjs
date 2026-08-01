@@ -2533,6 +2533,11 @@ try {
         expectedDisplayName &&
       document.querySelector("#participantRouteSessionLabel")?.textContent?.trim() ===
         expectedSessionId &&
+      document.querySelector("#participantRouteExecutionMode")?.textContent?.trim() ===
+        "run-hot-return · Durchführung Test/Befragung" &&
+      document
+        .querySelector("#participantRouteResponsePersistence")
+        ?.textContent?.trim() === "Responses and player logs are saved" &&
       document.querySelector("#participantRouteUnitDescription")?.textContent?.trim() ===
         "Read the participant prompt." &&
       document.querySelector("#participantRouteUnitContent")?.textContent?.trim() ===

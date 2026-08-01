@@ -1569,6 +1569,7 @@ export class RuntimeViewFacade {
           badges: [
             openRun.status,
             openRun.groupKey,
+            openRun.executionMode,
             openRun.bookletAssignmentKey,
             ...(activeTimer
               ? [`timer ${activeTimer.status} · ${activeTimerRemaining}`]
@@ -1610,6 +1611,10 @@ export class RuntimeViewFacade {
             {
               label: "Current Unit",
               value: openRun.currentUnitKey ?? "none"
+            },
+            {
+              label: "Execution Mode",
+              value: openRun.executionMode
             },
             {
               label: "Active Timer",

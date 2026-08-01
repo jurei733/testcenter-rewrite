@@ -45,6 +45,138 @@ export const testRunStatuses = [
   "paused",
   "completed"
 ] as const satisfies readonly TestRunStatus[];
+
+export type ParticipantExecutionMode =
+  | "run-demo"
+  | "run-hot-return"
+  | "run-hot-restart"
+  | "run-review"
+  | "run-trial"
+  | "run-simulation";
+
+export type ParticipantExecutionModeDefinition = {
+  mode: ParticipantExecutionMode;
+  label: string;
+  alwaysNewSession: boolean;
+  monitorable: boolean;
+  canReview: boolean;
+  saveResponses: boolean;
+  forceTimeRestrictions: boolean;
+  forceNaviRestrictions: boolean;
+  presetCode: boolean;
+  showTimeLeft: boolean;
+  showUnitMenu: boolean;
+  receiveRemoteCommands: boolean;
+  canChangeStateOptions: boolean;
+};
+
+export const participantExecutionModes = [
+  "run-demo",
+  "run-hot-return",
+  "run-hot-restart",
+  "run-review",
+  "run-trial",
+  "run-simulation"
+] as const satisfies readonly ParticipantExecutionMode[];
+
+export const defaultParticipantExecutionMode = "run-hot-return" as const;
+
+export const participantExecutionModeDefinitions: Record<
+  ParticipantExecutionMode,
+  ParticipantExecutionModeDefinition
+> = {
+  "run-demo": {
+    mode: "run-demo",
+    label: "Nur Ansicht (Demo)",
+    alwaysNewSession: false,
+    monitorable: false,
+    canReview: false,
+    saveResponses: false,
+    forceTimeRestrictions: false,
+    forceNaviRestrictions: false,
+    presetCode: true,
+    showTimeLeft: false,
+    showUnitMenu: false,
+    receiveRemoteCommands: false,
+    canChangeStateOptions: true
+  },
+  "run-hot-return": {
+    mode: "run-hot-return",
+    label: "Durchführung Test/Befragung",
+    alwaysNewSession: false,
+    monitorable: true,
+    canReview: false,
+    saveResponses: true,
+    forceTimeRestrictions: true,
+    forceNaviRestrictions: true,
+    presetCode: false,
+    showTimeLeft: false,
+    showUnitMenu: false,
+    receiveRemoteCommands: true,
+    canChangeStateOptions: false
+  },
+  "run-hot-restart": {
+    mode: "run-hot-restart",
+    label: "Durchführung Test/Befragung",
+    alwaysNewSession: true,
+    monitorable: true,
+    canReview: false,
+    saveResponses: true,
+    forceTimeRestrictions: true,
+    forceNaviRestrictions: true,
+    presetCode: false,
+    showTimeLeft: false,
+    showUnitMenu: false,
+    receiveRemoteCommands: true,
+    canChangeStateOptions: false
+  },
+  "run-review": {
+    mode: "run-review",
+    label: "Prüfdurchgang ohne Speichern",
+    alwaysNewSession: false,
+    monitorable: false,
+    canReview: true,
+    saveResponses: false,
+    forceTimeRestrictions: false,
+    forceNaviRestrictions: false,
+    presetCode: true,
+    showTimeLeft: true,
+    showUnitMenu: true,
+    receiveRemoteCommands: false,
+    canChangeStateOptions: true
+  },
+  "run-trial": {
+    mode: "run-trial",
+    label: "Prüfdurchgang mit Speichern und Reviewfunktionalität",
+    alwaysNewSession: false,
+    monitorable: true,
+    canReview: true,
+    saveResponses: true,
+    forceTimeRestrictions: false,
+    forceNaviRestrictions: false,
+    presetCode: true,
+    showTimeLeft: true,
+    showUnitMenu: true,
+    receiveRemoteCommands: false,
+    canChangeStateOptions: true
+  },
+  "run-simulation": {
+    mode: "run-simulation",
+    label:
+      "Prüfdurchgang ohne Speichern, ohne Reviewfunktionalität aber mit Beschränkungen",
+    alwaysNewSession: false,
+    monitorable: false,
+    canReview: false,
+    saveResponses: false,
+    forceTimeRestrictions: true,
+    forceNaviRestrictions: true,
+    presetCode: false,
+    showTimeLeft: false,
+    showUnitMenu: false,
+    receiveRemoteCommands: false,
+    canChangeStateOptions: false
+  }
+};
 export type MonitorRunCommandType =
   | "pause"
   | "resume"
@@ -169,6 +301,7 @@ export type ParticipantRosterEntry = {
   tenantId: string;
   workspaceId: string;
   loginKey: string;
+  executionMode?: ParticipantExecutionMode;
   groupKey: string;
   bookletKey: string | null;
   bookletKeys?: string[];
@@ -594,6 +727,7 @@ export type ParticipantSession = {
   loginKey: string;
   groupKey: string;
   participantCode?: string | null;
+  executionMode?: ParticipantExecutionMode;
   status: ParticipantSessionStatus;
   validUntil?: string | null;
   createdAt: string;
@@ -606,6 +740,7 @@ export type TestRun = {
   workspaceId: string;
   contentReleaseId: string;
   bookletKey: string;
+  executionMode?: ParticipantExecutionMode;
   bookletAssignmentKey?: string;
   presetBookletStates?: Record<string, string>;
   /** Server-authoritative equivalent of the original persisted BOOKLET_STATES test state. */
@@ -693,6 +828,7 @@ export type OpenMonitorRun = {
   participantSessionId: string;
   loginKey: string;
   groupKey: string;
+  executionMode: ParticipantExecutionMode;
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
   bookletAssignmentKey: string;
@@ -727,6 +863,7 @@ export type ParticipantRuntimeState = {
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
   scope: ParticipantSessionScope;
+  executionMode: ParticipantExecutionModeDefinition;
   latestTestRun: TestRun | null;
   booklets: ParticipantRuntimeBooklet[];
   runtimeStatus: ParticipantRuntimeStateStatus;
@@ -746,6 +883,7 @@ export type ParticipantCurrentRunState = {
   participantSession: ParticipantSession;
   participantRosterEntry: ParticipantRosterEntry | null;
   scope: ParticipantSessionScope;
+  executionMode: ParticipantExecutionModeDefinition;
   testRun: TestRun;
   booklet: {
     bookletKey: string;

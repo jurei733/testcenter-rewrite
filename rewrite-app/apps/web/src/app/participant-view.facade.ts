@@ -46,6 +46,9 @@ type ParticipantPlayerState = {
   unitContent: string;
   unitKey: string;
   unitPosition: string;
+  executionMode: string;
+  executionModeLabel: string;
+  responsePersistenceLabel: string;
   unitOverviewLabel: string;
   unitItems: ParticipantPlayerUnitItem[];
   responseProgressLabel: string;
@@ -415,6 +418,9 @@ export class ParticipantViewFacade {
         unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
+        executionMode: "n/a",
+        executionModeLabel: "No execution mode loaded",
+        responsePersistenceLabel: "No run loaded",
         unitOverviewLabel: "No units loaded",
         unitItems: [],
         responseProgressLabel: "0 / 0 responses saved",
@@ -457,6 +463,7 @@ export class ParticipantViewFacade {
     }
 
     const availableActions = currentState.availableActions;
+    const executionMode = currentState.executionMode;
     const unitLabel =
       currentState.currentUnit.displayLabel ??
       currentState.currentUnit.unitKey ??
@@ -523,7 +530,9 @@ export class ParticipantViewFacade {
       : "";
     const currentDraft = this.runtime.currentUnitResponse;
     const hasUnsavedResponse =
-      currentState.testRun.status !== "completed" && currentDraft !== savedUnitResponse;
+      executionMode.saveResponses &&
+      currentState.testRun.status !== "completed" &&
+      currentDraft !== savedUnitResponse;
     const effectiveCompletion = this.getEffectiveCompletionState({
       answeredUnitCount,
       currentDraft,
@@ -628,11 +637,20 @@ export class ParticipantViewFacade {
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
+      executionMode: executionMode.mode,
+      executionModeLabel: executionMode.label,
+      responsePersistenceLabel: executionMode.saveResponses
+        ? "Responses and player logs are saved"
+        : "Responses and player logs are not saved",
       unitOverviewLabel: `${answeredUnitCount}/${totalUnitCount} answered · ${missingUnitCount} open`,
       unitItems,
-      responseProgressLabel: `${answeredUnitCount} / ${totalUnitCount} responses saved`,
+      responseProgressLabel: executionMode.saveResponses
+        ? `${answeredUnitCount} / ${totalUnitCount} responses saved`
+        : "Response saving disabled for this mode",
       missingResponseLabel:
-        missingUnitCount === 0
+        !executionMode.saveResponses
+          ? "Responses remain local to the current player view."
+          : missingUnitCount === 0
           ? "All units have a saved response."
           : `${missingUnitCount} ${missingUnitCount === 1 ? "unit" : "units"} without a saved response.`,
       progressPercent,
@@ -669,7 +687,9 @@ export class ParticipantViewFacade {
       canComplete: availableActions.includes("complete"),
       canClearSession: true,
       saveProgressLabel:
-        currentState.testRun.status === "paused"
+        !executionMode.saveResponses
+          ? "Continue Without Saving"
+          : currentState.testRun.status === "paused"
           ? "Save Running"
           : "Save Paused",
       unitResponse: savedUnitResponse,

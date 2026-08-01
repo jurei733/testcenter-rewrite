@@ -171,6 +171,7 @@ describe("parseParticipantRosterText", () => {
       [
         {
           loginKey: "test",
+          executionMode: "run-hot-return",
           groupKey: "sample_group",
           bookletKey: "BOOKLET.SAMPLE-1",
           bookletKeys: ["BOOKLET.SAMPLE-1", "BOOKLET.SAMPLE-2"],
@@ -192,6 +193,7 @@ describe("parseParticipantRosterText", () => {
         },
         {
           loginKey: "test-review",
+          executionMode: "run-review",
           groupKey: "sample_group",
           bookletKey: "BOOKLET.REVIEW",
           bookletAssignments: [
@@ -221,6 +223,7 @@ describe("parseParticipantRosterText", () => {
       )[0],
       {
         loginKey: "xml-window",
+        executionMode: "run-hot-return",
         groupKey: "scheduled",
         bookletKey: "BOOKLET.A",
         bookletAssignments: [
@@ -292,12 +295,14 @@ describe("parseParticipantRosterText", () => {
       [
         {
           loginKey: "json-run",
+          executionMode: "run-hot-return",
           groupKey: "group:modes",
           bookletKey: null,
           displayName: null
         },
         {
           loginKey: "json-review",
+          executionMode: "run-review",
           groupKey: "group:modes",
           bookletKey: null,
           displayName: null

@@ -2101,11 +2101,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
     );
     assert.match(
       rosterCsvText,
-      /"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student","false"/
+      /"demo-tenant","demo-workspace","[^"]+","student-demo","run-hot-return","group:student-demo","booklet:demo","Demo Student","false"/
     );
 
     const participantSignIn = await requestJsonAt<{
@@ -2577,12 +2577,12 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(participantSessionsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       participantSessionsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,/
+      /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,/
     );
     assert.match(
       participantSessionsCsv.body,
       new RegExp(
-        `"demo-tenant","demo-workspace","${participantSignIn.body.participantSession.participantSessionId}","student-demo","group:student-demo"`
+        `"demo-tenant","demo-workspace","${participantSignIn.body.participantSession.participantSessionId}","student-demo","group:student-demo","run-hot-return"`
       )
     );
 
@@ -3036,11 +3036,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","\{\}","running","unit-practice","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","booklet:demo","\{\}","running","unit-practice","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -9014,7 +9014,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
 
@@ -12391,6 +12391,340 @@ test("participant sign-in reuses an open session for the active release", async 
   );
 });
 
+test("original Testcenter execution modes govern sessions, persistence, restrictions, and monitoring", async () => {
+  const tenantKey = "integration-tenant-execution-modes";
+  const workspaceKey = "integration-workspace-execution-modes";
+  const bookletKey = "BOOKLET.EXECUTION-MODES";
+  const protectedTestletKey = "protected-testlet";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-execution-modes.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata>
+            <Id>${bookletKey}</Id>
+            <Label>Execution Modes</Label>
+          </Metadata>
+          <Units>
+            <Unit id="UNIT.INTRO" label="Introduction" />
+            <Testlet id="${protectedTestletKey}" label="Protected Testlet">
+              <Restrictions>
+                <CodeToEnter code="Mode-Code">Supervisor code</CodeToEnter>
+                <TimeMax minutes="5" leave="forbidden" />
+              </Restrictions>
+              <Unit id="UNIT.PROTECTED" label="Protected Unit" />
+            </Testlet>
+            <Unit id="UNIT.FINISH" label="Finish" />
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    { method: "POST", body: { activatedByActorId: "execution-mode-test" } }
+  );
+
+  const roster = await requestJson<{
+    items: Array<{ loginKey: string; executionMode?: string }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: [
+        "<Testtakers>",
+        '  <Group id="execution-mode-group">',
+        `    <Login mode="run-demo" name="mode-demo"><Booklet>${bookletKey}</Booklet></Login>`,
+        `    <Login mode="run-hot-return" name="mode-hot-return"><Booklet>${bookletKey}</Booklet></Login>`,
+        `    <Login mode="run-hot-restart" name="mode-hot-restart"><Booklet>${bookletKey}</Booklet></Login>`,
+        `    <Login mode="run-review" name="mode-review"><Booklet>${bookletKey}</Booklet></Login>`,
+        `    <Login mode="run-trial" name="mode-trial"><Booklet>${bookletKey}</Booklet></Login>`,
+        `    <Login mode="run-simulation" name="mode-simulation"><Booklet>${bookletKey}</Booklet></Login>`,
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    }
+  });
+  assert.equal(roster.status, 201);
+  assert.deepEqual(
+    roster.body.items.map(item => [item.loginKey, item.executionMode]),
+    [
+      ["mode-demo", "run-demo"],
+      ["mode-hot-restart", "run-hot-restart"],
+      ["mode-hot-return", "run-hot-return"],
+      ["mode-review", "run-review"],
+      ["mode-simulation", "run-simulation"],
+      ["mode-trial", "run-trial"]
+    ]
+  );
+
+  const start = async (loginKey: string) => {
+    const signIn = await requestJson<{
+      participantSession: {
+        participantSessionId: string;
+        executionMode?: string;
+      };
+    }>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey }
+    });
+    assert.equal(signIn.status, 200);
+    const participantSessionId =
+      signIn.body.participantSession.participantSessionId;
+    const resumed = await requestJson<{
+      testRun: {
+        testRunId: string;
+        executionMode?: string;
+        currentUnitKey: string | null;
+        unlockedTestletKeys?: string[];
+        testletTimers?: Record<string, unknown>;
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+      method: "POST"
+    });
+    assert.equal(resumed.status, 200);
+    const state = await requestJson<{
+      currentRunState: {
+        executionMode: {
+          mode: string;
+          monitorable: boolean;
+          saveResponses: boolean;
+          forceTimeRestrictions: boolean;
+          forceNaviRestrictions: boolean;
+          presetCode: boolean;
+          showTimeLeft: boolean;
+          showUnitMenu: boolean;
+          receiveRemoteCommands: boolean;
+        };
+        booklet: {
+          policy: {
+            navigation: { unitMenuEnabled: boolean };
+            timing: { showTimeLeft: boolean };
+          };
+        };
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+    assert.equal(state.status, 200);
+    assert.equal(
+      state.body.currentRunState.executionMode.mode,
+      signIn.body.participantSession.executionMode
+    );
+    assert.equal(
+      resumed.body.testRun.executionMode,
+      signIn.body.participantSession.executionMode
+    );
+    return {
+      participantSessionId,
+      testRunId: resumed.body.testRun.testRunId,
+      testRun: resumed.body.testRun,
+      currentRunState: state.body.currentRunState
+    };
+  };
+
+  const demo = await start("mode-demo");
+  assert.deepEqual(demo.currentRunState.executionMode, {
+    mode: "run-demo",
+    label: "Nur Ansicht (Demo)",
+    alwaysNewSession: false,
+    monitorable: false,
+    canReview: false,
+    saveResponses: false,
+    forceTimeRestrictions: false,
+    forceNaviRestrictions: false,
+    presetCode: true,
+    showTimeLeft: false,
+    showUnitMenu: false,
+    receiveRemoteCommands: false,
+    canChangeStateOptions: true
+  });
+  assert.deepEqual(demo.testRun.unlockedTestletKeys, [protectedTestletKey]);
+  assert.deepEqual(demo.testRun.testletTimers, {});
+
+  const review = await start("mode-review");
+  assert.equal(review.currentRunState.executionMode.saveResponses, false);
+  assert.equal(review.currentRunState.executionMode.forceNaviRestrictions, false);
+  assert.equal(review.currentRunState.executionMode.forceTimeRestrictions, false);
+  assert.equal(review.currentRunState.executionMode.presetCode, true);
+  assert.equal(
+    review.currentRunState.booklet.policy.navigation.unitMenuEnabled,
+    true
+  );
+  assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
+  assert.deepEqual(review.testRun.unlockedTestletKeys, [protectedTestletKey]);
+  assert.deepEqual(review.testRun.testletTimers, {});
+  const reviewSave = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+      testletTimers?: Record<string, unknown>;
+    };
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.FINISH",
+      unitResponse: "Review response must remain ephemeral",
+      status: "running",
+      logs: [
+        {
+          unitKey: "UNIT.INTRO",
+          entries: [
+            { key: "PLAYER_EVENT", timeStamp: 1_700_000_000_000, content: "review" }
+          ]
+        }
+      ]
+    }
+  });
+  assert.equal(reviewSave.status, 200);
+  assert.equal(reviewSave.body.testRun.currentUnitKey, "UNIT.FINISH");
+  assert.deepEqual(reviewSave.body.testRun.unitResponses, {});
+  assert.deepEqual(reviewSave.body.testRun.testletTimers, {});
+  const reviewLogs = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${review.testRunId}`
+  );
+  assert.deepEqual(reviewLogs.body.items, []);
+  const reviewOpenRuns = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${review.testRunId}`
+  );
+  assert.deepEqual(reviewOpenRuns.body.items, []);
+  const rejectedReviewCommand = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${review.testRunId}/commands`,
+    { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
+  );
+  assert.equal(rejectedReviewCommand.status, 409);
+  assert.equal(
+    rejectedReviewCommand.body.error,
+    "monitor_run_commands_disabled"
+  );
+
+  const trial = await start("mode-trial");
+  assert.equal(trial.currentRunState.executionMode.monitorable, true);
+  assert.equal(trial.currentRunState.executionMode.saveResponses, true);
+  assert.equal(trial.currentRunState.executionMode.forceNaviRestrictions, false);
+  assert.equal(trial.currentRunState.executionMode.forceTimeRestrictions, false);
+  assert.equal(trial.currentRunState.executionMode.receiveRemoteCommands, false);
+  assert.equal(
+    trial.currentRunState.booklet.policy.navigation.unitMenuEnabled,
+    true
+  );
+  assert.equal(trial.currentRunState.booklet.policy.timing.showTimeLeft, true);
+  const trialSave = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+      testletTimers?: Record<string, unknown>;
+    };
+  }>(`/api/v1/participant/test-runs/${trial.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.PROTECTED",
+      unitResponse: "Trial response is durable",
+      status: "running"
+    }
+  });
+  assert.equal(trialSave.status, 200);
+  assert.equal(
+    trialSave.body.testRun.unitResponses["UNIT.PROTECTED"],
+    "Trial response is durable"
+  );
+  assert.deepEqual(trialSave.body.testRun.testletTimers, {});
+  const trialOpenRuns = await requestJson<{
+    items: Array<{ testRunId: string; executionMode: string }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${trial.testRunId}`
+  );
+  assert.deepEqual(
+    trialOpenRuns.body.items.map(item => [item.testRunId, item.executionMode]),
+    [[trial.testRunId, "run-trial"]]
+  );
+  const rejectedTrialCommand = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${trial.testRunId}/commands`,
+    { method: "POST", body: { commandType: "pause", actorId: "mode-monitor" } }
+  );
+  assert.equal(rejectedTrialCommand.status, 409);
+  assert.equal(rejectedTrialCommand.body.error, "monitor_run_commands_disabled");
+
+  const simulation = await start("mode-simulation");
+  assert.equal(simulation.currentRunState.executionMode.saveResponses, false);
+  assert.equal(simulation.currentRunState.executionMode.forceNaviRestrictions, true);
+  assert.equal(simulation.currentRunState.executionMode.forceTimeRestrictions, true);
+  assert.equal(simulation.currentRunState.executionMode.presetCode, false);
+  assert.deepEqual(simulation.testRun.unlockedTestletKeys, []);
+  const blockedSimulationNavigation = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${simulation.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.FINISH", status: "running" }
+  });
+  assert.equal(blockedSimulationNavigation.status, 409);
+  assert.equal(
+    blockedSimulationNavigation.body.error,
+    "booklet_navigation_denied"
+  );
+  assert.deepEqual(blockedSimulationNavigation.body.details?.deniedReasons, [
+    "testlet_code_required"
+  ]);
+
+  const hotReturnFirst = await requestJson<{
+    participantSession: { participantSessionId: string; executionMode?: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "mode-hot-return" }
+  });
+  const hotReturnSecond = await requestJson<typeof hotReturnFirst.body>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "mode-hot-return" }
+    }
+  );
+  assert.equal(hotReturnFirst.body.participantSession.executionMode, "run-hot-return");
+  assert.equal(
+    hotReturnSecond.body.participantSession.participantSessionId,
+    hotReturnFirst.body.participantSession.participantSessionId
+  );
+
+  const hotRestartFirst = await requestJson<{
+    participantSession: { participantSessionId: string; executionMode?: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "mode-hot-restart" }
+  });
+  const hotRestartSecond = await requestJson<typeof hotRestartFirst.body>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "mode-hot-restart" }
+    }
+  );
+  assert.equal(
+    hotRestartFirst.body.participantSession.executionMode,
+    "run-hot-restart"
+  );
+  assert.notEqual(
+    hotRestartSecond.body.participantSession.participantSessionId,
+    hotRestartFirst.body.participantSession.participantSessionId
+  );
+});
+
 test("participant launch rejects closed sessions after completion", async () => {
   const tenantKey = "integration-tenant-closed-launch";
   const workspaceKey = "integration-workspace-closed-launch";
@@ -12826,27 +13160,27 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","group:updated","booklet:updated","Ada Updated","false","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-a","run-hot-return","group:updated","booklet:updated","Ada Updated","false","[^"]+","active_content_release_missing","Booklet assignment cannot be validated because the workspace has no active content release\."/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","group:alias-a","booklet:alias-a","Ada Alias","true"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-alias-a","run-hot-return","group:alias-a","booklet:alias-a","Ada Alias","true"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-c","group:xml","booklet:xml","Cara XML"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-c","run-hot-return","group:xml","booklet:xml","Cara XML"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","group:nested","booklet:nested","Eve Nested"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-e","run-hot-return","group:nested","booklet:nested","Eve Nested"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","sample_group","BOOKLET\.SAMPLE-1",""/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","test","run-hot-return","sample_group","BOOKLET\.SAMPLE-1",""/
   );
   assert.doesNotMatch(
     rosterCsvText,
@@ -12854,19 +13188,19 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-f","group:json","booklet:json","Faye JSON"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-f","run-hot-return","group:json","booklet:json","Faye JSON"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","group:json","booklet:json-override","Gus JSON"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-g","run-hot-return","group:json","booklet:json-override","Gus JSON"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-h","group:native-json","booklet:native-json","Hana Native"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-h","run-hot-return","group:native-json","booklet:native-json","Hana Native"/
   );
   assert.match(
     rosterCsvText,
-    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-i","group:native-json","booklet:native-json","Ivan Native"/
+    /"integration-tenant-roster","integration-workspace-roster","[^"]+","roster-i","run-hot-return","group:native-json","booklet:native-json","Ivan Native"/
   );
 
   const metricsResponse = await requestJson<{
@@ -14403,7 +14737,7 @@ test("workspace participant-session list shows latest run and active release", a
   assert.equal(participantSessionsCsv.status, 200);
   assert.match(
     participantSessionsCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName,validUntil\n/
+    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName,validUntil\n/
   );
   assert.match(participantSessionsCsv.body, /booklet:session/);
   assert.equal(participantSessionsCsv.body.trim().split("\n").length, 2);

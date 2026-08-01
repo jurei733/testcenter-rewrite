@@ -1,3 +1,4 @@
+import { participantExecutionModes as supportedParticipantExecutionModes } from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
   AdminAuditEventType,
@@ -15,6 +16,7 @@ import type {
   MonitorRunCommandResult,
   MonitorRunCommandType,
   OpenMonitorRun,
+  ParticipantExecutionMode,
   ParticipantRuntimeBooklet,
   ParticipantTestLogEntryInput,
   ParticipantCurrentRunState,
@@ -66,6 +68,7 @@ export * from "./booklet-policy.js";
 
 export type ParsedParticipantRosterEntry = {
   loginKey: string;
+  executionMode?: ParticipantExecutionMode;
   groupKey: string;
   bookletKey: string | null;
   bookletKeys?: string[];
@@ -147,6 +150,7 @@ const rosterHeaderAliases = {
     "accesscode",
     "accesskey"
   ]),
+  executionMode: new Set(["mode", "loginmode", "testmode", "executionmode"]),
   validFrom: new Set(["validfrom", "accessvalidfrom", "availablefrom"]),
   validTo: new Set(["validto", "accessvalidto", "availableto", "validuntil"]),
   validForMinutes: new Set([
@@ -162,6 +166,7 @@ type RosterDelimitedHeader = {
   bookletKey: number | null;
   displayName: number | null;
   password: number | null;
+  executionMode: number | null;
   validFrom: number | null;
   validTo: number | null;
   validForMinutes: number | null;
@@ -198,6 +203,10 @@ const readRosterDelimitedHeader = (
     bookletKey: findRosterHeaderIndex(values, rosterHeaderAliases.bookletKey),
     displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName),
     password: findRosterHeaderIndex(values, rosterHeaderAliases.password),
+    executionMode: findRosterHeaderIndex(
+      values,
+      rosterHeaderAliases.executionMode
+    ),
     validFrom: findRosterHeaderIndex(values, rosterHeaderAliases.validFrom),
     validTo: findRosterHeaderIndex(values, rosterHeaderAliases.validTo),
     validForMinutes: findRosterHeaderIndex(
@@ -263,6 +272,11 @@ const parseDelimitedRosterRows = (
     const password = header
       ? readRosterDelimitedValue(values, header.password)
       : normalizeRosterTextValue(values[4]);
+    const executionMode = header
+      ? normalizeParticipantExecutionMode(
+          readRosterDelimitedValue(values, header.executionMode)
+        )
+      : null;
     const validFrom = header
       ? readRosterDelimitedValue(values, header.validFrom)
       : null;
@@ -280,6 +294,7 @@ const parseDelimitedRosterRows = (
         groupKey: groupKey || `group:${loginKey}`,
         bookletKey,
         displayName,
+        ...(executionMode ? { executionMode } : {}),
         ...(password ? { password } : {}),
         ...(validFrom ? { validFrom } : {}),
         ...(validTo ? { validTo } : {}),
@@ -591,7 +606,20 @@ const normalizeRosterTextValue = (value: string | undefined | null): string | nu
 
 const isParticipantRosterMode = (value: string | undefined | null): boolean => {
   const mode = normalizeRosterTextValue(value)?.toLowerCase();
-  return !mode || mode.startsWith("run-");
+  return !mode || normalizeParticipantExecutionMode(mode) !== null;
+};
+
+const participantExecutionModes = new Set<ParticipantExecutionMode>(
+  supportedParticipantExecutionModes
+);
+
+const normalizeParticipantExecutionMode = (
+  value: string | undefined | null
+): ParticipantExecutionMode | null => {
+  const mode = normalizeRosterTextValue(value)?.toLowerCase();
+  return mode && participantExecutionModes.has(mode as ParticipantExecutionMode)
+    ? (mode as ParticipantExecutionMode)
+    : null;
 };
 
 const combineRosterDisplayName = (
@@ -754,6 +782,7 @@ const parseParticipantRosterJsonValue = (
       explicitLoginKey ??
       (childValues.length === 0 ? readJsonRosterString(objectValue, "id") : null);
     const mode = readJsonRosterString(objectValue, "mode", "loginMode", "testMode");
+    const executionMode = normalizeParticipantExecutionMode(mode);
     const groupKey =
       readJsonRosterString(
         objectValue,
@@ -810,6 +839,7 @@ const parseParticipantRosterJsonValue = (
       );
       entries.push({
         loginKey,
+        ...(executionMode ? { executionMode } : {}),
         groupKey: groupKey || `group:${loginKey}`,
         bookletKey,
         displayName: combineRosterDisplayName(
@@ -1144,14 +1174,13 @@ const parseParticipantRosterXmlText = (
     if (!loginKey) {
       continue;
     }
-    if (
-      !isParticipantRosterMode(
-        readXmlAttribute(attributes, "mode", "loginMode", "testMode") ??
-          readXmlChildText(content, "mode", "loginMode", "testMode")
-      )
-    ) {
+    const rawExecutionMode =
+      readXmlAttribute(attributes, "mode", "loginMode", "testMode") ??
+      readXmlChildText(content, "mode", "loginMode", "testMode");
+    if (!isParticipantRosterMode(rawExecutionMode)) {
       continue;
     }
+    const executionMode = normalizeParticipantExecutionMode(rawExecutionMode);
 
     const groupKey = normalizeRosterTextValue(
       readXmlAttribute(
@@ -1246,6 +1275,7 @@ const parseParticipantRosterXmlText = (
 
     entries.push({
       loginKey,
+      ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
       ...withAdditionalBookletKeys([
         bookletKey,
@@ -1289,13 +1319,16 @@ const parseParticipantRosterXmlText = (
     if (!loginKey) {
       continue;
     }
-    if (
-      !isParticipantRosterMode(
-        readXmlAttribute(attributes, "mode", "loginMode", "testMode")
-      )
-    ) {
+    const rawExecutionMode = readXmlAttribute(
+      attributes,
+      "mode",
+      "loginMode",
+      "testMode"
+    );
+    if (!isParticipantRosterMode(rawExecutionMode)) {
       continue;
     }
+    const executionMode = normalizeParticipantExecutionMode(rawExecutionMode);
 
     const groupKey =
       normalizeRosterTextValue(
@@ -1368,6 +1401,7 @@ const parseParticipantRosterXmlText = (
 
     entries.push({
       loginKey,
+      ...(executionMode ? { executionMode } : {}),
       groupKey: groupKey || `group:${loginKey}`,
       ...withAdditionalBookletKeys([
         bookletKey,

@@ -306,9 +306,9 @@ const verifyBootstrappedDemo = async baseUrl => {
   const rosterCsvText = await rosterCsv.text();
   if (
     !rosterCsvText.startsWith(
-      "tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n"
+      "tenantKey,workspaceKey,participantRosterEntryId,loginKey,executionMode,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n"
     ) ||
-    !/"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student","false"/.test(
+    !/"demo-tenant","demo-workspace","[^"]+","student-demo","run-hot-return","group:student-demo","booklet:demo","Demo Student","false"/.test(
       rosterCsvText
     )
   ) {
@@ -384,7 +384,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const participantSessionsCsvText = await participantSessionsCsv.text();
   if (
     !participantSessionsCsvText.startsWith(
-      "tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,"
+      "tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,executionMode,sessionStatus,"
     ) ||
     !participantSessionsCsvText.includes('"student-demo"') ||
     !participantSessionsCsvText.includes('"group:student-demo"') ||
@@ -493,7 +493,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const openRunsCsvText = await openRunsCsv.text();
   if (
     !openRunsCsvText.startsWith(
-      "tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,"
+      "tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,"
     ) ||
     !openRunsCsvText.includes('"student-demo"') ||
     !openRunsCsvText.includes('"group:student-demo"') ||

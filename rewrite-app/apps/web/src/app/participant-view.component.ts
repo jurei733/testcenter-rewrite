@@ -253,6 +253,14 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <dd id="participantRouteRunId">{{ view.player.runId }}</dd>
             </div>
             <div>
+              <dt>Execution Mode</dt>
+              <dd id="participantRouteExecutionMode">{{ view.player.executionMode }} · {{ view.player.executionModeLabel }}</dd>
+            </div>
+            <div>
+              <dt>Response Storage</dt>
+              <dd id="participantRouteResponsePersistence">{{ view.player.responsePersistenceLabel }}</dd>
+            </div>
+            <div>
               <dt>Available Actions</dt>
               <dd id="participantRouteActions">{{ view.player.actions.join(", ") || "none" }}</dd>
             </div>
