@@ -704,6 +704,8 @@ export type BookletRuntimePolicy = {
     unitTitle: boolean;
     fullscreenPrompt: boolean;
     fullscreenButton: boolean;
+    reloadButton: boolean;
+    silentMode: boolean;
   };
   timing: {
     showTimeLeft: boolean;

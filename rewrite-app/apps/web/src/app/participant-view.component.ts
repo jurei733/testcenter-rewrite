@@ -191,10 +191,17 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </div>
         </section>
         <div
-          *ngIf="view.screenHeaderLabel || view.showFullscreenButton"
+          *ngIf="view.screenHeaderLabel || view.showFullscreenButton || view.showReloadButton"
           class="participant-runtime-toolbar"
         >
           <strong id="participantRouteScreenHeader" *ngIf="view.screenHeaderLabel">{{ view.screenHeaderLabel }}</strong>
+          <button
+            *ngIf="view.showReloadButton"
+            id="participantRouteReloadButton"
+            class="ghost"
+            type="button"
+            (click)="view.reloadPage()"
+          >Reload</button>
           <button
             *ngIf="view.showFullscreenButton"
             id="participantRouteFullscreenButton"

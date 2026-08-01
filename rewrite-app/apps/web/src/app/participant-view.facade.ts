@@ -732,7 +732,9 @@ export class ParticipantViewFacade {
       draftStateLabel,
       draftStateDetail,
       hasUnsavedResponse,
-      navigationNotice: this.describeNavigationDenial(currentState),
+      navigationNotice: policy.display.silentMode
+        ? ""
+        : this.describeNavigationDenial(currentState),
       nextTestletGate: currentState.navigation.nextTestletGate,
       testletTimer,
       leaveLock
@@ -790,6 +792,24 @@ export class ParticipantViewFacade {
     return Boolean(
       this.readCurrentRunState()?.booklet.policy.display.fullscreenButton
     );
+  }
+
+  get showReloadButton(): boolean {
+    return Boolean(
+      this.readCurrentRunState()?.booklet.policy.display.reloadButton
+    );
+  }
+
+  reloadPage(): void {
+    if (!this.showReloadButton) {
+      return;
+    }
+    this.persistState();
+    const entryLink = this.createParticipantSessionEntryLink();
+    if (entryLink) {
+      globalThis.window?.history.replaceState(null, "", entryLink);
+    }
+    globalThis.window?.location.reload();
   }
 
   get fullscreenStatusText(): string {

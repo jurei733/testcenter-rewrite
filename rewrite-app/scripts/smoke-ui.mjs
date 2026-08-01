@@ -24,7 +24,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
+  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="toolbar_show_reload_button">TRUE</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
 let smokeAdminSessionToken = "";
 
 const createStoredZipBuffer = entries => {
@@ -2276,6 +2276,22 @@ try {
     .filter({ hasText: "closed" })
     .waitFor();
   await page.locator("#participantRouteFullscreenPrompt").waitFor({ state: "detached" });
+  await page.locator("#participantRouteReloadButton").waitFor();
+  await page.locator("#participantRouteReloadButton").click();
+  await page.waitForLoadState("networkidle");
+  await page.waitForURL(url =>
+    url.searchParams.get("participantSessionId") === participantEntrySignInSessionId
+  );
+  await page.waitForFunction(
+    expectedRunId =>
+      document.querySelector("#participantRouteRunId")?.textContent?.trim() ===
+        expectedRunId &&
+      document.querySelector("#participantRouteStatus")?.textContent?.trim() ===
+        "running",
+    participantEntryStartedRunId,
+    { timeout: 15_000 }
+  );
+  await page.locator("#participantRouteReloadButton").waitFor();
   stopAfter("participant-entry-start-after-sign-in");
 
   logStep("participant-entry-review-comments");

@@ -189,7 +189,9 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       fullscreenButton: on(
         read("toolbar_show_fullscreen_button", "show_fullscreen_button"),
         false
-      )
+      ),
+      reloadButton: on(read("toolbar_show_reload_button"), false),
+      silentMode: on(read("silent_mode"), false)
     },
     timing: {
       showTimeLeft: on(read("toolbar_show_time_left", "unit_show_time_left"), false),
