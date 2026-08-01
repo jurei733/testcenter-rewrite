@@ -4400,6 +4400,9 @@ try {
     "groupKey=group%3Aentry-smoke",
     "bookletKey=booklet%3Astarter"
   ]);
+  const participantGroupKey = "group:student-ui";
+  const groupMonitorUsername = "entry-group-monitor";
+  const groupMonitorPassword = "ui-migrated-group-monitor-secret";
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -4421,11 +4424,11 @@ try {
     "#entryRosterText",
     [
       "<Testtakers>",
-      "  <Group id=\"group:testcenter-login-entry\" validFor=\"45\">",
+      `  <Group id="${participantGroupKey}" validFor="45">`,
       "    <Login name=\"entry-student-login\">",
       `      <Booklet>${participantRouteBookletKey}</Booklet>`,
       "    </Login>",
-      "    <Login mode=\"monitor-group\" name=\"entry-group-monitor\" pw=\"operator-secret\">",
+      `    <Login mode="monitor-group" name="${groupMonitorUsername}" pw="operator-secret">`,
       "      <Profile id=\"all\" />",
       "    </Login>",
       "  </Group>",
@@ -4439,7 +4442,7 @@ try {
       has: page.getByRole("heading", { name: "Saved Participant Roster" })
     })
     .filter({ hasText: "entry-student-login" })
-    .filter({ hasText: "group:testcenter-login-entry" })
+    .filter({ hasText: participantGroupKey })
     .filter({ hasText: participantRouteBookletKey })
     .filter({ hasText: "time-limited" })
     .filter({ hasText: "45 minute(s) after first sign-in" })
@@ -4452,9 +4455,9 @@ try {
       })
     })
     .locator(".record-card")
-    .filter({ has: page.getByRole("heading", { name: "entry-group-monitor" }) })
+    .filter({ has: page.getByRole("heading", { name: groupMonitorUsername }) })
     .filter({ hasText: "monitor-group" })
-    .filter({ hasText: "group:testcenter-login-entry" })
+    .filter({ hasText: participantGroupKey })
     .filter({ hasText: "password protected" })
     .filter({ hasText: "all" });
   await operationalLoginCandidateCard.waitFor();
@@ -4469,7 +4472,7 @@ try {
     .getByRole("button", { name: "Prepare Monitor Account" })
     .click();
   await page.waitForURL(/\/app\/ops$/);
-  await expectInputValue("#adminCreateUsername", "entry-group-monitor");
+  await expectInputValue("#adminCreateUsername", groupMonitorUsername);
   assert.equal(
     (await page.locator("#adminCreateRole option:checked").textContent())?.trim(),
     "group_monitor"
@@ -4478,10 +4481,23 @@ try {
   await expectInputValue("#adminCreateWorkspaceKey", workspaceKey);
   await expectInputValue(
     "#adminCreateGroupKey",
-    "group:testcenter-login-entry"
+    participantGroupKey
   );
   await expectInputValue("#adminCreatePassword", "");
   await expectButtonSelectorDisabled("#adminCreateUserButton");
+  await clickAction("Clear User Filters");
+  await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
+  await expectButtonSelectorEnabled("#adminCreateUserButton");
+  await clickAction("Create Monitor Account");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: groupMonitorUsername })
+    .filter({ hasText: "group_monitor" })
+    .filter({ hasText: participantGroupKey })
+    .waitFor();
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   stopAfter("operational-login-candidates");
@@ -4606,7 +4622,7 @@ try {
     })
     .filter({ hasText: "entry-student-login" })
     .filter({ hasText: participantEntryUrlPrefix })
-    .filter({ hasText: "group%3Atestcenter-login-entry" })
+    .filter({ hasText: encodeURIComponent(participantGroupKey) })
     .filter({ hasText: "booklet%3Astarter" })
     .waitFor();
   await page
@@ -4624,8 +4640,7 @@ try {
     .filter({ hasText: '"loginKey","groupKey","bookletKey","url","displayName"' })
     .filter({ hasText: '"entry-student-a","group:entry-smoke","booklet:starter"' })
     .filter({
-      hasText:
-        '"entry-student-login","group:testcenter-login-entry","booklet:starter"'
+      hasText: `"entry-student-login","${participantGroupKey}","booklet:starter"`
     })
     .filter({
       hasText:
@@ -4874,7 +4889,6 @@ try {
   stopAfter("participant-launch-status-session-link");
   logStep("participant-start");
   const participantLoginKey = "student-ui";
-  const participantGroupKey = "group:student-ui";
   const participantBookletKey = "booklet:starter";
   await sendSmokeJson(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
@@ -5597,28 +5611,6 @@ try {
   stopAfter("open-run-select-sync");
 
   logStep("group-monitor-console");
-  const groupMonitorUsername = `ui-group-monitor-${Date.now()}`;
-  const groupMonitorPassword = "ui-group-monitor-secret";
-  const createGroupMonitorResponse = await sendSmokeJson(
-    `${baseUrl}/api/v1/admin/users`,
-    {
-      body: {
-        username: groupMonitorUsername,
-        displayName: "UI Group Monitor",
-        password: groupMonitorPassword,
-        roleAssignments: [
-          {
-            role: "group_monitor",
-            tenantKey,
-            workspaceKey,
-            groupKey: participantGroupKey
-          }
-        ]
-      }
-    }
-  );
-  assert.equal(createGroupMonitorResponse.status, 201);
-
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
   await clickAction("Sign Out");

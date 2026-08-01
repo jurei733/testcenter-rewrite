@@ -37,8 +37,11 @@ operational-only rosters return the
 stable `participant_roster_operational_only` error. Administrators can create
 non-escalating `group_monitor` and `study_monitor` accounts with durable
 workspace/group scope. Supported candidates can prepare that account form in
-one action, but require a newly assigned password because the source password
-is deliberately never exposed or copied. When either monitor role signs in,
+one action and complete creation after a newly assigned password is entered;
+the source password is deliberately never exposed or copied. The protected
+browser flow carries one original `monitor-group` login through import, account
+creation, sign-in, route isolation, and group-scoped monitoring. When either
+monitor role signs in,
 the Angular shell switches to a focused monitor console: workspace/content and
 platform-administration navigation disappear, runtime refreshes use only
 monitor-authorized reads, direct client-side navigation to administrative views

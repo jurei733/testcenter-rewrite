@@ -162,8 +162,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="adminCreateGroupKey" name="adminCreateGroupKey" [(ngModel)]="view.ops.adminCreateGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'group_monitor'" />
           </label>
         </div>
+        <p *ngIf="view.isCreatingMonitorAccount">
+          Monitor accounts receive only the selected workspace/group scope. For
+          imported original logins, assign a new password here because source
+          passwords are deliberately never copied.
+        </p>
         <div class="actions">
-          <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">Create Admin User</button>
+          <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">{{ view.isCreatingMonitorAccount ? "Create Monitor Account" : "Create Admin User" }}</button>
         </div>
 
         <div class="form-grid">

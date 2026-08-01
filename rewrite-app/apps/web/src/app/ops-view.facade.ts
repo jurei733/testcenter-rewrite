@@ -162,6 +162,13 @@ export class OpsViewFacade {
     );
   }
 
+  get isCreatingMonitorAccount(): boolean {
+    return (
+      this.ops.adminCreateRole === "study_monitor" ||
+      this.ops.adminCreateRole === "group_monitor"
+    );
+  }
+
   get canRevokeAdminSession(): boolean {
     return (
       this.canUseAdminSession &&
@@ -695,6 +702,7 @@ export class OpsViewFacade {
                   roleAssignment.role,
                   roleAssignment.tenantId ?? "platform",
                   roleAssignment.workspaceId ?? "all-workspaces",
+                  roleAssignment.groupKey ?? "all-groups",
                   roleAssignment.roleAssignmentId
                 ].join(" / ")
               )
