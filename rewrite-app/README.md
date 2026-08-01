@@ -35,8 +35,8 @@ Responses retain their group, profile IDs, access window, and only a
 participant rows and show the candidates in a dedicated Runtime card;
 operational-only rosters return the
 stable `participant_roster_operational_only` error. Administrators can create
-non-escalating `group_monitor` and `study_monitor` accounts with durable
-workspace/group scope. Supported candidates can prepare that account form in
+non-escalating `group_monitor`, `study_monitor`, and `system_check` accounts with
+durable workspace/group scope. Supported candidates can prepare that account form in
 one action and complete creation after a newly assigned password is entered;
 the source password is deliberately never exposed or copied. Imported
 `validFrom`, `validTo`, and `validFor` values are copied into the account draft,
@@ -51,6 +51,11 @@ the Angular shell switches to a focused monitor console: workspace/content and
 platform-administration navigation disappear, runtime refreshes use only
 monitor-authorized reads, direct client-side navigation to administrative views
 returns to Runtime, and the selected scope remains enforced by the API.
+Migrated `system_check` accounts sign in directly on the System Check page,
+may keep multiple device sessions active, and save reports under the login name
+without receiving the configured report key. Their bearer session is accepted
+only for the assigned workspace's report-save route; administrative and monitor
+reads remain unavailable.
 
 ## Workspace Shape
 

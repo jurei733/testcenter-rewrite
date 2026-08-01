@@ -477,6 +477,7 @@ export type SystemCheckPort = {
     workspaceKey: string;
     checkId: string;
     keyPhrase?: string;
+    authenticatedLoginName?: string;
     title?: string;
     responses?: unknown;
     environment: SystemCheckReportEntry[];
@@ -1089,7 +1090,8 @@ const ADMIN_ROLES: AdminRole[] = [
   "tenant_admin",
   "workspace_admin",
   "study_monitor",
-  "group_monitor"
+  "group_monitor",
+  "system_check"
 ];
 const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
 const TEST_RUN_PROGRESS_STATUSES: Array<
@@ -19658,9 +19660,10 @@ export const createFirstSliceServices = (
           entry => entry.checkId.toUpperCase() === systemCheck.checkId.toUpperCase()
         );
         if (
-          !storedDefinition?.saveKey ||
-          storedDefinition.saveKey.toUpperCase() !==
-            String(input.keyPhrase ?? "").trim().toUpperCase()
+          !input.authenticatedLoginName &&
+          (!storedDefinition?.saveKey ||
+            storedDefinition.saveKey.toUpperCase() !==
+              String(input.keyPhrase ?? "").trim().toUpperCase())
         ) {
           throw new FirstSliceError(
             403,
@@ -19717,7 +19720,9 @@ export const createFirstSliceServices = (
           sourcePackageId: systemCheck.sourcePackageId,
           checkId: systemCheck.checkId,
           checkLabel: systemCheck.displayLabel,
-          title: String(input.title ?? "").trim() || systemCheck.displayLabel,
+          title:
+            String(input.authenticatedLoginName ?? input.title ?? "").trim() ||
+            systemCheck.displayLabel,
           responses: input.responses ?? "",
           environment: normalizeReportEntries("environment", input.environment),
           network: normalizeReportEntries("network", input.network),

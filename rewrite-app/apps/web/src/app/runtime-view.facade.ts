@@ -2,7 +2,7 @@ import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
-  mapOriginalTestcenterOperationalLoginToMonitorRole,
+  mapOriginalTestcenterOperationalLoginToAdminRole,
   parseParticipantRosterText
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -848,7 +848,7 @@ export class RuntimeViewFacade {
     return Array.isArray(payload?.items)
       ? payload.items.map(candidate => {
           const roleDraft =
-            mapOriginalTestcenterOperationalLoginToMonitorRole(candidate);
+            mapOriginalTestcenterOperationalLoginToAdminRole(candidate);
           return {
             headline: candidate.loginKey,
             subline: roleDraft
@@ -884,14 +884,17 @@ export class RuntimeViewFacade {
                 label: "Migration Decision",
                 value: roleDraft
                   ? `Create a ${roleDraft.role} account with a newly assigned password; the source password remains unavailable.`
-                  : "sys-check-login still requires a dedicated protected system-check account model."
+                  : "No safe account mapping is available for this operational login."
               }
             ],
             ...(roleDraft
               ? {
-                  actionLabel: "Prepare Monitor Account",
+                  actionLabel:
+                    roleDraft.role === "system_check"
+                      ? "Prepare System Check Account"
+                      : "Prepare Monitor Account",
                   actionPayload: {
-                    operationalLoginMigration: "prepareMonitorAccount",
+                    operationalLoginMigration: "prepareOperationalAccount",
                     username: candidate.loginKey,
                     role: roleDraft.role,
                     groupKey: roleDraft.groupKey ?? "",
@@ -910,12 +913,16 @@ export class RuntimeViewFacade {
 
   prepareOperationalLoginAccount(item: RecordCollectionItem): void {
     if (
-      item.actionPayload?.operationalLoginMigration !== "prepareMonitorAccount"
+      item.actionPayload?.operationalLoginMigration !== "prepareOperationalAccount"
     ) {
       return;
     }
     const role = item.actionPayload.role;
-    if (role !== "group_monitor" && role !== "study_monitor") {
+    if (
+      role !== "group_monitor" &&
+      role !== "study_monitor" &&
+      role !== "system_check"
+    ) {
       return;
     }
 
@@ -935,7 +942,9 @@ export class RuntimeViewFacade {
     ops.adminCreateValidForMinutes =
       item.actionPayload.validForMinutes?.trim() ?? "";
     this.feedback.rememberActivity(
-      "Monitor Account Draft Prepared",
+      role === "system_check"
+        ? "System Check Account Draft Prepared"
+        : "Monitor Account Draft Prepared",
       `${ops.adminCreateUsername} was mapped to ${role}. Assign a new password before creating the account; the original password was not copied.`
     );
     this.persistState();

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  mapOriginalTestcenterOperationalLoginToAdminRole,
   mapOriginalTestcenterOperationalLoginToMonitorRole,
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText
@@ -259,6 +260,10 @@ describe("parseParticipantRosterText", () => {
     assert.equal(
       mapOriginalTestcenterOperationalLoginToMonitorRole(operationalLogins[1]!),
       null
+    );
+    assert.deepEqual(
+      mapOriginalTestcenterOperationalLoginToAdminRole(operationalLogins[1]!),
+      { role: "system_check", groupKey: null }
     );
     assert.deepEqual(
       mapOriginalTestcenterOperationalLoginToMonitorRole({

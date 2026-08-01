@@ -6,7 +6,8 @@ export type AdminRole =
   | "tenant_admin"
   | "workspace_admin"
   | "study_monitor"
-  | "group_monitor";
+  | "group_monitor"
+  | "system_check";
 export type AdminAuditEventType =
   | "admin_user_bootstrapped"
   | "admin_sign_in_failed"

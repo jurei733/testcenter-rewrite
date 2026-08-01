@@ -31,12 +31,18 @@ export class RewriteAppOperatorAccessService {
     return this.mode === "study_monitor" || this.mode === "group_monitor";
   }
 
+  get isSystemCheckOnly(): boolean {
+    return this.mode === "system_check";
+  }
+
   get label(): string {
     switch (this.mode) {
       case "study_monitor":
         return "Study monitor";
       case "group_monitor":
         return "Group monitor";
+      case "system_check":
+        return "System check";
       case "admin":
         return "Administrator";
       case "unassigned":

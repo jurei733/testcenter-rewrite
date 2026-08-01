@@ -1029,7 +1029,8 @@ const parseAdminUserListQuery = (
     role !== "tenant_admin" &&
     role !== "workspace_admin" &&
     role !== "study_monitor" &&
-    role !== "group_monitor"
+    role !== "group_monitor" &&
+    role !== "system_check"
   ) {
     sendError(
       response,
@@ -1851,6 +1852,26 @@ const hasOperatorAccess = async (
     roleAssignment =>
       roleAssignment.role === "workspace_admin" &&
       roleAssignment.workspaceId === workspace.workspaceId
+  );
+};
+
+const hasSystemCheckAccess = async (input: {
+  repository: FirstSliceRepository;
+  roleAssignments: AdminRoleAssignment[];
+  tenantKey: string;
+  workspaceKey: string;
+}): Promise<boolean> => {
+  const workspace = await input.repository.getWorkspaceByScope(
+    input.tenantKey,
+    input.workspaceKey
+  );
+  return Boolean(
+    workspace &&
+      input.roleAssignments.some(
+        roleAssignment =>
+          roleAssignment.role === "system_check" &&
+          roleAssignment.workspaceId === workspace.workspaceId
+      )
   );
 };
 
@@ -5603,12 +5624,37 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
+        const sessionToken = readBearerToken(request);
+        let authenticatedLoginName: string | undefined;
+        if (sessionToken) {
+          const { adminUser, roleAssignments } =
+            await services.adminAuth.getCurrentSession({ sessionToken });
+          if (
+            !(await hasSystemCheckAccess({
+              repository: runtime.repository,
+              roleAssignments,
+              tenantKey,
+              workspaceKey
+            }))
+          ) {
+            sendError(
+              response,
+              403,
+              "admin_role_required",
+              "The admin session does not have system-check access for this workspace.",
+              { requiredRoles: ["system_check"] }
+            );
+            return;
+          }
+          authenticatedLoginName = adminUser.username;
+        }
         const body = await readRequestJsonBody<SaveSystemCheckReportRequest>();
         const report = await services.systemCheck.saveSystemCheckReport({
           tenantKey,
           workspaceKey,
           checkId,
           keyPhrase: body.keyPhrase,
+          authenticatedLoginName,
           title: body.title,
           responses: body.responses,
           environment: body.environment,

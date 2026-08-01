@@ -27,3 +27,10 @@ test("operator access mode distinguishes study and group monitors", () => {
   );
   assert.equal(resolveOperatorAccessMode([]), "unassigned");
 });
+
+test("operator access mode isolates system-check accounts", () => {
+  assert.equal(
+    resolveOperatorAccessMode([{ role: "system_check" }]),
+    "system_check"
+  );
+});

@@ -18787,6 +18787,132 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(wrongKey.status, 403);
   assert.equal(wrongKey.body.error, "system_check_save_key_invalid");
 
+  const platformAdminBootstrap = await requestJson<{ error?: string }>(
+    "/api/v1/admin/auth/bootstrap",
+    {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    }
+  );
+  assert.ok(
+    platformAdminBootstrap.status === 201 ||
+      (platformAdminBootstrap.status === 409 &&
+        platformAdminBootstrap.body.error ===
+          "admin_bootstrap_already_completed")
+  );
+  const platformAdminSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "integration-secret"
+      }
+    }
+  );
+  assert.equal(platformAdminSignIn.status, 200);
+  const systemCheckAccount = await requestJson<{
+    adminUser: { username: string };
+    roleAssignments: Array<{ role: string }>;
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${platformAdminSignIn.body.sessionToken}`
+    },
+    body: {
+      username: "system.check.login",
+      password: "system-check-login-secret",
+      roleAssignments: [
+        {
+          role: "system_check",
+          tenantKey,
+          workspaceKey
+        }
+      ]
+    }
+  });
+  assert.equal(systemCheckAccount.status, 201);
+  assert.equal(systemCheckAccount.body.adminUser.username, "system.check.login");
+  assert.equal(systemCheckAccount.body.roleAssignments[0]?.role, "system_check");
+  const systemCheckSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "system.check.login",
+        password: "system-check-login-secret"
+      }
+    }
+  );
+  assert.equal(systemCheckSignIn.status, 200);
+  const secondSystemCheckSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "system.check.login",
+        password: "system-check-login-secret"
+      }
+    }
+  );
+  assert.equal(secondSystemCheckSignIn.status, 200);
+  assert.notEqual(
+    secondSystemCheckSignIn.body.sessionToken,
+    systemCheckSignIn.body.sessionToken
+  );
+  const rejectedPlatformAdminReport = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${platformAdminSignIn.body.sessionToken}`
+      },
+      body: reportBody
+    }
+  );
+  assert.equal(rejectedPlatformAdminReport.status, 403);
+  assert.equal(rejectedPlatformAdminReport.body.error, "admin_role_required");
+  const protectedSaved = await requestJson<{
+    report: { systemCheckReportId: string; title: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${systemCheckSignIn.body.sessionToken}`
+      },
+      body: { ...reportBody, keyPhrase: undefined, title: "ignored title" }
+    }
+  );
+  assert.equal(protectedSaved.status, 201);
+  assert.equal(protectedSaved.body.report.title, "system.check.login");
+  const rejectedCrossWorkspaceReport = await requestJson<{ error: string }>(
+    "/api/v1/tenants/admin-directory-tenant/workspaces/admin-directory-workspace/system-checks/SYSCHECK.SAMPLE/reports",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${systemCheckSignIn.body.sessionToken}`
+      },
+      body: reportBody
+    }
+  );
+  assert.equal(rejectedCrossWorkspaceReport.status, 403);
+  assert.equal(rejectedCrossWorkspaceReport.body.error, "admin_role_required");
+  const rejectedSystemCheckAdminRead = await requestJson<{ error: string }>(
+    "/api/v1/admin/users",
+    {
+      headers: {
+        authorization: `Bearer ${systemCheckSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(rejectedSystemCheckAdminRead.status, 403);
+  assert.equal(rejectedSystemCheckAdminRead.body.error, "admin_role_required");
+
   const saved = await requestJson<{
     report: {
       systemCheckReportId: string;
@@ -18874,17 +19000,17 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(statistics.status, 200);
   assert.equal(statistics.body.items.length, 1);
   assert.equal(statistics.body.items[0]?.checkId, "SYSCHECK.SAMPLE");
-  assert.equal(statistics.body.items[0]?.reportCount, 2);
+  assert.equal(statistics.body.items[0]?.reportCount, 3);
   assert.deepEqual(statistics.body.items[0]?.browsers, [
-    { value: "Chrome", count: 1 },
+    { value: "Chrome", count: 2 },
     { value: "Firefox", count: 1 }
   ]);
   assert.deepEqual(statistics.body.items[0]?.operatingSystems, [
-    { value: "Linux", count: 1 },
-    { value: "unknown", count: 1 }
+    { value: "unknown", count: 2 },
+    { value: "Linux", count: 1 }
   ]);
   assert.deepEqual(statistics.body.items[0]?.overallRatings, [
-    { value: "good", count: 1 },
+    { value: "good", count: 2 },
     { value: "insufficient", count: 1 }
   ]);
 
@@ -18925,10 +19051,14 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     }
   );
   assert.equal(deleted.status, 200);
-  assert.equal(deleted.body.deletion.deletedCount, 2);
+  assert.equal(deleted.body.deletion.deletedCount, 3);
   assert.deepEqual(
     deleted.body.deletion.deletedReportIds.sort(),
-    [saved.body.report.systemCheckReportId, secondSaved.body.report.systemCheckReportId].sort()
+    [
+      protectedSaved.body.report.systemCheckReportId,
+      saved.body.report.systemCheckReportId,
+      secondSaved.body.report.systemCheckReportId
+    ].sort()
   );
 
   const reportsAfterDeletion = await requestJson<{ items: unknown[] }>(
@@ -18943,5 +19073,5 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=system_check_reports_deleted`
   );
   assert.equal(deletionAudit.status, 200);
-  assert.equal(deletionAudit.body.items[0]?.activityEvent.details.deletedCount, 2);
+  assert.equal(deletionAudit.body.items[0]?.activityEvent.details.deletedCount, 3);
 });

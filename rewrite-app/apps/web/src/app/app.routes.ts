@@ -4,7 +4,10 @@ import { ContentViewComponent } from "./content-view.component";
 import { OpsViewComponent } from "./ops-view.component";
 import { RuntimeViewComponent } from "./runtime-view.component";
 import { WorkspaceViewComponent } from "./workspace-view.component";
-import { requireAdministrativeOperator } from "./rewrite-app-admin-route.guard";
+import {
+  rejectSystemCheckOperator,
+  requireAdministrativeOperator
+} from "./rewrite-app-admin-route.guard";
 
 export const appRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "workspace" },
@@ -18,7 +21,11 @@ export const appRoutes: Routes = [
     component: ContentViewComponent,
     canActivate: [requireAdministrativeOperator]
   },
-  { path: "runtime", component: RuntimeViewComponent },
+  {
+    path: "runtime",
+    component: RuntimeViewComponent,
+    canActivate: [rejectSystemCheckOperator]
+  },
   {
     path: "participant",
     loadComponent: () =>
@@ -33,6 +40,10 @@ export const appRoutes: Routes = [
         module => module.SystemCheckViewComponent
       )
   },
-  { path: "ops", component: OpsViewComponent },
+  {
+    path: "ops",
+    component: OpsViewComponent,
+    canActivate: [rejectSystemCheckOperator]
+  },
   { path: "**", redirectTo: "workspace" }
 ];

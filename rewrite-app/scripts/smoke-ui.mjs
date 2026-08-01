@@ -4403,6 +4403,8 @@ try {
   const participantGroupKey = "group:student-ui";
   const groupMonitorUsername = "entry-group-monitor";
   const groupMonitorPassword = "ui-migrated-group-monitor-secret";
+  const systemCheckUsername = "entry-system-check";
+  const systemCheckPassword = "ui-migrated-system-check-secret";
   await fillAndCommit(
     "#entryRosterText",
     [
@@ -4431,6 +4433,7 @@ try {
       `    <Login mode="monitor-group" name="${groupMonitorUsername}" pw="operator-secret">`,
       "      <Profile id=\"all\" />",
       "    </Login>",
+      `    <Login mode="sys-check-login" name="${systemCheckUsername}" pw="system-check-secret" />`,
       "  </Group>",
       "</Testtakers>"
     ].join("\n")
@@ -4538,6 +4541,70 @@ try {
   await waitForInputMinLength("#adminSessionToken", 20);
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
   stopAfter("group-monitor-access-window");
+
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  const systemCheckLoginCandidateCard = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Operational Login Migration Candidates"
+      })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: systemCheckUsername }) })
+    .filter({ hasText: "sys-check-login" })
+    .filter({ hasText: "Ready to prepare a system_check account draft" });
+  await systemCheckLoginCandidateCard.waitFor();
+  await systemCheckLoginCandidateCard
+    .getByRole("button", { name: "Prepare System Check Account" })
+    .click();
+  await page.waitForURL(/\/app\/ops$/);
+  await expectInputValue("#adminCreateUsername", systemCheckUsername);
+  assert.equal(
+    (await page.locator("#adminCreateRole option:checked").textContent())?.trim(),
+    "system_check"
+  );
+  await expectInputValue("#adminCreateTenantKey", tenantKey);
+  await expectInputValue("#adminCreateWorkspaceKey", workspaceKey);
+  await expectInputValue("#adminCreateValidForMinutes", "45");
+  await fillAndCommit("#adminCreatePassword", systemCheckPassword);
+  await clickAction("Create System Check Account");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: systemCheckUsername })
+    .filter({ hasText: "system_check" })
+    .filter({ hasText: "45 minute(s) after first sign-in" })
+    .waitFor();
+  await page.goto(
+    `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+      tenantKey
+    )}&workspaceKey=${encodeURIComponent(workspaceKey)}`
+  );
+  await fillAndCommit("#systemCheckUsername", systemCheckUsername);
+  await fillAndCommit("#systemCheckPassword", systemCheckPassword);
+  await page.locator("#systemCheckSignInButton").click();
+  await page
+    .locator("#systemCheckSignedInUser")
+    .filter({ hasText: systemCheckUsername })
+    .waitFor();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/app/runtime");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await page.waitForURL(/\/app\/system-check$/);
+  await page.locator("#systemCheckSignOutButton").click();
+  await page.locator("#systemCheckSignInButton").waitFor();
+  await page.goto(`${baseUrl}/app/ops`);
+  await fillAndCommit("#adminUsername", adminUsername);
+  await fillAndCommit("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  stopAfter("system-check-login-migration");
 
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);

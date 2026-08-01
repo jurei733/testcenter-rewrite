@@ -111,6 +111,7 @@ export class OpsViewFacade {
 
   readonly ops = this.uiState.ops;
   readonly adminRoleOptions: AdminRole[] = [
+    "system_check",
     "group_monitor",
     "study_monitor",
     "workspace_admin",
@@ -196,6 +197,14 @@ export class OpsViewFacade {
       this.ops.adminCreateRole === "study_monitor" ||
       this.ops.adminCreateRole === "group_monitor"
     );
+  }
+
+  get isCreatingSystemCheckAccount(): boolean {
+    return this.ops.adminCreateRole === "system_check";
+  }
+
+  get isCreatingOperationalAccount(): boolean {
+    return this.isCreatingMonitorAccount || this.isCreatingSystemCheckAccount;
   }
 
   get canRevokeAdminSession(): boolean {
@@ -472,7 +481,8 @@ export class OpsViewFacade {
     this.ops.adminUserWorkspaceFilter =
       this.ops.adminRoleRole === "workspace_admin" ||
       this.ops.adminRoleRole === "study_monitor" ||
-      this.ops.adminRoleRole === "group_monitor"
+      this.ops.adminRoleRole === "group_monitor" ||
+      this.ops.adminRoleRole === "system_check"
         ? this.ops.adminRoleWorkspaceKey
         : "";
     this.persistState();

@@ -52,10 +52,15 @@ export class AppShellFacade {
     { id: "ops", label: "Access & Diagnostics", link: "/ops" }
   ] as const;
 
+  private readonly systemCheckViews = [
+    { id: "system-check", label: "System Check", link: "/system-check" }
+  ] as const;
+
   get views(): ReadonlyArray<{ id: AppView; label: string; link: string }> {
-    return this.operatorAccess.isMonitorOnly
-      ? this.monitorViews
-      : this.adminViews;
+    if (this.operatorAccess.isSystemCheckOnly) {
+      return this.systemCheckViews;
+    }
+    return this.operatorAccess.isMonitorOnly ? this.monitorViews : this.adminViews;
   }
 
   get isMonitorOnlySession(): boolean {

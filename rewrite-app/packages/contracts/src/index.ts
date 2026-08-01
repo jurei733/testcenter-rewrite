@@ -113,9 +113,17 @@ export type OriginalTestcenterMonitorRoleDraft = {
   groupKey: string | null;
 };
 
-export const mapOriginalTestcenterOperationalLoginToMonitorRole = (
+export type OriginalTestcenterOperationalRoleDraft = {
+  role: Extract<AdminRole, "group_monitor" | "study_monitor" | "system_check">;
+  groupKey: string | null;
+};
+
+export const mapOriginalTestcenterOperationalLoginToAdminRole = (
   candidate: OriginalTestcenterOperationalLoginCandidate
-): OriginalTestcenterMonitorRoleDraft | null => {
+): OriginalTestcenterOperationalRoleDraft | null => {
+  if (candidate.loginMode === "sys-check-login") {
+    return { role: "system_check", groupKey: null };
+  }
   if (candidate.loginMode === "monitor-study") {
     return { role: "study_monitor", groupKey: null };
   }
@@ -123,6 +131,15 @@ export const mapOriginalTestcenterOperationalLoginToMonitorRole = (
     return { role: "group_monitor", groupKey: candidate.groupKey };
   }
   return null;
+};
+
+export const mapOriginalTestcenterOperationalLoginToMonitorRole = (
+  candidate: OriginalTestcenterOperationalLoginCandidate
+): OriginalTestcenterMonitorRoleDraft | null => {
+  const draft = mapOriginalTestcenterOperationalLoginToAdminRole(candidate);
+  return draft?.role === "group_monitor" || draft?.role === "study_monitor"
+    ? { role: draft.role, groupKey: draft.groupKey }
+    : null;
 };
 
 export type ParticipantRosterSource =
@@ -1970,6 +1987,7 @@ export type OperatorAccessMode =
   | "admin"
   | "study_monitor"
   | "group_monitor"
+  | "system_check"
   | "unassigned";
 
 export const resolveOperatorAccessMode = (
@@ -1989,6 +2007,9 @@ export const resolveOperatorAccessMode = (
   }
   if (roleAssignments.some(({ role }) => role === "group_monitor")) {
     return "group_monitor";
+  }
+  if (roleAssignments.some(({ role }) => role === "system_check")) {
+    return "system_check";
   }
   return "unassigned";
 };

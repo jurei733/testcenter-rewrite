@@ -174,8 +174,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="adminCreateValidForMinutes" name="adminCreateValidForMinutes" type="number" min="1" max="5256000" step="1" [(ngModel)]="view.ops.adminCreateValidForMinutes" (change)="view.persistState()" />
           </label>
         </div>
-        <p *ngIf="view.isCreatingMonitorAccount">
-          Monitor accounts receive only the selected workspace/group scope. For
+        <p *ngIf="view.isCreatingOperationalAccount">
+          Operational accounts receive only the selected workspace/group scope. For
           imported original logins, assign a new password here because source
           passwords are deliberately never copied. Original access dates and
           first-login durations are copied into these fields and enforced at sign-in.
@@ -185,7 +185,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           whole duration between 1 and 5,256,000 minutes.
         </p>
         <div class="actions">
-          <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">{{ view.isCreatingMonitorAccount ? "Create Monitor Account" : "Create Admin User" }}</button>
+          <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">{{ view.isCreatingSystemCheckAccount ? "Create System Check Account" : view.isCreatingMonitorAccount ? "Create Monitor Account" : "Create Admin User" }}</button>
         </div>
 
         <div class="form-grid">

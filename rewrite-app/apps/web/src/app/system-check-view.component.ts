@@ -26,6 +26,8 @@ import type {
 
 import { downloadBlobFile, downloadTextFile } from "./download-text-file";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
@@ -66,6 +68,25 @@ type ThroughputResult = {
           <p>Environment, network, questionnaire and the configured Verona item are collected in one report.</p>
         </div>
         <strong id="systemCheckStepStatus">{{ stepNumber }} / {{ steps.length }} · {{ stepLabel }}</strong>
+      </article>
+
+      <article class="card system-check-login">
+        <ng-container *ngIf="isSystemCheckSession; else systemCheckSignIn">
+          <span class="eyebrow">Protected system check</span>
+          <h2 id="systemCheckSignedInUser">Signed in as {{ signedInUsername }}</h2>
+          <p>This workspace login authorizes report saving without a separate report key.</p>
+          <button id="systemCheckSignOutButton" class="ghost" type="button" [disabled]="busy" (click)="signOutSystemCheck()">Sign Out</button>
+        </ng-container>
+        <ng-template #systemCheckSignIn>
+          <span class="eyebrow">Optional workspace login</span>
+          <h2>Use a protected system-check account</h2>
+          <p>Imported <code>sys-check-login</code> accounts can save reports under their login name without entering the report key.</p>
+          <div class="form-grid">
+            <label>Login name<input id="systemCheckUsername" autocomplete="username" [(ngModel)]="systemCheckUsername" /></label>
+            <label>Password<input id="systemCheckPassword" type="password" autocomplete="current-password" [(ngModel)]="systemCheckPassword" /></label>
+          </div>
+          <button id="systemCheckSignInButton" class="primary" type="button" [disabled]="busy || !canSignInSystemCheck" (click)="signInSystemCheck()">Sign In</button>
+        </ng-template>
       </article>
 
       <article class="card" *ngIf="!systemCheck">
@@ -113,7 +134,7 @@ type ThroughputResult = {
             <div><dt>Network</dt><dd>{{ check.skipNetwork ? 'Skipped by configuration' : 'Measured' }}</dd></div>
             <div><dt>Questions</dt><dd>{{ interactiveQuestionCount }}</dd></div>
             <div><dt>Player item</dt><dd>{{ check.unit ? check.unit.unitKey : 'Not configured' }}</dd></div>
-            <div><dt>Report</dt><dd>{{ check.canSave ? 'Can be saved with report key' : 'Local download only' }}</dd></div>
+            <div><dt>Report</dt><dd>{{ check.canSave ? isSystemCheckSession ? 'Authorized by system-check login' : 'Can be saved with report key' : 'Local download only' }}</dd></div>
           </dl>
         </article>
 
@@ -206,21 +227,22 @@ type ThroughputResult = {
         <article class="card" *ngIf="step === 'report'">
           <h2>Report</h2>
           <p>The report contains {{ reportEntryCount }} measured or answered values.</p>
-          <p *ngIf="check.canSave">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
-          <div class="form-grid" *ngIf="check.canSave">
+          <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
+          <p *ngIf="check.canSave && isSystemCheckSession">The report will be saved as <strong>{{ signedInUsername }}</strong>.</p>
+          <div class="form-grid" *ngIf="check.canSave && !isSystemCheckSession">
             <label>{{ customText('syscheck_report_id', 'Report title') }}<input id="systemCheckReportTitle" [(ngModel)]="reportTitle" /></label>
             <label>Report key<input id="systemCheckReportKey" type="password" autocomplete="off" [(ngModel)]="reportKey" /></label>
           </div>
-          <p *ngIf="check.canSave">{{ customText('syscheck_report_aboutPassword', 'Enter the system-check key supplied by the project operator to save this report.') }}</p>
+          <p *ngIf="check.canSave && !isSystemCheckSession">{{ customText('syscheck_report_aboutPassword', 'Enter the system-check key supplied by the project operator to save this report.') }}</p>
           <div class="actions">
             <button id="downloadSystemCheckReportButton" class="secondary" type="button" (click)="downloadReport()">Download JSON</button>
-            <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !reportTitle.trim() || !reportKey.trim()" (click)="saveReport()">Save Report</button>
+            <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !canSaveReport" (click)="saveReport()">Save Report</button>
           </div>
           <section class="system-check-notice" *ngIf="savedReport">
             <strong id="systemCheckSavedReportStatus">Report saved</strong>
             <p>{{ savedReport.systemCheckReportId }} · {{ savedReport.createdAt }}</p>
           </section>
-          <section class="system-check-operator">
+          <section class="system-check-operator" *ngIf="!isSystemCheckSession">
             <h3>Operator report access</h3>
             <p>Signed-in workspace operators can inspect report distributions, drill into recent reports, export CSV, or delete reports for selected checks.</p>
             <div class="actions">
@@ -325,6 +347,8 @@ export class SystemCheckViewComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly api = inject(RewriteAppApiService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly opsService = inject(RewriteAppOpsService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
 
@@ -344,6 +368,8 @@ export class SystemCheckViewComponent implements OnInit {
   unitLoadingTimeMs: number | null = null;
   reportTitle = "System Check Report";
   reportKey = "";
+  systemCheckUsername = "";
+  systemCheckPassword = "";
   savedReport: SystemCheckReport | null = null;
   operatorReports: SystemCheckReport[] = [];
   operatorStatistics: SystemCheckReportStatistics[] = [];
@@ -473,6 +499,53 @@ export class SystemCheckViewComponent implements OnInit {
 
   get hasAdminSession(): boolean {
     return Boolean(this.uiState.ops.adminSessionToken.trim());
+  }
+
+  get isSystemCheckSession(): boolean {
+    return this.operatorAccess.isSystemCheckOnly;
+  }
+
+  get signedInUsername(): string {
+    return this.uiState.ops.adminUsername.trim();
+  }
+
+  get canSignInSystemCheck(): boolean {
+    return (
+      this.systemCheckUsername.trim() !== "" && this.systemCheckPassword !== ""
+    );
+  }
+
+  get canSaveReport(): boolean {
+    return (
+      this.isSystemCheckSession ||
+      (this.reportTitle.trim() !== "" && this.reportKey.trim() !== "")
+    );
+  }
+
+  async signInSystemCheck(): Promise<void> {
+    if (!this.canSignInSystemCheck) return;
+    await this.run(async () => {
+      if (this.hasAdminSession) {
+        await this.opsService.signOutAdmin();
+      }
+      this.uiState.ops.adminUsername = this.systemCheckUsername.trim();
+      this.uiState.ops.adminPassword = this.systemCheckPassword;
+      await this.opsService.signInAdmin();
+      this.systemCheckPassword = "";
+      if (!this.isSystemCheckSession) {
+        await this.opsService.signOutAdmin();
+        throw new Error(
+          "This account does not have dedicated system-check access."
+        );
+      }
+    });
+  }
+
+  async signOutSystemCheck(): Promise<void> {
+    await this.run(async () => {
+      await this.opsService.signOutAdmin();
+      this.systemCheckPassword = "";
+    });
   }
 
   stepName(step: SystemCheckStep): string {
@@ -727,7 +800,8 @@ export class SystemCheckViewComponent implements OnInit {
         this.workspaceRoute(productionApiRoutes.workspace.saveSystemCheckReport, {
           checkId: check.checkId
         }),
-        this.reportPayload(true)
+        this.reportPayload(!this.isSystemCheckSession),
+        this.isSystemCheckSession ? this.adminHeaders : undefined
       );
       this.savedReport = payload.report;
       this.reportKey = "";
