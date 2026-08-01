@@ -4,7 +4,13 @@ import type {
   AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
 
-export type AppView = "workspace" | "content" | "runtime" | "participant" | "ops";
+export type AppView =
+  | "workspace"
+  | "content"
+  | "runtime"
+  | "participant"
+  | "system-check"
+  | "ops";
 
 export type SummaryCard = {
   label: string;

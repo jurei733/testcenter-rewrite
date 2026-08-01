@@ -9,7 +9,14 @@ import { LiveContextComponent } from "./live-context.component";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
 
-const routeViews: AppView[] = ["workspace", "content", "runtime", "participant", "ops"];
+const routeViews: AppView[] = [
+  "workspace",
+  "content",
+  "runtime",
+  "participant",
+  "system-check",
+  "ops"
+];
 
 @Component({
   selector: "app-root",
@@ -31,7 +38,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
 
   get isParticipantView(): boolean {
-    return this.app.activeView === "participant";
+    return (
+      this.app.activeView === "participant" ||
+      this.app.activeView === "system-check"
+    );
   }
 
   async ngOnInit(): Promise<void> {

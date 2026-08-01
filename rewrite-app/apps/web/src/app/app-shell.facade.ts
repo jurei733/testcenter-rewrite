@@ -41,6 +41,7 @@ export class AppShellFacade {
     { id: "content", label: "Content", link: "/content" },
     { id: "runtime", label: "Runtime", link: "/runtime" },
     { id: "participant", label: "Participant", link: "/participant" },
+    { id: "system-check", label: "System Check", link: "/system-check" },
     { id: "ops", label: "Diagnostics", link: "/ops" }
   ] as const;
 

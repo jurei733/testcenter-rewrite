@@ -98,7 +98,8 @@ export type WorkspaceActivityEventType =
   | "group_results_deleted"
   | "review_created"
   | "review_updated"
-  | "review_deleted";
+  | "review_deleted"
+  | "system_check_report_saved";
 export const workspaceActivityEventTypes = [
   "workspace_created",
   "source_package_created",
@@ -123,7 +124,8 @@ export const workspaceActivityEventTypes = [
   "group_results_deleted",
   "review_created",
   "review_updated",
-  "review_deleted"
+  "review_deleted",
+  "system_check_report_saved"
 ] as const satisfies readonly WorkspaceActivityEventType[];
 export type WorkspaceActivitySubjectType =
   | "workspace"
@@ -131,14 +133,16 @@ export type WorkspaceActivitySubjectType =
   | "import_job"
   | "content_release"
   | "participant_session"
-  | "test_run";
+  | "test_run"
+  | "system_check_report";
 export const workspaceActivitySubjectTypes = [
   "workspace",
   "source_package",
   "import_job",
   "content_release",
   "participant_session",
-  "test_run"
+  "test_run",
+  "system_check_report"
 ] as const satisfies readonly WorkspaceActivitySubjectType[];
 
 export type Tenant = {
@@ -259,6 +263,45 @@ export type SourcePackage = {
 export type SourcePackageContentStructure = {
   bookletEntries: SourcePackageBookletEntry[];
   playerEntries?: SourcePackagePlayerEntry[];
+  systemCheckEntries?: SourcePackageSystemCheckEntry[];
+};
+
+export type SystemCheckQuestionType =
+  | "string"
+  | "select"
+  | "header"
+  | "check"
+  | "text"
+  | "radio";
+
+export type SystemCheckSpeedParameters = {
+  min: number;
+  good: number;
+  maxDevianceBytesPerSecond: number;
+  maxErrorsPerSequence: number;
+  maxSequenceRepetitions: number;
+  sequenceSizes: number[];
+};
+
+export type SystemCheckQuestion = {
+  id: string;
+  type: SystemCheckQuestionType;
+  prompt: string;
+  required: boolean;
+  options: string[];
+};
+
+export type SourcePackageSystemCheckEntry = {
+  checkId: string;
+  displayLabel: string;
+  description?: string;
+  unitKey?: string;
+  saveKey?: string;
+  skipNetwork: boolean;
+  uploadSpeed: SystemCheckSpeedParameters;
+  downloadSpeed: SystemCheckSpeedParameters;
+  customTexts: Record<string, string>;
+  questions: SystemCheckQuestion[];
 };
 
 export type SourcePackagePlayerEntry = {
@@ -398,6 +441,47 @@ export type ContentReleaseRuntimeSnapshot = {
   bookletEntries: ContentReleaseBookletEntry[];
   playerEntries?: ContentReleasePlayerEntry[];
   resourceEntries?: ContentReleaseResourceEntry[];
+  systemCheckEntries?: SourcePackageSystemCheckEntry[];
+};
+
+export type WorkspaceSystemCheck = Omit<
+  SourcePackageSystemCheckEntry,
+  "saveKey"
+> & {
+  sourcePackageId: string;
+  canSave: boolean;
+  unit: {
+    unitKey: string;
+    displayLabel: string;
+    playerKey?: string;
+    playerHtml?: string;
+    unitDefinition?: string;
+    unitDefinitionType?: string;
+  } | null;
+};
+
+export type SystemCheckReportEntry = {
+  id: string;
+  type: string;
+  label: string;
+  value: string | number | boolean | null;
+  warning: boolean;
+};
+
+export type SystemCheckReport = {
+  systemCheckReportId: string;
+  tenantId: string;
+  workspaceId: string;
+  sourcePackageId: string;
+  checkId: string;
+  checkLabel: string;
+  title: string;
+  responses: unknown;
+  environment: SystemCheckReportEntry[];
+  network: SystemCheckReportEntry[];
+  questionnaire: SystemCheckReportEntry[];
+  unit: SystemCheckReportEntry[];
+  createdAt: string;
 };
 
 export type ContentReleasePlayerEntry = {

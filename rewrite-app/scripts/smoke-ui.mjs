@@ -993,7 +993,128 @@ try {
     .filter({ hasText: tenantKey })
     .filter({ hasText: workspaceKey })
     .waitFor();
+
+  if (stopAfterStep === "" || stopAfterStep === "system-check-report") {
+    logStep("system-check-report");
+    const systemCheckTenantKey = `${tenantKey}-system-check`;
+    const systemCheckWorkspaceKey = `${workspaceKey}-system-check`;
+    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+      body: {
+        tenantKey: systemCheckTenantKey,
+        displayName: "UI System Check Tenant"
+      }
+    });
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces`,
+      {
+        body: {
+          workspaceKey: systemCheckWorkspaceKey,
+          displayName: "UI System Check Workspace"
+        }
+      }
+    );
+    const systemCheckSourceDocument = await readFile(
+      resolve("test-fixtures/original-testcenter/system-checks/SysCheck.xml"),
+      "utf8"
+    );
+    const systemCheckSourceResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
+      {
+        body: {
+          fileName: "SysCheck.xml",
+          mediaType: "application/xml",
+          sourceDocument: systemCheckSourceDocument
+        }
+      }
+    );
+    const systemCheckSource = await systemCheckSourceResponse.json();
+    const systemCheckSourcePackageId =
+      systemCheckSource.sourcePackage?.sourcePackageId;
+    assert.ok(
+      systemCheckSourcePackageId,
+      "UI smoke expected a source package id for the system check."
+    );
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/import-jobs`,
+      { body: { sourcePackageId: systemCheckSourcePackageId } }
+    );
+    await page.goto(
+      `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
+        systemCheckTenantKey
+      )}&workspaceKey=${encodeURIComponent(
+        systemCheckWorkspaceKey
+      )}&checkId=SYSCHECK.SAMPLE`,
+      { waitUntil: "networkidle" }
+    );
+    await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Environment" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Network" }).waitFor();
+    await page.locator("#runSystemCheckNetworkButton").click();
+    await page.waitForFunction(
+      () => {
+        const rating = document
+          .querySelector("#systemCheckNetworkRating")
+          ?.textContent?.trim();
+        return ["good", "ok", "insufficient"].includes(rating ?? "");
+      },
+      undefined,
+      { timeout: 15_000 }
+    );
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");
+    await selectAndCommit("#systemCheckQuestion-3", "Option B");
+    await fillAndCommit("#systemCheckQuestion-4", "Browser flow verified");
+    await page.locator("#systemCheckQuestion-5").check();
+    await page.getByRole("radio", { name: "Option A", exact: true }).check();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page.getByText("Player check unavailable", { exact: true }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
+    await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check");
+    await fillAndCommit("#systemCheckReportKey", "saveme");
+    await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
+    await page.locator("#saveSystemCheckReportButton").click();
+    await page.locator("#systemCheckSavedReportStatus").waitFor({ timeout: 15_000 });
+    await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
+    await page.locator("#loadSystemCheckReportsButton").click();
+    await page
+      .locator(".system-check-operator")
+      .filter({ hasText: "UI Smoke System Check" })
+      .waitFor({ timeout: 15_000 });
+    await expectButtonSelectorEnabled("#exportSystemCheckReportsButton");
+    const systemCheckReportDownloadPromise = page.waitForEvent("download");
+    await page.locator("#exportSystemCheckReportsButton").click();
+    const systemCheckReportDownload = await systemCheckReportDownloadPromise;
+    assert.equal(
+      systemCheckReportDownload.suggestedFilename(),
+      `${systemCheckWorkspaceKey}-system-check-reports.csv`
+    );
+    stopAfter("system-check-report");
+
+    await page.evaluate(
+      ([nextTenantKey, nextWorkspaceKey]) => {
+        const storageKey = "testcenter-rewrite-app-shell";
+        const persisted = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            ...persisted,
+            tenantKey: nextTenantKey,
+            workspaceKey: nextWorkspaceKey,
+            activeView: "workspace"
+          })
+        );
+      },
+      [tenantKey, workspaceKey]
+    );
+    await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
+  }
   logStep("workspace-directory-reads");
+  const expectedTenantDirectoryCount = stopAfterStep === "" ? 2 : 1;
   await clickAction("Refresh Tenant Directory");
   await page
     .locator("article.card")
@@ -1002,8 +1123,10 @@ try {
     })
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Tenant directory window" }) })
-    .filter({ hasText: "1 tenant row(s) loaded for the current directory" })
-    .filter({ hasText: "1 loaded" })
+    .filter({
+      hasText: `${expectedTenantDirectoryCount} tenant row(s) loaded for the current directory`
+    })
+    .filter({ hasText: `${expectedTenantDirectoryCount} loaded` })
     .filter({ hasText: "directory" })
     .filter({ hasText: "Loaded Records" })
     .filter({ hasText: "Selected Tenant" })
@@ -3614,14 +3737,14 @@ try {
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "10" })
+    .filter({ hasText: "11" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "10" })
+    .filter({ hasText: "11" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
@@ -4814,12 +4937,19 @@ try {
     }
     await collection.waitFor({ state: "visible", timeout: 15_000 });
   };
+  await fillAndCommit("#studyMonitorMatrixLoginFilter", participantLoginKey);
+  await fillAndCommit("#studyMonitorMatrixUnitFilter", "unit-paused");
+  await page.selectOption("#studyMonitorMatrixStatusFilter", "running");
+  await page.selectOption("#studyMonitorMatrixAnswerFilter", "answered");
+  await fillAndCommit("#studyMonitorMatrixLimit", "5");
+  await clickAction("Apply Matrix Filters");
   await page
     .locator("app-record-collection")
     .filter({ hasText: "Participant Unit Matrix" })
     .locator(".record-card")
     .filter({ hasText: "student-ui" })
     .filter({ hasText: "unit-paused" })
+    .filter({ hasText: "answered" })
     .getByRole("button", { name: "Open Run Detail" })
     .first()
     .click();
@@ -4834,6 +4964,10 @@ try {
     .filter({ hasText: `${studyMonitorRunDetail.missingExpectedUnitCount} missing` })
     .filter({ hasText: "1 review(s)" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  await page.getByRole("button", { name: "Clear Matrix Filters" }).click();
+  await expectInputValue("#studyMonitorMatrixLoginFilter", "");
+  await expectInputValue("#studyMonitorMatrixUnitFilter", "");
+  await expectInputValue("#studyMonitorMatrixLimit", "25");
   logStep("run-detail-csv-export");
   await expectButtonSelectorEnabled("#exportStudyMonitorRunCsvButton");
   const studyMonitorRunDownloadPromise = page.waitForEvent("download");

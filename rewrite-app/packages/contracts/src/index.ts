@@ -24,6 +24,8 @@ import type {
   SourcePackage,
   SourcePackageStatus,
   SourcePackageContentStructure,
+  SystemCheckReport,
+  SystemCheckReportEntry,
   Tenant,
   TestRun,
   Workspace,
@@ -44,6 +46,7 @@ import type {
   WorkspaceSourcePackageDeletion,
   WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageListItem,
+  WorkspaceSystemCheck,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorGroupDetail,
   WorkspaceStudyMonitorParticipantDetail,
@@ -1524,6 +1527,16 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
     exportContentReleasesCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/content-releases.csv",
+    listSystemChecks:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-checks",
+    getSystemCheck:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-checks/:checkId",
+    saveSystemCheckReport:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-checks/:checkId/reports",
+    listSystemCheckReports:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports",
+    exportSystemCheckReportsCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.csv",
     getContentRelease:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases/:contentReleaseId",
     getContentReleaseActivationReadiness:
@@ -1672,6 +1685,21 @@ export type ContentReleaseListQuery = {
   importJobId?: string;
   sourcePackageId?: string;
   limit?: number;
+};
+
+export type SystemCheckReportListQuery = {
+  checkId?: string;
+  limit?: number;
+};
+
+export type SaveSystemCheckReportRequest = {
+  keyPhrase?: string;
+  title?: string;
+  responses?: unknown;
+  environment: SystemCheckReportEntry[];
+  network: SystemCheckReportEntry[];
+  questionnaire: SystemCheckReportEntry[];
+  unit: SystemCheckReportEntry[];
 };
 
 export type AdminUserListQuery = {
@@ -2015,6 +2043,22 @@ export type ContentReleaseActivationSummary = {
 export type ActivateContentReleaseResponse = {
   contentRelease: ContentRelease;
   activation: ContentReleaseActivationSummary;
+};
+
+export type ListSystemChecksResponse = {
+  items: WorkspaceSystemCheck[];
+};
+
+export type GetSystemCheckResponse = {
+  systemCheck: WorkspaceSystemCheck;
+};
+
+export type SaveSystemCheckReportResponse = {
+  report: SystemCheckReport;
+};
+
+export type ListSystemCheckReportsResponse = {
+  items: SystemCheckReport[];
 };
 
 export type ParticipantSignInResponse = {

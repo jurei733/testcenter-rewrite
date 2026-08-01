@@ -180,5 +180,15 @@
       "kind": "participant-roster",
       "diagnosticCode": "testcenter_xml_login_name_duplicate"
     }
+  ],
+  "systemChecks": [
+    {
+      "fixture": "system-checks/SysCheck.xml",
+      "sourcePath": "sampledata/SysCheck.xml",
+      "checkId": "SYSCHECK.SAMPLE",
+      "questionCount": 6,
+      "skipNetwork": false,
+      "canSave": true
+    }
   ]
 }

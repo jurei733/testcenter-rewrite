@@ -78,6 +78,11 @@ import {
   type ListParticipantSessionsResponse,
   type ListContentReleasesResponse,
   type ListSourcePackagesResponse,
+  type ListSystemChecksResponse,
+  type GetSystemCheckResponse,
+  type SaveSystemCheckReportRequest,
+  type SaveSystemCheckReportResponse,
+  type ListSystemCheckReportsResponse,
   type MonitorOpenRunsResponse,
   type MonitorOpenRunsQuery,
   type ParticipantCurrentRunStateResponse,
@@ -1458,6 +1463,21 @@ const contentReleaseActivationReadinessPattern = createRoutePattern(
 const contentReleaseActivatePattern = createRoutePattern(
   productionApiRoutes.workspace.activateContentRelease
 );
+const systemCheckListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listSystemChecks
+);
+const systemCheckDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getSystemCheck
+);
+const systemCheckReportSavePattern = createRoutePattern(
+  productionApiRoutes.workspace.saveSystemCheckReport
+);
+const systemCheckReportListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listSystemCheckReports
+);
+const systemCheckReportCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportSystemCheckReportsCsv
+);
 const runtimeStatePattern = createRoutePattern(
   productionApiRoutes.participant.getRuntimeState
 );
@@ -1544,6 +1564,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", contentReleaseDetailPattern],
   ["GET", contentReleaseActivationReadinessPattern],
   ["POST", contentReleaseActivatePattern],
+  ["GET", systemCheckReportListPattern],
+  ["GET", systemCheckReportCsvExportPattern],
   ["GET", monitorOpenRunsPattern],
   ["POST", monitorRunCommandsPattern],
   ["POST", monitorRunCommandPattern]
@@ -1681,6 +1703,9 @@ const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
 const isParticipantEntryPath = (pathname: string): boolean =>
   pathname === "/participant" || pathname === "/participant/";
 
+const isSystemCheckEntryPath = (pathname: string): boolean =>
+  pathname === "/system-check" || pathname === "/system-check/";
+
 const resolveFrontendContentType = (pathname: string): string => {
   switch (extname(pathname)) {
     case ".css":
@@ -1773,6 +1798,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && isParticipantEntryPath(pathname)) {
     return "GET /participant";
+  }
+
+  if (method === "GET" && isSystemCheckEntryPath(pathname)) {
+    return "GET /system-check";
   }
 
   if (method === "GET" && pathname === "/healthz") {
@@ -2098,6 +2127,23 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "POST",
       contentReleaseActivatePattern,
       productionApiRoutes.workspace.activateContentRelease
+    ],
+    ["GET", systemCheckListPattern, productionApiRoutes.workspace.listSystemChecks],
+    ["GET", systemCheckDetailPattern, productionApiRoutes.workspace.getSystemCheck],
+    [
+      "POST",
+      systemCheckReportSavePattern,
+      productionApiRoutes.workspace.saveSystemCheckReport
+    ],
+    [
+      "GET",
+      systemCheckReportListPattern,
+      productionApiRoutes.workspace.listSystemCheckReports
+    ],
+    [
+      "GET",
+      systemCheckReportCsvExportPattern,
+      productionApiRoutes.workspace.exportSystemCheckReportsCsv
     ],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
@@ -2480,6 +2526,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
     try {
       if (request.method === "GET" && isParticipantEntryPath(pathname)) {
         sendRedirect(response, 302, `/app/participant${url.search}`);
+        return;
+      }
+
+      if (request.method === "GET" && isSystemCheckEntryPath(pathname)) {
+        sendRedirect(response, 302, `/app/system-check${url.search}`);
         return;
       }
 
@@ -4716,6 +4767,157 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           forceActivation: body.forceActivation
         });
         sendJson<ActivateContentReleaseResponse>(response, 200, activationResult);
+        return;
+      }
+
+      const systemCheckListMatch = systemCheckListPattern.exec(pathname);
+      const systemCheckDetailMatch = systemCheckDetailPattern.exec(pathname);
+      const systemCheckReportSaveMatch =
+        systemCheckReportSavePattern.exec(pathname);
+      const systemCheckReportListMatch =
+        systemCheckReportListPattern.exec(pathname);
+      const systemCheckReportCsvExportMatch =
+        systemCheckReportCsvExportPattern.exec(pathname);
+      if (request.method === "GET" && systemCheckListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(systemCheckListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          systemCheckListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const items = await services.systemCheck.listSystemChecks({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListSystemChecksResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && systemCheckDetailMatch?.groups) {
+        const tenantKey = decodeRouteGroup(systemCheckDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          systemCheckDetailMatch.groups.workspaceKey
+        );
+        const checkId = decodeRouteGroup(systemCheckDetailMatch.groups.checkId);
+        if (!tenantKey || !workspaceKey || !checkId) {
+          sendError(
+            response,
+            400,
+            "invalid_system_check_scope",
+            "tenantKey, workspaceKey, and checkId are required."
+          );
+          return;
+        }
+        const systemCheck = await services.systemCheck.getSystemCheck({
+          tenantKey,
+          workspaceKey,
+          checkId
+        });
+        sendJson<GetSystemCheckResponse>(response, 200, { systemCheck });
+        return;
+      }
+
+      if (request.method === "POST" && systemCheckReportSaveMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          systemCheckReportSaveMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          systemCheckReportSaveMatch.groups.workspaceKey
+        );
+        const checkId = decodeRouteGroup(
+          systemCheckReportSaveMatch.groups.checkId
+        );
+        if (!tenantKey || !workspaceKey || !checkId) {
+          sendError(
+            response,
+            400,
+            "invalid_system_check_scope",
+            "tenantKey, workspaceKey, and checkId are required."
+          );
+          return;
+        }
+        const body = await readRequestJsonBody<SaveSystemCheckReportRequest>();
+        const report = await services.systemCheck.saveSystemCheckReport({
+          tenantKey,
+          workspaceKey,
+          checkId,
+          keyPhrase: body.keyPhrase,
+          title: body.title,
+          responses: body.responses,
+          environment: body.environment,
+          network: body.network,
+          questionnaire: body.questionnaire,
+          unit: body.unit
+        });
+        sendJson<SaveSystemCheckReportResponse>(response, 201, { report });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        (systemCheckReportListMatch?.groups ||
+          systemCheckReportCsvExportMatch?.groups)
+      ) {
+        const groups =
+          systemCheckReportListMatch?.groups ??
+          systemCheckReportCsvExportMatch?.groups;
+        const tenantKey = decodeRouteGroup(groups?.tenantKey);
+        const workspaceKey = decodeRouteGroup(groups?.workspaceKey);
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const limitValue = url.searchParams.get("limit")?.trim();
+        const limit = limitValue ? Number.parseInt(limitValue, 10) : undefined;
+        if (
+          limitValue &&
+          (!/^\d+$/.test(limitValue) || !limit || limit < 1 || limit > 500)
+        ) {
+          sendError(
+            response,
+            400,
+            "system_check_report_limit_invalid",
+            "System-check report limit must be an integer between 1 and 500."
+          );
+          return;
+        }
+        if (systemCheckReportCsvExportMatch?.groups) {
+          const csv =
+            await services.workspaceAdminRead.exportSystemCheckReportsCsv({
+              tenantKey,
+              workspaceKey,
+              checkId,
+              limit
+            });
+          sendCsv(
+            response,
+            200,
+            `${workspaceKey}-system-check-reports.csv`,
+            csv
+          );
+          return;
+        }
+        const items =
+          await services.workspaceAdminRead.listSystemCheckReports({
+            tenantKey,
+            workspaceKey,
+            checkId,
+            limit
+          });
+        sendJson<ListSystemCheckReportsResponse>(response, 200, { items });
         return;
       }
 

@@ -31,7 +31,7 @@ export async function ensureShellDataForView(
     await host.refreshRuntimeReads(true).catch(() => undefined);
     return;
   }
-  if (view === "participant") {
+  if (view === "participant" || view === "system-check") {
     return;
   }
   if (view === "ops" && !host.diagnosticsLoaded) {
@@ -75,7 +75,10 @@ export async function refreshShellActiveViewData(
       await host.refreshRuntimeReads(true);
       return;
     }
-    if (host.activeView === "participant") {
+    if (
+      host.activeView === "participant" ||
+      host.activeView === "system-check"
+    ) {
       return;
     }
     await host.refreshOperationalDiagnostics(true);

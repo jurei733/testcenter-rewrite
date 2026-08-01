@@ -17,6 +17,13 @@ export const appRoutes: Routes = [
         module => module.ParticipantViewComponent
       )
   },
+  {
+    path: "system-check",
+    loadComponent: () =>
+      import("./system-check-view.component").then(
+        module => module.SystemCheckViewComponent
+      )
+  },
   { path: "ops", component: OpsViewComponent },
   { path: "**", redirectTo: "workspace" }
 ];

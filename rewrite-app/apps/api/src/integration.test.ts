@@ -1504,6 +1504,30 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedParticipantSessionsCsv.status, 401);
     assert.equal(rejectedParticipantSessionsCsv.body.error, "admin_session_missing");
 
+    const publicSystemChecks = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-checks"
+    );
+    assert.equal(publicSystemChecks.status, 200);
+    assert.deepEqual(publicSystemChecks.body.items, []);
+
+    const rejectedSystemCheckReports = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-check-reports"
+    );
+    assert.equal(rejectedSystemCheckReports.status, 401);
+    assert.equal(rejectedSystemCheckReports.body.error, "admin_session_missing");
+
+    const rejectedSystemCheckReportsCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/system-check-reports.csv"
+    );
+    assert.equal(rejectedSystemCheckReportsCsv.status, 401);
+    assert.equal(
+      rejectedSystemCheckReportsCsv.body.error,
+      "admin_session_missing"
+    );
+
     const overview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
     }>(
@@ -14431,6 +14455,17 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   );
   assert.equal(await participantEntryHeadResponse.text(), "");
 
+  const systemCheckEntryResponse = await fetch(
+    `${baseUrl}/system-check?tenantKey=demo-tenant&workspaceKey=demo-workspace`,
+    { redirect: "manual" }
+  );
+  assert.equal(systemCheckEntryResponse.status, 302);
+  assertSecurityHeaders(systemCheckEntryResponse);
+  assert.equal(
+    systemCheckEntryResponse.headers.get("location"),
+    "/app/system-check?tenantKey=demo-tenant&workspaceKey=demo-workspace"
+  );
+
   const scriptMatch = appResponse.body.match(
     /<script src="([^"]*main[^"]*\.js)" type="module"><\/script>/
   );
@@ -15104,4 +15139,177 @@ test("monitor bulk commands report per-run successes and failures", async () => 
   } finally {
     await closeServer(isolated.server);
   }
+});
+
+test("original SysCheck XML imports and produces compatible saved reports", async () => {
+  const tenantKey = "system-check-tenant";
+  const workspaceKey = "system-check-workspace";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: "System Check Tenant" }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: "System Check Workspace" }
+  });
+  const sourceDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
+    "utf8"
+  );
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "SysCheck.xml",
+        mediaType: "application/xml",
+        sourceDocument
+      }
+    }
+  );
+  assert.equal(sourcePackage.status, 201);
+
+  const imported = await requestJson<{
+    importJob: { status: string; diagnostics: unknown[] };
+    stagedContentRelease: unknown;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(imported.status, 201);
+  assert.equal(imported.body.importJob.status, "completed");
+  assert.deepEqual(imported.body.importJob.diagnostics, []);
+  assert.equal(imported.body.stagedContentRelease, null);
+
+  const configurations = await requestJson<{
+    items: Array<{
+      checkId: string;
+      displayLabel: string;
+      description?: string;
+      sourcePackageId: string;
+      canSave: boolean;
+      skipNetwork: boolean;
+      questions: Array<{
+        id: string;
+        type: string;
+        required: boolean;
+        options: string[];
+      }>;
+      uploadSpeed: { min: number; sequenceSizes: number[] };
+      unit: { unitKey: string; playerHtml?: string } | null;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks`);
+  assert.equal(configurations.status, 200);
+  assert.equal(configurations.body.items.length, 1);
+  const configuration = configurations.body.items[0];
+  assert.equal(configuration?.checkId, "SYSCHECK.SAMPLE");
+  assert.equal(configuration?.displayLabel, "System-Check Beispiel");
+  assert.equal(configuration?.canSave, true);
+  assert.equal(configuration?.skipNetwork, false);
+  assert.equal(configuration?.questions.length, 6);
+  assert.equal(configuration?.questions[1]?.required, true);
+  assert.deepEqual(configuration?.questions[2]?.options, ["Option A", "Option B"]);
+  assert.equal(configuration?.uploadSpeed.min, 1024);
+  assert.deepEqual(configuration?.uploadSpeed.sequenceSizes, [
+    100000,
+    200000,
+    400000,
+    800000
+  ]);
+  assert.equal(configuration?.unit?.unitKey, "UNIT.SAMPLE");
+  assert.equal(configuration?.unit?.playerHtml, undefined);
+
+  const reportBody = {
+    title: "SAMPLE SYS-CHECK REPORT",
+    keyPhrase: "wrong",
+    responses: "",
+    environment: [
+      {
+        id: "browser",
+        type: "environment",
+        label: "Browser",
+        value: "Chrome",
+        warning: false
+      }
+    ],
+    network: [
+      {
+        id: "overall",
+        type: "network",
+        label: "Gesamtbewertung",
+        value: "good",
+        warning: false
+      }
+    ],
+    questionnaire: [
+      {
+        id: "2",
+        type: "string",
+        label: "Eingabefeld",
+        value: "Sam Sample",
+        warning: false
+      }
+    ],
+    unit: [
+      {
+        id: "loading-time",
+        type: "unit/player",
+        label: "loading time",
+        value: 1594,
+        warning: false
+      }
+    ]
+  };
+  const wrongKey = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    { method: "POST", body: reportBody }
+  );
+  assert.equal(wrongKey.status, 403);
+  assert.equal(wrongKey.body.error, "system_check_save_key_invalid");
+
+  const saved = await requestJson<{
+    report: {
+      systemCheckReportId: string;
+      checkId: string;
+      checkLabel: string;
+      title: string;
+      environment: unknown[];
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    {
+      method: "POST",
+      body: { ...reportBody, keyPhrase: "SAVEME" }
+    }
+  );
+  assert.equal(saved.status, 201);
+  assert.equal(saved.body.report.checkId, "SYSCHECK.SAMPLE");
+  assert.equal(saved.body.report.checkLabel, "System-Check Beispiel");
+  assert.equal(saved.body.report.title, "SAMPLE SYS-CHECK REPORT");
+  assert.equal(saved.body.report.environment.length, 1);
+
+  const reports = await requestJson<{
+    items: Array<{ systemCheckReportId: string; checkId: string }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports?checkId=SYSCHECK.SAMPLE&limit=1`
+  );
+  assert.equal(reports.status, 200);
+  assert.equal(reports.body.items.length, 1);
+  assert.equal(
+    reports.body.items[0]?.systemCheckReportId,
+    saved.body.report.systemCheckReportId
+  );
+
+  const csv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.csv?checkId=SYSCHECK.SAMPLE`
+  );
+  assert.equal(csv.status, 200);
+  assert.equal(csv.contentType, "text/csv; charset=utf-8");
+  assert.match(
+    csv.body,
+    /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"Datum";"Report-Id";"SourcePackage-Id";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"\n/
+  );
+  assert.match(csv.body, /"SAMPLE SYS-CHECK REPORT";"SYSCHECK\.SAMPLE"/);
 });

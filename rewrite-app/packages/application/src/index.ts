@@ -58,7 +58,10 @@ import type {
   SourcePackageStatus,
   SourcePackageContentStructure,
   SourcePackageBookletStateEntry,
+  SourcePackageSystemCheckEntry,
   SourcePackageTestletEntry,
+  SystemCheckReport,
+  SystemCheckReportEntry,
   Tenant,
   TestRun,
   TestRunStatus,
@@ -83,6 +86,7 @@ import type {
   WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
+  WorkspaceSystemCheck,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
   WorkspaceStudyMonitorAttentionItem,
@@ -386,6 +390,42 @@ export type WorkspaceAdminReadPort = {
     sourcePackageId?: string;
     limit?: number;
   }): Promise<string>;
+  listSystemCheckReports(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<SystemCheckReport[]>;
+  exportSystemCheckReportsCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<string>;
+};
+
+export type SystemCheckPort = {
+  listSystemChecks(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceSystemCheck[]>;
+  getSystemCheck(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId: string;
+  }): Promise<WorkspaceSystemCheck>;
+  saveSystemCheckReport(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId: string;
+    keyPhrase?: string;
+    title?: string;
+    responses?: unknown;
+    environment: SystemCheckReportEntry[];
+    network: SystemCheckReportEntry[];
+    questionnaire: SystemCheckReportEntry[];
+    unit: SystemCheckReportEntry[];
+  }): Promise<SystemCheckReport>;
 };
 
 export type WorkspaceResultsPort = {
@@ -660,6 +700,7 @@ export type FirstSlicePorts = {
   participantRuntime: ParticipantRuntimePort;
   monitorRead: MonitorReadPort;
   monitorControl: MonitorControlPort;
+  systemCheck: SystemCheckPort;
 };
 
 export class FirstSliceError extends Error {
@@ -3557,8 +3598,10 @@ const hasStructuredContent = (
 ): contentStructure is SourcePackageContentStructure =>
   Boolean(
     contentStructure &&
-      Array.isArray(contentStructure.bookletEntries) &&
-      contentStructure.bookletEntries.length > 0
+      ((Array.isArray(contentStructure.bookletEntries) &&
+        contentStructure.bookletEntries.length > 0) ||
+        (Array.isArray(contentStructure.systemCheckEntries) &&
+          contentStructure.systemCheckEntries.length > 0))
   );
 
 const normalizeManifestToken = (value: unknown): string =>
@@ -3614,6 +3657,87 @@ const normalizeUnitCodingScheme = (value: unknown): UnitCodingScheme | null => {
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
+  const systemCheckEntriesById = new Map<string, SourcePackageSystemCheckEntry>();
+  for (const entry of contentStructure.systemCheckEntries ?? []) {
+    const checkId = normalizeManifestToken(entry.checkId);
+    if (!checkId || systemCheckEntriesById.has(checkId.toUpperCase())) {
+      continue;
+    }
+    const normalizeSpeed = (
+      speed: SourcePackageSystemCheckEntry["uploadSpeed"] | undefined
+    ): SourcePackageSystemCheckEntry["uploadSpeed"] => ({
+      min: Math.max(0, Number(speed?.min) || 0),
+      good: Math.max(0, Number(speed?.good) || 0),
+      maxDevianceBytesPerSecond: Math.max(
+        0,
+        Number(speed?.maxDevianceBytesPerSecond) || 0
+      ),
+      maxErrorsPerSequence: Math.max(
+        0,
+        Number(speed?.maxErrorsPerSequence) || 0
+      ),
+      maxSequenceRepetitions: Math.max(
+        0,
+        Number(speed?.maxSequenceRepetitions) || 0
+      ),
+      sequenceSizes: (speed?.sequenceSizes ?? []).flatMap(value => {
+        const size = Number(value);
+        return Number.isFinite(size) && size > 0 ? [size] : [];
+      })
+    });
+    const validQuestionTypes = new Set([
+      "string",
+      "select",
+      "header",
+      "check",
+      "text",
+      "radio"
+    ]);
+    const questionIds = new Set<string>();
+    const questions = (entry.questions ?? []).flatMap(question => {
+      const id = normalizeManifestToken(question.id);
+      const type = normalizeManifestToken(question.type).toLowerCase();
+      if (!id || questionIds.has(id) || !validQuestionTypes.has(type)) {
+        return [];
+      }
+      questionIds.add(id);
+      return [{
+        id,
+        type: type as SourcePackageSystemCheckEntry["questions"][number]["type"],
+        prompt: normalizeUnitContent(question.prompt) ?? "",
+        required: Boolean(question.required),
+        options: (question.options ?? [])
+          .map(option => String(option).trim())
+          .filter(Boolean)
+      }];
+    });
+    systemCheckEntriesById.set(checkId.toUpperCase(), {
+      checkId,
+      displayLabel: normalizeManifestLabel(
+        entry.displayLabel,
+        "System Check",
+        checkId
+      ),
+      ...(normalizeUnitContent(entry.description)
+        ? { description: normalizeUnitContent(entry.description) }
+        : {}),
+      ...(normalizeManifestToken(entry.unitKey)
+        ? { unitKey: normalizeManifestToken(entry.unitKey) }
+        : {}),
+      ...(normalizeManifestToken(entry.saveKey)
+        ? { saveKey: normalizeManifestToken(entry.saveKey) }
+        : {}),
+      skipNetwork: Boolean(entry.skipNetwork),
+      uploadSpeed: normalizeSpeed(entry.uploadSpeed),
+      downloadSpeed: normalizeSpeed(entry.downloadSpeed),
+      customTexts: Object.fromEntries(
+        Object.entries(entry.customTexts ?? {})
+          .map(([key, value]) => [key.trim(), String(value).trim()] as const)
+          .filter(([key]) => Boolean(key))
+      ),
+      questions
+    });
+  }
   const playerEntriesByKey = new Map<
     string,
     NonNullable<ContentReleaseRuntimeSnapshot["playerEntries"]>[number]
@@ -3924,14 +4048,16 @@ const normalizeContentStructure = (
 
   const bookletEntries = Array.from(bookletEntriesByKey.values());
 
-  if (bookletEntries.length === 0) {
+  const systemCheckEntries = Array.from(systemCheckEntriesById.values());
+  if (bookletEntries.length === 0 && systemCheckEntries.length === 0) {
     return null;
   }
 
   const playerEntries = Array.from(playerEntriesByKey.values());
   return {
     bookletEntries,
-    ...(playerEntries.length > 0 ? { playerEntries } : {})
+    ...(playerEntries.length > 0 ? { playerEntries } : {}),
+    ...(systemCheckEntries.length > 0 ? { systemCheckEntries } : {})
   };
 };
 
@@ -6349,9 +6475,138 @@ const collectXmlBookletUnitContentPathCandidates = (
   return candidatesByUnitKey;
 };
 
+const parseSystemCheckSourceDocument = (
+  sourceDocument: string
+): SourcePackageSystemCheckEntry[] => {
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser().parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return [];
+  }
+  const root = document?.documentElement;
+  if (!root || xmlElementLocalName(root).toLowerCase() !== "syscheck") {
+    return [];
+  }
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  const config = xmlChildrenNamed(root, "Config")[0];
+  const checkId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+  if (!checkId) {
+    return [];
+  }
+  const readAttribute = (element: XmlElement | undefined, name: string): string => {
+    if (!element) {
+      return "";
+    }
+    const exact = element.getAttribute(name);
+    if (exact !== null) {
+      return exact.trim();
+    }
+    for (let index = 0; index < element.attributes.length; index += 1) {
+      const attribute = element.attributes.item(index);
+      if (attribute && attribute.name.toLowerCase() === name.toLowerCase()) {
+        return attribute.value.trim();
+      }
+    }
+    return "";
+  };
+  const readNonNegativeInteger = (
+    element: XmlElement | undefined,
+    name: string
+  ): number => {
+    const value = Number.parseInt(readAttribute(element, name), 10);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  };
+  const readSpeed = (
+    name: "UploadSpeed" | "DownloadSpeed"
+  ): SourcePackageSystemCheckEntry["uploadSpeed"] => {
+    const element = config ? xmlChildrenNamed(config, name)[0] : undefined;
+    return {
+      min: readNonNegativeInteger(element, "min"),
+      good: readNonNegativeInteger(element, "good"),
+      maxDevianceBytesPerSecond: readNonNegativeInteger(
+        element,
+        "maxDevianceBytesPerSecond"
+      ),
+      maxErrorsPerSequence: readNonNegativeInteger(
+        element,
+        "maxErrorsPerSequence"
+      ),
+      maxSequenceRepetitions: readNonNegativeInteger(
+        element,
+        "maxSequenceRepetitions"
+      ),
+      sequenceSizes: xmlElementText(element)
+        .split(",")
+        .flatMap(value => {
+          const parsed = Number.parseInt(value.trim(), 10);
+          return Number.isFinite(parsed) && parsed > 0 ? [parsed] : [];
+        })
+    };
+  };
+  const validQuestionTypes = new Set([
+    "string",
+    "select",
+    "header",
+    "check",
+    "text",
+    "radio"
+  ]);
+  const questions: SourcePackageSystemCheckEntry["questions"] = config
+    ? xmlChildrenNamed(config, "Q").flatMap(question => {
+        const id = readAttribute(question, "id");
+        const type = readAttribute(question, "type").toLowerCase();
+        if (!id || !validQuestionTypes.has(type)) {
+          return [];
+        }
+        return [{
+          id,
+          type: type as SourcePackageSystemCheckEntry["questions"][number]["type"],
+          prompt: readAttribute(question, "prompt"),
+          required: readAttribute(question, "required").toLowerCase() === "true",
+          options: xmlElementText(question)
+            .split("#")
+            .map(value => value.trim())
+            .filter(Boolean)
+        }];
+      })
+    : [];
+  const customTexts = Object.fromEntries(
+    (config ? xmlChildrenNamed(config, "CustomText") : []).flatMap(element => {
+      const key = readAttribute(element, "key");
+      return key ? [[key, xmlElementText(element)]] : [];
+    })
+  );
+  const unitKey = readAttribute(config, "unit");
+  const saveKey = readAttribute(config, "savekey");
+  return [{
+    checkId,
+    displayLabel:
+      xmlElementText(xmlChildrenNamed(metadata ?? root, "Label")[0]) || checkId,
+    ...(xmlElementText(xmlChildrenNamed(metadata ?? root, "Description")[0])
+      ? {
+          description: xmlElementText(
+            xmlChildrenNamed(metadata ?? root, "Description")[0]
+          )
+        }
+      : {}),
+    ...(unitKey ? { unitKey } : {}),
+    ...(saveKey ? { saveKey } : {}),
+    skipNetwork: readAttribute(config, "skipnetwork").toLowerCase() === "true",
+    uploadSpeed: readSpeed("UploadSpeed"),
+    downloadSpeed: readSpeed("DownloadSpeed"),
+    customTexts,
+    questions
+  }];
+};
+
 const normalizeParsedXmlContentStructure = (
   sourceDocument: string
 ): ContentReleaseRuntimeSnapshot | null => {
+  const systemCheckEntries = parseSystemCheckSourceDocument(sourceDocument);
+  if (systemCheckEntries.length > 0) {
+    return normalizeContentStructure({ bookletEntries: [], systemCheckEntries });
+  }
   const explicitBookletEntries = collectXmlBookletEntries(
     sourceDocument,
     "booklet|testlet"
@@ -10973,6 +11228,34 @@ export const createFirstSliceServices = (
       finishedAt: timestamp,
       diagnostics: importResolution.diagnostics
     };
+    if (importResolution.runtimeSnapshot.bookletEntries.length === 0) {
+      await repository.saveImportJob(completedImportJob);
+      await repository.saveSourcePackage({
+        ...sourcePackage,
+        contentStructure: {
+          bookletEntries: [],
+          systemCheckEntries:
+            importResolution.runtimeSnapshot.systemCheckEntries ?? []
+        },
+        status: "accepted"
+      });
+      await recordWorkspaceActivity({
+        tenantId: workspace.tenantId,
+        workspaceId: workspace.workspaceId,
+        eventType: "import_job_completed",
+        subjectType: "import_job",
+        subjectId: completedImportJob.importJobId,
+        summary: `System-check definition import completed for '${sourcePackage.fileName}'.`,
+        details: {
+          sourcePackageId: sourcePackage.sourcePackageId,
+          contentReleaseId: null,
+          systemCheckCount:
+            importResolution.runtimeSnapshot.systemCheckEntries?.length ?? 0,
+          diagnostics: completedImportJob.diagnostics
+        }
+      });
+      return { importJob: completedImportJob, stagedContentRelease: null };
+    }
     const stagedContentRelease: ContentRelease = {
       contentReleaseId: idGenerator(),
       tenantId: workspace.tenantId,
@@ -11006,6 +11289,231 @@ export const createFirstSliceServices = (
     });
 
     return { importJob: completedImportJob, stagedContentRelease };
+  };
+
+  const listWorkspaceSystemChecks = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceSystemCheck[]> => {
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const sourcePackages = (
+      await repository.listSourcePackagesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      )
+    )
+      .filter(sourcePackage => sourcePackage.status === "accepted")
+      .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+    const releases = (
+      await repository.listContentReleasesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      )
+    ).sort((left, right) =>
+      (right.activatedAt ?? right.createdAt).localeCompare(
+        left.activatedAt ?? left.createdAt
+      )
+    );
+    const resolveUnit = (
+      systemCheck: SourcePackageSystemCheckEntry,
+      sourcePackage: SourcePackage
+    ): WorkspaceSystemCheck["unit"] => {
+      if (!systemCheck.unitKey) {
+        return null;
+      }
+      for (const release of releases) {
+        for (const booklet of release.runtimeSnapshot.bookletEntries) {
+          const unit = booklet.unitEntries.find(
+            entry => entry.unitKey.toUpperCase() === systemCheck.unitKey?.toUpperCase()
+          );
+          if (unit) {
+            const player = release.runtimeSnapshot.playerEntries?.find(
+              entry => entry.playerKey === unit.playerKey
+            );
+            return {
+              unitKey: unit.unitKey,
+              displayLabel: unit.displayLabel,
+              ...(unit.playerKey ? { playerKey: unit.playerKey } : {}),
+              ...(player?.html ? { playerHtml: player.html } : {}),
+              ...(unit.unitDefinition
+                ? { unitDefinition: unit.unitDefinition }
+                : {}),
+              ...(unit.unitDefinitionType
+                ? { unitDefinitionType: unit.unitDefinitionType }
+                : {})
+            };
+          }
+        }
+      }
+      const orderedPackages = [
+        sourcePackage,
+        ...sourcePackages.filter(
+          candidate => candidate.sourcePackageId !== sourcePackage.sourcePackageId
+        )
+      ];
+      for (const candidate of orderedPackages) {
+        for (const booklet of candidate.contentStructure?.bookletEntries ?? []) {
+          const unit = booklet.unitEntries.find(
+            entry => entry.unitKey.toUpperCase() === systemCheck.unitKey?.toUpperCase()
+          );
+          if (unit) {
+            const player = candidate.contentStructure?.playerEntries?.find(
+              entry => entry.playerKey === unit.playerKey
+            );
+            return {
+              unitKey: unit.unitKey,
+              displayLabel: unit.displayLabel,
+              ...(unit.playerKey ? { playerKey: unit.playerKey } : {}),
+              ...(player?.html ? { playerHtml: player.html } : {}),
+              ...(unit.unitDefinition
+                ? { unitDefinition: unit.unitDefinition }
+                : {}),
+              ...(unit.unitDefinitionType
+                ? { unitDefinitionType: unit.unitDefinitionType }
+                : {})
+            };
+          }
+        }
+      }
+      return {
+        unitKey: systemCheck.unitKey,
+        displayLabel: systemCheck.unitKey
+      };
+    };
+    const byCheckId = new Map<string, WorkspaceSystemCheck>();
+    for (const sourcePackage of sourcePackages) {
+      for (const systemCheck of sourcePackage.contentStructure?.systemCheckEntries ?? []) {
+        const normalizedId = systemCheck.checkId.toUpperCase();
+        if (byCheckId.has(normalizedId)) {
+          continue;
+        }
+        const { saveKey: _saveKey, ...publicDefinition } = systemCheck;
+        byCheckId.set(normalizedId, {
+          ...publicDefinition,
+          sourcePackageId: sourcePackage.sourcePackageId,
+          canSave: Boolean(systemCheck.saveKey),
+          unit: resolveUnit(systemCheck, sourcePackage)
+        });
+      }
+    }
+    return Array.from(byCheckId.values()).sort((left, right) =>
+      left.checkId.localeCompare(right.checkId)
+    );
+  };
+
+  const requireWorkspaceSystemCheck = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId: string;
+  }): Promise<WorkspaceSystemCheck> => {
+    const systemCheck = (await listWorkspaceSystemChecks(input)).find(
+      item => item.checkId.toUpperCase() === input.checkId.trim().toUpperCase()
+    );
+    if (!systemCheck) {
+      throw new FirstSliceError(
+        404,
+        "system_check_not_found",
+        `System check '${input.checkId}' was not found in workspace '${input.workspaceKey}'.`
+      );
+    }
+    return systemCheck;
+  };
+
+  const readSystemCheckReports = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<SystemCheckReport[]> => {
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+    const normalizedCheckId = input.checkId?.trim().toUpperCase();
+    const events = await repository.listWorkspaceActivityEventsByWorkspace(
+      workspace.tenantId,
+      workspace.workspaceId
+    );
+    return events
+      .filter(event => event.eventType === "system_check_report_saved")
+      .flatMap(event => {
+        const report = event.details.report;
+        return report && typeof report === "object" && !Array.isArray(report)
+          ? [report as SystemCheckReport]
+          : [];
+      })
+      .filter(
+        report =>
+          !normalizedCheckId || report.checkId.toUpperCase() === normalizedCheckId
+      )
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  };
+
+  const exportSystemCheckReportsCsv = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<string> => {
+    const reports = await readSystemCheckReports(input);
+    const baseHeaders = [
+      "Titel",
+      "SysCheck-Id",
+      "SysCheck",
+      "Responses",
+      "Datum",
+      "Report-Id",
+      "SourcePackage-Id"
+    ];
+    const dynamicHeaders: string[] = [];
+    const rows = reports.map(report => {
+      const values = new Map<string, unknown>([
+        ["Titel", report.title],
+        ["SysCheck-Id", report.checkId],
+        ["SysCheck", report.checkLabel],
+        [
+          "Responses",
+          report.responses == null
+            ? ""
+            : typeof report.responses === "string"
+              ? report.responses
+              : JSON.stringify(report.responses)
+        ],
+        ["Datum", report.createdAt],
+        ["Report-Id", report.systemCheckReportId],
+        ["SourcePackage-Id", report.sourcePackageId]
+      ]);
+      for (const entry of [
+        ...report.environment,
+        ...report.network,
+        ...report.questionnaire,
+        ...report.unit
+      ]) {
+        if (!values.has(entry.label)) {
+          values.set(entry.label, entry.value);
+        }
+        if (!baseHeaders.includes(entry.label) && !dynamicHeaders.includes(entry.label)) {
+          dynamicHeaders.push(entry.label);
+        }
+      }
+      return values;
+    });
+    const headers = [...baseHeaders, ...dynamicHeaders];
+    const escapeSemicolonCsvCell = (value: unknown): string =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+    return `\uFEFF${[
+      headers.map(escapeSemicolonCsvCell).join(";"),
+      ...rows.map(row =>
+        headers.map(header => escapeSemicolonCsvCell(row.get(header))).join(";")
+      )
+    ].join("\n")}\n`;
   };
 
   return {
@@ -13211,6 +13719,12 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           items
         });
+      },
+      async listSystemCheckReports(input) {
+        return readSystemCheckReports(input);
+      },
+      async exportSystemCheckReportsCsv(input) {
+        return exportSystemCheckReportsCsv(input);
       }
     },
     workspaceResults: {
@@ -15567,6 +16081,117 @@ export const createFirstSliceServices = (
           }
         }
         return { commands, failures };
+      }
+    },
+    systemCheck: {
+      async listSystemChecks(input) {
+        return listWorkspaceSystemChecks(input);
+      },
+      async getSystemCheck(input) {
+        return requireWorkspaceSystemCheck(input);
+      },
+      async saveSystemCheckReport(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const systemCheck = await requireWorkspaceSystemCheck(input);
+        if (!systemCheck.canSave) {
+          throw new FirstSliceError(
+            409,
+            "system_check_report_saving_disabled",
+            `System check '${systemCheck.checkId}' does not allow reports to be saved.`
+          );
+        }
+        const sourcePackage = await requireSourcePackage(
+          repository,
+          systemCheck.sourcePackageId
+        );
+        const storedDefinition = sourcePackage.contentStructure?.systemCheckEntries?.find(
+          entry => entry.checkId.toUpperCase() === systemCheck.checkId.toUpperCase()
+        );
+        if (
+          !storedDefinition?.saveKey ||
+          storedDefinition.saveKey.toUpperCase() !==
+            String(input.keyPhrase ?? "").trim().toUpperCase()
+        ) {
+          throw new FirstSliceError(
+            403,
+            "system_check_save_key_invalid",
+            "The system-check report key is invalid."
+          );
+        }
+        const normalizeReportEntries = (
+          section: string,
+          entries: SystemCheckReportEntry[]
+        ): SystemCheckReportEntry[] => {
+          if (!Array.isArray(entries) || entries.length > 200) {
+            throw new FirstSliceError(
+              400,
+              "system_check_report_invalid",
+              `System-check report section '${section}' must contain at most 200 entries.`
+            );
+          }
+          return entries.map((entry, index) => {
+            if (!entry || typeof entry !== "object" || !String(entry.label ?? "").trim()) {
+              throw new FirstSliceError(
+                400,
+                "system_check_report_invalid",
+                `System-check report section '${section}' contains an invalid entry at index ${index}.`
+              );
+            }
+            const value = entry.value;
+            if (
+              value !== null &&
+              typeof value !== "string" &&
+              typeof value !== "number" &&
+              typeof value !== "boolean"
+            ) {
+              throw new FirstSliceError(
+                400,
+                "system_check_report_invalid",
+                `System-check report value '${entry.label}' must be scalar.`
+              );
+            }
+            return {
+              id: String(entry.id ?? index).trim() || String(index),
+              type: String(entry.type ?? section).trim() || section,
+              label: String(entry.label).trim(),
+              value,
+              warning: Boolean(entry.warning)
+            };
+          });
+        };
+        const createdAt = now();
+        const report: SystemCheckReport = {
+          systemCheckReportId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          sourcePackageId: systemCheck.sourcePackageId,
+          checkId: systemCheck.checkId,
+          checkLabel: systemCheck.displayLabel,
+          title: String(input.title ?? "").trim() || systemCheck.displayLabel,
+          responses: input.responses ?? "",
+          environment: normalizeReportEntries("environment", input.environment),
+          network: normalizeReportEntries("network", input.network),
+          questionnaire: normalizeReportEntries(
+            "questionnaire",
+            input.questionnaire
+          ),
+          unit: normalizeReportEntries("unit", input.unit),
+          createdAt
+        };
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "system_check_report_saved",
+          subjectType: "system_check_report",
+          subjectId: report.systemCheckReportId,
+          summary: `System-check report '${report.title}' saved for '${report.checkId}'.`,
+          details: { report }
+        });
+        return report;
       }
     }
   };

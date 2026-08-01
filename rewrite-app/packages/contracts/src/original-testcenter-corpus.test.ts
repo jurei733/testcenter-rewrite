@@ -17,6 +17,13 @@ type OriginalTestcenterCorpus = {
     fixture: string;
     sha256: string;
   }>;
+  systemChecks: Array<{
+    fixture: string;
+    checkId: string;
+    questionCount: number;
+    skipNetwork: boolean;
+    canSave: boolean;
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -71,6 +78,19 @@ test("original Testcenter compatibility corpus separates participant and operati
       resourcePackage.sha256
     );
   }
+
+  const systemCheck = corpus.systemChecks[0];
+  const systemCheckXml = readFileSync(
+    resolve(corpusRoot, systemCheck.fixture),
+    "utf8"
+  );
+  assert.match(systemCheckXml, new RegExp(`<Id>${systemCheck.checkId}</Id>`));
+  assert.equal(
+    Array.from(systemCheckXml.matchAll(/<Q\b/g)).length,
+    systemCheck.questionCount
+  );
+  assert.equal(/skipnetwork="true"/i.test(systemCheckXml), systemCheck.skipNetwork);
+  assert.equal(/\bsavekey="[^"]+"/i.test(systemCheckXml), systemCheck.canSave);
 
   const reviewParticipant = entries.find(entry => entry.loginKey === "test-review");
   assert.deepEqual(reviewParticipant?.bookletKeys, [
