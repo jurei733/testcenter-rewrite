@@ -72,6 +72,19 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Workspace Key
             <input id="monitorWorkspaceKey" name="monitorWorkspaceKey" [(ngModel)]="view.workspace.workspaceKey" />
           </label>
+          <label *ngIf="view.monitorProfiles.length > 0">
+            Monitor Profile
+            <select
+              id="monitorProfile"
+              name="monitorProfile"
+              [ngModel]="view.activeMonitorProfileId"
+              (ngModelChange)="view.selectMonitorProfile($event)"
+            >
+              <option *ngFor="let profile of view.monitorProfiles" [value]="profile.profileId">
+                {{ profile.label || profile.profileId }}
+              </option>
+            </select>
+          </label>
           <label>
             Selected Test Run
             <input id="monitorSelectedTestRunId" name="monitorSelectedTestRunId" readonly [value]="view.runtime.testRunId || 'Select an open run below'" />
@@ -85,6 +98,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="monitorConsoleTimeSeconds" name="monitorConsoleTimeSeconds" type="number" min="1" max="86400" step="1" [(ngModel)]="view.runtime.monitorTimeSeconds" (change)="view.persistState()" />
           </label>
         </div>
+        <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
         <div class="actions">
           <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>

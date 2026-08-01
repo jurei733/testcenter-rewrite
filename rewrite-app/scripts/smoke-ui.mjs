@@ -4427,8 +4427,8 @@ try {
     [
       "<Testtakers>",
       "  <Profiles><GroupMonitor>",
-      "    <Profile id=\"all\" label=\"All sessions\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" autoselectNextBlock=\"no\">",
-      "      <Filter label=\"Entry booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Starter\" />",
+      "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"no\">",
+      "      <Filter label=\"Current participant\" type=\"substring\" field=\"personLabel\" value=\"student-ui\" not=\"true\" />",
       "    </Profile>",
       "  </GroupMonitor></Profiles>",
       `  <Group id="${participantGroupKey}" validFor="45">`,
@@ -4468,8 +4468,8 @@ try {
     .filter({ hasText: participantGroupKey })
     .filter({ hasText: "password protected" })
     .filter({ hasText: "All sessions (all)" })
-    .filter({ hasText: "all: full view; block show" })
-    .filter({ hasText: "all: Entry booklet equal Starter" });
+    .filter({ hasText: "all: small view; block hide" })
+    .filter({ hasText: "all: Current participant not substring student-ui" });
   await operationalLoginCandidateCard.waitFor();
   if (
     (await operationalLoginCandidateCard.textContent())?.includes(
@@ -4497,6 +4497,7 @@ try {
   await expectInputValue("#adminCreateValidTo", "");
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
+  await page.getByText("1 imported monitor profile(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -4530,6 +4531,12 @@ try {
   const initialGroupMonitorSignIn =
     await initialGroupMonitorSignInResponse.json();
   assert.equal(initialGroupMonitorSignIn.adminUser.validForMinutes, 45);
+  assert.deepEqual(
+    initialGroupMonitorSignIn.roleAssignments[0]?.monitorProfiles.map(
+      profile => profile.profileId
+    ),
+    ["all"]
+  );
   assert.equal(
     initialGroupMonitorSignIn.adminUser.firstSignedInAt,
     initialGroupMonitorSignIn.adminSession.createdAt
@@ -4540,6 +4547,19 @@ try {
       45 * 60_000
   );
   await waitForInputMinLength("#adminSessionToken", 20);
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await page.locator("#monitorOperatorConsole").waitFor();
+  assert.equal(
+    (await page.locator("#monitorProfile option:checked").textContent())?.trim(),
+    "All sessions"
+  );
+  await page
+    .locator("#monitorProfileDetail")
+    .filter({ hasText: "All sessions: small view, 1 imported filter(s)." })
+    .waitFor();
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
   await clickAction("Sign Out");
   await expectInputValue("#adminSessionToken", "");
   await fillAndCommit("#adminUsername", adminUsername);
@@ -5780,6 +5800,14 @@ try {
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#monitorOperatorConsole").waitFor();
   assert.equal(
+    (await page.locator("#monitorProfile option:checked").textContent())?.trim(),
+    "All sessions"
+  );
+  await page
+    .locator("#monitorProfileDetail")
+    .filter({ hasText: "All sessions: small view, 1 imported filter(s)." })
+    .waitFor();
+  assert.equal(
     await page.locator("#loginKey").count(),
     0,
     "Group monitor runtime must not render participant-management controls."
@@ -5795,6 +5823,18 @@ try {
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
     .waitFor();
+  assert.equal(
+    await scopedOpenRuns.getByText("Group", { exact: true }).count(),
+    1,
+    "Imported monitor profile must show the configured group column."
+  );
+  for (const hiddenColumn of ["Session", "Run", "Booklet", "Current Unit"]) {
+    assert.equal(
+      await scopedOpenRuns.getByText(hiddenColumn, { exact: true }).count(),
+      0,
+      `Imported small monitor profile must hide the ${hiddenColumn} column.`
+    );
+  }
   assert.equal(
     await scopedOpenRuns.filter({ hasText: "entry-student-a" }).count(),
     0,

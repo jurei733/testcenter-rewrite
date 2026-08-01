@@ -82,6 +82,7 @@ export type PersistedShellState = {
   openRunUnitFilter: string;
   openRunStatusFilter: string;
   openRunLimit: string;
+  monitorProfileId: string;
   monitorCommandHistoryRunFilter: string;
   monitorCommandHistoryLimit: string;
   entryRosterText: string;
@@ -125,6 +126,7 @@ export type PersistedShellState = {
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
+  adminCreateMonitorProfilesJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;

@@ -444,6 +444,12 @@ export function createShellPersistenceStateHost(args: {
     set openRunLimit(nextValue) {
       args.runtimeState.openRunLimit = nextValue;
     },
+    get monitorProfileId() {
+      return args.runtimeState.monitorProfileId;
+    },
+    set monitorProfileId(nextValue) {
+      args.runtimeState.monitorProfileId = nextValue;
+    },
     get monitorCommandHistoryRunFilter() {
       return args.runtimeState.monitorCommandHistoryRunFilter;
     },
@@ -701,6 +707,12 @@ export function createShellPersistenceStateHost(args: {
     },
     set adminCreateGroupKey(nextValue) {
       args.opsState.adminCreateGroupKey = nextValue;
+    },
+    get adminCreateMonitorProfilesJson() {
+      return args.opsState.adminCreateMonitorProfilesJson;
+    },
+    set adminCreateMonitorProfilesJson(nextValue) {
+      args.opsState.adminCreateMonitorProfilesJson = nextValue;
     },
     get adminCreateValidFrom() {
       return args.opsState.adminCreateValidFrom;

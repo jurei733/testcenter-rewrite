@@ -15,6 +15,8 @@ import type {
   ImportJobStatus,
   MonitorRunCommandResult,
   MonitorRunCommandType,
+  MonitorViewProfile,
+  MonitorViewProfileFilter,
   OpenMonitorRun,
   ParticipantExecutionMode,
   ParticipantRuntimeBooklet,
@@ -97,33 +99,9 @@ export const originalTestcenterOperationalLoginModes = [
 export type OriginalTestcenterOperationalLoginMode =
   (typeof originalTestcenterOperationalLoginModes)[number];
 
-export type OriginalTestcenterMonitorProfileFilter = {
-  target: string;
-  value: string;
-  subValue: string | null;
-  label: string;
-  type: string;
-  not: boolean;
-};
+export type OriginalTestcenterMonitorProfileFilter = MonitorViewProfileFilter;
 
-export type OriginalTestcenterMonitorProfile = {
-  profileId: string;
-  label: string;
-  settings: {
-    blockColumn: string;
-    unitColumn: string;
-    view: string;
-    groupColumn: string;
-    bookletColumn: string;
-    bookletStatesColumns: string;
-    autoselectNextBlock: "yes" | "no";
-  };
-  filters: OriginalTestcenterMonitorProfileFilter[];
-  filtersEnabled: {
-    pending: string;
-    locked: string;
-  };
-};
+export type OriginalTestcenterMonitorProfile = MonitorViewProfile;
 
 export type OriginalTestcenterOperationalLoginCandidate = {
   loginKey: string;
@@ -2105,6 +2083,84 @@ export type OperatorAccessMode =
   | "system_check"
   | "unassigned";
 
+const isEnabledMonitorProfileFlag = (value: string): boolean =>
+  ["1", "true", "on", "yes"].includes(value.trim().toLowerCase());
+
+const monitorProfileFilterExcludesRun = (
+  openRun: OpenMonitorRun,
+  filter: MonitorViewProfileFilter
+): boolean => {
+  const expected = filter.subValue || filter.value;
+  let subject: string;
+  switch (filter.target) {
+    case "groupName":
+      subject = openRun.groupKey;
+      break;
+    case "personLabel":
+      subject = openRun.participantRosterEntry?.displayName ?? openRun.loginKey;
+      break;
+    case "mode":
+      subject = openRun.executionMode;
+      break;
+    case "bookletId":
+    case "bookletLabel":
+      subject = openRun.bookletKey;
+      break;
+    case "unitId":
+    case "unitLabel":
+      subject = openRun.currentUnitKey ?? "";
+      break;
+    case "state":
+      subject = openRun.status;
+      break;
+    case "testState":
+      if (filter.value !== "status") {
+        return false;
+      }
+      subject = openRun.status;
+      break;
+    case "bookletStates":
+      subject = openRun.bookletStates[filter.value] ?? "";
+      break;
+    default:
+      return false;
+  }
+
+  let matches = false;
+  if (filter.type === "substring") {
+    matches = subject.includes(expected);
+  } else if (filter.type === "regex") {
+    try {
+      matches = new RegExp(expected).test(subject);
+    } catch {
+      matches = false;
+    }
+  } else if (filter.type === "equal" || filter.type === "equals") {
+    matches = subject === expected;
+  }
+  return filter.not ? !matches : matches;
+};
+
+export const filterOpenMonitorRunsByProfile = (
+  openRuns: OpenMonitorRun[],
+  profile: MonitorViewProfile | null
+): OpenMonitorRun[] => {
+  if (!profile) {
+    return openRuns;
+  }
+  return openRuns.filter(openRun => {
+    if (
+      isEnabledMonitorProfileFlag(profile.filtersEnabled.pending) &&
+      openRun.status === "created"
+    ) {
+      return false;
+    }
+    return !profile.filters.some(filter =>
+      monitorProfileFilterExcludesRun(openRun, filter)
+    );
+  });
+};
+
 export const resolveOperatorAccessMode = (
   roleAssignments: ReadonlyArray<Pick<AdminRoleAssignment, "role">>
 ): OperatorAccessMode => {
@@ -2145,6 +2201,7 @@ export type AdminRoleAssignmentRequest = {
   tenantKey?: string | null;
   workspaceKey?: string | null;
   groupKey?: string | null;
+  monitorProfiles?: MonitorViewProfile[];
 };
 
 export type CreateAdminUserRequest = {

@@ -24,6 +24,17 @@ describe("createFileFirstSliceRepository", () => {
               status: "active",
               createdAt: "2026-01-01T00:00:00.000Z"
             }
+          },
+          adminRoleAssignments: {
+            "legacy-role": {
+              roleAssignmentId: "legacy-role",
+              adminUserId: "admin-user-id",
+              role: "group_monitor",
+              tenantId: "tenant-id",
+              workspaceId: "workspace-id",
+              groupKey: "group:legacy",
+              createdAt: "2026-01-01T00:00:00.000Z"
+            }
           }
         }),
         "utf8"
@@ -37,6 +48,9 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(adminUser?.validTo, null);
       assert.equal(adminUser?.validForMinutes, null);
       assert.equal(adminUser?.firstSignedInAt, null);
+      const [roleAssignment] =
+        await repository.listAdminRoleAssignmentsByUserId("admin-user-id");
+      assert.deepEqual(roleAssignment?.monitorProfiles, []);
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });
     }

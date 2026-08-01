@@ -53,6 +53,7 @@ import type {
   MonitorTestletTimer,
   MonitorRunCommandResult,
   MonitorRunCommandType,
+  MonitorViewProfile,
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantExecutionMode,
@@ -775,6 +776,7 @@ export type AdminDirectoryPort = {
       tenantKey?: string | null;
       workspaceKey?: string | null;
       groupKey?: string | null;
+      monitorProfiles?: MonitorViewProfile[];
     }>;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   updateAdminUser(input: {
@@ -795,6 +797,7 @@ export type AdminDirectoryPort = {
     tenantKey?: string | null;
     workspaceKey?: string | null;
     groupKey?: string | null;
+    monitorProfiles?: MonitorViewProfile[];
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   revokeAdminRole(input: {
     sessionToken: string;
@@ -1269,6 +1272,7 @@ type AdminRoleAssignmentInput = {
   tenantKey?: string | null;
   workspaceKey?: string | null;
   groupKey?: string | null;
+  monitorProfiles?: MonitorViewProfile[];
 };
 
 type ResolvedAdminRoleScope = {
@@ -1276,6 +1280,7 @@ type ResolvedAdminRoleScope = {
   tenantId: string | null;
   workspaceId: string | null;
   groupKey: string | null;
+  monitorProfiles: MonitorViewProfile[];
 };
 
 const normalizeAdminUsername = (value: unknown): string => {
@@ -1859,6 +1864,159 @@ const normalizeOptionalReviewPageLabel = (value: unknown): string | null => {
     );
   }
   return value.trim() || null;
+};
+
+const normalizeMonitorProfileText = (
+  value: unknown,
+  fieldName: string,
+  maximumLength: number,
+  fallback = ""
+): string => {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  if (typeof value !== "string" || value.length > maximumLength) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      `${fieldName} must be a string with up to ${maximumLength} characters.`
+    );
+  }
+  return value.trim();
+};
+
+const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value) || value.length > 20) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      "Monitor profiles must be an array with at most 20 entries."
+    );
+  }
+
+  const profileIds = new Set<string>();
+  return value.map((candidate, profileIndex) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        `Monitor profile ${profileIndex + 1} must be an object.`
+      );
+    }
+    const input = candidate as Record<string, unknown>;
+    const profileId = normalizeMonitorProfileText(
+      input.profileId,
+      `monitorProfiles[${profileIndex}].profileId`,
+      128
+    );
+    if (!profileId || profileIds.has(profileId)) {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        "Monitor profile IDs must be non-empty and unique."
+      );
+    }
+    profileIds.add(profileId);
+    const settingsInput = input.settings;
+    if (!settingsInput || typeof settingsInput !== "object" || Array.isArray(settingsInput)) {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        `monitorProfiles[${profileIndex}].settings must be an object.`
+      );
+    }
+    const settings = settingsInput as Record<string, unknown>;
+    const autoselectNextBlock = normalizeMonitorProfileText(
+      settings.autoselectNextBlock,
+      `monitorProfiles[${profileIndex}].settings.autoselectNextBlock`,
+      3,
+      "yes"
+    );
+    if (autoselectNextBlock !== "yes" && autoselectNextBlock !== "no") {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        "Monitor profile autoselectNextBlock must be 'yes' or 'no'."
+      );
+    }
+    if (!Array.isArray(input.filters) || input.filters.length > 50) {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        `monitorProfiles[${profileIndex}].filters must contain at most 50 entries.`
+      );
+    }
+    const filters = input.filters.map((filterCandidate, filterIndex) => {
+      if (
+        !filterCandidate ||
+        typeof filterCandidate !== "object" ||
+        Array.isArray(filterCandidate)
+      ) {
+        throw new FirstSliceError(
+          400,
+          "admin_monitor_profiles_invalid",
+          `Monitor filter ${filterIndex + 1} must be an object.`
+        );
+      }
+      const filter = filterCandidate as Record<string, unknown>;
+      if (typeof filter.not !== "boolean") {
+        throw new FirstSliceError(
+          400,
+          "admin_monitor_profiles_invalid",
+          `monitorProfiles[${profileIndex}].filters[${filterIndex}].not must be boolean.`
+        );
+      }
+      return {
+        target: normalizeMonitorProfileText(filter.target, "filter.target", 128),
+        value: normalizeMonitorProfileText(filter.value, "filter.value", 2_048),
+        subValue:
+          filter.subValue === undefined || filter.subValue === null
+            ? null
+            : normalizeMonitorProfileText(filter.subValue, "filter.subValue", 2_048),
+        label: normalizeMonitorProfileText(filter.label, "filter.label", 256),
+        type: normalizeMonitorProfileText(filter.type, "filter.type", 64, "equal"),
+        not: filter.not
+      };
+    });
+    const filtersEnabledInput = input.filtersEnabled;
+    if (
+      !filtersEnabledInput ||
+      typeof filtersEnabledInput !== "object" ||
+      Array.isArray(filtersEnabledInput)
+    ) {
+      throw new FirstSliceError(
+        400,
+        "admin_monitor_profiles_invalid",
+        `monitorProfiles[${profileIndex}].filtersEnabled must be an object.`
+      );
+    }
+    const filtersEnabled = filtersEnabledInput as Record<string, unknown>;
+    return {
+      profileId,
+      label: normalizeMonitorProfileText(input.label, "monitor profile label", 256),
+      settings: {
+        blockColumn: normalizeMonitorProfileText(settings.blockColumn, "blockColumn", 32, "show"),
+        unitColumn: normalizeMonitorProfileText(settings.unitColumn, "unitColumn", 32, "show"),
+        view: normalizeMonitorProfileText(settings.view, "view", 32, "middle"),
+        groupColumn: normalizeMonitorProfileText(settings.groupColumn, "groupColumn", 32, "hide"),
+        bookletColumn: normalizeMonitorProfileText(settings.bookletColumn, "bookletColumn", 32, "show"),
+        bookletStatesColumns: normalizeMonitorProfileText(
+          settings.bookletStatesColumns,
+          "bookletStatesColumns",
+          1_024
+        ),
+        autoselectNextBlock
+      },
+      filters,
+      filtersEnabled: {
+        pending: normalizeMonitorProfileText(filtersEnabled.pending, "filterPending", 32, "no"),
+        locked: normalizeMonitorProfileText(filtersEnabled.locked, "filterLocked", 32, "no")
+      }
+    };
+  });
 };
 
 const normalizeAdminRoleAssignmentInputs = (
@@ -2485,6 +2643,19 @@ const resolveAdminRoleScope = async (
   const tenantKey = normalizeOptionalScopeKey(input.tenantKey, "tenantKey");
   const workspaceKey = normalizeOptionalScopeKey(input.workspaceKey, "workspaceKey");
   const groupKey = normalizeOptionalScopeKey(input.groupKey, "groupKey");
+  const monitorProfiles = normalizeMonitorViewProfiles(input.monitorProfiles);
+
+  if (
+    monitorProfiles.length > 0 &&
+    role !== "group_monitor" &&
+    role !== "study_monitor"
+  ) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      "Monitor profiles may only be assigned to group or study monitor roles."
+    );
+  }
 
   if (role === "platform_admin") {
     if (tenantKey || workspaceKey || groupKey) {
@@ -2499,7 +2670,8 @@ const resolveAdminRoleScope = async (
       role,
       tenantId: null,
       workspaceId: null,
-      groupKey: null
+      groupKey: null,
+      monitorProfiles
     };
   }
 
@@ -2525,7 +2697,8 @@ const resolveAdminRoleScope = async (
       role,
       tenantId: tenant.tenantId,
       workspaceId: null,
-      groupKey: null
+      groupKey: null,
+      monitorProfiles
     };
   }
 
@@ -2556,7 +2729,8 @@ const resolveAdminRoleScope = async (
     role,
     tenantId: workspace.tenantId,
     workspaceId: workspace.workspaceId,
-    groupKey: role === "group_monitor" ? groupKey : null
+    groupKey: role === "group_monitor" ? groupKey : null,
+    monitorProfiles
   };
 };
 
@@ -2576,7 +2750,10 @@ const summarizeAdminRoleAssignment = (
   role: roleAssignment.role,
   tenantId: roleAssignment.tenantId,
   workspaceId: roleAssignment.workspaceId,
-  groupKey: roleAssignment.groupKey
+  groupKey: roleAssignment.groupKey,
+  monitorProfileIds: roleAssignment.monitorProfiles
+    .map(profile => profile.profileId)
+    .join(",")
 });
 
 const createAdminUserDirectoryItem = async (
@@ -14158,6 +14335,7 @@ export const createFirstSliceServices = (
           tenantId: null,
           workspaceId: null,
           groupKey: null,
+          monitorProfiles: [],
           createdAt: timestamp
         };
 
@@ -14508,6 +14686,7 @@ export const createFirstSliceServices = (
             tenantId: scope.tenantId,
             workspaceId: scope.workspaceId,
             groupKey: scope.groupKey,
+            monitorProfiles: scope.monitorProfiles,
             createdAt: timestamp
           };
           await repository.saveAdminRoleAssignment(roleAssignment);
@@ -14633,12 +14812,31 @@ export const createFirstSliceServices = (
           repository,
           adminUser.adminUserId
         );
-        if (
-          existingRoleAssignments.some(roleAssignment =>
-            isSameAdminRoleScope(roleAssignment, scope)
-          )
-        ) {
+        const existingRoleAssignment = existingRoleAssignments.find(roleAssignment =>
+          isSameAdminRoleScope(roleAssignment, scope)
+        );
+        if (existingRoleAssignment && input.monitorProfiles === undefined) {
           return { adminUser, roleAssignments: existingRoleAssignments };
+        }
+
+        if (existingRoleAssignment) {
+          const updatedRoleAssignment: AdminRoleAssignment = {
+            ...existingRoleAssignment,
+            monitorProfiles: scope.monitorProfiles
+          };
+          await repository.saveAdminRoleAssignment(updatedRoleAssignment);
+          const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
+          await recordAdminAuditEvent({
+            eventType: "admin_role_assigned",
+            actorAdminUserId: currentSession.adminUser.adminUserId,
+            subjectAdminUserId: adminUser.adminUserId,
+            summary: `Admin '${currentSession.adminUser.username}' updated '${updatedRoleAssignment.role}' for '${adminUser.username}'.`,
+            details: {
+              username: adminUser.username,
+              roleAssignment: summarizeAdminRoleAssignment(updatedRoleAssignment)
+            }
+          });
+          return directoryItem;
         }
 
         const roleAssignment: AdminRoleAssignment = {
@@ -14648,6 +14846,7 @@ export const createFirstSliceServices = (
           tenantId: scope.tenantId,
           workspaceId: scope.workspaceId,
           groupKey: scope.groupKey,
+          monitorProfiles: scope.monitorProfiles,
           createdAt: now()
         };
         await repository.saveAdminRoleAssignment(roleAssignment);

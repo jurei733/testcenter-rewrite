@@ -116,9 +116,26 @@ const mapAdminRoleAssignment = (
           row.group_key === null || row.group_key === undefined
             ? null
             : String(row.group_key),
+        monitorProfiles: parseMonitorProfiles(row.monitor_profiles_json),
         createdAt: String(row.created_at)
       }
     : null;
+
+const parseMonitorProfiles = (
+  value: unknown
+): AdminRoleAssignment["monitorProfiles"] => {
+  if (typeof value !== "string" || !value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? (parsed as AdminRoleAssignment["monitorProfiles"])
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 const mapAdminAuditEvent = (
   row: Record<string, unknown> | undefined
@@ -532,7 +549,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 33;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 34;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -1007,6 +1024,13 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE admin_users ADD COLUMN valid_for_minutes INTEGER;
       ALTER TABLE admin_users ADD COLUMN first_signed_in_at TEXT;
     `
+  },
+  {
+    version: 34,
+    name: "add_admin_role_monitor_profiles",
+    sql: `
+      ALTER TABLE admin_role_assignments ADD COLUMN monitor_profiles_json TEXT NOT NULL DEFAULT '[]';
+    `
   }
 ];
 
@@ -1179,7 +1203,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const rows = database
         .prepare(
-          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
+          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
            FROM admin_role_assignments
            WHERE admin_user_id = ?`
         )
@@ -1192,14 +1216,15 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_role_assignments (
-            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(role_assignment_id) DO UPDATE SET
             admin_user_id = excluded.admin_user_id,
             role = excluded.role,
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
             group_key = excluded.group_key,
+            monitor_profiles_json = excluded.monitor_profiles_json,
             created_at = excluded.created_at`
         )
         .run(
@@ -1209,6 +1234,7 @@ export const createSqliteFirstSliceRepository = (
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
           roleAssignment.groupKey,
+          JSON.stringify(roleAssignment.monitorProfiles),
           roleAssignment.createdAt
         );
     },

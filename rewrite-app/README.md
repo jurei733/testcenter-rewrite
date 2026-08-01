@@ -38,7 +38,11 @@ rows and show the candidates in a dedicated Runtime card;
 operational-only rosters return the
 stable `participant_roster_operational_only` error. Administrators can create
 non-escalating `group_monitor`, `study_monitor`, and `system_check` accounts with
-durable workspace/group scope. Supported candidates can prepare that account form in
+the resolved monitor profiles attached to their scoped role. Monitor sign-in
+restores those profiles, offers the original alternatives for selection, applies
+supported original run filters, and uses the selected column/density settings in
+the open-run view. The profile JSON is persisted by file, SQLite, and PostgreSQL
+stores and is never inferred from the redacted source password. Supported candidates can prepare that account form in
 one action and complete creation after a newly assigned password is entered;
 the source password is deliberately never exposed or copied. Imported
 `validFrom`, `validTo`, and `validFor` values are copied into the account draft,

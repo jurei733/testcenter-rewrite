@@ -3,6 +3,7 @@ import { Router } from "@angular/router";
 
 import {
   mapOriginalTestcenterOperationalLoginToAdminRole,
+  filterOpenMonitorRunsByProfile,
   parseParticipantRosterText
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -22,8 +23,15 @@ import {
   participantSessionStatuses,
   testRunStatuses
 } from "@testcenter-rewrite-app/domain";
+import type {
+  MonitorViewProfile,
+  OpenMonitorRun
+} from "@testcenter-rewrite-app/domain";
 
-import type { RecordCollectionItem } from "./record-collection.component";
+import type {
+  RecordCollectionItem,
+  RecordCollectionRow
+} from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
 import {
   parseJsonDocument,
@@ -87,6 +95,44 @@ export class RuntimeViewFacade {
 
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
+  }
+
+  get monitorProfiles(): MonitorViewProfile[] {
+    return this.operatorAccess.monitorProfiles;
+  }
+
+  get activeMonitorProfile(): MonitorViewProfile | null {
+    const profiles = this.monitorProfiles;
+    if (profiles.length === 0) {
+      return null;
+    }
+    return (
+      profiles.find(profile => profile.profileId === this.runtime.monitorProfileId) ??
+      profiles[0] ??
+      null
+    );
+  }
+
+  get activeMonitorProfileId(): string {
+    return this.activeMonitorProfile?.profileId ?? "";
+  }
+
+  get monitorProfileDetail(): string {
+    const profile = this.activeMonitorProfile;
+    if (!profile) {
+      return "No imported monitor profile is assigned; all loaded runs remain visible.";
+    }
+    return `${profile.label || profile.profileId}: ${profile.settings.view} view, ${profile.filters.length} imported filter(s).`;
+  }
+
+  selectMonitorProfile(profileId: string): void {
+    if (!this.monitorProfiles.some(profile => profile.profileId === profileId)) {
+      return;
+    }
+    this.runtime.monitorProfileId = profileId;
+    this.monitorBatchSelection.clear();
+    this.persistState();
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   get monitorConnectionLabel(): string {
@@ -937,6 +983,7 @@ export class RuntimeViewFacade {
                     username: candidate.loginKey,
                     role: roleDraft.role,
                     groupKey: roleDraft.groupKey ?? "",
+                    monitorProfilesJson: JSON.stringify(candidate.monitorProfiles),
                     validFrom: candidate.validFrom ?? "",
                     validTo: candidate.validTo ?? "",
                     validForMinutes: candidate.validForMinutes
@@ -976,6 +1023,10 @@ export class RuntimeViewFacade {
       role === "group_monitor"
         ? item.actionPayload.groupKey?.trim() ?? ""
         : "";
+    ops.adminCreateMonitorProfilesJson =
+      role === "group_monitor" || role === "study_monitor"
+        ? item.actionPayload.monitorProfilesJson ?? "[]"
+        : "[]";
     ops.adminCreateValidFrom = item.actionPayload.validFrom?.trim() ?? "";
     ops.adminCreateValidTo = item.actionPayload.validTo?.trim() ?? "";
     ops.adminCreateValidForMinutes =
@@ -1773,8 +1824,9 @@ export class RuntimeViewFacade {
 
   get openRunItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView);
+    const profile = this.activeMonitorProfile;
     return (
-      payload?.items.map(openRun => {
+      filterOpenMonitorRunsByProfile(payload?.items ?? [], profile).map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
         const activeTimer = openRun.activeTestletTimer;
         const activeTimerRemaining = activeTimer
@@ -1807,10 +1859,9 @@ export class RuntimeViewFacade {
             batchSelected ? "batch selected" : "not in batch"
           ],
           rows: [
-            {
-              label: "Session",
-              value: openRun.participantSessionId
-            },
+            ...(profile?.settings.view === "small"
+              ? []
+              : [{ label: "Session", value: openRun.participantSessionId }]),
             ...participantSessionLinkRows(openRun.participantSessionId, {
               tenantKey: this.uiState.workspace.tenantKey,
               workspaceKey: this.uiState.workspace.workspaceKey,
@@ -1818,50 +1869,41 @@ export class RuntimeViewFacade {
               groupKey: openRun.groupKey,
               bookletKey: openRun.bookletKey
             }),
-            {
-              label: "Run",
-              value: openRun.testRunId
-            },
-            {
-              label: "Booklet",
-              value: openRun.bookletKey
-            },
-            {
-              label: "Booklet Assignment",
-              value: openRun.bookletAssignmentKey
-            },
-            {
-              label: "Persisted BOOKLET_STATES",
-              value: bookletStates.length > 0 ? bookletStates.join(" | ") : "none"
-            },
-            {
-              label: "Current Unit",
-              value: openRun.currentUnitKey ?? "none"
-            },
-            {
-              label: "Execution Mode",
-              value: openRun.executionMode
-            },
-            {
-              label: "Active Timer",
-              value: activeTimer?.displayLabel ?? "none"
-            },
-            {
-              label: "Timer Remaining",
-              value: activeTimerRemaining ?? "none"
-            },
-            {
-              label: "Timer Expires",
-              value: activeTimer?.expiresAt
-                ? this.formatDateTime(activeTimer.expiresAt)
-                : activeTimer
-                  ? "paused"
-                  : "none"
-            },
-            {
-              label: "Updated",
-              value: this.formatDateTime(openRun.updatedAt)
-            }
+            ...(profile?.settings.groupColumn === "show"
+              ? [{ label: "Group", value: openRun.groupKey }]
+              : []),
+            ...(profile?.settings.view === "small"
+              ? []
+              : [{ label: "Run", value: openRun.testRunId }]),
+            ...(profile?.settings.bookletColumn === "hide"
+              ? []
+              : [
+                  { label: "Booklet", value: openRun.bookletKey },
+                  {
+                    label: "Booklet Assignment",
+                    value: openRun.bookletAssignmentKey
+                  }
+                ]),
+            ...this.monitorBookletStateRows(openRun, profile),
+            ...(profile?.settings.unitColumn === "hide"
+              ? []
+              : [{ label: "Current Unit", value: openRun.currentUnitKey ?? "none" }]),
+            ...(profile?.settings.view === "small"
+              ? []
+              : [
+                  { label: "Execution Mode", value: openRun.executionMode },
+                  { label: "Active Timer", value: activeTimer?.displayLabel ?? "none" },
+                  { label: "Timer Remaining", value: activeTimerRemaining ?? "none" },
+                  {
+                    label: "Timer Expires",
+                    value: activeTimer?.expiresAt
+                      ? this.formatDateTime(activeTimer.expiresAt)
+                      : activeTimer
+                        ? "paused"
+                        : "none"
+                  },
+                  { label: "Updated", value: this.formatDateTime(openRun.updatedAt) }
+                ])
           ],
           selected: this.runtime.testRunId.trim() === openRun.testRunId,
           actionLabel: "Select + Sync",
@@ -1884,7 +1926,7 @@ export class RuntimeViewFacade {
             }
           ]
         };
-      }) ?? []
+      })
     );
   }
 
@@ -2833,7 +2875,10 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<MonitorOpenRunsResponse>(
       this.runtime.openRunsView
     );
-    for (const openRun of payload?.items ?? []) {
+    for (const openRun of filterOpenMonitorRunsByProfile(
+      payload?.items ?? [],
+      this.activeMonitorProfile
+    )) {
       this.monitorBatchSelection.add(openRun.testRunId);
     }
     this.uiState.renderVersion.update(version => version + 1);
@@ -3436,6 +3481,39 @@ export class RuntimeViewFacade {
           currentUnitKey: unitKey
         }
       }));
+  }
+
+  private monitorBookletStateRows(
+    openRun: OpenMonitorRun,
+    profile: MonitorViewProfile | null
+  ): RecordCollectionRow[] {
+    if (!profile) {
+      const states = Object.entries(openRun.bookletStates).map(
+        ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
+      );
+      return [
+        {
+          label: "Persisted BOOKLET_STATES",
+          value: states.length > 0 ? states.join(" | ") : "none"
+        }
+      ];
+    }
+    const visibleStateKeys = profile.settings.bookletStatesColumns
+      .split(/[\W,]+/)
+      .filter(Boolean);
+    if (visibleStateKeys.length === 0) {
+      return [];
+    }
+    const states = visibleStateKeys.flatMap(stateKey => {
+      const optionKey = openRun.bookletStates[stateKey];
+      return optionKey === undefined ? [] : [`${stateKey}=${optionKey}`];
+    });
+    return [
+      {
+        label: "Profile BOOKLET_STATES",
+        value: states.length > 0 ? states.join(" | ") : "none"
+      }
+    ];
   }
 
   private formatResponsePreview(value: string): string {

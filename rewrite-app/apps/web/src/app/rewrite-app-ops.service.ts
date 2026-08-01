@@ -25,6 +25,7 @@ import {
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
+import type { MonitorViewProfile } from "@testcenter-rewrite-app/domain";
 
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
@@ -345,7 +346,8 @@ export class RewriteAppOpsService {
             this.opsState.adminCreateRole,
             this.opsState.adminCreateTenantKey,
             this.opsState.adminCreateWorkspaceKey,
-            this.opsState.adminCreateGroupKey
+            this.opsState.adminCreateGroupKey,
+            this.opsState.adminCreateMonitorProfilesJson
           )
         ]
       } satisfies CreateAdminUserRequest,
@@ -356,6 +358,7 @@ export class RewriteAppOpsService {
     this.opsState.adminCreateValidFrom = "";
     this.opsState.adminCreateValidTo = "";
     this.opsState.adminCreateValidForMinutes = "";
+    this.opsState.adminCreateMonitorProfilesJson = "[]";
     this.opsState.adminRoleTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeRoleAssignmentId =
@@ -600,7 +603,8 @@ export class RewriteAppOpsService {
     role: AssignAdminRoleRequest["role"],
     tenantKey: string,
     workspaceKey: string,
-    groupKey: string
+    groupKey: string,
+    monitorProfilesJson?: string
   ): AssignAdminRoleRequest {
     if (role === "platform_admin") {
       return { role };
@@ -617,7 +621,20 @@ export class RewriteAppOpsService {
       role,
       tenantKey: tenantKey.trim(),
       workspaceKey: workspaceKey.trim(),
-      ...(role === "group_monitor" ? { groupKey: groupKey.trim() } : {})
+      ...(role === "group_monitor" ? { groupKey: groupKey.trim() } : {}),
+      ...((role === "group_monitor" || role === "study_monitor") &&
+      monitorProfilesJson !== undefined
+        ? { monitorProfiles: this.parseMonitorProfiles(monitorProfilesJson) }
+        : {})
     };
+  }
+
+  private parseMonitorProfiles(value: string): MonitorViewProfile[] {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? (parsed as MonitorViewProfile[]) : [];
+    } catch {
+      return [];
+    }
   }
 }

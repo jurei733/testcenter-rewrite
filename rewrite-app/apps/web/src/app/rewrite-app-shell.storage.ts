@@ -64,6 +64,7 @@ export type ShellPersistenceTarget = {
   openRunUnitFilter: string;
   openRunStatusFilter: string;
   openRunLimit: string;
+  monitorProfileId: string;
   monitorCommandHistoryRunFilter: string;
   monitorCommandHistoryLimit: string;
   entryRosterText: string;
@@ -107,6 +108,7 @@ export type ShellPersistenceTarget = {
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
+  adminCreateMonitorProfilesJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;
@@ -186,6 +188,7 @@ export const createPersistedShellState = (
   openRunUnitFilter: target.openRunUnitFilter,
   openRunStatusFilter: target.openRunStatusFilter,
   openRunLimit: target.openRunLimit,
+  monitorProfileId: target.monitorProfileId,
   monitorCommandHistoryRunFilter: target.monitorCommandHistoryRunFilter,
   monitorCommandHistoryLimit: target.monitorCommandHistoryLimit,
   entryRosterText: target.entryRosterText,
@@ -229,6 +232,7 @@ export const createPersistedShellState = (
   adminCreateTenantKey: target.adminCreateTenantKey,
   adminCreateWorkspaceKey: target.adminCreateWorkspaceKey,
   adminCreateGroupKey: target.adminCreateGroupKey,
+  adminCreateMonitorProfilesJson: target.adminCreateMonitorProfilesJson,
   adminCreateValidFrom: target.adminCreateValidFrom,
   adminCreateValidTo: target.adminCreateValidTo,
   adminCreateValidForMinutes: target.adminCreateValidForMinutes,
@@ -475,6 +479,10 @@ export const applyHydratedShellState = (
     target.openRunStatusFilter
   );
   target.openRunLimit = hydrateString(snapshot.openRunLimit, target.openRunLimit);
+  target.monitorProfileId = hydrateString(
+    snapshot.monitorProfileId,
+    target.monitorProfileId
+  );
   target.monitorCommandHistoryRunFilter = hydrateString(
     snapshot.monitorCommandHistoryRunFilter,
     target.monitorCommandHistoryRunFilter
@@ -630,6 +638,10 @@ export const applyHydratedShellState = (
     );
   target.adminCreateGroupKey =
     hydrateString(snapshot.adminCreateGroupKey, target.adminCreateGroupKey);
+  target.adminCreateMonitorProfilesJson = hydrateString(
+    snapshot.adminCreateMonitorProfilesJson,
+    target.adminCreateMonitorProfilesJson
+  );
   target.adminCreateValidFrom = hydrateString(
     snapshot.adminCreateValidFrom,
     target.adminCreateValidFrom

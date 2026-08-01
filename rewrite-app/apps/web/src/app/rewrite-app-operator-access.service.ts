@@ -5,6 +5,7 @@ import {
   type OperatorAccessMode,
   type PublicAdminRoleAssignment
 } from "@testcenter-rewrite-app/contracts";
+import type { MonitorViewProfile } from "@testcenter-rewrite-app/domain";
 
 import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -33,6 +34,27 @@ export class RewriteAppOperatorAccessService {
 
   get isSystemCheckOnly(): boolean {
     return this.mode === "system_check";
+  }
+
+  get monitorProfiles(): MonitorViewProfile[] {
+    const session = parseJsonDocument<OperatorSessionView>(
+      this.uiState.ops.adminSessionView
+    );
+    const profiles = new Map<string, MonitorViewProfile>();
+    for (const assignment of session?.roleAssignments ?? []) {
+      if (
+        assignment.role !== "study_monitor" &&
+        assignment.role !== "group_monitor"
+      ) {
+        continue;
+      }
+      for (const profile of assignment.monitorProfiles ?? []) {
+        if (!profiles.has(profile.profileId)) {
+          profiles.set(profile.profileId, profile);
+        }
+      }
+    }
+    return Array.from(profiles.values());
   }
 
   get label(): string {

@@ -51,6 +51,7 @@ export interface ShellOpsState {
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
+  adminCreateMonitorProfilesJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;
@@ -135,6 +136,7 @@ export interface ShellRuntimeState {
   openRunUnitFilter: string;
   openRunStatusFilter: string;
   openRunLimit: string;
+  monitorProfileId: string;
   openRunsView: string;
   openRunsExportView: string;
   monitorCommandHistoryView: string;
@@ -272,6 +274,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateTenantKey: "demo-tenant",
     adminCreateWorkspaceKey: "demo-workspace",
     adminCreateGroupKey: "group:student-demo",
+    adminCreateMonitorProfilesJson: "[]",
     adminCreateValidFrom: "",
     adminCreateValidTo: "",
     adminCreateValidForMinutes: "",
@@ -357,6 +360,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     openRunUnitFilter: "",
     openRunStatusFilter: "",
     openRunLimit: "100",
+    monitorProfileId: "",
     openRunsView: 'Use "Refresh Runtime Reads".',
     openRunsExportView: 'Use "Export Open Runs CSV".',
     monitorCommandHistoryView: 'Use "Refresh Runtime Reads".',

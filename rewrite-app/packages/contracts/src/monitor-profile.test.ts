@@ -1,0 +1,108 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import type {
+  MonitorViewProfile,
+  OpenMonitorRun
+} from "@testcenter-rewrite-app/domain";
+
+import { filterOpenMonitorRunsByProfile } from "./index.js";
+
+const createOpenRun = (
+  loginKey: string,
+  status: OpenMonitorRun["status"],
+  bookletStates: Record<string, string> = {}
+): OpenMonitorRun => ({
+  testRunId: `run:${loginKey}`,
+  participantSessionId: `session:${loginKey}`,
+  loginKey,
+  groupKey: "group:allowed",
+  executionMode: "run-hot-return",
+  participantRosterEntry: null,
+  bookletKey: "booklet:starter",
+  bookletAssignmentKey: "booklet:starter",
+  bookletStates,
+  status,
+  currentUnitKey: "unit:one",
+  activeTestletTimer: null,
+  updatedAt: "2026-08-01T00:00:00.000Z"
+});
+
+const baseProfile: MonitorViewProfile = {
+  profileId: "small",
+  label: "Small",
+  settings: {
+    blockColumn: "hide",
+    unitColumn: "hide",
+    view: "small",
+    groupColumn: "show",
+    bookletColumn: "hide",
+    bookletStatesColumns: "level",
+    autoselectNextBlock: "no"
+  },
+  filters: [],
+  filtersEnabled: { pending: "no", locked: "no" }
+};
+
+test("monitor profiles apply original exclusion and inverted inclusion filters", () => {
+  const student = createOpenRun("student-ui", "running", { level: "advanced" });
+  const other = createOpenRun("other-ui", "running", { level: "basic" });
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "personLabel",
+        value: "student",
+        subValue: null,
+        label: "Students only",
+        type: "substring",
+        not: true
+      },
+      {
+        target: "bookletStates",
+        value: "level",
+        subValue: "advanced",
+        label: "Advanced only",
+        type: "equal",
+        not: true
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([student, other], profile).map(
+      run => run.loginKey
+    ),
+    ["student-ui"]
+  );
+});
+
+test("monitor profiles hide pending runs and ignore unavailable original fields", () => {
+  const created = createOpenRun("created-ui", "created");
+  const running = createOpenRun("running-ui", "running");
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "blockLabel",
+        value: "Unavailable block",
+        subValue: null,
+        label: "Unavailable field",
+        type: "equal",
+        not: false
+      }
+    ],
+    filtersEnabled: { pending: "yes", locked: "no" }
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([created, running], profile).map(
+      run => run.loginKey
+    ),
+    ["running-ui"]
+  );
+  assert.equal(
+    filterOpenMonitorRunsByProfile([created, running], null).length,
+    2
+  );
+});

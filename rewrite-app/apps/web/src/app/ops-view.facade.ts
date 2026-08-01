@@ -199,6 +199,13 @@ export class OpsViewFacade {
     );
   }
 
+  get adminCreateMonitorProfileCount(): number {
+    const profiles = parseJsonDocument<unknown[]>(
+      this.ops.adminCreateMonitorProfilesJson
+    );
+    return Array.isArray(profiles) ? profiles.length : 0;
+  }
+
   get isCreatingSystemCheckAccount(): boolean {
     return this.ops.adminCreateRole === "system_check";
   }
@@ -804,7 +811,10 @@ export class OpsViewFacade {
             ? "workspace-scope"
             : roleAssignment.tenantId
               ? "tenant-scope"
-              : "platform-scope"
+              : "platform-scope",
+          ...(roleAssignment.monitorProfiles.length > 0
+            ? [`${roleAssignment.monitorProfiles.length} monitor profile(s)`]
+            : [])
         ],
         rows: [
           {
@@ -826,6 +836,13 @@ export class OpsViewFacade {
           {
             label: "Group Key",
             value: roleAssignment.groupKey ?? "all-groups"
+          },
+          {
+            label: "Monitor Profiles",
+            value:
+              roleAssignment.monitorProfiles
+                .map(profile => profile.label || profile.profileId)
+                .join(" | ") || "none"
           },
           {
             label: "Created",

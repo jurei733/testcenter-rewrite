@@ -1998,9 +1998,52 @@ test("operator API can require a platform-admin bearer session", async () => {
       "admin_role_required"
     );
 
+    const rejectedProfilesOnAdminRole = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          username: "profiles.on.admin",
+          password: "profiles-on-admin-secret",
+          roleAssignments: [
+            {
+              role: "workspace_admin",
+              tenantKey: "auth-required-tenant",
+              workspaceKey: "auth-required-workspace",
+              monitorProfiles: [
+                {
+                  profileId: "invalid-admin-profile",
+                  label: "Invalid",
+                  settings: {},
+                  filters: [],
+                  filtersEnabled: {}
+                }
+              ]
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(rejectedProfilesOnAdminRole.status, 400);
+    assert.equal(
+      rejectedProfilesOnAdminRole.body.error,
+      "admin_monitor_profiles_invalid"
+    );
+
     const groupMonitor = await requestJsonAt<{
       adminUser: { username: string };
-      roleAssignments: Array<{ role: string; groupKey: string | null }>;
+      roleAssignments: Array<{
+        role: string;
+        groupKey: string | null;
+        monitorProfiles: Array<{
+          profileId: string;
+          label: string;
+          settings: { view: string; unitColumn: string };
+          filters: Array<{ target: string; value: string; not: boolean }>;
+        }>;
+      }>;
     }>(isolated.baseUrl, "/api/v1/admin/users", {
       method: "POST",
       headers: adminHeaders,
@@ -2013,7 +2056,33 @@ test("operator API can require a platform-admin bearer session", async () => {
             role: "group_monitor",
             tenantKey: "auth-required-tenant",
             workspaceKey: "auth-required-workspace",
-            groupKey: "group:allowed"
+            groupKey: "group:allowed",
+            monitorProfiles: [
+              {
+                profileId: "allowed-only",
+                label: "Allowed Group",
+                settings: {
+                  blockColumn: "hide",
+                  unitColumn: "show",
+                  view: "small",
+                  groupColumn: "show",
+                  bookletColumn: "hide",
+                  bookletStatesColumns: "level",
+                  autoselectNextBlock: "no"
+                },
+                filters: [
+                  {
+                    target: "groupName",
+                    value: "group:allowed",
+                    subValue: null,
+                    label: "Allowed group only",
+                    type: "equal",
+                    not: true
+                  }
+                ],
+                filtersEnabled: { pending: "yes", locked: "no" }
+              }
+            ]
           }
         ]
       }
@@ -2022,8 +2091,21 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(groupMonitor.status, 201);
     assert.equal(groupMonitor.body.roleAssignments[0]?.role, "group_monitor");
     assert.equal(groupMonitor.body.roleAssignments[0]?.groupKey, "group:allowed");
+    assert.equal(
+      groupMonitor.body.roleAssignments[0]?.monitorProfiles[0]?.profileId,
+      "allowed-only"
+    );
+    assert.equal(
+      groupMonitor.body.roleAssignments[0]?.monitorProfiles[0]?.settings.view,
+      "small"
+    );
 
-    const groupMonitorSignIn = await requestJsonAt<{ sessionToken: string }>(
+    const groupMonitorSignIn = await requestJsonAt<{
+      sessionToken: string;
+      roleAssignments: Array<{
+        monitorProfiles: Array<{ profileId: string; filters: unknown[] }>;
+      }>;
+    }>(
       isolated.baseUrl,
       "/api/v1/admin/auth/sign-in",
       {
@@ -2037,6 +2119,16 @@ test("operator API can require a platform-admin bearer session", async () => {
     const groupMonitorHeaders = {
       authorization: `Bearer ${groupMonitorSignIn.body.sessionToken}`
     };
+    assert.deepEqual(
+      groupMonitorSignIn.body.roleAssignments[0]?.monitorProfiles.map(
+        profile => profile.profileId
+      ),
+      ["allowed-only"]
+    );
+    assert.equal(
+      groupMonitorSignIn.body.roleAssignments[0]?.monitorProfiles[0]?.filters.length,
+      1
+    );
 
     const groupMonitorOpenRuns = await requestJsonAt<{ items: unknown[] }>(
       isolated.baseUrl,

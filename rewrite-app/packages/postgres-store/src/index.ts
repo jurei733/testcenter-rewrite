@@ -105,9 +105,29 @@ const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | nul
           row.group_key === null || row.group_key === undefined
             ? null
             : String(row.group_key),
+        monitorProfiles: parseMonitorProfiles(row.monitor_profiles_json),
         createdAt: String(row.created_at)
       }
     : null;
+
+const parseMonitorProfiles = (
+  value: unknown
+): AdminRoleAssignment["monitorProfiles"] => {
+  if (Array.isArray(value)) {
+    return value as AdminRoleAssignment["monitorProfiles"];
+  }
+  if (typeof value !== "string" || !value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? (parsed as AdminRoleAssignment["monitorProfiles"])
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 const mapAdminAuditEvent = (row: Row | undefined): AdminAuditEvent | null =>
   row
@@ -510,7 +530,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 27;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 28;
 
 const migrations: PostgresMigration[] = [
   {
@@ -942,6 +962,13 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS valid_for_minutes INTEGER;
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS first_signed_in_at TEXT;
     `
+  },
+  {
+    version: 28,
+    name: "add_admin_role_monitor_profiles",
+    sql: `
+      ALTER TABLE admin_role_assignments ADD COLUMN IF NOT EXISTS monitor_profiles_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+    `
   }
 ];
 
@@ -1117,7 +1144,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       return many(
-        `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
+        `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
          FROM admin_role_assignments
          WHERE admin_user_id = $1`,
         [adminUserId],
@@ -1127,14 +1154,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveAdminRoleAssignment(roleAssignment) {
       await pool.query(
         `INSERT INTO admin_role_assignments (
-          role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
         ON CONFLICT(role_assignment_id) DO UPDATE SET
           admin_user_id = EXCLUDED.admin_user_id,
           role = EXCLUDED.role,
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
           group_key = EXCLUDED.group_key,
+          monitor_profiles_json = EXCLUDED.monitor_profiles_json,
           created_at = EXCLUDED.created_at`,
         [
           roleAssignment.roleAssignmentId,
@@ -1143,6 +1171,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
           roleAssignment.groupKey,
+          JSON.stringify(roleAssignment.monitorProfiles),
           roleAssignment.createdAt
         ]
       );

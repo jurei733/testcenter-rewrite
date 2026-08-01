@@ -179,6 +179,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           imported original logins, assign a new password here because source
           passwords are deliberately never copied. Original access dates and
           first-login durations are copied into these fields and enforced at sign-in.
+          <ng-container *ngIf="view.isCreatingMonitorAccount">
+            {{ view.adminCreateMonitorProfileCount }} imported monitor profile(s)
+            will be stored with the scoped role.
+          </ng-container>
         </p>
         <p *ngIf="!view.isAdminCreateAccessWindowValid">
           Enter valid ISO timestamps with the start no later than the end, and a

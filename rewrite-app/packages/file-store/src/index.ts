@@ -223,7 +223,10 @@ export const createFileFirstSliceRepository = (
         .filter(roleAssignment => roleAssignment.adminUserId === adminUserId)
         .map(roleAssignment => ({
           ...roleAssignment,
-          groupKey: roleAssignment.groupKey ?? null
+          groupKey: roleAssignment.groupKey ?? null,
+          monitorProfiles: Array.isArray(roleAssignment.monitorProfiles)
+            ? roleAssignment.monitorProfiles
+            : []
         }));
     },
     async saveAdminRoleAssignment(roleAssignment) {

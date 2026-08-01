@@ -376,6 +376,34 @@ export type AdminSession = {
 
 export type AdminSessionStatus = "active" | "expired" | "revoked";
 
+export type MonitorViewProfileFilter = {
+  target: string;
+  value: string;
+  subValue: string | null;
+  label: string;
+  type: string;
+  not: boolean;
+};
+
+export type MonitorViewProfile = {
+  profileId: string;
+  label: string;
+  settings: {
+    blockColumn: string;
+    unitColumn: string;
+    view: string;
+    groupColumn: string;
+    bookletColumn: string;
+    bookletStatesColumns: string;
+    autoselectNextBlock: "yes" | "no";
+  };
+  filters: MonitorViewProfileFilter[];
+  filtersEnabled: {
+    pending: string;
+    locked: string;
+  };
+};
+
 export type AdminRoleAssignment = {
   roleAssignmentId: string;
   adminUserId: string;
@@ -383,6 +411,7 @@ export type AdminRoleAssignment = {
   tenantId: string | null;
   workspaceId: string | null;
   groupKey: string | null;
+  monitorProfiles: MonitorViewProfile[];
   createdAt: string;
 };
 
