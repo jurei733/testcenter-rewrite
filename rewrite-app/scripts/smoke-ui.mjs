@@ -4426,6 +4426,11 @@ try {
     "#entryRosterText",
     [
       "<Testtakers>",
+      "  <Profiles><GroupMonitor>",
+      "    <Profile id=\"all\" label=\"All sessions\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" autoselectNextBlock=\"no\">",
+      "      <Filter label=\"Entry booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Starter\" />",
+      "    </Profile>",
+      "  </GroupMonitor></Profiles>",
       `  <Group id="${participantGroupKey}" validFor="45">`,
       "    <Login name=\"entry-student-login\">",
       `      <Booklet>${participantRouteBookletKey}</Booklet>`,
@@ -4462,7 +4467,9 @@ try {
     .filter({ hasText: "monitor-group" })
     .filter({ hasText: participantGroupKey })
     .filter({ hasText: "password protected" })
-    .filter({ hasText: "all" });
+    .filter({ hasText: "All sessions (all)" })
+    .filter({ hasText: "all: full view; block show" })
+    .filter({ hasText: "all: Entry booklet equal Starter" });
   await operationalLoginCandidateCard.waitFor();
   if (
     (await operationalLoginCandidateCard.textContent())?.includes(

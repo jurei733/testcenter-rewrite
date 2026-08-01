@@ -219,11 +219,16 @@ describe("parseParticipantRosterText", () => {
     const operationalLogins = parseOriginalTestcenterOperationalLogins(
       [
         "<Testtakers>",
+        "  <Profiles><GroupMonitor>",
+        "    <Profile id=\"all\" label=\"All sessions\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" bookletStatesColumns=\"level bonus\" autoselectNextBlock=\"no\" />",
+        "    <Profile id=\"small\" label=\"Reduced\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"hide\" bookletColumn=\"hide\" filterLocked=\"yes\" filterPending=\"yes\"><Filter label=\"Reduced Booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Reduced Booklet\" not=\"true\" /></Profile>",
+        "  </GroupMonitor></Profiles>",
         "  <Group id=\"scheduled-operators\" validFrom=\"1/6/2023 10:00\" validFor=\"45\">",
         "    <Login mode=\"monitor-group\" name=\"group-monitor\" pw=\"secret\">",
         "      <Profile id=\"all\" />",
         "      <Profile id=\"small\" />",
         "      <Profile id=\"all\" />",
+        "      <Profile id=\"missing\" />",
         "    </Login>",
         "    <Login mode=\"sys-check-login\" name=\"sys-check\" />",
         "    <Login mode=\"run-hot-return\" name=\"participant\"><Booklet>BOOKLET.A</Booklet></Login>",
@@ -238,7 +243,49 @@ describe("parseParticipantRosterText", () => {
         loginMode: "monitor-group",
         groupKey: "scheduled-operators",
         passwordRequired: true,
-        profileIds: ["all", "small"],
+        profileIds: ["all", "small", "missing"],
+        monitorProfiles: [
+          {
+            profileId: "all",
+            label: "All sessions",
+            settings: {
+              blockColumn: "show",
+              unitColumn: "show",
+              view: "full",
+              groupColumn: "show",
+              bookletColumn: "show",
+              bookletStatesColumns: "level bonus",
+              autoselectNextBlock: "no"
+            },
+            filters: [],
+            filtersEnabled: { pending: "no", locked: "no" }
+          },
+          {
+            profileId: "small",
+            label: "Reduced",
+            settings: {
+              blockColumn: "hide",
+              unitColumn: "hide",
+              view: "small",
+              groupColumn: "hide",
+              bookletColumn: "hide",
+              bookletStatesColumns: "",
+              autoselectNextBlock: "yes"
+            },
+            filters: [
+              {
+                target: "bookletLabel",
+                value: "Reduced Booklet",
+                subValue: null,
+                label: "Reduced Booklet",
+                type: "equal",
+                not: true
+              }
+            ],
+            filtersEnabled: { pending: "yes", locked: "yes" }
+          }
+        ],
+        unresolvedProfileIds: ["missing"],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
       },
@@ -248,6 +295,8 @@ describe("parseParticipantRosterText", () => {
         groupKey: "scheduled-operators",
         passwordRequired: false,
         profileIds: [],
+        monitorProfiles: [],
+        unresolvedProfileIds: [],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
       }
@@ -271,7 +320,9 @@ describe("parseParticipantRosterText", () => {
         loginMode: "monitor-study",
         groupKey: "ignored-study-group",
         passwordRequired: true,
-        profileIds: []
+        profileIds: [],
+        monitorProfiles: [],
+        unresolvedProfileIds: []
       }),
       { role: "study_monitor", groupKey: null }
     );

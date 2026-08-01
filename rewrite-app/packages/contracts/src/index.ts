@@ -97,12 +97,42 @@ export const originalTestcenterOperationalLoginModes = [
 export type OriginalTestcenterOperationalLoginMode =
   (typeof originalTestcenterOperationalLoginModes)[number];
 
+export type OriginalTestcenterMonitorProfileFilter = {
+  target: string;
+  value: string;
+  subValue: string | null;
+  label: string;
+  type: string;
+  not: boolean;
+};
+
+export type OriginalTestcenterMonitorProfile = {
+  profileId: string;
+  label: string;
+  settings: {
+    blockColumn: string;
+    unitColumn: string;
+    view: string;
+    groupColumn: string;
+    bookletColumn: string;
+    bookletStatesColumns: string;
+    autoselectNextBlock: "yes" | "no";
+  };
+  filters: OriginalTestcenterMonitorProfileFilter[];
+  filtersEnabled: {
+    pending: string;
+    locked: string;
+  };
+};
+
 export type OriginalTestcenterOperationalLoginCandidate = {
   loginKey: string;
   loginMode: OriginalTestcenterOperationalLoginMode;
   groupKey: string | null;
   passwordRequired: boolean;
   profileIds: string[];
+  monitorProfiles: OriginalTestcenterMonitorProfile[];
+  unresolvedProfileIds: string[];
   validFrom?: string | null;
   validTo?: string | null;
   validForMinutes?: number | null;
@@ -1488,6 +1518,81 @@ const parseParticipantRosterXmlText = (
   return mergeParsedParticipantRosterEntries(entries);
 };
 
+const parseOriginalTestcenterMonitorProfiles = (
+  rosterText: string
+): Map<string, OriginalTestcenterMonitorProfile> => {
+  const profilesContent = rosterText.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?profiles)\b[^>]*>([\s\S]*?)<\/\1>/i
+  )?.[2];
+  const groupMonitorContent = profilesContent?.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?groupmonitor)\b[^>]*>([\s\S]*?)<\/\1>/i
+  )?.[2];
+  const profiles = new Map<string, OriginalTestcenterMonitorProfile>();
+  if (!groupMonitorContent) {
+    return profiles;
+  }
+
+  for (const match of groupMonitorContent.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?profile)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+  )) {
+    const attributes = parseXmlAttributes(match[2] ?? "");
+    const profileId = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "id")
+    );
+    if (!profileId || profiles.has(profileId)) {
+      continue;
+    }
+    const content = match[3] ?? "";
+    const filters: OriginalTestcenterMonitorProfileFilter[] = Array.from(
+      content.matchAll(
+        /<(?:[a-zA-Z_][\w.-]*:)?filter\b([^>]*?)(?:\/>|>[\s\S]*?<\/(?:[a-zA-Z_][\w.-]*:)?filter>)/gi
+      ),
+      filterMatch => {
+        const filterAttributes = parseXmlAttributes(filterMatch[1] ?? "");
+        return {
+          target: readXmlAttribute(filterAttributes, "field")?.trim() || "personLabel",
+          value: readXmlAttribute(filterAttributes, "value")?.trim() || "",
+          subValue:
+            readXmlAttribute(filterAttributes, "subValue")?.trim() || null,
+          label: readXmlAttribute(filterAttributes, "label")?.trim() || "",
+          type: readXmlAttribute(filterAttributes, "type")?.trim() || "equals",
+          not:
+            readXmlAttribute(filterAttributes, "not")?.trim().toLowerCase() ===
+            "true"
+        };
+      }
+    );
+    profiles.set(profileId, {
+      profileId,
+      label: readXmlAttribute(attributes, "label")?.trim() || "",
+      settings: {
+        blockColumn:
+          readXmlAttribute(attributes, "blockColumn")?.trim() || "show",
+        unitColumn:
+          readXmlAttribute(attributes, "unitColumn")?.trim() || "show",
+        view: readXmlAttribute(attributes, "view")?.trim() || "middle",
+        groupColumn:
+          readXmlAttribute(attributes, "groupColumn")?.trim() || "hide",
+        bookletColumn:
+          readXmlAttribute(attributes, "bookletColumn")?.trim() || "show",
+        bookletStatesColumns:
+          readXmlAttribute(attributes, "bookletStatesColumns")?.trim() || "",
+        autoselectNextBlock:
+          readXmlAttribute(attributes, "autoselectNextBlock")?.trim() === "no"
+            ? "no"
+            : "yes"
+      },
+      filters,
+      filtersEnabled: {
+        pending:
+          readXmlAttribute(attributes, "filterPending")?.trim() || "no",
+        locked: readXmlAttribute(attributes, "filterLocked")?.trim() || "no"
+      }
+    });
+  }
+  return profiles;
+};
+
 export const parseOriginalTestcenterOperationalLogins = (
   rosterText: ParticipantRosterSource
 ): OriginalTestcenterOperationalLoginCandidate[] => {
@@ -1532,6 +1637,7 @@ export const parseOriginalTestcenterOperationalLogins = (
   const operationalModes = new Set<string>(
     originalTestcenterOperationalLoginModes
   );
+  const monitorProfiles = parseOriginalTestcenterMonitorProfiles(rosterText);
   const candidates: OriginalTestcenterOperationalLoginCandidate[] = [];
 
   for (const match of rosterText.matchAll(
@@ -1579,13 +1685,21 @@ export const parseOriginalTestcenterOperationalLogins = (
           readXmlAttribute(parseXmlAttributes(profileMatch[1] ?? ""), "id", "ref")
         )
     ).filter((profileId): profileId is string => Boolean(profileId));
+    const uniqueProfileIds = Array.from(new Set(profileIds));
 
     candidates.push({
       loginKey,
       loginMode: loginMode as OriginalTestcenterOperationalLoginMode,
       groupKey,
       passwordRequired: Boolean(password),
-      profileIds: Array.from(new Set(profileIds)),
+      profileIds: uniqueProfileIds,
+      monitorProfiles: uniqueProfileIds.flatMap(profileId => {
+        const profile = monitorProfiles.get(profileId);
+        return profile ? [profile] : [];
+      }),
+      unresolvedProfileIds: uniqueProfileIds.filter(
+        profileId => !monitorProfiles.has(profileId)
+      ),
       ...(validFrom ? { validFrom } : {}),
       ...(validTo ? { validTo } : {}),
       ...(validForMinutes ? { validForMinutes } : {})

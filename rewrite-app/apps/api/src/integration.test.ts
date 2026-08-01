@@ -8089,7 +8089,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
         loginMode: "monitor-study",
         groupKey: "operators",
         passwordRequired: false,
-        profileIds: []
+        profileIds: [],
+        monitorProfiles: [],
+        unresolvedProfileIds: []
       }
     ]
   );
@@ -15653,7 +15655,9 @@ test("workspace participant roster can be imported, updated, and listed", async 
       loginMode: "monitor-group",
       groupKey: "sample_group",
       passwordRequired: true,
-      profileIds: []
+      profileIds: [],
+      monitorProfiles: [],
+      unresolvedProfileIds: []
     }
   ]);
   const testcenterLogin = testcenterLoginImport.body.items.find(

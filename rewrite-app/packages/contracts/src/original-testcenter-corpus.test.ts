@@ -68,6 +68,28 @@ test("original Testcenter compatibility corpus separates participant and operati
       ?.profileIds.join(","),
     "all,small"
   );
+  const importedSmallProfile = operationalLogins
+    .find(login => login.loginKey === "test-group-monitor-2")
+    ?.monitorProfiles.find(profile => profile.profileId === "small");
+  assert.equal(importedSmallProfile?.label, "Superklein");
+  assert.equal(importedSmallProfile?.settings.view, "small");
+  assert.equal(importedSmallProfile?.settings.blockColumn, "hide");
+  assert.equal(importedSmallProfile?.filtersEnabled.locked, "yes");
+  assert.deepEqual(importedSmallProfile?.filters, [
+    {
+      target: "bookletLabel",
+      value: "Reduced Booklet",
+      subValue: null,
+      label: "Reduced Booklet",
+      type: "equal",
+      not: false
+    }
+  ]);
+  assert.deepEqual(
+    operationalLogins.find(login => login.loginKey === "test-group-monitor-2")
+      ?.unresolvedProfileIds,
+    []
+  );
   assert.equal(
     operationalLogins.find(login => login.loginKey === "expired-study-monitor")
       ?.validTo,

@@ -857,7 +857,10 @@ export class RuntimeViewFacade {
             badges: [
               candidate.loginMode,
               candidate.groupKey ?? "group missing",
-              candidate.passwordRequired ? "password protected" : "passwordless"
+              candidate.passwordRequired ? "password protected" : "passwordless",
+              ...(candidate.unresolvedProfileIds.length > 0
+                ? ["profile reference missing"]
+                : [])
             ],
             rows: [
               { label: "Original Mode", value: candidate.loginMode },
@@ -865,8 +868,44 @@ export class RuntimeViewFacade {
               {
                 label: "Profiles",
                 value:
-                  candidate.profileIds.length > 0
-                    ? candidate.profileIds.join(" | ")
+                  candidate.monitorProfiles.length > 0
+                    ? candidate.monitorProfiles
+                        .map(
+                          profile =>
+                            `${profile.label || profile.profileId} (${profile.profileId})`
+                        )
+                        .join(" | ")
+                    : candidate.profileIds.length > 0
+                      ? candidate.profileIds.join(" | ")
+                    : "none"
+              },
+              {
+                label: "Profile Views",
+                value:
+                  candidate.monitorProfiles.length > 0
+                    ? candidate.monitorProfiles
+                        .map(profile => {
+                          const settings = profile.settings;
+                          return `${profile.profileId}: ${settings.view} view; block ${settings.blockColumn}; unit ${settings.unitColumn}; group ${settings.groupColumn}; booklet ${settings.bookletColumn}; auto-next ${settings.autoselectNextBlock}`;
+                        })
+                        .join(" | ")
+                    : "none"
+              },
+              {
+                label: "Profile Filters",
+                value:
+                  candidate.monitorProfiles.flatMap(profile =>
+                    profile.filters.map(
+                      filter =>
+                        `${profile.profileId}: ${filter.label || filter.target} ${filter.not ? "not " : ""}${filter.type} ${filter.value}`
+                    )
+                  ).join(" | ") || "none"
+              },
+              {
+                label: "Missing Profile Definitions",
+                value:
+                  candidate.unresolvedProfileIds.length > 0
+                    ? candidate.unresolvedProfileIds.join(" | ")
                     : "none"
               },
               {
