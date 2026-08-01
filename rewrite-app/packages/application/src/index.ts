@@ -585,6 +585,7 @@ export type ParticipantRuntimePort = {
   }): Promise<TestRun>;
   saveProgress(input: {
     testRunId: string;
+    deliveryId?: string;
     currentUnitKey?: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
@@ -1454,6 +1455,25 @@ const normalizeTestRunId = (value: unknown): string => {
     );
   }
 
+  return value.trim();
+};
+
+const normalizeOptionalParticipantDeliveryId = (
+  value: unknown
+): string | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(value.trim())
+  ) {
+    throw new FirstSliceError(
+      400,
+      "participant_delivery_id_invalid",
+      "deliveryId must contain 1–200 URL-safe identifier characters when provided."
+    );
+  }
   return value.trim();
 };
 
@@ -12819,6 +12839,7 @@ export const createFirstSliceServices = (
   }
 
   const recordWorkspaceActivity = async (input: {
+    activityEventId?: string;
     tenantId: string;
     workspaceId: string;
     eventType: WorkspaceActivityEvent["eventType"];
@@ -12829,7 +12850,7 @@ export const createFirstSliceServices = (
     details?: Record<string, unknown>;
   }): Promise<void> => {
     await repository.saveWorkspaceActivityEvent({
-      activityEventId: idGenerator(),
+      activityEventId: input.activityEventId ?? idGenerator(),
       tenantId: input.tenantId,
       workspaceId: input.workspaceId,
       eventType: input.eventType,
@@ -12844,6 +12865,7 @@ export const createFirstSliceServices = (
 
   const buildParticipantTestLogs = (input: {
     testRun: TestRun;
+    deliveryId?: string;
     batches: Array<{
       unitKey?: string | null;
       originalUnitId?: string | null;
@@ -12868,6 +12890,7 @@ export const createFirstSliceServices = (
         "At most 200 participant test-log entries may be saved at once."
       );
     }
+    let entryIndex = 0;
     return input.batches.flatMap(batch => {
       if (!Array.isArray(batch.entries)) {
         throw new FirstSliceError(
@@ -12912,7 +12935,9 @@ export const createFirstSliceServices = (
           );
         }
         return {
-          participantTestLogId: idGenerator(),
+          participantTestLogId: input.deliveryId
+            ? `delivery:${input.testRun.testRunId}:${input.deliveryId}:log:${entryIndex++}`
+            : idGenerator(),
           tenantId: input.testRun.tenantId,
           workspaceId: input.testRun.workspaceId,
           participantSessionId: input.testRun.participantSessionId,
@@ -18018,6 +18043,9 @@ export const createFirstSliceServices = (
       },
       async saveProgress(input) {
         const testRunId = normalizeTestRunId(input.testRunId);
+        const deliveryId = normalizeOptionalParticipantDeliveryId(
+          input.deliveryId
+        );
         const storedTestRun = await repository.getTestRunById(testRunId);
 
         if (!storedTestRun) {
@@ -18195,6 +18223,7 @@ export const createFirstSliceServices = (
         const participantTestLogs = executionMode.saveResponses
           ? buildParticipantTestLogs({
               testRun: updatedRun,
+              deliveryId,
               batches: [...incomingLogBatches, ...runtimeLogBatches]
             })
           : [];
@@ -18208,6 +18237,12 @@ export const createFirstSliceServices = (
           timestamp
         });
         await recordWorkspaceActivity({
+          ...(deliveryId
+            ? {
+                activityEventId:
+                  `delivery:${updatedRun.testRunId}:${deliveryId}:activity:progress`
+              }
+            : {}),
           tenantId: effectiveRun.tenantId,
           workspaceId: effectiveRun.workspaceId,
           eventType: "test_run_progress_saved",
@@ -18224,6 +18259,12 @@ export const createFirstSliceServices = (
         });
         if (activatedLeaveLock) {
           await recordWorkspaceActivity({
+            ...(deliveryId
+              ? {
+                  activityEventId:
+                    `delivery:${updatedRun.testRunId}:${deliveryId}:activity:leave-lock`
+                }
+              : {}),
             tenantId: effectiveRun.tenantId,
             workspaceId: effectiveRun.workspaceId,
             eventType: "testlet_leave_lock_activated",

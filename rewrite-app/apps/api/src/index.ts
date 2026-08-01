@@ -5585,6 +5585,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const body = await readRequestJsonBody<SaveTestRunProgressRequest>();
         const testRun = await services.participantRuntime.saveProgress({
           testRunId,
+          deliveryId: body.deliveryId,
           currentUnitKey: body.currentUnitKey,
           status: body.status,
           unitResponse: body.unitResponse,

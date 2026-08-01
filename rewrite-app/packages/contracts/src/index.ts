@@ -1874,6 +1874,7 @@ export type ResumeParticipantSessionRequest = {
 };
 
 export type SaveTestRunProgressRequest = {
+  deliveryId?: string;
   currentUnitKey?: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;

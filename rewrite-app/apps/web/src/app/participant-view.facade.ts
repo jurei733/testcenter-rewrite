@@ -34,6 +34,14 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
+import {
+  createParticipantSaveOutboxEntry,
+  discardParticipantSaveOutboxForRun,
+  findParticipantSaveOutboxEntry,
+  persistParticipantSaveOutboxEntry,
+  removeParticipantSaveOutboxEntry,
+  type ParticipantSaveOutboxEntry
+} from "./participant-save-outbox";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
@@ -196,8 +204,12 @@ export class ParticipantViewFacade {
   readonly runtime = this.uiState.runtime;
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
   participantCodeRequired = false;
-  veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
-    "not_saved";
+  veronaSaveStatus:
+    | "not_saved"
+    | "saving"
+    | "saved"
+    | "queued_offline"
+    | "save_failed" = "not_saved";
   testletUnlockCode = "";
   participantReviews: WorkspaceReview[] = [];
   reviewTarget: "unit" | "test" | "task" = "unit";
@@ -239,12 +251,11 @@ export class ParticipantViewFacade {
   } | null = null;
   private readonly seenTimerWarnings = new Set<string>();
   private readonly timerRemainingSeconds = new Map<string, number>();
-  private pendingVeronaSave: {
+  private pendingVeronaSave: ParticipantSaveOutboxEntry | null = null;
+  private optimisticVeronaResponse: {
     testRunId: string;
     unitKey: string;
     response: string;
-    status: "running" | "paused";
-    logs: ParticipantTestLogBatch[];
   } | null = null;
   private queuedVeronaLogs: Array<{
     testRunId: string;
@@ -256,6 +267,9 @@ export class ParticipantViewFacade {
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
   };
+  private readonly onlineListener = (): void => {
+    this.retryVeronaSave();
+  };
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -263,6 +277,7 @@ export class ParticipantViewFacade {
       "fullscreenchange",
       this.fullscreenChangeListener
     );
+    globalThis.window?.addEventListener("online", this.onlineListener);
     this.fullscreenChangeListener();
     this.startTimerTicker();
   }
@@ -276,6 +291,7 @@ export class ParticipantViewFacade {
       "fullscreenchange",
       this.fullscreenChangeListener
     );
+    globalThis.window?.removeEventListener("online", this.onlineListener);
   }
 
   persistState(): void {
@@ -484,7 +500,7 @@ export class ParticipantViewFacade {
         canResumeRun: false,
         canComplete: false,
         canReview: false,
-        canClearSession: hasParticipantSession,
+        canClearSession: hasParticipantSession && !this.pendingVeronaSave,
         saveProgressLabel: "Save Progress",
         unitResponse: "",
         draftStateLabel: "No response loaded",
@@ -721,7 +737,7 @@ export class ParticipantViewFacade {
       canResumeRun: availableActions.includes("resume"),
       canComplete: availableActions.includes("complete"),
       canReview: availableActions.includes("review"),
-      canClearSession: true,
+      canClearSession: !this.pendingVeronaSave,
       saveProgressLabel:
         !executionMode.saveResponses
           ? "Continue Without Saving"
@@ -891,7 +907,12 @@ export class ParticipantViewFacade {
       unitDefinitionType:
         currentState.currentUnit.unitDefinitionType?.trim() || player.playerKey,
       resourceBasePath: currentState.resourceBasePath?.trim() ?? "",
-      savedResponse: currentState.testRun.unitResponses[unitKey] ?? "",
+      savedResponse:
+        this.optimisticVeronaResponse?.testRunId ===
+          currentState.testRun.testRunId &&
+        this.optimisticVeronaResponse.unitKey === unitKey
+          ? this.optimisticVeronaResponse.response
+          : currentState.testRun.unitResponses[unitKey] ?? "",
       unitNumber: Math.max(unitIndex + 1, 1),
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
@@ -1253,13 +1274,20 @@ export class ParticipantViewFacade {
       ...pendingLogs,
       ...queuedEntries
     ]);
-    this.pendingVeronaSave = {
+    const save = createParticipantSaveOutboxEntry({
       testRunId: currentState.testRun.testRunId,
       unitKey,
       response,
       status: currentState.testRun.status === "paused" ? "paused" : "running",
       logs
+    });
+    this.optimisticVeronaResponse = {
+      testRunId: save.testRunId,
+      unitKey: save.unitKey,
+      response: save.response
     };
+    this.pendingVeronaSave = save;
+    persistParticipantSaveOutboxEntry(save);
     this.scheduleVeronaSaveDrain();
   }
 
@@ -1296,6 +1324,9 @@ export class ParticipantViewFacade {
   }
 
   retryVeronaSave(): void {
+    if (!this.pendingVeronaSave) {
+      this.restorePersistentVeronaSave(this.readCurrentRunState());
+    }
     if (this.pendingVeronaSave) {
       this.scheduleVeronaSaveDrain();
     }
@@ -1525,6 +1556,10 @@ export class ParticipantViewFacade {
   private clearStoredParticipantSession(
     message = 'Stored participant session is gone. Use "Start Or Resume".'
   ): void {
+    const previousTestRunId = this.runtime.testRunId.trim();
+    if (previousTestRunId) {
+      discardParticipantSaveOutboxForRun(previousTestRunId);
+    }
     this.copiedSessionEntryLink = "";
     this.assignedBooklets = [];
     this.participantReviews = [];
@@ -1533,6 +1568,7 @@ export class ParticipantViewFacade {
     this.adaptiveStateFeedback = "";
     this.adaptiveStateChangePending = "";
     this.pendingVeronaSave = null;
+    this.optimisticVeronaResponse = null;
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
@@ -1689,6 +1725,12 @@ export class ParticipantViewFacade {
       } satisfies SaveTestRunProgressRequest
     );
 
+    this.removeMatchingDeliveredOutbox(
+      testRunId,
+      currentUnitKey,
+      unitResponse
+    );
+
     if (matchingLogBatches.length > 0) {
       this.queuedVeronaLogs = this.queuedVeronaLogs.filter(
         batch => !matchingLogBatchSet.has(batch)
@@ -1713,7 +1755,11 @@ export class ParticipantViewFacade {
       if (this.veronaSaveDrainPromise === drainPromise) {
         this.veronaSaveDrainPromise = null;
       }
-      if (this.pendingVeronaSave && this.veronaSaveStatus !== "save_failed") {
+      if (
+        this.pendingVeronaSave &&
+        this.veronaSaveStatus !== "save_failed" &&
+        this.veronaSaveStatus !== "queued_offline"
+      ) {
         this.scheduleVeronaSaveDrain();
       }
     });
@@ -1733,6 +1779,7 @@ export class ParticipantViewFacade {
             testRunId: save.testRunId
           }),
           {
+            deliveryId: save.deliveryId,
             currentUnitKey: save.unitKey,
             status: save.status,
             unitResponse: save.response,
@@ -1740,14 +1787,21 @@ export class ParticipantViewFacade {
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
         );
+        removeParticipantSaveOutboxEntry(
+          save.testRunId,
+          save.deliveryId
+        );
         this.syncRun(payload.testRun);
         this.runtime.runtimeMonitorView = prettyPrintJson(
           payload,
           this.runtime.runtimeMonitorView
         );
       } catch {
-        this.pendingVeronaSave = this.pendingVeronaSave ?? save;
-        this.veronaSaveStatus = "save_failed";
+        const retrySave = this.pendingVeronaSave ?? save;
+        this.pendingVeronaSave = retrySave;
+        this.veronaSaveStatus = persistParticipantSaveOutboxEntry(retrySave)
+          ? "queued_offline"
+          : "save_failed";
         this.persistState();
         return;
       }
@@ -2143,6 +2197,8 @@ export class ParticipantViewFacade {
       );
       this.syncCurrentRunState(payload.currentRunState);
       this.syncCurrentUnitResponse(payload.currentRunState);
+      this.reconcileOptimisticVeronaResponse(payload.currentRunState);
+      this.restorePersistentVeronaSave(payload.currentRunState);
       await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
       this.persistState();
     } catch (error) {
@@ -2239,6 +2295,78 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitResponse = unitKey
       ? currentState.testRun.unitResponses[unitKey] ?? ""
       : "";
+  }
+
+  private restorePersistentVeronaSave(
+    currentState:
+      | ParticipantCurrentRunStateResponse["currentRunState"]
+      | null
+  ): void {
+    if (!currentState || this.pendingVeronaSave) {
+      return;
+    }
+    const saved = findParticipantSaveOutboxEntry(
+      currentState.testRun.testRunId
+    );
+    if (!saved) {
+      return;
+    }
+    if (currentState.testRun.status === "completed") {
+      if (currentState.testRun.unitResponses[saved.unitKey] === saved.response) {
+        removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
+        this.veronaSaveStatus = "saved";
+      } else {
+        this.veronaSaveStatus = "save_failed";
+      }
+      return;
+    }
+    this.pendingVeronaSave = saved;
+    this.optimisticVeronaResponse = {
+      testRunId: saved.testRunId,
+      unitKey: saved.unitKey,
+      response: saved.response
+    };
+    this.veronaSaveStatus = "queued_offline";
+    if (currentState.currentUnit.unitKey === saved.unitKey) {
+      this.runtime.currentUnitResponse = saved.response;
+    }
+    if (
+      currentState.availableActions.includes("save_progress") &&
+      globalThis.navigator?.onLine !== false
+    ) {
+      this.scheduleVeronaSaveDrain();
+    }
+  }
+
+  private reconcileOptimisticVeronaResponse(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"]
+  ): void {
+    const optimistic = this.optimisticVeronaResponse;
+    if (
+      optimistic?.testRunId === currentState.testRun.testRunId &&
+      currentState.testRun.unitResponses[optimistic.unitKey] ===
+        optimistic.response
+    ) {
+      this.optimisticVeronaResponse = null;
+    }
+  }
+
+  private removeMatchingDeliveredOutbox(
+    testRunId: string,
+    unitKey: string | undefined,
+    unitResponse: string | null | undefined
+  ): void {
+    if (!unitKey || unitResponse == null) {
+      return;
+    }
+    const saved = findParticipantSaveOutboxEntry(testRunId);
+    if (
+      saved &&
+      saved.unitKey === unitKey &&
+      saved.response === unitResponse
+    ) {
+      removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
+    }
   }
 
   private createParticipantSessionEntryLink(): string {

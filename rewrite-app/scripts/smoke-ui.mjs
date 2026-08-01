@@ -3235,6 +3235,7 @@ try {
             <Config key="pagingMode">concat-scroll</Config>
             <Config key="logPolicy">debug</Config>
             <Config key="restore_current_page_on_return">ON</Config>
+            <Config key="toolbar_show_reload_button">TRUE</Config>
             <Config key="unit_show_time_left">ON</Config>
             <Config key="unit_time_left_warnings">1</Config>
           </BookletConfig>
@@ -3516,6 +3517,109 @@ try {
     await page.locator("#participantRouteCompleteButton").isDisabled(),
     false
   );
+  logStep("participant-verona-offline-outbox");
+  const veronaOfflineResponse = "Recovered after offline reload";
+  const veronaTestRunId = (
+    await page.locator("#participantRouteRunId").textContent()
+  )?.trim();
+  assert.ok(veronaTestRunId);
+  const veronaSaveProgressUrl =
+    `**/api/v1/participant/test-runs/${veronaTestRunId}/save-progress`;
+  const rejectVeronaSave = route => route.abort("internetdisconnected");
+  await page.route(veronaSaveProgressUrl, rejectVeronaSave);
+  await veronaFrame.locator("#playerAnswer").fill(veronaOfflineResponse);
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "queued offline" })
+    .waitFor({ timeout: 15_000 });
+  const queuedOutbox = await page.evaluate(() => {
+    const rawValue = localStorage.getItem(
+      "testcenter-rewrite:participant-save-outbox:v1"
+    );
+    return rawValue ? JSON.parse(rawValue) : null;
+  });
+  assert.equal(queuedOutbox?.version, 1);
+  assert.ok(
+    queuedOutbox.entries.some(entry => {
+      if (
+        entry.testRunId !== veronaTestRunId ||
+        entry.unitKey !== veronaUnitKey ||
+        typeof entry.response !== "string" ||
+        !entry.deliveryId
+      ) {
+        return false;
+      }
+      try {
+        return (
+          JSON.parse(entry.response).unitState?.dataParts?.answer ===
+          veronaOfflineResponse
+        );
+      } catch {
+        return false;
+      }
+    }),
+    "Failed Verona saves should remain durable in the browser outbox."
+  );
+  await page.unroute(veronaSaveProgressUrl, rejectVeronaSave);
+  await page.locator("#participantRouteReloadButton").click({ noWaitAfter: true });
+  await page.waitForURL(url =>
+    url.searchParams.get("participantSessionId") === veronaParticipantSessionId
+  );
+  await page.waitForLoadState("networkidle");
+  const offlineRecoveredVeronaFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await offlineRecoveredVeronaFrame
+    .locator("#playerAnswer")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await offlineRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
+    veronaOfflineResponse
+  );
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "saved" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        return (
+          JSON.parse(response).unitState?.dataParts?.answer ===
+          veronaOfflineResponse
+        );
+      } catch {
+        return false;
+      }
+    }
+  );
+  assert.equal(
+    await page.evaluate(() =>
+      localStorage.getItem("testcenter-rewrite:participant-save-outbox:v1")
+    ),
+    null,
+    "A confirmed retry should remove the durable Verona outbox entry."
+  );
+  const recoveredVeronaLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PLAYER_STATE_CHANGED&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item => item.testLog?.logContent === veronaOfflineResponse
+      )
+  );
+  assert.equal(
+    recoveredVeronaLogs.items.filter(
+      item => item.testLog?.logContent === veronaOfflineResponse
+    ).length,
+    1,
+    "Outbox retries should not duplicate Verona Player logs."
+  );
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       veronaParticipantSessionId
@@ -3529,7 +3633,7 @@ try {
     .waitFor({ state: "visible" });
   assert.equal(
     await resumedVeronaFrame.locator("#playerAnswer").inputValue(),
-    "Saved through Verona"
+    veronaOfflineResponse
   );
   assert.equal(
     await resumedVeronaFrame.locator("#playerStartPage").textContent(),

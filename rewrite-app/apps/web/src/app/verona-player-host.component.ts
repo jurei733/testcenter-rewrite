@@ -56,9 +56,9 @@ import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domai
         <button type="button" class="secondary" (click)="reload()">Reload Player</button>
       </section>
       <footer>
-        <span id="participantVeronaSaveStatus">{{ saveStatus }}</span>
+        <span id="participantVeronaSaveStatus" aria-live="polite">{{ saveStatusLabel }}</span>
         <button
-          *ngIf="saveStatus === 'save_failed'"
+          *ngIf="saveStatus === 'save_failed' || saveStatus === 'queued_offline'"
           id="participantVeronaRetrySaveButton"
           type="button"
           class="ghost"
@@ -116,6 +116,19 @@ export class VeronaPlayerHostComponent
 
   private get sessionId(): string {
     return `${this.testRunId}:${this.unitKey}`;
+  }
+
+  get saveStatusLabel(): string {
+    switch (this.saveStatus) {
+      case "queued_offline":
+        return "queued offline";
+      case "save_failed":
+        return "save failed";
+      case "not_saved":
+        return "not saved";
+      default:
+        return this.saveStatus;
+    }
   }
 
   ngAfterViewInit(): void {

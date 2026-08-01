@@ -2213,6 +2213,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       {
         method: "POST",
         body: {
+          deliveryId: "integration-demo-intro-save",
           currentUnitKey: "unit-intro",
           status: "running",
           unitResponse: "My first demo response",
@@ -2232,6 +2233,36 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(saved.status, 200);
     assert.equal(saved.body.testRun.currentUnitKey, "unit-intro");
     assert.equal(saved.body.testRun.unitResponses["unit-intro"], "My first demo response");
+
+    const replayedSave = await requestJsonAt<{
+      testRun: { unitResponses: Record<string, string> };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          deliveryId: "integration-demo-intro-save",
+          currentUnitKey: "unit-intro",
+          status: "running",
+          unitResponse: "My first demo response",
+          logs: [{
+            unitKey: "unit-intro",
+            originalUnitId: "UNIT.INTRO.ORIGINAL",
+            entries: [{
+              key: "PLAYER_EVENT",
+              timeStamp: 1_700_000_000_000,
+              content: "answer changed"
+            }]
+          }]
+        }
+      }
+    );
+    assert.equal(replayedSave.status, 200);
+    assert.equal(
+      replayedSave.body.testRun.unitResponses["unit-intro"],
+      "My first demo response"
+    );
 
     const statusOnlySave = await requestJsonAt<{
       testRun: {
@@ -2332,6 +2363,23 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(invalidStatusSave.status, 400);
     assert.equal(invalidStatusSave.body.error, "test_run_progress_status_invalid");
+
+    const invalidDeliveryIdSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          deliveryId: "invalid delivery id",
+          status: "running"
+        }
+      }
+    );
+    assert.equal(invalidDeliveryIdSave.status, 400);
+    assert.equal(
+      invalidDeliveryIdSave.body.error,
+      "participant_delivery_id_invalid"
+    );
 
     const invalidCurrentUnitSave = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -3701,6 +3749,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         item.testLog.logContent === "RUNNING" &&
         item.testLog.unitKey === null
       )
+    );
+    assert.equal(
+      participantTestLogs.body.items.filter(item =>
+        item.testLog.logKey === "PLAYER_EVENT" &&
+        item.testLog.logContent === "answer changed" &&
+        item.testLog.unitKey === "unit-intro"
+      ).length,
+      1,
+      "Replaying one delivery must not duplicate participant Player logs."
     );
     assert.ok(
       participantTestLogs.body.items.some(item =>
