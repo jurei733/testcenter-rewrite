@@ -63,4 +63,21 @@ test("Verona notifications and supported API versions are validated", () => {
     }),
     null
   );
+  assert.deepEqual(
+    parseVeronaIncomingNotification({
+      type: "vopWindowFocusChangedNotification",
+      hasFocus: true
+    }),
+    {
+      type: "vopWindowFocusChangedNotification",
+      hasFocus: true
+    }
+  );
+  assert.equal(
+    parseVeronaIncomingNotification({
+      type: "vopWindowFocusChangedNotification",
+      hasFocus: "true"
+    }),
+    null
+  );
 });

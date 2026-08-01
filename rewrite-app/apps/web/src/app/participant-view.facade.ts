@@ -167,6 +167,12 @@ type NormalizedParticipantEntryParameters = {
   hasUnitResponse: boolean;
 };
 
+type ParticipantTestLogBatch = {
+  unitKey: string | null;
+  originalUnitId: string | null;
+  entries: ParticipantTestLogEntryInput[];
+};
+
 @Injectable({ providedIn: "root" })
 export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
@@ -201,15 +207,12 @@ export class ParticipantViewFacade {
     unitKey: string;
     response: string;
     status: "running" | "paused";
-    logs: Array<{
-      unitKey: string;
-      originalUnitId: string;
-      entries: ParticipantTestLogEntryInput[];
-    }>;
+    logs: ParticipantTestLogBatch[];
   } | null = null;
   private queuedVeronaLogs: Array<{
     testRunId: string;
-    unitKey: string;
+    unitKey: string | null;
+    originalUnitId: string | null;
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
@@ -995,28 +998,29 @@ export class ParticipantViewFacade {
       .filter(
         batch =>
           batch.testRunId === currentState.testRun.testRunId &&
-          batch.unitKey === unitKey
+          (batch.unitKey === unitKey || batch.unitKey === null)
       )
-      .flatMap(batch => batch.entries);
+      .map(({ testRunId: _testRunId, ...batch }) => batch);
     this.queuedVeronaLogs = this.queuedVeronaLogs.filter(
       batch =>
         batch.testRunId !== currentState.testRun.testRunId ||
-        batch.unitKey !== unitKey
+        (batch.unitKey !== unitKey && batch.unitKey !== null)
     );
-    const pendingEntries =
+    const pendingLogs =
       this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId &&
       this.pendingVeronaSave.unitKey === unitKey
-        ? this.pendingVeronaSave.logs.flatMap(batch => batch.entries)
+        ? this.pendingVeronaSave.logs
         : [];
-    const entries = [...pendingEntries, ...queuedEntries].slice(-200);
+    const logs = this.compactParticipantTestLogBatches([
+      ...pendingLogs,
+      ...queuedEntries
+    ]);
     this.pendingVeronaSave = {
       testRunId: currentState.testRun.testRunId,
       unitKey,
       response,
       status: currentState.testRun.status === "paused" ? "paused" : "running",
-      logs: entries.length > 0
-        ? [{ unitKey, originalUnitId: unitKey, entries }]
-        : []
+      logs
     };
     this.scheduleVeronaSaveDrain();
   }
@@ -1030,8 +1034,27 @@ export class ParticipantViewFacade {
     this.queuedVeronaLogs.push({
       testRunId: currentState.testRun.testRunId,
       unitKey,
+      originalUnitId: unitKey,
       entries
     });
+  }
+
+  saveVeronaFocusLogs(entries: ParticipantTestLogEntryInput[]): void {
+    const currentState = this.readCurrentRunState();
+    if (
+      !currentState ||
+      entries.length === 0 ||
+      !currentState.availableActions.includes("save_progress")
+    ) {
+      return;
+    }
+    this.queuedVeronaLogs.push({
+      testRunId: currentState.testRun.testRunId,
+      unitKey: null,
+      originalUnitId: null,
+      entries
+    });
+    this.saveVeronaResponse(this.runtime.currentUnitResponse);
   }
 
   retryVeronaSave(): void {
@@ -1394,9 +1417,15 @@ export class ParticipantViewFacade {
     const testRunId = this.runtime.testRunId.trim();
     const matchingLogBatches = currentUnitKey
       ? this.queuedVeronaLogs.filter(
-          batch => batch.testRunId === testRunId && batch.unitKey === currentUnitKey
+          batch =>
+            batch.testRunId === testRunId &&
+            (batch.unitKey === currentUnitKey || batch.unitKey === null)
         )
       : [];
+    const matchingLogBatchSet = new Set(matchingLogBatches);
+    const compactedLogBatches = this.compactParticipantTestLogBatches(
+      matchingLogBatches.map(({ testRunId: _testRunId, ...batch }) => batch)
+    );
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
       "POST",
@@ -1409,19 +1438,15 @@ export class ParticipantViewFacade {
         unitResponse,
         confirmTestletTimeLeave,
         confirmTestletLeaveLock,
-        logs: matchingLogBatches.length > 0
-          ? [{
-              unitKey: currentUnitKey,
-              originalUnitId: currentUnitKey,
-              entries: matchingLogBatches.flatMap(batch => batch.entries).slice(-200)
-            }]
+        logs: compactedLogBatches.length > 0
+          ? compactedLogBatches
           : undefined
       } satisfies SaveTestRunProgressRequest
     );
 
     if (matchingLogBatches.length > 0) {
       this.queuedVeronaLogs = this.queuedVeronaLogs.filter(
-        batch => batch.testRunId !== testRunId || batch.unitKey !== currentUnitKey
+        batch => !matchingLogBatchSet.has(batch)
       );
     }
 
@@ -1665,11 +1690,40 @@ export class ParticipantViewFacade {
         this.queuedVeronaLogs.push({
           testRunId: pendingSave.testRunId,
           unitKey: batch.unitKey,
+          originalUnitId: batch.originalUnitId,
           entries: batch.entries
         });
       }
     }
     this.pendingVeronaSave = null;
+  }
+
+  private compactParticipantTestLogBatches(
+    batches: ParticipantTestLogBatch[]
+  ): ParticipantTestLogBatch[] {
+    const latestEntries = batches
+      .flatMap(batch =>
+        batch.entries.map(entry => ({
+          unitKey: batch.unitKey,
+          originalUnitId: batch.originalUnitId,
+          entry
+        }))
+      )
+      .slice(-200);
+    const compacted = new Map<string, ParticipantTestLogBatch>();
+    for (const item of latestEntries) {
+      const scopeKey = item.unitKey === null
+        ? "test:"
+        : `unit:${item.unitKey}`;
+      const batch = compacted.get(scopeKey) ?? {
+        unitKey: item.unitKey,
+        originalUnitId: item.originalUnitId,
+        entries: []
+      };
+      batch.entries.push(item.entry);
+      compacted.set(scopeKey, batch);
+    }
+    return [...compacted.values()].slice(-20);
   }
 
   private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {

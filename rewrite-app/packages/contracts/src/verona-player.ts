@@ -73,10 +73,16 @@ export type VeronaRuntimeErrorNotification = {
   message?: string;
 };
 
+export type VeronaWindowFocusChangedNotification = {
+  type: "vopWindowFocusChangedNotification";
+  hasFocus: boolean;
+};
+
 export type VeronaIncomingNotification =
   | VeronaReadyNotification
   | VeronaStateChangedNotification
   | VeronaNavigationRequestedNotification
+  | VeronaWindowFocusChangedNotification
   | VeronaRuntimeErrorNotification;
 
 export type PersistedVeronaUnitResponse = {
@@ -187,6 +193,10 @@ export const parseVeronaIncomingNotification = (
     case "vopUnitNavigationRequestedNotification":
       return typeof message.sessionId === "string"
         ? (message as VeronaNavigationRequestedNotification)
+        : null;
+    case "vopWindowFocusChangedNotification":
+      return typeof message.hasFocus === "boolean"
+        ? (message as VeronaWindowFocusChangedNotification)
         : null;
     case "vopRuntimeErrorNotification":
       return message as VeronaRuntimeErrorNotification;

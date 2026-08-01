@@ -296,6 +296,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
             [saveStatus]="view.veronaSaveStatus"
             (logEntries)="view.queueVeronaLogs($event)"
+            (focusLogEntries)="view.saveVeronaFocusLogs($event)"
             (responseChange)="view.saveVeronaResponse($event)"
             (navigationRequest)="view.navigateFromVerona($event)"
             (retrySave)="view.retryVeronaSave()"

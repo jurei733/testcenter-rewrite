@@ -2950,6 +2950,10 @@ try {
           document.querySelector("#playerStartPage").textContent = String(event.data.playerConfig?.startPage || "");
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
           document.querySelector("#playerAnswer").addEventListener("input", sendState);
+          parent.postMessage({
+            type: "vopWindowFocusChangedNotification",
+            hasFocus: true
+          }, "*");
           fetch(event.data.playerConfig.directDownloadUrl + "/sample_resource_package/file.text")
             .then(response => {
               if (!response.ok) throw new Error("resource status " + response.status);
@@ -3236,6 +3240,20 @@ try {
           item.testLog?.logKey === "PLAYER_STATE_CHANGED" &&
           item.testLog?.logContent === "Saved through Verona" &&
           item.testLog?.unitKey === veronaUnitKey
+      )
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=FOCUS`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.logKey === "FOCUS" &&
+          item.testLog?.logContent === "HAS" &&
+          item.testLog?.unitKey === null &&
+          item.testLog?.originalUnitId === null
       )
   );
   await page.locator("#participantRouteNavigationNotice").waitFor({ state: "detached" });

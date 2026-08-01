@@ -98,6 +98,8 @@ export class VeronaPlayerHostComponent
   @Output() readonly responseChange = new EventEmitter<string>();
   @Output() readonly logEntries =
     new EventEmitter<ParticipantTestLogEntryInput[]>();
+  @Output() readonly focusLogEntries =
+    new EventEmitter<ParticipantTestLogEntryInput[]>();
   @Output() readonly navigationRequest = new EventEmitter<string>();
   @Output() readonly retrySave = new EventEmitter<void>();
 
@@ -107,6 +109,9 @@ export class VeronaPlayerHostComponent
 
   private frame: HTMLIFrameElement | null = null;
   private readyTimeout: ReturnType<typeof setTimeout> | null = null;
+  private focusLogTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingPlayerHasFocus: boolean | undefined;
+  private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
   private viewReady = false;
 
   private get sessionId(): string {
@@ -141,6 +146,7 @@ export class VeronaPlayerHostComponent
 
   ngOnDestroy(): void {
     this.clearReadyTimeout();
+    this.clearFocusLogTimeout();
     this.frame?.remove();
     this.frame = null;
   }
@@ -163,12 +169,11 @@ export class VeronaPlayerHostComponent
       this.handleReady(notification);
       return;
     }
-    if (
-      notification.sessionId &&
-      notification.sessionId !== this.sessionId
-    ) {
+    const notificationSessionId =
+      "sessionId" in notification ? notification.sessionId : undefined;
+    if (notificationSessionId && notificationSessionId !== this.sessionId) {
       this.fail(
-        `Player sent a message for unexpected session '${notification.sessionId}'.`
+        `Player sent a message for unexpected session '${notificationSessionId}'.`
       );
       return;
     }
@@ -211,6 +216,9 @@ export class VeronaPlayerHostComponent
       case "vopUnitNavigationRequestedNotification":
         this.handleNavigationRequest(notification);
         break;
+      case "vopWindowFocusChangedNotification":
+        this.scheduleFocusLog(notification.hasFocus);
+        break;
       case "vopRuntimeErrorNotification":
         this.fail(
           [notification.code, notification.message]
@@ -221,8 +229,24 @@ export class VeronaPlayerHostComponent
     }
   }
 
+  @HostListener("window:focus")
+  onWindowFocus(): void {
+    this.scheduleFocusLog();
+  }
+
+  @HostListener("window:blur")
+  onWindowBlur(): void {
+    this.scheduleFocusLog();
+  }
+
+  @HostListener("document:visibilitychange")
+  onVisibilityChange(): void {
+    this.scheduleFocusLog();
+  }
+
   private mountPlayer(): void {
     this.clearReadyTimeout();
+    this.clearFocusLogTimeout();
     this.frame?.remove();
     this.frame = null;
     this.status = "loading";
@@ -329,6 +353,31 @@ export class VeronaPlayerHostComponent
     }
   }
 
+  private scheduleFocusLog(playerHasFocus?: boolean): void {
+    if (this.status !== "running") {
+      return;
+    }
+    this.pendingPlayerHasFocus = playerHasFocus;
+    this.clearFocusLogTimeout(false);
+    this.focusLogTimeout = setTimeout(() => {
+      this.focusLogTimeout = null;
+      const hasApplicationFocus =
+        this.pendingPlayerHasFocus === true ||
+        (!document.hidden && document.hasFocus());
+      this.pendingPlayerHasFocus = undefined;
+      const content = hasApplicationFocus ? "HAS" : "HAS_NOT";
+      if (content === this.lastFocusLogContent) {
+        return;
+      }
+      this.lastFocusLogContent = content;
+      this.focusLogEntries.emit([{
+        key: "FOCUS",
+        timeStamp: Date.now(),
+        content
+      }]);
+    }, 500);
+  }
+
   private fail(message: string): void {
     this.clearReadyTimeout();
     this.status = "error";
@@ -339,6 +388,16 @@ export class VeronaPlayerHostComponent
     if (this.readyTimeout) {
       clearTimeout(this.readyTimeout);
       this.readyTimeout = null;
+    }
+  }
+
+  private clearFocusLogTimeout(clearPendingState = true): void {
+    if (this.focusLogTimeout) {
+      clearTimeout(this.focusLogTimeout);
+      this.focusLogTimeout = null;
+    }
+    if (clearPendingState) {
+      this.pendingPlayerHasFocus = undefined;
     }
   }
 }
