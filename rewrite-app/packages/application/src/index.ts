@@ -9911,6 +9911,86 @@ const getLatestTestRunByParticipantSessionId = (
   return latestBySessionId;
 };
 
+const scopeStudyMonitorDataToMonitorableModes = (input: {
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+}): {
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+} => {
+  const rosterEntriesByLoginKey = new Map(
+    input.participantRosterEntries.map(rosterEntry => [
+      rosterEntry.loginKey,
+      rosterEntry
+    ])
+  );
+  const modeByParticipantSessionId = new Map<
+    string,
+    ParticipantExecutionMode
+  >();
+  for (const testRun of input.testRuns) {
+    if (testRun.executionMode) {
+      modeByParticipantSessionId.set(
+        testRun.participantSessionId,
+        testRun.executionMode
+      );
+    }
+  }
+  const participantSessions = input.participantSessions.filter(
+    participantSession =>
+      resolveParticipantExecutionMode(
+        participantSession.executionMode ??
+          modeByParticipantSessionId.get(
+            participantSession.participantSessionId
+          ) ??
+          rosterEntriesByLoginKey.get(participantSession.loginKey)?.executionMode
+      ).monitorable
+  );
+  const participantSessionsById = new Map(
+    participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const monitorableParticipantSessionIds = new Set(
+    participantSessionsById.keys()
+  );
+  const testRuns = input.testRuns.filter(testRun => {
+    const participantSession = participantSessionsById.get(
+      testRun.participantSessionId
+    );
+    return (
+      monitorableParticipantSessionIds.has(testRun.participantSessionId) &&
+      resolveParticipantExecutionMode(
+        testRun.executionMode ??
+          participantSession?.executionMode ??
+          (participantSession
+            ? rosterEntriesByLoginKey.get(participantSession.loginKey)?.executionMode
+            : undefined)
+      ).monitorable
+    );
+  });
+  const monitorableTestRunIds = new Set(
+    testRuns.map(testRun => testRun.testRunId)
+  );
+
+  return {
+    participantSessions,
+    participantRosterEntries: input.participantRosterEntries.filter(
+      rosterEntry =>
+        resolveParticipantExecutionMode(rosterEntry.executionMode).monitorable
+    ),
+    testRuns,
+    reviews: input.reviews.filter(review =>
+      monitorableTestRunIds.has(review.testRunId)
+    )
+  };
+};
+
 const buildStudyMonitorUnitProgress = (input: {
   participantSessions: ParticipantSession[];
   participantRosterEntries?: ParticipantRosterEntry[];
@@ -12802,16 +12882,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
 
         return buildStudyMonitorSummary({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
       },
       async getStudyMonitorParticipantMatrix(input) {
@@ -12849,16 +12932,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
 
         const matrix = buildStudyMonitorParticipantMatrix({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
 
         return filterStudyMonitorParticipantMatrix(matrix, input);
@@ -12906,16 +12992,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
         const detail = buildStudyMonitorParticipantDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           loginKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
 
         if (!detail.rosterEntry && detail.participantSessionCount === 0) {
@@ -12964,16 +13053,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
         const detail = buildStudyMonitorGroupDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           groupKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
 
         if (detail.expectedParticipantCount === 0) {
@@ -13016,16 +13108,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
         const detail = buildStudyMonitorBookletDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           bookletKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
 
         if (detail.expectedParticipantCount === 0) {
@@ -13068,16 +13163,19 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
         const detail = buildStudyMonitorUnitDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           unitKey,
           generatedAt: now(),
-          participantSessions,
-          participantRosterEntries,
-          testRuns,
+          ...studyMonitorData,
           contentReleases,
-          reviews
         });
 
         if (detail.expectedRunCount === 0 && detail.responseCount === 0) {
@@ -13133,8 +13231,14 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const studyMonitorData = scopeStudyMonitorDataToMonitorableModes({
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews
+        });
         const generatedAt = now();
-        const storedTestRun = testRuns.find(
+        const storedTestRun = studyMonitorData.testRuns.find(
           candidate => candidate.testRunId === testRunId
         );
         const testRunContentRelease = storedTestRun
@@ -13158,17 +13262,18 @@ export const createFirstSliceServices = (
           workspaceKey: input.workspaceKey,
           testRunId,
           generatedAt,
-          participantSessions,
-          participantRosterEntries,
+          participantSessions: studyMonitorData.participantSessions,
+          participantRosterEntries:
+            studyMonitorData.participantRosterEntries,
           testRuns: effectiveTestRun
-            ? testRuns.map(candidate =>
+            ? studyMonitorData.testRuns.map(candidate =>
                 candidate.testRunId === testRunId
                   ? effectiveTestRun
                   : candidate
               )
-            : testRuns,
+            : studyMonitorData.testRuns,
           contentReleases,
-          reviews
+          reviews: studyMonitorData.reviews
         });
 
         if (!detail) {

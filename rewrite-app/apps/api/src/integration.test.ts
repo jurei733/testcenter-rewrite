@@ -12723,6 +12723,90 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     hotRestartSecond.body.participantSession.participantSessionId,
     hotRestartFirst.body.participantSession.participantSessionId
   );
+
+  const studyMonitorMatrix = await requestJson<{
+    studyMonitorParticipantMatrix: { rows: Array<{ loginKey: string }> };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/participants`
+  );
+  assert.equal(studyMonitorMatrix.status, 200);
+  assert.deepEqual(
+    [
+      ...new Set(
+        studyMonitorMatrix.body.studyMonitorParticipantMatrix.rows.map(
+          row => row.loginKey
+        )
+      )
+    ].sort(),
+    ["mode-hot-restart", "mode-hot-return", "mode-trial"]
+  );
+
+  const hiddenReviewParticipant = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/participants/mode-review`
+  );
+  assert.equal(hiddenReviewParticipant.status, 404);
+  assert.equal(
+    hiddenReviewParticipant.body.error,
+    "study_monitor_participant_not_found"
+  );
+
+  const studyMonitorGroup = await requestJson<{
+    studyMonitorGroup: {
+      rosterEntries: Array<{ loginKey: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/groups/execution-mode-group`
+  );
+  assert.deepEqual(
+    studyMonitorGroup.body.studyMonitorGroup.rosterEntries.map(
+      rosterEntry => rosterEntry.loginKey
+    ),
+    ["mode-hot-restart", "mode-hot-return", "mode-trial"]
+  );
+
+  const studyMonitorBooklet = await requestJson<{
+    studyMonitorBooklet: {
+      rosterEntries: Array<{ loginKey: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/booklets/${bookletKey}`
+  );
+  assert.deepEqual(
+    studyMonitorBooklet.body.studyMonitorBooklet.rosterEntries.map(
+      rosterEntry => rosterEntry.loginKey
+    ),
+    ["mode-hot-restart", "mode-hot-return", "mode-trial"]
+  );
+
+  const studyMonitorUnit = await requestJson<{
+    studyMonitorUnit: {
+      rosterEntries: Array<{ loginKey: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/units/UNIT.INTRO`
+  );
+  assert.deepEqual(
+    studyMonitorUnit.body.studyMonitorUnit.rosterEntries.map(
+      rosterEntry => rosterEntry.loginKey
+    ),
+    ["mode-hot-restart", "mode-hot-return"]
+  );
+
+  const hiddenReviewRun = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${review.testRunId}`
+  );
+  assert.equal(hiddenReviewRun.status, 404);
+  assert.equal(hiddenReviewRun.body.error, "study_monitor_run_not_found");
+  const visibleTrialRun = await requestJson<{
+    studyMonitorRun: { testRun: { testRunId: string; executionMode?: string } };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${trial.testRunId}`
+  );
+  assert.equal(visibleTrialRun.status, 200);
+  assert.equal(
+    visibleTrialRun.body.studyMonitorRun.testRun.executionMode,
+    "run-trial"
+  );
 });
 
 test("participant launch rejects closed sessions after completion", async () => {
