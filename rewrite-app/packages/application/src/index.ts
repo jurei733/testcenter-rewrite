@@ -1883,6 +1883,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       bookletKey: testRun.bookletKey,
       bookletAssignmentKey:
         testRun.bookletAssignmentKey ?? testRun.bookletKey,
+      bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
       status: testRun.status,
       currentUnitKey: testRun.currentUnitKey,
       updatedAt: testRun.updatedAt
@@ -1954,6 +1955,17 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       String(testRun.bookletAssignmentKey ?? "").trim() || testRun.bookletKey,
     presetBookletStates: Object.fromEntries(
       Object.entries(testRun.presetBookletStates ?? {}).flatMap(
+        ([stateKey, optionKey]) => {
+          const normalizedStateKey = stateKey.trim();
+          const normalizedOptionKey = String(optionKey ?? "").trim();
+          return normalizedStateKey && normalizedOptionKey
+            ? [[normalizedStateKey, normalizedOptionKey]]
+            : [];
+        }
+      )
+    ),
+    bookletStates: Object.fromEntries(
+      Object.entries(testRun.bookletStates ?? {}).flatMap(
         ([stateKey, optionKey]) => {
           const normalizedStateKey = stateKey.trim();
           const normalizedOptionKey = String(optionKey ?? "").trim();
@@ -2899,6 +2911,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "groupKey",
     "bookletKey",
     "bookletAssignmentKey",
+    "bookletStates",
     "status",
     "currentUnitKey",
     "updatedAt",
@@ -2918,6 +2931,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.groupKey,
         item.bookletKey,
         item.bookletAssignmentKey,
+        JSON.stringify(item.bookletStates),
         item.status,
         item.currentUnitKey ?? "",
         item.updatedAt,
@@ -6983,7 +6997,7 @@ const resolveAdaptiveVariables = (
   return variablesByUnitKey;
 };
 
-const resolveAdaptiveStates = (
+const evaluateAdaptiveStates = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun
 ): ParticipantCurrentRunState["adaptiveStates"] => {
@@ -7094,6 +7108,59 @@ const resolveAdaptiveStates = (
     };
   });
 };
+
+const resolveAdaptiveStates = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): ParticipantCurrentRunState["adaptiveStates"] => {
+  const evaluatedStates = evaluateAdaptiveStates(booklet, testRun);
+  if (!testRun.bookletStates) {
+    return evaluatedStates;
+  }
+  return evaluatedStates.map(evaluatedState => {
+    const persistedOptionKey = testRun.bookletStates?.[evaluatedState.stateKey];
+    const persistedOption = booklet?.stateEntries
+      ?.find(state => state.stateKey === evaluatedState.stateKey)
+      ?.options.find(option => option.optionKey === persistedOptionKey);
+    return persistedOption
+      ? {
+          ...evaluatedState,
+          optionKey: persistedOption.optionKey,
+          optionLabel: persistedOption.displayLabel
+        }
+      : evaluatedState;
+  });
+};
+
+const evaluateTestRunBookletStates = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): Record<string, string> =>
+  Object.fromEntries(
+    evaluateAdaptiveStates(booklet, testRun).map(state => [
+      state.stateKey,
+      state.optionKey
+    ])
+  );
+
+const withEvaluatedBookletStates = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): TestRun => ({
+  ...testRun,
+  bookletStates: evaluateTestRunBookletStates(booklet, testRun)
+});
+
+const hasCompleteBookletStatesSnapshot = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): boolean =>
+  !booklet?.stateEntries?.length ||
+  booklet.stateEntries.every(state =>
+    state.options.some(
+      option => option.optionKey === testRun.bookletStates?.[state.stateKey]
+    )
+  );
 
 const resolveVisibleBookletUnits = (
   booklet: ContentReleaseBookletEntry | undefined,
@@ -12879,11 +12946,23 @@ export const createFirstSliceServices = (
           storedCurrentTestRun.contentReleaseId
         );
         const currentTimestamp = now();
-        const currentTestRun = await persistEffectiveTestletTimerState({
+        const timerAdjustedTestRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: storedCurrentTestRun,
           timestamp: currentTimestamp
         });
+        const currentBooklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          booklet => booklet.bookletKey === timerAdjustedTestRun.bookletKey
+        );
+        const currentTestRun = hasCompleteBookletStatesSnapshot(
+          currentBooklet,
+          timerAdjustedTestRun
+        )
+          ? timerAdjustedTestRun
+          : withEvaluatedBookletStates(currentBooklet, timerAdjustedTestRun);
+        if (currentTestRun !== timerAdjustedTestRun) {
+          await repository.saveTestRun(currentTestRun);
+        }
         const participantRosterEntry = await findParticipantRosterEntryByLoginKey(
           repository,
           participantSession.tenantId,
@@ -12931,9 +13010,7 @@ export const createFirstSliceServices = (
             currentTestRun
           ),
           adaptiveStates: resolveAdaptiveStates(
-            contentRelease.runtimeSnapshot.bookletEntries.find(
-              booklet => booklet.bookletKey === currentTestRun.bookletKey
-            ),
+            currentBooklet,
             currentTestRun
           ),
           activeTestletTimer: resolveActiveTestletTimer(
@@ -13097,7 +13174,7 @@ export const createFirstSliceServices = (
         }
 
         const timestamp = now();
-        const initialTestRun: TestRun = {
+        const initialTestRun = withEvaluatedBookletStates(selectedBooklet, {
           testRunId: idGenerator(),
           participantSessionId: participantSession.participantSessionId,
           tenantId: participantSession.tenantId,
@@ -13118,7 +13195,7 @@ export const createFirstSliceServices = (
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
-        };
+        });
         const firstUnit = resolveVisibleBookletUnits(
           selectedBooklet,
           initialTestRun
@@ -13253,6 +13330,9 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
+        );
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -13283,9 +13363,6 @@ export const createFirstSliceServices = (
             confirmTestletTimeLeave: input.confirmTestletTimeLeave,
             confirmTestletLeaveLock: input.confirmTestletLeaveLock
           });
-          const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
-            candidate => candidate.bookletKey === testRun.bookletKey
-          );
           const leavingTimedTestlet = resolveLeavingTimedTestlet(
             booklet,
             testRun,
@@ -13331,13 +13408,13 @@ export const createFirstSliceServices = (
           timestamp
         );
 
-        const updatedRun: TestRun = {
+        const updatedRun = withEvaluatedBookletStates(booklet, {
           ...statusAdjustedRun,
           status: nextStatus,
           currentUnitKey: nextCurrentUnitKey,
           unitResponses: nextUnitResponses,
           updatedAt: timestamp
-        };
+        });
         await repository.saveTestRun(updatedRun);
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
@@ -13353,7 +13430,8 @@ export const createFirstSliceServices = (
           summary: `Progress saved for run '${effectiveRun.testRunId}'.`,
           details: {
             status: effectiveRun.status,
-            currentUnitKey: effectiveRun.currentUnitKey
+            currentUnitKey: effectiveRun.currentUnitKey,
+            bookletStates: effectiveRun.bookletStates
           }
         });
         if (activatedLeaveLock) {
@@ -13776,6 +13854,7 @@ export const createFirstSliceServices = (
               bookletKey: testRun.bookletKey,
               bookletAssignmentKey:
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
+              bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
               status: testRun.status,
               currentUnitKey: testRun.currentUnitKey,
               updatedAt: testRun.updatedAt

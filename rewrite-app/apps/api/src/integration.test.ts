@@ -2816,11 +2816,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","\{\}","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -8912,16 +8912,26 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   });
   const participantSessionId = signIn.body.participantSession.participantSessionId;
   const resume = await requestJson<{
-    testRun: { testRunId: string; currentUnitKey: string | null };
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      bookletStates: Record<string, string>;
+    };
   }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
     method: "POST",
     body: { bookletKey }
   });
   assert.equal(resume.status, 200);
   assert.equal(resume.body.testRun.currentUnitKey, "decision-unit");
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    level: "beginner",
+    quality: "basic",
+    numeric: "low"
+  });
   const testRunId = resume.body.testRun.testRunId;
   const readState = () => requestJson<{
     currentRunState: {
+      testRun: { bookletStates: Record<string, string> };
       bookletUnits: Array<{ unitKey: string }>;
       adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
       navigation: { nextUnitKey: string | null; canGoNext: boolean };
@@ -8929,6 +8939,11 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
 
   const initialState = await readState();
+  assert.deepEqual(initialState.body.currentRunState.testRun.bookletStates, {
+    level: "beginner",
+    quality: "basic",
+    numeric: "low"
+  });
   assert.deepEqual(
     initialState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
     ["decision-unit", "beginner-unit", "finish-unit"]
@@ -8991,7 +9006,9 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
       }
     }
   });
-  const savedDecision = await requestJson(
+  const savedDecision = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(
     `/api/v1/participant/test-runs/${testRunId}/save-progress`,
     {
       method: "POST",
@@ -9003,8 +9020,18 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     }
   );
   assert.equal(savedDecision.status, 200);
+  assert.deepEqual(savedDecision.body.testRun.bookletStates, {
+    level: "professional",
+    quality: "gold",
+    numeric: "high"
+  });
 
   const routedState = await readState();
+  assert.deepEqual(routedState.body.currentRunState.testRun.bookletStates, {
+    level: "professional",
+    quality: "gold",
+    numeric: "high"
+  });
   assert.deepEqual(
     routedState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
     [
@@ -9047,6 +9074,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
 
   const monitorRun = await requestJson<{
     studyMonitorRun: {
+      testRun: { bookletStates: Record<string, string> };
       expectedUnitCount: number;
       answeredExpectedUnitCount: number;
       missingExpectedUnitCount: number;
@@ -9058,6 +9086,11 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${testRunId}`
   );
   assert.equal(monitorRun.status, 200);
+  assert.deepEqual(monitorRun.body.studyMonitorRun.testRun.bookletStates, {
+    level: "professional",
+    quality: "gold",
+    numeric: "high"
+  });
   assert.deepEqual(
     monitorRun.body.studyMonitorRun.units.map(unit => [unit.unitKey, unit.expected]),
     [
@@ -9210,6 +9243,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     testRun: {
       testRunId: string;
       presetBookletStates?: Record<string, string>;
+      bookletStates: Record<string, string>;
     };
   }>(`/api/v1/participant/sessions/${presetSessionId}/resume`, {
     method: "POST",
@@ -9220,10 +9254,16 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     quality: "basic",
     numeric: "low"
   });
+  assert.deepEqual(presetResume.body.testRun.bookletStates, {
+    level: "advanced",
+    quality: "basic",
+    numeric: "low"
+  });
   const presetRunId = presetResume.body.testRun.testRunId;
 
   const readPresetState = () => requestJson<{
     currentRunState: {
+      testRun: { bookletStates: Record<string, string> };
       bookletUnits: Array<{ unitKey: string }>;
       adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
     };
@@ -9250,6 +9290,11 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     }
   });
   const routedPresetState = await readPresetState();
+  assert.deepEqual(routedPresetState.body.currentRunState.testRun.bookletStates, {
+    level: "advanced",
+    quality: "basic",
+    numeric: "low"
+  });
   assert.deepEqual(
     routedPresetState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
     ["decision-unit", "advanced-unit", "finish-unit"]
@@ -9257,6 +9302,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
 
   const presetMonitorRun = await requestJson<{
     studyMonitorRun: {
+      testRun: { bookletStates: Record<string, string> };
       adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
       expectedUnitCount: number;
     };
@@ -9264,6 +9310,11 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${presetRunId}`
   );
   assert.equal(presetMonitorRun.body.studyMonitorRun.expectedUnitCount, 3);
+  assert.deepEqual(presetMonitorRun.body.studyMonitorRun.testRun.bookletStates, {
+    level: "advanced",
+    quality: "basic",
+    numeric: "low"
+  });
   assert.deepEqual(
     presetMonitorRun.body.studyMonitorRun.adaptiveStates.map(state => [
       state.stateKey,
@@ -9305,6 +9356,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
       bookletKey: string;
       bookletAssignmentKey: string;
       presetBookletStates: Record<string, string>;
+      bookletStates: Record<string, string>;
     };
   }>(`/api/v1/participant/sessions/${variantSessionId}/resume`, {
     method: "POST",
@@ -9316,6 +9368,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     firstVariantAssignmentKey
   );
   assert.equal(firstVariantRun.body.testRun.presetBookletStates.level, "advanced");
+  assert.equal(firstVariantRun.body.testRun.bookletStates.level, "advanced");
   await requestJson(
     `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/complete`,
     { method: "POST", body: {} }
@@ -9349,6 +9402,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
       testRunId: string;
       bookletAssignmentKey: string;
       presetBookletStates: Record<string, string>;
+      bookletStates: Record<string, string>;
     };
   }>(`/api/v1/participant/sessions/${variantSessionId}/resume`, {
     method: "POST",
@@ -9359,11 +9413,13 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     secondVariantAssignmentKey
   );
   assert.equal(secondVariantRun.body.testRun.presetBookletStates.level, "beginner");
+  assert.equal(secondVariantRun.body.testRun.bookletStates.level, "beginner");
   const variantOpenRuns = await requestJson<{
     items: Array<{
       testRunId: string;
       bookletKey: string;
       bookletAssignmentKey: string;
+      bookletStates: Record<string, string>;
     }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=adaptive-variant-participant`
@@ -9378,6 +9434,18 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   assert.equal(
     variantOpenRuns.body.items[0]?.bookletAssignmentKey,
     secondVariantAssignmentKey
+  );
+  assert.equal(variantOpenRuns.body.items[0]?.bookletStates.level, "beginner");
+
+  const variantOpenRunsCsv = await requestTextAt(
+    baseUrl,
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/open-runs.csv?loginKey=adaptive-variant-participant`
+  );
+  assert.equal(variantOpenRunsCsv.status, 200);
+  assert.match(variantOpenRunsCsv.body, /bookletStates/);
+  assert.match(
+    variantOpenRunsCsv.body,
+    /level.*beginner.*quality.*basic.*numeric.*low/
   );
 });
 

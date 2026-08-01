@@ -1608,6 +1608,15 @@ export class WorkspaceViewFacade {
                   .join(", ")
               : "none"
           },
+          {
+            label: "Persisted BOOKLET_STATES",
+            value:
+              Object.keys(detail.testRun.bookletStates ?? {}).length > 0
+                ? Object.entries(detail.testRun.bookletStates ?? {})
+                    .map(([stateKey, optionKey]) => `${stateKey}=${optionKey}`)
+                    .join(", ")
+                : "none"
+          },
           { label: "Unexpected Responses", value: String(detail.unexpectedResponseCount) },
           { label: "Updated", value: this.formatDateTime(detail.testRun.updatedAt) },
           { label: "Generated", value: this.formatDateTime(detail.generatedAt) }

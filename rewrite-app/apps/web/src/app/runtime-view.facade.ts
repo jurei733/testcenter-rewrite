@@ -1506,6 +1506,9 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
+        const bookletStates = Object.entries(openRun.bookletStates).map(
+          ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
+        );
 
         return {
           headline: displayName ?? openRun.loginKey,
@@ -1514,6 +1517,9 @@ export class RuntimeViewFacade {
             openRun.status,
             openRun.groupKey,
             openRun.bookletAssignmentKey,
+            bookletStates.length > 0
+              ? `${bookletStates.length} booklet state${bookletStates.length === 1 ? "" : "s"}`
+              : "no booklet states",
             openRun.participantRosterEntry ? "roster" : "ad hoc"
           ],
           rows: [
@@ -1539,6 +1545,10 @@ export class RuntimeViewFacade {
             {
               label: "Booklet Assignment",
               value: openRun.bookletAssignmentKey
+            },
+            {
+              label: "Persisted BOOKLET_STATES",
+              value: bookletStates.length > 0 ? bookletStates.join(" | ") : "none"
             },
             {
               label: "Current Unit",

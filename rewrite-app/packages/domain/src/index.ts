@@ -473,6 +473,8 @@ export type TestRun = {
   bookletKey: string;
   bookletAssignmentKey?: string;
   presetBookletStates?: Record<string, string>;
+  /** Server-authoritative equivalent of the original persisted BOOKLET_STATES test state. */
+  bookletStates?: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
@@ -524,6 +526,7 @@ export type OpenMonitorRun = {
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
   bookletAssignmentKey: string;
+  bookletStates: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
   updatedAt: string;
