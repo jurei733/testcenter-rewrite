@@ -4704,6 +4704,13 @@ try {
     .filter({ hasText: operatorParticipantSessionLink })
     .filter({ hasText: pausedTestRunId });
   await openRunStudentCard.waitFor();
+  await openRunStudentCard
+    .filter({ hasText: "Timed Paused Work" })
+    .filter({ hasText: "Active Timer" })
+    .filter({ hasText: "Timer Remaining" })
+    .filter({ hasText: "Timer Expires" })
+    .waitFor();
+  assert.match(await openRunStudentCard.innerText(), /Timer Remaining\s+\d+:\d{2}/);
   logStep("monitor-bulk-pause-resume");
   await openRunStudentCard
     .getByRole("button", { name: "Add to Batch" })

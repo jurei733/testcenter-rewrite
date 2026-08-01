@@ -43,6 +43,7 @@ import type {
   ImportJob,
   ImportJobStatus,
   ImportJobDiagnostic,
+  MonitorTestletTimer,
   MonitorRunCommandResult,
   MonitorRunCommandType,
   OpenMonitorRun,
@@ -2355,7 +2356,8 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
   repository: FirstSliceRepository;
   tenantId: string;
   workspaceId: string;
-  activeContentReleaseId: string;
+  activeContentRelease: ContentRelease;
+  timestamp: string;
 }): Promise<OpenMonitorRun[]> => {
   const participantSessions =
     await input.repository.listParticipantSessionsByWorkspace(
@@ -2371,7 +2373,8 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     participantSessions
       .filter(
         participantSession =>
-          participantSession.contentReleaseId === input.activeContentReleaseId
+          participantSession.contentReleaseId ===
+          input.activeContentRelease.contentReleaseId
       )
       .map(participantSession => participantSession.participantSessionId)
   );
@@ -2384,6 +2387,12 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
   );
 
   return openRuns.map(testRun => {
+    const normalizedTestRun = normalizeTestRun(testRun);
+    const testletTimers = buildMonitorTestletTimers(
+      input.activeContentRelease,
+      normalizedTestRun,
+      input.timestamp
+    );
     const participantSession =
       participantSessions.find(
         currentParticipantSession =>
@@ -2404,10 +2413,16 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       bookletKey: testRun.bookletKey,
       bookletAssignmentKey:
         testRun.bookletAssignmentKey ?? testRun.bookletKey,
-      bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
-      status: testRun.status,
-      currentUnitKey: testRun.currentUnitKey,
-      updatedAt: testRun.updatedAt
+      bookletStates: normalizedTestRun.bookletStates ?? {},
+      status: normalizedTestRun.status,
+      currentUnitKey: normalizedTestRun.currentUnitKey,
+      activeTestletTimer:
+        testletTimers.find(
+          timer =>
+            timer.current &&
+            (timer.status === "running" || timer.status === "paused")
+        ) ?? null,
+      updatedAt: normalizedTestRun.updatedAt
     };
   });
 };
@@ -3430,6 +3445,7 @@ const formatStudyMonitorRunCsv = (
     "testRunStatus",
     "currentUnitKey",
     "adaptiveStates",
+    "testletTimers",
     "unitKey",
     "unitLabel",
     "expected",
@@ -3461,6 +3477,7 @@ const formatStudyMonitorRunCsv = (
             detail.adaptiveStates.map(state => [state.stateKey, state.optionKey])
           )
         ),
+        JSON.stringify(detail.testletTimers),
         unit.unitKey,
         unit.displayLabel,
         String(unit.expected),
@@ -3551,6 +3568,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "bookletStates",
     "status",
     "currentUnitKey",
+    "activeTestletTimer",
     "updatedAt",
     "rosterBookletKey",
     "rosterDisplayName"
@@ -3571,6 +3589,9 @@ const formatOpenMonitorRunsCsv = (input: {
         JSON.stringify(item.bookletStates),
         item.status,
         item.currentUnitKey ?? "",
+        item.activeTestletTimer
+          ? JSON.stringify(item.activeTestletTimer)
+          : "",
         item.updatedAt,
         item.participantRosterEntry?.bookletKey ?? "",
         item.participantRosterEntry?.displayName ?? ""
@@ -9277,6 +9298,47 @@ const resolveActiveTestletTimer = (
   };
 };
 
+const buildMonitorTestletTimers = (
+  contentRelease: ContentRelease | null,
+  testRun: TestRun,
+  timestamp: string
+): MonitorTestletTimer[] => {
+  const normalizedTestRun = normalizeTestRun(testRun);
+  const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === normalizedTestRun.bookletKey
+  );
+  const activeTimedTestlet = resolveTimedTestletForUnit(
+    booklet,
+    normalizedTestRun.currentUnitKey
+  );
+  const testletOrder = new Map(
+    (booklet?.testletEntries ?? []).map((testlet, index) => [
+      testlet.testletKey,
+      index
+    ])
+  );
+
+  return Object.values(normalizedTestRun.testletTimers ?? {})
+    .map(timer => {
+      const testlet = booklet?.testletEntries?.find(
+        candidate => candidate.testletKey === timer.testletKey
+      );
+      return {
+        ...timer,
+        displayLabel: testlet?.displayLabel ?? timer.testletKey,
+        remainingSeconds: getTestletTimerRemainingSeconds(timer, timestamp),
+        current: activeTimedTestlet?.testletKey === timer.testletKey,
+        leave: testlet?.restrictions?.timeMax?.leave ?? null
+      };
+    })
+    .sort(
+      (left, right) =>
+        (testletOrder.get(left.testletKey) ?? Number.MAX_SAFE_INTEGER) -
+          (testletOrder.get(right.testletKey) ?? Number.MAX_SAFE_INTEGER) ||
+        left.testletKey.localeCompare(right.testletKey)
+    );
+};
+
 const resolveTestletCompletenessPolicy = (
   booklet: ContentReleaseBookletEntry | undefined,
   currentUnitKey: string | null,
@@ -11116,6 +11178,11 @@ const buildStudyMonitorRunDetail = (input: {
     bookletKey: testRun.bookletKey,
     bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
     adaptiveStates: resolveAdaptiveStates(booklet ?? undefined, testRun),
+    testletTimers: buildMonitorTestletTimers(
+      contentRelease,
+      testRun,
+      input.generatedAt
+    ),
     responseCount: responseUnitKeys.length,
     reviewCount: runReviews.length,
     expectedUnitCount: expectedUnits.length,
@@ -12974,14 +13041,40 @@ export const createFirstSliceServices = (
               workspace.workspaceId
             )
           ]);
+        const generatedAt = now();
+        const storedTestRun = testRuns.find(
+          candidate => candidate.testRunId === testRunId
+        );
+        const testRunContentRelease = storedTestRun
+          ? contentReleases.find(
+              candidate =>
+                candidate.contentReleaseId === storedTestRun.contentReleaseId
+            ) ?? null
+          : null;
+        const effectiveTestRun =
+          storedTestRun &&
+          testRunContentRelease &&
+          storedTestRun.status !== "completed"
+            ? await persistEffectiveTestletTimerState({
+                contentRelease: testRunContentRelease,
+                testRun: storedTestRun,
+                timestamp: generatedAt
+              })
+            : storedTestRun;
         const detail = buildStudyMonitorRunDetail({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
           testRunId,
-          generatedAt: now(),
+          generatedAt,
           participantSessions,
           participantRosterEntries,
-          testRuns,
+          testRuns: effectiveTestRun
+            ? testRuns.map(candidate =>
+                candidate.testRunId === testRunId
+                  ? effectiveTestRun
+                  : candidate
+              )
+            : testRuns,
           contentReleases,
           reviews
         });
@@ -14016,7 +14109,8 @@ export const createFirstSliceServices = (
                 repository,
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
-                activeContentReleaseId: activeRelease.contentReleaseId
+                activeContentRelease: activeRelease,
+                timestamp: now()
               })
             : [];
         const participantRosterEntries =
@@ -14927,7 +15021,8 @@ export const createFirstSliceServices = (
                 repository,
                 tenantId: workspace.tenantId,
                 workspaceId: workspace.workspaceId,
-                activeContentReleaseId: activeRelease.contentReleaseId
+                activeContentRelease: activeRelease,
+                timestamp: activatedAt
               })
             : [];
 
@@ -16358,6 +16453,15 @@ export const createFirstSliceServices = (
           .filter(testRun => testRun.status !== "completed")
           .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
           .map<OpenMonitorRun>(testRun => {
+            const contentRelease = contentReleases.find(
+              candidate =>
+                candidate.contentReleaseId === testRun.contentReleaseId
+            ) ?? null;
+            const testletTimers = buildMonitorTestletTimers(
+              contentRelease,
+              testRun,
+              timestamp
+            );
             const participantSession =
               participantSessions.find(
                 candidate =>
@@ -16380,6 +16484,12 @@ export const createFirstSliceServices = (
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
               status: testRun.status,
               currentUnitKey: testRun.currentUnitKey,
+              activeTestletTimer:
+                testletTimers.find(
+                  timer =>
+                    timer.current &&
+                    (timer.status === "running" || timer.status === "paused")
+                ) ?? null,
               updatedAt: testRun.updatedAt
             };
           });

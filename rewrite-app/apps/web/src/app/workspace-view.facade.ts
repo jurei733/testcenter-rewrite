@@ -1588,6 +1588,13 @@ export class WorkspaceViewFacade {
       bookletKey: detail.bookletKey,
       currentUnitKey: detail.testRun.currentUnitKey ?? ""
     };
+    const activeTimer = detail.testletTimers.find(
+      timer =>
+        timer.current &&
+        (timer.status === "running" || timer.status === "paused")
+    ) ?? null;
+    const formatTimerSeconds = (seconds: number): string =>
+      `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
     return [
       {
@@ -1598,6 +1605,9 @@ export class WorkspaceViewFacade {
           `${detail.responseCount}/${detail.expectedUnitCount} response(s)`,
           `${detail.missingExpectedUnitCount} missing`,
           `${detail.reviewCount} review(s)`,
+          ...(activeTimer
+            ? [`timer ${activeTimer.status} · ${formatTimerSeconds(activeTimer.remainingSeconds)}`]
+            : []),
           ...detail.adaptiveStates.map(
             state => `${state.displayLabel}: ${state.optionLabel}`
           )
@@ -1609,6 +1619,12 @@ export class WorkspaceViewFacade {
           { label: "Group", value: detail.participantSession?.groupKey ?? "none" },
           { label: "Booklet", value: detail.bookletKey },
           { label: "Current Unit", value: detail.testRun.currentUnitKey ?? "none" },
+          {
+            label: "Active Timer",
+            value: activeTimer
+              ? `${activeTimer.displayLabel} · ${formatTimerSeconds(activeTimer.remainingSeconds)} remaining`
+              : "none"
+          },
           {
             label: "Adaptive States",
             value: detail.adaptiveStates.length > 0
@@ -1636,6 +1652,39 @@ export class WorkspaceViewFacade {
           participantCommand: "openRuntime"
         }
       },
+      ...detail.testletTimers.map(timer => ({
+        headline: `Timer · ${timer.displayLabel}`,
+        subline: timer.testletKey,
+        badges: [
+          "testlet timer",
+          timer.status,
+          timer.current ? "current" : "not current"
+        ],
+        rows: [
+          {
+            label: "Remaining",
+            value: formatTimerSeconds(timer.remainingSeconds)
+          },
+          {
+            label: "Configured Duration",
+            value: formatTimerSeconds(timer.durationSeconds)
+          },
+          { label: "Leave Policy", value: timer.leave ?? "unknown" },
+          { label: "Started", value: this.formatDateTime(timer.startedAt) },
+          {
+            label: "Expires",
+            value: timer.expiresAt
+              ? this.formatDateTime(timer.expiresAt)
+              : "not running"
+          },
+          {
+            label: "Ended",
+            value: timer.endedAt
+              ? this.formatDateTime(timer.endedAt)
+              : "not ended"
+          }
+        ]
+      })),
       ...detail.units.map(unit => {
         const unitActionPayload = {
           ...runInspectionPayload,

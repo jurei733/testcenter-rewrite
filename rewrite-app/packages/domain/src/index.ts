@@ -669,6 +669,12 @@ export type TestletTimerState = {
   endedAt: string | null;
 };
 
+export type MonitorTestletTimer = TestletTimerState & {
+  displayLabel: string;
+  current: boolean;
+  leave: TestletTimeMaxLeavePolicy | null;
+};
+
 export type WorkspaceActivityEvent = {
   activityEventId: string;
   tenantId: string;
@@ -693,6 +699,7 @@ export type OpenMonitorRun = {
   bookletStates: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
+  activeTestletTimer: MonitorTestletTimer | null;
   updatedAt: string;
 };
 
@@ -939,6 +946,7 @@ export type WorkspaceStudyMonitorRunDetail = {
   bookletKey: string;
   bookletLabel: string;
   adaptiveStates: ParticipantCurrentRunState["adaptiveStates"];
+  testletTimers: MonitorTestletTimer[];
   responseCount: number;
   reviewCount: number;
   expectedUnitCount: number;

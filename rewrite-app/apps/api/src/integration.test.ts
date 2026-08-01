@@ -2989,15 +2989,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorRunCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       studyMonitorRunCsv.body,
-      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
+      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","\[\]","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
     );
 
     const filteredStudyMonitorParticipantMatrixCsv = await requestTextAt(
@@ -3036,11 +3036,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","\{\}","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","\{\}","running","unit-practice","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -8950,6 +8950,83 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.status, "paused");
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.remainingSeconds, 1);
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.expiresAt, null);
+
+  const openRunsWithTimer = await requestJson<{
+    items: Array<{
+      testRunId: string;
+      activeTestletTimer: {
+        testletKey: string;
+        displayLabel: string;
+        status: string;
+        durationSeconds: number;
+        remainingSeconds: number;
+        startedAt: string;
+        expiresAt: string | null;
+        updatedAt: string;
+        endedAt: string | null;
+        current: boolean;
+        leave: string | null;
+      } | null;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${testRunId}`
+  );
+  assert.equal(openRunsWithTimer.status, 200);
+  const monitorTimer = openRunsWithTimer.body.items[0]?.activeTestletTimer;
+  assert.ok(monitorTimer);
+  assert.deepEqual(
+    {
+      ...monitorTimer,
+      updatedAt: "<timestamp>"
+    },
+    {
+      testletKey,
+      displayLabel: "Timed Block",
+      status: "paused",
+      durationSeconds: 1,
+      remainingSeconds: 1,
+      startedAt: entered.body.testRun.testletTimers?.[testletKey]?.startedAt,
+      expiresAt: null,
+      updatedAt: "<timestamp>",
+      endedAt: null,
+      current: true,
+      leave: "forbidden"
+    }
+  );
+  assert.match(monitorTimer.updatedAt, ISO_DATE_REGEX);
+
+  const studyMonitorRunWithTimer = await requestJson<{
+    studyMonitorRun: {
+      testletTimers: Array<typeof monitorTimer>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${testRunId}`
+  );
+  assert.equal(studyMonitorRunWithTimer.status, 200);
+  assert.deepEqual(
+    studyMonitorRunWithTimer.body.studyMonitorRun.testletTimers,
+    [monitorTimer]
+  );
+
+  const openRunsTimerCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/open-runs.csv?testRunId=${testRunId}`
+  );
+  assert.equal(openRunsTimerCsv.status, 200);
+  assert.match(
+    openRunsTimerCsv.body,
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,bookletStates,status,currentUnitKey,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+  );
+  assert.match(openRunsTimerCsv.body, /Timed Block/);
+
+  const studyMonitorTimerCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-runs/${testRunId}.csv`
+  );
+  assert.equal(studyMonitorTimerCsv.status, 200);
+  assert.match(
+    studyMonitorTimerCsv.body,
+    /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,testletTimers,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
+  );
+  assert.match(studyMonitorTimerCsv.body, /Timed Block/);
 
   await delay(1_100);
   const stateWhilePaused = await requestJson<{

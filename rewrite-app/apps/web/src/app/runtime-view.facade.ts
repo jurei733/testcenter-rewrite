@@ -1550,6 +1550,12 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
+        const activeTimer = openRun.activeTestletTimer;
+        const activeTimerRemaining = activeTimer
+          ? `${Math.floor(activeTimer.remainingSeconds / 60)}:${String(
+              activeTimer.remainingSeconds % 60
+            ).padStart(2, "0")}`
+          : null;
         const batchSelected = this.monitorBatchSelection.has(
           openRun.testRunId
         );
@@ -1564,6 +1570,9 @@ export class RuntimeViewFacade {
             openRun.status,
             openRun.groupKey,
             openRun.bookletAssignmentKey,
+            ...(activeTimer
+              ? [`timer ${activeTimer.status} · ${activeTimerRemaining}`]
+              : []),
             bookletStates.length > 0
               ? `${bookletStates.length} booklet state${bookletStates.length === 1 ? "" : "s"}`
               : "no booklet states",
@@ -1601,6 +1610,22 @@ export class RuntimeViewFacade {
             {
               label: "Current Unit",
               value: openRun.currentUnitKey ?? "none"
+            },
+            {
+              label: "Active Timer",
+              value: activeTimer?.displayLabel ?? "none"
+            },
+            {
+              label: "Timer Remaining",
+              value: activeTimerRemaining ?? "none"
+            },
+            {
+              label: "Timer Expires",
+              value: activeTimer?.expiresAt
+                ? this.formatDateTime(activeTimer.expiresAt)
+                : activeTimer
+                  ? "paused"
+                  : "none"
             },
             {
               label: "Updated",
