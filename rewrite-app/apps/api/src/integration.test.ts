@@ -6339,6 +6339,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
     stateKeys?: string[];
     showRules?: Array<[string, string, string]>;
     testletTimeMax?: Array<[string, number, string]>;
+    testletRestrictions?: Array<{
+      testletKey: string;
+      codeToEnter?: string;
+      timeMax?: [number, string];
+      denyNavigation?: [string, string];
+      lockAfterLeaving?: [boolean, string];
+    }>;
     policy: {
       logPolicy?: string;
       pagingMode?: string;
@@ -6346,6 +6353,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
       unitMenuEnabled?: boolean;
       unitControls?: string;
       playerEnd?: string;
+      requirePresentationComplete?: string;
+      requireResponseComplete?: string;
       restoreCurrentPageOnReturn?: boolean;
       lockOnTermination?: boolean;
       unitTitle?: boolean;
@@ -6366,6 +6375,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   ) as {
     sourceCommit: string;
     booklets: BookletExpectation[];
+    systemBooklets: BookletExpectation[];
     roster: {
       fixture: string;
       participantLoginKeys: string[];
@@ -6390,7 +6400,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   });
 
   const releaseIdsByBookletKey = new Map<string, string>();
-  for (const expectation of corpus.booklets) {
+  for (const expectation of [...corpus.booklets, ...corpus.systemBooklets]) {
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
     }>(
@@ -6442,6 +6452,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
               displayLabel: string;
               policy?: {
                 navigation: {
+                  requirePresentationComplete: string;
+                  requireResponseComplete: string;
                   unitMenuEnabled: boolean;
                   unitControls: string;
                   playerEnd: string;
@@ -6468,7 +6480,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
                 testletKey: string;
                 restrictions?: {
                   show?: { stateKey: string; optionKey: string };
+                  codeToEnter?: { code: string; prompt: string };
                   timeMax?: { minutes: number; leave: string };
+                  denyNavigationOnIncomplete?: {
+                    presentation?: string;
+                    response?: string;
+                  };
+                  lockAfterLeaving?: { confirm: boolean; scope: string };
                 };
               }>;
               unitEntries: Array<{ unitKey: string }>;
@@ -6522,6 +6540,53 @@ test("original Testcenter compatibility corpus imports representative booklets",
         expectation.sourcePath
       );
     }
+    if (expectation.testletRestrictions) {
+      for (const restrictionExpectation of expectation.testletRestrictions) {
+        const testlet: NonNullable<
+          typeof booklet.testletEntries
+        >[number] | undefined = booklet.testletEntries?.find(
+          candidate => candidate.testletKey === restrictionExpectation.testletKey
+        );
+        assert.ok(testlet, expectation.sourcePath);
+        if (restrictionExpectation.codeToEnter !== undefined) {
+          assert.equal(
+            testlet.restrictions?.codeToEnter?.code,
+            restrictionExpectation.codeToEnter,
+            expectation.sourcePath
+          );
+        }
+        if (restrictionExpectation.timeMax) {
+          assert.deepEqual(
+            [
+              testlet.restrictions?.timeMax?.minutes,
+              testlet.restrictions?.timeMax?.leave
+            ],
+            restrictionExpectation.timeMax,
+            expectation.sourcePath
+          );
+        }
+        if (restrictionExpectation.denyNavigation) {
+          assert.deepEqual(
+            [
+              testlet.restrictions?.denyNavigationOnIncomplete?.presentation,
+              testlet.restrictions?.denyNavigationOnIncomplete?.response
+            ],
+            restrictionExpectation.denyNavigation,
+            expectation.sourcePath
+          );
+        }
+        if (restrictionExpectation.lockAfterLeaving) {
+          assert.deepEqual(
+            [
+              testlet.restrictions?.lockAfterLeaving?.confirm,
+              testlet.restrictions?.lockAfterLeaving?.scope
+            ],
+            restrictionExpectation.lockAfterLeaving,
+            expectation.sourcePath
+          );
+        }
+      }
+    }
     assert.ok(booklet.policy, expectation.sourcePath);
     if (expectation.policy.logPolicy) {
       assert.equal(booklet.policy.player.logPolicy, expectation.policy.logPolicy);
@@ -6551,6 +6616,20 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.navigation.playerEnd,
         expectation.policy.playerEnd
+      );
+    }
+    if (expectation.policy.requirePresentationComplete) {
+      assert.equal(
+        booklet.policy.navigation.requirePresentationComplete,
+        expectation.policy.requirePresentationComplete,
+        expectation.sourcePath
+      );
+    }
+    if (expectation.policy.requireResponseComplete) {
+      assert.equal(
+        booklet.policy.navigation.requireResponseComplete,
+        expectation.policy.requireResponseComplete,
+        expectation.sourcePath
       );
     }
     if (expectation.policy.restoreCurrentPageOnReturn !== undefined) {
@@ -6773,6 +6852,172 @@ test("original Testcenter compatibility corpus imports representative booklets",
     );
     assert.equal(importResult.body.stagedContentRelease, null);
   }
+
+  const timedSystemBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/system-test/CY_Bklt_TC-6.xml"
+    ),
+    "utf8"
+  );
+  const allowedLeaveSystemBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/system-test/CY_Bklt_TC-7.xml"
+    ),
+    "utf8"
+  );
+  const completionSystemBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/system-test/CY_Bklt_TC-10.xml"
+    ),
+    "utf8"
+  );
+  const lockSystemBookletXml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "booklets/system-test/CY_Bklt_TC-12.xml"
+    ),
+    "utf8"
+  );
+  const xsdFacetCases = [
+    {
+      name: "time-max-minutes",
+      sourceDocument: timedSystemBookletXml.replace(
+        'minutes="2"',
+        'minutes="later"'
+      ),
+      diagnosticCode: "testcenter_xml_time_max_invalid"
+    },
+    {
+      name: "time-max-non-positive",
+      sourceDocument: timedSystemBookletXml.replace(
+        'minutes="2"',
+        'minutes="0"'
+      ),
+      diagnosticCode: "testcenter_xml_time_max_invalid"
+    },
+    {
+      name: "time-max-leave",
+      sourceDocument: allowedLeaveSystemBookletXml.replace(
+        /leave\s*=\s*"allowed"/,
+        'leave="sometimes"'
+      ),
+      diagnosticCode: "testcenter_xml_time_max_leave_invalid"
+    },
+    {
+      name: "completion-policy",
+      sourceDocument: completionSystemBookletXml.replace(
+        'presentation="ON"',
+        'presentation="SOMETIMES"'
+      ),
+      diagnosticCode: "testcenter_xml_navigation_restriction_invalid"
+    },
+    {
+      name: "lock-confirm",
+      sourceDocument: lockSystemBookletXml.replace(
+        'confirm="true"',
+        'confirm="yes"'
+      ),
+      diagnosticCode: "testcenter_xml_lock_after_leaving_confirm_invalid"
+    },
+    {
+      name: "lock-scope",
+      sourceDocument: lockSystemBookletXml.replace(
+        /scope\s*=\s*"unit"/,
+        'scope="session"'
+      ),
+      diagnosticCode: "testcenter_xml_lock_after_leaving_scope_invalid"
+    },
+    {
+      name: "unit-label",
+      sourceDocument: timedSystemBookletXml.replace(
+        /(<Unit id="CY-Unit\.Sample-101") label="[^"]+"/,
+        "$1"
+      ),
+      diagnosticCode: "testcenter_xml_unit_label_missing"
+    },
+    {
+      name: "testlet-id",
+      sourceDocument: timedSystemBookletXml.replace(
+        '<Testlet id="Tslt1"',
+        "<Testlet"
+      ),
+      diagnosticCode: "testcenter_xml_testlet_id_missing"
+    }
+  ];
+  for (const xsdFacetCase of xsdFacetCases) {
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `invalid-original-${xsdFacetCase.name}.xml`,
+        mediaType: "application/xml",
+        sourceDocument: xsdFacetCase.sourceDocument
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.body.importJob.status, "failed", xsdFacetCase.name);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === xsdFacetCase.diagnosticCode
+      ),
+      xsdFacetCase.name
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  const numericBooleanPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "valid-original-lock-boolean.xml",
+      mediaType: "application/xml",
+      sourceDocument: lockSystemBookletXml.replace('confirm="true"', 'confirm="1"')
+    }
+  });
+  const numericBooleanImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: numericBooleanPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(numericBooleanImport.body.importJob.status, "completed");
+  assert.deepEqual(numericBooleanImport.body.importJob.diagnostics, []);
+  const numericBooleanRelease = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            testletEntries?: Array<{
+              testletKey: string;
+              restrictions?: { lockAfterLeaving?: { confirm: boolean } };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${numericBooleanImport.body.stagedContentRelease.contentReleaseId}`
+  );
+  assert.equal(
+    numericBooleanRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.testletEntries?.[0]?.restrictions?.lockAfterLeaving
+      ?.confirm,
+    true
+  );
 
   const invalidNestedBookletExpectation = corpus.invalidXml.find(
     expectation =>

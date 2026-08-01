@@ -79,6 +79,199 @@
       }
     }
   ],
+  "systemBooklets": [
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_1.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_1.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-1",
+      "displayLabel": "Bklt-config-1",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [0.05, "confirm"] }],
+      "policy": {
+        "unitMenuEnabled": false,
+        "unitControls": "both",
+        "playerEnd": "always",
+        "headerContent": "none",
+        "showTimeLeft": false,
+        "warningMinutes": [0.01]
+      }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_3.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_3.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-3",
+      "displayLabel": "Bklt-config-3",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"] }],
+      "policy": {
+        "unitControls": "both",
+        "playerEnd": "last_unit",
+        "headerContent": "booklet"
+      }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_4.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-4",
+      "displayLabel": "Bklt-config-4",
+      "unitKeys": ["CY-Unit.Sample-101", "cpy"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"] }],
+      "policy": { "unitControls": "both", "headerContent": "block" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-1.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-1.xml",
+      "bookletKey": "Cy-Bklt_TC-1",
+      "displayLabel": "Test-Controller-1",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "unitMenuEnabled": false, "showTimeLeft": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-2.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-2.xml",
+      "bookletKey": "Cy-Bklt_TC-2",
+      "displayLabel": "Test-Controller-2",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": false }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-3.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-3.xml",
+      "bookletKey": "Cy-Bklt_TC-3",
+      "displayLabel": "Test-Controller-3",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-4.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-4.xml",
+      "bookletKey": "Cy-Bklt_TC-4",
+      "displayLabel": "Test-Controller-4",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
+      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-5.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-5.xml",
+      "bookletKey": "Cy-Bklt_TC-5",
+      "displayLabel": "Test-Controller-5",
+      "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [0.2, "confirm"] }],
+      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-6.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-6.xml",
+      "bookletKey": "Cy-Bklt_TC-6",
+      "displayLabel": "Test-Controller-6",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-7.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-7.xml",
+      "bookletKey": "Cy-Bklt_TC-7",
+      "displayLabel": "Test-Controller-7",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "allowed"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-8.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-8.xml",
+      "bookletKey": "Cy-Bklt_TC-8",
+      "displayLabel": "Test-Controller-8",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "forbidden"], "denyNavigation": ["off", "off"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-9.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-9.xml",
+      "bookletKey": "Cy-Bklt_TC-9",
+      "displayLabel": "Test-Controller-9",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["off", "off"] }],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-10.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-10.xml",
+      "bookletKey": "Cy-Bklt_TC-10",
+      "displayLabel": "Test-Controller-10",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["forward", "forward"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-11.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-11.xml",
+      "bookletKey": "Cy-Bklt_TC-11",
+      "displayLabel": "Test-Controller-11",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "timeMax": [2, "confirm"], "denyNavigation": ["always", "always"] }],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-12.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-12.xml",
+      "bookletKey": "Cy-Bklt_TC-12",
+      "displayLabel": "Test-Controller-12",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "lockAfterLeaving": [true, "unit"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-13.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-13.xml",
+      "bookletKey": "Cy-Bklt_TC-13",
+      "displayLabel": "Test-Controller-13",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "lockAfterLeaving": [false, "testlet"] }],
+      "policy": {}
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-14.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-14.xml",
+      "bookletKey": "Cy-Bklt_TC-14",
+      "displayLabel": "Test-Controller-14",
+      "unitKeys": ["start", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [{ "testletKey": "Tslt1", "denyNavigation": ["always", "always"] }],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off" }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-15.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-15.xml",
+      "bookletKey": "Cy-Bklt_TC-15",
+      "displayLabel": "Test-Controller-15",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "off", "requireResponseComplete": "off", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-16.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-16.xml",
+      "bookletKey": "Cy-Bklt_TC-16",
+      "displayLabel": "Test-Controller-16",
+      "unitKeys": ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "forward", "requireResponseComplete": "forward", "unitMenuEnabled": true }
+    },
+    {
+      "fixture": "booklets/system-test/CY_Bklt_TC-17.xml",
+      "sourcePath": "sampledata/system-test/test-controller/CY_Bklt_TC-17.xml",
+      "bookletKey": "Cy-Bklt_TC-17",
+      "displayLabel": "Test-Controller-17",
+      "unitKeys": ["CY-Unit.Sample-101", "unit2", "CY-Unit.Sample-104"],
+      "testletRestrictions": [],
+      "policy": { "requirePresentationComplete": "always", "requireResponseComplete": "always", "unitMenuEnabled": true }
+    }
+  ],
   "adaptiveDependencyPackages": [
     {
       "bookletFixture": "booklets/Booklet2.xml",

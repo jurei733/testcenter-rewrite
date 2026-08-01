@@ -5543,6 +5543,24 @@ const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] =>
 const xmlElementText = (element: XmlElement | undefined): string =>
   String(element?.textContent ?? "").trim();
 
+const parseTestcenterXmlBoolean = (value: string | null): boolean | null => {
+  switch (value?.trim()) {
+    case "true":
+    case "1":
+      return true;
+    case "false":
+    case "0":
+      return false;
+    default:
+      return null;
+  }
+};
+
+const isPositiveTestcenterXmlNumber = (value: string): boolean =>
+  /^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$/.test(
+    value.trim()
+  ) && Number(value) > 0;
+
 const validateUniqueTestcenterXmlValues = (
   values: Array<{ value: string; label: string }>,
   code: string,
@@ -5691,6 +5709,110 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
+      if (!unit.getAttribute("label")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_label_missing",
+            `Original Testcenter booklet '${sourceFileName}' contains a Unit without a label.`
+          )
+        );
+      }
+    }
+    const testletEntries = units ? xmlDescendantsNamed(units, "Testlet") : [];
+    for (const testlet of testletEntries) {
+      const testletKey = testlet.getAttribute("id")?.trim() ?? "";
+      if (!testletKey) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testlet_id_missing",
+            `Original Testcenter booklet '${sourceFileName}' contains a Testlet without an id.`
+          )
+        );
+      }
+      const restrictions = xmlChildrenNamed(testlet, "Restrictions");
+      if (restrictions.length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testlet_restrictions_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains multiple Restrictions blocks for Testlet '${testletKey || "unknown"}'.`
+          )
+        );
+      }
+      const restriction = restrictions[0];
+      if (!restriction) {
+        continue;
+      }
+      const timeMaxEntries = xmlChildrenNamed(restriction, "TimeMax");
+      if (timeMaxEntries.length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_time_max_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains multiple TimeMax restrictions for Testlet '${testletKey || "unknown"}'.`
+          )
+        );
+      }
+      for (const timeMax of timeMaxEntries) {
+        const minutes = timeMax.getAttribute("minutes");
+        const leave = timeMax.getAttribute("leave");
+        if (minutes !== null && !isPositiveTestcenterXmlNumber(minutes)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_time_max_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax minutes '${minutes}' for Testlet '${testletKey || "unknown"}'.`
+            )
+          );
+        }
+        if (
+          leave !== null &&
+          !["forbidden", "confirm", "allowed"].includes(leave.trim())
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_time_max_leave_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax leave policy '${leave}' for Testlet '${testletKey || "unknown"}'.`
+            )
+          );
+        }
+      }
+      for (const denyNavigation of xmlChildrenNamed(
+        restriction,
+        "DenyNavigationOnIncomplete"
+      )) {
+        for (const attributeName of ["presentation", "response"] as const) {
+          const value = denyNavigation.getAttribute(attributeName);
+          if (value !== null && !["ON", "OFF", "ALWAYS"].includes(value.trim())) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_navigation_restriction_invalid",
+                `Original Testcenter booklet '${sourceFileName}' contains invalid ${attributeName} completion policy '${value}' for Testlet '${testletKey || "unknown"}'.`
+              )
+            );
+          }
+        }
+      }
+      for (const lockAfterLeaving of xmlChildrenNamed(
+        restriction,
+        "LockAfterLeaving"
+      )) {
+        const confirm = lockAfterLeaving.getAttribute("confirm");
+        const scope = lockAfterLeaving.getAttribute("scope");
+        if (confirm !== null && parseTestcenterXmlBoolean(confirm) === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_lock_after_leaving_confirm_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving confirm value '${confirm}' for Testlet '${testletKey || "unknown"}'.`
+            )
+          );
+        }
+        if (scope !== null && !["unit", "testlet"].includes(scope.trim())) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_lock_after_leaving_scope_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving scope '${scope}' for Testlet '${testletKey || "unknown"}'.`
+            )
+          );
+        }
+      }
     }
     diagnostics.push(
       ...validateUniqueTestcenterXmlValues(
@@ -5703,7 +5825,7 @@ const validateTestcenterXmlSourceDocument = (
         sourceFileName
       ),
       ...validateUniqueTestcenterXmlValues(
-        (units ? xmlDescendantsNamed(units, "Testlet") : []).map(testlet => ({
+        testletEntries.map(testlet => ({
           value: testlet.getAttribute("id")?.trim() ?? "",
           label: "testlet id"
         })),
@@ -6631,8 +6753,9 @@ const collectXmlBookletHierarchies = (
             ? {
                 lockAfterLeaving: {
                   confirm:
-                    lockAfterLeavingElement.getAttribute("confirm")?.trim() ===
-                    "true",
+                    parseTestcenterXmlBoolean(
+                      lockAfterLeavingElement.getAttribute("confirm")
+                    ) ?? false,
                   scope: lockScope === "unit" ? "unit" : "testlet"
                 }
               }
