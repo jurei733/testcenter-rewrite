@@ -267,6 +267,41 @@ after(async () => {
   await closeServer(server);
 });
 
+test("system-check speed-test endpoints transfer exact package sizes", async () => {
+  const download = await fetch(`${baseUrl}/speed-test/random-package/4096`, {
+    cache: "no-store"
+  });
+  assert.equal(download.status, 200);
+  assertSecurityHeaders(download);
+  assert.equal(download.headers.get("content-length"), "4096");
+  assert.equal(download.headers.get("cache-control"), "no-store, no-transform");
+  assert.equal((await download.arrayBuffer()).byteLength, 4096);
+
+  const uploadBody = "u".repeat(8192);
+  const upload = await fetch(`${baseUrl}/speed-test/random-package`, {
+    method: "POST",
+    headers: { "content-type": "text/plain" },
+    body: uploadBody
+  });
+  assert.equal(upload.status, 200);
+  assertSecurityHeaders(upload);
+  const uploadPayload = await upload.json() as {
+    requestTime: number;
+    packageReceivedSize: number;
+  };
+  assert.equal(uploadPayload.packageReceivedSize, 8192);
+  assert.equal(Number.isFinite(uploadPayload.requestTime), true);
+
+  const invalidDownload = await requestJson<{ error: string }>(
+    "/speed-test/random-package/15"
+  );
+  assert.equal(invalidDownload.status, 406);
+  assert.equal(
+    invalidDownload.body.error,
+    "system_check_speed_test_size_unsupported"
+  );
+});
+
 test("admin bootstrap and bearer session lifecycle", async () => {
   const bootstrap = await requestJson<{
     adminUser: {
@@ -15155,6 +15190,9 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   const sourceDocument = readFileSync(
     resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
     "utf8"
+  ).replace(
+    '    <Q id="1"',
+    '    <CustomText key="syscheck_intro">Project-specific readiness introduction</CustomText>\n\n    <Q id="1"'
   );
   const sourcePackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
@@ -15198,6 +15236,7 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
         options: string[];
       }>;
       uploadSpeed: { min: number; sequenceSizes: number[] };
+      customTexts: Record<string, string>;
       unit: { unitKey: string; playerHtml?: string } | null;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks`);
@@ -15218,6 +15257,10 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     400000,
     800000
   ]);
+  assert.equal(
+    configuration?.customTexts.syscheck_intro,
+    "Project-specific readiness introduction"
+  );
   assert.equal(configuration?.unit?.unitKey, "UNIT.SAMPLE");
   assert.equal(configuration?.unit?.playerHtml, undefined);
 

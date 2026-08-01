@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -83,6 +84,7 @@ import {
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type ListSystemCheckReportsResponse,
+  type SystemCheckSpeedTestUploadResponse,
   type MonitorOpenRunsResponse,
   type MonitorOpenRunsQuery,
   type ParticipantCurrentRunStateResponse,
@@ -1298,6 +1300,58 @@ const readOptionalJsonBody = async <T>(
   return payload ? (JSON.parse(payload) as T) : null;
 };
 
+const SYSTEM_CHECK_SPEED_TEST_MIN_BYTES = 16;
+const SYSTEM_CHECK_SPEED_TEST_MAX_BYTES = 64 * 1024 * 1024;
+
+const readRequestBodyByteLength = async (
+  request: IncomingMessage,
+  maxBytes: number
+): Promise<number> => {
+  const contentLengthHeader = request.headers["content-length"];
+  const contentLength =
+    typeof contentLengthHeader === "string" && /^\d+$/.test(contentLengthHeader)
+      ? Number.parseInt(contentLengthHeader, 10)
+      : null;
+  if (contentLength !== null && contentLength > maxBytes) {
+    throw new RequestBodyTooLargeError(maxBytes);
+  }
+
+  let totalBytes = 0;
+  for await (const chunk of request) {
+    totalBytes += Buffer.byteLength(chunk);
+    if (totalBytes > maxBytes) {
+      throw new RequestBodyTooLargeError(maxBytes);
+    }
+  }
+  return totalBytes;
+};
+
+const sendSystemCheckSpeedTestPackage = async (
+  response: ServerResponse,
+  size: number
+): Promise<void> => {
+  response.writeHead(200, {
+    ...securityHeaders,
+    "content-type": "text/plain; charset=utf-8",
+    "content-length": String(size),
+    "content-transfer-encoding": "binary",
+    "cache-control": "no-store, no-transform",
+    "content-encoding": "identity"
+  });
+  const chunk = Buffer.alloc(Math.min(size, 64 * 1024), "a");
+  let remaining = size;
+  while (remaining > 0) {
+    const nextChunk = remaining >= chunk.byteLength
+      ? chunk
+      : chunk.subarray(0, remaining);
+    if (!response.write(nextChunk)) {
+      await once(response, "drain");
+    }
+    remaining -= nextChunk.byteLength;
+  }
+  response.end();
+};
+
 const isFirstSliceError = (value: unknown): value is FirstSliceError =>
   value instanceof Error &&
   "statusCode" in value &&
@@ -1477,6 +1531,9 @@ const systemCheckReportListPattern = createRoutePattern(
 );
 const systemCheckReportCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSystemCheckReportsCsv
+);
+const systemCheckSpeedTestDownloadPattern = createRoutePattern(
+  productionApiRoutes.system.downloadSpeedTestPackage
 );
 const runtimeStatePattern = createRoutePattern(
   productionApiRoutes.participant.getRuntimeState
@@ -1826,6 +1883,17 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (method === "GET" && pathname === productionApiRoutes.system.getRuntimeConfig) {
     return `GET ${productionApiRoutes.system.getRuntimeConfig}`;
+  }
+
+  if (method === "GET" && systemCheckSpeedTestDownloadPattern.test(pathname)) {
+    return `GET ${productionApiRoutes.system.downloadSpeedTestPackage}`;
+  }
+
+  if (
+    method === "POST" &&
+    pathname === productionApiRoutes.system.uploadSpeedTestPackage
+  ) {
+    return `POST ${productionApiRoutes.system.uploadSpeedTestPackage}`;
   }
 
   if (method === "GET" && pathname === "/manifest") {
@@ -2543,6 +2611,64 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson(response, 200, {
           status: "ok",
           phase: "production-baseline"
+        });
+        return;
+      }
+
+      const systemCheckSpeedTestDownloadMatch =
+        systemCheckSpeedTestDownloadPattern.exec(pathname);
+      if (
+        request.method === "GET" &&
+        systemCheckSpeedTestDownloadMatch?.groups
+      ) {
+        const sizeValue = decodeRouteGroup(
+          systemCheckSpeedTestDownloadMatch.groups.size
+        ) ?? "";
+        const size = /^\d+$/.test(sizeValue)
+          ? Number.parseInt(sizeValue, 10)
+          : Number.NaN;
+        if (
+          !Number.isSafeInteger(size) ||
+          size < SYSTEM_CHECK_SPEED_TEST_MIN_BYTES ||
+          size > SYSTEM_CHECK_SPEED_TEST_MAX_BYTES
+        ) {
+          sendError(
+            response,
+            406,
+            "system_check_speed_test_size_unsupported",
+            `Speed-test package size must be between ${SYSTEM_CHECK_SPEED_TEST_MIN_BYTES} and ${SYSTEM_CHECK_SPEED_TEST_MAX_BYTES} bytes.`
+          );
+          return;
+        }
+        await sendSystemCheckSpeedTestPackage(response, size);
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.system.uploadSpeedTestPackage
+      ) {
+        let packageReceivedSize = 0;
+        try {
+          packageReceivedSize = await readRequestBodyByteLength(
+            request,
+            SYSTEM_CHECK_SPEED_TEST_MAX_BYTES
+          );
+        } catch (error) {
+          if (error instanceof RequestBodyTooLargeError) {
+            sendError(
+              response,
+              413,
+              "system_check_speed_test_package_too_large",
+              `Speed-test upload must not exceed ${SYSTEM_CHECK_SPEED_TEST_MAX_BYTES} bytes.`
+            );
+            return;
+          }
+          throw error;
+        }
+        sendJson<SystemCheckSpeedTestUploadResponse>(response, 200, {
+          requestTime: Date.now() / 1000,
+          packageReceivedSize
         });
         return;
       }

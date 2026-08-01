@@ -1027,9 +1027,12 @@ try {
         }
       }
     );
-    const systemCheckSourceDocument = await readFile(
+    const systemCheckSourceDocument = (await readFile(
       resolve("test-fixtures/original-testcenter/system-checks/SysCheck.xml"),
       "utf8"
+    )).replace(
+      '    <Q id="1"',
+      '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n\n    <Q id="1"'
     );
     const systemCheckSourceResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
@@ -1061,6 +1064,10 @@ try {
       { waitUntil: "networkidle" }
     );
     await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
+    await page
+      .locator("#systemCheckIntroText")
+      .filter({ hasText: "UI smoke readiness introduction" })
+      .waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Environment" }).waitFor();
     await page.locator("#systemCheckNextButton").click();
@@ -1071,11 +1078,16 @@ try {
         const rating = document
           .querySelector("#systemCheckNetworkRating")
           ?.textContent?.trim();
-        return ["good", "ok", "insufficient"].includes(rating ?? "");
+        return ["good", "ok", "insufficient", "unstable"].includes(rating ?? "");
       },
       undefined,
-      { timeout: 15_000 }
+      { timeout: 45_000 }
     );
+    await page
+      .locator(".system-check-results")
+      .filter({ hasText: "Downloadgeschwindigkeit" })
+      .filter({ hasText: "Uploadgeschwindigkeit" })
+      .waitFor();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
     await fillAndCommit("#systemCheckQuestion-2", "UI smoke device");

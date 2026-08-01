@@ -1568,7 +1568,9 @@ export const productionApiRoutes = {
   },
   system: {
     getRuntimeDiagnostics: "/diagnostics/runtime",
-    getRuntimeConfig: "/diagnostics/config"
+    getRuntimeConfig: "/diagnostics/config",
+    downloadSpeedTestPackage: "/speed-test/random-package/:size",
+    uploadSpeedTestPackage: "/speed-test/random-package"
   }
 } as const;
 
@@ -1690,6 +1692,11 @@ export type ContentReleaseListQuery = {
 export type SystemCheckReportListQuery = {
   checkId?: string;
   limit?: number;
+};
+
+export type SystemCheckSpeedTestUploadResponse = {
+  requestTime: number;
+  packageReceivedSize: number;
 };
 
 export type SaveSystemCheckReportRequest = {

@@ -11,11 +11,13 @@ import {
   type ListSystemCheckReportsResponse,
   type ListSystemChecksResponse,
   type SaveSystemCheckReportRequest,
-  type SaveSystemCheckReportResponse
+  type SaveSystemCheckReportResponse,
+  type SystemCheckSpeedTestUploadResponse
 } from "@testcenter-rewrite-app/contracts";
 import type {
   SystemCheckReport,
   SystemCheckReportEntry,
+  SystemCheckSpeedParameters,
   WorkspaceSystemCheck
 } from "@testcenter-rewrite-app/domain";
 
@@ -38,6 +40,14 @@ type BrowserConnection = {
   effectiveType?: string;
   rtt?: number;
   type?: string;
+};
+
+type SystemCheckNetworkRating = "good" | "ok" | "insufficient" | "unstable";
+
+type ThroughputResult = {
+  bytesPerSecond: number;
+  unstable: boolean;
+  repetitions: number;
 };
 
 @Component({
@@ -94,7 +104,8 @@ type BrowserConnection = {
         <article class="card" *ngIf="step === 'welcome'">
           <span class="eyebrow">{{ check.checkId }}</span>
           <h2>{{ check.displayLabel }}</h2>
-          <p>{{ check.description || 'This check verifies whether the current device is ready for a test session.' }}</p>
+          <p id="systemCheckIntroText">{{ customText('syscheck_intro', 'This check verifies whether the current device is ready for a test session.') }}</p>
+          <p *ngIf="check.description">{{ check.description }}</p>
           <dl class="system-check-facts">
             <div><dt>Network</dt><dd>{{ check.skipNetwork ? 'Skipped by configuration' : 'Measured' }}</dd></div>
             <div><dt>Questions</dt><dd>{{ interactiveQuestionCount }}</dd></div>
@@ -114,8 +125,9 @@ type BrowserConnection = {
 
         <article class="card" *ngIf="step === 'network'">
           <h2>Network</h2>
-          <p>Three requests measure application reachability and round-trip latency; browser-provided connection estimates are included when available.</p>
-          <div class="network-rating" [class.has-warning]="networkRating === 'insufficient'">
+          <p>Configured upload and download packages measure throughput against this test server; application latency and browser-provided connection estimates are included.</p>
+          <p id="systemCheckNetworkStatus">{{ networkStatusMessage }}</p>
+          <div class="network-rating" [class.has-warning]="networkRating === 'insufficient' || networkRating === 'unstable'">
             <span>Overall rating</span>
             <strong id="systemCheckNetworkRating">{{ networkRating }}</strong>
           </div>
@@ -129,7 +141,7 @@ type BrowserConnection = {
 
         <article class="card" *ngIf="step === 'questionnaire'">
           <h2>Questionnaire</h2>
-          <p>Please answer all fields marked as required.</p>
+          <p id="systemCheckQuestionsIntro">{{ customText('syscheck_questionsintro', 'Please answer all fields marked as required.') }}</p>
           <div class="system-check-questionnaire">
             <ng-container *ngFor="let question of check.questions">
               <h3 *ngIf="question.type === 'header'">{{ question.prompt }}</h3>
@@ -165,7 +177,7 @@ type BrowserConnection = {
         </article>
 
         <article class="card" *ngIf="step === 'unit'">
-          <h2>Player and unit</h2>
+          <h2>{{ customText('syscheck_unitPrompt', 'Player and unit') }}</h2>
           <p *ngIf="check.unit">Configured item: {{ check.unit.displayLabel }} ({{ check.unit.unitKey }})</p>
           <app-verona-player-host
             *ngIf="check.unit?.playerHtml && check.unit?.unitDefinition; else unresolvedUnit"
@@ -191,10 +203,12 @@ type BrowserConnection = {
         <article class="card" *ngIf="step === 'report'">
           <h2>Report</h2>
           <p>The report contains {{ reportEntryCount }} measured or answered values.</p>
+          <p *ngIf="check.canSave">{{ customText('syscheck_report_aboutReportId', 'Use a report title that lets operators assign this result to the intended study or location.') }}</p>
           <div class="form-grid" *ngIf="check.canSave">
-            <label>Report title<input id="systemCheckReportTitle" [(ngModel)]="reportTitle" /></label>
+            <label>{{ customText('syscheck_report_id', 'Report title') }}<input id="systemCheckReportTitle" [(ngModel)]="reportTitle" /></label>
             <label>Report key<input id="systemCheckReportKey" type="password" autocomplete="off" [(ngModel)]="reportKey" /></label>
           </div>
+          <p *ngIf="check.canSave">{{ customText('syscheck_report_aboutPassword', 'Enter the system-check key supplied by the project operator to save this report.') }}</p>
           <div class="actions">
             <button id="downloadSystemCheckReportButton" class="secondary" type="button" (click)="downloadReport()">Download JSON</button>
             <button id="saveSystemCheckReportButton" *ngIf="check.canSave" class="primary" type="button" [disabled]="busy || !reportTitle.trim() || !reportKey.trim()" (click)="saveReport()">Save Report</button>
@@ -278,6 +292,7 @@ export class SystemCheckViewComponent implements OnInit {
   environmentEntries: SystemCheckReportEntry[] = [];
   networkEntries: SystemCheckReportEntry[] = [];
   networkRating = "not measured";
+  networkStatusMessage = "Measurement has not started.";
   networkBusy = false;
   unitResponse = "";
   unitStartedAt = 0;
@@ -461,6 +476,9 @@ export class SystemCheckViewComponent implements OnInit {
       this.answers = {};
       this.networkEntries = [];
       this.networkRating = payload.systemCheck.skipNetwork ? "skipped" : "not measured";
+      this.networkStatusMessage = payload.systemCheck.skipNetwork
+        ? "Network measurement is skipped by configuration."
+        : "Measurement has not started.";
       this.unitResponse = "";
       this.unitLoadingTimeMs = null;
       this.savedReport = null;
@@ -492,7 +510,10 @@ export class SystemCheckViewComponent implements OnInit {
   nextStep(): void {
     if (!this.canContinue) {
       if (this.step === "questionnaire") {
-        this.questionnaireIssue = "Please complete all required questions.";
+        this.questionnaireIssue = this.customText(
+          "syscheck_questionsRequiredMessage",
+          "Please complete all required questions."
+        );
       }
       return;
     }
@@ -560,8 +581,12 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   async runNetworkCheck(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check) return;
     this.networkBusy = true;
     this.errorMessage = "";
+    this.networkStatusMessage = "Measuring application latency…";
+    this.changeDetectorRef.detectChanges();
     try {
       const measurements: number[] = [];
       for (let index = 0; index < 3; index += 1) {
@@ -575,27 +600,58 @@ export class SystemCheckViewComponent implements OnInit {
       }
       const average = measurements.reduce((sum, value) => sum + value, 0) /
         measurements.length;
-      this.networkRating = average < 150 ? "good" : average < 400 ? "ok" : "insufficient";
+      this.networkStatusMessage = "Measuring configured download packages…";
+      this.changeDetectorRef.detectChanges();
+      const download = await this.measureThroughput("download", check.downloadSpeed);
+      this.networkStatusMessage = "Measuring configured upload packages…";
+      this.changeDetectorRef.detectChanges();
+      const upload = await this.measureThroughput("upload", check.uploadSpeed);
+      const downloadRating = this.rateThroughput(
+        download,
+        check.downloadSpeed.min,
+        check.downloadSpeed.good
+      );
+      const uploadRating = this.rateThroughput(
+        upload,
+        check.uploadSpeed.min,
+        check.uploadSpeed.good
+      );
+      this.networkRating = this.overallNetworkRating(
+        downloadRating,
+        uploadRating
+      );
       const connection = (navigator as Navigator & { connection?: BrowserConnection })
         .connection;
       this.networkEntries = [
+        this.entry("nw-download", "network", "Downloadgeschwindigkeit", this.humanReadableBitsPerSecond(download.bytesPerSecond)),
+        this.entry("nw-download-needed", "network", "Downloadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.downloadSpeed.min)),
+        this.entry("nw-download-evaluation", "network", "Downloadbewertung", downloadRating, downloadRating === "insufficient" || downloadRating === "unstable"),
+        this.entry("nw-upload", "network", "Uploadgeschwindigkeit", this.humanReadableBitsPerSecond(upload.bytesPerSecond)),
+        this.entry("nw-upload-needed", "network", "Uploadgeschwindigkeit benötigt", this.humanReadableBitsPerSecond(check.uploadSpeed.min)),
+        this.entry("nw-upload-evaluation", "network", "Uploadbewertung", uploadRating, uploadRating === "insufficient" || uploadRating === "unstable"),
         this.entry("latency", "network", "RoundTrip in Ms", average.toFixed(1), average >= 400),
-        this.entry("overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient"),
-        this.entry("effective-type", "network", "Netzwerktyp nach Leistung", connection?.effectiveType ?? "not available"),
-        this.entry("downlink", "network", "Downlink MB/s", connection?.downlink ?? "not available"),
-        this.entry("browser-rtt", "network", "Browser RoundTrip in Ms", connection?.rtt ?? "not available"),
-        this.entry("network-type", "network", "Netzwerktyp", connection?.type ?? "not available")
+        this.entry("nw-overall", "network", "Gesamtbewertung", this.networkRating, this.networkRating === "insufficient" || this.networkRating === "unstable"),
+        this.entry("bnni-effective-network-type", "network", "Netzwerktyp nach Leistung", connection?.effectiveType ?? "not available"),
+        this.entry("bnni-downlink", "network", "Downlink MB/s", connection?.downlink ?? "not available"),
+        this.entry("bnni-roundtrip", "network", "Browser RoundTrip in Ms", connection?.rtt ?? "not available"),
+        this.entry("bnni-network-type", "network", "Netzwerktyp", connection?.type ?? "not available")
       ];
+      this.networkStatusMessage = `Measurement complete after ${download.repetitions} download and ${upload.repetitions} upload sequence(s).`;
     } catch (error) {
       this.networkRating = "insufficient";
       this.networkEntries = [
-        this.entry("overall", "network", "Gesamtbewertung", "insufficient", true)
+        this.entry("nw-overall", "network", "Gesamtbewertung", "insufficient", true)
       ];
+      this.networkStatusMessage = "Network measurement failed.";
       this.errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       this.networkBusy = false;
       this.changeDetectorRef.detectChanges();
     }
+  }
+
+  customText(key: string, fallback: string): string {
+    return this.systemCheck?.customTexts[key]?.trim() || fallback;
   }
 
   onUnitResponse(response: string): void {
@@ -659,6 +715,157 @@ export class SystemCheckViewComponent implements OnInit {
         blob: download.blob
       });
     });
+  }
+
+  private async measureThroughput(
+    direction: "download" | "upload",
+    parameters: SystemCheckSpeedParameters
+  ): Promise<ThroughputResult> {
+    const sequenceSizes = parameters.sequenceSizes.filter(
+      size => Number.isSafeInteger(size) && size >= 16 && size <= 64 * 1024 * 1024
+    );
+    if (sequenceSizes.length === 0) {
+      throw new Error(`No supported ${direction} package sizes are configured.`);
+    }
+
+    const maxRepetitions = Math.max(
+      1,
+      Math.min(parameters.maxSequenceRepetitions || 1, 15)
+    );
+    const sequenceAverages: number[] = [];
+    let unstable = false;
+
+    for (let repetition = 1; repetition <= maxRepetitions; repetition += 1) {
+      const successfulSpeeds: number[] = [];
+      let errors = 0;
+      for (const size of sequenceSizes) {
+        try {
+          successfulSpeeds.push(
+            await this.measureSpeedTestPackage(direction, size, repetition)
+          );
+        } catch {
+          errors += 1;
+        }
+      }
+      if (errors > parameters.maxErrorsPerSequence || successfulSpeeds.length === 0) {
+        unstable = true;
+        break;
+      }
+
+      const sequenceAverage = successfulSpeeds.reduce((sum, speed) => sum + speed, 0) /
+        successfulSpeeds.length;
+      const previousAverage = sequenceAverages.length > 0
+        ? sequenceAverages.reduce((sum, speed) => sum + speed, 0) /
+          sequenceAverages.length
+        : null;
+      sequenceAverages.push(sequenceAverage);
+      const stable =
+        sequenceAverages.length >= 3 &&
+        previousAverage != null &&
+        Math.abs(previousAverage - sequenceAverage) <=
+          parameters.maxDevianceBytesPerSecond;
+      if (stable) break;
+    }
+
+    const bytesPerSecond = sequenceAverages.length > 0
+      ? sequenceAverages.reduce((sum, speed) => sum + speed, 0) /
+        sequenceAverages.length
+      : 0;
+    return {
+      bytesPerSecond,
+      unstable,
+      repetitions: sequenceAverages.length
+    };
+  }
+
+  private async measureSpeedTestPackage(
+    direction: "download" | "upload",
+    size: number,
+    repetition: number
+  ): Promise<number> {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(
+      () => controller.abort(),
+      direction === "download" ? 45_000 : 10_000
+    );
+    const startedAt = performance.now();
+    try {
+      if (direction === "download") {
+        const path = resolveRoutePath(
+          productionApiRoutes.system.downloadSpeedTestPackage,
+          { size: String(size) }
+        );
+        const response = await fetch(
+          `${path}?round=${repetition}&uid=${Date.now()}`,
+          { cache: "no-store", signal: controller.signal }
+        );
+        if (!response.ok) {
+          throw new Error(`Download speed test returned HTTP ${response.status}.`);
+        }
+        const body = await response.arrayBuffer();
+        if (body.byteLength !== size) {
+          throw new Error(`Download speed test returned ${body.byteLength} of ${size} bytes.`);
+        }
+      } else {
+        const response = await fetch(
+          productionApiRoutes.system.uploadSpeedTestPackage,
+          {
+            method: "POST",
+            headers: { "content-type": "text/plain" },
+            body: "a".repeat(size),
+            cache: "no-store",
+            signal: controller.signal
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`Upload speed test returned HTTP ${response.status}.`);
+        }
+        const payload = await response.json() as SystemCheckSpeedTestUploadResponse;
+        if (payload.packageReceivedSize !== size) {
+          throw new Error(
+            `Upload speed test received ${payload.packageReceivedSize} of ${size} bytes.`
+          );
+        }
+      }
+      const durationMs = Math.max(performance.now() - startedAt, 0.1);
+      return size / (durationMs / 1000);
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  private rateThroughput(
+    result: ThroughputResult,
+    minimum: number,
+    good: number
+  ): SystemCheckNetworkRating {
+    if (result.unstable) return "unstable";
+    if (result.bytesPerSecond < minimum) return "insufficient";
+    if (result.bytesPerSecond < good) return "ok";
+    return "good";
+  }
+
+  private overallNetworkRating(
+    download: SystemCheckNetworkRating,
+    upload: SystemCheckNetworkRating
+  ): SystemCheckNetworkRating {
+    const ratings: SystemCheckNetworkRating[] = [download, upload];
+    if (ratings.includes("unstable")) return "unstable";
+    if (ratings.includes("insufficient")) return "insufficient";
+    if (ratings.includes("ok")) return "ok";
+    return "good";
+  }
+
+  private humanReadableBitsPerSecond(bytesPerSecond: number): string {
+    const bitsPerSecond = Math.max(0, bytesPerSecond) * 8;
+    const units = ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"];
+    let value = bitsPerSecond;
+    let unitIndex = 0;
+    while (value >= 1000 && unitIndex < units.length - 1) {
+      value /= 1000;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(2)} ${units[unitIndex]}`;
   }
 
   private reportPayload(includeKey: boolean): SaveSystemCheckReportRequest {
