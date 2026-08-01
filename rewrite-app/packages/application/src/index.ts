@@ -79,6 +79,7 @@ import type {
   WorkspaceReview,
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
+  WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
@@ -224,6 +225,11 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     sourcePackageId: string;
   }): Promise<WorkspaceSourcePackageDetail>;
+  downloadSourcePackage(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    sourcePackageId: string;
+  }): Promise<WorkspaceSourcePackageDownload>;
   listSourcePackages(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -1390,6 +1396,53 @@ const normalizeOptionalSourceDocument = (
   return value.trim() === "" ? null : value;
 };
 
+const decodePersistedSourceDocument = (
+  sourcePackage: SourcePackage
+): { mediaType: string; bytes: Buffer } | null => {
+  const sourceDocument = sourcePackage.sourceDocument;
+  if (sourceDocument === null) {
+    return null;
+  }
+
+  const dataUrlMatch = sourceDocument.match(
+    /^data:([^,]*?)(;base64)?,([\s\S]*)$/i
+  );
+  if (!dataUrlMatch) {
+    return {
+      mediaType: sourcePackage.mediaType,
+      bytes: Buffer.from(sourceDocument, "utf8")
+    };
+  }
+
+  const mediaType = dataUrlMatch[1]?.trim() || sourcePackage.mediaType;
+  const payload = dataUrlMatch[3] ?? "";
+  if (dataUrlMatch[2]) {
+    const normalizedPayload = payload
+      .replace(/\s+/g, "")
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    if (
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(normalizedPayload) ||
+      normalizedPayload.length % 4 === 1
+    ) {
+      return null;
+    }
+    return {
+      mediaType,
+      bytes: Buffer.from(normalizedPayload, "base64")
+    };
+  }
+
+  try {
+    return {
+      mediaType,
+      bytes: Buffer.from(decodeURIComponent(payload), "utf8")
+    };
+  } catch {
+    return null;
+  }
+};
+
 const normalizeReviewText = (
   value: unknown,
   fieldName: string,
@@ -2531,6 +2584,10 @@ const formatSourcePackagesCsv = (input: {
     "bookletCount",
     "unitCount",
     "hasSourceDocument",
+    "fileSizeBytes",
+    "downloadAvailable",
+    "importJobCount",
+    "contentReleaseCount",
     "latestImportJobId",
     "latestImportStatus",
     "latestImportCreatedAt",
@@ -2558,7 +2615,11 @@ const formatSourcePackagesCsv = (input: {
         sourcePackage.uploadedAt,
         String(bookletEntries.length),
         String(unitCount),
-        String(sourcePackage.sourceDocument !== null),
+        String(item.downloadAvailable),
+        item.fileSizeBytes === null ? "" : String(item.fileSizeBytes),
+        String(item.downloadAvailable),
+        String(item.importJobCount),
+        String(item.contentReleaseCount),
         item.latestImportJob?.importJobId ?? "",
         item.latestImportJob?.status ?? "",
         item.latestImportJob?.createdAt ?? "",
@@ -12083,6 +12144,40 @@ export const createFirstSliceServices = (
           contentReleases
         };
       },
+      async downloadSourcePackage(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const sourcePackage = await requireSourcePackage(repository, input.sourcePackageId);
+        if (
+          sourcePackage.tenantId !== workspace.tenantId ||
+          sourcePackage.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "source_package_not_found",
+            `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+        if (!decodedDocument) {
+          throw new FirstSliceError(
+            409,
+            "source_package_download_unavailable",
+            `Source package '${input.sourcePackageId}' has no downloadable source document.`
+          );
+        }
+
+        return {
+          fileName: sourcePackage.fileName,
+          mediaType: decodedDocument.mediaType,
+          sizeBytes: decodedDocument.bytes.byteLength,
+          dataBase64: decodedDocument.bytes.toString("base64")
+        };
+      },
       async listSourcePackages(input) {
         const workspace = await requireWorkspace(
           repository,
@@ -12093,26 +12188,44 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const importJobs = await repository.listImportJobsByWorkspace(
-          workspace.tenantId,
-          workspace.workspaceId
-        );
+        const [importJobs, contentReleases] = await Promise.all([
+          repository.listImportJobsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listContentReleasesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
 
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
 
         return sourcePackages
           .map<WorkspaceSourcePackageListItem>(sourcePackage => {
-            const latestImportJob =
-              importJobs
-                .filter(
-                  importJob => importJob.sourcePackageId === sourcePackage.sourcePackageId
-                )
-                .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ??
-              null;
+            const sourcePackageImportJobs = importJobs
+              .filter(
+                importJob => importJob.sourcePackageId === sourcePackage.sourcePackageId
+              )
+              .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+            const latestImportJob = sourcePackageImportJobs[0] ?? null;
+            const importJobIds = new Set(
+              sourcePackageImportJobs.map(importJob => importJob.importJobId)
+            );
+            const decodedDocument = decodePersistedSourceDocument(sourcePackage);
 
             return {
-              sourcePackage,
-              latestImportJob
+              sourcePackage: {
+                ...sourcePackage,
+                sourceDocument: null
+              },
+              latestImportJob,
+              fileSizeBytes: decodedDocument?.bytes.byteLength ?? null,
+              downloadAvailable: decodedDocument !== null,
+              importJobCount: sourcePackageImportJobs.length,
+              contentReleaseCount: contentReleases.filter(contentRelease =>
+                importJobIds.has(contentRelease.importJobId)
+              ).length
             };
           })
           .filter(

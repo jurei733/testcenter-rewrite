@@ -982,6 +982,10 @@ export type WorkspaceContentReleaseDetail = {
 export type WorkspaceSourcePackageListItem = {
   sourcePackage: SourcePackage;
   latestImportJob: ImportJob | null;
+  fileSizeBytes: number | null;
+  downloadAvailable: boolean;
+  importJobCount: number;
+  contentReleaseCount: number;
 };
 
 export type WorkspaceImportJobListItem = {
@@ -1086,6 +1090,13 @@ export type WorkspaceSourcePackageDetail = {
   contentReleases: ContentRelease[];
 };
 
+export type WorkspaceSourcePackageDownload = {
+  fileName: string;
+  mediaType: string;
+  sizeBytes: number;
+  dataBase64: string;
+};
+
 export type FirstSliceCapability =
   | "admin_bootstrap"
   | "admin_authentication"
@@ -1107,6 +1118,7 @@ export type FirstSliceCapability =
   | "workspace_activity_read"
   | "source_package_intake"
   | "source_package_read"
+  | "source_package_download"
   | "source_package_csv_export"
   | "source_package_retry"
   | "import_job_intake"
@@ -1167,6 +1179,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "workspace_activity_read",
   "source_package_intake",
   "source_package_read",
+  "source_package_download",
   "source_package_csv_export",
   "source_package_retry",
   "import_job_intake",

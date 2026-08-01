@@ -1,6 +1,10 @@
 import { ApplicationRef, Injectable, inject } from "@angular/core";
 
-import { RewriteAppApiService, type ApiErrorLike } from "./rewrite-app-api.service";
+import {
+  RewriteAppApiService,
+  type ApiDownload,
+  type ApiErrorLike
+} from "./rewrite-app-api.service";
 import {
   applyForegroundShellError,
   applyForegroundShellResponse,
@@ -70,6 +74,38 @@ export class RewriteAppShellRequestService {
       } else {
         flushShellRender(this.createRequestStateHost());
       }
+    }
+  }
+
+  async requestDownload(label: string, path: string): Promise<ApiDownload> {
+    beginForegroundShellRequest(this.createRequestStateHost(), label);
+    try {
+      const download = await this.api.download(
+        path,
+        this.createRequestHeaders(undefined)
+      );
+      applyForegroundShellResponse(
+        this.createRequestStateHost(),
+        label,
+        download.statusCode,
+        {
+          filename: download.filename,
+          mediaType: download.blob.type,
+          sizeBytes: download.blob.size
+        }
+      );
+      return download;
+    } catch (error) {
+      const apiError = this.api.isApiError(error)
+        ? error
+        : ({
+            error: "unexpected_error",
+            message: error instanceof Error ? error.message : String(error)
+          } satisfies ApiErrorLike);
+      applyForegroundShellError(this.createRequestStateHost(), label, apiError);
+      throw error;
+    } finally {
+      finishForegroundShellRequest(this.createRequestStateHost());
     }
   }
 

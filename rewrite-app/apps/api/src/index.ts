@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { extname, relative, resolve } from "node:path";
+import { basename, extname, relative, resolve } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
 import {
@@ -858,6 +858,21 @@ const sendCsv = (
   endResponse(response, text);
 };
 
+const buildAttachmentContentDisposition = (filename: string): string => {
+  const normalizedFileName = basename(filename)
+    .replace(/[\u0000-\u001f\u007f/\\]/g, "_")
+    .trim() || "download";
+  const asciiFallback = normalizedFileName
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_");
+  const encodedFileName = encodeURIComponent(normalizedFileName).replace(
+    /['()*]/g,
+    character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`;
+};
+
 const sendAsset = (
   response: ServerResponse,
   statusCode: number,
@@ -1345,6 +1360,9 @@ const sourcePackageListPattern = createRoutePattern(
 const sourcePackageDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getSourcePackage
 );
+const sourcePackageDownloadPattern = createRoutePattern(
+  productionApiRoutes.workspace.downloadSourcePackage
+);
 const sourcePackageCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSourcePackagesCsv
 );
@@ -1478,6 +1496,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["POST", sourcePackageCreatePattern],
   ["GET", sourcePackageListPattern],
   ["GET", sourcePackageDetailPattern],
+  ["GET", sourcePackageDownloadPattern],
   ["GET", sourcePackageCsvExportPattern],
   ["POST", sourcePackageRetryImportPattern],
   ["POST", importJobCreatePattern],
@@ -1905,6 +1924,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", sourcePackageCreatePattern, productionApiRoutes.workspace.createSourcePackage],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
+    [
+      "GET",
+      sourcePackageDownloadPattern,
+      productionApiRoutes.workspace.downloadSourcePackage
+    ],
     [
       "GET",
       sourcePackageCsvExportPattern,
@@ -3461,6 +3485,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
+      const sourcePackageDownloadMatch = sourcePackageDownloadPattern.exec(pathname);
       const sourcePackageCsvExportMatch =
         sourcePackageCsvExportPattern.exec(pathname);
       const sourcePackageRetryImportMatch =
@@ -3522,6 +3547,39 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           ...query
         });
         sendCsv(response, 200, `${workspaceKey}-source-packages.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && sourcePackageDownloadMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          sourcePackageDownloadMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageDownloadMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageDownloadMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const download = await services.workspaceAdminRead.downloadSourcePackage({
+          tenantKey,
+          workspaceKey,
+          sourcePackageId
+        });
+        const body = Buffer.from(download.dataBase64, "base64");
+        sendAsset(response, 200, download.mediaType, body, {
+          "content-disposition": buildAttachmentContentDisposition(download.fileName),
+          "content-length": String(body.byteLength)
+        });
         return;
       }
 

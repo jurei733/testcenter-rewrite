@@ -1498,6 +1498,14 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  const uploadedZip = await readFile(uploadedZipSourcePath);
+  await page.locator("#refreshContentReadsButton").click();
+  await page
+    .locator("app-record-collection")
+    .filter({ hasText: "Source Packages" })
+    .filter({ hasText: `${uploadedZip.byteLength} byte(s), downloadable` })
+    .filter({ hasText: "0 import(s), 0 release(s)" })
+    .waitFor({ timeout: 15_000 });
   await expectButtonSelectorEnabled("#downloadSourceDocumentButton");
   const zipDownloadPromise = page.waitForEvent("download");
   await page.locator("#downloadSourceDocumentButton").click();
@@ -1509,7 +1517,7 @@ try {
   );
   await zipDownload.saveAs(downloadedZipPath);
   const downloadedZip = await readFile(downloadedZipPath);
-  assert.equal(downloadedZip.readUInt32LE(0), 0x04034b50);
+  assert.deepEqual(downloadedZip, uploadedZip);
   await fillAndCommit("#sourcePackageId", "");
   await fillAndCommit("#importJobId", "");
   await fillAndCommit("#contentReleaseId", "");

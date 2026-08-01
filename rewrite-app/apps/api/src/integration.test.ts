@@ -1326,6 +1326,17 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedSourcePackageCsv.status, 401);
     assert.equal(rejectedSourcePackageCsv.body.error, "admin_session_missing");
 
+    const rejectedSourcePackageDownload = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages/not-authorized/download"
+    );
+
+    assert.equal(rejectedSourcePackageDownload.status, 401);
+    assert.equal(
+      rejectedSourcePackageDownload.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedImportJobCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/import-jobs.csv"
@@ -4214,6 +4225,16 @@ test("failed import can be retried on the same source package", async () => {
   );
   assert.equal(failedImport.body.stagedContentRelease, null);
 
+  const fixedSourceDocument = {
+    booklets: [
+      {
+        bookletKey: "booklet:fixed",
+        title: "Fixed",
+        units: [{ unitKey: "unit-fixed", title: "Fixed Unit" }]
+      }
+    ]
+  };
+  const persistedFixedSourceDocument = JSON.stringify(fixedSourceDocument, null, 2);
   const retriedImport = await requestJson<{
     sourcePackage: {
       sourcePackageId: string;
@@ -4230,15 +4251,7 @@ test("failed import can be retried on the same source package", async () => {
       body: {
         fileName: "fixed.json",
         mediaType: "application/json",
-        sourceDocument: {
-          booklets: [
-            {
-              bookletKey: "booklet:fixed",
-              title: "Fixed",
-              units: [{ unitKey: "unit-fixed", title: "Fixed Unit" }]
-            }
-          ]
-        }
+        sourceDocument: fixedSourceDocument
       }
     }
   );
@@ -4255,8 +4268,13 @@ test("failed import can be retried on the same source package", async () => {
         fileName: string;
         mediaType: string;
         status: string;
+        sourceDocument: string | null;
       };
       latestImportJob: { status: string } | null;
+      fileSizeBytes: number | null;
+      downloadAvailable: boolean;
+      importJobCount: number;
+      contentReleaseCount: number;
     }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
@@ -4269,9 +4287,35 @@ test("failed import can be retried on the same source package", async () => {
     sourcePackage.body.sourcePackage.sourcePackageId
   );
   assert.equal(
+    acceptedSourcePackages.body.items[0]?.sourcePackage.sourceDocument,
+    null
+  );
+  assert.equal(
     acceptedSourcePackages.body.items[0]?.latestImportJob?.status,
     "completed"
   );
+  assert.equal(
+    acceptedSourcePackages.body.items[0]?.fileSizeBytes,
+    Buffer.byteLength(persistedFixedSourceDocument)
+  );
+  assert.equal(acceptedSourcePackages.body.items[0]?.downloadAvailable, true);
+  assert.equal(acceptedSourcePackages.body.items[0]?.importJobCount, 2);
+  assert.equal(acceptedSourcePackages.body.items[0]?.contentReleaseCount, 1);
+
+  const sourcePackageDownload = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${sourcePackage.body.sourcePackage.sourcePackageId}/download`
+  );
+  assert.equal(sourcePackageDownload.status, 200);
+  assert.equal(sourcePackageDownload.headers.get("content-type"), "application/json");
+  assert.match(
+    sourcePackageDownload.headers.get("content-disposition") ?? "",
+    /attachment; filename="fixed\.json"; filename\*=UTF-8''fixed\.json/
+  );
+  assert.equal(
+    Number(sourcePackageDownload.headers.get("content-length")),
+    Buffer.byteLength(persistedFixedSourceDocument)
+  );
+  assert.equal(await sourcePackageDownload.text(), persistedFixedSourceDocument);
 
   const sourcePackagesCsv = await requestText(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/source-packages.csv?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
@@ -4281,12 +4325,12 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(sourcePackagesCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     sourcePackagesCsv.body,
-    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
+    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,fileSizeBytes,downloadAvailable,importJobCount,contentReleaseCount,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
   );
   assert.match(
     sourcePackagesCsv.body,
     new RegExp(
-      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
+      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${Buffer.byteLength(persistedFixedSourceDocument)}","true","2","1","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
     )
   );
 
@@ -4493,6 +4537,34 @@ test("source-package intake rejects invalid metadata before import", async () =>
   });
 
   assert.equal(validSourcePackage.status, 201);
+
+  const metadataOnlySourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "metadata-only.json",
+      mediaType: "application/json",
+      contentStructure: {
+        bookletEntries: [
+          {
+            bookletKey: "booklet:metadata-only",
+            displayLabel: "Metadata only",
+            unitEntries: []
+          }
+        ]
+      }
+    }
+  });
+  assert.equal(metadataOnlySourcePackage.status, 201);
+  const unavailableDownload = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${metadataOnlySourcePackage.body.sourcePackage.sourcePackageId}/download`
+  );
+  assert.equal(unavailableDownload.status, 409);
+  assert.equal(
+    unavailableDownload.body.error,
+    "source_package_download_unavailable"
+  );
 
   const invalidRetryMediaType = await requestJson<{ error: string }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${validSourcePackage.body.sourcePackage.sourcePackageId}/retry-import`,
@@ -13745,6 +13817,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportResponseCsv: string;
         exportLogCsv: string;
         exportReviewCsv: string;
+        downloadSourcePackage: string;
         listReviews: string;
         deleteGroupResults: string;
         getContentReleaseActivationReadiness: string;
@@ -13781,6 +13854,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "workspace_directory_csv_export",
     "workspace_overview_csv_export",
     "source_package_read",
+    "source_package_download",
     "source_package_csv_export",
     "source_package_retry",
     "import_job_read",
@@ -13823,6 +13897,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     /workspace-overview\.csv/
   );
   assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
+  assert.match(
+    manifest.routes.workspace.downloadSourcePackage,
+    /source-packages\/.+\/download/
+  );
   assert.match(
     manifest.routes.workspace.exportParticipantRosterCsv,
     /participant-roster\.csv/

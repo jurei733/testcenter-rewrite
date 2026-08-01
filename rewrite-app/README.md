@@ -320,6 +320,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/source-packages.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/download`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/retry-import`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
@@ -376,7 +377,7 @@ The added read side now makes the first slice inspectable:
 - study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context, and can be narrowed by the same login/group/booklet/unit/status/answer/limit filters used by the operator matrix
 - study monitor run-detail CSV export flattens the selected run into unit rows with expected/current/answered state, response length, review count, and response text for per-participant support handoff
 - open-run reads and CSV export flatten the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff, filterable by login, group, booklet, session, run, unit, status, and limit
-- source-package listing and CSV export show uploaded packages together with their latest import attempt and package structure counts, filterable by status, media type, file name, latest import status, and limit
+- source-package listing and CSV export show uploaded package files together with exact stored byte size, download availability, import/release dependency counts, latest import attempt, and package structure counts, filterable by status, media type, file name, latest import status, and limit; list responses omit the potentially large source document, while a protected binary route downloads text/JSON/XML or base64 ZIP uploads with safe attachment names and without routing file bytes through a JSON response
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing and CSV export show completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists
@@ -512,7 +513,7 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 
 - admin bootstrap, current-session, sign-out, sign-in, protected tenant/workspace directory reads, protected admin-user and audit read models plus their filters, admin-user creation, password reset, scoped role assignment/revocation, and status deactivation
 - workspace bootstrap and workspace overview export
-- source-package import/export, import-job/content-release export, release activation, direct unit `Definition` prompt extraction, and roster-compatibility warning drill-downs for staged releases
+- source-package import/export, protected byte-exact source-file download with file-size/dependency cards, import-job/content-release export, release activation, direct unit `Definition` prompt extraction, and roster-compatibility warning drill-downs for staged releases
 - participant sign-in, optional participant-password entry, original per-booklet second-code challenge, code-scoped session reuse, session resume, direct `Definition` prompt display, and participant completion
 - CSV/TSV/semicolon roster import with canonical or alias headers, XML/original Testcenter `Login`/JSON participant roster import including password-required metadata, participant-session export, and open-run export through the runtime shell
 - response and review CSV export plus review-readiness inspection through the runtime shell

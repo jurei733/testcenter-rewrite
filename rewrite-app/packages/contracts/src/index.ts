@@ -1462,6 +1462,8 @@ export const productionApiRoutes = {
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
+    downloadSourcePackage:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/download",
     exportSourcePackagesCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/source-packages.csv",
     retrySourcePackageImport:

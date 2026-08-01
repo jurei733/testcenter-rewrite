@@ -4,7 +4,9 @@ import {
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetImportJobResponse,
-  type GetSourcePackageResponse
+  type GetSourcePackageResponse,
+  productionApiRoutes,
+  resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
@@ -29,7 +31,7 @@ import {
   runBlockedActivationFlow,
   runImportActivateFlow
 } from "./rewrite-app-shell.workflows";
-import { downloadTextFile } from "./download-text-file";
+import { downloadBlobFile, downloadTextFile } from "./download-text-file";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppShellContentHostsService } from "./rewrite-app-shell-content-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -155,6 +157,28 @@ export class RewriteAppContentService {
 
   async loadSourcePackageDetail(): Promise<GetSourcePackageResponse> {
     return loadSourcePackageDetailAction(this.hosts.createContentDetailsHost());
+  }
+
+  async downloadSourcePackage(): Promise<void> {
+    if (!this.hasWorkspaceScope() || !this.contentState.sourcePackageId.trim()) {
+      return;
+    }
+    const sourcePackageId = this.contentState.sourcePackageId.trim();
+    const download = await this.requestState.requestDownload(
+      "Source Package Download",
+      resolveRoutePath(productionApiRoutes.workspace.downloadSourcePackage, {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+        sourcePackageId
+      })
+    );
+    const filename =
+      download.filename || this.contentState.sourceFileName.trim() || "source-package";
+    downloadBlobFile({ filename, blob: download.blob });
+    this.feedback.rememberActivity(
+      "Source Package Downloaded",
+      `${filename} downloaded as ${download.blob.size} byte(s).`
+    );
   }
 
   async loadImportJobDetail(): Promise<GetImportJobResponse> {

@@ -212,7 +212,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="sourcePackageDetailButton" class="primary" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.getSourcePackageDetail()">Source Package Detail</button>
           <button id="importJobDetailButton" class="secondary" type="button" [disabled]="!view.canUseSelectedImportJob" (click)="view.getImportJobDetail()">Import Job Detail</button>
-          <button id="downloadSourceDocumentButton" class="secondary" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.downloadSelectedSourceDocument()">Download Source Document</button>
+          <button id="downloadSourceDocumentButton" class="secondary" type="button" [disabled]="!view.canDownloadSelectedSourcePackage" (click)="view.downloadSelectedSourceDocument()">Download Stored File</button>
           <button id="participantSessionDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedParticipantSession" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
           <button id="releaseReadinessButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseActivationReadiness()">Release Readiness</button>
           <button id="releaseDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseDetail()">Release Detail</button>

@@ -23,7 +23,6 @@ import {
   readStringValue,
   readUnknownValue
 } from "./rewrite-app-shell.readers";
-import { downloadDataUrlFile, downloadTextFile } from "./download-text-file";
 import type { RecordCollectionItem } from "./record-collection.component";
 import {
   type ParticipantSessionEntryLinkContext,
@@ -85,6 +84,20 @@ export class ContentViewFacade {
 
   get canUseSelectedSourcePackage(): boolean {
     return this.isWorkspaceScopeComplete() && this.content.sourcePackageId.trim() !== "";
+  }
+
+  get canDownloadSelectedSourcePackage(): boolean {
+    if (!this.canUseSelectedSourcePackage) {
+      return false;
+    }
+    const selectedSourcePackageId = this.content.sourcePackageId.trim();
+    const payload = parseJsonDocument<ListSourcePackagesResponse>(
+      this.content.sourcePackagesView
+    );
+    const listedPackage = payload?.items.find(
+      item => item.sourcePackage.sourcePackageId === selectedSourcePackageId
+    );
+    return listedPackage?.downloadAvailable ?? true;
   }
 
   get canUseSelectedImportJob(): boolean {
@@ -551,6 +564,16 @@ export class ContentViewFacade {
         ],
         rows: [
           { label: "Media Type", value: item.sourcePackage.mediaType },
+          {
+            label: "Stored File",
+            value: item.downloadAvailable
+              ? `${item.fileSizeBytes ?? 0} byte(s), downloadable`
+              : "no source document"
+          },
+          {
+            label: "Dependencies",
+            value: `${item.importJobCount} import(s), ${item.contentReleaseCount} release(s)`
+          },
           {
             label: "Uploaded",
             value: this.formatDateTime(item.sourcePackage.uploadedAt)
@@ -1916,40 +1939,10 @@ export class ContentViewFacade {
   }
 
   downloadSelectedSourceDocument(): void {
-    if (!this.canUseSelectedSourcePackage) {
+    if (!this.canDownloadSelectedSourcePackage) {
       return;
     }
-    this.viewState.onActionAsync(async () => {
-      const payload = await this.resolveSourcePackageDetailForDownload();
-      const sourcePackage = payload.sourcePackageDetail.sourcePackage;
-      const sourceDocument = sourcePackage.sourceDocument ?? "";
-      const filename = sourcePackage.fileName.trim() || "source-document.txt";
-      const mediaType = sourcePackage.mediaType.trim() || "text/plain";
-
-      if (!sourceDocument.trim()) {
-        this.feedback.rememberActivity(
-          "Source Document Download Skipped",
-          `${filename} has no persisted source document to download.`
-        );
-        return;
-      }
-
-      const downloadedFromDataUrl = downloadDataUrlFile({
-        filename,
-        dataUrl: sourceDocument
-      });
-      if (!downloadedFromDataUrl) {
-        downloadTextFile({
-          filename,
-          mediaType,
-          text: sourceDocument
-        });
-      }
-      this.feedback.rememberActivity(
-        "Source Document Downloaded",
-        `${filename} downloaded from the selected source package.`
-      );
-    });
+    this.viewState.onActionAsync(() => this.contentService.downloadSourcePackage());
   }
 
   retrySourcePackageImport(): void {
@@ -2062,26 +2055,6 @@ export class ContentViewFacade {
       return "XML source document";
     }
     return "Text source document";
-  }
-
-  private async resolveSourcePackageDetailForDownload(): Promise<GetSourcePackageResponse> {
-    const selectedSourcePackageId = this.content.sourcePackageId.trim();
-    const existingPayload = parseJsonDocument<GetSourcePackageResponse>(
-      this.content.sourcePackageDetailView
-    );
-    const existingSourcePackage =
-      existingPayload?.sourcePackageDetail.sourcePackage ?? null;
-
-    if (
-      existingPayload &&
-      existingSourcePackage &&
-      (!selectedSourcePackageId ||
-        existingSourcePackage.sourcePackageId === selectedSourcePackageId)
-    ) {
-      return existingPayload;
-    }
-
-    return this.contentService.loadSourcePackageDetail();
   }
 
   private buildReadWindowItem(
