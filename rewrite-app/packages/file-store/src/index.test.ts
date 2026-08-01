@@ -108,6 +108,10 @@ describe("createFileFirstSliceRepository", () => {
         entries.find(entry => entry.loginKey === "open-student")?.passwordRequired,
         false
       );
+      assert.deepEqual(
+        entries.find(entry => entry.loginKey === "protected-student")?.customTexts,
+        {}
+      );
       assert.equal(
         await repository.getParticipantRosterPasswordHash(
           "tenant-id",

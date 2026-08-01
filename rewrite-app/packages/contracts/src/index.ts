@@ -88,6 +88,7 @@ export type ParsedParticipantRosterEntry = {
   validFrom?: string | null;
   validTo?: string | null;
   validForMinutes?: number | null;
+  customTexts?: Record<string, string>;
 };
 
 export const originalTestcenterOperationalLoginModes = [
@@ -1158,6 +1159,29 @@ const parseParticipantRosterXmlText = (
   }
 
   const entries: ParsedParticipantRosterEntry[] = [];
+  const customTexts = (() => {
+    const section = rosterText.match(
+      /<((?:[a-zA-Z_][\w.-]*:)?customtexts)\b[^>]*>([\s\S]*?)<\/\1>/i
+    )?.[2];
+    if (!section) {
+      return {};
+    }
+    return Object.fromEntries(
+      Array.from(
+        section.matchAll(
+          /<((?:[a-zA-Z_][\w.-]*:)?customtext)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+        )
+      ).flatMap(match => {
+        const key = normalizeRosterTextValue(
+          readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "key")
+        );
+        if (!key) {
+          return [];
+        }
+        return [[key, decodeXmlText((match[3] ?? "").trim())] as const];
+      })
+    );
+  })();
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -1363,6 +1387,7 @@ const parseParticipantRosterXmlText = (
       })(),
       displayName,
       ...(password ? { password } : {}),
+      ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
@@ -1489,6 +1514,7 @@ const parseParticipantRosterXmlText = (
       })(),
       displayName,
       ...(password ? { password } : {}),
+      ...(Object.keys(customTexts).length > 0 ? { customTexts } : {}),
       ...readXmlAccessWindow(attributes, entryOffset)
     });
   }

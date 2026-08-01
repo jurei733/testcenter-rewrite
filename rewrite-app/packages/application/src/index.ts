@@ -16267,6 +16267,7 @@ export const createFirstSliceServices = (
             validFrom,
             validTo,
             validForMinutes: parsedEntry.validForMinutes ?? null,
+            customTexts: parsedEntry.customTexts ?? {},
             importedAt: now()
           };
 
@@ -17837,7 +17838,8 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             409,
             "participant_code_required",
-            `Participant '${loginKey}' must enter the assigned participant code.`
+            `Participant '${loginKey}' must enter the assigned participant code.`,
+            { customTexts: rosterEntry?.customTexts ?? {} }
           );
         }
         if (
@@ -17849,7 +17851,8 @@ export const createFirstSliceServices = (
           throw new FirstSliceError(
             400,
             "participant_code_invalid",
-            "The participant code is invalid."
+            "The participant code is invalid.",
+            { customTexts: rosterEntry?.customTexts ?? {} }
           );
         }
         const effectiveParticipantCode = codeRequired ? participantCode : null;

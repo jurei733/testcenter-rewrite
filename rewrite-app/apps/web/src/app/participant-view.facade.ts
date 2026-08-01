@@ -29,6 +29,7 @@ import {
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import type {
+  ParticipantRosterEntry,
   ParticipantRuntimeBooklet,
   ParticipantTestLogEntryInput,
   WorkspaceReview
@@ -204,6 +205,7 @@ export class ParticipantViewFacade {
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  private participantCustomTexts: Record<string, string> = {};
   participantCodeRequired = false;
   veronaSaveStatus:
     | "not_saved"
@@ -1456,6 +1458,10 @@ export class ParticipantViewFacade {
     );
   }
 
+  customText(key: string, fallback: string): string {
+    return this.participantCustomTexts[key]?.trim() || fallback;
+  }
+
   async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
     const normalizedSessionEntryLink = sessionEntryLink.trim();
     if (!normalizedSessionEntryLink) {
@@ -1579,6 +1585,7 @@ export class ParticipantViewFacade {
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
+    this.participantCustomTexts = {};
     this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
@@ -1616,6 +1623,17 @@ export class ParticipantViewFacade {
   private handleParticipantCodeChallenge(error: unknown): boolean {
     if (!this.requestState.isApiError(error)) {
       return false;
+    }
+    const details = error.details;
+    if (details && typeof details === "object" && "customTexts" in details) {
+      const customTexts = (details as { customTexts?: unknown }).customTexts;
+      if (customTexts && typeof customTexts === "object" && !Array.isArray(customTexts)) {
+        this.participantCustomTexts = Object.fromEntries(
+          Object.entries(customTexts).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string"
+          )
+        );
+      }
     }
     if (error.error === "participant_code_invalid") {
       this.participantCodeRequired = true;
@@ -2301,10 +2319,14 @@ export class ParticipantViewFacade {
   }
 
   private syncParticipantRosterEntry(
-    participantRosterEntry: { displayName: string | null } | null
+    participantRosterEntry: Pick<
+      ParticipantRosterEntry,
+      "displayName" | "customTexts"
+    > | null
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
+    this.participantCustomTexts = participantRosterEntry?.customTexts ?? {};
   }
 
   private syncRuntimeBooklets(booklets: ParticipantRuntimeBooklet[]): void {

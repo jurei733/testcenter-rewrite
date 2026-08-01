@@ -15589,6 +15589,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       }>;
       displayName: string | null;
       passwordRequired: boolean;
+      customTexts?: Record<string, string>;
       validationWarnings: Array<{ code: string; message: string }>;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
@@ -15725,6 +15726,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       body: {
         rosterText: [
           "<Testtakers>",
+          "  <CustomTexts><CustomText key=\"login_subtitle\">Project test selection</CustomText><CustomText key=\"login_testEndButtonLabel\">Submit project test</CustomText></CustomTexts>",
           "  <Group id=\"sample_group\" label=\"Primary Sample Group\">",
           "    <Login mode=\"run-hot-return\" name=\"test\" pw=\"user123\">",
           "      <Booklet codes=\"xxx yyy\">BOOKLET.SAMPLE-1</Booklet>",
@@ -15776,6 +15778,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
   );
   assert.equal(testcenterLogin?.displayName, null);
   assert.equal(testcenterLogin?.passwordRequired, true);
+  assert.deepEqual(testcenterLogin?.customTexts, {
+    login_subtitle: "Project test selection",
+    login_testEndButtonLabel: "Submit project test"
+  });
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
     item => item.loginKey === "test-group-monitor"
   );
@@ -15893,6 +15899,13 @@ test("workspace participant roster can be imported, updated, and listed", async 
 
   assert.equal(listedRoster.status, 200);
   assert.equal(listedRoster.body.items.length, 12);
+  assert.deepEqual(
+    listedRoster.body.items.find(item => item.loginKey === "test")?.customTexts,
+    {
+      login_subtitle: "Project test selection",
+      login_testEndButtonLabel: "Submit project test"
+    }
+  );
   assert.deepEqual(
     listedRoster.body.items.map(item => item.loginKey),
     [

@@ -16,7 +16,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
         <header class="participant-entry-hero">
           <div>
             <span>Participant Entry</span>
-            <h2>Start or Resume Test</h2>
+            <h2 id="participantCustomLoginSubtitle">{{ view.customText('login_subtitle', 'Start or Resume Test') }}</h2>
             <p>Use a direct link or enter the assigned workspace and login key. The test opens the assigned booklet directly.</p>
           </div>
           <div class="participant-entry-status">
@@ -102,7 +102,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <input id="participantPassword" name="participantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
           </label>
           <label *ngIf="view.participantCodeRequired">
-            Participant Code
+            {{ view.customText('login_codeInputTitle', 'Participant Code') }}
             <input id="participantCode" name="participantCode" autocomplete="one-time-code" [(ngModel)]="view.runtime.participantCode" />
           </label>
           <label>
@@ -159,13 +159,13 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </div>
         </section>
         <p id="participantCodePrompt" class="hint" *ngIf="view.participantCodeRequired">
-          This login requires the second code assigned by the test supervisor.
+          {{ view.customText('login_codeInputPrompt', 'This login requires the second code assigned by the test supervisor.') }}
         </p>
         <div class="actions">
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In
           </button>
-          <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">Start Or Resume</button>
+          <button id="participantRouteStartOrResumeButton" class="primary" type="button" [disabled]="!view.canStartOrResume" (click)="view.resumeSession()">{{ view.customText('login_testResumeButtonLabel', 'Start Or Resume') }}</button>
           <button id="participantRouteRefreshCurrentStateButton" class="ghost" type="button" [disabled]="!view.canRefreshCurrentState" (click)="view.refreshCurrentState()">Refresh Current State</button>
           <button id="participantRouteClearSessionButton" class="ghost" type="button" [disabled]="!view.player.canClearSession" (click)="view.clearSession()">Leave Session</button>
         </div>
@@ -602,7 +602,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>
-            <button id="participantRouteCompleteButton" class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">Complete Test</button>
+            <button id="participantRouteCompleteButton" class="ghost" type="button" [disabled]="!view.player.canComplete" (click)="view.completeRun()">{{ view.customText('login_testEndButtonLabel', 'Complete Test') }}</button>
           </div>
         </div>
       </article>

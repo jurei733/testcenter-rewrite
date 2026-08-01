@@ -320,6 +320,7 @@ export type ParticipantRosterEntry = {
   validFrom?: string | null;
   validTo?: string | null;
   validForMinutes?: number | null;
+  customTexts?: Record<string, string>;
   importedAt: string;
 };
 

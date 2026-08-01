@@ -2582,6 +2582,12 @@ try {
       body: {
         rosterText: [
           "<Testtakers>",
+          "  <CustomTexts>",
+          "    <CustomText key=\"login_subtitle\">Project Test Selection</CustomText>",
+          "    <CustomText key=\"login_codeInputTitle\">Project Access Code</CustomText>",
+          "    <CustomText key=\"login_codeInputPrompt\">Ask the project supervisor for your access code.</CustomText>",
+          "    <CustomText key=\"login_testResumeButtonLabel\">Open Project Test</CustomText>",
+          "  </CustomTexts>",
           `  <Group id="${codedParticipantGroupKey}">`,
           `    <Login mode="run-hot-return" name="${codedParticipantLoginKey}">`,
           "      <Booklet codes=\"alpha beta\">booklet:starter</Booklet>",
@@ -2600,6 +2606,15 @@ try {
   await page.locator("#participantRouteSignInButton").click();
   await page.locator("#participantCodePrompt").waitFor({ timeout: 15_000 });
   await page.locator("#participantCode").waitFor({ timeout: 15_000 });
+  await page
+    .locator("label")
+    .filter({ hasText: "Project Access Code" })
+    .filter({ has: page.locator("#participantCode") })
+    .waitFor();
+  await page
+    .locator("#participantCodePrompt")
+    .filter({ hasText: "Ask the project supervisor for your access code." })
+    .waitFor();
   await expectInputValue("#participantRouteSessionId", "");
   await fillAndCommitUntilValue("#participantCode", "wrong");
   await page.locator("#participantRouteSignInButton").click();
@@ -2630,6 +2645,14 @@ try {
     "UI smoke expected the second participant code to create a scoped session."
   );
   await expectInputValue("#participantRouteSessionId", codedParticipantSessionId);
+  await page
+    .locator("#participantCustomLoginSubtitle")
+    .filter({ hasText: "Project Test Selection" })
+    .waitFor();
+  await page
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "Open Project Test" })
+    .waitFor();
   assert.equal(
     await page.locator("#participantCode").count(),
     0,

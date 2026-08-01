@@ -100,6 +100,10 @@ const readStateFromFile = async (
         entryId,
         {
           ...entry,
+          customTexts:
+            entry.customTexts && typeof entry.customTexts === "object"
+              ? entry.customTexts
+              : {},
           bookletKey:
             entry.bookletKey ??
             (Array.isArray(entry.bookletKeys) &&

@@ -292,6 +292,20 @@ const mapParticipantRosterEntry = (
             return [];
           }
         })();
+        const customTexts = (() => {
+          try {
+            const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? Object.fromEntries(
+                  Object.entries(parsed).filter(
+                    (entry): entry is [string, string] => typeof entry[1] === "string"
+                  )
+                )
+              : {};
+          } catch {
+            return {};
+          }
+        })();
         return {
           participantRosterEntryId: String(row.participant_roster_entry_id),
           tenantId: String(row.tenant_id),
@@ -331,6 +345,7 @@ const mapParticipantRosterEntry = (
             row.valid_for_minutes === null || row.valid_for_minutes === undefined
               ? null
               : Number(row.valid_for_minutes),
+          customTexts,
           importedAt: String(row.imported_at)
         };
       })()
@@ -549,7 +564,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 34;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 35;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -1030,6 +1045,13 @@ const sqliteMigrations: SqliteMigration[] = [
     name: "add_admin_role_monitor_profiles",
     sql: `
       ALTER TABLE admin_role_assignments ADD COLUMN monitor_profiles_json TEXT NOT NULL DEFAULT '[]';
+    `
+  },
+  {
+    version: 35,
+    name: "add_participant_custom_texts",
+    sql: `
+      ALTER TABLE participant_roster_entries ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';
     `
   }
 ];
@@ -1813,7 +1835,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, imported_at
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1840,8 +1862,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, execution_mode, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, custom_texts_json, imported_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             execution_mode = excluded.execution_mode,
@@ -1855,6 +1877,7 @@ export const createSqliteFirstSliceRepository = (
             valid_from = excluded.valid_from,
             valid_to = excluded.valid_to,
             valid_for_minutes = excluded.valid_for_minutes,
+            custom_texts_json = excluded.custom_texts_json,
             imported_at = excluded.imported_at`
         )
         .run(
@@ -1879,6 +1902,7 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.validFrom ?? null,
           participantRosterEntry.validTo ?? null,
           participantRosterEntry.validForMinutes ?? null,
+          JSON.stringify(participantRosterEntry.customTexts ?? {}),
           participantRosterEntry.importedAt
         );
     },

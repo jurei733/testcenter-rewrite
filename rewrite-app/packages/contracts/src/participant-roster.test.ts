@@ -328,6 +328,30 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("applies Original Testtakers custom texts to every participant login", () => {
+    const entries = parseParticipantRosterText(
+      [
+        "<Testtakers>",
+        "  <CustomTexts>",
+        "    <CustomText key=\"login_subtitle\">Project &amp; Study</CustomText>",
+        "    <CustomText key=\"login_testEndButtonLabel\">Submit answers</CustomText>",
+        "  </CustomTexts>",
+        "  <Group id=\"students\">",
+        "    <Login mode=\"run-hot-return\" name=\"one\"><Booklet>BOOKLET.A</Booklet></Login>",
+        "    <Login mode=\"run-hot-return\" name=\"two\"><Booklet>BOOKLET.B</Booklet></Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    );
+
+    assert.equal(entries.length, 2);
+    assert.deepEqual(entries[0]?.customTexts, {
+      login_subtitle: "Project & Study",
+      login_testEndButtonLabel: "Submit answers"
+    });
+    assert.deepEqual(entries[1]?.customTexts, entries[0]?.customTexts);
+  });
+
   it("inherits Original Testcenter access windows and accepts JSON/CSV aliases", () => {
     assert.deepEqual(
       parseParticipantRosterText(
