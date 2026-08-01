@@ -124,10 +124,12 @@ export type PersistedShellState = {
   adminCreateRole: AdminRole;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
+  adminCreateGroupKey: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
+  adminRoleGroupKey: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;

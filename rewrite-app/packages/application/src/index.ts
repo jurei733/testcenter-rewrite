@@ -653,6 +653,7 @@ export type MonitorReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -665,6 +666,7 @@ export type MonitorReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -768,6 +770,7 @@ export type AdminDirectoryPort = {
       role: AdminRole;
       tenantKey?: string | null;
       workspaceKey?: string | null;
+      groupKey?: string | null;
     }>;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   updateAdminUser(input: {
@@ -787,6 +790,7 @@ export type AdminDirectoryPort = {
     role: AdminRole;
     tenantKey?: string | null;
     workspaceKey?: string | null;
+    groupKey?: string | null;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   revokeAdminRole(input: {
     sessionToken: string;
@@ -1080,7 +1084,9 @@ const PASSWORD_HASH_KEY_LENGTH = 64;
 const ADMIN_ROLES: AdminRole[] = [
   "platform_admin",
   "tenant_admin",
-  "workspace_admin"
+  "workspace_admin",
+  "study_monitor",
+  "group_monitor"
 ];
 const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
 const TEST_RUN_PROGRESS_STATUSES: Array<
@@ -1257,12 +1263,14 @@ type AdminRoleAssignmentInput = {
   role: AdminRole;
   tenantKey?: string | null;
   workspaceKey?: string | null;
+  groupKey?: string | null;
 };
 
 type ResolvedAdminRoleScope = {
   role: AdminRole;
   tenantId: string | null;
   workspaceId: string | null;
+  groupKey: string | null;
 };
 
 const normalizeAdminUsername = (value: unknown): string => {
@@ -2367,17 +2375,23 @@ const resolveAdminRoleScope = async (
   const role = normalizeAdminRole(input.role);
   const tenantKey = normalizeOptionalScopeKey(input.tenantKey, "tenantKey");
   const workspaceKey = normalizeOptionalScopeKey(input.workspaceKey, "workspaceKey");
+  const groupKey = normalizeOptionalScopeKey(input.groupKey, "groupKey");
 
   if (role === "platform_admin") {
-    if (tenantKey || workspaceKey) {
+    if (tenantKey || workspaceKey || groupKey) {
       throw new FirstSliceError(
         400,
         "admin_role_scope_invalid",
-        "Platform admin role assignments must not include tenant or workspace scope."
+        "Platform admin role assignments must not include tenant, workspace, or group scope."
       );
     }
 
-    return { role, tenantId: null, workspaceId: null };
+    return {
+      role,
+      tenantId: null,
+      workspaceId: null,
+      groupKey: null
+    };
   }
 
   if (!tenantKey) {
@@ -2389,28 +2403,52 @@ const resolveAdminRoleScope = async (
   }
 
   if (role === "tenant_admin") {
-    if (workspaceKey) {
+    if (workspaceKey || groupKey) {
       throw new FirstSliceError(
         400,
         "admin_role_scope_invalid",
-        "Tenant admin role assignments must not include workspaceKey."
+        "Tenant admin role assignments must not include workspaceKey or groupKey."
       );
     }
 
     const tenant = await requireTenant(repository, tenantKey);
-    return { role, tenantId: tenant.tenantId, workspaceId: null };
+    return {
+      role,
+      tenantId: tenant.tenantId,
+      workspaceId: null,
+      groupKey: null
+    };
   }
 
   if (!workspaceKey) {
     throw new FirstSliceError(
       400,
       "admin_role_scope_invalid",
-      "Workspace admin role assignments require tenantKey and workspaceKey."
+      "Workspace-scoped role assignments require tenantKey and workspaceKey."
     );
   }
 
   const workspace = await requireWorkspace(repository, tenantKey, workspaceKey);
-  return { role, tenantId: workspace.tenantId, workspaceId: workspace.workspaceId };
+  if (role === "group_monitor" && !groupKey) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_scope_invalid",
+      "Group monitor role assignments require groupKey."
+    );
+  }
+  if (role !== "group_monitor" && groupKey) {
+    throw new FirstSliceError(
+      400,
+      "admin_role_scope_invalid",
+      "Only group monitor role assignments may include groupKey."
+    );
+  }
+  return {
+    role,
+    tenantId: workspace.tenantId,
+    workspaceId: workspace.workspaceId,
+    groupKey: role === "group_monitor" ? groupKey : null
+  };
 };
 
 const isSameAdminRoleScope = (
@@ -2419,7 +2457,8 @@ const isSameAdminRoleScope = (
 ): boolean =>
   roleAssignment.role === scope.role &&
   roleAssignment.tenantId === scope.tenantId &&
-  roleAssignment.workspaceId === scope.workspaceId;
+  roleAssignment.workspaceId === scope.workspaceId &&
+  roleAssignment.groupKey === scope.groupKey;
 
 const summarizeAdminRoleAssignment = (
   roleAssignment: AdminRoleAssignment
@@ -2427,7 +2466,8 @@ const summarizeAdminRoleAssignment = (
   roleAssignmentId: roleAssignment.roleAssignmentId,
   role: roleAssignment.role,
   tenantId: roleAssignment.tenantId,
-  workspaceId: roleAssignment.workspaceId
+  workspaceId: roleAssignment.workspaceId,
+  groupKey: roleAssignment.groupKey
 });
 
 const createAdminUserDirectoryItem = async (
@@ -2850,6 +2890,7 @@ type WorkspaceReviewFilters = {
 type OpenMonitorRunFilters = {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
@@ -2873,6 +2914,9 @@ const filterOpenMonitorRuns = (
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
     groupKey: normalizeExactFilter(input.groupKey),
+    groupKeys: input.groupKeys
+      ?.map(groupKey => normalizeExactFilter(groupKey))
+      .filter((groupKey): groupKey is string => Boolean(groupKey)),
     bookletKey: normalizeExactFilter(input.bookletKey),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
@@ -2885,6 +2929,7 @@ const filterOpenMonitorRuns = (
       item =>
         (!filters.loginKey || item.loginKey === filters.loginKey) &&
         (!filters.groupKey || item.groupKey === filters.groupKey) &&
+        (!filters.groupKeys?.length || filters.groupKeys.includes(item.groupKey)) &&
         (!filters.bookletKey ||
           item.bookletKey === filters.bookletKey ||
           item.bookletAssignmentKey === filters.bookletKey ||
@@ -13999,6 +14044,7 @@ export const createFirstSliceServices = (
           role: "platform_admin",
           tenantId: null,
           workspaceId: null,
+          groupKey: null,
           createdAt: timestamp
         };
 
@@ -14327,6 +14373,7 @@ export const createFirstSliceServices = (
             role: scope.role,
             tenantId: scope.tenantId,
             workspaceId: scope.workspaceId,
+            groupKey: scope.groupKey,
             createdAt: timestamp
           };
           await repository.saveAdminRoleAssignment(roleAssignment);
@@ -14463,6 +14510,7 @@ export const createFirstSliceServices = (
           role: scope.role,
           tenantId: scope.tenantId,
           workspaceId: scope.workspaceId,
+          groupKey: scope.groupKey,
           createdAt: now()
         };
         await repository.saveAdminRoleAssignment(roleAssignment);

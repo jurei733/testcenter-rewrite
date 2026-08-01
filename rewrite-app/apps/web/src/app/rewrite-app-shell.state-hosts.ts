@@ -696,6 +696,12 @@ export function createShellPersistenceStateHost(args: {
     set adminCreateWorkspaceKey(nextValue) {
       args.opsState.adminCreateWorkspaceKey = nextValue;
     },
+    get adminCreateGroupKey() {
+      return args.opsState.adminCreateGroupKey;
+    },
+    set adminCreateGroupKey(nextValue) {
+      args.opsState.adminCreateGroupKey = nextValue;
+    },
     get adminRoleTargetUserId() {
       return args.opsState.adminRoleTargetUserId;
     },
@@ -719,6 +725,12 @@ export function createShellPersistenceStateHost(args: {
     },
     set adminRoleWorkspaceKey(nextValue) {
       args.opsState.adminRoleWorkspaceKey = nextValue;
+    },
+    get adminRoleGroupKey() {
+      return args.opsState.adminRoleGroupKey;
+    },
+    set adminRoleGroupKey(nextValue) {
+      args.opsState.adminRoleGroupKey = nextValue;
     },
     get adminRevokeTargetUserId() {
       return args.opsState.adminRevokeTargetUserId;

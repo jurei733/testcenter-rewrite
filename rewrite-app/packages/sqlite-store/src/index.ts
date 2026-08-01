@@ -106,6 +106,10 @@ const mapAdminRoleAssignment = (
           row.workspace_id === null || row.workspace_id === undefined
             ? null
             : String(row.workspace_id),
+        groupKey:
+          row.group_key === null || row.group_key === undefined
+            ? null
+            : String(row.group_key),
         createdAt: String(row.created_at)
       }
     : null;
@@ -522,7 +526,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 31;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 32;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -980,6 +984,13 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE workspace_reviews ADD COLUMN original_unit_id TEXT;
       ALTER TABLE workspace_reviews ADD COLUMN user_agent TEXT;
     `
+  },
+  {
+    version: 32,
+    name: "add_admin_role_group_scope",
+    sql: `
+      ALTER TABLE admin_role_assignments ADD COLUMN group_key TEXT;
+    `
   }
 ];
 
@@ -1144,7 +1155,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const rows = database
         .prepare(
-          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
            FROM admin_role_assignments
            WHERE admin_user_id = ?`
         )
@@ -1157,13 +1168,14 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_role_assignments (
-            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
+            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(role_assignment_id) DO UPDATE SET
             admin_user_id = excluded.admin_user_id,
             role = excluded.role,
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
+            group_key = excluded.group_key,
             created_at = excluded.created_at`
         )
         .run(
@@ -1172,6 +1184,7 @@ export const createSqliteFirstSliceRepository = (
           roleAssignment.role,
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
+          roleAssignment.groupKey,
           roleAssignment.createdAt
         );
     },

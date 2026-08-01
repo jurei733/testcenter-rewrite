@@ -106,10 +106,12 @@ export type ShellPersistenceTarget = {
   adminCreateRole: AdminRole;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
+  adminCreateGroupKey: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
+  adminRoleGroupKey: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -223,10 +225,12 @@ export const createPersistedShellState = (
   adminCreateRole: target.adminCreateRole,
   adminCreateTenantKey: target.adminCreateTenantKey,
   adminCreateWorkspaceKey: target.adminCreateWorkspaceKey,
+  adminCreateGroupKey: target.adminCreateGroupKey,
   adminRoleTargetUserId: target.adminRoleTargetUserId,
   adminRoleRole: target.adminRoleRole,
   adminRoleTenantKey: target.adminRoleTenantKey,
   adminRoleWorkspaceKey: target.adminRoleWorkspaceKey,
+  adminRoleGroupKey: target.adminRoleGroupKey,
   adminRevokeTargetUserId: target.adminRevokeTargetUserId,
   adminRevokeRoleAssignmentId: target.adminRevokeRoleAssignmentId,
   adminStatusTargetUserId: target.adminStatusTargetUserId,
@@ -618,6 +622,8 @@ export const applyHydratedShellState = (
       snapshot.adminCreateWorkspaceKey,
       target.adminCreateWorkspaceKey
     );
+  target.adminCreateGroupKey =
+    hydrateString(snapshot.adminCreateGroupKey, target.adminCreateGroupKey);
   target.adminRoleTargetUserId =
     hydrateString(snapshot.adminRoleTargetUserId, target.adminRoleTargetUserId);
   target.adminRoleRole = snapshot.adminRoleRole ?? target.adminRoleRole;
@@ -628,6 +634,8 @@ export const applyHydratedShellState = (
       snapshot.adminRoleWorkspaceKey,
       target.adminRoleWorkspaceKey
     );
+  target.adminRoleGroupKey =
+    hydrateString(snapshot.adminRoleGroupKey, target.adminRoleGroupKey);
   target.adminRevokeTargetUserId =
     hydrateString(
       snapshot.adminRevokeTargetUserId,

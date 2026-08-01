@@ -109,6 +109,8 @@ export class OpsViewFacade {
 
   readonly ops = this.uiState.ops;
   readonly adminRoleOptions: AdminRole[] = [
+    "group_monitor",
+    "study_monitor",
     "workspace_admin",
     "tenant_admin",
     "platform_admin"
@@ -144,7 +146,8 @@ export class OpsViewFacade {
       this.isScopedAdminRoleInputComplete(
         this.ops.adminCreateRole,
         this.ops.adminCreateTenantKey,
-        this.ops.adminCreateWorkspaceKey
+        this.ops.adminCreateWorkspaceKey,
+        this.ops.adminCreateGroupKey
       )
     );
   }
@@ -163,7 +166,8 @@ export class OpsViewFacade {
       this.isScopedAdminRoleInputComplete(
         this.ops.adminRoleRole,
         this.ops.adminRoleTenantKey,
-        this.ops.adminRoleWorkspaceKey
+        this.ops.adminRoleWorkspaceKey,
+        this.ops.adminRoleGroupKey
       )
     );
   }
@@ -420,7 +424,9 @@ export class OpsViewFacade {
     this.ops.adminUserRoleFilter = this.ops.adminRoleRole;
     this.ops.adminUserTenantFilter = this.ops.adminRoleTenantKey;
     this.ops.adminUserWorkspaceFilter =
-      this.ops.adminRoleRole === "workspace_admin"
+      this.ops.adminRoleRole === "workspace_admin" ||
+      this.ops.adminRoleRole === "study_monitor" ||
+      this.ops.adminRoleRole === "group_monitor"
         ? this.ops.adminRoleWorkspaceKey
         : "";
     this.persistState();
@@ -735,6 +741,10 @@ export class OpsViewFacade {
           {
             label: "Workspace ID",
             value: roleAssignment.workspaceId ?? "all-workspaces"
+          },
+          {
+            label: "Group Key",
+            value: roleAssignment.groupKey ?? "all-groups"
           },
           {
             label: "Created",
@@ -1620,7 +1630,8 @@ export class OpsViewFacade {
   private isScopedAdminRoleInputComplete(
     role: AdminRole,
     tenantKey: string,
-    workspaceKey: string
+    workspaceKey: string,
+    groupKey: string
   ): boolean {
     if (role === "platform_admin") {
       return true;
@@ -1628,6 +1639,14 @@ export class OpsViewFacade {
 
     if (role === "tenant_admin") {
       return tenantKey.trim() !== "";
+    }
+
+    if (role === "group_monitor") {
+      return (
+        tenantKey.trim() !== "" &&
+        workspaceKey.trim() !== "" &&
+        groupKey.trim() !== ""
+      );
     }
 
     return tenantKey.trim() !== "" && workspaceKey.trim() !== "";

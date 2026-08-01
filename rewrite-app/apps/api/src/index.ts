@@ -1027,7 +1027,9 @@ const parseAdminUserListQuery = (
     role &&
     role !== "platform_admin" &&
     role !== "tenant_admin" &&
-    role !== "workspace_admin"
+    role !== "workspace_admin" &&
+    role !== "study_monitor" &&
+    role !== "group_monitor"
   ) {
     sendError(
       response,
@@ -1838,6 +1840,166 @@ const hasOperatorAccess = async (
       roleAssignment.role === "workspace_admin" &&
       roleAssignment.workspaceId === workspace.workspaceId
   );
+};
+
+type MonitorRouteScope =
+  | { kind: "workspace_monitor" }
+  | { kind: "study_workspace" }
+  | { kind: "study_group"; groupKey: string };
+
+type MonitorOperatorAccess =
+  | { kind: "full" }
+  | { kind: "groups"; groupKeys: string[] };
+
+const monitorOperatorAccessByRequest = new WeakMap<
+  IncomingMessage,
+  MonitorOperatorAccess
+>();
+
+const workspaceMonitorRouteChecks: Array<[string, RegExp]> = [
+  ["GET", openRunsCsvExportPattern],
+  ["GET", monitorOpenRunsPattern],
+  ["GET", monitorEventStreamPattern],
+  ["POST", monitorRunCommandsPattern],
+  ["POST", monitorRunCommandPattern]
+];
+
+const studyMonitorRouteChecks: Array<[string, RegExp]> = [
+  ["GET", studyMonitorSummaryPattern],
+  ["GET", studyMonitorParticipantMatrixPattern],
+  ["GET", studyMonitorParticipantPattern],
+  ["GET", studyMonitorGroupPattern],
+  ["GET", studyMonitorBookletPattern],
+  ["GET", studyMonitorUnitPattern],
+  ["GET", studyMonitorRunPattern],
+  ["GET", studyMonitorCsvExportPattern],
+  ["GET", studyMonitorParticipantMatrixCsvExportPattern],
+  ["GET", studyMonitorRunCsvExportPattern]
+];
+
+const resolveMonitorRouteScope = (
+  method: string,
+  pathname: string
+): MonitorRouteScope | null => {
+  for (const [expectedMethod, pattern] of workspaceMonitorRouteChecks) {
+    if (method === expectedMethod && pattern.test(pathname)) {
+      return { kind: "workspace_monitor" };
+    }
+  }
+
+  if (method === "GET") {
+    const groupMatch = studyMonitorGroupPattern.exec(pathname);
+    const groupKey = groupMatch?.groups
+      ? decodeRouteGroup(groupMatch.groups.groupKey)
+      : null;
+    if (groupKey) {
+      return { kind: "study_group", groupKey };
+    }
+  }
+
+  for (const [expectedMethod, pattern] of studyMonitorRouteChecks) {
+    if (method === expectedMethod && pattern.test(pathname)) {
+      return { kind: "study_workspace" };
+    }
+  }
+
+  return null;
+};
+
+const resolveMonitorOperatorAccess = async (input: {
+  repository: FirstSliceRepository;
+  roleAssignments: AdminRoleAssignment[];
+  tenantKey: string;
+  workspaceKey: string;
+  routeScope: MonitorRouteScope;
+}): Promise<MonitorOperatorAccess | null> => {
+  const workspace = await input.repository.getWorkspaceByScope(
+    input.tenantKey,
+    input.workspaceKey
+  );
+  if (!workspace) {
+    return null;
+  }
+
+  if (
+    input.roleAssignments.some(
+      assignment =>
+        assignment.role === "study_monitor" &&
+        assignment.workspaceId === workspace.workspaceId
+    )
+  ) {
+    return { kind: "full" };
+  }
+
+  const groupKeys = [
+    ...new Set(
+      input.roleAssignments
+        .filter(
+          assignment =>
+            assignment.role === "group_monitor" &&
+            assignment.workspaceId === workspace.workspaceId &&
+            assignment.groupKey
+        )
+        .map(assignment => assignment.groupKey as string)
+    )
+  ];
+  if (groupKeys.length === 0) {
+    return null;
+  }
+  if (
+    input.routeScope.kind === "study_group" &&
+    !groupKeys.includes(input.routeScope.groupKey)
+  ) {
+    return null;
+  }
+  if (input.routeScope.kind === "study_workspace") {
+    return null;
+  }
+
+  return { kind: "groups", groupKeys };
+};
+
+const getMonitorGroupKeys = (request: IncomingMessage): string[] | undefined => {
+  const access = monitorOperatorAccessByRequest.get(request);
+  return access?.kind === "groups" ? access.groupKeys : undefined;
+};
+
+const canAccessMonitorRuns = async (input: {
+  repository: FirstSliceRepository;
+  tenantKey: string;
+  workspaceKey: string;
+  testRunIds: string[];
+  groupKeys?: string[];
+}): Promise<boolean> => {
+  if (!input.groupKeys) {
+    return true;
+  }
+  const workspace = await input.repository.getWorkspaceByScope(
+    input.tenantKey,
+    input.workspaceKey
+  );
+  if (!workspace) {
+    return false;
+  }
+
+  for (const testRunId of input.testRunIds) {
+    const testRun = await input.repository.getTestRunById(testRunId);
+    if (
+      !testRun ||
+      testRun.tenantId !== workspace.tenantId ||
+      testRun.workspaceId !== workspace.workspaceId
+    ) {
+      return false;
+    }
+    const participantSession = await input.repository.getParticipantSessionById(
+      testRun.participantSessionId
+    );
+    if (!participantSession || !input.groupKeys.includes(participantSession.groupKey)) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const describeOperatorAccessScope = (scope: OperatorAccessScope): string => {
@@ -2749,12 +2911,14 @@ const streamMonitorEvents = async (input: {
   monitorRead: FirstSliceServices["monitorRead"];
   tenantKey: string;
   workspaceKey: string;
+  groupKeys?: string[];
   validateAccess?: () => Promise<void>;
 }): Promise<void> => {
   await input.validateAccess?.();
   const initialItems = await input.monitorRead.listOpenRuns({
     tenantKey: input.tenantKey,
     workspaceKey: input.workspaceKey,
+    groupKeys: input.groupKeys,
     limit: 500
   });
   let revision = monitorOpenRunsRevision(initialItems);
@@ -2815,6 +2979,7 @@ const streamMonitorEvents = async (input: {
       return input.monitorRead.listOpenRuns({
         tenantKey: input.tenantKey,
         workspaceKey: input.workspaceKey,
+        groupKeys: input.groupKeys,
         limit: 500
       });
     })()
@@ -3482,7 +3647,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           adminUserId,
           role: body.role,
           tenantKey: body.tenantKey,
-          workspaceKey: body.workspaceKey
+          workspaceKey: body.workspaceKey,
+          groupKey: body.groupKey
         });
         sendJson<AssignAdminRoleResponse>(
           response,
@@ -3548,14 +3714,30 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const { roleAssignments } = await services.adminAuth.getCurrentSession({
           sessionToken
         });
-        if (
-          !operatorAccessScope ||
-          !(await hasOperatorAccess(
-            runtime.repository,
-            roleAssignments,
-            operatorAccessScope
-          ))
-        ) {
+        const hasAdminAccess = operatorAccessScope
+          ? await hasOperatorAccess(
+              runtime.repository,
+              roleAssignments,
+              operatorAccessScope
+            )
+          : false;
+        const monitorRouteScope = resolveMonitorRouteScope(
+          request.method,
+          pathname
+        );
+        const monitorAccess =
+          !hasAdminAccess &&
+          operatorAccessScope?.kind === "workspace" &&
+          monitorRouteScope
+            ? await resolveMonitorOperatorAccess({
+                repository: runtime.repository,
+                roleAssignments,
+                tenantKey: operatorAccessScope.tenantKey,
+                workspaceKey: operatorAccessScope.workspaceKey,
+                routeScope: monitorRouteScope
+              })
+            : null;
+        if (!operatorAccessScope || (!hasAdminAccess && !monitorAccess)) {
           sendError(
             response,
             403,
@@ -3573,6 +3755,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             }
           );
           return;
+        }
+        if (monitorRouteScope) {
+          monitorOperatorAccessByRequest.set(
+            request,
+            hasAdminAccess ? { kind: "full" } : monitorAccess!
+          );
         }
       }
 
@@ -4988,9 +5176,21 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const groupKeys = getMonitorGroupKeys(request);
+        if (query.groupKey && groupKeys && !groupKeys.includes(query.groupKey)) {
+          sendError(
+            response,
+            403,
+            "monitor_group_access_required",
+            "The monitor session does not have access to the requested group."
+          );
+          return;
+        }
+
         const csv = await services.monitorRead.exportOpenRunsCsv({
           tenantKey,
           workspaceKey,
+          groupKeys,
           ...query
         });
         sendCsv(response, 200, `${workspaceKey}-open-runs.csv`, csv);
@@ -5944,12 +6144,14 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const initialGroupKeys = getMonitorGroupKeys(request);
         await streamMonitorEvents({
           request,
           response,
           monitorRead: services.monitorRead,
           tenantKey,
           workspaceKey,
+          groupKeys: initialGroupKeys,
           ...(runtime.config.operatorAuthRequired
             ? {
                 validateAccess: async () => {
@@ -5959,12 +6161,33 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
                   }
                   const { roleAssignments } =
                     await services.adminAuth.getCurrentSession({ sessionToken });
+                  const hasAdminAccess = await hasOperatorAccess(
+                    runtime.repository,
+                    roleAssignments,
+                    { kind: "workspace", tenantKey, workspaceKey }
+                  );
+                  const monitorAccess = hasAdminAccess
+                    ? { kind: "full" as const }
+                    : await resolveMonitorOperatorAccess({
+                        repository: runtime.repository,
+                        roleAssignments,
+                        tenantKey,
+                        workspaceKey,
+                        routeScope: { kind: "workspace_monitor" }
+                      });
+                  const currentGroupKeys =
+                    monitorAccess?.kind === "groups"
+                      ? [...monitorAccess.groupKeys].sort()
+                      : undefined;
+                  const expectedGroupKeys = initialGroupKeys
+                    ? [...initialGroupKeys].sort()
+                    : undefined;
                   if (
-                    !(await hasOperatorAccess(
-                      runtime.repository,
-                      roleAssignments,
-                      { kind: "workspace", tenantKey, workspaceKey }
-                    ))
+                    !monitorAccess ||
+                    (expectedGroupKeys &&
+                      JSON.stringify(currentGroupKeys) !==
+                        JSON.stringify(expectedGroupKeys)) ||
+                    (!expectedGroupKeys && currentGroupKeys)
                   ) {
                     throw new Error("Workspace monitor access was revoked.");
                   }
@@ -5993,9 +6216,21 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const groupKeys = getMonitorGroupKeys(request);
+        if (query.groupKey && groupKeys && !groupKeys.includes(query.groupKey)) {
+          sendError(
+            response,
+            403,
+            "monitor_group_access_required",
+            "The monitor session does not have access to the requested group."
+          );
+          return;
+        }
+
         const items = await services.monitorRead.listOpenRuns({
           tenantKey,
           workspaceKey,
+          groupKeys,
           ...query
         });
         sendJson<MonitorOpenRunsResponse>(response, 200, { items });
@@ -6052,6 +6287,25 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const groupKeys = getMonitorGroupKeys(request);
+        if (
+          !(await canAccessMonitorRuns({
+            repository: runtime.repository,
+            tenantKey,
+            workspaceKey,
+            testRunIds: normalizedTestRunIds,
+            groupKeys
+          }))
+        ) {
+          sendError(
+            response,
+            403,
+            "monitor_group_access_required",
+            "The monitor session does not have access to every requested run."
+          );
+          return;
+        }
+
         const { commands, failures } =
           await services.monitorControl.issueRunCommands({
             tenantKey,
@@ -6092,6 +6346,23 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
 
         const body = await readRequestJsonBody<IssueMonitorRunCommandRequest>();
+        if (
+          !(await canAccessMonitorRuns({
+            repository: runtime.repository,
+            tenantKey,
+            workspaceKey,
+            testRunIds: [testRunId],
+            groupKeys: getMonitorGroupKeys(request)
+          }))
+        ) {
+          sendError(
+            response,
+            403,
+            "monitor_group_access_required",
+            "The monitor session does not have access to the requested run."
+          );
+          return;
+        }
         const command = await services.monitorControl.issueRunCommand({
           tenantKey,
           workspaceKey,

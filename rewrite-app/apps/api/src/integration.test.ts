@@ -1829,6 +1829,168 @@ test("operator API can require a platform-admin bearer session", async () => {
       "admin_role_required"
     );
 
+    const groupMonitor = await requestJsonAt<{
+      adminUser: { username: string };
+      roleAssignments: Array<{ role: string; groupKey: string | null }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Group.Required.Monitor",
+        displayName: "Group Required Monitor",
+        password: "group-required-secret",
+        roleAssignments: [
+          {
+            role: "group_monitor",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace",
+            groupKey: "group:allowed"
+          }
+        ]
+      }
+    });
+
+    assert.equal(groupMonitor.status, 201);
+    assert.equal(groupMonitor.body.roleAssignments[0]?.role, "group_monitor");
+    assert.equal(groupMonitor.body.roleAssignments[0]?.groupKey, "group:allowed");
+
+    const groupMonitorSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "group.required.monitor",
+          password: "group-required-secret"
+        }
+      }
+    );
+    const groupMonitorHeaders = {
+      authorization: `Bearer ${groupMonitorSignIn.body.sessionToken}`
+    };
+
+    const groupMonitorOpenRuns = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/monitor/open-runs",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(groupMonitorOpenRuns.status, 200);
+    assert.deepEqual(groupMonitorOpenRuns.body.items, []);
+
+    const rejectedOtherGroupQuery = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/monitor/open-runs?groupKey=group%3Aother",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(rejectedOtherGroupQuery.status, 403);
+    assert.equal(
+      rejectedOtherGroupQuery.body.error,
+      "monitor_group_access_required"
+    );
+
+    const allowedStudyGroup = await requestJsonAt<unknown>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/groups/group%3Aallowed",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(
+      allowedStudyGroup.status,
+      404,
+      "An allowed empty group reaches the study-monitor handler instead of failing authorization."
+    );
+
+    const rejectedOtherStudyGroup = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/groups/group%3Aother",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(rejectedOtherStudyGroup.status, 403);
+    assert.equal(rejectedOtherStudyGroup.body.error, "admin_role_required");
+
+    const rejectedSummaryByGroupMonitor = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/summary",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(rejectedSummaryByGroupMonitor.status, 403);
+    assert.equal(rejectedSummaryByGroupMonitor.body.error, "admin_role_required");
+
+    const rejectedOverviewByGroupMonitor = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      { headers: groupMonitorHeaders }
+    );
+    assert.equal(rejectedOverviewByGroupMonitor.status, 403);
+    assert.equal(rejectedOverviewByGroupMonitor.body.error, "admin_role_required");
+
+    const rejectedUnknownRunByGroupMonitor = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/monitor/open-runs/not-in-group/commands",
+      {
+        method: "POST",
+        headers: groupMonitorHeaders,
+        body: { commandType: "pause", actorId: "group-monitor" }
+      }
+    );
+    assert.equal(rejectedUnknownRunByGroupMonitor.status, 403);
+    assert.equal(
+      rejectedUnknownRunByGroupMonitor.body.error,
+      "monitor_group_access_required"
+    );
+
+    const studyMonitor = await requestJsonAt<{
+      roleAssignments: Array<{ role: string; groupKey: string | null }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Study.Required.Monitor",
+        displayName: "Study Required Monitor",
+        password: "study-required-secret",
+        roleAssignments: [
+          {
+            role: "study_monitor",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace"
+          }
+        ]
+      }
+    });
+    assert.equal(studyMonitor.status, 201);
+    assert.equal(studyMonitor.body.roleAssignments[0]?.role, "study_monitor");
+    assert.equal(studyMonitor.body.roleAssignments[0]?.groupKey, null);
+
+    const studyMonitorSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "study.required.monitor",
+          password: "study-required-secret"
+        }
+      }
+    );
+    const studyMonitorHeaders = {
+      authorization: `Bearer ${studyMonitorSignIn.body.sessionToken}`
+    };
+    const studyMonitorSummary = await requestJsonAt<unknown>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/study-monitor/summary",
+      { headers: studyMonitorHeaders }
+    );
+    assert.equal(studyMonitorSummary.status, 200);
+
+    const rejectedOverviewByStudyMonitor = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      { headers: studyMonitorHeaders }
+    );
+    assert.equal(rejectedOverviewByStudyMonitor.status, 403);
+    assert.equal(rejectedOverviewByStudyMonitor.body.error, "admin_role_required");
+
     const tenantAdmin = await requestJsonAt<{
       adminUser: { username: string };
       roleAssignments: Array<{ role: string }>;

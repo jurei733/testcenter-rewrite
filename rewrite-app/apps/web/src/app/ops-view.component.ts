@@ -153,7 +153,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Initial Workspace Key
-            <input id="adminCreateWorkspaceKey" name="adminCreateWorkspaceKey" [(ngModel)]="view.ops.adminCreateWorkspaceKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'workspace_admin'" />
+            <input id="adminCreateWorkspaceKey" name="adminCreateWorkspaceKey" [(ngModel)]="view.ops.adminCreateWorkspaceKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole === 'platform_admin' || view.ops.adminCreateRole === 'tenant_admin'" />
+          </label>
+          <label>
+            Initial Group Key
+            <input id="adminCreateGroupKey" name="adminCreateGroupKey" [(ngModel)]="view.ops.adminCreateGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'group_monitor'" />
           </label>
         </div>
         <div class="actions">
@@ -177,7 +181,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Role Workspace Key
-            <input id="adminRoleWorkspaceKey" name="adminRoleWorkspaceKey" [(ngModel)]="view.ops.adminRoleWorkspaceKey" (change)="view.persistState()" [disabled]="view.ops.adminRoleRole !== 'workspace_admin'" />
+            <input id="adminRoleWorkspaceKey" name="adminRoleWorkspaceKey" [(ngModel)]="view.ops.adminRoleWorkspaceKey" (change)="view.persistState()" [disabled]="view.ops.adminRoleRole === 'platform_admin' || view.ops.adminRoleRole === 'tenant_admin'" />
+          </label>
+          <label>
+            Role Group Key
+            <input id="adminRoleGroupKey" name="adminRoleGroupKey" [(ngModel)]="view.ops.adminRoleGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminRoleRole !== 'group_monitor'" />
           </label>
         </div>
         <div class="actions">

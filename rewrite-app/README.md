@@ -34,8 +34,10 @@ Responses retain their group, profile IDs, access window, and only a
 `passwordRequired` flag—never the source password. Mixed rosters import their
 participant rows and show the candidates in a dedicated Runtime card;
 operational-only rosters return the
-stable `participant_roster_operational_only` error until a non-escalating role
-mapping is selected.
+stable `participant_roster_operational_only` error. Administrators can create
+non-escalating `group_monitor` and `study_monitor` accounts with durable
+workspace/group scope; automatic candidate-to-account conversion remains a
+migration follow-up.
 
 ## Workspace Shape
 

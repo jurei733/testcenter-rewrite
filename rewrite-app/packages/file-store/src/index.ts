@@ -207,9 +207,12 @@ export const createFileFirstSliceRepository = (
     },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const state = await getState();
-      return Object.values(state.adminRoleAssignments).filter(
-        roleAssignment => roleAssignment.adminUserId === adminUserId
-      );
+      return Object.values(state.adminRoleAssignments)
+        .filter(roleAssignment => roleAssignment.adminUserId === adminUserId)
+        .map(roleAssignment => ({
+          ...roleAssignment,
+          groupKey: roleAssignment.groupKey ?? null
+        }));
     },
     async saveAdminRoleAssignment(roleAssignment) {
       await mutate(state => {

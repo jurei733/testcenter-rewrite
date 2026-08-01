@@ -50,10 +50,12 @@ export interface ShellOpsState {
   adminCreateRole: AdminRole;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
+  adminCreateGroupKey: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
+  adminRoleGroupKey: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -266,10 +268,12 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateRole: "workspace_admin",
     adminCreateTenantKey: "demo-tenant",
     adminCreateWorkspaceKey: "demo-workspace",
+    adminCreateGroupKey: "group:student-demo",
     adminRoleTargetUserId: "",
     adminRoleRole: "workspace_admin",
     adminRoleTenantKey: "demo-tenant",
     adminRoleWorkspaceKey: "demo-workspace",
+    adminRoleGroupKey: "group:student-demo",
     adminRevokeTargetUserId: "",
     adminRevokeRoleAssignmentId: "",
     adminStatusTargetUserId: "",

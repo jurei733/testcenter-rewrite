@@ -1964,6 +1964,7 @@ export type AdminRoleAssignmentRequest = {
   role: AdminRole;
   tenantKey?: string | null;
   workspaceKey?: string | null;
+  groupKey?: string | null;
 };
 
 export type CreateAdminUserRequest = {

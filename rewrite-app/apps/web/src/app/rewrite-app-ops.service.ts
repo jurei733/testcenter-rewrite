@@ -339,7 +339,8 @@ export class RewriteAppOpsService {
           this.createRoleAssignmentRequest(
             this.opsState.adminCreateRole,
             this.opsState.adminCreateTenantKey,
-            this.opsState.adminCreateWorkspaceKey
+            this.opsState.adminCreateWorkspaceKey,
+            this.opsState.adminCreateGroupKey
           )
         ]
       } satisfies CreateAdminUserRequest,
@@ -373,7 +374,8 @@ export class RewriteAppOpsService {
       this.createRoleAssignmentRequest(
         this.opsState.adminRoleRole,
         this.opsState.adminRoleTenantKey,
-        this.opsState.adminRoleWorkspaceKey
+        this.opsState.adminRoleWorkspaceKey,
+        this.opsState.adminRoleGroupKey
       ) satisfies AssignAdminRoleRequest,
       { headers: this.createAdminHeaders() }
     );
@@ -589,7 +591,8 @@ export class RewriteAppOpsService {
   private createRoleAssignmentRequest(
     role: AssignAdminRoleRequest["role"],
     tenantKey: string,
-    workspaceKey: string
+    workspaceKey: string,
+    groupKey: string
   ): AssignAdminRoleRequest {
     if (role === "platform_admin") {
       return { role };
@@ -605,7 +608,8 @@ export class RewriteAppOpsService {
     return {
       role,
       tenantKey: tenantKey.trim(),
-      workspaceKey: workspaceKey.trim()
+      workspaceKey: workspaceKey.trim(),
+      ...(role === "group_monitor" ? { groupKey: groupKey.trim() } : {})
     };
   }
 }

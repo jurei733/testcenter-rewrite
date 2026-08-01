@@ -1349,6 +1349,42 @@ try {
     "UI smoke expected a tenant admin role assignment id after assigning the role."
   );
 
+  const groupMonitorKey = "group:ui-monitor";
+  await selectAndCommit("#adminRoleRole", "group_monitor");
+  await fillAndCommit("#adminRoleTenantKey", tenantKey);
+  await fillAndCommit("#adminRoleWorkspaceKey", workspaceKey);
+  await fillAndCommit("#adminRoleGroupKey", "");
+  await expectButtonSelectorDisabled("#adminAssignRoleButton");
+  await fillAndCommit("#adminRoleGroupKey", groupMonitorKey);
+  await expectButtonSelectorEnabled("#adminAssignRoleButton");
+  logStep("assign-group-monitor-role");
+  await clickAction("Assign Role");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          Array.isArray(item?.roleAssignments) &&
+          item.roleAssignments.some(
+            roleAssignment =>
+              roleAssignment?.role === "group_monitor" &&
+              roleAssignment?.groupKey === groupMonitorKey
+          )
+      )
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Role Assignments", exact: true })
+    })
+    .filter({ hasText: "group_monitor" })
+    .filter({ hasText: groupMonitorKey })
+    .waitFor();
+
   await page
     .locator("article.card")
     .filter({

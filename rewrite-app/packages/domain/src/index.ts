@@ -1,7 +1,12 @@
 export type TenantStatus = "active" | "suspended";
 export type WorkspaceStatus = "active" | "archived";
 export type AdminUserStatus = "active" | "disabled";
-export type AdminRole = "platform_admin" | "tenant_admin" | "workspace_admin";
+export type AdminRole =
+  | "platform_admin"
+  | "tenant_admin"
+  | "workspace_admin"
+  | "study_monitor"
+  | "group_monitor";
 export type AdminAuditEventType =
   | "admin_user_bootstrapped"
   | "admin_sign_in_failed"
@@ -372,6 +377,7 @@ export type AdminRoleAssignment = {
   role: AdminRole;
   tenantId: string | null;
   workspaceId: string | null;
+  groupKey: string | null;
   createdAt: string;
 };
 

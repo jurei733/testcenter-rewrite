@@ -95,6 +95,10 @@ const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | nul
           row.workspace_id === null || row.workspace_id === undefined
             ? null
             : String(row.workspace_id),
+        groupKey:
+          row.group_key === null || row.group_key === undefined
+            ? null
+            : String(row.group_key),
         createdAt: String(row.created_at)
       }
     : null;
@@ -500,7 +504,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 25;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 26;
 
 const migrations: PostgresMigration[] = [
   {
@@ -915,6 +919,13 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE workspace_reviews ADD COLUMN IF NOT EXISTS original_unit_id TEXT;
       ALTER TABLE workspace_reviews ADD COLUMN IF NOT EXISTS user_agent TEXT;
     `
+  },
+  {
+    version: 26,
+    name: "add_admin_role_group_scope",
+    sql: `
+      ALTER TABLE admin_role_assignments ADD COLUMN IF NOT EXISTS group_key TEXT;
+    `
   }
 ];
 
@@ -1082,7 +1093,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       return many(
-        `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
+        `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
          FROM admin_role_assignments
          WHERE admin_user_id = $1`,
         [adminUserId],
@@ -1092,13 +1103,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveAdminRoleAssignment(roleAssignment) {
       await pool.query(
         `INSERT INTO admin_role_assignments (
-          role_assignment_id, admin_user_id, role, tenant_id, workspace_id, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT(role_assignment_id) DO UPDATE SET
           admin_user_id = EXCLUDED.admin_user_id,
           role = EXCLUDED.role,
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
+          group_key = EXCLUDED.group_key,
           created_at = EXCLUDED.created_at`,
         [
           roleAssignment.roleAssignmentId,
@@ -1106,6 +1118,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           roleAssignment.role,
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
+          roleAssignment.groupKey,
           roleAssignment.createdAt
         ]
       );
