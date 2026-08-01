@@ -8953,7 +8953,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     {
       fileName: "export/units/UNIT.SAMPLE.xml",
       content: `
-        <Unit>
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
           <Metadata>
             <Id>UNIT.SAMPLE</Id>
             <Label>A sample unit</Label>
@@ -8971,7 +8972,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     {
       fileName: "export/units/UNIT.INLINE.xml",
       content: `
-        <Unit>
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
           <Metadata>
             <Id>UNIT.INLINE</Id>
             <Label>Inline Unit</Label>
@@ -9245,6 +9247,133 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
   assert.equal(unsafeResourcePath.status, 400);
   assert.equal(unsafeResourcePath.body.error, "participant_resource_path_invalid");
+});
+
+test("original Testcenter Unit cross-file references block incomplete packages", async () => {
+  const tenantKey = "integration-tenant-unit-cross-references";
+  const workspaceKey = "integration-workspace-unit-cross-references";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const baseEntries = [
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="BOOKLET.CROSS" href="booklets/booklet.xml" />
+            <resource identifier="UNIT.CROSS" href="units/unit.xml" />
+            <resource identifier="cross-player@6.0" href="players/cross-player.html" />
+            <resource identifier="../definitions/unit.voud" href="definitions/unit.voud" />
+            <resource identifier="runtime-assets.bin" href="resources/runtime-assets.bin" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>BOOKLET.CROSS</Id><Label>Cross-file booklet</Label></Metadata>
+          <Units><Unit id="UNIT.CROSS" label="Cross-file unit" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/unit.xml",
+      content: `
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
+          <Metadata><Id>UNIT.CROSS</Id><Label>Cross-file unit</Label></Metadata>
+          <DefinitionRef player="cross-player@6.0">../definitions/unit.voud</DefinitionRef>
+          <Dependencies><File for="player">runtime-assets.bin</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/definitions/unit.voud",
+      content: "<section>Cross-file unit definition</section>"
+    },
+    {
+      fileName: "export/players/cross-player.html",
+      content:
+        '<!doctype html><script type="application/ld+json">{"type":"player","id":"cross-player","specVersion":"6.0"}</script><main>Cross player</main>'
+    },
+    {
+      fileName: "export/resources/runtime-assets.bin",
+      content: "bounded player resource"
+    }
+  ];
+  const cases: Array<{
+    fileName: string;
+    omittedEntry?: string;
+    diagnosticCode?: string;
+  }> = [
+    { fileName: "unit-cross-references-valid.zip" },
+    {
+      fileName: "unit-cross-reference-missing-definition.zip",
+      omittedEntry: "export/definitions/unit.voud",
+      diagnosticCode: "source_document_unit_definition_missing"
+    },
+    {
+      fileName: "unit-cross-reference-missing-player.zip",
+      omittedEntry: "export/players/cross-player.html",
+      diagnosticCode: "source_document_unit_player_missing"
+    },
+    {
+      fileName: "unit-cross-reference-missing-resource.zip",
+      omittedEntry: "export/resources/runtime-assets.bin",
+      diagnosticCode: "source_document_unit_player_resource_missing"
+    }
+  ];
+
+  for (const crossReferenceCase of cases) {
+    const zipPayload = createZipBase64(
+      baseEntries.filter(
+        entry => entry.fileName !== crossReferenceCase.omittedEntry
+      )
+    );
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: crossReferenceCase.fileName,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: {
+        sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+      }
+    });
+
+    if (!crossReferenceCase.diagnosticCode) {
+      assert.equal(importResult.body.importJob.status, "completed");
+      assert.ok(importResult.body.stagedContentRelease);
+      continue;
+    }
+    assert.equal(importResult.body.importJob.status, "failed");
+    assert.equal(importResult.body.stagedContentRelease, null);
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === crossReferenceCase.diagnosticCode
+      ),
+      true,
+      crossReferenceCase.fileName
+    );
+  }
 });
 
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {

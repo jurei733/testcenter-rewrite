@@ -8391,6 +8391,78 @@ const extractZipUnitDefinition = (
   };
 };
 
+type DeclaredTestcenterUnitCrossReferences = {
+  playerKey: string | null;
+  definitionReference: string | null;
+  playerResourceReferences: string[];
+};
+
+const extractDeclaredTestcenterUnitCrossReferences = (
+  sourceDocument: string
+): DeclaredTestcenterUnitCrossReferences | null => {
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(_level, message) {
+        parserErrors.push(message);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return null;
+  }
+  if (parserErrors.length > 0 || !document?.documentElement) {
+    return null;
+  }
+
+  const root = document.documentElement;
+  const schemaLocation =
+    root.getAttributeNS(
+      "http://www.w3.org/2001/XMLSchema-instance",
+      "noNamespaceSchemaLocation"
+    ) || root.getAttribute("xsi:noNamespaceSchemaLocation");
+  if (
+    xmlElementLocalName(root) !== "Unit" ||
+    !/(?:^|\/)definitions\/vo_Unit\.xsd(?:[?#].*)?$/i.test(schemaLocation ?? "")
+  ) {
+    return null;
+  }
+
+  const definition =
+    xmlChildrenNamed(root, "DefinitionRef")[0] ??
+    xmlChildrenNamed(root, "Definition")[0];
+  const playerKey = definition?.getAttribute("player")?.trim() || null;
+  const definitionReferenceAttribute = definition
+    ? ["href", "path", "src", "uri", "file", "fileName", "filename"]
+        .map(attributeName => definition.getAttribute(attributeName)?.trim())
+        .find(Boolean)
+    : undefined;
+  const definitionReference =
+    definition && xmlElementLocalName(definition) === "DefinitionRef"
+      ? definitionReferenceAttribute || xmlElementText(definition) || null
+      : null;
+  const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
+  const playerResourceReferences = dependencies
+    ? xmlChildElements(dependencies)
+        .filter(dependency => {
+          const dependencyName = xmlElementLocalName(dependency);
+          const target = dependency.getAttribute("for")?.trim();
+          return (
+            ["File", "file"].includes(dependencyName) &&
+            (!target || target === "player")
+          );
+        })
+        .map(xmlElementText)
+        .filter(Boolean)
+    : [];
+
+  return {
+    playerKey,
+    definitionReference: definitionReference || null,
+    playerResourceReferences: [...new Set(playerResourceReferences)]
+  };
+};
+
 type ZipUnitCodingSchemeReference = {
   reference: string;
   schemer: string | null;
@@ -8502,23 +8574,61 @@ const findXmlManifestResource = (
   );
 };
 
+const findZipUnitReferencedEntry = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
+  unitEntry: ZipEntry,
+  reference: string,
+  manifestResources: Map<string, XmlManifestResource>
+): ZipEntry | null => {
+  const manifestResource = findXmlManifestResource(manifestResources, reference);
+  const directEntry = findZipEntryByPath(manifestExtraction.entries, [
+    ...resolveZipResourcePathCandidates(unitEntry.fileName, reference),
+    ...(manifestResource
+      ? resolveZipResourcePathCandidates(
+          manifestExtraction.manifestFileName,
+          manifestResource.key
+        )
+      : [])
+  ]);
+  if (directEntry) {
+    return directEntry;
+  }
+
+  const referenceFileName = normalizeZipEntryPath(reference)
+    .split("/")
+    .at(-1)
+    ?.toLowerCase();
+  if (!referenceFileName) {
+    return null;
+  }
+  const basenameMatches = manifestExtraction.entries.filter(
+    entry =>
+      normalizeZipEntryPath(entry.fileName).split("/").at(-1)?.toLowerCase() ===
+      referenceFileName
+  );
+  return basenameMatches.length === 1 ? basenameMatches[0]! : null;
+};
+
 const findZipUnitPlayerEntry = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
   unitEntry: ZipEntry,
   playerKey: string,
   manifestResources: Map<string, XmlManifestResource>
 ): ZipEntry | null => {
-  const playerResource = findXmlManifestResource(manifestResources, playerKey);
-  return findZipEntryByPath(manifestExtraction.entries, [
-    ...(playerResource
-      ? resolveZipResourcePathCandidates(
-          manifestExtraction.manifestFileName,
-          playerResource.key
-        )
-      : []),
-    ...resolveZipResourcePathCandidates(unitEntry.fileName, playerKey),
-    ...resolveZipResourcePathCandidates(unitEntry.fileName, `${playerKey}.html`)
-  ]);
+  return (
+    findZipUnitReferencedEntry(
+      manifestExtraction,
+      unitEntry,
+      playerKey,
+      manifestResources
+    ) ??
+    findZipUnitReferencedEntry(
+      manifestExtraction,
+      unitEntry,
+      `${playerKey}.html`,
+      manifestResources
+    )
+  );
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -8853,17 +8963,72 @@ const validateZipXmlEntries = (
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
     const unitDefinition = extractZipUnitDefinition(sourceDocument);
+    const declaredUnitReferences =
+      extractDeclaredTestcenterUnitCrossReferences(sourceDocument);
+    const playerEntry = unitDefinition.playerKey
+      ? findZipUnitPlayerEntry(
+          manifestExtraction,
+          entry,
+          unitDefinition.playerKey,
+          manifestResources
+        )
+      : null;
+    if (declaredUnitReferences?.playerKey && !playerEntry) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_unit_player_missing",
+          `Unit ZIP entry '${entry.fileName}' references missing player '${declaredUnitReferences.playerKey}'.`
+        )
+      );
+    }
+    if (declaredUnitReferences?.definitionReference) {
+      const definitionEntry = findZipUnitReferencedEntry(
+        manifestExtraction,
+        entry,
+        declaredUnitReferences.definitionReference,
+        manifestResources
+      );
+      if (!definitionEntry) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_definition_missing",
+            `Unit ZIP entry '${entry.fileName}' references missing definition '${declaredUnitReferences.definitionReference}'.`
+          )
+        );
+      } else if (
+        readZipEntryText(manifestExtraction.zipBuffer, definitionEntry) === null
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_definition_unreadable",
+            `Unit definition ZIP entry '${definitionEntry.fileName}' could not be read.`
+          )
+        );
+      }
+    }
+    for (const resourceReference of
+      declaredUnitReferences?.playerResourceReferences ?? []) {
+      if (
+        !findZipUnitReferencedEntry(
+          manifestExtraction,
+          entry,
+          resourceReference,
+          manifestResources
+        )
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_player_resource_missing",
+            `Unit ZIP entry '${entry.fileName}' references missing player resource '${resourceReference}'.`
+          )
+        );
+      }
+    }
     if (
       unitDefinition.playerKey &&
       !validatedPlayerKeys.has(unitDefinition.playerKey.toLowerCase())
     ) {
       validatedPlayerKeys.add(unitDefinition.playerKey.toLowerCase());
-      const playerEntry = findZipUnitPlayerEntry(
-        manifestExtraction,
-        entry,
-        unitDefinition.playerKey,
-        manifestResources
-      );
       if (playerEntry) {
         const playerHtml = readZipEntryText(
           manifestExtraction.zipBuffer,
