@@ -46,6 +46,7 @@ import type {
   WorkspaceParticipantSessionListItem,
   WorkspaceParticipantTestLogListItem,
   WorkspaceReviewListItem,
+  WorkspaceReview,
   WorkspaceActivityEventType,
   WorkspaceActivitySubjectType,
   WorkspaceSourcePackageDetail,
@@ -1599,6 +1600,12 @@ export const productionApiRoutes = {
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
+    listReviews: "/api/v1/participant/test-runs/:testRunId/reviews",
+    createReview: "/api/v1/participant/test-runs/:testRunId/reviews",
+    updateReview:
+      "/api/v1/participant/test-runs/:testRunId/reviews/:reviewId",
+    deleteReview:
+      "/api/v1/participant/test-runs/:testRunId/reviews/:reviewId",
     unlockTestlet:
       "/api/v1/participant/test-runs/:testRunId/testlets/:testletKey/unlock",
     resumeSession: "/api/v1/participant/sessions/:participantSessionId/resume",
@@ -1862,6 +1869,20 @@ export type SaveTestRunProgressRequest = {
     originalUnitId?: string | null;
     entries: ParticipantTestLogEntryInput[];
   }>;
+};
+
+export type CreateParticipantReviewRequest = {
+  unitKey?: string | null;
+  reviewerId?: string;
+  category: string;
+  comment: string;
+};
+
+export type UpdateParticipantReviewRequest = {
+  unitKey?: string | null;
+  reviewerId?: string;
+  category?: string;
+  comment?: string;
 };
 
 export type ParticipantTestLogListQuery = {
@@ -2169,6 +2190,18 @@ export type ParticipantCurrentRunStateResponse = {
 
 export type SaveTestRunProgressResponse = {
   testRun: TestRun;
+};
+
+export type ListParticipantReviewsResponse = {
+  items: WorkspaceReview[];
+};
+
+export type ParticipantReviewResponse = {
+  review: WorkspaceReview;
+};
+
+export type DeleteParticipantReviewResponse = {
+  deletedReviewId: string;
 };
 
 export type UnlockParticipantTestletResponse = {

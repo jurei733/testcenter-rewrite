@@ -328,6 +328,83 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </label>
           </ng-template>
           <section
+            *ngIf="view.player.canReview"
+            id="participantRouteReviewPanel"
+            class="participant-review-panel"
+            aria-labelledby="participantRouteReviewTitle"
+          >
+            <header>
+              <div>
+                <span>Review Mode</span>
+                <strong id="participantRouteReviewTitle">Comments and assessments</strong>
+                <p>Add feedback for the whole test or the unit currently shown. Your comments are saved even when responses are not.</p>
+              </div>
+              <strong id="participantRouteReviewCount">{{ view.participantReviews.length }} comment{{ view.participantReviews.length === 1 ? "" : "s" }}</strong>
+            </header>
+            <div class="participant-review-target" role="group" aria-label="Comment target">
+              <button
+                id="participantRouteReviewTargetUnit"
+                type="button"
+                class="unit-chip"
+                [class.is-current]="view.reviewTarget === 'unit'"
+                [disabled]="!view.player.unitKey || view.player.unitKey === 'n/a'"
+                (click)="view.reviewTarget = 'unit'"
+              >{{ view.reviewUnitTargetLabel }}</button>
+              <button
+                id="participantRouteReviewTargetTest"
+                type="button"
+                class="unit-chip"
+                [class.is-current]="view.reviewTarget === 'test'"
+                (click)="view.reviewTarget = 'test'"
+              >Whole Test</button>
+            </div>
+            <div class="form-grid participant-review-form">
+              <label>
+                Reviewer name (optional)
+                <input id="participantRouteReviewReviewer" name="participantRouteReviewReviewer" [(ngModel)]="view.reviewerId" placeholder="Defaults to participant login" />
+              </label>
+              <label>
+                Category
+                <select id="participantRouteReviewCategory" name="participantRouteReviewCategory" [(ngModel)]="view.reviewCategory">
+                  <option *ngFor="let category of view.reviewCategories" [value]="category">{{ category }}</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Comment
+              <textarea
+                id="participantRouteReviewComment"
+                name="participantRouteReviewComment"
+                [(ngModel)]="view.reviewComment"
+                placeholder="Describe the issue, observation, or recommendation."
+              ></textarea>
+            </label>
+            <div class="actions">
+              <button id="participantRouteReviewSaveButton" class="primary" type="button" [disabled]="!view.canSubmitReview" (click)="view.saveReview()">{{ view.reviewActionLabel }}</button>
+              <button *ngIf="view.editingReviewId" id="participantRouteReviewCancelButton" class="ghost" type="button" (click)="view.cancelReviewEdit()">Cancel Edit</button>
+            </div>
+            <p *ngIf="view.reviewFeedback" id="participantRouteReviewFeedback" class="participant-review-feedback" role="status">{{ view.reviewFeedback }}</p>
+            <div class="participant-review-list" *ngIf="view.participantReviews.length > 0; else noParticipantReviews">
+              <article *ngFor="let review of view.participantReviews" class="participant-review-item" [attr.data-review-id]="review.reviewId">
+                <header>
+                  <div>
+                    <strong>{{ view.reviewTargetLabel(review) }}</strong>
+                    <span>{{ review.category }} · {{ review.reviewerId }}</span>
+                  </div>
+                  <time [attr.datetime]="review.updatedAt">{{ review.updatedAt }}</time>
+                </header>
+                <p>{{ review.comment }}</p>
+                <div class="actions">
+                  <button class="secondary" type="button" (click)="view.beginReviewEdit(review)">Edit</button>
+                  <button class="ghost" type="button" (click)="view.deleteReview(review)">Delete</button>
+                </div>
+              </article>
+            </div>
+            <ng-template #noParticipantReviews>
+              <p id="participantRouteReviewEmpty" class="hint">No comments have been added for this run.</p>
+            </ng-template>
+          </section>
+          <section
             class="participant-draft-state"
             [class.has-unsaved-response]="view.player.hasUnsavedResponse"
             aria-live="polite"

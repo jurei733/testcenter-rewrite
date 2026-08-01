@@ -572,6 +572,26 @@ export type ParticipantRuntimePort = {
       entries: ParticipantTestLogEntryInput[];
     }>;
   }): Promise<TestRun>;
+  listReviews(input: { testRunId: string }): Promise<WorkspaceReview[]>;
+  createReview(input: {
+    testRunId: string;
+    unitKey?: string | null;
+    reviewerId?: string;
+    category: string;
+    comment: string;
+  }): Promise<WorkspaceReview>;
+  updateReview(input: {
+    testRunId: string;
+    reviewId: string;
+    unitKey?: string | null;
+    reviewerId?: string;
+    category?: string;
+    comment?: string;
+  }): Promise<WorkspaceReview>;
+  deleteReview(input: {
+    testRunId: string;
+    reviewId: string;
+  }): Promise<string>;
   unlockTestlet(input: {
     testRunId: string;
     testletKey: string;
@@ -841,6 +861,10 @@ export const firstSliceUseCases = {
   participantLaunch: "ParticipantLaunch",
   resumeParticipantSession: "ResumeParticipantSession",
   saveTestRunProgress: "SaveTestRunProgress",
+  listParticipantReviews: "ListParticipantReviews",
+  createParticipantReview: "CreateParticipantReview",
+  updateParticipantReview: "UpdateParticipantReview",
+  deleteParticipantReview: "DeleteParticipantReview",
   resumeTestRun: "ResumeTestRun",
   completeTestRun: "CompleteTestRun",
   listOpenMonitorRuns: "ListOpenMonitorRuns",
@@ -11542,6 +11566,79 @@ export const createFirstSliceServices = (
     return participantSession;
   };
 
+  const requireParticipantReviewContext = async (
+    rawTestRunId: string
+  ): Promise<{
+    participantSession: ParticipantSession;
+    testRun: TestRun;
+    contentRelease: ContentRelease;
+  }> => {
+    const testRunId = normalizeTestRunId(rawTestRunId);
+    const storedTestRun = await repository.getTestRunById(testRunId);
+    if (!storedTestRun) {
+      throw new FirstSliceError(
+        404,
+        "test_run_not_found",
+        `Test run '${testRunId}' was not found.`
+      );
+    }
+    const testRun = normalizeTestRun(storedTestRun);
+    const participantSession = await requireAccessibleParticipantSession(
+      testRun.participantSessionId
+    );
+    const executionMode = resolveParticipantExecutionMode(
+      testRun.executionMode ?? participantSession.executionMode
+    );
+    if (!executionMode.canReview) {
+      throw new FirstSliceError(
+        403,
+        "participant_review_not_allowed",
+        `Execution mode '${executionMode.mode}' does not allow participant reviews.`
+      );
+    }
+    const contentRelease = await requireContentRelease(
+      repository,
+      testRun.contentReleaseId
+    );
+    return { participantSession, testRun, contentRelease };
+  };
+
+  const requireParticipantOwnedReview = async (input: {
+    testRun: TestRun;
+    reviewId: string;
+  }): Promise<WorkspaceReview> => {
+    const reviewId = String(input.reviewId ?? "").trim();
+    const review = reviewId
+      ? await repository.getWorkspaceReviewById(reviewId)
+      : null;
+    if (
+      !review ||
+      review.testRunId !== input.testRun.testRunId ||
+      review.participantSessionId !== input.testRun.participantSessionId
+    ) {
+      throw new FirstSliceError(
+        404,
+        "participant_review_not_found",
+        `Participant review '${reviewId}' was not found for test run '${input.testRun.testRunId}'.`
+      );
+    }
+    return review;
+  };
+
+  const resolveParticipantReviewReviewerId = (
+    value: unknown,
+    fallbackLoginKey: string
+  ): string => {
+    if (value == null || (typeof value === "string" && !value.trim())) {
+      return fallbackLoginKey;
+    }
+    return normalizeReviewText(
+      value,
+      "reviewerId",
+      "review_reviewer_required"
+    );
+  };
+
   const persistEffectiveTestletTimerState = async (input: {
     contentRelease: ContentRelease;
     testRun: TestRun;
@@ -15688,6 +15785,9 @@ export const createFirstSliceServices = (
         if (navigation.canComplete) {
           availableActions.push("complete");
         }
+        if (executionMode.canReview) {
+          availableActions.push("review");
+        }
 
         return {
           participantSession,
@@ -15748,6 +15848,170 @@ export const createFirstSliceServices = (
           navigation,
           availableActions
         };
+      },
+      async listReviews(input) {
+        const { testRun } = await requireParticipantReviewContext(input.testRunId);
+        return (
+          await repository.listWorkspaceReviewsByWorkspace(
+            testRun.tenantId,
+            testRun.workspaceId
+          )
+        )
+          .filter(
+            review =>
+              review.testRunId === testRun.testRunId &&
+              review.participantSessionId === testRun.participantSessionId
+          )
+          .sort(
+            (left, right) =>
+              right.updatedAt.localeCompare(left.updatedAt) ||
+              right.reviewId.localeCompare(left.reviewId)
+          );
+      },
+      async createReview(input) {
+        const { participantSession, testRun, contentRelease } =
+          await requireParticipantReviewContext(input.testRunId);
+        const unitKey = normalizeOptionalUnitKey(input.unitKey);
+        if (unitKey) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            unitKey
+          );
+        }
+        const timestamp = now();
+        const review: WorkspaceReview = {
+          reviewId: idGenerator(),
+          tenantId: testRun.tenantId,
+          workspaceId: testRun.workspaceId,
+          participantSessionId: participantSession.participantSessionId,
+          testRunId: testRun.testRunId,
+          unitKey,
+          reviewerId: resolveParticipantReviewReviewerId(
+            input.reviewerId,
+            participantSession.loginKey
+          ),
+          category: normalizeReviewText(
+            input.category,
+            "category",
+            "review_category_required"
+          ),
+          comment: normalizeReviewText(
+            input.comment,
+            "comment",
+            "review_comment_required"
+          ),
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        await repository.saveWorkspaceReview(review);
+        await recordWorkspaceActivity({
+          tenantId: testRun.tenantId,
+          workspaceId: testRun.workspaceId,
+          eventType: "review_created",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: testRun.testRunId,
+          summary: `Participant review '${review.reviewId}' created for test run '${testRun.testRunId}'.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category,
+            participantAuthored: true
+          }
+        });
+        return review;
+      },
+      async updateReview(input) {
+        const { participantSession, testRun, contentRelease } =
+          await requireParticipantReviewContext(input.testRunId);
+        const existingReview = await requireParticipantOwnedReview({
+          testRun,
+          reviewId: input.reviewId
+        });
+        const unitKey =
+          input.unitKey === undefined
+            ? existingReview.unitKey
+            : normalizeOptionalUnitKey(input.unitKey);
+        if (unitKey) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            unitKey
+          );
+        }
+        const review: WorkspaceReview = {
+          ...existingReview,
+          unitKey,
+          reviewerId:
+            input.reviewerId === undefined
+              ? existingReview.reviewerId
+              : resolveParticipantReviewReviewerId(
+                  input.reviewerId,
+                  participantSession.loginKey
+                ),
+          category:
+            input.category === undefined
+              ? existingReview.category
+              : normalizeReviewText(
+                  input.category,
+                  "category",
+                  "review_category_required"
+                ),
+          comment:
+            input.comment === undefined
+              ? existingReview.comment
+              : normalizeReviewText(
+                  input.comment,
+                  "comment",
+                  "review_comment_required"
+                ),
+          updatedAt: now()
+        };
+        await repository.saveWorkspaceReview(review);
+        await recordWorkspaceActivity({
+          tenantId: testRun.tenantId,
+          workspaceId: testRun.workspaceId,
+          eventType: "review_updated",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: testRun.testRunId,
+          summary: `Participant review '${review.reviewId}' updated.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category,
+            participantAuthored: true
+          }
+        });
+        return review;
+      },
+      async deleteReview(input) {
+        const { testRun } = await requireParticipantReviewContext(input.testRunId);
+        const review = await requireParticipantOwnedReview({
+          testRun,
+          reviewId: input.reviewId
+        });
+        await repository.deleteWorkspaceReview(review.reviewId);
+        await recordWorkspaceActivity({
+          tenantId: testRun.tenantId,
+          workspaceId: testRun.workspaceId,
+          eventType: "review_deleted",
+          actorId: review.reviewerId,
+          subjectType: "test_run",
+          subjectId: testRun.testRunId,
+          summary: `Participant review '${review.reviewId}' deleted.`,
+          details: {
+            reviewId: review.reviewId,
+            participantSessionId: review.participantSessionId,
+            unitKey: review.unitKey,
+            category: review.category,
+            participantAuthored: true
+          }
+        });
+        return review.reviewId;
       },
       async getResource(input) {
         const participantSessionId = normalizeParticipantSessionId(

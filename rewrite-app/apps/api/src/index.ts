@@ -31,6 +31,7 @@ import {
   type CreateAdminUserResponse,
   type CreateImportJobRequest,
   type CreateImportJobResponse,
+  type CreateParticipantReviewRequest,
   type CreateReviewRequest,
   type CreateSourcePackageRequest,
   type CreateSourcePackageResponse,
@@ -39,6 +40,7 @@ import {
   type CreateWorkspaceRequest,
   type CreateWorkspaceResponse,
   type DeleteGroupResultsResponse,
+  type DeleteParticipantReviewResponse,
   type DeleteReviewResponse,
   type DeleteSourcePackageRequest,
   type DeleteSourcePackageResponse,
@@ -78,6 +80,7 @@ import {
   type ListTenantsResponse,
   type ListWorkspacesResponse,
   type ListParticipantRosterResponse,
+  type ListParticipantReviewsResponse,
   type ListParticipantSessionsResponse,
   type ListParticipantTestLogsResponse,
   type ListContentReleasesResponse,
@@ -94,6 +97,7 @@ import {
   type ParticipantCurrentRunStateResponse,
   type ParticipantLaunchRequest,
   type ParticipantLaunchResponse,
+  type ParticipantReviewResponse,
   type ParticipantRuntimeStateResponse,
   type ResumeParticipantSessionRequest,
   type ResumeTestRunResponse,
@@ -116,6 +120,7 @@ import {
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
+  type UpdateParticipantReviewRequest,
   type AdminSessionListQuery,
   type AdminUserListQuery,
   type ContentReleaseListQuery,
@@ -1617,6 +1622,12 @@ const participantResourcePattern =
 const saveProgressPattern = createRoutePattern(
   productionApiRoutes.participant.saveProgress
 );
+const participantReviewListPattern = createRoutePattern(
+  productionApiRoutes.participant.listReviews
+);
+const participantReviewDetailPattern = createRoutePattern(
+  productionApiRoutes.participant.updateReview
+);
 const unlockTestletPattern = createRoutePattern(
   productionApiRoutes.participant.unlockTestlet
 );
@@ -2312,6 +2323,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
+    ["GET", participantReviewListPattern, productionApiRoutes.participant.listReviews],
+    ["POST", participantReviewListPattern, productionApiRoutes.participant.createReview],
+    ["PATCH", participantReviewDetailPattern, productionApiRoutes.participant.updateReview],
+    ["DELETE", participantReviewDetailPattern, productionApiRoutes.participant.deleteReview],
     ["POST", unlockTestletPattern, productionApiRoutes.participant.unlockTestlet],
     ["POST", resumeSessionPattern, productionApiRoutes.participant.resumeSession],
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
@@ -5517,6 +5532,88 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           logs: body.logs
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const participantReviewListMatch =
+        participantReviewListPattern.exec(pathname);
+      if (request.method === "GET" && participantReviewListMatch?.groups) {
+        const testRunId = decodeRouteGroup(
+          participantReviewListMatch.groups.testRunId
+        );
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+        const items = await services.participantRuntime.listReviews({ testRunId });
+        sendJson<ListParticipantReviewsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "POST" && participantReviewListMatch?.groups) {
+        const testRunId = decodeRouteGroup(
+          participantReviewListMatch.groups.testRunId
+        );
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+        const body =
+          await readRequestJsonBody<CreateParticipantReviewRequest>();
+        const review = await services.participantRuntime.createReview({
+          testRunId,
+          unitKey: body.unitKey,
+          reviewerId: body.reviewerId,
+          category: body.category,
+          comment: body.comment
+        });
+        sendJson<ParticipantReviewResponse>(response, 201, { review });
+        return;
+      }
+
+      const participantReviewDetailMatch =
+        participantReviewDetailPattern.exec(pathname);
+      if (
+        (request.method === "PATCH" || request.method === "DELETE") &&
+        participantReviewDetailMatch?.groups
+      ) {
+        const testRunId = decodeRouteGroup(
+          participantReviewDetailMatch.groups.testRunId
+        );
+        const reviewId = decodeRouteGroup(
+          participantReviewDetailMatch.groups.reviewId
+        );
+        if (!testRunId || !reviewId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_review_scope",
+            "testRunId and reviewId are required."
+          );
+          return;
+        }
+        if (request.method === "DELETE") {
+          const deletedReviewId =
+            await services.participantRuntime.deleteReview({
+              testRunId,
+              reviewId
+            });
+          sendJson<DeleteParticipantReviewResponse>(response, 200, {
+            deletedReviewId
+          });
+          return;
+        }
+        const body =
+          await readRequestJsonBody<UpdateParticipantReviewRequest>();
+        const review = await services.participantRuntime.updateReview({
+          testRunId,
+          reviewId,
+          unitKey: body.unitKey,
+          reviewerId: body.reviewerId,
+          category: body.category,
+          comment: body.comment
+        });
+        sendJson<ParticipantReviewResponse>(response, 200, { review });
         return;
       }
 

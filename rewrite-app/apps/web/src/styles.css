@@ -1225,6 +1225,80 @@ pre {
   font-weight: 800;
 }
 
+.participant-review-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(31, 92, 84, 0.2);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(31, 92, 84, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.78);
+}
+
+.participant-review-panel > header,
+.participant-review-item > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.participant-review-panel > header > div,
+.participant-review-item > header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.participant-review-panel > header span,
+.participant-review-item span,
+.participant-review-item time {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.participant-review-panel > header p,
+.participant-review-item p,
+.participant-review-feedback {
+  margin: 0;
+}
+
+.participant-review-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.participant-review-form {
+  margin: 0;
+}
+
+.participant-review-list {
+  display: grid;
+  gap: 10px;
+}
+
+.participant-review-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 252, 246, 0.82);
+}
+
+.participant-review-item .actions {
+  margin-top: 0;
+}
+
+.participant-review-feedback {
+  color: var(--secondary);
+  font-weight: 700;
+}
+
 .participant-draft-state {
   display: grid;
   gap: 6px;

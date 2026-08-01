@@ -966,7 +966,7 @@ export type ParticipantCurrentRunState = {
       prompt: string;
     } | null;
   };
-  availableActions: Array<"save_progress" | "resume" | "complete">;
+  availableActions: Array<"save_progress" | "resume" | "complete" | "review">;
 };
 
 export type WorkspaceOverview = {

@@ -361,6 +361,10 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/participant/sessions/{participantSessionId}/current-state`
 - `POST /api/v1/participant/starter:launch`
 - `POST /api/v1/participant/test-runs/{testRunId}/save-progress`
+- `GET /api/v1/participant/test-runs/{testRunId}/reviews`
+- `POST /api/v1/participant/test-runs/{testRunId}/reviews`
+- `PATCH /api/v1/participant/test-runs/{testRunId}/reviews/{reviewId}`
+- `DELETE /api/v1/participant/test-runs/{testRunId}/reviews/{reviewId}`
 - `POST /api/v1/participant/test-runs/{testRunId}/testlets/{testletKey}/unlock`
 - `POST /api/v1/participant/sessions/{participantSessionId}/resume`
 - `POST /api/v1/participant/test-runs/{testRunId}/resume`
@@ -375,6 +379,7 @@ The added read side now makes the first slice inspectable:
 - protected admin directory reads are filterable by username, status, role, tenant/workspace scope, and limit so platform operators can narrow user-management follow-up without leaving the shell, with a matching CSV export for access reviews
 - admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, targeted session revoke, user management, password reset, and role assignment/revocation, filterable by event type, actor admin id, subject admin id, and limit, with a matching CSV export endpoint
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
+- participant review routes are bound to an opaque participant run, reject execution modes without `canReview`, and expose only that run's own test- and unit-level comments
 - password-protected participant sign-in and starter launch share a durable, workspace-scoped login sink with the original five-failure/30-minute defaults and stable `429` retry responses
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts, with a one-row CSV export for operator handoff

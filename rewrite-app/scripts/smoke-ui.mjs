@@ -2218,6 +2218,111 @@ try {
   await page.locator("#participantRouteFullscreenPrompt").waitFor({ state: "detached" });
   stopAfter("participant-entry-start-after-sign-in");
 
+  logStep("participant-entry-review-comments");
+  const participantReviewLoginKey = "student-entry-review";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "loginKey,executionMode,groupKey,displayName",
+          `${participantReviewLoginKey},run-review,group:participant-entry-review,Student Entry Review`
+        ].join("\n")
+      }
+    }
+  );
+  await page.locator("#participantRouteClearSessionButton").click();
+  await fillAndCommitUntilValue("#participantTenantKey", tenantKey);
+  await fillAndCommitUntilValue("#participantWorkspaceKey", workspaceKey);
+  await fillAndCommitUntilValue("#participantLoginKey", participantReviewLoginKey);
+  await fillAndCommitUntilValue(
+    "#participantRouteGroupKey",
+    "group:participant-entry-review"
+  );
+  await page.getByRole("button", { name: "Start Or Resume" }).click();
+  await page.locator("#participantRouteReviewPanel").waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-review" })
+    .waitFor();
+  await page
+    .locator("#participantRouteActions")
+    .filter({ hasText: "review" })
+    .waitFor();
+  const participantReviewRunId = (
+    await page.locator("#participantRouteRunId").textContent()
+  )?.trim();
+  assert.ok(participantReviewRunId, "Participant review smoke expected a run id.");
+  await page.locator("#participantRouteReviewReviewer").fill("UI Reviewer");
+  await page.locator("#participantRouteReviewCategory").selectOption("technical");
+  await page
+    .locator("#participantRouteReviewComment")
+    .fill("Participant review comment from browser smoke");
+  await page.locator("#participantRouteReviewSaveButton").click();
+  await page
+    .locator("#participantRouteReviewFeedback")
+    .filter({ hasText: "Comment saved" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator(".participant-review-item")
+    .filter({ hasText: "Participant review comment from browser smoke" })
+    .filter({ hasText: "unit-1" })
+    .waitFor();
+  const participantReviewPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/test-runs/${participantReviewRunId}/reviews`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item => item?.comment === "Participant review comment from browser smoke"
+      )
+  );
+  const participantReviewId = participantReviewPayload.items[0]?.reviewId;
+  assert.ok(participantReviewId, "Participant review smoke expected a review id.");
+  await page
+    .locator(`.participant-review-item[data-review-id="${participantReviewId}"]`)
+    .getByRole("button", { name: "Edit" })
+    .click();
+  await page.locator("#participantRouteReviewTargetTest").click();
+  await page
+    .locator("#participantRouteReviewComment")
+    .fill("Updated whole-test review comment");
+  await page.locator("#participantRouteReviewSaveButton").click();
+  await page
+    .locator(".participant-review-item")
+    .filter({ hasText: "Updated whole-test review comment" })
+    .filter({ hasText: "Whole test" })
+    .waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/test-runs/${participantReviewRunId}/reviews`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.reviewId === participantReviewId &&
+          item?.unitKey === null &&
+          item?.comment === "Updated whole-test review comment"
+      )
+  );
+  page.once("dialog", dialog => dialog.accept());
+  await page
+    .locator(`.participant-review-item[data-review-id="${participantReviewId}"]`)
+    .getByRole("button", { name: "Delete" })
+    .click();
+  await page.locator("#participantRouteReviewEmpty").waitFor({ timeout: 15_000 });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/test-runs/${participantReviewRunId}/reviews`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.length === 0
+  );
+  stopAfter("participant-entry-review-comments");
+
   logStep("participant-entry-protected-password");
   const protectedParticipantLoginKey = "student-entry-protected";
   const protectedParticipantGroupKey = "group:participant-entry-protected";

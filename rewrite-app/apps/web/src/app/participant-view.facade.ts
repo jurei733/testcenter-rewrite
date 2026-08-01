@@ -2,9 +2,13 @@ import { Injectable, inject, signal } from "@angular/core";
 
 import type {
   CompleteTestRunRequest,
+  CreateParticipantReviewRequest,
+  DeleteParticipantReviewResponse,
+  ListParticipantReviewsResponse,
   ParticipantCurrentRunStateResponse,
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
+  ParticipantReviewResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -13,7 +17,8 @@ import type {
   SaveTestRunProgressRequest,
   SaveTestRunProgressResponse,
   UnlockParticipantTestletRequest,
-  UnlockParticipantTestletResponse
+  UnlockParticipantTestletResponse,
+  UpdateParticipantReviewRequest
 } from "@testcenter-rewrite-app/contracts";
 import {
   productionApiRoutes,
@@ -21,7 +26,8 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import type {
   ParticipantRuntimeBooklet,
-  ParticipantTestLogEntryInput
+  ParticipantTestLogEntryInput,
+  WorkspaceReview
 } from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
@@ -74,6 +80,7 @@ type ParticipantPlayerState = {
   canGoNextUnit: boolean;
   canResumeRun: boolean;
   canComplete: boolean;
+  canReview: boolean;
   canClearSession: boolean;
   saveProgressLabel: string;
   unitResponse: string;
@@ -189,6 +196,15 @@ export class ParticipantViewFacade {
   veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
     "not_saved";
   testletUnlockCode = "";
+  participantReviews: WorkspaceReview[] = [];
+  reviewTarget: "unit" | "test" = "unit";
+  reviewerId = "";
+  reviewCategory = "general";
+  reviewComment = "";
+  editingReviewId = "";
+  editingReviewUnitKey: string | null = null;
+  reviewFeedback = "";
+  readonly reviewCategories = ["general", "technical", "content", "design"];
   readonly timerTick = signal(Date.now());
   readonly fullscreenActive = signal(false);
   readonly fullscreenStatus = signal("");
@@ -449,6 +465,7 @@ export class ParticipantViewFacade {
         canGoNextUnit: false,
         canResumeRun: false,
         canComplete: false,
+        canReview: false,
         canClearSession: hasParticipantSession,
         saveProgressLabel: "Save Progress",
         unitResponse: "",
@@ -685,6 +702,7 @@ export class ParticipantViewFacade {
       canGoNextUnit: canNavigateUnits && currentState.navigation.canGoNext,
       canResumeRun: availableActions.includes("resume"),
       canComplete: availableActions.includes("complete"),
+      canReview: availableActions.includes("review"),
       canClearSession: true,
       saveProgressLabel:
         !executionMode.saveResponses
@@ -984,6 +1002,66 @@ export class ParticipantViewFacade {
     }
 
     this.viewState.onActionAsync(() => this.refreshCurrentStateInternal(false));
+  }
+
+  get canSubmitReview(): boolean {
+    return Boolean(
+      this.player.canReview &&
+      this.runtime.testRunId.trim() &&
+      this.reviewComment.trim() &&
+      this.reviewCategory.trim()
+    );
+  }
+
+  get reviewActionLabel(): string {
+    return this.editingReviewId ? "Save Comment Changes" : "Add Comment";
+  }
+
+  get reviewUnitTargetLabel(): string {
+    return this.editingReviewId && this.editingReviewUnitKey
+      ? `Unit · ${this.editingReviewUnitKey}`
+      : "Current Unit";
+  }
+
+  beginReviewEdit(review: WorkspaceReview): void {
+    this.editingReviewId = review.reviewId;
+    this.editingReviewUnitKey = review.unitKey;
+    this.reviewTarget = review.unitKey ? "unit" : "test";
+    this.reviewerId = review.reviewerId;
+    this.reviewCategory = review.category;
+    this.reviewComment = review.comment;
+    this.reviewFeedback = `Editing comment from ${review.reviewerId}.`;
+  }
+
+  cancelReviewEdit(): void {
+    this.resetReviewEditor();
+    this.reviewFeedback = "Comment changes discarded.";
+  }
+
+  saveReview(): void {
+    if (!this.canSubmitReview) {
+      return;
+    }
+    this.viewState.onActionAsync(() => this.saveReviewInternal());
+  }
+
+  deleteReview(review: WorkspaceReview): void {
+    if (!this.player.canReview) {
+      return;
+    }
+    const accepted = globalThis.confirm?.(
+      "Delete this participant comment permanently?"
+    );
+    if (accepted === false) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.deleteReviewInternal(review.reviewId)
+    );
+  }
+
+  reviewTargetLabel(review: WorkspaceReview): string {
+    return review.unitKey ? `Unit · ${review.unitKey}` : "Whole test";
   }
 
   saveProgressFromPlayer(): void {
@@ -1307,6 +1385,9 @@ export class ParticipantViewFacade {
   ): void {
     this.copiedSessionEntryLink = "";
     this.assignedBooklets = [];
+    this.participantReviews = [];
+    this.resetReviewEditor();
+    this.reviewFeedback = "";
     this.pendingVeronaSave = null;
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
@@ -1746,6 +1827,104 @@ export class ParticipantViewFacade {
     return [...compacted.values()].slice(-20);
   }
 
+  private resetReviewEditor(): void {
+    this.editingReviewId = "";
+    this.editingReviewUnitKey = null;
+    this.reviewTarget = "unit";
+    this.reviewerId = "";
+    this.reviewCategory = "general";
+    this.reviewComment = "";
+  }
+
+  private async refreshParticipantReviewsInternal(
+    currentState: ParticipantCurrentRunStateResponse["currentRunState"],
+    quiet: boolean
+  ): Promise<void> {
+    if (!currentState.executionMode.canReview) {
+      this.participantReviews = [];
+      this.resetReviewEditor();
+      this.reviewFeedback = "";
+      return;
+    }
+    const payload =
+      await this.requestState.request<ListParticipantReviewsResponse>(
+        "Participant Review Comments",
+        "GET",
+        resolveRoutePath(productionApiRoutes.participant.listReviews, {
+          testRunId: currentState.testRun.testRunId
+        }),
+        undefined,
+        { quiet }
+      );
+    this.participantReviews = payload.items;
+  }
+
+  private async saveReviewInternal(): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (!currentState || !currentState.executionMode.canReview) {
+      return;
+    }
+    const unitKey =
+      this.reviewTarget === "unit"
+        ? this.editingReviewUnitKey ?? currentState.currentUnit.unitKey
+        : null;
+    const reviewId = this.editingReviewId;
+    if (reviewId) {
+      await this.requestState.request<ParticipantReviewResponse>(
+        "Update Participant Comment",
+        "PATCH",
+        resolveRoutePath(productionApiRoutes.participant.updateReview, {
+          testRunId: currentState.testRun.testRunId,
+          reviewId
+        }),
+        {
+          unitKey,
+          reviewerId: this.reviewerId.trim() || undefined,
+          category: this.reviewCategory,
+          comment: this.reviewComment
+        } satisfies UpdateParticipantReviewRequest
+      );
+      this.reviewFeedback = "Comment updated.";
+    } else {
+      await this.requestState.request<ParticipantReviewResponse>(
+        "Create Participant Comment",
+        "POST",
+        resolveRoutePath(productionApiRoutes.participant.createReview, {
+          testRunId: currentState.testRun.testRunId
+        }),
+        {
+          unitKey,
+          reviewerId: this.reviewerId.trim() || undefined,
+          category: this.reviewCategory,
+          comment: this.reviewComment
+        } satisfies CreateParticipantReviewRequest
+      );
+      this.reviewFeedback = "Comment saved.";
+    }
+    this.resetReviewEditor();
+    await this.refreshParticipantReviewsInternal(currentState, true);
+  }
+
+  private async deleteReviewInternal(reviewId: string): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (!currentState || !currentState.executionMode.canReview) {
+      return;
+    }
+    await this.requestState.request<DeleteParticipantReviewResponse>(
+      "Delete Participant Comment",
+      "DELETE",
+      resolveRoutePath(productionApiRoutes.participant.deleteReview, {
+        testRunId: currentState.testRun.testRunId,
+        reviewId
+      })
+    );
+    if (this.editingReviewId === reviewId) {
+      this.resetReviewEditor();
+    }
+    this.reviewFeedback = "Comment deleted.";
+    await this.refreshParticipantReviewsInternal(currentState, true);
+  }
+
   private async refreshCurrentStateInternal(quiet: boolean): Promise<void> {
     if (!this.runtime.participantSessionId.trim()) {
       return;
@@ -1768,6 +1947,7 @@ export class ParticipantViewFacade {
       );
       this.syncCurrentRunState(payload.currentRunState);
       this.syncCurrentUnitResponse(payload.currentRunState);
+      await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
       this.persistState();
     } catch (error) {
       if (

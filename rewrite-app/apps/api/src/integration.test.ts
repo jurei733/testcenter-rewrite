@@ -12503,6 +12503,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     assert.equal(resumed.status, 200);
     const state = await requestJson<{
       currentRunState: {
+        availableActions: string[];
         executionMode: {
           mode: string;
           monitorable: boolean;
@@ -12570,6 +12571,80 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
   assert.deepEqual(review.testRun.unlockedTestletKeys, [protectedTestletKey]);
   assert.deepEqual(review.testRun.testletTimers, {});
+  assert.equal(review.currentRunState.availableActions.includes("review"), true);
+  const createdParticipantReview = await requestJson<{
+    review: {
+      reviewId: string;
+      testRunId: string;
+      participantSessionId: string;
+      unitKey: string | null;
+      reviewerId: string;
+      category: string;
+      comment: string;
+    };
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`, {
+    method: "POST",
+    body: {
+      unitKey: "UNIT.INTRO",
+      reviewerId: "Mode Reviewer",
+      category: "technical",
+      comment: "Participant-authored review"
+    }
+  });
+  assert.equal(createdParticipantReview.status, 201);
+  assert.equal(createdParticipantReview.body.review.testRunId, review.testRunId);
+  assert.equal(
+    createdParticipantReview.body.review.participantSessionId,
+    review.participantSessionId
+  );
+  assert.equal(createdParticipantReview.body.review.unitKey, "UNIT.INTRO");
+  const participantReviews = await requestJson<{
+    items: Array<{ reviewId: string; comment: string }>;
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
+  assert.deepEqual(
+    participantReviews.body.items.map(item => [item.reviewId, item.comment]),
+    [[createdParticipantReview.body.review.reviewId, "Participant-authored review"]]
+  );
+  const updatedParticipantReview = await requestJson<{
+    review: { unitKey: string | null; category: string; comment: string };
+  }>(
+    `/api/v1/participant/test-runs/${review.testRunId}/reviews/${createdParticipantReview.body.review.reviewId}`,
+    {
+      method: "PATCH",
+      body: {
+        unitKey: null,
+        category: "content",
+        comment: "Updated participant-authored review"
+      }
+    }
+  );
+  assert.equal(updatedParticipantReview.status, 200);
+  assert.equal(updatedParticipantReview.body.review.unitKey, null);
+  assert.equal(updatedParticipantReview.body.review.category, "content");
+  assert.equal(
+    updatedParticipantReview.body.review.comment,
+    "Updated participant-authored review"
+  );
+  const deletedParticipantReview = await requestJson<{
+    deletedReviewId: string;
+  }>(
+    `/api/v1/participant/test-runs/${review.testRunId}/reviews/${createdParticipantReview.body.review.reviewId}`,
+    { method: "DELETE" }
+  );
+  assert.equal(deletedParticipantReview.status, 200);
+  assert.equal(
+    deletedParticipantReview.body.deletedReviewId,
+    createdParticipantReview.body.review.reviewId
+  );
+  const deniedDemoReview = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${demo.testRunId}/reviews`,
+    {
+      method: "POST",
+      body: { category: "general", comment: "Must be rejected" }
+    }
+  );
+  assert.equal(deniedDemoReview.status, 403);
+  assert.equal(deniedDemoReview.body.error, "participant_review_not_allowed");
   const reviewSave = await requestJson<{
     testRun: {
       currentUnitKey: string | null;
@@ -12620,6 +12695,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(trial.currentRunState.executionMode.forceNaviRestrictions, false);
   assert.equal(trial.currentRunState.executionMode.forceTimeRestrictions, false);
   assert.equal(trial.currentRunState.executionMode.receiveRemoteCommands, false);
+  assert.equal(trial.currentRunState.availableActions.includes("review"), true);
   assert.equal(
     trial.currentRunState.booklet.policy.navigation.unitMenuEnabled,
     true
@@ -12645,6 +12721,18 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     "Trial response is durable"
   );
   assert.deepEqual(trialSave.body.testRun.testletTimers, {});
+  const trialReview = await requestJson<{
+    review: { reviewId: string; testRunId: string; reviewerId: string };
+  }>(`/api/v1/participant/test-runs/${trial.testRunId}/reviews`, {
+    method: "POST",
+    body: {
+      category: "general",
+      comment: "Trial participant review"
+    }
+  });
+  assert.equal(trialReview.status, 201);
+  assert.equal(trialReview.body.review.testRunId, trial.testRunId);
+  assert.equal(trialReview.body.review.reviewerId, "mode-trial");
   const trialOpenRuns = await requestJson<{
     items: Array<{ testRunId: string; executionMode: string }>;
   }>(
@@ -12798,7 +12886,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(hiddenReviewRun.status, 404);
   assert.equal(hiddenReviewRun.body.error, "study_monitor_run_not_found");
   const visibleTrialRun = await requestJson<{
-    studyMonitorRun: { testRun: { testRunId: string; executionMode?: string } };
+    studyMonitorRun: {
+      reviewCount: number;
+      testRun: { testRunId: string; executionMode?: string };
+    };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${trial.testRunId}`
   );
@@ -12807,6 +12898,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     visibleTrialRun.body.studyMonitorRun.testRun.executionMode,
     "run-trial"
   );
+  assert.equal(visibleTrialRun.body.studyMonitorRun.reviewCount, 1);
 });
 
 test("participant launch rejects closed sessions after completion", async () => {
