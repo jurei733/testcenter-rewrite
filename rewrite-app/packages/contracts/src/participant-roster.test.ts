@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseParticipantRosterText } from "./index.js";
+import {
+  parseOriginalTestcenterOperationalLogins,
+  parseParticipantRosterText
+} from "./index.js";
 
 describe("parseParticipantRosterText", () => {
   it("parses CSV, TSV, and semicolon roster rows", () => {
@@ -208,6 +211,46 @@ describe("parseParticipantRosterText", () => {
         }
       ]
     );
+  });
+
+  it("classifies operational Testtakers logins without exposing passwords", () => {
+    const operationalLogins = parseOriginalTestcenterOperationalLogins(
+      [
+        "<Testtakers>",
+        "  <Group id=\"scheduled-operators\" validFrom=\"1/6/2023 10:00\" validFor=\"45\">",
+        "    <Login mode=\"monitor-group\" name=\"group-monitor\" pw=\"secret\">",
+        "      <Profile id=\"all\" />",
+        "      <Profile id=\"small\" />",
+        "      <Profile id=\"all\" />",
+        "    </Login>",
+        "    <Login mode=\"sys-check-login\" name=\"sys-check\" />",
+        "    <Login mode=\"run-hot-return\" name=\"participant\"><Booklet>BOOKLET.A</Booklet></Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    );
+
+    assert.deepEqual(operationalLogins, [
+      {
+        loginKey: "group-monitor",
+        loginMode: "monitor-group",
+        groupKey: "scheduled-operators",
+        passwordRequired: true,
+        profileIds: ["all", "small"],
+        validFrom: "1/6/2023 10:00",
+        validForMinutes: 45
+      },
+      {
+        loginKey: "sys-check",
+        loginMode: "sys-check-login",
+        groupKey: "scheduled-operators",
+        passwordRequired: false,
+        profileIds: [],
+        validFrom: "1/6/2023 10:00",
+        validForMinutes: 45
+      }
+    ]);
+    assert.equal(JSON.stringify(operationalLogins).includes("secret"), false);
   });
 
   it("inherits Original Testcenter access windows and accepts JSON/CSV aliases", () => {

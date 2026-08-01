@@ -107,6 +107,7 @@ export interface ShellRuntimeState {
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
+  operationalLoginCandidatesView: string;
   participantSessionId: string;
   testRunId: string;
   currentUnitKey: string;
@@ -323,6 +324,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     ].join("\n"),
     entryLinksView: "",
     participantRosterView: 'Use "Load Saved Roster".',
+    operationalLoginCandidatesView: "No operational login candidates classified yet.",
     participantSessionId: "",
     testRunId: "",
     currentUnitKey: "unit-1",

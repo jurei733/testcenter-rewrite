@@ -88,6 +88,26 @@ export type ParsedParticipantRosterEntry = {
   validForMinutes?: number | null;
 };
 
+export const originalTestcenterOperationalLoginModes = [
+  "monitor-group",
+  "monitor-study",
+  "sys-check-login"
+] as const;
+
+export type OriginalTestcenterOperationalLoginMode =
+  (typeof originalTestcenterOperationalLoginModes)[number];
+
+export type OriginalTestcenterOperationalLoginCandidate = {
+  loginKey: string;
+  loginMode: OriginalTestcenterOperationalLoginMode;
+  groupKey: string | null;
+  passwordRequired: boolean;
+  profileIds: string[];
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
+};
+
 export type ParticipantRosterSource =
   | string
   | Record<string, unknown>
@@ -1434,6 +1454,113 @@ const parseParticipantRosterXmlText = (
   return mergeParsedParticipantRosterEntries(entries);
 };
 
+export const parseOriginalTestcenterOperationalLogins = (
+  rosterText: ParticipantRosterSource
+): OriginalTestcenterOperationalLoginCandidate[] => {
+  if (
+    typeof rosterText !== "string" ||
+    !rosterText.trimStart().startsWith("<")
+  ) {
+    return [];
+  }
+
+  const groupContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "groupKey",
+    "key",
+    "id",
+    "identifier",
+    "ref",
+    "name",
+    "label"
+  );
+  const validFromContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validFrom",
+    "valid-from"
+  );
+  const validToContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validTo",
+    "valid-to",
+    "validUntil"
+  );
+  const validForContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validFor",
+    "valid-for",
+    "validForMinutes"
+  );
+  const operationalModes = new Set<string>(
+    originalTestcenterOperationalLoginModes
+  );
+  const candidates: OriginalTestcenterOperationalLoginCandidate[] = [];
+
+  for (const match of rosterText.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?login)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+  )) {
+    const entryOffset = match.index ?? 0;
+    const attributes = parseXmlAttributes(match[2] ?? "");
+    const content = match[3] ?? "";
+    const loginMode = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "mode", "loginMode")
+    )?.toLowerCase();
+    if (!loginMode || !operationalModes.has(loginMode)) {
+      continue;
+    }
+    const loginKey = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "name", "login", "loginKey", "username")
+    );
+    if (!loginKey) {
+      continue;
+    }
+    const password = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "password", "pw", "passwort", "kennwort")
+    );
+    const groupKey = findNearestXmlRosterContextValue(
+      groupContextRanges,
+      entryOffset
+    );
+    const validFrom = findNearestXmlRosterContextValue(
+      validFromContextRanges,
+      entryOffset
+    );
+    const validTo = findNearestXmlRosterContextValue(
+      validToContextRanges,
+      entryOffset
+    );
+    const validForMinutes = parseRosterValidForMinutes(
+      findNearestXmlRosterContextValue(validForContextRanges, entryOffset)
+    );
+    const profileIds = Array.from(
+      content.matchAll(
+        /<(?:[a-zA-Z_][\w.-]*:)?profile\b([^>]*?)(?:\/>|>[\s\S]*?<\/(?:[a-zA-Z_][\w.-]*:)?profile>)/gi
+      ),
+      profileMatch =>
+        normalizeRosterTextValue(
+          readXmlAttribute(parseXmlAttributes(profileMatch[1] ?? ""), "id", "ref")
+        )
+    ).filter((profileId): profileId is string => Boolean(profileId));
+
+    candidates.push({
+      loginKey,
+      loginMode: loginMode as OriginalTestcenterOperationalLoginMode,
+      groupKey,
+      passwordRequired: Boolean(password),
+      profileIds: Array.from(new Set(profileIds)),
+      ...(validFrom ? { validFrom } : {}),
+      ...(validTo ? { validTo } : {}),
+      ...(validForMinutes ? { validForMinutes } : {})
+    });
+  }
+
+  return candidates;
+};
+
 export const parseParticipantRosterText = (
   rosterText: ParticipantRosterSource
 ): ParsedParticipantRosterEntry[] => {
@@ -2114,6 +2241,7 @@ export type GetParticipantSessionResponse = {
 export type ImportParticipantRosterResponse = {
   importedCount: number;
   updatedCount: number;
+  operationalLoginCandidates: OriginalTestcenterOperationalLoginCandidate[];
   items: WorkspaceParticipantRosterItem[];
 };
 

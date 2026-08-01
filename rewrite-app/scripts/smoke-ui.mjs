@@ -4389,6 +4389,9 @@ try {
       "    <Login name=\"entry-student-login\">",
       `      <Booklet>${participantRouteBookletKey}</Booklet>`,
       "    </Login>",
+      "    <Login mode=\"monitor-group\" name=\"entry-group-monitor\" pw=\"operator-secret\">",
+      "      <Profile id=\"all\" />",
+      "    </Login>",
       "  </Group>",
       "</Testtakers>"
     ].join("\n")
@@ -4405,6 +4408,28 @@ try {
     .filter({ hasText: "time-limited" })
     .filter({ hasText: "45 minute(s) after first sign-in" })
     .waitFor();
+  const operationalLoginCandidateCard = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Operational Login Migration Candidates"
+      })
+    })
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: "entry-group-monitor" }) })
+    .filter({ hasText: "monitor-group" })
+    .filter({ hasText: "group:testcenter-login-entry" })
+    .filter({ hasText: "password protected" })
+    .filter({ hasText: "all" });
+  await operationalLoginCandidateCard.waitFor();
+  if (
+    (await operationalLoginCandidateCard.textContent())?.includes(
+      "operator-secret"
+    )
+  ) {
+    throw new Error("Operational login migration card exposed a source password.");
+  }
+  stopAfter("operational-login-candidates");
   await fillAndCommit(
     "#entryRosterText",
     JSON.stringify({

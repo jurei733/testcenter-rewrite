@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
-import { parseParticipantRosterText } from "./index.js";
+import {
+  parseOriginalTestcenterOperationalLogins,
+  parseParticipantRosterText
+} from "./index.js";
 
 type OriginalTestcenterCorpus = {
   sourceCommit: string;
@@ -40,9 +43,11 @@ test("original Testcenter compatibility corpus separates participant and operati
     "284a4ffcd9452d56dddd51939707ac7f646c3da7"
   );
 
-  const entries = parseParticipantRosterText(
-    readFileSync(resolve(corpusRoot, corpus.roster.fixture), "utf8")
+  const rosterXml = readFileSync(
+    resolve(corpusRoot, corpus.roster.fixture),
+    "utf8"
   );
+  const entries = parseParticipantRosterText(rosterXml);
   assert.deepEqual(
     entries.map(entry => entry.loginKey),
     corpus.roster.participantLoginKeys
@@ -51,6 +56,22 @@ test("original Testcenter compatibility corpus separates participant and operati
     corpus.roster.excludedOperationalLoginKeys.every(
       loginKey => !entries.some(entry => entry.loginKey === loginKey)
     )
+  );
+  const operationalLogins =
+    parseOriginalTestcenterOperationalLogins(rosterXml);
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    corpus.roster.excludedOperationalLoginKeys
+  );
+  assert.equal(
+    operationalLogins.find(login => login.loginKey === "test-group-monitor-2")
+      ?.profileIds.join(","),
+    "all,small"
+  );
+  assert.equal(
+    operationalLogins.find(login => login.loginKey === "expired-study-monitor")
+      ?.validTo,
+    "1/3/2020 19:30"
   );
 
   const primaryParticipant = entries.find(entry => entry.loginKey === "test");

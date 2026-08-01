@@ -409,6 +409,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Operational Login Migration Candidates"
+        subtitle="Password-redacted original Testtakers logins that need an explicit non-escalating role mapping."
+        [items]="view.operationalLoginCandidateItems"
+        emptyState="The latest roster import did not contain operational logins."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Generated Entry Links"
         subtitle="Participant URLs scoped to the selected workspace and optional booklet."
         [items]="view.entryLinkItems"

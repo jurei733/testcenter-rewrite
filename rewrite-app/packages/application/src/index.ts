@@ -13,11 +13,13 @@ import {
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
   isSupportedVeronaPlayerApiVersion,
+  parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText,
   parseVeronaUnitResponse,
   readBookletConfigValues
 } from "@testcenter-rewrite-app/contracts";
 import type {
+  OriginalTestcenterOperationalLoginCandidate,
   ParticipantRosterSource,
   SourceDocumentSource
 } from "@testcenter-rewrite-app/contracts";
@@ -361,6 +363,7 @@ export type WorkspaceAdminReadPort = {
   }): Promise<{
     importedCount: number;
     updatedCount: number;
+    operationalLoginCandidates: OriginalTestcenterOperationalLoginCandidate[];
     items: WorkspaceParticipantRosterItem[];
   }>;
   listParticipantRoster(input: {
@@ -15786,8 +15789,18 @@ export const createFirstSliceServices = (
             );
           }
         }
+        const operationalLoginCandidates =
+          parseOriginalTestcenterOperationalLogins(input.rosterText);
         const parsedEntries = parseParticipantRosterText(input.rosterText);
         if (parsedEntries.length === 0) {
+          if (operationalLoginCandidates.length > 0) {
+            throw new FirstSliceError(
+              400,
+              "participant_roster_operational_only",
+              "Testtakers XML contains only operational logins; explicit role mapping is required before admin accounts can be created.",
+              { operationalLoginCandidates }
+            );
+          }
           throw new FirstSliceError(
             400,
             "participant_roster_empty",
@@ -15933,7 +15946,9 @@ export const createFirstSliceServices = (
             details: {
               importedCount,
               updatedCount,
-              parsedCount: parsedEntries.length
+              parsedCount: parsedEntries.length,
+              operationalLoginCandidateCount:
+                operationalLoginCandidates.length
             }
           });
         }
@@ -15941,6 +15956,7 @@ export const createFirstSliceServices = (
         return {
           importedCount,
           updatedCount,
+          operationalLoginCandidates,
           items: buildParticipantRosterReadItems(
             Array.from(entriesByLoginKey.values()),
             await getActiveWorkspaceRelease(

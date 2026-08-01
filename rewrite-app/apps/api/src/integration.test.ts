@@ -7724,7 +7724,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
     )
   );
 
-  const operationalOnlyRoster = await requestJson<{ error: string }>(
+  const operationalOnlyRoster = await requestJson<{
+    error: string;
+    details: {
+      operationalLoginCandidates: Array<{
+        loginKey: string;
+        loginMode: string;
+        groupKey: string | null;
+        passwordRequired: boolean;
+        profileIds: string[];
+      }>;
+    };
+  }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
       method: "POST",
@@ -7735,7 +7746,22 @@ test("original Testcenter compatibility corpus imports representative booklets",
     }
   );
   assert.equal(operationalOnlyRoster.status, 400);
-  assert.equal(operationalOnlyRoster.body.error, "participant_roster_empty");
+  assert.equal(
+    operationalOnlyRoster.body.error,
+    "participant_roster_operational_only"
+  );
+  assert.deepEqual(
+    operationalOnlyRoster.body.details.operationalLoginCandidates,
+    [
+      {
+        loginKey: "study-monitor",
+        loginMode: "monitor-study",
+        groupKey: "operators",
+        passwordRequired: false,
+        profileIds: []
+      }
+    ]
+  );
 });
 
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
@@ -15117,6 +15143,13 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const initialImport = await requestJson<{
     importedCount: number;
     updatedCount: number;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      loginMode: string;
+      groupKey: string | null;
+      passwordRequired: boolean;
+      profileIds: string[];
+    }>;
     items: Array<{
       participantRosterEntryId: string;
       loginKey: string;
@@ -15148,6 +15181,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(initialImport.status, 201);
   assert.equal(initialImport.body.importedCount, 2);
   assert.equal(initialImport.body.updatedCount, 0);
+  assert.deepEqual(initialImport.body.operationalLoginCandidates, []);
   assert.equal(initialImport.body.items.length, 2);
   assert.equal(initialImport.body.items[0]?.loginKey, "roster-a");
   assert.equal(initialImport.body.items[0]?.passwordRequired, false);
@@ -15282,6 +15316,15 @@ test("workspace participant roster can be imported, updated, and listed", async 
   assert.equal(testcenterLoginImport.status, 201);
   assert.equal(testcenterLoginImport.body.importedCount, 1);
   assert.equal(testcenterLoginImport.body.updatedCount, 0);
+  assert.deepEqual(testcenterLoginImport.body.operationalLoginCandidates, [
+    {
+      loginKey: "test-group-monitor",
+      loginMode: "monitor-group",
+      groupKey: "sample_group",
+      passwordRequired: true,
+      profileIds: []
+    }
+  ]);
   const testcenterLogin = testcenterLoginImport.body.items.find(
     item => item.loginKey === "test"
   );

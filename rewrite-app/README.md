@@ -28,6 +28,15 @@ session-reuse, response persistence, navigation/time restrictions, participant
 display, monitor visibility, and remote-command policies are enforced from one
 versioned domain matrix across every storage adapter.
 
+The same import classifies original `monitor-group`, `monitor-study`, and
+`sys-check-login` entries as explicit operational-login migration candidates.
+Responses retain their group, profile IDs, access window, and only a
+`passwordRequired` flag—never the source password. Mixed rosters import their
+participant rows and show the candidates in a dedicated Runtime card;
+operational-only rosters return the
+stable `participant_roster_operational_only` error until a non-escalating role
+mapping is selected.
+
 ## Workspace Shape
 
 ```text

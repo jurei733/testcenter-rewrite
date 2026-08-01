@@ -237,9 +237,19 @@ export class RewriteAppRuntimeService {
         this.refreshCrossViewStateAfterRuntimeChange()
       )
     );
+    const operationalCandidateCount =
+      payload.operationalLoginCandidates.length;
+    this.runtimeState.operationalLoginCandidatesView = JSON.stringify(
+      { items: payload.operationalLoginCandidates },
+      null,
+      2
+    );
+    const operationalCandidateSummary = operationalCandidateCount
+      ? `, ${operationalCandidateCount} operational login candidate${operationalCandidateCount === 1 ? "" : "s"} awaiting explicit role mapping`
+      : "";
     this.feedback.rememberActivity(
       "Participant Roster Imported",
-      `${payload.importedCount} imported, ${payload.updatedCount} updated.`
+      `${payload.importedCount} imported, ${payload.updatedCount} updated${operationalCandidateSummary}.`
     );
   }
 

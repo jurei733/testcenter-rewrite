@@ -3,6 +3,7 @@ import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
+  ImportParticipantRosterResponse,
   ListDetailedResponsesResponse,
   ListReviewsResponse,
   ListParticipantRosterResponse,
@@ -822,6 +823,50 @@ export class RuntimeViewFacade {
         };
       }) ?? []
     );
+  }
+
+  get operationalLoginCandidateItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<{
+      items: ImportParticipantRosterResponse["operationalLoginCandidates"];
+    }>(this.runtime.operationalLoginCandidatesView);
+    return Array.isArray(payload?.items)
+      ? payload.items.map(candidate => ({
+          headline: candidate.loginKey,
+          subline: "Explicit role mapping required before account creation",
+          badges: [
+            candidate.loginMode,
+            candidate.groupKey ?? "group missing",
+            candidate.passwordRequired ? "password protected" : "passwordless"
+          ],
+          rows: [
+            { label: "Original Mode", value: candidate.loginMode },
+            { label: "Original Group", value: candidate.groupKey ?? "none" },
+            {
+              label: "Profiles",
+              value:
+                candidate.profileIds.length > 0
+                  ? candidate.profileIds.join(" | ")
+                  : "none"
+            },
+            {
+              label: "Valid From",
+              value: candidate.validFrom ?? "immediately"
+            },
+            { label: "Valid To", value: candidate.validTo ?? "unlimited" },
+            {
+              label: "Valid For",
+              value: candidate.validForMinutes
+                ? `${candidate.validForMinutes} minute(s)`
+                : "unlimited"
+            },
+            {
+              label: "Migration Decision",
+              value:
+                "Choose a non-escalating monitor/sys-check role mapping; no admin account was created."
+            }
+          ]
+        }))
+      : [];
   }
 
   get entryLinksCsvPreview(): string {
