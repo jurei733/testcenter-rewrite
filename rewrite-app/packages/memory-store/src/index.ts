@@ -9,6 +9,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  ParticipantTestLog,
   SourcePackage,
   Tenant,
   TestRun,
@@ -36,6 +37,7 @@ type InMemoryFirstSliceState = {
   participantRosterPasswordHashes: Map<string, string>;
   participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
+  participantTestLogs: Map<string, ParticipantTestLog>;
 };
 
 const createInitialState = (): InMemoryFirstSliceState => ({
@@ -56,7 +58,8 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantRosterEntries: new Map(),
   participantRosterPasswordHashes: new Map(),
   participantLoginAttempts: new Map(),
-  testRuns: new Map()
+  testRuns: new Map(),
+  participantTestLogs: new Map()
 });
 
 const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
@@ -357,6 +360,28 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       let deletedCount = 0;
       for (const testRunId of testRunIds) {
         if (state.testRuns.delete(testRunId)) {
+          deletedCount += 1;
+        }
+      }
+      return deletedCount;
+    },
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+      return Array.from(state.participantTestLogs.values()).filter(
+        testLog =>
+          testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+      );
+    },
+    async saveParticipantTestLogs(testLogs) {
+      for (const testLog of testLogs) {
+        state.participantTestLogs.set(testLog.participantTestLogId, testLog);
+      }
+    },
+    async deleteParticipantTestLogsByTestRunIds(testRunIds) {
+      const testRunIdSet = new Set(testRunIds);
+      let deletedCount = 0;
+      for (const testLog of state.participantTestLogs.values()) {
+        if (testRunIdSet.has(testLog.testRunId)) {
+          state.participantTestLogs.delete(testLog.participantTestLogId);
           deletedCount += 1;
         }
       }

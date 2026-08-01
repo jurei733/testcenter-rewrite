@@ -15,6 +15,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  ParticipantTestLog,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -456,7 +457,27 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 25;
+const mapParticipantTestLog = (
+  row: Record<string, unknown> | undefined
+): ParticipantTestLog | null =>
+  row
+    ? {
+        participantTestLogId: String(row.participant_test_log_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        participantSessionId: String(row.participant_session_id),
+        testRunId: String(row.test_run_id),
+        unitKey: row.unit_key == null ? null : String(row.unit_key),
+        originalUnitId:
+          row.original_unit_id == null ? null : String(row.original_unit_id),
+        logKey: String(row.log_key),
+        logContent: String(row.log_content),
+        timestamp: Number(row.timestamp),
+        recordedAt: String(row.recorded_at)
+      }
+    : null;
+
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 26;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -849,6 +870,29 @@ const sqliteMigrations: SqliteMigration[] = [
     name: "add_participant_code",
     sql: `
       ALTER TABLE participant_sessions ADD COLUMN participant_code TEXT;
+    `
+  },
+  {
+    version: 26,
+    name: "add_participant_test_logs",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_test_logs (
+        participant_test_log_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        test_run_id TEXT NOT NULL,
+        unit_key TEXT,
+        original_unit_id TEXT,
+        log_key TEXT NOT NULL,
+        log_content TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        recorded_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_workspace
+        ON participant_test_logs (tenant_id, workspace_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_test_run
+        ON participant_test_logs (test_run_id, timestamp);
     `
   }
 ];
@@ -1825,6 +1869,74 @@ export const createSqliteFirstSliceRepository = (
       const placeholders = testRunIds.map(() => "?").join(", ");
       const result = database
         .prepare(`DELETE FROM test_runs WHERE test_run_id IN (${placeholders})`)
+        .run(...testRunIds);
+      return Number(result.changes);
+    },
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+           FROM participant_test_logs
+           WHERE tenant_id = ? AND workspace_id = ?
+           ORDER BY timestamp DESC, recorded_at DESC`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapParticipantTestLog(row))
+        .filter(Boolean) as ParticipantTestLog[];
+    },
+    async saveParticipantTestLogs(testLogs) {
+      if (testLogs.length === 0) {
+        return;
+      }
+      const statement = database.prepare(
+        `INSERT INTO participant_test_logs (
+          participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(participant_test_log_id) DO UPDATE SET
+          tenant_id = excluded.tenant_id,
+          workspace_id = excluded.workspace_id,
+          participant_session_id = excluded.participant_session_id,
+          test_run_id = excluded.test_run_id,
+          unit_key = excluded.unit_key,
+          original_unit_id = excluded.original_unit_id,
+          log_key = excluded.log_key,
+          log_content = excluded.log_content,
+          timestamp = excluded.timestamp,
+          recorded_at = excluded.recorded_at`
+      );
+      database.exec("BEGIN");
+      try {
+        for (const testLog of testLogs) {
+          statement.run(
+            testLog.participantTestLogId,
+            testLog.tenantId,
+            testLog.workspaceId,
+            testLog.participantSessionId,
+            testLog.testRunId,
+            testLog.unitKey,
+            testLog.originalUnitId,
+            testLog.logKey,
+            testLog.logContent,
+            testLog.timestamp,
+            testLog.recordedAt
+          );
+        }
+        database.exec("COMMIT");
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
+    async deleteParticipantTestLogsByTestRunIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const placeholders = testRunIds.map(() => "?").join(", ");
+      const result = database
+        .prepare(
+          `DELETE FROM participant_test_logs WHERE test_run_id IN (${placeholders})`
+        )
         .run(...testRunIds);
       return Number(result.changes);
     },

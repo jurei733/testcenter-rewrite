@@ -26,6 +26,7 @@ import {
   type VeronaNavigationRequestedNotification,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
+import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
 
 @Component({
   selector: "app-verona-player-host",
@@ -95,6 +96,8 @@ export class VeronaPlayerHostComponent
   @Input() saveStatus = "not_saved";
 
   @Output() readonly responseChange = new EventEmitter<string>();
+  @Output() readonly logEntries =
+    new EventEmitter<ParticipantTestLogEntryInput[]>();
   @Output() readonly navigationRequest = new EventEmitter<string>();
   @Output() readonly retrySave = new EventEmitter<void>();
 
@@ -173,6 +176,31 @@ export class VeronaPlayerHostComponent
     switch (notification.type) {
       case "vopStateChangedNotification":
         this.status = "running";
+        if (Array.isArray(notification.log)) {
+          const logEntries = notification.log.flatMap(entry => {
+            const key = typeof entry?.key === "string" ? entry.key.trim() : "";
+            const timeStamp = Number(entry?.timeStamp);
+            const content = entry.content == null ? "" : String(entry.content);
+            if (
+              !key ||
+              key.length > 200 ||
+              content.length > 32_768 ||
+              !Number.isSafeInteger(timeStamp) ||
+              timeStamp < 0 ||
+              timeStamp > 8_640_000_000_000_000
+            ) {
+              return [];
+            }
+            return [{
+              key,
+              timeStamp,
+              content
+            } satisfies ParticipantTestLogEntryInput];
+          }).slice(-200);
+          if (logEntries.length > 0) {
+            this.logEntries.emit(logEntries);
+          }
+        }
         this.responseChange.emit(
           serializeVeronaUnitResponse({
             unitState: notification.unitState,

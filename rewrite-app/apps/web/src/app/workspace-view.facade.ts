@@ -10,6 +10,7 @@ import type {
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
   GetWorkspaceOverviewResponse,
+  ListParticipantTestLogsResponse,
   ListParticipantSessionsResponse,
   ListTenantsResponse,
   ListWorkspacesResponse,
@@ -167,6 +168,14 @@ export class WorkspaceViewFacade {
 
   get workspaceLogExportView(): string {
     return this.uiState.workspace.workspaceLogExportView;
+  }
+
+  get workspaceActivityExportView(): string {
+    return this.uiState.workspace.workspaceActivityExportView;
+  }
+
+  get participantTestLogsView(): string {
+    return this.uiState.workspace.participantTestLogsView;
   }
 
   get studyMonitorExportView(): string {
@@ -2120,6 +2129,27 @@ export class WorkspaceViewFacade {
     ];
   }
 
+  get participantTestLogItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListParticipantTestLogsResponse>(
+      this.workspace.participantTestLogsView
+    );
+    const items = payload?.items ?? [];
+    return items.slice(0, 20).map(item => ({
+      headline: item.testLog.logKey,
+      subline: `${item.loginKey} · ${item.bookletKey} · ${this.formatTimestampMillis(item.testLog.timestamp)}`,
+      badges: [
+        item.groupKey,
+        item.testLog.unitKey ? `unit ${item.testLog.unitKey}` : "test-wide"
+      ],
+      rows: [
+        { label: "Content", value: item.testLog.logContent || "—" },
+        { label: "Run", value: item.testLog.testRunId },
+        { label: "Original Unit", value: item.testLog.originalUnitId ?? "—" },
+        { label: "Recorded", value: this.formatDateTime(item.testLog.recordedAt) }
+      ]
+    }));
+  }
+
   get workspaceActivityDetailItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListWorkspaceActivityEventsResponse>(
       this.workspace.workspaceActivityView
@@ -2265,6 +2295,15 @@ export class WorkspaceViewFacade {
     this.persistState();
     this.viewState.onActionAsync(() =>
       this.workspaceService.refreshWorkspaceActivity()
+    );
+  }
+
+  refreshParticipantTestLogs(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.refreshParticipantTestLogs()
     );
   }
 
@@ -2562,6 +2601,15 @@ export class WorkspaceViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.workspaceService.exportWorkspaceLogCsv());
+  }
+
+  exportWorkspaceActivityCsv(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.workspaceService.exportWorkspaceActivityCsv()
+    );
   }
 
   exportStudyMonitorCsv(): void {
@@ -2896,6 +2944,11 @@ export class WorkspaceViewFacade {
   private formatDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  private formatTimestampMillis(value: number): string {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
   }
 
   private buildDirectoryWindowItem(

@@ -12,6 +12,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  ParticipantTestLog,
   SourcePackage,
   Tenant,
   TestRun,
@@ -38,6 +39,7 @@ type PersistedFirstSliceState = {
   participantRosterPasswordHashes: Record<string, string>;
   participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
+  participantTestLogs: Record<string, ParticipantTestLog>;
 };
 
 const createInitialState = (): PersistedFirstSliceState => ({
@@ -57,7 +59,8 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantRosterEntries: {},
   participantRosterPasswordHashes: {},
   participantLoginAttempts: {},
-  testRuns: {}
+  testRuns: {},
+  participantTestLogs: {}
 });
 
 const workspaceScopeKey = (tenantKey: string, workspaceKey: string): string =>
@@ -531,6 +534,33 @@ export const createFileFirstSliceRepository = (
         for (const testRunId of testRunIds) {
           if (state.testRuns[testRunId]) {
             delete state.testRuns[testRunId];
+            deletedCount += 1;
+          }
+        }
+      });
+      return deletedCount;
+    },
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return Object.values(state.participantTestLogs).filter(
+        testLog =>
+          testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+      );
+    },
+    async saveParticipantTestLogs(testLogs) {
+      await mutate(state => {
+        for (const testLog of testLogs) {
+          state.participantTestLogs[testLog.participantTestLogId] = testLog;
+        }
+      });
+    },
+    async deleteParticipantTestLogsByTestRunIds(testRunIds) {
+      const testRunIdSet = new Set(testRunIds);
+      let deletedCount = 0;
+      await mutate(state => {
+        for (const testLog of Object.values(state.participantTestLogs)) {
+          if (testRunIdSet.has(testLog.testRunId)) {
+            delete state.participantTestLogs[testLog.participantTestLogId];
             deletedCount += 1;
           }
         }

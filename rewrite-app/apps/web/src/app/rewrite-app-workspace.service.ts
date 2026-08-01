@@ -8,6 +8,7 @@ import type {
   GetStudyMonitorRunResponse,
   GetStudyMonitorSummaryResponse,
   GetStudyMonitorUnitResponse,
+  ListParticipantTestLogsResponse,
   ListWorkspaceActivityEventsResponse,
   ListTenantsResponse,
   ListWorkspacesResponse
@@ -122,6 +123,35 @@ export class RewriteAppWorkspaceService {
       this.feedback.rememberActivity(
         "Workspace Activity Refreshed",
         `${payload.items.length} event(s) loaded with the current timeline filters.`
+      );
+    }
+  }
+
+  async refreshParticipantTestLogs(quiet = false): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<ListParticipantTestLogsResponse>(
+      "Participant Test Logs",
+      "GET",
+      `${resolveRoutePath(productionApiRoutes.workspace.listParticipantTestLogs, {
+        tenantKey,
+        workspaceKey
+      })}?limit=100`,
+      undefined,
+      { quiet }
+    );
+
+    this.workspaceState.participantTestLogsView = prettyPrintJson(
+      payload,
+      this.workspaceState.participantTestLogsView
+    );
+    if (!quiet) {
+      this.feedback.rememberActivity(
+        "Participant Test Logs Refreshed",
+        `${payload.items.length} test and unit log entry or entries loaded.`
       );
     }
   }
@@ -348,7 +378,7 @@ export class RewriteAppWorkspaceService {
     const tenantKey = this.workspaceState.tenantKey.trim();
     const workspaceKey = this.workspaceState.workspaceKey.trim();
     const csv = await this.requestState.request<string>(
-      "Workspace Log CSV Export",
+      "Participant Test Log CSV Export",
       "GET",
       resolveRoutePath(productionApiRoutes.workspace.exportLogCsv, {
         tenantKey,
@@ -358,13 +388,41 @@ export class RewriteAppWorkspaceService {
 
     this.workspaceState.workspaceLogExportView = csv;
     downloadTextFile({
-      filename: `${workspaceKey || "workspace"}-logs.csv`,
+      filename: `${workspaceKey || "workspace"}-test-logs.csv`,
       mediaType: "text/csv;charset=utf-8",
       text: csv
     });
     this.feedback.rememberActivity(
-      "Workspace Log Exported",
-      `CSV log export loaded for ${tenantKey}/${workspaceKey}.`
+      "Participant Test Logs Exported",
+      `CSV participant test log export loaded for ${tenantKey}/${workspaceKey}.`
+    );
+    return csv;
+  }
+
+  async exportWorkspaceActivityCsv(): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const csv = await this.requestState.request<string>(
+      "Workspace Activity CSV Export",
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.exportActivityCsv, {
+        tenantKey,
+        workspaceKey
+      })
+    );
+
+    this.workspaceState.workspaceActivityExportView = csv;
+    downloadTextFile({
+      filename: `${workspaceKey || "workspace"}-activity-events.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    this.feedback.rememberActivity(
+      "Workspace Activity Exported",
+      `CSV activity export loaded for ${tenantKey}/${workspaceKey}.`
     );
     return csv;
   }

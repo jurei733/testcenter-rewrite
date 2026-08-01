@@ -16,6 +16,7 @@ import type {
   MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantRuntimeBooklet,
+  ParticipantTestLogEntryInput,
   ParticipantCurrentRunState,
   ParticipantRosterEntry,
   ParticipantSession,
@@ -41,6 +42,7 @@ import type {
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantRosterItem,
   WorkspaceParticipantSessionListItem,
+  WorkspaceParticipantTestLogListItem,
   WorkspaceReviewListItem,
   WorkspaceActivityEventType,
   WorkspaceActivitySubjectType,
@@ -1511,6 +1513,10 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
     exportLogCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
+    exportActivityCsv:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/activity-events.csv",
+    listParticipantTestLogs:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/test-logs",
     exportReviewCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/reviews.csv",
     listDetailedResponses:
@@ -1817,6 +1823,21 @@ export type SaveTestRunProgressRequest = {
   unitResponse?: string | null;
   confirmTestletTimeLeave?: boolean;
   confirmTestletLeaveLock?: boolean;
+  logs?: Array<{
+    unitKey?: string | null;
+    originalUnitId?: string | null;
+    entries: ParticipantTestLogEntryInput[];
+  }>;
+};
+
+export type ParticipantTestLogListQuery = {
+  loginKey?: string;
+  groupKey?: string;
+  bookletKey?: string;
+  testRunId?: string;
+  unitKey?: string;
+  logKey?: string;
+  limit?: number;
 };
 
 export type UnlockParticipantTestletRequest = {
@@ -2077,6 +2098,10 @@ export type SaveSystemCheckReportResponse = {
 
 export type ListSystemCheckReportsResponse = {
   items: SystemCheckReport[];
+};
+
+export type ListParticipantTestLogsResponse = {
+  items: WorkspaceParticipantTestLogListItem[];
 };
 
 export type GetSystemCheckReportStatisticsResponse = {

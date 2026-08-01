@@ -13,6 +13,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
+  ParticipantTestLog,
   SourcePackage,
   SourcePackageContentStructure,
   Tenant,
@@ -436,7 +437,25 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 19;
+const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null =>
+  row
+    ? {
+        participantTestLogId: String(row.participant_test_log_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        participantSessionId: String(row.participant_session_id),
+        testRunId: String(row.test_run_id),
+        unitKey: row.unit_key == null ? null : String(row.unit_key),
+        originalUnitId:
+          row.original_unit_id == null ? null : String(row.original_unit_id),
+        logKey: String(row.log_key),
+        logContent: String(row.log_content),
+        timestamp: Number(row.timestamp),
+        recordedAt: String(row.recorded_at)
+      }
+    : null;
+
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 20;
 
 const migrations: PostgresMigration[] = [
   {
@@ -786,6 +805,29 @@ const migrations: PostgresMigration[] = [
     name: "add_participant_code",
     sql: `
       ALTER TABLE participant_sessions ADD COLUMN IF NOT EXISTS participant_code TEXT;
+    `
+  },
+  {
+    version: 20,
+    name: "add_participant_test_logs",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_test_logs (
+        participant_test_log_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        test_run_id TEXT NOT NULL,
+        unit_key TEXT,
+        original_unit_id TEXT,
+        log_key TEXT NOT NULL,
+        log_content TEXT NOT NULL,
+        timestamp BIGINT NOT NULL,
+        recorded_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_workspace
+        ON participant_test_logs (tenant_id, workspace_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_test_run
+        ON participant_test_logs (test_run_id, timestamp);
     `
   }
 ];
@@ -1655,6 +1697,72 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
       }
       const result = await pool.query(
         "DELETE FROM test_runs WHERE test_run_id = ANY($1::text[])",
+        [testRunIds]
+      );
+      return result.rowCount ?? 0;
+    },
+    async listParticipantTestLogsByWorkspace(tenantId, workspaceId) {
+      return many(
+        `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+         FROM participant_test_logs
+         WHERE tenant_id = $1 AND workspace_id = $2
+         ORDER BY timestamp DESC, recorded_at DESC`,
+        [tenantId, workspaceId],
+        mapParticipantTestLog
+      );
+    },
+    async saveParticipantTestLogs(testLogs) {
+      if (testLogs.length === 0) {
+        return;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        for (const testLog of testLogs) {
+          await client.query(
+            `INSERT INTO participant_test_logs (
+              participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ON CONFLICT(participant_test_log_id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
+              workspace_id = EXCLUDED.workspace_id,
+              participant_session_id = EXCLUDED.participant_session_id,
+              test_run_id = EXCLUDED.test_run_id,
+              unit_key = EXCLUDED.unit_key,
+              original_unit_id = EXCLUDED.original_unit_id,
+              log_key = EXCLUDED.log_key,
+              log_content = EXCLUDED.log_content,
+              timestamp = EXCLUDED.timestamp,
+              recorded_at = EXCLUDED.recorded_at`,
+            [
+              testLog.participantTestLogId,
+              testLog.tenantId,
+              testLog.workspaceId,
+              testLog.participantSessionId,
+              testLog.testRunId,
+              testLog.unitKey,
+              testLog.originalUnitId,
+              testLog.logKey,
+              testLog.logContent,
+              testLog.timestamp,
+              testLog.recordedAt
+            ]
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    async deleteParticipantTestLogsByTestRunIds(testRunIds) {
+      if (testRunIds.length === 0) {
+        return 0;
+      }
+      const result = await pool.query(
+        "DELETE FROM participant_test_logs WHERE test_run_id = ANY($1::text[])",
         [testRunIds]
       );
       return result.rowCount ?? 0;

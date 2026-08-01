@@ -79,6 +79,7 @@ import {
   type ListWorkspacesResponse,
   type ListParticipantRosterResponse,
   type ListParticipantSessionsResponse,
+  type ListParticipantTestLogsResponse,
   type ListContentReleasesResponse,
   type ListSourcePackagesResponse,
   type ListSystemChecksResponse,
@@ -1487,6 +1488,12 @@ const responseCsvExportPattern = createRoutePattern(
 const logCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportLogCsv
 );
+const activityCsvExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportActivityCsv
+);
+const participantTestLogListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listParticipantTestLogs
+);
 const reviewCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportReviewCsv
 );
@@ -1622,6 +1629,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["DELETE", deleteGroupResultsPattern],
   ["GET", responseCsvExportPattern],
   ["GET", logCsvExportPattern],
+  ["GET", activityCsvExportPattern],
+  ["GET", participantTestLogListPattern],
   ["GET", reviewCsvExportPattern],
   ["GET", contentReleaseListPattern],
   ["GET", contentReleaseDetailPattern],
@@ -2176,6 +2185,16 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     [
       "GET",
+      activityCsvExportPattern,
+      productionApiRoutes.workspace.exportActivityCsv
+    ],
+    [
+      "GET",
+      participantTestLogListPattern,
+      productionApiRoutes.workspace.listParticipantTestLogs
+    ],
+    [
+      "GET",
       reviewCsvExportPattern,
       productionApiRoutes.workspace.exportReviewCsv
     ],
@@ -2437,6 +2456,43 @@ const parseDetailedResponseListQuery = (
     unitKey: readOptionalQueryValue(url, "unitKey"),
     status: status as TestRunStatus | undefined,
     limit: limitResult.limit
+  };
+};
+
+const parseParticipantTestLogListQuery = (
+  url: URL,
+  response: ServerResponse
+): {
+  loginKey?: string;
+  groupKey?: string;
+  bookletKey?: string;
+  testRunId?: string;
+  unitKey?: string;
+  logKey?: string;
+  limit?: number;
+} | null => {
+  const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
+  const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
+  if (
+    limitRawValue &&
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 50_000)
+  ) {
+    sendError(
+      response,
+      400,
+      "participant_test_log_limit_invalid",
+      "Participant test-log limit must be an integer between 1 and 50000."
+    );
+    return null;
+  }
+  return {
+    loginKey: readOptionalQueryValue(url, "loginKey"),
+    groupKey: readOptionalQueryValue(url, "groupKey"),
+    bookletKey: readOptionalQueryValue(url, "bookletKey"),
+    testRunId: readOptionalQueryValue(url, "testRunId"),
+    unitKey: readOptionalQueryValue(url, "unitKey"),
+    logKey: readOptionalQueryValue(url, "logKey"),
+    limit
   };
 };
 
@@ -4023,6 +4079,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const openRunsCsvExportMatch = openRunsCsvExportPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
+      const activityCsvExportMatch = activityCsvExportPattern.exec(pathname);
+      const participantTestLogListMatch =
+        participantTestLogListPattern.exec(pathname);
       const reviewCsvExportMatch = reviewCsvExportPattern.exec(pathname);
       if (request.method === "GET" && importJobListMatch?.groups) {
         const tenantKey = decodeRouteGroup(importJobListMatch.groups.tenantKey);
@@ -4360,6 +4419,35 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (request.method === "GET" && participantTestLogListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          participantTestLogListMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          participantTestLogListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const query = parseParticipantTestLogListQuery(url, response);
+        if (!query) {
+          return;
+        }
+        const items = await services.workspaceAdminRead.listParticipantTestLogs({
+          tenantKey,
+          workspaceKey,
+          ...query
+        });
+        sendJson<ListParticipantTestLogsResponse>(response, 200, { items });
+        return;
+      }
+
       if (request.method === "GET" && reviewListMatch?.groups) {
         const tenantKey = decodeRouteGroup(reviewListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(reviewListMatch.groups.workspaceKey);
@@ -4692,11 +4780,38 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const query = parseParticipantTestLogListQuery(url, response);
+        if (!query) {
+          return;
+        }
         const csv = await services.workspaceAdminRead.exportLogCsv({
+          tenantKey,
+          workspaceKey,
+          ...query
+        });
+        sendCsv(response, 200, `${workspaceKey}-logs.csv`, csv);
+        return;
+      }
+
+      if (request.method === "GET" && activityCsvExportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(activityCsvExportMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          activityCsvExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const csv = await services.workspaceAdminRead.exportActivityCsv({
           tenantKey,
           workspaceKey
         });
-        sendCsv(response, 200, `${workspaceKey}-logs.csv`, csv);
+        sendCsv(response, 200, `${workspaceKey}-activity-events.csv`, csv);
         return;
       }
 
@@ -5304,7 +5419,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           status: body.status,
           unitResponse: body.unitResponse,
           confirmTestletTimeLeave: body.confirmTestletTimeLeave,
-          confirmTestletLeaveLock: body.confirmTestletLeaveLock
+          confirmTestletLeaveLock: body.confirmTestletLeaveLock,
+          logs: body.logs
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
         return;

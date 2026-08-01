@@ -75,7 +75,9 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
           <button id="exportStudyMonitorCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
           <button id="exportParticipantMatrixCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
           <button id="exportStudyMonitorRunCsvButton" class="ghost" type="button" [disabled]="!view.canExportStudyMonitorRunCsv" (click)="view.exportStudyMonitorRunCsv()">Export Run Detail CSV</button>
-          <button id="exportWorkspaceLogCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceLogCsv()">Export Workspace Logs CSV</button>
+          <button id="refreshParticipantTestLogsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshParticipantTestLogs()">Refresh Participant Test Logs</button>
+          <button id="exportWorkspaceLogCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceLogCsv()">Export Participant Test Logs CSV</button>
+          <button id="exportWorkspaceActivityCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceActivityCsv()">Export Activity CSV</button>
         </div>
       </article>
 
@@ -358,10 +360,23 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         emptyState="No detailed workspace activity is loaded yet."
       ></app-record-collection>
 
+      <app-record-collection
+        title="Participant Test Logs"
+        subtitle="Controller and Verona Player events, kept separately from the operator activity timeline."
+        [items]="view.participantTestLogItems"
+        emptyState="Refresh participant test logs after a participant has launched a booklet."
+      ></app-record-collection>
+
       <article class="card">
-        <h2>Workspace Log CSV Export</h2>
-        <p>Workspace activity events in chronological CSV form for audit and operations handoff.</p>
+        <h2>Participant Test Log CSV Export</h2>
+        <p>Original-compatible test-wide and unit-wide log entries for result processing and support.</p>
         <pre id="workspaceLogExportPreview">{{ view.workspaceLogExportView }}</pre>
+      </article>
+
+      <article class="card">
+        <h2>Workspace Activity CSV Export</h2>
+        <p>Operator and system activity events in chronological CSV form for audit and operations handoff.</p>
+        <pre id="workspaceActivityExportPreview">{{ view.workspaceActivityExportView }}</pre>
       </article>
 
       <article class="card">
@@ -485,10 +500,24 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       ></app-json-panel>
 
       <app-json-panel
-        title="Workspace Log CSV Export"
-        subtitle="Operator Timeline CSV"
+        title="Participant Test Logs"
+        subtitle="Controller and Verona Player Events"
+        viewId="participantTestLogsView"
+        [content]="view.participantTestLogsView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Participant Test Log CSV Export"
+        subtitle="Original-Compatible Log CSV"
         viewId="workspaceLogExportView"
         [content]="view.workspaceLogExportView"
+      ></app-json-panel>
+
+      <app-json-panel
+        title="Workspace Activity CSV Export"
+        subtitle="Operator Timeline CSV"
+        viewId="workspaceActivityExportView"
+        [content]="view.workspaceActivityExportView"
       ></app-json-panel>
 
       <app-json-panel

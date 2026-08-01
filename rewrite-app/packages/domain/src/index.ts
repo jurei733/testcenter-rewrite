@@ -623,6 +623,35 @@ export type TestRun = {
   completedAt: string | null;
 };
 
+export type ParticipantTestLog = {
+  participantTestLogId: string;
+  tenantId: string;
+  workspaceId: string;
+  participantSessionId: string;
+  testRunId: string;
+  unitKey: string | null;
+  originalUnitId: string | null;
+  logKey: string;
+  logContent: string;
+  timestamp: number;
+  recordedAt: string;
+};
+
+export type ParticipantTestLogEntryInput = {
+  key: string;
+  content?: string;
+  timeStamp: number;
+};
+
+export type WorkspaceParticipantTestLogListItem = {
+  testLog: ParticipantTestLog;
+  loginKey: string;
+  groupKey: string;
+  participantCode: string;
+  bookletKey: string;
+  bookletAssignmentKey: string;
+};
+
 export type TestletTimerStatus =
   | "running"
   | "paused"
@@ -1182,6 +1211,7 @@ export type WorkspaceGroupResultDeletion = {
   deletedTestRunCount: number;
   deletedResponseCount: number;
   deletedReviewCount: number;
+  deletedTestLogCount: number;
   affectedParticipantSessionIds: string[];
   deletedTestRunIds: string[];
 };

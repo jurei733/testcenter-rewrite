@@ -1539,6 +1539,30 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedParticipantSessionsCsv.status, 401);
     assert.equal(rejectedParticipantSessionsCsv.body.error, "admin_session_missing");
 
+    const rejectedParticipantTestLogs = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/test-logs"
+    );
+    assert.equal(rejectedParticipantTestLogs.status, 401);
+    assert.equal(rejectedParticipantTestLogs.body.error, "admin_session_missing");
+
+    const rejectedParticipantTestLogsCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/logs.csv"
+    );
+    assert.equal(rejectedParticipantTestLogsCsv.status, 401);
+    assert.equal(
+      rejectedParticipantTestLogsCsv.body.error,
+      "admin_session_missing"
+    );
+
+    const rejectedWorkspaceActivityCsv = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/activity-events.csv"
+    );
+    assert.equal(rejectedWorkspaceActivityCsv.status, 401);
+    assert.equal(rejectedWorkspaceActivityCsv.body.error, "admin_session_missing");
+
     const publicSystemChecks = await requestJsonAt<{ items: unknown[] }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-checks"
@@ -2191,7 +2215,16 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         body: {
           currentUnitKey: "unit-intro",
           status: "running",
-          unitResponse: "My first demo response"
+          unitResponse: "My first demo response",
+          logs: [{
+            unitKey: "unit-intro",
+            originalUnitId: "UNIT.INTRO.ORIGINAL",
+            entries: [{
+              key: "PLAYER_EVENT",
+              timeStamp: 1_700_000_000_000,
+              content: "answer changed"
+            }]
+          }]
         }
       }
     );
@@ -2331,6 +2364,43 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(invalidUnitResponseSave.status, 400);
     assert.equal(invalidUnitResponseSave.body.error, "unit_response_invalid");
+
+    const invalidTestLogSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          status: "running",
+          logs: [{
+            unitKey: "unit-practice",
+            entries: [{ key: "PLAYER_EVENT", timeStamp: -1 }]
+          }]
+        }
+      }
+    );
+    assert.equal(invalidTestLogSave.status, 400);
+    assert.equal(
+      invalidTestLogSave.body.error,
+      "participant_test_log_timestamp_invalid"
+    );
+
+    const malformedTestLogSave = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          status: "running",
+          logs: { key: "not-an-array" }
+        }
+      }
+    );
+    assert.equal(malformedTestLogSave.status, 400);
+    assert.equal(
+      malformedTestLogSave.body.error,
+      "participant_test_logs_invalid"
+    );
 
     const invalidSaveTestRunId = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -3585,9 +3655,68 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       createdReview.body.item.review.reviewId
     );
 
+    const participantTestLogs = await requestJsonAt<{
+      items: Array<{
+        testLog: {
+          testRunId: string;
+          unitKey: string | null;
+          originalUnitId: string | null;
+          logKey: string;
+          logContent: string;
+        };
+        loginKey: string;
+        groupKey: string;
+        bookletKey: string;
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs?loginKey=student-demo&testRunId=${resumed.body.testRun.testRunId}&limit=100`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(participantTestLogs.status, 200);
+    assert.ok(participantTestLogs.body.items.length >= 8);
+    assert.ok(
+      participantTestLogs.body.items.some(item =>
+        item.testLog.logKey === "CONTROLLER" &&
+        item.testLog.logContent === "RUNNING" &&
+        item.testLog.unitKey === null
+      )
+    );
+    assert.ok(
+      participantTestLogs.body.items.some(item =>
+        item.testLog.logKey === "PLAYER_EVENT" &&
+        item.testLog.logContent === "answer changed" &&
+        item.testLog.unitKey === "unit-intro" &&
+        item.testLog.originalUnitId === "UNIT.INTRO.ORIGINAL" &&
+        item.loginKey === "student-demo" &&
+        item.groupKey === "group:student-demo" &&
+        item.bookletKey === "booklet:demo"
+      )
+    );
+
+    const invalidParticipantTestLogLimit = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs?limit=0",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(invalidParticipantTestLogLimit.status, 400);
+    assert.equal(
+      invalidParticipantTestLogLimit.body.error,
+      "participant_test_log_limit_invalid"
+    );
+
     const logCsv = await requestTextAt(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv?logKey=PLAYER_EVENT&unitKey=unit-intro",
       {
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
@@ -3597,11 +3726,32 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(logCsv.status, 200);
     assert.equal(logCsv.contentType, "text/csv; charset=utf-8");
-    assert.match(logCsv.body, /^tenantKey,workspaceKey,activityEventId,eventType,/);
-    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"participant_signed_in"/);
-    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"test_run_progress_saved"/);
-    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_created"/);
-    assert.match(logCsv.body, /"demo-tenant","demo-workspace",.*"review_deleted"/);
+    assert.match(
+      logCsv.body,
+      /^groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry\n/
+    );
+    assert.match(
+      logCsv.body,
+      /"group:student-demo";"student-demo";"";"booklet:demo";"unit-intro";"UNIT.INTRO.ORIGINAL";"1700000000000";"PLAYER_EVENT = ""answer changed"""/
+    );
+
+    const activityCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/activity-events.csv",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+
+    assert.equal(activityCsv.status, 200);
+    assert.equal(activityCsv.contentType, "text/csv; charset=utf-8");
+    assert.match(activityCsv.body, /^tenantKey,workspaceKey,activityEventId,eventType,/);
+    assert.match(activityCsv.body, /"demo-tenant","demo-workspace",.*"participant_signed_in"/);
+    assert.match(activityCsv.body, /"demo-tenant","demo-workspace",.*"test_run_progress_saved"/);
+    assert.match(activityCsv.body, /"demo-tenant","demo-workspace",.*"review_created"/);
+    assert.match(activityCsv.body, /"demo-tenant","demo-workspace",.*"review_deleted"/);
 
     const cleanupReview = await requestJsonAt<{
       item: { review: { reviewId: string } };
@@ -3632,6 +3782,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
         deletedTestRunCount: number;
         deletedResponseCount: number;
         deletedReviewCount: number;
+        deletedTestLogCount: number;
         affectedParticipantSessionIds: string[];
         deletedTestRunIds: string[];
       };
@@ -3651,6 +3802,10 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(groupDeletion.body.deletion.deletedTestRunCount, 1);
     assert.equal(groupDeletion.body.deletion.deletedResponseCount, 2);
     assert.equal(groupDeletion.body.deletion.deletedReviewCount, 1);
+    assert.equal(
+      groupDeletion.body.deletion.deletedTestLogCount,
+      participantTestLogs.body.items.length
+    );
     assert.deepEqual(groupDeletion.body.deletion.affectedParticipantSessionIds, [
       participantSignIn.body.participantSession.participantSessionId
     ]);
@@ -3685,6 +3840,18 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
 
     assert.equal(reviewsAfterDeletion.status, 200);
     assert.deepEqual(reviewsAfterDeletion.body.items, []);
+
+    const testLogsAfterDeletion = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(testLogsAfterDeletion.status, 200);
+    assert.deepEqual(testLogsAfterDeletion.body.items, []);
 
     const groupMonitorAfterDeletion = await requestJsonAt<{
       studyMonitorGroup: {
@@ -3724,6 +3891,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
             deletedTestRunCount?: number;
             deletedResponseCount?: number;
             deletedReviewCount?: number;
+            deletedTestLogCount?: number;
           };
         };
       }>;
@@ -3751,6 +3919,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       deletedTestRunCount: 1,
       deletedResponseCount: 2,
       deletedReviewCount: 1,
+      deletedTestLogCount: participantTestLogs.body.items.length,
       affectedParticipantSessionIds: [
         participantSignIn.body.participantSession.participantSessionId
       ],

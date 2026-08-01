@@ -48,6 +48,8 @@ import type {
   OpenMonitorRun,
   ParticipantCurrentRunState,
   ParticipantLoginAttempt,
+  ParticipantTestLog,
+  ParticipantTestLogEntryInput,
   ParticipantRosterEntry,
   ParticipantRuntimeBooklet,
   ParticipantSession,
@@ -81,6 +83,7 @@ import type {
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceParticipantRosterItem,
+  WorkspaceParticipantTestLogListItem,
   WorkspaceReview,
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
@@ -227,7 +230,29 @@ export type WorkspaceAdminReadPort = {
   exportLogCsv(input: {
     tenantKey: string;
     workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    bookletKey?: string;
+    testRunId?: string;
+    unitKey?: string;
+    logKey?: string;
+    limit?: number;
   }): Promise<string>;
+  exportActivityCsv(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<string>;
+  listParticipantTestLogs(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    loginKey?: string;
+    groupKey?: string;
+    bookletKey?: string;
+    testRunId?: string;
+    unitKey?: string;
+    logKey?: string;
+    limit?: number;
+  }): Promise<WorkspaceParticipantTestLogListItem[]>;
   exportStudyMonitorCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -533,6 +558,11 @@ export type ParticipantRuntimePort = {
     unitResponse?: string | null;
     confirmTestletTimeLeave?: boolean;
     confirmTestletLeaveLock?: boolean;
+    logs?: Array<{
+      unitKey?: string | null;
+      originalUnitId?: string | null;
+      entries: ParticipantTestLogEntryInput[];
+    }>;
   }): Promise<TestRun>;
   unlockTestlet(input: {
     testRunId: string;
@@ -944,6 +974,12 @@ export type FirstSliceRepository = {
   listTestRunsByWorkspace(tenantId: string, workspaceId: string): Promise<TestRun[]>;
   saveTestRun(testRun: TestRun): Promise<void>;
   deleteTestRunsByIds(testRunIds: string[]): Promise<number>;
+  listParticipantTestLogsByWorkspace(
+    tenantId: string,
+    workspaceId: string
+  ): Promise<ParticipantTestLog[]>;
+  saveParticipantTestLogs(testLogs: ParticipantTestLog[]): Promise<void>;
+  deleteParticipantTestLogsByTestRunIds(testRunIds: string[]): Promise<number>;
   getWorkspaceReviewById(reviewId: string): Promise<WorkspaceReview | null>;
   listWorkspaceReviewsByWorkspace(
     tenantId: string,
@@ -2726,6 +2762,102 @@ const formatWorkspaceActivityCsv = (input: {
         .join(",")
     )
   ].join("\n") + "\n";
+};
+
+const listParticipantTestLogsForWorkspace = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  testLogs: ParticipantTestLog[];
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  loginKey?: string;
+  groupKey?: string;
+  bookletKey?: string;
+  testRunId?: string;
+  unitKey?: string;
+  logKey?: string;
+  limit: number;
+}): WorkspaceParticipantTestLogListItem[] => {
+  const sessionsById = new Map(
+    input.participantSessions.map(session => [session.participantSessionId, session])
+  );
+  const runsById = new Map(input.testRuns.map(testRun => [testRun.testRunId, testRun]));
+  return input.testLogs
+    .flatMap(testLog => {
+      const participantSession = sessionsById.get(testLog.participantSessionId);
+      const testRun = runsById.get(testLog.testRunId);
+      if (!participantSession || !testRun) {
+        return [];
+      }
+      return [{
+        testLog,
+        loginKey: participantSession.loginKey,
+        groupKey: participantSession.groupKey,
+        participantCode: participantSession.participantCode ?? "",
+        bookletKey: testRun.bookletKey,
+        bookletAssignmentKey:
+          testRun.bookletAssignmentKey ?? testRun.bookletKey
+      } satisfies WorkspaceParticipantTestLogListItem];
+    })
+    .filter(item =>
+      (!input.loginKey || item.loginKey === input.loginKey) &&
+      (!input.groupKey || item.groupKey === input.groupKey) &&
+      (!input.bookletKey || item.bookletKey === input.bookletKey) &&
+      (!input.testRunId || item.testLog.testRunId === input.testRunId) &&
+      (!input.unitKey || item.testLog.unitKey === input.unitKey) &&
+      (!input.logKey || item.testLog.logKey === input.logKey)
+    )
+    .sort((left, right) =>
+      right.testLog.timestamp - left.testLog.timestamp ||
+      right.testLog.recordedAt.localeCompare(left.testLog.recordedAt) ||
+      right.testLog.participantTestLogId.localeCompare(
+        left.testLog.participantTestLogId
+      )
+    )
+    .slice(0, input.limit);
+};
+
+const formatParticipantTestLogCsv = (
+  items: WorkspaceParticipantTestLogListItem[]
+): string => {
+  const columns = [
+    "groupname",
+    "loginname",
+    "code",
+    "bookletname",
+    "unitname",
+    "originalUnitId",
+    "timestamp",
+    "logentry"
+  ];
+  const escapeSemicolonCsvCell = (value: unknown): string =>
+    `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const chronologicalItems = [...items].sort((left, right) =>
+    left.testLog.timestamp - right.testLog.timestamp ||
+    left.testLog.recordedAt.localeCompare(right.testLog.recordedAt) ||
+    left.testLog.participantTestLogId.localeCompare(
+      right.testLog.participantTestLogId
+    )
+  );
+  return `\uFEFF${[
+    columns.join(";"),
+    ...chronologicalItems.map(item => {
+      const separator = item.testLog.unitKey ? " = " : " : ";
+      const logEntry = item.testLog.logContent
+        ? `${item.testLog.logKey}${separator}${JSON.stringify(item.testLog.logContent)}`
+        : item.testLog.logKey;
+      return [
+        item.groupKey,
+        item.loginKey,
+        item.participantCode,
+        item.bookletAssignmentKey,
+        item.testLog.unitKey ?? "",
+        item.testLog.originalUnitId ?? "",
+        item.testLog.timestamp,
+        logEntry
+      ].map(escapeSemicolonCsvCell).join(";");
+    })
+  ].join("\n")}\n`;
 };
 
 const formatSourcePackagesCsv = (input: {
@@ -11041,6 +11173,92 @@ export const createFirstSliceServices = (
     });
   };
 
+  const buildParticipantTestLogs = (input: {
+    testRun: TestRun;
+    batches: Array<{
+      unitKey?: string | null;
+      originalUnitId?: string | null;
+      entries: ParticipantTestLogEntryInput[];
+    }>;
+  }): ParticipantTestLog[] => {
+    if (!Array.isArray(input.batches) || input.batches.length > 20) {
+      throw new FirstSliceError(
+        400,
+        "participant_test_logs_invalid",
+        "At most 20 participant test-log batches may be saved at once."
+      );
+    }
+    const entryCount = input.batches.reduce(
+      (count, batch) => count + (Array.isArray(batch.entries) ? batch.entries.length : 201),
+      0
+    );
+    if (entryCount > 200) {
+      throw new FirstSliceError(
+        400,
+        "participant_test_logs_invalid",
+        "At most 200 participant test-log entries may be saved at once."
+      );
+    }
+    return input.batches.flatMap(batch => {
+      if (!Array.isArray(batch.entries)) {
+        throw new FirstSliceError(
+          400,
+          "participant_test_logs_invalid",
+          "Participant test-log entries must be an array."
+        );
+      }
+      const unitKey =
+        batch.unitKey == null ? null : String(batch.unitKey).trim() || null;
+      const originalUnitId =
+        batch.originalUnitId == null
+          ? unitKey
+          : String(batch.originalUnitId).trim() || unitKey;
+      return batch.entries.map(entry => {
+        const logKey = typeof entry?.key === "string" ? entry.key.trim() : "";
+        const logContent =
+          entry?.content == null ? "" : String(entry.content);
+        if (!logKey || logKey.length > 200) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_log_key_invalid",
+            "Participant test-log keys must contain between 1 and 200 characters."
+          );
+        }
+        if (logContent.length > 32_768) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_log_content_too_large",
+            "Participant test-log content must not exceed 32768 characters."
+          );
+        }
+        if (
+          !Number.isSafeInteger(entry.timeStamp) ||
+          entry.timeStamp < 0 ||
+          entry.timeStamp > 8_640_000_000_000_000
+        ) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_log_timestamp_invalid",
+            "Participant test-log timestamps must be valid non-negative Unix millisecond values."
+          );
+        }
+        return {
+          participantTestLogId: idGenerator(),
+          tenantId: input.testRun.tenantId,
+          workspaceId: input.testRun.workspaceId,
+          participantSessionId: input.testRun.participantSessionId,
+          testRunId: input.testRun.testRunId,
+          unitKey,
+          originalUnitId,
+          logKey,
+          logContent,
+          timestamp: entry.timeStamp,
+          recordedAt: now()
+        } satisfies ParticipantTestLog;
+      });
+    });
+  };
+
   const requireAccessibleParticipantSession = async (
     participantSessionId: string
   ): Promise<ParticipantSession> => {
@@ -12774,7 +12992,50 @@ export const createFirstSliceServices = (
           .slice(0, limit)
           .map(activityEvent => ({ activityEvent }));
       },
+      async listParticipantTestLogs(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [testLogs, participantSessions, testRuns] = await Promise.all([
+          repository.listParticipantTestLogsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+
+        return listParticipantTestLogsForWorkspace({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          testLogs,
+          participantSessions,
+          testRuns,
+          loginKey: input.loginKey,
+          groupKey: input.groupKey,
+          bookletKey: input.bookletKey,
+          testRunId: input.testRunId,
+          unitKey: input.unitKey,
+          logKey: input.logKey,
+          limit: Math.max(1, Math.min(input.limit ?? 100, 50_000))
+        });
+      },
       async exportLogCsv(input) {
+        const items = await this.listParticipantTestLogs({
+          ...input,
+          limit: input.limit ?? 50_000
+        });
+        return formatParticipantTestLogCsv(items);
+      },
+      async exportActivityCsv(input) {
         const workspace = await requireWorkspace(
           repository,
           input.tenantKey,
@@ -13854,6 +14115,8 @@ export const createFirstSliceServices = (
         );
         const deletedReviewCount =
           await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
+        const deletedTestLogCount =
+          await repository.deleteParticipantTestLogsByTestRunIds(deletedTestRunIds);
         const deletedTestRunCount = await repository.deleteTestRunsByIds(
           deletedTestRunIds
         );
@@ -13870,6 +14133,7 @@ export const createFirstSliceServices = (
             deletedTestRunCount,
             deletedResponseCount,
             deletedReviewCount,
+            deletedTestLogCount,
             affectedParticipantSessionIds,
             deletedTestRunIds
           }
@@ -13882,6 +14146,7 @@ export const createFirstSliceServices = (
           deletedTestRunCount,
           deletedResponseCount,
           deletedReviewCount,
+          deletedTestLogCount,
           affectedParticipantSessionIds,
           deletedTestRunIds
         };
@@ -15317,6 +15582,27 @@ export const createFirstSliceServices = (
           testRun,
           timestamp
         });
+        await repository.saveParticipantTestLogs(
+          buildParticipantTestLogs({
+            testRun: effectiveTestRun,
+            batches: [{
+              entries: [
+                {
+                  key: "CONTROLLER",
+                  timeStamp: Date.parse(timestamp),
+                  content: "RUNNING"
+                },
+                ...(effectiveTestRun.currentUnitKey
+                  ? [{
+                      key: "CURRENT_UNIT_ID",
+                      timeStamp: Date.parse(timestamp),
+                      content: effectiveTestRun.currentUnitKey
+                    }]
+                  : [])
+              ]
+            }]
+          })
+        );
         await repository.saveParticipantSession({
           ...participantSession,
           status: "launched"
@@ -15424,6 +15710,25 @@ export const createFirstSliceServices = (
           repository,
           storedTestRun.contentReleaseId
         );
+        if (input.logs != null && !Array.isArray(input.logs)) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_logs_invalid",
+            "Participant test logs must be an array."
+          );
+        }
+        const incomingLogBatches = input.logs ?? [];
+        for (const batch of incomingLogBatches) {
+          const unitKey =
+            batch?.unitKey == null ? null : String(batch.unitKey).trim() || null;
+          if (unitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              storedTestRun.bookletKey,
+              unitKey
+            );
+          }
+        }
         const timestamp = now();
         const testRun = await persistEffectiveTestletTimerState({
           contentRelease,
@@ -15515,7 +15820,47 @@ export const createFirstSliceServices = (
           unitResponses: nextUnitResponses,
           updatedAt: timestamp
         });
+        const logTimestamp = Date.parse(timestamp);
+        const runtimeLogBatches: Array<{
+          unitKey?: string | null;
+          originalUnitId?: string | null;
+          entries: ParticipantTestLogEntryInput[];
+        }> = [];
+        const testStateEntries: ParticipantTestLogEntryInput[] = [];
+        if (nextCurrentUnitKey !== testRun.currentUnitKey) {
+          testStateEntries.push({
+            key: "CURRENT_UNIT_ID",
+            timeStamp: logTimestamp,
+            content: nextCurrentUnitKey ?? ""
+          });
+        }
+        if (nextStatus !== testRun.status) {
+          testStateEntries.push({
+            key: "CONTROLLER",
+            timeStamp: logTimestamp,
+            content: nextStatus.toUpperCase()
+          });
+        }
+        if (testStateEntries.length > 0) {
+          runtimeLogBatches.push({ entries: testStateEntries });
+        }
+        if (responseUnitKey && nextUnitResponse != null) {
+          runtimeLogBatches.push({
+            unitKey: responseUnitKey,
+            originalUnitId: responseUnitKey,
+            entries: [{
+              key: "RESPONSE_SAVED",
+              timeStamp: logTimestamp,
+              content: `${nextUnitResponse.length} characters`
+            }]
+          });
+        }
+        const participantTestLogs = buildParticipantTestLogs({
+          testRun: updatedRun,
+          batches: [...incomingLogBatches, ...runtimeLogBatches]
+        });
         await repository.saveTestRun(updatedRun);
+        await repository.saveParticipantTestLogs(participantTestLogs);
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: updatedRun,
@@ -15658,6 +16003,20 @@ export const createFirstSliceServices = (
             : {})
         };
         await repository.saveTestRun(updatedRun);
+        if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
+              testRun: updatedRun,
+              batches: [{
+                entries: [{
+                  key: "CURRENT_UNIT_ID",
+                  timeStamp: Date.parse(timestamp),
+                  content: updatedRun.currentUnitKey ?? ""
+                }]
+              }]
+            })
+          );
+        }
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: updatedRun,
@@ -15722,6 +16081,18 @@ export const createFirstSliceServices = (
           timestamp
         );
         await repository.saveTestRun(resumedRun);
+        await repository.saveParticipantTestLogs(
+          buildParticipantTestLogs({
+            testRun: resumedRun,
+            batches: [{
+              entries: [{
+                key: "CONTROLLER",
+                timeStamp: Date.parse(timestamp),
+                content: "RUNNING"
+              }]
+            }]
+          })
+        );
         const effectiveRun = await persistEffectiveTestletTimerState({
           contentRelease,
           testRun: resumedRun,
@@ -15849,6 +16220,18 @@ export const createFirstSliceServices = (
           completedAt: timestamp
         };
         await repository.saveTestRun(completedRun);
+        await repository.saveParticipantTestLogs(
+          buildParticipantTestLogs({
+            testRun: completedRun,
+            batches: [{
+              entries: [{
+                key: "CONTROLLER",
+                timeStamp: Date.parse(timestamp),
+                content: "TERMINATED"
+              }]
+            }]
+          })
+        );
 
         const participantSession = await repository.getParticipantSessionById(
           testRun.participantSessionId
@@ -16120,6 +16503,32 @@ export const createFirstSliceServices = (
                   );
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
+        }
+        const monitorTestLogEntries: ParticipantTestLogEntryInput[] = [];
+        if (nextTestRun.status !== testRun.status) {
+          monitorTestLogEntries.push({
+            key: "CONTROLLER",
+            timeStamp: Date.parse(issuedAt),
+            content:
+              nextTestRun.status === "completed"
+                ? "TERMINATED"
+                : nextTestRun.status.toUpperCase()
+          });
+        }
+        if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
+          monitorTestLogEntries.push({
+            key: "CURRENT_UNIT_ID",
+            timeStamp: Date.parse(issuedAt),
+            content: nextTestRun.currentUnitKey ?? ""
+          });
+        }
+        if (monitorTestLogEntries.length > 0) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
+              testRun: nextTestRun,
+              batches: [{ entries: monitorTestLogEntries }]
+            })
+          );
         }
         const effectiveNextTestRun =
           commandType === "complete"

@@ -962,6 +962,8 @@ try {
   await expectButtonSelectorDisabled("#exportStudyMonitorCsvButton");
   await expectButtonSelectorDisabled("#exportParticipantMatrixCsvButton");
   await expectButtonSelectorDisabled("#exportWorkspaceLogCsvButton");
+  await expectButtonSelectorDisabled("#refreshParticipantTestLogsButton");
+  await expectButtonSelectorDisabled("#exportWorkspaceActivityCsvButton");
   await fillAndCommit("#tenantKey", tenantKey);
   await expectButtonSelectorEnabled("#createTenantButton");
   await expectButtonSelectorDisabled("#createWorkspaceButton");
@@ -976,6 +978,8 @@ try {
   await expectButtonSelectorEnabled("#exportStudyMonitorCsvButton");
   await expectButtonSelectorEnabled("#exportParticipantMatrixCsvButton");
   await expectButtonSelectorEnabled("#exportWorkspaceLogCsvButton");
+  await expectButtonSelectorEnabled("#refreshParticipantTestLogsButton");
+  await expectButtonSelectorEnabled("#exportWorkspaceActivityCsvButton");
   logStep("bootstrap-workspace-flow");
   await clickCardAction(
     "Workspace Action Queue",
@@ -2931,7 +2935,12 @@ try {
             responseProgress: document.querySelector("#playerAnswer").value ? "complete" : "none",
             unitStateDataType: "verona-smoke@1"
           },
-          playerState: { currentPage: "page-1" }
+          playerState: { currentPage: "page-1" },
+          log: [{
+            key: "PLAYER_STATE_CHANGED",
+            timeStamp: Date.now(),
+            content: document.querySelector("#playerAnswer").value
+          }]
         }, "*");
         addEventListener("message", event => {
           if (event.data?.type !== "vopStartCommand") return;
@@ -3215,6 +3224,19 @@ try {
         return false;
       }
     }
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PLAYER_STATE_CHANGED&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.logKey === "PLAYER_STATE_CHANGED" &&
+          item.testLog?.logContent === "Saved through Verona" &&
+          item.testLog?.unitKey === veronaUnitKey
+      )
   );
   await page.locator("#participantRouteNavigationNotice").waitFor({ state: "detached" });
   assert.equal(
@@ -6180,13 +6202,40 @@ try {
     )
     .first()
     .waitFor();
-  logStep("export-workspace-log-csv");
+  logStep("refresh-participant-test-logs");
+  await clickAction("Refresh Participant Test Logs");
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Participant Test Logs" }) })
+    .filter({ hasText: "CONTROLLER" })
+    .waitFor();
+  logStep("export-participant-test-log-csv");
   const workspaceLogDownloadPromise = page.waitForEvent("download");
-  await clickAction("Export Workspace Logs CSV");
+  await clickAction("Export Participant Test Logs CSV");
   const workspaceLogDownload = await workspaceLogDownloadPromise;
-  assert.equal(workspaceLogDownload.suggestedFilename(), `${workspaceKey}-logs.csv`);
+  assert.equal(
+    workspaceLogDownload.suggestedFilename(),
+    `${workspaceKey}-test-logs.csv`
+  );
   await page
     .locator("#workspaceLogExportPreview")
+    .filter({
+      hasText:
+        "groupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry"
+    })
+    .filter({ hasText: "PLAYER_STATE_CHANGED" })
+    .filter({ hasText: "Saved through Verona" })
+    .waitFor();
+  logStep("export-workspace-activity-csv");
+  const workspaceActivityDownloadPromise = page.waitForEvent("download");
+  await clickAction("Export Activity CSV");
+  const workspaceActivityDownload = await workspaceActivityDownloadPromise;
+  assert.equal(
+    workspaceActivityDownload.suggestedFilename(),
+    `${workspaceKey}-activity-events.csv`
+  );
+  await page
+    .locator("#workspaceActivityExportPreview")
     .filter({ hasText: "tenantKey,workspaceKey,activityEventId,eventType" })
     .filter({ hasText: "participant_session_resumed" })
     .filter({ hasText: "test_run_progress_saved" })

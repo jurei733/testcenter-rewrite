@@ -19,7 +19,10 @@ import {
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
-import type { ParticipantRuntimeBooklet } from "@testcenter-rewrite-app/domain";
+import type {
+  ParticipantRuntimeBooklet,
+  ParticipantTestLogEntryInput
+} from "@testcenter-rewrite-app/domain";
 
 import { copyTextToClipboard } from "./copy-text-to-clipboard";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
@@ -198,7 +201,17 @@ export class ParticipantViewFacade {
     unitKey: string;
     response: string;
     status: "running" | "paused";
+    logs: Array<{
+      unitKey: string;
+      originalUnitId: string;
+      entries: ParticipantTestLogEntryInput[];
+    }>;
   } | null = null;
+  private queuedVeronaLogs: Array<{
+    testRunId: string;
+    unitKey: string;
+    entries: ParticipantTestLogEntryInput[];
+  }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
@@ -978,13 +991,47 @@ export class ParticipantViewFacade {
 
     this.runtime.currentUnitResponse = response;
     this.persistState();
+    const queuedEntries = this.queuedVeronaLogs
+      .filter(
+        batch =>
+          batch.testRunId === currentState.testRun.testRunId &&
+          batch.unitKey === unitKey
+      )
+      .flatMap(batch => batch.entries);
+    this.queuedVeronaLogs = this.queuedVeronaLogs.filter(
+      batch =>
+        batch.testRunId !== currentState.testRun.testRunId ||
+        batch.unitKey !== unitKey
+    );
+    const pendingEntries =
+      this.pendingVeronaSave?.testRunId === currentState.testRun.testRunId &&
+      this.pendingVeronaSave.unitKey === unitKey
+        ? this.pendingVeronaSave.logs.flatMap(batch => batch.entries)
+        : [];
+    const entries = [...pendingEntries, ...queuedEntries].slice(-200);
     this.pendingVeronaSave = {
       testRunId: currentState.testRun.testRunId,
       unitKey,
       response,
-      status: currentState.testRun.status === "paused" ? "paused" : "running"
+      status: currentState.testRun.status === "paused" ? "paused" : "running",
+      logs: entries.length > 0
+        ? [{ unitKey, originalUnitId: unitKey, entries }]
+        : []
     };
     this.scheduleVeronaSaveDrain();
+  }
+
+  queueVeronaLogs(entries: ParticipantTestLogEntryInput[]): void {
+    const currentState = this.readCurrentRunState();
+    const unitKey = currentState?.currentUnit.unitKey?.trim();
+    if (!currentState || !unitKey || entries.length === 0) {
+      return;
+    }
+    this.queuedVeronaLogs.push({
+      testRunId: currentState.testRun.testRunId,
+      unitKey,
+      entries
+    });
   }
 
   retryVeronaSave(): void {
@@ -1218,6 +1265,7 @@ export class ParticipantViewFacade {
     this.copiedSessionEntryLink = "";
     this.assignedBooklets = [];
     this.pendingVeronaSave = null;
+    this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
     this.runtime.participantCode = "";
@@ -1343,20 +1391,39 @@ export class ParticipantViewFacade {
     confirmTestletTimeLeave = false,
     confirmTestletLeaveLock = false
   ): Promise<void> {
+    const testRunId = this.runtime.testRunId.trim();
+    const matchingLogBatches = currentUnitKey
+      ? this.queuedVeronaLogs.filter(
+          batch => batch.testRunId === testRunId && batch.unitKey === currentUnitKey
+        )
+      : [];
     const payload = await this.requestState.request<SaveTestRunProgressResponse>(
       status === "paused" ? "Participant Save Paused" : "Participant Save Running",
       "POST",
       resolveRoutePath(productionApiRoutes.participant.saveProgress, {
-        testRunId: this.runtime.testRunId.trim()
+        testRunId
       }),
       {
         currentUnitKey,
         status,
         unitResponse,
         confirmTestletTimeLeave,
-        confirmTestletLeaveLock
+        confirmTestletLeaveLock,
+        logs: matchingLogBatches.length > 0
+          ? [{
+              unitKey: currentUnitKey,
+              originalUnitId: currentUnitKey,
+              entries: matchingLogBatches.flatMap(batch => batch.entries).slice(-200)
+            }]
+          : undefined
       } satisfies SaveTestRunProgressRequest
     );
+
+    if (matchingLogBatches.length > 0) {
+      this.queuedVeronaLogs = this.queuedVeronaLogs.filter(
+        batch => batch.testRunId !== testRunId || batch.unitKey !== currentUnitKey
+      );
+    }
 
     this.syncRun(payload.testRun);
     this.runtime.runtimeMonitorView = prettyPrintJson(
@@ -1398,7 +1465,8 @@ export class ParticipantViewFacade {
           {
             currentUnitKey: save.unitKey,
             status: save.status,
-            unitResponse: save.response
+            unitResponse: save.response,
+            logs: save.logs
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
         );
@@ -1591,6 +1659,16 @@ export class ParticipantViewFacade {
     // A failed background save remains queued for an explicit retry. Navigation
     // and completion perform the same save in the foreground, so use the latest
     // runtime response there instead of issuing the stale queued request later.
+    const pendingSave = this.pendingVeronaSave;
+    if (pendingSave) {
+      for (const batch of pendingSave.logs) {
+        this.queuedVeronaLogs.push({
+          testRunId: pendingSave.testRunId,
+          unitKey: batch.unitKey,
+          entries: batch.entries
+        });
+      }
+    }
     this.pendingVeronaSave = null;
   }
 

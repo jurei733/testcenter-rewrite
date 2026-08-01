@@ -189,6 +189,7 @@ export interface ShellWorkspaceState {
   workspaceOverviewView: string;
   workspaceOverviewExportView: string;
   workspaceActivityView: string;
+  participantTestLogsView: string;
   studyMonitorView: string;
   studyMonitorParticipantMatrixView: string;
   studyMonitorParticipantView: string;
@@ -200,6 +201,7 @@ export interface ShellWorkspaceState {
   studyMonitorParticipantMatrixExportView: string;
   studyMonitorRunExportView: string;
   workspaceLogExportView: string;
+  workspaceActivityExportView: string;
   workspaceLoaded: boolean;
 }
 
@@ -406,6 +408,7 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     workspaceOverviewView: 'Use "Refresh Workspace Overview".',
     workspaceOverviewExportView: 'Use "Export Workspace Overview CSV".',
     workspaceActivityView: 'Use "Refresh Content Reads".',
+    participantTestLogsView: 'Use "Refresh Participant Test Logs".',
     studyMonitorView: 'Use "Refresh Study Monitor".',
     studyMonitorParticipantMatrixView: 'Use "Refresh Study Monitor".',
     studyMonitorParticipantView: "Select a participant from the study monitor.",
@@ -417,7 +420,8 @@ export function createInitialShellWorkspaceState(): ShellWorkspaceState {
     studyMonitorParticipantMatrixExportView:
       'Use "Export Participant Matrix CSV".',
     studyMonitorRunExportView: 'Open a run, then use "Export Run Detail CSV".',
-    workspaceLogExportView: 'Use "Export Workspace Logs CSV".',
+    workspaceLogExportView: 'Use "Export Participant Test Logs CSV".',
+    workspaceActivityExportView: 'Use "Export Activity CSV".',
     workspaceLoaded: false
   };
 }
