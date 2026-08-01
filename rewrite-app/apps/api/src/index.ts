@@ -4580,6 +4580,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           unitKey: body.unitKey,
           reviewerId: body.reviewerId,
           category: body.category,
+          categories: body.categories,
+          priority: body.priority,
           comment: body.comment
         });
         sendJson<ReviewResponse>(response, 201, { item });
@@ -4608,6 +4610,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           unitKey: body.unitKey,
           reviewerId: body.reviewerId,
           category: body.category,
+          categories: body.categories,
+          priority: body.priority,
           comment: body.comment
         });
         sendJson<ReviewResponse>(response, 200, { item });
@@ -5605,6 +5609,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           unitKey: body.unitKey,
           reviewerId: body.reviewerId,
           category: body.category,
+          categories: body.categories,
+          priority: body.priority,
           comment: body.comment
         });
         sendJson<ParticipantReviewResponse>(response, 201, { review });
@@ -5651,6 +5657,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           unitKey: body.unitKey,
           reviewerId: body.reviewerId,
           category: body.category,
+          categories: body.categories,
+          priority: body.priority,
           comment: body.comment
         });
         sendJson<ParticipantReviewResponse>(response, 200, { review });

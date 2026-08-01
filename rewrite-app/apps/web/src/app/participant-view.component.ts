@@ -396,12 +396,24 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 <input id="participantRouteReviewReviewer" name="participantRouteReviewReviewer" [(ngModel)]="view.reviewerId" placeholder="Defaults to participant login" />
               </label>
               <label>
-                Category
-                <select id="participantRouteReviewCategory" name="participantRouteReviewCategory" [(ngModel)]="view.reviewCategory">
-                  <option *ngFor="let category of view.reviewCategories" [value]="category">{{ category }}</option>
+                Priority
+                <select id="participantRouteReviewPriority" name="participantRouteReviewPriority" [(ngModel)]="view.reviewPriority">
+                  <option *ngFor="let option of view.reviewPriorityOptions" [ngValue]="option.value">{{ option.label }}</option>
                 </select>
               </label>
             </div>
+            <fieldset class="participant-review-categories">
+              <legend>Categories</legend>
+              <label *ngFor="let option of view.reviewCategoryOptions">
+                <input
+                  type="checkbox"
+                  [attr.id]="'participantRouteReviewCategory-' + option.value"
+                  [checked]="view.hasReviewCategory(option.value)"
+                  (change)="view.toggleReviewCategory(option.value, $any($event.target).checked)"
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            </fieldset>
             <label>
               Comment
               <textarea
@@ -421,7 +433,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 <header>
                   <div>
                     <strong>{{ view.reviewTargetLabel(review) }}</strong>
-                    <span>{{ review.category }} · {{ review.reviewerId }}</span>
+                    <span>{{ view.reviewPriorityLabel(review.priority) }} · {{ view.reviewCategoriesLabel(review) }} · {{ review.reviewerId }}</span>
                   </div>
                   <time [attr.datetime]="review.updatedAt">{{ review.updatedAt }}</time>
                 </header>

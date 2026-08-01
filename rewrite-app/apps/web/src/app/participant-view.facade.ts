@@ -201,14 +201,25 @@ export class ParticipantViewFacade {
   participantReviews: WorkspaceReview[] = [];
   reviewTarget: "unit" | "test" = "unit";
   reviewerId = "";
-  reviewCategory = "general";
+  reviewPriority: 0 | 1 | 2 | 3 = 0;
+  reviewCategories: string[] = [];
   reviewComment = "";
   editingReviewId = "";
   editingReviewUnitKey: string | null = null;
   reviewFeedback = "";
   adaptiveStateFeedback = "";
   adaptiveStateChangePending = "";
-  readonly reviewCategories = ["general", "technical", "content", "design"];
+  readonly reviewPriorityOptions = [
+    { value: 0 as const, label: "No priority" },
+    { value: 1 as const, label: "Critical / urgent" },
+    { value: 2 as const, label: "Medium term" },
+    { value: 3 as const, label: "Optional" }
+  ];
+  readonly reviewCategoryOptions = [
+    { value: "tech", label: "Technical" },
+    { value: "content", label: "Content" },
+    { value: "design", label: "Design" }
+  ];
   readonly timerTick = signal(Date.now());
   readonly fullscreenActive = signal(false);
   readonly fullscreenStatus = signal("");
@@ -1033,8 +1044,7 @@ export class ParticipantViewFacade {
     return Boolean(
       this.player.canReview &&
       this.runtime.testRunId.trim() &&
-      this.reviewComment.trim() &&
-      this.reviewCategory.trim()
+      this.reviewComment.trim()
     );
   }
 
@@ -1053,7 +1063,8 @@ export class ParticipantViewFacade {
     this.editingReviewUnitKey = review.unitKey;
     this.reviewTarget = review.unitKey ? "unit" : "test";
     this.reviewerId = review.reviewerId;
-    this.reviewCategory = review.category;
+    this.reviewPriority = review.priority ?? 0;
+    this.reviewCategories = [...(review.categories ?? [])];
     this.reviewComment = review.comment;
     this.reviewFeedback = `Editing comment from ${review.reviewerId}.`;
   }
@@ -1087,6 +1098,33 @@ export class ParticipantViewFacade {
 
   reviewTargetLabel(review: WorkspaceReview): string {
     return review.unitKey ? `Unit · ${review.unitKey}` : "Whole test";
+  }
+
+  reviewPriorityLabel(priority: number): string {
+    return (
+      this.reviewPriorityOptions.find(option => option.value === priority)
+        ?.label ?? "No priority"
+    );
+  }
+
+  reviewCategoriesLabel(review: WorkspaceReview): string {
+    const categories = review.categories?.length
+      ? review.categories
+      : review.category
+          .split(/[\s,]+/)
+          .map(category => category.trim())
+          .filter(Boolean);
+    return categories.length > 0 ? categories.join(", ") : "No category";
+  }
+
+  hasReviewCategory(category: string): boolean {
+    return this.reviewCategories.includes(category);
+  }
+
+  toggleReviewCategory(category: string, selected: boolean): void {
+    this.reviewCategories = selected
+      ? Array.from(new Set([...this.reviewCategories, category]))
+      : this.reviewCategories.filter(candidate => candidate !== category);
   }
 
   saveProgressFromPlayer(): void {
@@ -1861,7 +1899,8 @@ export class ParticipantViewFacade {
     this.editingReviewUnitKey = null;
     this.reviewTarget = "unit";
     this.reviewerId = "";
-    this.reviewCategory = "general";
+    this.reviewPriority = 0;
+    this.reviewCategories = [];
     this.reviewComment = "";
   }
 
@@ -1944,7 +1983,8 @@ export class ParticipantViewFacade {
         {
           unitKey,
           reviewerId: this.reviewerId.trim() || undefined,
-          category: this.reviewCategory,
+          categories: this.reviewCategories,
+          priority: this.reviewPriority,
           comment: this.reviewComment
         } satisfies UpdateParticipantReviewRequest
       );
@@ -1959,7 +1999,8 @@ export class ParticipantViewFacade {
         {
           unitKey,
           reviewerId: this.reviewerId.trim() || undefined,
-          category: this.reviewCategory,
+          categories: this.reviewCategories,
+          priority: this.reviewPriority,
           comment: this.reviewComment
         } satisfies CreateParticipantReviewRequest
       );

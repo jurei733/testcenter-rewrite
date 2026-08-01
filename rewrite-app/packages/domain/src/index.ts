@@ -1348,7 +1348,11 @@ export type WorkspaceReview = {
   testRunId: string;
   unitKey: string | null;
   reviewerId: string;
+  /** Space-separated compatibility projection of `categories`. */
   category: string;
+  categories: string[];
+  /** Original Testcenter priority: 0 unset, 1 critical, 2 medium, 3 optional. */
+  priority: 0 | 1 | 2 | 3;
   comment: string;
   createdAt: string;
   updatedAt: string;

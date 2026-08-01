@@ -503,7 +503,9 @@ export type WorkspaceReviewPort = {
     testRunId: string;
     unitKey?: string | null;
     reviewerId: string;
-    category: string;
+    category?: string;
+    categories?: string[];
+    priority?: number;
     comment: string;
   }): Promise<WorkspaceReviewListItem>;
   updateReview(input: {
@@ -513,6 +515,8 @@ export type WorkspaceReviewPort = {
     unitKey?: string | null;
     reviewerId?: string;
     category?: string;
+    categories?: string[];
+    priority?: number;
     comment?: string;
   }): Promise<WorkspaceReviewListItem>;
   deleteReview(input: {
@@ -582,7 +586,9 @@ export type ParticipantRuntimePort = {
     testRunId: string;
     unitKey?: string | null;
     reviewerId?: string;
-    category: string;
+    category?: string;
+    categories?: string[];
+    priority?: number;
     comment: string;
   }): Promise<WorkspaceReview>;
   updateReview(input: {
@@ -591,6 +597,8 @@ export type ParticipantRuntimePort = {
     unitKey?: string | null;
     reviewerId?: string;
     category?: string;
+    categories?: string[];
+    priority?: number;
     comment?: string;
   }): Promise<WorkspaceReview>;
   deleteReview(input: {
@@ -1622,6 +1630,100 @@ const normalizeReviewText = (
   }
 
   return value.trim();
+};
+
+const parseReviewCategoryText = (value: string): string[] =>
+  Array.from(
+    new Set(
+      value
+        .split(/[\s,]+/)
+        .map(category => category.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+
+const normalizeReviewCategories = (
+  categories: unknown,
+  legacyCategory: unknown
+): string[] => {
+  const values =
+    categories === undefined
+      ? typeof legacyCategory === "string"
+        ? parseReviewCategoryText(legacyCategory)
+        : []
+      : Array.isArray(categories)
+        ? categories
+        : null;
+  if (!values) {
+    throw new FirstSliceError(
+      400,
+      "review_categories_invalid",
+      "categories must be an array when provided."
+    );
+  }
+  if (values.some(value => typeof value !== "string")) {
+    throw new FirstSliceError(
+      400,
+      "review_categories_invalid",
+      "Every review category must be a string."
+    );
+  }
+  const normalized = Array.from(
+    new Set(
+      values.map(value => String(value).trim().toLowerCase())
+    )
+  ).filter(Boolean);
+  if (
+    normalized.length > 10 ||
+    normalized.some(category => category.length > 64)
+  ) {
+    throw new FirstSliceError(
+      400,
+      "review_categories_invalid",
+      "At most 10 categories with up to 64 characters each are allowed."
+    );
+  }
+  return normalized;
+};
+
+const normalizeReviewPriority = (value: unknown): 0 | 1 | 2 | 3 => {
+  const priority = value === undefined ? 0 : value;
+  if (
+    typeof priority !== "number" ||
+    !Number.isInteger(priority) ||
+    priority < 0 ||
+    priority > 3
+  ) {
+    throw new FirstSliceError(
+      400,
+      "review_priority_invalid",
+      "priority must be one of 0, 1, 2, or 3."
+    );
+  }
+  return priority as 0 | 1 | 2 | 3;
+};
+
+const normalizeWorkspaceReview = (review: WorkspaceReview): WorkspaceReview => {
+  const categories = Array.isArray(review.categories)
+    ? Array.from(
+        new Set(
+          review.categories
+            .filter(category => typeof category === "string")
+            .map(category => category.trim().toLowerCase())
+            .filter(Boolean)
+        )
+      )
+    : parseReviewCategoryText(String(review.category ?? ""));
+  const priority = Number(review.priority);
+  return {
+    ...review,
+    category: categories.join(" "),
+    categories,
+    priority:
+      Number.isInteger(priority) && priority >= 0 && priority <= 3
+        ? (priority as 0 | 1 | 2 | 3)
+        : 0
+  };
 };
 
 const normalizeOptionalUnitKey = (value: unknown): string | null => {
@@ -3727,6 +3829,7 @@ const buildWorkspaceReviewListItems = (input: {
   };
 
   return [...input.reviews]
+    .map(normalizeWorkspaceReview)
     .map(review => {
       const participantSession =
         participantSessionsById.get(review.participantSessionId) ?? null;
@@ -3755,7 +3858,8 @@ const buildWorkspaceReviewListItems = (input: {
         (!filters.testRunId || item.review.testRunId === filters.testRunId) &&
         (!filters.unitKey || item.review.unitKey === filters.unitKey) &&
         (!filters.reviewerId || item.review.reviewerId === filters.reviewerId) &&
-        (!filters.category || item.review.category === filters.category)
+        (!filters.category ||
+          item.review.categories.includes(filters.category.toLowerCase()))
     )
     .sort(
       (left, right) =>
@@ -3800,6 +3904,8 @@ const formatReviewCsv = (input: {
     "bookletKey",
     "unitKey",
     "reviewerId",
+    "priority",
+    "categories",
     "category",
     "comment",
     "createdAt",
@@ -3823,6 +3929,8 @@ const formatReviewCsv = (input: {
         item.testRun?.bookletKey ?? "",
         item.review.unitKey ?? "",
         item.review.reviewerId,
+        String(item.review.priority),
+        item.review.categories.join(" "),
         item.review.category,
         item.review.comment,
         item.review.createdAt,
@@ -10037,9 +10145,9 @@ const scopeStudyMonitorDataToMonitorableModes = (input: {
         resolveParticipantExecutionMode(rosterEntry.executionMode).monitorable
     ),
     testRuns,
-    reviews: input.reviews.filter(review =>
-      monitorableTestRunIds.has(review.testRunId)
-    )
+    reviews: input.reviews
+      .map(normalizeWorkspaceReview)
+      .filter(review => monitorableTestRunIds.has(review.testRunId))
   };
 };
 
@@ -14290,6 +14398,7 @@ export const createFirstSliceServices = (
           .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
         const testRunIds = new Set(testRuns.map(testRun => testRun.testRunId));
         const reviews = workspaceReviews
+          .map(normalizeWorkspaceReview)
           .filter(
             review =>
               review.participantSessionId ===
@@ -14744,6 +14853,10 @@ export const createFirstSliceServices = (
           );
         }
 
+        const categories = normalizeReviewCategories(
+          input.categories,
+          input.category
+        );
         const timestamp = now();
         const review: WorkspaceReview = {
           reviewId: idGenerator(),
@@ -14757,11 +14870,9 @@ export const createFirstSliceServices = (
             "reviewerId",
             "review_reviewer_required"
           ),
-          category: normalizeReviewText(
-            input.category,
-            "category",
-            "review_category_required"
-          ),
+          category: categories.join(" "),
+          categories,
+          priority: normalizeReviewPriority(input.priority),
           comment: normalizeReviewText(
             input.comment,
             "comment",
@@ -14784,7 +14895,9 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
-            category: review.category
+            category: review.category,
+            categories: review.categories,
+            priority: review.priority
           }
         });
         const participantRosterEntries =
@@ -14809,14 +14922,14 @@ export const createFirstSliceServices = (
           input.tenantKey,
           input.workspaceKey
         );
-        const existingReview = await repository.getWorkspaceReviewById(
+        const storedExistingReview = await repository.getWorkspaceReviewById(
           input.reviewId
         );
 
         if (
-          !existingReview ||
-          existingReview.tenantId !== workspace.tenantId ||
-          existingReview.workspaceId !== workspace.workspaceId
+          !storedExistingReview ||
+          storedExistingReview.tenantId !== workspace.tenantId ||
+          storedExistingReview.workspaceId !== workspace.workspaceId
         ) {
           throw new FirstSliceError(
             404,
@@ -14824,6 +14937,7 @@ export const createFirstSliceServices = (
             `Review '${input.reviewId}' was not found in workspace '${input.workspaceKey}'.`
           );
         }
+        const existingReview = normalizeWorkspaceReview(storedExistingReview);
 
         const nextUnitKey =
           input.unitKey === undefined
@@ -14856,6 +14970,10 @@ export const createFirstSliceServices = (
           );
         }
 
+        const categories =
+          input.categories === undefined && input.category === undefined
+            ? existingReview.categories
+            : normalizeReviewCategories(input.categories, input.category);
         const review: WorkspaceReview = {
           ...existingReview,
           unitKey: nextUnitKey,
@@ -14867,14 +14985,12 @@ export const createFirstSliceServices = (
                   "reviewerId",
                   "review_reviewer_required"
                 ),
-          category:
-            input.category === undefined
-              ? existingReview.category
-              : normalizeReviewText(
-                  input.category,
-                  "category",
-                  "review_category_required"
-                ),
+          category: categories.join(" "),
+          categories,
+          priority:
+            input.priority === undefined
+              ? existingReview.priority
+              : normalizeReviewPriority(input.priority),
           comment:
             input.comment === undefined
               ? existingReview.comment
@@ -14899,7 +15015,9 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
-            category: review.category
+            category: review.category,
+            categories: review.categories,
+            priority: review.priority
           }
         });
 
@@ -14957,7 +15075,9 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
-            category: review.category
+            category: review.category,
+            categories: review.categories,
+            priority: review.priority
           }
         });
 
@@ -15990,6 +16110,7 @@ export const createFirstSliceServices = (
             testRun.workspaceId
           )
         )
+          .map(normalizeWorkspaceReview)
           .filter(
             review =>
               review.testRunId === testRun.testRunId &&
@@ -16012,6 +16133,10 @@ export const createFirstSliceServices = (
             unitKey
           );
         }
+        const categories = normalizeReviewCategories(
+          input.categories,
+          input.category
+        );
         const timestamp = now();
         const review: WorkspaceReview = {
           reviewId: idGenerator(),
@@ -16024,11 +16149,9 @@ export const createFirstSliceServices = (
             input.reviewerId,
             participantSession.loginKey
           ),
-          category: normalizeReviewText(
-            input.category,
-            "category",
-            "review_category_required"
-          ),
+          category: categories.join(" "),
+          categories,
+          priority: normalizeReviewPriority(input.priority),
           comment: normalizeReviewText(
             input.comment,
             "comment",
@@ -16051,6 +16174,8 @@ export const createFirstSliceServices = (
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
             category: review.category,
+            categories: review.categories,
+            priority: review.priority,
             participantAuthored: true
           }
         });
@@ -16059,10 +16184,12 @@ export const createFirstSliceServices = (
       async updateReview(input) {
         const { participantSession, testRun, contentRelease } =
           await requireParticipantReviewContext(input.testRunId);
-        const existingReview = await requireParticipantOwnedReview({
-          testRun,
-          reviewId: input.reviewId
-        });
+        const existingReview = normalizeWorkspaceReview(
+          await requireParticipantOwnedReview({
+            testRun,
+            reviewId: input.reviewId
+          })
+        );
         const unitKey =
           input.unitKey === undefined
             ? existingReview.unitKey
@@ -16074,6 +16201,10 @@ export const createFirstSliceServices = (
             unitKey
           );
         }
+        const categories =
+          input.categories === undefined && input.category === undefined
+            ? existingReview.categories
+            : normalizeReviewCategories(input.categories, input.category);
         const review: WorkspaceReview = {
           ...existingReview,
           unitKey,
@@ -16084,14 +16215,12 @@ export const createFirstSliceServices = (
                   input.reviewerId,
                   participantSession.loginKey
                 ),
-          category:
-            input.category === undefined
-              ? existingReview.category
-              : normalizeReviewText(
-                  input.category,
-                  "category",
-                  "review_category_required"
-                ),
+          category: categories.join(" "),
+          categories,
+          priority:
+            input.priority === undefined
+              ? existingReview.priority
+              : normalizeReviewPriority(input.priority),
           comment:
             input.comment === undefined
               ? existingReview.comment
@@ -16116,6 +16245,8 @@ export const createFirstSliceServices = (
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
             category: review.category,
+            categories: review.categories,
+            priority: review.priority,
             participantAuthored: true
           }
         });
@@ -16141,6 +16272,8 @@ export const createFirstSliceServices = (
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
             category: review.category,
+            categories: review.categories,
+            priority: review.priority,
             participantAuthored: true
           }
         });

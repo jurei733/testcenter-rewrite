@@ -475,6 +475,13 @@ const mapWorkspaceReview = (
             : String(row.unit_key),
         reviewerId: String(row.reviewer_id),
         category: String(row.category),
+        categories: String(row.category ?? "")
+          .split(/[\s,]+/)
+          .map(category => category.trim().toLowerCase())
+          .filter(Boolean),
+        priority: ([0, 1, 2, 3].includes(Number(row.priority))
+          ? Number(row.priority)
+          : 0) as WorkspaceReview["priority"],
         comment: String(row.comment_text),
         createdAt: String(row.created_at),
         updatedAt: String(row.updated_at)
@@ -501,7 +508,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 28;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 29;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -934,6 +941,14 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE test_runs
         ADD COLUMN booklet_state_overrides_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 29,
+    name: "add_review_priorities",
+    sql: `
+      ALTER TABLE workspace_reviews
+        ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
     `
   }
 ];
@@ -1992,7 +2007,7 @@ export const createSqliteFirstSliceRepository = (
     async getWorkspaceReviewById(reviewId) {
       const row = database
         .prepare(
-          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
            FROM workspace_reviews
            WHERE review_id = ?`
         )
@@ -2002,7 +2017,7 @@ export const createSqliteFirstSliceRepository = (
     async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
            FROM workspace_reviews
            WHERE tenant_id = ? AND workspace_id = ?
            ORDER BY updated_at DESC, created_at DESC`
@@ -2014,8 +2029,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO workspace_reviews (
-            review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(review_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -2024,6 +2039,7 @@ export const createSqliteFirstSliceRepository = (
             unit_key = excluded.unit_key,
             reviewer_id = excluded.reviewer_id,
             category = excluded.category,
+            priority = excluded.priority,
             comment_text = excluded.comment_text,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at`
@@ -2037,6 +2053,7 @@ export const createSqliteFirstSliceRepository = (
           review.unitKey,
           review.reviewerId,
           review.category,
+          review.priority,
           review.comment,
           review.createdAt,
           review.updatedAt

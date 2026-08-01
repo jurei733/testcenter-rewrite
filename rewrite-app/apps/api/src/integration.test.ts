@@ -3619,7 +3619,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(reviewCsv.body, /^tenantKey,workspaceKey,reviewId,loginKey,/);
     assert.match(
       reviewCsv.body,
-      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","integration-reviewer","final-check","Updated integration review"/
+      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const filteredReviewCsv = await requestTextAt(
@@ -3635,7 +3635,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredReviewCsv.status, 200);
     assert.match(
       filteredReviewCsv.body,
-      /"unit-intro","integration-reviewer","final-check","Updated integration review"/
+      /"unit-intro","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const deletedReview = await requestJsonAt<{ deletedReviewId: string }>(
@@ -12695,6 +12695,18 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     review.currentRunState.availableActions.includes("change_state_options"),
     true
   );
+  const invalidParticipantReviewPriority = await requestJson<{ error: string }>(
+    `/api/v1/participant/test-runs/${review.testRunId}/reviews`,
+    {
+      method: "POST",
+      body: { priority: 4, categories: ["tech"], comment: "Invalid priority" }
+    }
+  );
+  assert.equal(invalidParticipantReviewPriority.status, 400);
+  assert.equal(
+    invalidParticipantReviewPriority.body.error,
+    "review_priority_invalid"
+  );
   const createdParticipantReview = await requestJson<{
     review: {
       reviewId: string;
@@ -12703,6 +12715,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       unitKey: string | null;
       reviewerId: string;
       category: string;
+      categories: string[];
+      priority: number;
       comment: string;
     };
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`, {
@@ -12710,7 +12724,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     body: {
       unitKey: "UNIT.INTRO",
       reviewerId: "Mode Reviewer",
-      category: "technical",
+      categories: ["tech", "content"],
+      priority: 1,
       comment: "Participant-authored review"
     }
   });
@@ -12721,29 +12736,64 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     review.participantSessionId
   );
   assert.equal(createdParticipantReview.body.review.unitKey, "UNIT.INTRO");
+  assert.equal(createdParticipantReview.body.review.category, "tech content");
+  assert.deepEqual(createdParticipantReview.body.review.categories, [
+    "tech",
+    "content"
+  ]);
+  assert.equal(createdParticipantReview.body.review.priority, 1);
   const participantReviews = await requestJson<{
-    items: Array<{ reviewId: string; comment: string }>;
+    items: Array<{
+      reviewId: string;
+      priority: number;
+      categories: string[];
+      comment: string;
+    }>;
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
   assert.deepEqual(
-    participantReviews.body.items.map(item => [item.reviewId, item.comment]),
-    [[createdParticipantReview.body.review.reviewId, "Participant-authored review"]]
+    participantReviews.body.items.map(item => [
+      item.reviewId,
+      item.priority,
+      item.categories,
+      item.comment
+    ]),
+    [
+      [
+        createdParticipantReview.body.review.reviewId,
+        1,
+        ["tech", "content"],
+        "Participant-authored review"
+      ]
+    ]
   );
   const updatedParticipantReview = await requestJson<{
-    review: { unitKey: string | null; category: string; comment: string };
+    review: {
+      unitKey: string | null;
+      category: string;
+      categories: string[];
+      priority: number;
+      comment: string;
+    };
   }>(
     `/api/v1/participant/test-runs/${review.testRunId}/reviews/${createdParticipantReview.body.review.reviewId}`,
     {
       method: "PATCH",
       body: {
         unitKey: null,
-        category: "content",
+        categories: ["content", "design"],
+        priority: 2,
         comment: "Updated participant-authored review"
       }
     }
   );
   assert.equal(updatedParticipantReview.status, 200);
   assert.equal(updatedParticipantReview.body.review.unitKey, null);
-  assert.equal(updatedParticipantReview.body.review.category, "content");
+  assert.equal(updatedParticipantReview.body.review.category, "content design");
+  assert.deepEqual(updatedParticipantReview.body.review.categories, [
+    "content",
+    "design"
+  ]);
+  assert.equal(updatedParticipantReview.body.review.priority, 2);
   assert.equal(
     updatedParticipantReview.body.review.comment,
     "Updated participant-authored review"
@@ -13971,7 +14021,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     reviewCsv.body,
-    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,reviewerId,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
+    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,reviewerId,priority,categories,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
   );
   assert.match(
     reviewCsv.body,

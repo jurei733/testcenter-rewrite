@@ -455,6 +455,13 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
             : String(row.unit_key),
         reviewerId: String(row.reviewer_id),
         category: String(row.category),
+        categories: String(row.category ?? "")
+          .split(/[\s,]+/)
+          .map(category => category.trim().toLowerCase())
+          .filter(Boolean),
+        priority: ([0, 1, 2, 3].includes(Number(row.priority))
+          ? Number(row.priority)
+          : 0) as WorkspaceReview["priority"],
         comment: String(row.comment_text),
         createdAt: String(row.created_at),
         updatedAt: String(row.updated_at)
@@ -479,7 +486,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 22;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 23;
 
 const migrations: PostgresMigration[] = [
   {
@@ -869,6 +876,14 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE test_runs
         ADD COLUMN IF NOT EXISTS booklet_state_overrides_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 23,
+    name: "add_review_priorities",
+    sql: `
+      ALTER TABLE workspace_reviews
+        ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
     `
   }
 ];
@@ -1818,7 +1833,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getWorkspaceReviewById(reviewId) {
       return one(
-        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
          FROM workspace_reviews
          WHERE review_id = $1`,
         [reviewId],
@@ -1827,7 +1842,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
          FROM workspace_reviews
          WHERE tenant_id = $1 AND workspace_id = $2
          ORDER BY updated_at DESC, created_at DESC`,
@@ -1838,8 +1853,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveWorkspaceReview(review) {
       await pool.query(
         `INSERT INTO workspace_reviews (
-          review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, comment_text, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT(review_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -1848,6 +1863,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           unit_key = EXCLUDED.unit_key,
           reviewer_id = EXCLUDED.reviewer_id,
           category = EXCLUDED.category,
+          priority = EXCLUDED.priority,
           comment_text = EXCLUDED.comment_text,
           created_at = EXCLUDED.created_at,
           updated_at = EXCLUDED.updated_at`,
@@ -1860,6 +1876,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           review.unitKey,
           review.reviewerId,
           review.category,
+          review.priority,
           review.comment,
           review.createdAt,
           review.updatedAt

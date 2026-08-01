@@ -1728,12 +1728,21 @@ export class WorkspaceViewFacade {
         };
 
         return {
-          headline: `${review.category} by ${review.reviewerId}`,
+          headline: `${review.category || "uncategorized"} by ${review.reviewerId}`,
           subline: review.unitKey ?? "whole run",
-          badges: ["review", review.category],
+          badges: [
+            "review",
+            `priority ${review.priority}`,
+            ...(review.categories.length > 0 ? review.categories : ["uncategorized"])
+          ],
           rows: [
             { label: "Review", value: review.reviewId },
             { label: "Unit", value: review.unitKey ?? "whole run" },
+            { label: "Priority", value: String(review.priority) },
+            {
+              label: "Categories",
+              value: review.categories.join(", ") || "none"
+            },
             { label: "Comment", value: review.comment },
             { label: "Created", value: this.formatDateTime(review.createdAt) },
             { label: "Updated", value: this.formatDateTime(review.updatedAt) }

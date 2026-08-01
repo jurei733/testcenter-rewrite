@@ -2254,7 +2254,11 @@ try {
   )?.trim();
   assert.ok(participantReviewRunId, "Participant review smoke expected a run id.");
   await page.locator("#participantRouteReviewReviewer").fill("UI Reviewer");
-  await page.locator("#participantRouteReviewCategory").selectOption("technical");
+  await page
+    .locator("#participantRouteReviewPriority")
+    .selectOption({ label: "Critical / urgent" });
+  await page.locator("#participantRouteReviewCategory-tech").check();
+  await page.locator("#participantRouteReviewCategory-content").check();
   await page
     .locator("#participantRouteReviewComment")
     .fill("Participant review comment from browser smoke");
@@ -2275,7 +2279,11 @@ try {
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.some(
-        item => item?.comment === "Participant review comment from browser smoke"
+        item =>
+          item?.comment === "Participant review comment from browser smoke" &&
+          item?.priority === 1 &&
+          Array.isArray(item?.categories) &&
+          item.categories.join(" ") === "tech content"
       )
   );
   const participantReviewId = participantReviewPayload.items[0]?.reviewId;
@@ -2304,6 +2312,8 @@ try {
         item =>
           item?.reviewId === participantReviewId &&
           item?.unitKey === null &&
+          item?.priority === 1 &&
+          item?.categories?.join(" ") === "tech content" &&
           item?.comment === "Updated whole-test review comment"
       )
   );

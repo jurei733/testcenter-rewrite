@@ -1313,11 +1313,21 @@ export class RuntimeViewFacade {
         candidate => candidate.testRunId === review.testRunId
       );
       return {
-        headline: `${review.category} · ${review.unitKey ?? "whole run"}`,
+        headline: `${review.category || "uncategorized"} · ${review.unitKey ?? "whole run"}`,
         subline: review.reviewId,
-        badges: [review.reviewerId, review.testRunId],
+        badges: [
+          review.reviewerId,
+          `priority ${review.priority}`,
+          ...review.categories,
+          review.testRunId
+        ],
         rows: [
           { label: "Comment", value: this.formatResponsePreview(review.comment) },
+          { label: "Priority", value: String(review.priority) },
+          {
+            label: "Categories",
+            value: review.categories.join(", ") || "none"
+          },
           {
             label: "Participant",
             value:
@@ -1388,16 +1398,23 @@ export class RuntimeViewFacade {
         const loginKey = item.participantSession?.loginKey ?? "unknown";
 
         return {
-          headline: `${item.review.category} · ${displayName ?? loginKey}`,
+          headline: `${item.review.category || "uncategorized"} · ${displayName ?? loginKey}`,
           subline: item.review.reviewId,
           badges: [
             item.review.reviewerId,
+            `priority ${item.review.priority}`,
+            ...item.review.categories,
             item.testRun?.status ?? "missing run",
             item.review.unitKey ?? "whole run",
             item.participantRosterEntry ? "roster" : "ad hoc"
           ],
           rows: [
             { label: "Review Id", value: item.review.reviewId },
+            { label: "Priority", value: String(item.review.priority) },
+            {
+              label: "Categories",
+              value: item.review.categories.join(", ") || "none"
+            },
             {
               label: "Comment",
               value: this.formatResponsePreview(item.review.comment)
