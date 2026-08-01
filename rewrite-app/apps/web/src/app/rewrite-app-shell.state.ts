@@ -63,6 +63,16 @@ export interface ShellOpsState {
 }
 
 export interface ShellRuntimeState {
+  monitorConnectionStatus:
+    | "idle"
+    | "connecting"
+    | "live"
+    | "reconnecting"
+    | "polling"
+    | "offline";
+  monitorConnectionDetail: string;
+  monitorConnectionLastEventAt: string;
+  monitorConnectionOpenRunCount: number;
   participantDisplayName: string;
   loginKey: string;
   participantPassword: string;
@@ -270,6 +280,10 @@ export function createInitialShellOpsState(): ShellOpsState {
 
 export function createInitialShellRuntimeState(): ShellRuntimeState {
   return {
+    monitorConnectionStatus: "idle",
+    monitorConnectionDetail: "Live monitor is not connected yet.",
+    monitorConnectionLastEventAt: "",
+    monitorConnectionOpenRunCount: 0,
     participantDisplayName: "",
     loginKey: "student-ui",
     participantPassword: "",

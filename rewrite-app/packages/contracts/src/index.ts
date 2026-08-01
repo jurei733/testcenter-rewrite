@@ -66,6 +66,7 @@ import type {
 
 export * from "./verona-player.js";
 export * from "./booklet-policy.js";
+export * from "./monitor-event-stream.js";
 
 export type ParsedParticipantRosterEntry = {
   loginKey: string;
@@ -1624,6 +1625,8 @@ export const productionApiRoutes = {
   },
   monitor: {
     openRuns: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs",
+    eventStream:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/events",
     issueRunCommands:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/commands",
     issueRunCommand:

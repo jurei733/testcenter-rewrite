@@ -5,6 +5,13 @@ export interface ShellLifecycleHost {
   workspaceLoaded: boolean;
   contentLoaded: boolean;
   runtimeLoaded: boolean;
+  monitorConnectionStatus:
+    | "idle"
+    | "connecting"
+    | "live"
+    | "reconnecting"
+    | "polling"
+    | "offline";
   diagnosticsLoaded: boolean;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
@@ -72,6 +79,9 @@ export async function refreshShellActiveViewData(
       return;
     }
     if (host.activeView === "runtime") {
+      if (host.monitorConnectionStatus === "live") {
+        return;
+      }
       await host.refreshRuntimeReads(true);
       return;
     }

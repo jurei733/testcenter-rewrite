@@ -72,6 +72,29 @@ export class RuntimeViewFacade {
   readonly participantSessionStatusOptions = participantSessionStatuses;
   readonly testRunStatusOptions = testRunStatuses;
 
+  get monitorConnectionLabel(): string {
+    switch (this.runtime.monitorConnectionStatus) {
+      case "connecting":
+        return "Connecting";
+      case "live":
+        return "Live";
+      case "reconnecting":
+        return "Reconnecting";
+      case "polling":
+        return "Polling fallback";
+      case "offline":
+        return "Offline";
+      default:
+        return "Inactive";
+    }
+  }
+
+  get monitorConnectionLastEventLabel(): string {
+    return this.runtime.monitorConnectionLastEventAt
+      ? this.formatDateTime(this.runtime.monitorConnectionLastEventAt)
+      : "waiting for first event";
+  }
+
   get participantSessionsView(): string {
     return this.uiState.runtime.participantSessionsView;
   }
@@ -2190,6 +2213,10 @@ export class RuntimeViewFacade {
 
   persistState(): void {
     this.viewState.persistShellState();
+  }
+
+  reconnectMonitorEventStream(): void {
+    this.viewState.reconnectMonitorEventStream();
   }
 
   get canUseParticipantLoginActions(): boolean {

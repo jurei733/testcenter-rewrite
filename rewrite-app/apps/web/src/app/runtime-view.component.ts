@@ -20,6 +20,40 @@ import { SummaryCardsComponent } from "./summary-cards.component";
   ],
   template: `
     <div class="stack">
+      <article id="monitorConnectionCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Near-real-time monitor</span>
+            <h2>Live Connection</h2>
+          </div>
+          <span
+            id="monitorConnectionStatus"
+            class="status-pill"
+            [attr.data-status]="view.runtime.monitorConnectionStatus"
+          >{{ view.monitorConnectionLabel }}</span>
+        </div>
+        <p id="monitorConnectionDetail">{{ view.runtime.monitorConnectionDetail }}</p>
+        <div class="form-grid">
+          <div>
+            <strong>Open runs</strong>
+            <p id="monitorConnectionOpenRunCount">{{ view.runtime.monitorConnectionOpenRunCount }}</p>
+          </div>
+          <div>
+            <strong>Last event</strong>
+            <p id="monitorConnectionLastEvent">{{ view.monitorConnectionLastEventLabel }}</p>
+          </div>
+        </div>
+        <div class="actions">
+          <button
+            id="reconnectMonitorEventStreamButton"
+            class="ghost"
+            type="button"
+            [disabled]="!view.canUseWorkspaceScope"
+            (click)="view.reconnectMonitorEventStream()"
+          >Reconnect Live Monitor</button>
+        </div>
+      </article>
+
       <article class="card">
         <h2>Participant Runtime</h2>
         <div class="form-grid">

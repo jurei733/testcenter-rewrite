@@ -1553,6 +1553,17 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedOpenRunsCsv.status, 401);
     assert.equal(rejectedOpenRunsCsv.body.error, "admin_session_missing");
 
+    const rejectedMonitorEventStream = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/monitor/events"
+    );
+
+    assert.equal(rejectedMonitorEventStream.status, 401);
+    assert.equal(
+      rejectedMonitorEventStream.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedParticipantRosterCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/participant-roster.csv"
@@ -4621,6 +4632,223 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       ]
     );
   } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("monitor event stream publishes authenticated snapshots and run changes", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
+  });
+  const abortController = new AbortController();
+
+  try {
+    const signIn = await requestJsonAt<{
+      sessionToken: string;
+      adminSession: { adminSessionId: string };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "demo-admin",
+          password: "demo-admin-password"
+        }
+      }
+    );
+    assert.equal(signIn.status, 200);
+    const authorization = `Bearer ${signIn.body.sessionToken}`;
+
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    });
+    const resumed = await requestJsonAt<{
+      testRun: { testRunId: string; status: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(resumed.body.testRun.status, "running");
+
+    const streamResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/events`,
+      {
+        headers: {
+          accept: "text/event-stream",
+          authorization
+        },
+        signal: abortController.signal
+      }
+    );
+    assert.equal(streamResponse.status, 200);
+    assert.equal(
+      streamResponse.headers.get("content-type"),
+      "text/event-stream; charset=utf-8"
+    );
+    assert.equal(
+      streamResponse.headers.get("cache-control"),
+      "no-cache, no-transform"
+    );
+    assert.equal(streamResponse.headers.get("x-accel-buffering"), "no");
+    assertSecurityHeaders(streamResponse);
+    assert.ok(streamResponse.body);
+
+    const reader = streamResponse.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const readEvent = async (
+      expectedEventType: "snapshot" | "change"
+    ): Promise<{
+      eventType: string;
+      sequence: number;
+      tenantKey: string;
+      workspaceKey: string;
+      revision: string;
+      openRunCount: number;
+    }> => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        let boundary = buffer.indexOf("\n\n");
+        while (boundary >= 0) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const eventType = frame
+            .split("\n")
+            .find(line => line.startsWith("event: "))
+            ?.slice("event: ".length);
+          const data = frame
+            .split("\n")
+            .find(line => line.startsWith("data: "))
+            ?.slice("data: ".length);
+          if (eventType === expectedEventType && data) {
+            return JSON.parse(data) as {
+              eventType: string;
+              sequence: number;
+              tenantKey: string;
+              workspaceKey: string;
+              revision: string;
+              openRunCount: number;
+            };
+          }
+          boundary = buffer.indexOf("\n\n");
+        }
+
+        const remainingMs = deadline - Date.now();
+        const chunk = await new Promise<ReadableStreamReadResult<Uint8Array>>(
+          (resolve, reject) => {
+            const timeout = setTimeout(
+              () => reject(new Error(`Timed out waiting for ${expectedEventType}.`)),
+              remainingMs
+            );
+            void reader.read().then(
+              result => {
+                clearTimeout(timeout);
+                resolve(result);
+              },
+              error => {
+                clearTimeout(timeout);
+                reject(error);
+              }
+            );
+          }
+        );
+        if (chunk.done) {
+          throw new Error(
+            `Monitor event stream closed before ${expectedEventType}.`
+          );
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+      }
+      throw new Error(`Timed out waiting for ${expectedEventType}.`);
+    };
+
+    const snapshot = await readEvent("snapshot");
+    assert.equal(snapshot.eventType, "snapshot");
+    assert.equal(snapshot.sequence, 1);
+    assert.equal(snapshot.tenantKey, "demo-tenant");
+    assert.equal(snapshot.workspaceKey, "demo-workspace");
+    assert.match(snapshot.revision, /^[a-f0-9]{64}$/);
+    assert.equal(snapshot.openRunCount, 1);
+
+    const pause = await requestJsonAt<{
+      command: { testRun: { status: string } };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: { commandType: "pause", actorId: "stream-test" }
+      }
+    );
+    assert.equal(pause.body.command.testRun.status, "paused");
+
+    const change = await readEvent("change");
+    assert.equal(change.eventType, "change");
+    assert.equal(change.sequence, 2);
+    assert.notEqual(change.revision, snapshot.revision);
+    assert.equal(change.openRunCount, 1);
+
+    const replacementSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "demo-admin",
+          password: "demo-admin-password"
+        }
+      }
+    );
+    const revoked = await requestJsonAt<{ adminSession: { revokedAt: string } }>(
+      isolated.baseUrl,
+      `/api/v1/admin/auth/sessions/${signIn.body.adminSession.adminSessionId}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${replacementSignIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(revoked.status, 200);
+    assert.ok(revoked.body.adminSession.revokedAt);
+
+    const streamClosed = await new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("Monitor stream stayed open after session revocation.")),
+        5_000
+      );
+      const readUntilClosed = (): void => {
+        void reader.read().then(
+          result => {
+            if (result.done) {
+              clearTimeout(timeout);
+              resolve(true);
+              return;
+            }
+            readUntilClosed();
+          },
+          error => {
+            clearTimeout(timeout);
+            reject(error);
+          }
+        );
+      };
+      readUntilClosed();
+    });
+    assert.equal(streamClosed, true);
+  } finally {
+    abortController.abort();
     await closeServer(isolated.server);
   }
 });
@@ -17177,6 +17405,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       };
       monitor: {
         openRuns: string;
+        eventStream: string;
         issueRunCommand: string;
       };
     };
@@ -17223,6 +17452,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "study_monitor_read",
     "study_monitor_attention",
     "monitor_open_runs_csv_export",
+    "monitor_event_stream",
     "monitor_run_control",
     "system_diagnostics",
     "frontend_shell"
@@ -17311,6 +17541,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);
   assert.match(manifest.routes.monitor.openRuns, /monitor\/open-runs/);
+  assert.match(manifest.routes.monitor.eventStream, /monitor\/events/);
   assert.match(
     manifest.routes.monitor.issueRunCommand,
     /monitor\/open-runs\/:testRunId\/commands/

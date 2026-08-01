@@ -1,6 +1,7 @@
 import { ApplicationRef, Injectable, inject } from "@angular/core";
 
 import { RewriteAppContentService } from "./rewrite-app-content.service";
+import { MonitorEventStreamService } from "./monitor-event-stream.service";
 import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppShellLifecycleService } from "./rewrite-app-shell-lifecycle.service";
@@ -13,6 +14,7 @@ export class RewriteAppViewStateService {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly applicationRef = inject(ApplicationRef);
   private readonly lifecycle = inject(RewriteAppShellLifecycleService);
+  private readonly monitorEvents = inject(MonitorEventStreamService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly contentService = inject(RewriteAppContentService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
@@ -48,10 +50,12 @@ export class RewriteAppViewStateService {
       this.refreshRuntimeReads,
       this.refreshOperationalDiagnostics
     );
+    this.syncMonitorEventStream();
     void this.opsService.refreshOperationalDiagnostics(true);
   }
 
   destroy(): void {
+    this.monitorEvents.stop("Application shell closed.");
     this.lifecycle.clearAutoRefresh(
       this.refreshWorkspaceOverview,
       this.refreshContentReads,
@@ -62,6 +66,7 @@ export class RewriteAppViewStateService {
 
   setActiveView(view: AppView): void {
     if (this.activeView === view) {
+      this.syncMonitorEventStream();
       void this.lifecycle.ensureDataForView(
         view,
         this.refreshWorkspaceOverview,
@@ -73,6 +78,7 @@ export class RewriteAppViewStateService {
     }
 
     this.activeView = view;
+    this.syncMonitorEventStream();
     this.persistShellState();
     void this.lifecycle.ensureDataForView(
       view,
@@ -97,6 +103,13 @@ export class RewriteAppViewStateService {
     );
   }
 
+  reconnectMonitorEventStream(): void {
+    if (this.activeView !== "runtime") {
+      return;
+    }
+    this.monitorEvents.restart(() => this.runtimeService.refreshRuntimeReads(true));
+  }
+
   onActionAsync(action: () => Promise<unknown>): void {
     void action()
       .catch(() => undefined)
@@ -112,5 +125,13 @@ export class RewriteAppViewStateService {
 
   getPersistedView(): AppView {
     return this.activeView;
+  }
+
+  private syncMonitorEventStream(): void {
+    if (this.activeView === "runtime") {
+      this.monitorEvents.start(() => this.runtimeService.refreshRuntimeReads(true));
+      return;
+    }
+    this.monitorEvents.stop();
   }
 }

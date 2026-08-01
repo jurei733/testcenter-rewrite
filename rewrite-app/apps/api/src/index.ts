@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
@@ -93,6 +93,8 @@ import {
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type ListSystemCheckReportsResponse,
+  MONITOR_EVENT_STREAM_SCHEMA_VERSION,
+  type MonitorEventStreamEvent,
   type SystemCheckSpeedTestUploadResponse,
   type MonitorOpenRunsResponse,
   type MonitorOpenRunsQuery,
@@ -1662,6 +1664,9 @@ const completeRunPattern = createRoutePattern(
 const monitorOpenRunsPattern = createRoutePattern(
   productionApiRoutes.monitor.openRuns
 );
+const monitorEventStreamPattern = createRoutePattern(
+  productionApiRoutes.monitor.eventStream
+);
 const monitorRunCommandPattern = createRoutePattern(
   productionApiRoutes.monitor.issueRunCommand
 );
@@ -1730,6 +1735,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["DELETE", systemCheckReportListPattern],
   ["GET", systemCheckReportCsvExportPattern],
   ["GET", monitorOpenRunsPattern],
+  ["GET", monitorEventStreamPattern],
   ["POST", monitorRunCommandsPattern],
   ["POST", monitorRunCommandPattern]
 ];
@@ -2362,6 +2368,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["POST", resumeRunPattern, productionApiRoutes.participant.resumeRun],
     ["POST", completeRunPattern, productionApiRoutes.participant.completeRun],
     ["GET", monitorOpenRunsPattern, productionApiRoutes.monitor.openRuns],
+    ["GET", monitorEventStreamPattern, productionApiRoutes.monitor.eventStream],
     ["POST", monitorRunCommandsPattern, productionApiRoutes.monitor.issueRunCommands],
     ["POST", monitorRunCommandPattern, productionApiRoutes.monitor.issueRunCommand]
   ];
@@ -2713,6 +2720,133 @@ const parseStudyMonitorParticipantMatrixQuery = (
     answerState: answerState as "answered" | "missing" | undefined,
     limit: limitResult.limit
   };
+};
+
+const MONITOR_EVENT_STREAM_POLL_INTERVAL_MS = 1_000;
+const MONITOR_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
+
+const monitorOpenRunsRevision = (items: unknown[]): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify(items, (key, value) =>
+        key === "remainingSeconds" ? undefined : value
+      )
+    )
+    .digest("hex");
+
+const writeMonitorEvent = (
+  response: ServerResponse,
+  event: MonitorEventStreamEvent
+): void => {
+  response.write(`id: ${event.sequence}\n`);
+  response.write(`event: ${event.eventType}\n`);
+  response.write(`data: ${JSON.stringify(event)}\n\n`);
+};
+
+const streamMonitorEvents = async (input: {
+  request: IncomingMessage;
+  response: ServerResponse;
+  monitorRead: FirstSliceServices["monitorRead"];
+  tenantKey: string;
+  workspaceKey: string;
+  validateAccess?: () => Promise<void>;
+}): Promise<void> => {
+  await input.validateAccess?.();
+  const initialItems = await input.monitorRead.listOpenRuns({
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    limit: 500
+  });
+  let revision = monitorOpenRunsRevision(initialItems);
+  let openRunCount = initialItems.length;
+  let sequence = 0;
+  let lastEventAt = Date.now();
+  let polling = false;
+  let closed = false;
+  let pollHandle: NodeJS.Timeout | null = null;
+
+  const stop = (): void => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (pollHandle) {
+      clearInterval(pollHandle);
+      pollHandle = null;
+    }
+  };
+  const publish = (
+    eventType: MonitorEventStreamEvent["eventType"]
+  ): void => {
+    sequence += 1;
+    lastEventAt = Date.now();
+    writeMonitorEvent(input.response, {
+      schemaVersion: MONITOR_EVENT_STREAM_SCHEMA_VERSION,
+      eventType,
+      sequence,
+      tenantKey: input.tenantKey,
+      workspaceKey: input.workspaceKey,
+      emittedAt: new Date(lastEventAt).toISOString(),
+      revision,
+      openRunCount
+    });
+  };
+
+  input.request.once("close", stop);
+  input.response.once("close", stop);
+  input.response.writeHead(200, {
+    ...securityHeaders,
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache, no-transform",
+    connection: "keep-alive",
+    "x-accel-buffering": "no"
+  });
+  input.response.flushHeaders();
+  input.response.write("retry: 3000\n\n");
+  publish("snapshot");
+
+  pollHandle = setInterval(() => {
+    if (closed || polling) {
+      return;
+    }
+    polling = true;
+    void (async () => {
+      await input.validateAccess?.();
+      return input.monitorRead.listOpenRuns({
+        tenantKey: input.tenantKey,
+        workspaceKey: input.workspaceKey,
+        limit: 500
+      });
+    })()
+      .then(items => {
+        if (closed) {
+          return;
+        }
+        const nextRevision = monitorOpenRunsRevision(items);
+        if (nextRevision !== revision) {
+          revision = nextRevision;
+          openRunCount = items.length;
+          publish("change");
+          return;
+        }
+        if (
+          Date.now() - lastEventAt >=
+          MONITOR_EVENT_STREAM_HEARTBEAT_INTERVAL_MS
+        ) {
+          publish("heartbeat");
+        }
+      })
+      .catch(() => {
+        stop();
+        if (!input.response.writableEnded) {
+          input.response.end();
+        }
+      })
+      .finally(() => {
+        polling = false;
+      });
+  }, MONITOR_EVENT_STREAM_POLL_INTERVAL_MS);
+  pollHandle.unref();
 };
 
 const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntime>>) =>
@@ -5792,6 +5926,55 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const monitorOpenRunsMatch = monitorOpenRunsPattern.exec(pathname);
+      const monitorEventStreamMatch = monitorEventStreamPattern.exec(pathname);
+      if (request.method === "GET" && monitorEventStreamMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          monitorEventStreamMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          monitorEventStreamMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_monitor_event_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        await streamMonitorEvents({
+          request,
+          response,
+          monitorRead: services.monitorRead,
+          tenantKey,
+          workspaceKey,
+          ...(runtime.config.operatorAuthRequired
+            ? {
+                validateAccess: async () => {
+                  const sessionToken = readBearerToken(request);
+                  if (!sessionToken) {
+                    throw new Error("Admin session is no longer available.");
+                  }
+                  const { roleAssignments } =
+                    await services.adminAuth.getCurrentSession({ sessionToken });
+                  if (
+                    !(await hasOperatorAccess(
+                      runtime.repository,
+                      roleAssignments,
+                      { kind: "workspace", tenantKey, workspaceKey }
+                    ))
+                  ) {
+                    throw new Error("Workspace monitor access was revoked.");
+                  }
+                }
+              }
+            : {})
+        });
+        return;
+      }
+
       if (request.method === "GET" && monitorOpenRunsMatch?.groups) {
         const tenantKey = decodeRouteGroup(monitorOpenRunsMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(monitorOpenRunsMatch.groups.workspaceKey);

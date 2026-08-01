@@ -4188,7 +4188,7 @@ try {
   stopAfter("participant-verona-player");
 
   logStep("nav-runtime");
-  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
   await page
@@ -4216,7 +4216,7 @@ try {
   await expectButtonSelectorDisabled("#refreshContentReadsButton");
   await expectButtonSelectorDisabled("#applyContentReadFiltersButton");
   await expectButtonSelectorDisabled("#useSelectedIdsAsContentReadFiltersButton");
-  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
   await fillAndCommit("#loginKey", "runtime-no-scope");
@@ -4247,7 +4247,7 @@ try {
   await page.locator("#tenantKey").waitFor();
   await fillAndCommit("#tenantKey", tenantKey);
   await fillAndCommit("#workspaceKey", workspaceKey);
-  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#loginKey").waitFor();
   await expectButtonSelectorEnabled("#runtimeParticipantSignInButton");
@@ -4271,6 +4271,47 @@ try {
   await expectButtonSelectorEnabled("#applyDetailedResponseFiltersButton");
   await expectButtonSelectorEnabled("#applyReviewFiltersButton");
   await expectButtonSelectorEnabled("#applyMonitorCommandHistoryFiltersButton");
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#monitorConnectionStatus")?.textContent?.trim() ===
+        "Live" &&
+      document
+        .querySelector("#monitorConnectionDetail")
+        ?.textContent?.includes("open run") &&
+      document.querySelector("#monitorConnectionLastEvent")?.textContent?.trim() !==
+        "waiting for first event",
+    undefined,
+    { timeout: 15_000 }
+  );
+  const aspectStateBeforeMonitorPush = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
+    payload =>
+      typeof payload?.currentRunState?.testRun?.testRunId === "string" &&
+      typeof payload?.currentRunState?.testRun?.currentUnitKey === "string"
+  );
+  const monitorEventBeforeExternalSave = await page
+    .locator("#monitorConnectionDetail")
+    .textContent();
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/test-runs/${aspectStateBeforeMonitorPush.currentRunState.testRun.testRunId}/save-progress`,
+    {
+      body: {
+        status: "running",
+        currentUnitKey:
+          aspectStateBeforeMonitorPush.currentRunState.testRun.currentUnitKey
+      }
+    }
+  );
+  await page.waitForFunction(
+    previousEvent => {
+      const detail = document
+        .querySelector("#monitorConnectionDetail")
+        ?.textContent?.trim();
+      return !!detail && detail !== previousEvent?.trim() && detail.includes("change #");
+    },
+    monitorEventBeforeExternalSave,
+    { timeout: 15_000 }
+  );
   stopAfter("runtime-scope-gating");
   logStep("generate-entry-links");
   const uploadedRosterText = [
@@ -5189,6 +5230,9 @@ try {
     transition: "paused -> running"
   });
   logStep("monitor-pause-run");
+  const monitorEventBeforePause = await page
+    .locator("#monitorConnectionDetail")
+    .textContent();
   await clickAction("Monitor Pause");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
@@ -5210,6 +5254,16 @@ try {
         .querySelector("#playerPreviewActions")
         ?.textContent?.includes("resume"),
     undefined,
+    { timeout: 15_000 }
+  );
+  await page.waitForFunction(
+    previousEvent => {
+      const detail = document
+        .querySelector("#monitorConnectionDetail")
+        ?.textContent?.trim();
+      return !!detail && detail !== previousEvent?.trim() && detail.includes("change #");
+    },
+    monitorEventBeforePause,
     { timeout: 15_000 }
   );
   await clickAction("Refresh Runtime Reads");

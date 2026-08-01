@@ -51,6 +51,9 @@ export function createShellLifecycleStateHost(args: {
     set runtimeLoaded(nextValue) {
       args.runtimeState.runtimeLoaded = nextValue;
     },
+    get monitorConnectionStatus() {
+      return args.runtimeState.monitorConnectionStatus;
+    },
     get diagnosticsLoaded() {
       return args.opsState.diagnosticsLoaded;
     },
