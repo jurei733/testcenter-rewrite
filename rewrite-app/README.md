@@ -41,7 +41,8 @@ one action, but require a newly assigned password because the source password
 is deliberately never exposed or copied. When either monitor role signs in,
 the Angular shell switches to a focused monitor console: workspace/content and
 platform-administration navigation disappear, runtime refreshes use only
-monitor-authorized reads, and the selected scope remains enforced by the API.
+monitor-authorized reads, direct client-side navigation to administrative views
+returns to Runtime, and the selected scope remains enforced by the API.
 
 ## Workspace Shape
 

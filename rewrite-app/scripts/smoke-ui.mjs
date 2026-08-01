@@ -5649,7 +5649,10 @@ try {
     "Group monitor diagnostics must not render admin user management."
   );
 
-  await page.locator('[data-view-nav="runtime"]').click();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/app/workspace");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#monitorOperatorConsole").waitFor();
   assert.equal(
