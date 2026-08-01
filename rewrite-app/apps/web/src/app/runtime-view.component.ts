@@ -36,6 +36,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="runtimeParticipantPassword" name="runtimeParticipantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
           </label>
           <label>
+            Participant Code
+            <input id="runtimeParticipantCode" name="runtimeParticipantCode" autocomplete="one-time-code" [(ngModel)]="view.runtime.participantCode" />
+          </label>
+          <label>
             Group Key
             <input id="groupKey" name="groupKey" [(ngModel)]="view.runtime.groupKey" (change)="view.persistState()" />
           </label>

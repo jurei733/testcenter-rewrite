@@ -4655,7 +4655,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           workspaceKey: body.workspaceKey ?? "",
           loginKey: body.loginKey ?? "",
           groupKey: body.groupKey,
-          password: body.password
+          password: body.password,
+          participantCode: body.participantCode
         });
         const testRun = await services.participantRuntime.resumeSession({
           participantSessionId: participantSession.participantSessionId,

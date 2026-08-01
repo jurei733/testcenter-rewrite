@@ -5905,14 +5905,25 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.equal(operationalLogin.body.error, "participant_login_invalid");
 
   const participantLogin = await requestJson<{
-    participantSession: { loginKey: string; groupKey: string };
+    participantSession: {
+      loginKey: string;
+      groupKey: string;
+      participantCode: string | null;
+    };
   }>("/api/v1/participant/auth/sign-in", {
     method: "POST",
-    body: { tenantKey, workspaceKey, loginKey: "test", password: "user123" }
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "test",
+      password: "user123",
+      participantCode: "xxx"
+    }
   });
   assert.equal(participantLogin.status, 200);
   assert.equal(participantLogin.body.participantSession.loginKey, "test");
   assert.equal(participantLogin.body.participantSession.groupKey, "sample_group");
+  assert.equal(participantLogin.body.participantSession.participantCode, "xxx");
 
   for (const expectation of corpus.invalidXml) {
     const fixtureText = readFileSync(
@@ -14286,6 +14297,152 @@ test("password-protected participant logins use a shared persistent login sink",
     });
     assert.equal(recoveredLogin.status, 200);
     assert.equal(recoveredLogin.body.participantSession.loginKey, "sink-protected");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("original Testcenter participant codes gate and scope reusable sessions", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false"
+  });
+
+  try {
+    const rosterImport = await requestJsonAt<{ updatedCount: number }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: [
+            "<Testtakers>",
+            "  <Group id=\"group:participant-code\">",
+            "    <Login mode=\"run-hot-return\" name=\"participant-code-user\" pw=\"participant-secret\">",
+            "      <Booklet codes=\"alpha\">booklet:demo</Booklet>",
+            "      <Booklet codes=\"beta\">booklet:other</Booklet>",
+            "      <Booklet>booklet:shared</Booklet>",
+            "    </Login>",
+            "  </Group>",
+            "</Testtakers>"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+
+    const missingPassword = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "participant-code-user"
+        }
+      }
+    );
+    assert.equal(missingPassword.status, 401);
+    assert.equal(missingPassword.body.error, "participant_password_invalid");
+
+    const missingCode = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "participant-code-user",
+          password: "participant-secret"
+        }
+      }
+    );
+    assert.equal(missingCode.status, 409);
+    assert.equal(missingCode.body.error, "participant_code_required");
+
+    const invalidCode = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "participant-code-user",
+          password: "participant-secret",
+          participantCode: "wrong"
+        }
+      }
+    );
+    assert.equal(invalidCode.status, 400);
+    assert.equal(invalidCode.body.error, "participant_code_invalid");
+
+    const signInWithCode = async (participantCode: string) =>
+      requestJsonAt<{
+        participantSession: {
+          participantSessionId: string;
+          participantCode: string | null;
+        };
+        participantRosterEntry: {
+          bookletAssignments: Array<{
+            bookletKey: string;
+            accessCodes?: string[];
+          }>;
+        } | null;
+        booklets: Array<{ sourceBookletKey: string }>;
+      }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "participant-code-user",
+          password: "participant-secret",
+          participantCode
+        }
+      });
+
+    const alpha = await signInWithCode("alpha");
+    assert.equal(alpha.status, 200);
+    assert.equal(alpha.body.participantSession.participantCode, "alpha");
+    assert.deepEqual(
+      alpha.body.booklets.map(booklet => booklet.sourceBookletKey),
+      ["booklet:demo"]
+    );
+    assert.deepEqual(
+      alpha.body.participantRosterEntry?.bookletAssignments.map(
+        assignment => assignment.bookletKey
+      ),
+      ["booklet:demo", "booklet:shared"]
+    );
+    assert.equal(
+      alpha.body.participantRosterEntry?.bookletAssignments.some(
+        assignment => "accessCodes" in assignment
+      ),
+      false
+    );
+
+    const alphaReentry = await signInWithCode("alpha");
+    assert.equal(
+      alphaReentry.body.participantSession.participantSessionId,
+      alpha.body.participantSession.participantSessionId
+    );
+
+    const beta = await signInWithCode("beta");
+    assert.equal(beta.status, 200);
+    assert.equal(beta.body.participantSession.participantCode, "beta");
+    assert.deepEqual(
+      beta.body.participantRosterEntry?.bookletAssignments.map(
+        assignment => assignment.bookletKey
+      ),
+      ["booklet:other", "booklet:shared"]
+    );
+    assert.notEqual(
+      beta.body.participantSession.participantSessionId,
+      alpha.body.participantSession.participantSessionId
+    );
   } finally {
     await closeServer(isolated.server);
   }

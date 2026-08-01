@@ -178,7 +178,8 @@ describe("parseParticipantRosterText", () => {
             {
               assignmentKey: "BOOKLET.SAMPLE-1",
               bookletKey: "BOOKLET.SAMPLE-1",
-              statePreset: {}
+              statePreset: {},
+              accessCodes: ["xxx", "yyy"]
             },
             {
               assignmentKey: "BOOKLET.SAMPLE-2",

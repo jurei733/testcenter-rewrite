@@ -66,6 +66,7 @@ export interface ShellRuntimeState {
   participantDisplayName: string;
   loginKey: string;
   participantPassword: string;
+  participantCode: string;
   groupKey: string;
   bookletKey: string;
   participantSessionStatusFilter: string;
@@ -269,6 +270,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     participantDisplayName: "",
     loginKey: "student-ui",
     participantPassword: "",
+    participantCode: "",
     groupKey: "group:student-ui",
     bookletKey: "",
     participantSessionStatusFilter: "",

@@ -65,6 +65,7 @@ export type ParsedParticipantRosterEntry = {
     assignmentKey: string;
     bookletKey: string;
     statePreset: Record<string, string>;
+    accessCodes?: string[];
   }>;
   displayName: string | null;
   password?: string | null;
@@ -397,6 +398,37 @@ const buildBookletAssignmentKey = (
     : bookletKey;
 };
 
+const mergeBookletAssignments = (
+  ...assignmentLists: Array<
+    NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]>
+  >
+): NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]> => {
+  const assignmentsByKey = new Map<
+    string,
+    NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]>[number]
+  >();
+  for (const assignment of assignmentLists.flat()) {
+    const existing = assignmentsByKey.get(assignment.assignmentKey);
+    const accessCodes = [
+      ...new Set(
+        [...(existing?.accessCodes ?? []), ...(assignment.accessCodes ?? [])]
+          .map(code => code.trim())
+          .filter(Boolean)
+      )
+    ];
+    assignmentsByKey.set(assignment.assignmentKey, {
+      ...(existing ?? assignment),
+      ...assignment,
+      statePreset: {
+        ...(existing?.statePreset ?? {}),
+        ...assignment.statePreset
+      },
+      ...(accessCodes.length > 0 ? { accessCodes } : {})
+    });
+  }
+  return Array.from(assignmentsByKey.values());
+};
+
 const readXmlBookletAssignments = (
   content: string
 ): NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]> => {
@@ -411,21 +443,26 @@ const readXmlBookletAssignments = (
     if (!bookletKey) {
       return [];
     }
+    const attributes = parseXmlAttributes(match[2] ?? "");
     const statePreset = parseBookletStatePreset(
-      readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "state", "states")
+      readXmlAttribute(attributes, "state", "states")
     );
+    const accessCodes = [
+      ...new Set(
+        (readXmlAttribute(attributes, "codes") ?? "")
+          .split(/\s+/)
+          .map(code => code.trim())
+          .filter(Boolean)
+      )
+    ];
     return [{
       assignmentKey: buildBookletAssignmentKey(bookletKey, statePreset),
       bookletKey,
-      statePreset
+      statePreset,
+      ...(accessCodes.length > 0 ? { accessCodes } : {})
     }];
   });
-  return assignments.filter(
-    (assignment, index) =>
-      assignments.findIndex(
-        candidate => candidate.assignmentKey === assignment.assignmentKey
-      ) === index
-  );
+  return mergeBookletAssignments(assignments);
 };
 
 const readXmlBookletStatePresets = (
@@ -480,14 +517,9 @@ const mergeParsedParticipantRosterEntries = (
       displayName: entry.displayName ?? existingEntry.displayName,
       ...((existingEntry.bookletAssignments || entry.bookletAssignments)
         ? {
-            bookletAssignments: [
-              ...(existingEntry.bookletAssignments ?? []),
-              ...(entry.bookletAssignments ?? [])
-            ].filter(
-              (assignment, index, assignments) =>
-                assignments.findIndex(
-                  candidate => candidate.assignmentKey === assignment.assignmentKey
-                ) === index
+            bookletAssignments: mergeBookletAssignments(
+              existingEntry.bookletAssignments ?? [],
+              entry.bookletAssignments ?? []
             )
           }
         : {}),
@@ -1654,6 +1686,7 @@ export type ParticipantSignInRequest = {
   loginKey: string;
   groupKey?: string;
   password?: string;
+  participantCode?: string;
 };
 
 export type PublicAdminUser = Omit<AdminUser, "passwordHash">;
@@ -1705,6 +1738,7 @@ export type ParticipantLaunchRequest = {
   groupKey?: string;
   bookletKey?: string;
   password?: string;
+  participantCode?: string;
 };
 
 export type ImportParticipantRosterRequest = {

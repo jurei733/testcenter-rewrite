@@ -189,6 +189,10 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        participantCode:
+          row.participant_code === null || row.participant_code === undefined
+            ? null
+            : String(row.participant_code),
         status: row.status as ParticipantSession["status"],
         validUntil:
           row.valid_until === null || row.valid_until === undefined
@@ -432,7 +436,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 18;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 19;
 
 const migrations: PostgresMigration[] = [
   {
@@ -775,6 +779,13 @@ const migrations: PostgresMigration[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_participant_login_attempts_expiry
         ON participant_login_attempts (expires_at);
+    `
+  },
+  {
+    version: 19,
+    name: "add_participant_code",
+    sql: `
+      ALTER TABLE participant_sessions ADD COLUMN IF NOT EXISTS participant_code TEXT;
     `
   }
 ];
@@ -1311,7 +1322,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -1320,7 +1331,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1330,14 +1341,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantSession(participantSession) {
       await pool.query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
           content_release_id = EXCLUDED.content_release_id,
           login_key = EXCLUDED.login_key,
           group_key = EXCLUDED.group_key,
+          participant_code = EXCLUDED.participant_code,
           status = EXCLUDED.status,
           valid_until = EXCLUDED.valid_until,
           created_at = EXCLUDED.created_at`,
@@ -1348,6 +1360,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.contentReleaseId,
           participantSession.loginKey,
           participantSession.groupKey,
+          participantSession.participantCode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
           participantSession.createdAt

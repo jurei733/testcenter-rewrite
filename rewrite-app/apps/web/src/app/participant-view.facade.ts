@@ -173,6 +173,7 @@ export class ParticipantViewFacade {
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  participantCodeRequired = false;
   veronaSaveStatus: "not_saved" | "saving" | "saved" | "save_failed" =
     "not_saved";
   testletUnlockCode = "";
@@ -360,9 +361,13 @@ export class ParticipantViewFacade {
       return {
         headline: hasParticipantSession
           ? "Session ready"
+          : this.participantCodeRequired
+            ? "Participant code required"
           : "Sign in to start",
         detail: hasParticipantSession
           ? "Resume the session to launch or continue the current run."
+          : this.participantCodeRequired
+            ? "Enter the second code assigned by the test supervisor, then sign in again."
           : "Enter your workspace and login key, then sign in.",
         displayNameLabel:
           this.runtime.participantDisplayName.trim() ||
@@ -784,7 +789,9 @@ export class ParticipantViewFacade {
 
   get canSignIn(): boolean {
     return Boolean(
-      this.workspace.workspaceKey.trim() && this.runtime.loginKey.trim()
+      this.workspace.workspaceKey.trim() &&
+      this.runtime.loginKey.trim() &&
+      (!this.participantCodeRequired || this.runtime.participantCode.trim())
     );
   }
 
@@ -810,6 +817,11 @@ export class ParticipantViewFacade {
     }
 
     this.viewState.onActionAsync(() => this.signInInternal());
+  }
+
+  resetParticipantCodeChallenge(): void {
+    this.participantCodeRequired = false;
+    this.runtime.participantCode = "";
   }
 
   refreshCurrentState(): void {
@@ -1037,18 +1049,27 @@ export class ParticipantViewFacade {
   }
 
   private async signInInternal(): Promise<void> {
-    const payload = await this.requestState.request<ParticipantSignInResponse>(
-      "Participant Sign In",
-      "POST",
-      productionApiRoutes.participant.signIn,
-      {
-        tenantKey: this.workspace.tenantKey.trim() || undefined,
-        workspaceKey: this.workspace.workspaceKey.trim(),
-        loginKey: this.runtime.loginKey.trim(),
-        groupKey: this.runtime.groupKey.trim() || undefined,
-        password: this.runtime.participantPassword || undefined
-      } satisfies ParticipantSignInRequest
-    );
+    let payload: ParticipantSignInResponse;
+    try {
+      payload = await this.requestState.request<ParticipantSignInResponse>(
+        "Participant Sign In",
+        "POST",
+        productionApiRoutes.participant.signIn,
+        {
+          tenantKey: this.workspace.tenantKey.trim() || undefined,
+          workspaceKey: this.workspace.workspaceKey.trim(),
+          loginKey: this.runtime.loginKey.trim(),
+          groupKey: this.runtime.groupKey.trim() || undefined,
+          password: this.runtime.participantPassword || undefined,
+          participantCode: this.runtime.participantCode.trim() || undefined
+        } satisfies ParticipantSignInRequest
+      );
+    } catch (error) {
+      if (this.handleParticipantCodeChallenge(error)) {
+        return;
+      }
+      throw error;
+    }
 
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
@@ -1056,6 +1077,8 @@ export class ParticipantViewFacade {
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
+    this.participantCodeRequired = false;
+    this.runtime.participantCode = "";
     this.runtime.currentRunStateView = prettyPrintJson(
       {
         status: "participant_signed_in",
@@ -1078,6 +1101,8 @@ export class ParticipantViewFacade {
     this.assignedBooklets = [];
     this.pendingVeronaSave = null;
     this.veronaSaveStatus = "not_saved";
+    this.participantCodeRequired = false;
+    this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
       !this.runtime.testRunId.trim()
@@ -1111,25 +1136,58 @@ export class ParticipantViewFacade {
     );
   }
 
-  private async starterLaunchInternal(): Promise<void> {
-    const payload = await this.requestState.request<ParticipantLaunchResponse>(
-      "Participant Starter Launch",
-      "POST",
-      productionApiRoutes.participant.launch,
+  private handleParticipantCodeChallenge(error: unknown): boolean {
+    if (!this.requestState.isApiError(error)) {
+      return false;
+    }
+    if (error.error === "participant_code_invalid") {
+      this.participantCodeRequired = true;
+      return false;
+    }
+    if (error.error !== "participant_code_required") {
+      return false;
+    }
+    this.participantCodeRequired = true;
+    this.runtime.currentRunStateView = prettyPrintJson(
       {
-        tenantKey: this.workspace.tenantKey.trim() || undefined,
-        workspaceKey: this.workspace.workspaceKey.trim(),
-        loginKey: this.runtime.loginKey.trim(),
-        groupKey: this.runtime.groupKey.trim() || undefined,
-        bookletKey: this.runtime.bookletKey.trim() || undefined,
-        password: this.runtime.participantPassword || undefined
-      } satisfies ParticipantLaunchRequest
+        status: "participant_code_required",
+        message: "Enter the second code assigned by the test supervisor."
+      },
+      this.runtime.currentRunStateView
     );
+    return true;
+  }
+
+  private async starterLaunchInternal(): Promise<void> {
+    let payload: ParticipantLaunchResponse;
+    try {
+      payload = await this.requestState.request<ParticipantLaunchResponse>(
+        "Participant Starter Launch",
+        "POST",
+        productionApiRoutes.participant.launch,
+        {
+          tenantKey: this.workspace.tenantKey.trim() || undefined,
+          workspaceKey: this.workspace.workspaceKey.trim(),
+          loginKey: this.runtime.loginKey.trim(),
+          groupKey: this.runtime.groupKey.trim() || undefined,
+          bookletKey: this.runtime.bookletKey.trim() || undefined,
+          password: this.runtime.participantPassword || undefined,
+          participantCode: this.runtime.participantCode.trim() || undefined
+        } satisfies ParticipantLaunchRequest
+      );
+    } catch (error) {
+      if (this.handleParticipantCodeChallenge(error)) {
+        return;
+      }
+      throw error;
+    }
 
     this.syncParticipantSessionFields(payload.participantSession);
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRun(payload.testRun);
     this.syncRuntimeBooklets(payload.booklets);
+    this.participantCodeRequired = false;
+    this.runtime.participantCode = "";
     this.runtime.runtimeMonitorView = prettyPrintJson(
       payload,
       this.runtime.runtimeMonitorView

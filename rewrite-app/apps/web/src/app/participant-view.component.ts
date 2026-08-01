@@ -95,11 +95,15 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </label>
           <label>
             Login Key
-            <input id="participantLoginKey" name="participantLoginKey" [(ngModel)]="view.runtime.loginKey" (change)="view.persistState()" />
+            <input id="participantLoginKey" name="participantLoginKey" [(ngModel)]="view.runtime.loginKey" (ngModelChange)="view.resetParticipantCodeChallenge()" (change)="view.persistState()" />
           </label>
           <label>
             Password
             <input id="participantPassword" name="participantPassword" type="password" autocomplete="current-password" [(ngModel)]="view.runtime.participantPassword" (change)="view.persistState()" />
+          </label>
+          <label *ngIf="view.participantCodeRequired">
+            Participant Code
+            <input id="participantCode" name="participantCode" autocomplete="one-time-code" [(ngModel)]="view.runtime.participantCode" />
           </label>
           <label>
             Group Key
@@ -154,6 +158,9 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </button>
           </div>
         </section>
+        <p id="participantCodePrompt" class="hint" *ngIf="view.participantCodeRequired">
+          This login requires the second code assigned by the test supervisor.
+        </p>
         <div class="actions">
           <button id="participantRouteSignInButton" class="secondary" type="button" [disabled]="!view.canSignIn" (click)="view.signIn()">
             Sign In

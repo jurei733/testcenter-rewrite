@@ -185,6 +185,7 @@ export type ParticipantBookletAssignment = {
   assignmentKey: string;
   bookletKey: string;
   statePreset: Record<string, string>;
+  accessCodes?: string[];
 };
 
 export type ParticipantRosterValidationWarning = {
@@ -480,6 +481,7 @@ export type ParticipantSession = {
   contentReleaseId: string;
   loginKey: string;
   groupKey: string;
+  participantCode?: string | null;
   status: ParticipantSessionStatus;
   validUntil?: string | null;
   createdAt: string;

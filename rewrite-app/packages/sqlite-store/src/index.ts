@@ -208,6 +208,10 @@ const mapParticipantSession = (
         contentReleaseId: String(row.content_release_id),
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
+        participantCode:
+          row.participant_code === null || row.participant_code === undefined
+            ? null
+            : String(row.participant_code),
         status: row.status as ParticipantSession["status"],
         validUntil:
           row.valid_until === null || row.valid_until === undefined
@@ -452,7 +456,7 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 24;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 25;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -838,6 +842,13 @@ const sqliteMigrations: SqliteMigration[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_participant_login_attempts_expiry
         ON participant_login_attempts (expires_at);
+    `
+  },
+  {
+    version: 25,
+    name: "add_participant_code",
+    sql: `
+      ALTER TABLE participant_sessions ADD COLUMN participant_code TEXT;
     `
   }
 ];
@@ -1436,7 +1447,7 @@ export const createSqliteFirstSliceRepository = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -1446,7 +1457,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1459,14 +1470,15 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, participant_code, status, valid_until, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
             content_release_id = excluded.content_release_id,
             login_key = excluded.login_key,
             group_key = excluded.group_key,
+            participant_code = excluded.participant_code,
             status = excluded.status,
             valid_until = excluded.valid_until,
             created_at = excluded.created_at`
@@ -1478,6 +1490,7 @@ export const createSqliteFirstSliceRepository = (
           participantSession.contentReleaseId,
           participantSession.loginKey,
           participantSession.groupKey,
+          participantSession.participantCode ?? null,
           participantSession.status,
           participantSession.validUntil ?? null,
           participantSession.createdAt

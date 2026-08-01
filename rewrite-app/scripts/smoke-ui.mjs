@@ -2016,6 +2016,78 @@ try {
   );
   stopAfter("participant-entry-protected-password");
 
+  logStep("participant-entry-second-code");
+  const codedParticipantLoginKey = "student-entry-coded";
+  const codedParticipantGroupKey = "group:participant-entry-coded";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "<Testtakers>",
+          `  <Group id="${codedParticipantGroupKey}">`,
+          `    <Login mode="run-hot-return" name="${codedParticipantLoginKey}">`,
+          "      <Booklet codes=\"alpha beta\">booklet:starter</Booklet>",
+          "    </Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  await page.locator("#participantRouteClearSessionButton").click();
+  await expectInputValue("#participantRouteSessionId", "");
+  await fillAndCommitUntilValue("#participantLoginKey", codedParticipantLoginKey);
+  await fillAndCommitUntilValue("#participantRouteGroupKey", codedParticipantGroupKey);
+  await fillAndCommitUntilValue("#participantPassword", "");
+  await page.locator("#participantRouteSignInButton").click();
+  await page.locator("#participantCodePrompt").waitFor({ timeout: 15_000 });
+  await page.locator("#participantCode").waitFor({ timeout: 15_000 });
+  await expectInputValue("#participantRouteSessionId", "");
+  await fillAndCommitUntilValue("#participantCode", "wrong");
+  await page.locator("#participantRouteSignInButton").click();
+  await page
+    .locator("#participantEntryIssueCode")
+    .filter({ hasText: "participant_code_invalid" })
+    .waitFor({ timeout: 15_000 });
+  await fillAndCommitUntilValue("#participantCode", "alpha");
+  await page.locator("#participantRouteSignInButton").click();
+  const codedParticipantSessionsPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-sessions`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.participantSession?.loginKey === codedParticipantLoginKey &&
+          item?.participantSession?.participantCode === "alpha"
+      )
+  );
+  const codedParticipantSessionId =
+    codedParticipantSessionsPayload.items.find(
+      item => item?.participantSession?.loginKey === codedParticipantLoginKey
+    )?.participantSession?.participantSessionId;
+  assert.ok(
+    codedParticipantSessionId,
+    "UI smoke expected the second participant code to create a scoped session."
+  );
+  await expectInputValue("#participantRouteSessionId", codedParticipantSessionId);
+  assert.equal(
+    await page.locator("#participantCode").count(),
+    0,
+    "Participant code input should close after a successful code challenge."
+  );
+  const persistedAfterParticipantCode = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+  );
+  assert.equal(
+    Object.hasOwn(persistedAfterParticipantCode, "participantCode"),
+    false,
+    "Participant codes should not be persisted in shell localStorage."
+  );
+  stopAfter("participant-entry-second-code");
+
   logStep("participant-entry-url");
   const participantRouteLoginKey = "student-participant-route";
   const participantRouteGroupKey = "group:participant-route-smoke";

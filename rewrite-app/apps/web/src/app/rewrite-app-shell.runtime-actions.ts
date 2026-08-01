@@ -57,6 +57,7 @@ export interface ShellRuntimeActionsHost {
   setParticipantRosterView(nextValue: string): void;
   getLoginKey(): string;
   getParticipantPassword(): string;
+  getParticipantCode(): string;
   getGroupKey(): string;
   getBookletKey(): string;
   getParticipantSessionId(): string;
@@ -161,7 +162,8 @@ export async function participantSignInAction(
       workspaceKey: host.getWorkspaceKey().trim(),
       loginKey: host.getLoginKey().trim(),
       groupKey: host.getGroupKey().trim() || undefined,
-      password: host.getParticipantPassword() || undefined
+      password: host.getParticipantPassword() || undefined,
+      participantCode: host.getParticipantCode().trim() || undefined
     } satisfies ParticipantSignInRequest
   );
   applyParticipantSignInResult(host.createRuntimePresentationHost(), payload);
@@ -199,7 +201,8 @@ export async function participantLaunchAction(
       loginKey: host.getLoginKey().trim(),
       groupKey: host.getGroupKey().trim() || undefined,
       bookletKey: host.getBookletKey().trim() || undefined,
-      password: host.getParticipantPassword() || undefined
+      password: host.getParticipantPassword() || undefined,
+      participantCode: host.getParticipantCode().trim() || undefined
     } satisfies ParticipantLaunchRequest
   );
   applyParticipantLaunchResult(host.createRuntimePresentationHost(), payload);

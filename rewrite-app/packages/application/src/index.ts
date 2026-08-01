@@ -423,6 +423,7 @@ export type ParticipantRuntimePort = {
     loginKey: string;
     groupKey?: string;
     password?: string;
+    participantCode?: string;
   }): Promise<ParticipantSession>;
   getRuntimeState(input: {
     participantSessionId: string;
@@ -1677,7 +1678,8 @@ const getParticipantRosterBookletKeys = (
 const getParticipantRosterBookletAssignments = (
   entry: ParticipantRosterEntry | null | undefined
 ): NonNullable<ParticipantRosterEntry["bookletAssignments"]> => {
-  const assignments = entry?.bookletAssignments?.length
+  const assignments: NonNullable<ParticipantRosterEntry["bookletAssignments"]> =
+    entry?.bookletAssignments?.length
     ? entry.bookletAssignments
     : getParticipantRosterBookletKeys(entry).map(bookletKey => {
         const statePreset = entry?.bookletStatePresets?.[bookletKey] ?? {};
@@ -1711,7 +1713,17 @@ const getParticipantRosterBookletAssignments = (
                   : [];
               }
             )
-          )
+          ),
+          ...(() => {
+            const accessCodes = [
+              ...new Set(
+                (assignment.accessCodes ?? [])
+                  .map(code => String(code ?? "").trim())
+                  .filter(Boolean)
+              )
+            ];
+            return accessCodes.length > 0 ? { accessCodes } : {};
+          })()
         }
       ];
     })
@@ -1723,13 +1735,68 @@ const getParticipantRosterBookletAssignments = (
     );
 };
 
+const participantRosterRequiresCode = (
+  entry: ParticipantRosterEntry | null | undefined
+): boolean =>
+  getParticipantRosterBookletAssignments(entry).some(
+    assignment => (assignment.accessCodes?.length ?? 0) > 0
+  );
+
+const getParticipantCodeBookletAssignments = (
+  entry: ParticipantRosterEntry | null | undefined,
+  participantCode: string | null | undefined
+): NonNullable<ParticipantRosterEntry["bookletAssignments"]> => {
+  const assignments = getParticipantRosterBookletAssignments(entry);
+  if (!assignments.some(assignment => (assignment.accessCodes?.length ?? 0) > 0)) {
+    return assignments;
+  }
+  const normalizedCode = String(participantCode ?? "").trim();
+  if (!normalizedCode) {
+    return [];
+  }
+  return assignments.filter(
+    assignment =>
+      !assignment.accessCodes?.length ||
+      assignment.accessCodes.includes(normalizedCode)
+  );
+};
+
+const sanitizeParticipantRosterEntryForSession = (
+  entry: ParticipantRosterEntry | null,
+  participantCode: string | null | undefined
+): ParticipantRosterEntry | null => {
+  if (!entry) {
+    return null;
+  }
+  const bookletAssignments = getParticipantCodeBookletAssignments(
+    entry,
+    participantCode
+  ).map(({ accessCodes: _accessCodes, ...assignment }) => assignment);
+  const bookletKeys = [
+    ...new Set(bookletAssignments.map(assignment => assignment.bookletKey))
+  ];
+  return {
+    ...entry,
+    bookletKey: bookletKeys[0] ?? null,
+    bookletKeys,
+    bookletAssignments,
+    bookletStatePresets: Object.fromEntries(
+      Object.entries(entry.bookletStatePresets ?? {}).filter(([bookletKey]) =>
+        bookletKeys.includes(bookletKey)
+      )
+    )
+  };
+};
+
 const buildParticipantRuntimeBooklets = (input: {
   contentRelease: ContentRelease;
   participantRosterEntry: ParticipantRosterEntry | null;
+  participantCode?: string | null;
   testRuns: TestRun[];
 }): ParticipantRuntimeBooklet[] => {
-  const assignedBooklets = getParticipantRosterBookletAssignments(
-    input.participantRosterEntry
+  const assignedBooklets = getParticipantCodeBookletAssignments(
+    input.participantRosterEntry,
+    input.participantCode
   );
   const releaseBooklets = new Map(
     input.contentRelease.runtimeSnapshot.bookletEntries.map(booklet => [
@@ -1795,6 +1862,7 @@ const resolveParticipantSessionStatusAfterCompletion = async (
   const hasAvailableBooklet = buildParticipantRuntimeBooklets({
     contentRelease,
     participantRosterEntry,
+    participantCode: participantSession.participantCode,
     testRuns: testRuns.map(normalizeTestRun)
   }).some(booklet => booklet.status === "available");
   return hasAvailableBooklet ? "signed_in" : "closed";
@@ -12480,19 +12548,15 @@ export const createFirstSliceServices = (
             workspace.tenantId,
             workspace.workspaceId
           );
-        const accessStartedAtByLoginKey = new Map<string, string>();
+        const accessStartedAtByLoginAndCode = new Map<string, string>();
         for (const participantSession of participantSessions) {
-          const currentStartedAt = accessStartedAtByLoginKey.get(
-            participantSession.loginKey
-          );
+          const accessKey = `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`;
+          const currentStartedAt = accessStartedAtByLoginAndCode.get(accessKey);
           if (
             !currentStartedAt ||
             participantSession.createdAt.localeCompare(currentStartedAt) < 0
           ) {
-            accessStartedAtByLoginKey.set(
-              participantSession.loginKey,
-              participantSession.createdAt
-            );
+            accessStartedAtByLoginAndCode.set(accessKey, participantSession.createdAt);
           }
         }
         for (const participantSession of participantSessions) {
@@ -12502,7 +12566,9 @@ export const createFirstSliceServices = (
           }
           const validUntil = resolveParticipantSessionValidUntil(
             rosterEntry,
-            accessStartedAtByLoginKey.get(participantSession.loginKey) ??
+            accessStartedAtByLoginAndCode.get(
+              `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`
+            ) ??
               participantSession.createdAt
           );
           if (validUntil !== participantSession.validUntil) {
@@ -13624,6 +13690,28 @@ export const createFirstSliceServices = (
             );
           }
         }
+        const participantCode = String(input.participantCode ?? "").trim();
+        const codeRequired = participantRosterRequiresCode(rosterEntry);
+        if (codeRequired && !participantCode) {
+          throw new FirstSliceError(
+            409,
+            "participant_code_required",
+            `Participant '${loginKey}' must enter the assigned participant code.`
+          );
+        }
+        if (
+          codeRequired &&
+          !getParticipantRosterBookletAssignments(rosterEntry).some(
+            assignment => assignment.accessCodes?.includes(participantCode)
+          )
+        ) {
+          throw new FirstSliceError(
+            400,
+            "participant_code_invalid",
+            "The participant code is invalid."
+          );
+        }
+        const effectiveParticipantCode = codeRequired ? participantCode : null;
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
@@ -13636,7 +13724,9 @@ export const createFirstSliceServices = (
         const loginSessions = workspaceParticipantSessions
           .filter(
             participantSession =>
-              participantSession.loginKey === loginKey
+              participantSession.loginKey === loginKey &&
+              (participantSession.participantCode ?? null) ===
+                effectiveParticipantCode
           )
           .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
         const accessStartedAt = loginSessions[0]?.createdAt ?? signInTimestamp;
@@ -13651,6 +13741,8 @@ export const createFirstSliceServices = (
             participantSession =>
               participantSession.loginKey === loginKey &&
               participantSession.groupKey === groupKey &&
+              (participantSession.participantCode ?? null) ===
+                effectiveParticipantCode &&
               participantSession.contentReleaseId ===
                 activeRelease.contentReleaseId &&
               participantSession.status !== "closed"
@@ -13669,6 +13761,7 @@ export const createFirstSliceServices = (
               loginKey: reusableSession.loginKey,
               groupKey: reusableSession.groupKey,
               contentReleaseId: reusableSession.contentReleaseId,
+              participantCodeRequired: codeRequired,
               rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry),
               reused: true
             }
@@ -13683,6 +13776,7 @@ export const createFirstSliceServices = (
           contentReleaseId: activeRelease.contentReleaseId,
           loginKey,
           groupKey,
+          participantCode: effectiveParticipantCode,
           status: "signed_in",
           validUntil,
           createdAt: signInTimestamp
@@ -13699,6 +13793,7 @@ export const createFirstSliceServices = (
             loginKey: participantSession.loginKey,
             groupKey: participantSession.groupKey,
             contentReleaseId: participantSession.contentReleaseId,
+            participantCodeRequired: codeRequired,
             rosterDefaultUsed: !requestedGroupKey && Boolean(rosterEntry)
           }
         });
@@ -13737,8 +13832,14 @@ export const createFirstSliceServices = (
         const booklets = buildParticipantRuntimeBooklets({
           contentRelease,
           participantRosterEntry,
+          participantCode: participantSession.participantCode,
           testRuns
         });
+        const publicParticipantRosterEntry =
+          sanitizeParticipantRosterEntryForSession(
+            participantRosterEntry,
+            participantSession.participantCode
+          );
         const hasAvailableBooklet = booklets.some(
           booklet => booklet.status === "available"
         );
@@ -13746,7 +13847,7 @@ export const createFirstSliceServices = (
         if (!latestTestRun) {
           return {
             participantSession,
-            participantRosterEntry,
+            participantRosterEntry: publicParticipantRosterEntry,
             scope,
             latestTestRun: null,
             booklets,
@@ -13758,7 +13859,7 @@ export const createFirstSliceServices = (
         if (latestTestRun.status === "completed") {
           return {
             participantSession,
-            participantRosterEntry,
+            participantRosterEntry: publicParticipantRosterEntry,
             scope,
             latestTestRun: normalizeTestRun(latestTestRun),
             booklets,
@@ -13769,7 +13870,7 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
-          participantRosterEntry,
+          participantRosterEntry: publicParticipantRosterEntry,
           scope,
           latestTestRun: normalizeTestRun(latestTestRun),
           booklets,
@@ -13851,7 +13952,10 @@ export const createFirstSliceServices = (
 
         return {
           participantSession,
-          participantRosterEntry,
+          participantRosterEntry: sanitizeParticipantRosterEntryForSession(
+            participantRosterEntry,
+            participantSession.participantCode
+          ),
           scope,
           testRun: currentTestRun,
           booklet: resolveRuntimeBooklet(contentRelease, currentTestRun.bookletKey),
@@ -13886,6 +13990,7 @@ export const createFirstSliceServices = (
           booklets: buildParticipantRuntimeBooklets({
             contentRelease,
             participantRosterEntry,
+            participantCode: participantSession.participantCode,
             testRuns
           }),
           navigation,
@@ -13969,7 +14074,14 @@ export const createFirstSliceServices = (
           participantSession.workspaceId,
           participantSession.loginKey
         );
-        const assignedBookletKeys = getParticipantRosterBookletKeys(rosterEntry);
+        const assignedBookletKeys = [
+          ...new Set(
+            getParticipantCodeBookletAssignments(
+              rosterEntry,
+              participantSession.participantCode
+            ).map(assignment => assignment.bookletKey)
+          )
+        ];
         const testRuns = (
           await repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
@@ -13978,6 +14090,7 @@ export const createFirstSliceServices = (
         const runtimeBooklets = buildParticipantRuntimeBooklets({
           contentRelease,
           participantRosterEntry: rosterEntry,
+          participantCode: participantSession.participantCode,
           testRuns
         });
         const selectedRuntimeBooklet = requestedBookletKey

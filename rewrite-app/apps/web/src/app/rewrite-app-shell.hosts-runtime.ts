@@ -78,6 +78,7 @@ export function createRuntimeActionsStateHost(args: {
     },
     getLoginKey: () => args.runtimeState.loginKey,
     getParticipantPassword: () => args.runtimeState.participantPassword,
+    getParticipantCode: () => args.runtimeState.participantCode,
     getGroupKey: () => args.runtimeState.groupKey,
     getBookletKey: () => args.runtimeState.bookletKey,
     getParticipantSessionId: () => args.runtimeState.participantSessionId,
