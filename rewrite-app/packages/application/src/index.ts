@@ -5577,6 +5577,72 @@ const isPositiveTestcenterXmlNumber = (value: string): boolean =>
     value.trim()
   ) && Number(value) > 0;
 
+const isTestcenterXmlInteger = (value: string): boolean =>
+  /^[+-]?\d+$/.test(value.trim());
+
+const isTestcenterXmlDateTime = (value: string): boolean => {
+  const match = value.trim().match(
+    /^(-?\d{4,})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)(?:(Z)|([+-])(\d{2}):(\d{2}))?$/
+  );
+  if (!match) {
+    return false;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const timezoneHour = Number(match[9] ?? 0);
+  const timezoneMinute = Number(match[10] ?? 0);
+  if (
+    year === 0 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    hour > 24 ||
+    minute > 59 ||
+    second >= 60 ||
+    timezoneHour > 14 ||
+    timezoneMinute > 59 ||
+    (timezoneHour === 14 && timezoneMinute !== 0) ||
+    (hour === 24 && (minute !== 0 || second !== 0))
+  ) {
+    return false;
+  }
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31
+  ];
+  return day <= daysInMonth[month - 1]!;
+};
+
+const parseTestcenterSchemaVersion = (
+  schemaLocation: string
+): { major: number; minor: number } | null => {
+  const match = schemaLocation.match(
+    /(?:^|\/)(\d+)\.(\d+)(?:\.\d+)?\/definitions\//i
+  );
+  if (!match) {
+    return null;
+  }
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2])
+  };
+};
+
 const validateUniqueTestcenterXmlValues = (
   values: Array<{ value: string; label: string }>,
   code: string,
@@ -5852,6 +5918,11 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   if (canonicalRootName === "Unit") {
+    const schemaVersion = parseTestcenterSchemaVersion(schemaLocation);
+    const usesPre15UnitSchema =
+      schemaVersion !== null && schemaVersion.major < 15;
+    const usesPre16UnitSchema =
+      schemaVersion !== null && schemaVersion.major < 16;
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -5877,6 +5948,501 @@ const validateTestcenterXmlSourceDocument = (
         createImportDiagnostic(
           "testcenter_xml_definition_invalid",
           `Original Testcenter unit '${sourceFileName}' requires exactly one Definition or DefinitionRef with a player attribute.`
+        )
+      );
+    }
+    const allowedUnitChildren = new Set([
+      "Metadata",
+      "Definition",
+      "DefinitionRef",
+      "CodingSchemeRef",
+      "Dependencies",
+      "BaseVariables",
+      "DerivedVariables"
+    ]);
+    if (!usesPre15UnitSchema) {
+      allowedUnitChildren.add("VariablesRef");
+    }
+    for (const child of xmlChildElements(root)) {
+      const childName = xmlElementLocalName(child);
+      if (!allowedUnitChildren.has(childName)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            childName === "VariablesRef"
+              ? "testcenter_xml_unit_child_version_invalid"
+              : "testcenter_xml_unit_child_invalid",
+            childName === "VariablesRef"
+              ? `Original Testcenter unit '${sourceFileName}' contains VariablesRef, which is not supported by schema ${schemaVersion?.major}.${schemaVersion?.minor}.`
+              : `Original Testcenter unit '${sourceFileName}' contains unsupported direct child '${childName}'.`
+          )
+        );
+      }
+    }
+    for (const childName of [
+      "Metadata",
+      "CodingSchemeRef",
+      "Dependencies",
+      "VariablesRef",
+      "BaseVariables",
+      "DerivedVariables"
+    ]) {
+      if (xmlChildrenNamed(root, childName).length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_child_cardinality_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains multiple ${childName} elements.`
+          )
+        );
+      }
+    }
+    const validateLastChange = (
+      element: XmlElement | undefined,
+      label: string
+    ): void => {
+      const lastChange = element?.getAttribute("lastChange");
+      if (lastChange !== null && lastChange !== undefined && !isTestcenterXmlDateTime(lastChange)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_last_change_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid ${label} lastChange '${lastChange}'.`
+          )
+        );
+      }
+    };
+    validateLastChange(metadata, "Metadata");
+    validateLastChange(definitions[0], xmlElementLocalName(definitions[0] ?? root));
+
+    const codingSchemeReference = xmlChildrenNamed(root, "CodingSchemeRef")[0];
+    if (codingSchemeReference) {
+      if (!codingSchemeReference.getAttribute("schemer")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_coding_scheme_schemer_missing",
+            `Original Testcenter unit '${sourceFileName}' requires CodingSchemeRef/@schemer.`
+          )
+        );
+      }
+      validateLastChange(codingSchemeReference, "CodingSchemeRef");
+    }
+    validateLastChange(xmlChildrenNamed(root, "VariablesRef")[0], "VariablesRef");
+
+    const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
+    for (const dependency of dependencies ? xmlChildElements(dependencies) : []) {
+      const dependencyName = xmlElementLocalName(dependency);
+      if (!["File", "file", "Service"].includes(dependencyName)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_dependency_element_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains unsupported dependency element '${dependencyName}'.`
+          )
+        );
+      }
+      const target = dependency.getAttribute("for");
+      if (
+        target !== null &&
+        !["player", "editor", "schemer", "coder"].includes(target.trim())
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_dependency_target_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid dependency target '${target}'.`
+          )
+        );
+      }
+    }
+
+    const variableContainers = [
+      ...xmlChildrenNamed(root, "BaseVariables"),
+      ...xmlChildrenNamed(root, "DerivedVariables")
+    ];
+    for (const container of variableContainers) {
+      for (const child of xmlChildElements(container)) {
+        if (xmlElementLocalName(child) !== "Variable") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_variable_container_child_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains unsupported ${xmlElementLocalName(container)} child '${xmlElementLocalName(child)}'.`
+            )
+          );
+        }
+      }
+    }
+    const variables = variableContainers.flatMap(container =>
+      xmlChildrenNamed(container, "Variable")
+    );
+    const variableTypes = new Set([
+      "string",
+      "integer",
+      "number",
+      "boolean",
+      "attachment"
+    ]);
+    if (!usesPre16UnitSchema) {
+      variableTypes.add("json");
+      variableTypes.add("no-value");
+    }
+    const maximumVariableIdLength = usesPre15UnitSchema ? 20 : 50;
+    for (const variable of variables) {
+      const variableId = variable.getAttribute("id") ?? "";
+      if (!variableId.trim() || variableId.length > maximumVariableIdLength) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_id_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains a Variable with an id outside the 1–${maximumVariableIdLength} character range for its schema.`
+          )
+        );
+      }
+      const variableType = variable.getAttribute("type")?.trim() ?? "";
+      if (!variableTypes.has(variableType)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_type_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid Variable type '${variableType || "missing"}' for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      const format = variable.getAttribute("format");
+      if (format !== null && !/^[a-z\d-]*$/.test(format)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_format_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid Variable format '${format}' for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      for (const booleanAttribute of ["multiple", "nullable"]) {
+        const value = variable.getAttribute(booleanAttribute);
+        if (value !== null && parseTestcenterXmlBoolean(value) === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_variable_boolean_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains invalid Variable ${booleanAttribute} value '${value}' for '${variableId || "unknown"}'.`
+            )
+          );
+        }
+      }
+      const page = variable.getAttribute("page");
+      if (page !== null && usesPre15UnitSchema) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_attribute_version_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains Variable/@page for '${variableId || "unknown"}', which is not supported by schema ${schemaVersion?.major}.${schemaVersion?.minor}.`
+          )
+        );
+      } else if (page !== null && !/^[0-9A-Za-z_]*$/.test(page)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_page_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid Variable page '${page}' for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      if (variable.getAttribute("alias") !== null && usesPre16UnitSchema) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_attribute_version_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains Variable/@alias for '${variableId || "unknown"}', which is not supported by schema ${schemaVersion?.major}.${schemaVersion?.minor}.`
+          )
+        );
+      }
+      const valuesElements = xmlChildrenNamed(variable, "Values");
+      const positionLabelElements = xmlChildrenNamed(
+        variable,
+        "ValuePositionLabels"
+      );
+      if (valuesElements.length > 1 || positionLabelElements.length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_children_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains repeated Variable value metadata for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      const variableChildren = xmlChildElements(variable);
+      const allowedVariableChildren = new Set(["Values"]);
+      if (!usesPre15UnitSchema) {
+        allowedVariableChildren.add("ValuePositionLabels");
+      }
+      let previousVariableChildRank = -1;
+      for (const child of variableChildren) {
+        const childName = xmlElementLocalName(child);
+        if (!allowedVariableChildren.has(childName)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              childName === "ValuePositionLabels"
+                ? "testcenter_xml_variable_child_version_invalid"
+                : "testcenter_xml_variable_child_invalid",
+              childName === "ValuePositionLabels"
+                ? `Original Testcenter unit '${sourceFileName}' contains ValuePositionLabels for '${variableId || "unknown"}', which is not supported by schema ${schemaVersion?.major}.${schemaVersion?.minor}.`
+                : `Original Testcenter unit '${sourceFileName}' contains unsupported Variable child '${childName}' for '${variableId || "unknown"}'.`
+            )
+          );
+          continue;
+        }
+        const rank = childName === "Values" ? 0 : 1;
+        if (rank < previousVariableChildRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_variable_children_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains Variable value metadata outside schema order for '${variableId || "unknown"}'.`
+            )
+          );
+          break;
+        }
+        previousVariableChildRank = rank;
+      }
+      const complete = valuesElements[0]?.getAttribute("complete");
+      if (complete !== null && complete !== undefined && parseTestcenterXmlBoolean(complete) === null) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_variable_values_complete_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains invalid Values/@complete '${complete}' for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      for (const values of valuesElements) {
+        const valueElements = xmlChildElements(values);
+        if (
+          valueElements.length === 0 ||
+          valueElements.some(value => xmlElementLocalName(value) !== "Value")
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_variable_value_structure_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains invalid Values children for '${variableId || "unknown"}'.`
+            )
+          );
+        }
+        for (const value of valueElements.filter(
+          item => xmlElementLocalName(item) === "Value"
+        )) {
+          const valueChildren = xmlChildElements(value).map(xmlElementLocalName);
+          if (
+            valueChildren.length !== 2 ||
+            valueChildren[0] !== "label" ||
+            valueChildren[1] !== "value"
+          ) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_variable_value_structure_invalid",
+                `Original Testcenter unit '${sourceFileName}' contains a Value without the required label/value sequence for '${variableId || "unknown"}'.`
+              )
+            );
+          }
+        }
+      }
+      for (const positionLabels of positionLabelElements) {
+        const labelChildren = xmlChildElements(positionLabels);
+        if (
+          labelChildren.length === 0 ||
+          labelChildren.some(
+            label => xmlElementLocalName(label) !== "ValuePositionLabel"
+          )
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_variable_value_structure_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains invalid ValuePositionLabels children for '${variableId || "unknown"}'.`
+            )
+          );
+        }
+      }
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        variables.map(variable => ({
+          value: variable.getAttribute("id") ?? "",
+          label: "variable id"
+        })),
+        "testcenter_xml_variable_id_duplicate",
+        sourceFileName
+      )
+    );
+  }
+
+  if (canonicalRootName === "SysCheck") {
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_id_missing",
+          `Original Testcenter system check '${sourceFileName}' requires Metadata/Id.`
+        )
+      );
+    }
+    if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Label")[0])) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_label_missing",
+          `Original Testcenter system check '${sourceFileName}' requires Metadata/Label.`
+        )
+      );
+    }
+    const directChildren = xmlChildElements(root);
+    for (const child of directChildren) {
+      const childName = xmlElementLocalName(child);
+      if (!["Metadata", "Config"].includes(childName)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_child_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains unsupported direct child '${childName}'.`
+          )
+        );
+      }
+    }
+    const configs = xmlChildrenNamed(root, "Config");
+    if (xmlChildrenNamed(root, "Metadata").length > 1 || configs.length > 1) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_syscheck_child_cardinality_invalid",
+          `Original Testcenter system check '${sourceFileName}' contains repeated Metadata or Config elements.`
+        )
+      );
+    }
+    const config = configs[0];
+    if (config) {
+      const skipNetwork = config.getAttribute("skipnetwork");
+      if (
+        skipNetwork !== null &&
+        parseTestcenterXmlBoolean(skipNetwork) === null
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_skip_network_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains invalid Config/@skipnetwork '${skipNetwork}'.`
+          )
+        );
+      }
+      const configChildren = xmlChildElements(config);
+      const configChildRanks = new Map([
+        ["UploadSpeed", 0],
+        ["DownloadSpeed", 1],
+        ["CustomText", 2],
+        ["Q", 3]
+      ]);
+      let previousRank = -1;
+      for (const child of configChildren) {
+        const childName = xmlElementLocalName(child);
+        const rank = configChildRanks.get(childName);
+        if (rank === undefined) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_config_child_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains unsupported Config child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        if (rank < previousRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_config_sequence_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains Config children outside schema order.`
+            )
+          );
+          break;
+        }
+        previousRank = rank;
+      }
+      for (const speedName of ["UploadSpeed", "DownloadSpeed"]) {
+        const speeds = xmlChildrenNamed(config, speedName);
+        if (speeds.length > 1) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_speed_cardinality_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains multiple ${speedName} elements.`
+            )
+          );
+        }
+        for (const speed of speeds) {
+          for (const attributeName of [
+            "min",
+            "good",
+            "maxDevianceBytesPerSecond",
+            "maxErrorsPerSequence",
+            "maxSequenceRepetitions"
+          ]) {
+            const value = speed.getAttribute(attributeName);
+            if (
+              (attributeName === "min" && value === null) ||
+              (value !== null && !isTestcenterXmlInteger(value))
+            ) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "testcenter_xml_syscheck_speed_integer_invalid",
+                  `Original Testcenter system check '${sourceFileName}' contains invalid ${speedName}/@${attributeName} '${value ?? "missing"}'.`
+                )
+              );
+            }
+          }
+        }
+      }
+      const questions = xmlChildrenNamed(config, "Q");
+      const questionTypes = new Set([
+        "string",
+        "select",
+        "header",
+        "check",
+        "text",
+        "radio"
+      ]);
+      for (const question of questions) {
+        const questionId = question.getAttribute("id")?.trim() ?? "";
+        if (!questionId) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_question_id_missing",
+              `Original Testcenter system check '${sourceFileName}' contains a question without an id.`
+            )
+          );
+        }
+        const questionType = question.getAttribute("type")?.trim() ?? "";
+        if (!questionTypes.has(questionType)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_question_type_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains invalid question type '${questionType || "missing"}' for '${questionId || "unknown"}'.`
+            )
+          );
+        }
+        const required = question.getAttribute("required");
+        if (required !== null && parseTestcenterXmlBoolean(required) === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_question_required_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains invalid question required value '${required}' for '${questionId || "unknown"}'.`
+            )
+          );
+        }
+      }
+      diagnostics.push(
+        ...validateUniqueTestcenterXmlValues(
+          questions.map(question => ({
+            value: question.getAttribute("id")?.trim() ?? "",
+            label: "question id"
+          })),
+          "testcenter_xml_syscheck_question_id_duplicate",
+          sourceFileName
+        )
+      );
+      const customTexts = xmlChildrenNamed(config, "CustomText");
+      for (const customText of customTexts) {
+        if (!customText.getAttribute("key")?.trim()) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_custom_text_key_missing",
+              `Original Testcenter system check '${sourceFileName}' contains CustomText without a key.`
+            )
+          );
+        }
+      }
+      diagnostics.push(
+        ...validateUniqueTestcenterXmlValues(
+          customTexts.map(customText => ({
+            value: customText.getAttribute("key")?.trim() ?? "",
+            label: "custom text key"
+          })),
+          "testcenter_xml_syscheck_custom_text_key_duplicate",
+          sourceFileName
         )
       );
     }

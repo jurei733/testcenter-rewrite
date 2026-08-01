@@ -6853,6 +6853,225 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
+  const validUnitXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "units/Unit2.xml"),
+    "utf8"
+  );
+  const validSystemCheckXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
+    "utf8"
+  );
+  const schemaFacetCases: Array<{
+    fileName: string;
+    sourceDocument: string;
+    diagnosticCode: string;
+  }> = [
+    {
+      fileName: "unit-duplicate-variable.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="derived_var" type="number"',
+        'id="var1" type="number"'
+      ),
+      diagnosticCode: "testcenter_xml_variable_id_duplicate"
+    },
+    {
+      fileName: "unit-invalid-variable-type.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        'id="var1" type="decimal"'
+      ),
+      diagnosticCode: "testcenter_xml_variable_type_invalid"
+    },
+    {
+      fileName: "unit-invalid-variable-boolean.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        'id="var1" type="string" multiple="yes"'
+      ),
+      diagnosticCode: "testcenter_xml_variable_boolean_invalid"
+    },
+    {
+      fileName: "unit-invalid-variable-format.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        'id="var1" type="string" format="Upper Case"'
+      ),
+      diagnosticCode: "testcenter_xml_variable_format_invalid"
+    },
+    {
+      fileName: "unit-missing-schemer.xml",
+      sourceDocument: validUnitXml.replace(
+        '    schemer="iqb-schemer@2.1"\n',
+        ""
+      ),
+      diagnosticCode: "testcenter_xml_coding_scheme_schemer_missing"
+    },
+    {
+      fileName: "unit-invalid-dependency-target.xml",
+      sourceDocument: validUnitXml.replace(
+        "  <BaseVariables>",
+        '  <Dependencies><File for="renderer">asset.bin</File></Dependencies>\n\n  <BaseVariables>'
+      ),
+      diagnosticCode: "testcenter_xml_dependency_target_invalid"
+    },
+    {
+      fileName: "unit-invalid-last-change.xml",
+      sourceDocument: validUnitXml.replace(
+        'lastChange="2024-10-02T09:30:00+00:00"',
+        'lastChange="2024-13-99T25:61:00"'
+      ),
+      diagnosticCode: "testcenter_xml_unit_last_change_invalid"
+    },
+    {
+      fileName: "unit-14-variable-id-too-long.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace('id="var1" type="string"', 'id="variable_identifier_x" type="string"'),
+      diagnosticCode: "testcenter_xml_variable_id_invalid"
+    },
+    {
+      fileName: "unit-15-new-variable-type.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/15.1.8/definitions/")
+        .replace('id="var1" type="string"', 'id="var1" type="json"'),
+      diagnosticCode: "testcenter_xml_variable_type_invalid"
+    },
+    {
+      fileName: "unit-14-variables-ref.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("  <BaseVariables>", "  <VariablesRef>variables.xml</VariablesRef>\n\n  <BaseVariables>"),
+      diagnosticCode: "testcenter_xml_unit_child_version_invalid"
+    },
+    {
+      fileName: "unit-14-page.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace('id="var1" type="string"', 'id="var1" type="string" page="p1"'),
+      diagnosticCode: "testcenter_xml_variable_attribute_version_invalid"
+    },
+    {
+      fileName: "unit-empty-values.xml",
+      sourceDocument: validUnitXml.replace(
+        '<Variable id="var1" type="string" />',
+        '<Variable id="var1" type="string"><Values /></Variable>'
+      ),
+      diagnosticCode: "testcenter_xml_variable_value_structure_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-boolean.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'skipnetwork="false"',
+        'skipnetwork="sometimes"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_skip_network_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-speed.xml",
+      sourceDocument: validSystemCheckXml.replace('min="1024"', 'min="1.5"'),
+      diagnosticCode: "testcenter_xml_syscheck_speed_integer_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-question-type.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'type="header"',
+        'type="rating"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_question_type_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-question-required.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'required="true"',
+        'required="yes"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_question_required_invalid"
+    },
+    {
+      fileName: "syscheck-duplicate-question.xml",
+      sourceDocument: validSystemCheckXml.replace('id="2"', 'id="1"'),
+      diagnosticCode: "testcenter_xml_syscheck_question_id_duplicate"
+    },
+    {
+      fileName: "syscheck-missing-custom-text-key.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        '    <Q id="1"',
+        '    <CustomText>Missing key</CustomText>\n    <Q id="1"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_custom_text_key_missing"
+    },
+    {
+      fileName: "syscheck-invalid-config-order.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        '    <Q id="2"',
+        '    <CustomText key="late_text">Late</CustomText>\n    <Q id="2"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_config_sequence_invalid"
+    }
+  ];
+  for (const facetCase of schemaFacetCases) {
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: facetCase.fileName,
+        mediaType: "application/xml",
+        sourceDocument: facetCase.sourceDocument
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.body.importJob.status, "failed", facetCase.fileName);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === facetCase.diagnosticCode
+      ),
+      facetCase.fileName
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+
+  const version16UnitPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unit-16-extended-variable.xml",
+      mediaType: "application/xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/16.0.0/definitions/")
+        .replace(
+          'id="var1" type="string"',
+          'id="var1" alias="legacy_var1" type="json"'
+        )
+    }
+  });
+  const version16UnitValidation = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: version16UnitPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(
+    version16UnitValidation.body.importJob.diagnostics.some(diagnostic =>
+      [
+        "testcenter_xml_variable_type_invalid",
+        "testcenter_xml_variable_attribute_version_invalid"
+      ].includes(diagnostic.code)
+    ),
+    false,
+    JSON.stringify(version16UnitValidation.body.importJob.diagnostics)
+  );
+
   const timedSystemBookletXml = readFileSync(
     resolve(
       originalTestcenterCorpusRoot,
