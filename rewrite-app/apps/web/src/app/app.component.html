@@ -33,16 +33,17 @@
   <ng-template #operatorShell>
     <section class="hero">
       <div class="hero-panel">
-        <span class="eyebrow">Rewrite App Frontend Start</span>
-        <h1>Operate The First Slice Without Leaving The Browser.</h1>
+        <span class="eyebrow">{{ app.isMonitorOnlySession ? app.operatorAccessLabel : "Rewrite App Frontend Start" }}</span>
+        <h1>{{ app.isMonitorOnlySession ? "Monitor The Active Test Session." : "Operate The First Slice Without Leaving The Browser." }}</h1>
         <p class="lead">
-          This Angular app now runs as routed frontend surface for workspace setup,
-          content intake, participant runtime, and operator diagnostics.
+          {{ app.isMonitorOnlySession
+            ? "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls."
+            : "This Angular app now runs as routed frontend surface for workspace setup, content intake, participant runtime, and operator diagnostics." }}
         </p>
         <section
           id="localDemoStartupCard"
           class="local-demo-startup"
-          *ngIf="app.localDemoBootstrapEnabled"
+          *ngIf="app.localDemoBootstrapEnabled && !app.isMonitorOnlySession"
         >
           <div>
             <span class="eyebrow">Local Demo Startup</span>

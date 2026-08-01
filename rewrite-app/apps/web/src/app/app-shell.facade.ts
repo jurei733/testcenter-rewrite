@@ -7,6 +7,7 @@ import { buildParticipantEntryUrl } from "./participant-session-links";
 import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import type { LiveContextSection } from "./live-context.component";
 
 const localDemoParticipantLink = buildParticipantEntryUrl(
@@ -24,6 +25,7 @@ const localDemoParticipantLink = buildParticipantEntryUrl(
 export class AppShellFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
 
   readonly renderVersion = this.uiState.renderVersion;
   readonly responseMeta = this.uiState.responseMeta;
@@ -36,7 +38,7 @@ export class AppShellFacade {
   readonly content = this.uiState.content;
   readonly runtime = this.uiState.runtime;
 
-  readonly views = [
+  private readonly adminViews = [
     { id: "workspace", label: "Workspace", link: "/workspace" },
     { id: "content", label: "Content", link: "/content" },
     { id: "runtime", label: "Runtime", link: "/runtime" },
@@ -44,6 +46,25 @@ export class AppShellFacade {
     { id: "system-check", label: "System Check", link: "/system-check" },
     { id: "ops", label: "Diagnostics", link: "/ops" }
   ] as const;
+
+  private readonly monitorViews = [
+    { id: "runtime", label: "Monitor", link: "/runtime" },
+    { id: "ops", label: "Access & Diagnostics", link: "/ops" }
+  ] as const;
+
+  get views(): ReadonlyArray<{ id: AppView; label: string; link: string }> {
+    return this.operatorAccess.isMonitorOnly
+      ? this.monitorViews
+      : this.adminViews;
+  }
+
+  get isMonitorOnlySession(): boolean {
+    return this.operatorAccess.isMonitorOnly;
+  }
+
+  get operatorAccessLabel(): string {
+    return this.operatorAccess.label;
+  }
 
   get activeView(): AppView {
     return this.uiState.activeView;
@@ -110,6 +131,38 @@ export class AppShellFacade {
   }
 
   get liveContextSections(): LiveContextSection[] {
+    if (this.operatorAccess.isMonitorOnly) {
+      return [
+        {
+          title: "Monitor Scope",
+          route: "/runtime",
+          items: [
+            { label: "Tenant", value: this.displayValue(this.workspace.tenantKey) },
+            {
+              label: "Workspace",
+              value: this.displayValue(this.workspace.workspaceKey)
+            },
+            { label: "Access", value: this.operatorAccess.label },
+            {
+              label: "Selected Run",
+              value: this.displayValue(this.runtime.testRunId)
+            }
+          ]
+        },
+        {
+          title: "Operator Session",
+          route: "/ops",
+          items: [
+            { label: "Operator", value: this.displayValue(this.ops.adminUsername) },
+            { label: "Role", value: this.operatorAccess.label },
+            {
+              label: "Session",
+              value: this.ops.adminSessionToken.trim() ? "signed in" : "not signed in"
+            }
+          ]
+        }
+      ];
+    }
     return [
       {
         title: "Workspace Scope",

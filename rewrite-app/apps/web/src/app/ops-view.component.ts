@@ -39,8 +39,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <article class="card">
-        <h2>Admin Access</h2>
-        <p>Bootstrap the first platform admin, sign in, and verify the active bearer session from the browser.</p>
+        <h2>Operator Access</h2>
+        <p>Sign in and verify the active bearer session. Administrative tools appear only for accounts with an admin role.</p>
         <div class="form-grid">
           <label>
             Admin Username
@@ -60,23 +60,25 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminBootstrapOrSignInButton" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-          <button id="adminBootstrapButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
+          <button id="adminBootstrapOrSignInButton" *ngIf="!view.isMonitorOnlySession" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
+          <button id="adminBootstrapButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
           <button id="adminSignInButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.signInAdmin()">Sign In</button>
           <button id="adminCurrentSessionButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSession()">Current Session</button>
-          <button id="adminSessionsButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
-          <button id="adminUsersButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminUsers()">Admin Users</button>
-          <button id="adminAuditEventsButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
+          <button id="adminSessionsButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
+          <button id="adminUsersButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminUsers()">Admin Users</button>
+          <button id="adminAuditEventsButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
           <button id="adminSignOutButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.signOutAdmin()">Sign Out</button>
         </div>
       </article>
 
       <app-record-collection
-        title="Admin Session"
-        subtitle="The currently known admin identity, role assignment, and session lifecycle."
+        title="Operator Session"
+        [subtitle]="'Active access: ' + view.operatorAccessLabel"
         [items]="view.adminSessionItems"
         emptyState="Bootstrap or sign in to inspect the admin session."
       ></app-record-collection>
+
+      <ng-container *ngIf="!view.isMonitorOnlySession">
 
       <article class="card">
         <h2>Admin Session Filters</h2>
@@ -347,6 +349,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p>Preview the filtered audit trail as CSV for platform handoff, incident review, or external archiving.</p>
         <pre id="adminAuditExportPreview">{{ view.ops.adminAuditExportView }}</pre>
       </article>
+      </ng-container>
 
       <article class="card">
         <h2>Operational Snapshot</h2>

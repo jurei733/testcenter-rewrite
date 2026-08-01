@@ -29,6 +29,7 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppOpsService } from "./rewrite-app-ops.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 
 type RuntimeMetricsPayload = {
   runtime: {
@@ -106,6 +107,7 @@ export class OpsViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
 
   readonly ops = this.uiState.ops;
   readonly adminRoleOptions: AdminRole[] = [
@@ -125,6 +127,14 @@ export class OpsViewFacade {
 
   init(): void {
     this.viewState.setActiveView("ops");
+  }
+
+  get isMonitorOnlySession(): boolean {
+    return this.operatorAccess.isMonitorOnly;
+  }
+
+  get operatorAccessLabel(): string {
+    return this.operatorAccess.label;
   }
 
   get canUseAdminCredentials(): boolean {

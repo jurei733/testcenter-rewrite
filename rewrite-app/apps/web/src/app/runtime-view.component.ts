@@ -54,6 +54,52 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article id="monitorOperatorConsole" class="card" *ngIf="view.isMonitorOnlySession">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Scoped operator console</span>
+            <h2>{{ view.operatorAccessLabel }}</h2>
+          </div>
+          <span class="status-pill">Server-enforced scope</span>
+        </div>
+        <p>Choose the assigned study scope, refresh its live runs, then select a run below before issuing a command. Group monitors see only their assigned groups even if a broader filter is entered.</p>
+        <div class="form-grid">
+          <label>
+            Tenant Key
+            <input id="monitorTenantKey" name="monitorTenantKey" [(ngModel)]="view.workspace.tenantKey" />
+          </label>
+          <label>
+            Workspace Key
+            <input id="monitorWorkspaceKey" name="monitorWorkspaceKey" [(ngModel)]="view.workspace.workspaceKey" />
+          </label>
+          <label>
+            Selected Test Run
+            <input id="monitorSelectedTestRunId" name="monitorSelectedTestRunId" readonly [value]="view.runtime.testRunId || 'Select an open run below'" />
+          </label>
+          <label>
+            Target Unit
+            <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.currentUnitKey" (change)="view.persistState()" />
+          </label>
+          <label>
+            Timer Seconds
+            <input id="monitorConsoleTimeSeconds" name="monitorConsoleTimeSeconds" type="number" min="1" max="86400" step="1" [(ngModel)]="view.runtime.monitorTimeSeconds" (change)="view.persistState()" />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
+          <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
+          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Pause</button>
+          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Resume</button>
+          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canSaveProgressActions" (click)="view.issueMonitorGoto()">Go To Unit</button>
+          <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
+          <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
+          <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
+          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Complete</button>
+        </div>
+      </article>
+
+      <ng-container *ngIf="!view.isMonitorOnlySession">
+
       <article class="card">
         <h2>Participant Runtime</h2>
         <div class="form-grid">
@@ -612,6 +658,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         (itemAction)="view.selectTestRun($event)"
         emptyState="No current run state loaded yet."
       ></app-record-collection>
+      </ng-container>
 
       <article class="card">
         <h2>Open Run Filters</h2>
@@ -690,6 +737,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="No open runs are currently loaded."
       ></app-record-collection>
 
+      <ng-container *ngIf="!view.isMonitorOnlySession">
+
       <article class="card">
         <h2>Monitor Command History Filters</h2>
         <p>Narrow persisted operator command acknowledgements by test run and result window.</p>
@@ -733,6 +782,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Response CSV Export" subtitle="Workspace Responses" viewId="responseExportView" [content]="view.runtime.responseExportView"></app-json-panel>
       <app-json-panel title="Review CSV Export" subtitle="Workspace Reviews" viewId="reviewExportView" [content]="view.runtime.reviewExportView"></app-json-panel>
       <app-json-panel title="Runtime And Monitor" subtitle="Live Session State" viewId="runtimeMonitorView" [content]="view.runtime.runtimeMonitorView"></app-json-panel>
+      </ng-container>
+      <app-json-panel *ngIf="view.isMonitorOnlySession" title="Scoped Open Runs" subtitle="Monitor Read Model" viewId="openRunsView" [content]="view.runtime.openRunsView"></app-json-panel>
     </div>
   `
 })

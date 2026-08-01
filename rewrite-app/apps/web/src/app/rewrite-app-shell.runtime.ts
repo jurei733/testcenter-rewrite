@@ -177,7 +177,8 @@ export function applyCompleteRunResult(
 export function applyRuntimeReadsWithoutSession(
   host: RuntimePresentationHost,
   openRuns: MonitorOpenRunsResponse,
-  quiet: boolean
+  quiet: boolean,
+  options: { monitorOnly?: boolean } = {}
 ): void {
   const openRunCount = openRuns.items.length;
   host.setOpenRunsView(prettyPrintJson(openRuns, host.getOpenRunsView()));
@@ -190,8 +191,12 @@ export function applyRuntimeReadsWithoutSession(
   host.setRuntimeStateView(
     prettyPrintJson(
     {
-      status: "participant_session_required",
-      message: "Sign in a participant or enter a session id to hydrate runtime reads."
+      status: options.monitorOnly
+        ? "monitor_scope_loaded"
+        : "participant_session_required",
+      message: options.monitorOnly
+        ? "The monitor console intentionally loads only scoped open-run data."
+        : "Sign in a participant or enter a session id to hydrate runtime reads."
     },
     host.getRuntimeStateView()
     )
@@ -199,8 +204,12 @@ export function applyRuntimeReadsWithoutSession(
   host.setCurrentRunStateView(
     prettyPrintJson(
     {
-      status: "participant_session_required",
-      message: "Current run state appears after a participant session is available."
+      status: options.monitorOnly
+        ? "select_open_run"
+        : "participant_session_required",
+      message: options.monitorOnly
+        ? "Select an open run to prepare monitor commands."
+        : "Current run state appears after a participant session is available."
     },
     host.getCurrentRunStateView()
     )
@@ -208,10 +217,14 @@ export function applyRuntimeReadsWithoutSession(
   host.setRuntimeLoaded(true);
   if (!quiet) {
     host.rememberActivity(
-      "Runtime Refresh",
-      openRunCount === 0
-        ? "Monitor is clear; sign in a participant to load runtime state."
-        : `Monitor sees ${openRunCount} open run(s); sign in a participant to inspect session state.`
+      options.monitorOnly ? "Monitor Scope Refreshed" : "Runtime Refresh",
+      options.monitorOnly
+        ? openRunCount === 0
+          ? "No open runs are visible in the assigned monitor scope."
+          : `${openRunCount} open run(s) are visible in the assigned monitor scope.`
+        : openRunCount === 0
+          ? "Monitor is clear; sign in a participant to load runtime state."
+          : `Monitor sees ${openRunCount} open run(s); sign in a participant to inspect session state.`
     );
   }
 }

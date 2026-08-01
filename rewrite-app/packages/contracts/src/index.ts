@@ -1966,6 +1966,33 @@ export type PublicAdminSession = Omit<AdminSession, "token">;
 
 export type PublicAdminRoleAssignment = AdminRoleAssignment;
 
+export type OperatorAccessMode =
+  | "admin"
+  | "study_monitor"
+  | "group_monitor"
+  | "unassigned";
+
+export const resolveOperatorAccessMode = (
+  roleAssignments: ReadonlyArray<Pick<AdminRoleAssignment, "role">>
+): OperatorAccessMode => {
+  if (
+    roleAssignments.some(({ role }) =>
+      role === "platform_admin" ||
+      role === "tenant_admin" ||
+      role === "workspace_admin"
+    )
+  ) {
+    return "admin";
+  }
+  if (roleAssignments.some(({ role }) => role === "study_monitor")) {
+    return "study_monitor";
+  }
+  if (roleAssignments.some(({ role }) => role === "group_monitor")) {
+    return "group_monitor";
+  }
+  return "unassigned";
+};
+
 export type BootstrapAdminUserRequest = {
   username: string;
   displayName?: string;

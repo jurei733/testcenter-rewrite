@@ -95,16 +95,41 @@ export async function exportOpenRunsCsvAction(
 export async function refreshRuntimeReadsAction(
   host: ShellRuntimeReadsHost,
   participantSessionId: string,
-  quiet = false
+  quiet = false,
+  options: { monitorOnly?: boolean } = {}
 ): Promise<void> {
+  const openRunsRequest = host.request<MonitorOpenRunsResponse>(
+    "Monitor Open Runs",
+    "GET",
+    host.getOpenRunsPath(),
+    undefined,
+    { quiet }
+  );
+
+  if (options.monitorOnly) {
+    const openRuns = await openRunsRequest;
+    host.setMonitorCommandHistoryView(
+      JSON.stringify(
+        {
+          status: "monitor_scope_only",
+          message:
+            "Workspace-wide command history is hidden for scoped monitor sessions."
+        },
+        null,
+        2
+      )
+    );
+    applyRuntimeReadsWithoutSession(
+      host.createRuntimePresentationHost(),
+      openRuns,
+      quiet,
+      { monitorOnly: true }
+    );
+    return;
+  }
+
   const [openRuns, monitorCommandHistory] = await Promise.all([
-    host.request<MonitorOpenRunsResponse>(
-      "Monitor Open Runs",
-      "GET",
-      host.getOpenRunsPath(),
-      undefined,
-      { quiet }
-    ),
+    openRunsRequest,
     host.request<ListWorkspaceActivityEventsResponse>(
       "Monitor Command History",
       "GET",

@@ -792,7 +792,7 @@ try {
   await page
     .locator("article.card")
     .filter({
-      has: page.getByRole("heading", { name: "Admin Session", exact: true })
+      has: page.getByRole("heading", { name: "Operator Session", exact: true })
     })
     .filter({ hasText: "platform_admin" })
     .waitFor();
@@ -4638,17 +4638,27 @@ try {
     .filter({ hasText: participantEntryUrlPrefix })
     .filter({ hasText: '"Ada Entry"' })
     .waitFor();
+  const generatedEntryLinksCsv =
+    (await page.locator("#entryLinksCsvPreview").textContent()) ?? "";
+  const generatedEntryLinkCount = Math.max(
+    generatedEntryLinksCsv.split(/\r?\n/).filter(Boolean).length - 1,
+    0
+  );
+  assert.ok(
+    generatedEntryLinkCount >= 11,
+    "UI smoke expected all previously imported participant roster entries to produce links."
+  );
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "11" })
+    .filter({ hasText: String(generatedEntryLinkCount) })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "11" })
+    .filter({ hasText: String(generatedEntryLinkCount) })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
@@ -5498,7 +5508,7 @@ try {
     .filter({ hasText: "Timer Remaining" })
     .filter({ hasText: "Timer Expires" })
     .waitFor();
-  assert.match(await openRunStudentCard.innerText(), /Timer Remaining\s+\d+:\d{2}/);
+  assert.match(await openRunStudentCard.innerText(), /Timer Remaining\s+\d+:\d{2}/i);
   logStep("monitor-bulk-pause-resume");
   await openRunStudentCard
     .getByRole("button", { name: "Add to Batch" })
@@ -5585,6 +5595,106 @@ try {
   await expectInputValue("#openRunUnitFilter", "unit-paused");
   await expectInputValue("#openRunStatusFilter", "");
   stopAfter("open-run-select-sync");
+
+  logStep("group-monitor-console");
+  const groupMonitorUsername = `ui-group-monitor-${Date.now()}`;
+  const groupMonitorPassword = "ui-group-monitor-secret";
+  const createGroupMonitorResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/admin/users`,
+    {
+      body: {
+        username: groupMonitorUsername,
+        displayName: "UI Group Monitor",
+        password: groupMonitorPassword,
+        roleAssignments: [
+          {
+            role: "group_monitor",
+            tenantKey,
+            workspaceKey,
+            groupKey: participantGroupKey
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(createGroupMonitorResponse.status, 201);
+
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommit("#adminUsername", groupMonitorUsername);
+  await fillAndCommit("#adminPassword", groupMonitorPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Operator Session" }) })
+    .filter({ hasText: "group_monitor" })
+    .filter({ hasText: "Active access: Group monitor" })
+    .waitFor();
+  assert.equal(
+    await page.locator('[data-view-nav="workspace"]').count(),
+    0,
+    "Group monitor navigation must not expose workspace administration."
+  );
+  assert.equal(
+    await page.locator('[data-view-nav="content"]').count(),
+    0,
+    "Group monitor navigation must not expose content administration."
+  );
+  assert.equal(
+    await page.getByRole("heading", { name: "Admin User Management" }).count(),
+    0,
+    "Group monitor diagnostics must not render admin user management."
+  );
+
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await page.locator("#monitorOperatorConsole").waitFor();
+  assert.equal(
+    await page.locator("#loginKey").count(),
+    0,
+    "Group monitor runtime must not render participant-management controls."
+  );
+  await fillAndCommit("#monitorTenantKey", tenantKey);
+  await fillAndCommit("#monitorWorkspaceKey", workspaceKey);
+  await clickAction("Clear Open Run Filters");
+  await page.locator("#monitorApplyScopeButton").click();
+  const scopedOpenRuns = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Open Monitor Runs" }) });
+  await scopedOpenRuns
+    .filter({ hasText: participantLoginKey })
+    .filter({ hasText: participantGroupKey })
+    .waitFor();
+  assert.equal(
+    await scopedOpenRuns.filter({ hasText: "entry-student-a" }).count(),
+    0,
+    "Group monitor open runs must not include participants from other groups."
+  );
+  await scopedOpenRuns
+    .getByRole("button", { name: "Select + Sync" })
+    .first()
+    .click();
+  await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
+  await expectButtonSelectorEnabled("#monitorConsoleResumeButton");
+  await page.waitForFunction(
+    () => !document.querySelector(".status-banner.is-error"),
+    undefined,
+    { timeout: 10_000 }
+  );
+  stopAfter("group-monitor-console");
+
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
+  await clickAction("Sign Out");
+  await fillAndCommit("#adminUsername", adminUsername);
+  await fillAndCommit("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+
   logStep("filter-open-runs");
   await fillAndCommit("#openRunLoginFilter", participantLoginKey);
   await fillAndCommit("#openRunGroupFilter", participantGroupKey);

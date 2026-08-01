@@ -35,6 +35,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import {
   buildParticipantEntryUrl,
   participantSessionLinkRows
@@ -72,11 +73,21 @@ export class RuntimeViewFacade {
   private readonly router = inject(Router);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly monitorBatchSelection = new Set<string>();
 
   readonly runtime = this.uiState.runtime;
+  readonly workspace = this.uiState.workspace;
   readonly participantSessionStatusOptions = participantSessionStatuses;
   readonly testRunStatusOptions = testRunStatuses;
+
+  get isMonitorOnlySession(): boolean {
+    return this.operatorAccess.isMonitorOnly;
+  }
+
+  get operatorAccessLabel(): string {
+    return this.operatorAccess.label;
+  }
 
   get monitorConnectionLabel(): string {
     switch (this.runtime.monitorConnectionStatus) {
@@ -2315,6 +2326,15 @@ export class RuntimeViewFacade {
 
   reconnectMonitorEventStream(): void {
     this.viewState.reconnectMonitorEventStream();
+  }
+
+  applyMonitorScope(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.persistState();
+    this.reconnectMonitorEventStream();
+    this.refreshRuntimeReads();
   }
 
   get canUseParticipantLoginActions(): boolean {

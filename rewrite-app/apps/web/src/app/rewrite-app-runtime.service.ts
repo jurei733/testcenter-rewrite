@@ -43,6 +43,7 @@ import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppRuntimeService {
@@ -52,6 +53,7 @@ export class RewriteAppRuntimeService {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly contentService = inject(RewriteAppContentService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
 
   private readonly runtimeState = this.uiState.runtime;
 
@@ -170,7 +172,8 @@ export class RewriteAppRuntimeService {
     await refreshRuntimeReadsAction(
       this.hosts.createRuntimeReadsHost(),
       this.getParticipantSessionId(),
-      quiet
+      quiet,
+      { monitorOnly: this.operatorAccess.isMonitorOnly }
     );
   }
 
@@ -426,6 +429,10 @@ export class RewriteAppRuntimeService {
   }
 
   private async refreshCrossViewStateAfterRuntimeChange(): Promise<void> {
+    if (this.operatorAccess.isMonitorOnly) {
+      await this.refreshRuntimeReads(true);
+      return;
+    }
     await Promise.all([
       this.workspaceService.refreshWorkspaceOverview(true),
       this.contentService.refreshContentReads(true),
