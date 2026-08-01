@@ -2758,6 +2758,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       readJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
     const readOptionalRequestJsonBody = <T>(): Promise<T | null> =>
       readOptionalJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
+    const userAgentHeader = request.headers["user-agent"];
+    const requestUserAgent = Array.isArray(userAgentHeader)
+      ? userAgentHeader[0] ?? null
+      : userAgentHeader ?? null;
 
     try {
       if (request.method === "GET" && isParticipantEntryPath(pathname)) {
@@ -4622,7 +4626,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           category: body.category,
           categories: body.categories,
           priority: body.priority,
-          comment: body.comment
+          comment: body.comment,
+          userAgent: requestUserAgent
         });
         sendJson<ReviewResponse>(response, 201, { item });
         return;
@@ -5655,7 +5660,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           category: body.category,
           categories: body.categories,
           priority: body.priority,
-          comment: body.comment
+          comment: body.comment,
+          userAgent: requestUserAgent
         });
         sendJson<ParticipantReviewResponse>(response, 201, { review });
         return;

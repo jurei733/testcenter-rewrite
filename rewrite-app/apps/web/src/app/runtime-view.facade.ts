@@ -1332,6 +1332,8 @@ export class RuntimeViewFacade {
             label: "Task / Page",
             value: review.pageLabel ?? (review.page === null ? "none" : String(review.page))
           },
+          { label: "Original Unit", value: review.originalUnitId ?? "none" },
+          { label: "Browser", value: review.userAgent ?? "unavailable" },
           {
             label: "Participant",
             value:
@@ -1424,6 +1426,14 @@ export class RuntimeViewFacade {
               value:
                 item.review.pageLabel ??
                 (item.review.page === null ? "none" : String(item.review.page))
+            },
+            {
+              label: "Original Unit",
+              value: item.review.originalUnitId ?? "none"
+            },
+            {
+              label: "Browser",
+              value: item.review.userAgent ?? "unavailable"
             },
             {
               label: "Comment",

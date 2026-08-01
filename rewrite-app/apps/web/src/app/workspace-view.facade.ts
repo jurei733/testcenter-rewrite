@@ -1746,6 +1746,8 @@ export class WorkspaceViewFacade {
               label: "Task / Page",
               value: review.pageLabel ?? (review.page == null ? "none" : String(review.page))
             },
+            { label: "Original Unit", value: review.originalUnitId ?? "none" },
+            { label: "Browser", value: review.userAgent ?? "unavailable" },
             { label: "Priority", value: String(review.priority) },
             {
               label: "Categories",

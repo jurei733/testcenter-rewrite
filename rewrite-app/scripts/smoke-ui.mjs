@@ -2335,6 +2335,8 @@ try {
     .locator(".participant-review-item")
     .filter({ hasText: "Participant review comment from browser smoke" })
     .filter({ hasText: "unit-1" })
+    .filter({ hasText: "Original unit unit-1" })
+    .filter({ hasText: "Browser" })
     .waitFor();
   const participantReviewPayload = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/test-runs/${participantReviewRunId}/reviews`,
@@ -2345,6 +2347,9 @@ try {
       payload.items.some(
         item =>
           item?.comment === "Participant review comment from browser smoke" &&
+          item?.originalUnitId === "unit-1" &&
+          typeof item?.userAgent === "string" &&
+          item.userAgent.length > 0 &&
           item?.priority === 1 &&
           item?.pageLabel === "Browser smoke task" &&
           Array.isArray(item?.categories) &&
@@ -2377,6 +2382,9 @@ try {
         item =>
           item?.reviewId === participantReviewId &&
           item?.unitKey === null &&
+          item?.originalUnitId === "unit-1" &&
+          typeof item?.userAgent === "string" &&
+          item.userAgent.length > 0 &&
           item?.page === null &&
           item?.pageLabel === null &&
           item?.priority === 1 &&

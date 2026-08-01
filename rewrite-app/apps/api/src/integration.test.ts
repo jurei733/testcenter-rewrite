@@ -3087,6 +3087,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           category: string;
           comment: string;
           unitKey: string | null;
+          originalUnitId: string | null;
+          userAgent: string | null;
         };
       };
     }>(
@@ -3095,7 +3097,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       {
         method: "POST",
         headers: {
-          authorization: `Bearer ${signIn.body.sessionToken}`
+          authorization: `Bearer ${signIn.body.sessionToken}`,
+          "user-agent": "integration-review-agent/1.0"
         },
         body: {
           participantSessionId:
@@ -3112,6 +3115,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(createdReview.status, 201);
     assert.equal(createdReview.body.item.review.reviewerId, "integration-reviewer");
     assert.equal(createdReview.body.item.review.unitKey, "unit-intro");
+    assert.equal(createdReview.body.item.review.originalUnitId, "unit-intro");
+    assert.equal(
+      createdReview.body.item.review.userAgent,
+      "integration-review-agent/1.0"
+    );
 
     const unknownUnitReview = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -3159,6 +3167,8 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           reviewId: string;
           category: string;
           comment: string;
+          originalUnitId: string | null;
+          userAgent: string | null;
         };
       };
     }>(
@@ -3179,6 +3189,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(updatedReview.status, 200);
     assert.equal(updatedReview.body.item.review.category, "final-check");
     assert.equal(updatedReview.body.item.review.comment, "Updated integration review");
+    assert.equal(updatedReview.body.item.review.originalUnitId, "unit-intro");
+    assert.equal(
+      updatedReview.body.item.review.userAgent,
+      "integration-review-agent/1.0"
+    );
 
     const reviews = await requestJsonAt<{
       items: Array<{
@@ -3619,7 +3634,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(reviewCsv.body, /^tenantKey,workspaceKey,reviewId,loginKey,/);
     assert.match(
       reviewCsv.body,
-      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","","","integration-reviewer","0","final-check","final-check","Updated integration review"/
+      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","unit-intro","","","integration-review-agent\/1\.0","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const filteredReviewCsv = await requestTextAt(
@@ -3635,7 +3650,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredReviewCsv.status, 200);
     assert.match(
       filteredReviewCsv.body,
-      /"unit-intro","","","integration-reviewer","0","final-check","final-check","Updated integration review"/
+      /"unit-intro","unit-intro","","","integration-review-agent\/1\.0","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const deletedReview = await requestJsonAt<{ deletedReviewId: string }>(
@@ -5337,6 +5352,7 @@ test("source document import accepts native JSON booklet and unit maps", async (
             displayLabel: string;
             unitEntries: Array<{
               unitKey: string;
+              originalUnitId?: string;
               displayLabel: string;
               description?: string;
               content?: string;
@@ -8050,6 +8066,7 @@ test("source document import preserves testcenter unit aliases", async () => {
             },
             {
               unitKey: "an_alias",
+              originalUnitId: "UNIT.SAMPLE",
               displayLabel: "Sample Unit again, with Alias",
               testletPath: ["another_testlet"]
             },
@@ -13581,8 +13598,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       testRunId: string;
       participantSessionId: string;
       unitKey: string | null;
+      originalUnitId: string | null;
       page: number | null;
       pageLabel: string | null;
+      userAgent: string | null;
       reviewerId: string;
       category: string;
       categories: string[];
@@ -13591,8 +13610,9 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     };
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`, {
     method: "POST",
+    headers: { "user-agent": "participant-review-agent/1.0" },
     body: {
-      unitKey: "UNIT.INTRO",
+      unitKey: "basic-unit",
       page: 2,
       pageLabel: "Task 2b",
       reviewerId: "Mode Reviewer",
@@ -13607,9 +13627,17 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     createdParticipantReview.body.review.participantSessionId,
     review.participantSessionId
   );
-  assert.equal(createdParticipantReview.body.review.unitKey, "UNIT.INTRO");
+  assert.equal(createdParticipantReview.body.review.unitKey, "basic-unit");
+  assert.equal(
+    createdParticipantReview.body.review.originalUnitId,
+    "UNIT.BASIC"
+  );
   assert.equal(createdParticipantReview.body.review.page, 2);
   assert.equal(createdParticipantReview.body.review.pageLabel, "Task 2b");
+  assert.equal(
+    createdParticipantReview.body.review.userAgent,
+    "participant-review-agent/1.0"
+  );
   assert.equal(createdParticipantReview.body.review.category, "tech content");
   assert.deepEqual(createdParticipantReview.body.review.categories, [
     "tech",
@@ -13623,6 +13651,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       categories: string[];
       page: number | null;
       pageLabel: string | null;
+      originalUnitId: string | null;
+      userAgent: string | null;
       comment: string;
     }>;
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
@@ -13633,6 +13663,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       item.categories,
       item.page,
       item.pageLabel,
+      item.originalUnitId,
+      item.userAgent,
       item.comment
     ]),
     [
@@ -13642,6 +13674,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
         ["tech", "content"],
         2,
         "Task 2b",
+        "UNIT.BASIC",
+        "participant-review-agent/1.0",
         "Participant-authored review"
       ]
     ]
@@ -13651,6 +13685,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       unitKey: string | null;
       page: number | null;
       pageLabel: string | null;
+      originalUnitId: string | null;
+      userAgent: string | null;
       category: string;
       categories: string[];
       priority: number;
@@ -13672,6 +13708,14 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(updatedParticipantReview.body.review.unitKey, null);
   assert.equal(updatedParticipantReview.body.review.page, null);
   assert.equal(updatedParticipantReview.body.review.pageLabel, null);
+  assert.equal(
+    updatedParticipantReview.body.review.originalUnitId,
+    "UNIT.BASIC"
+  );
+  assert.equal(
+    updatedParticipantReview.body.review.userAgent,
+    "participant-review-agent/1.0"
+  );
   assert.equal(updatedParticipantReview.body.review.category, "content design");
   assert.deepEqual(updatedParticipantReview.body.review.categories, [
     "content",
@@ -14905,7 +14949,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     reviewCsv.body,
-    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,page,pageLabel,reviewerId,priority,categories,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
+    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,originalUnitId,page,pageLabel,userAgent,reviewerId,priority,categories,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
   );
   assert.match(
     reviewCsv.body,

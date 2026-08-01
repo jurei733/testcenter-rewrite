@@ -1165,6 +1165,15 @@ export class ParticipantViewFacade {
     return categories.length > 0 ? categories.join(", ") : "No category";
   }
 
+  reviewBrowserLabel(review: WorkspaceReview): string {
+    if (!review.userAgent) {
+      return "unavailable";
+    }
+    return review.userAgent.length > 80
+      ? `${review.userAgent.slice(0, 77)}...`
+      : review.userAgent;
+  }
+
   hasReviewCategory(category: string): boolean {
     return this.reviewCategories.includes(category);
   }

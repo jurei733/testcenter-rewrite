@@ -473,12 +473,20 @@ const mapWorkspaceReview = (
           row.unit_key === null || row.unit_key === undefined
             ? null
             : String(row.unit_key),
+        originalUnitId:
+          row.original_unit_id === null || row.original_unit_id === undefined
+            ? null
+            : String(row.original_unit_id),
         page:
           row.page === null || row.page === undefined ? null : Number(row.page),
         pageLabel:
           row.page_label === null || row.page_label === undefined
             ? null
             : String(row.page_label),
+        userAgent:
+          row.user_agent === null || row.user_agent === undefined
+            ? null
+            : String(row.user_agent),
         reviewerId: String(row.reviewer_id),
         category: String(row.category),
         categories: String(row.category ?? "")
@@ -514,7 +522,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 30;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 31;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -963,6 +971,14 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE workspace_reviews ADD COLUMN page INTEGER;
       ALTER TABLE workspace_reviews ADD COLUMN page_label TEXT;
+    `
+  },
+  {
+    version: 31,
+    name: "add_review_provenance",
+    sql: `
+      ALTER TABLE workspace_reviews ADD COLUMN original_unit_id TEXT;
+      ALTER TABLE workspace_reviews ADD COLUMN user_agent TEXT;
     `
   }
 ];
@@ -2021,7 +2037,7 @@ export const createSqliteFirstSliceRepository = (
     async getWorkspaceReviewById(reviewId) {
       const row = database
         .prepare(
-          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
+          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at
            FROM workspace_reviews
            WHERE review_id = ?`
         )
@@ -2031,7 +2047,7 @@ export const createSqliteFirstSliceRepository = (
     async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
+          `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at
            FROM workspace_reviews
            WHERE tenant_id = ? AND workspace_id = ?
            ORDER BY updated_at DESC, created_at DESC`
@@ -2043,16 +2059,18 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO workspace_reviews (
-            review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, page, page_label, user_agent, reviewer_id, category, priority, comment_text, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(review_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
             participant_session_id = excluded.participant_session_id,
             test_run_id = excluded.test_run_id,
             unit_key = excluded.unit_key,
+            original_unit_id = excluded.original_unit_id,
             page = excluded.page,
             page_label = excluded.page_label,
+            user_agent = excluded.user_agent,
             reviewer_id = excluded.reviewer_id,
             category = excluded.category,
             priority = excluded.priority,
@@ -2067,8 +2085,10 @@ export const createSqliteFirstSliceRepository = (
           review.participantSessionId,
           review.testRunId,
           review.unitKey,
+          review.originalUnitId,
           review.page,
           review.pageLabel,
+          review.userAgent,
           review.reviewerId,
           review.category,
           review.priority,

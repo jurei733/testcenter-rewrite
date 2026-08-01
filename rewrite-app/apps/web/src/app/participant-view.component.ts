@@ -452,6 +452,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                   <div>
                     <strong>{{ view.reviewTargetLabel(review) }}</strong>
                     <span>{{ view.reviewPriorityLabel(review.priority) }} · {{ view.reviewCategoriesLabel(review) }} · {{ review.reviewerId }}</span>
+                    <span>Original unit {{ review.originalUnitId ?? "none" }} · Browser {{ view.reviewBrowserLabel(review) }}</span>
                   </div>
                   <time [attr.datetime]="review.updatedAt">{{ review.updatedAt }}</time>
                 </header>

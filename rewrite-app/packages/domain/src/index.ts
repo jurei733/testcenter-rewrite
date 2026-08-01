@@ -529,6 +529,8 @@ export type SourcePackageTestletEntry = {
 
 export type SourcePackageUnitEntry = {
   unitKey: string;
+  /** Authored Unit/@id when `unitKey` is an Original Testcenter alias. */
+  originalUnitId?: string;
   displayLabel: string;
   testletPath?: string[];
   description?: string;
@@ -711,6 +713,8 @@ export type BookletRuntimePolicy = {
 
 export type ContentReleaseUnitEntry = {
   unitKey: string;
+  /** Authored Unit/@id when `unitKey` is an Original Testcenter alias. */
+  originalUnitId?: string;
   displayLabel: string;
   testletPath?: string[];
   description?: string;
@@ -1349,10 +1353,14 @@ export type WorkspaceReview = {
   participantSessionId: string;
   testRunId: string;
   unitKey: string | null;
+  /** Authored unit identity captured when the review was created. */
+  originalUnitId: string | null;
   /** Original task-page index; null for whole-test/unit reviews or non-numeric player pages. */
   page: number | null;
   /** Participant-authored task/page label from the Original Testcenter review dialog. */
   pageLabel: string | null;
+  /** Browser provenance captured when the review was created. */
+  userAgent: string | null;
   reviewerId: string;
   /** Space-separated compatibility projection of `categories`. */
   category: string;

@@ -524,6 +524,7 @@ export type WorkspaceReviewPort = {
     categories?: string[];
     priority?: number;
     comment: string;
+    userAgent?: string | null;
   }): Promise<WorkspaceReviewListItem>;
   updateReview(input: {
     tenantKey: string;
@@ -611,6 +612,7 @@ export type ParticipantRuntimePort = {
     categories?: string[];
     priority?: number;
     comment: string;
+    userAgent?: string | null;
   }): Promise<WorkspaceReview>;
   updateReview(input: {
     testRunId: string;
@@ -1741,6 +1743,10 @@ const normalizeWorkspaceReview = (review: WorkspaceReview): WorkspaceReview => {
   const priority = Number(review.priority);
   return {
     ...review,
+    originalUnitId:
+      typeof review.originalUnitId === "string" && review.originalUnitId.trim()
+        ? review.originalUnitId.trim()
+        : null,
     page:
       review.page !== null &&
       review.page !== undefined &&
@@ -1752,6 +1758,10 @@ const normalizeWorkspaceReview = (review: WorkspaceReview): WorkspaceReview => {
       typeof review.pageLabel === "string" && review.pageLabel.trim()
         ? review.pageLabel.trim()
         : null,
+    userAgent:
+      typeof review.userAgent === "string" && review.userAgent.trim()
+        ? review.userAgent.trim()
+        : null,
     category: categories.join(" "),
     categories,
     priority:
@@ -1760,6 +1770,11 @@ const normalizeWorkspaceReview = (review: WorkspaceReview): WorkspaceReview => {
         : 0
   };
 };
+
+const normalizeReviewUserAgent = (value: unknown): string | null =>
+  typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 1024)
+    : null;
 
 const normalizeOptionalUnitKey = (value: unknown): string | null => {
   if (value === undefined || value === null) {
@@ -3971,8 +3986,10 @@ const formatReviewCsv = (input: {
     "testRunId",
     "bookletKey",
     "unitKey",
+    "originalUnitId",
     "page",
     "pageLabel",
+    "userAgent",
     "reviewerId",
     "priority",
     "categories",
@@ -3998,8 +4015,10 @@ const formatReviewCsv = (input: {
         item.review.testRunId,
         item.testRun?.bookletKey ?? "",
         item.review.unitKey ?? "",
+        item.review.originalUnitId ?? "",
         item.review.page === null ? "" : String(item.review.page),
         item.review.pageLabel ?? "",
+        item.review.userAgent ?? "",
         item.review.reviewerId,
         String(item.review.priority),
         item.review.categories.join(" "),
@@ -4452,6 +4471,7 @@ const normalizeContentStructure = (
       }
 
       const description = normalizeUnitContent(unitEntry.description);
+      const originalUnitId = normalizeManifestToken(unitEntry.originalUnitId);
       const content = normalizeUnitContent(unitEntry.content);
       const playerKey = normalizeManifestToken(unitEntry.playerKey);
       const unitDefinition = normalizeRuntimeDocument(unitEntry.unitDefinition);
@@ -4461,6 +4481,9 @@ const normalizeContentStructure = (
       const codingScheme = normalizeUnitCodingScheme(unitEntry.codingScheme);
       normalizedBooklet.unitEntries.push({
         unitKey,
+        ...(originalUnitId && originalUnitId !== unitKey
+          ? { originalUnitId }
+          : {}),
         displayLabel: normalizeManifestLabel(
           unitEntry.displayLabel,
           "Unit",
@@ -5397,32 +5420,43 @@ const normalizeParsedJsonContentStructure = (
                     .map(testletKey => String(testletKey).trim())
                     .filter(Boolean)
                 : [];
+              const unitKey = String(
+                unit.unitKey ??
+                  unit.unitId ??
+                  unit.identifier ??
+                  unit.key ??
+                  unit.id ??
+                  unit.unitRef ??
+                  unit.ref ??
+                  unit.identifierref ??
+                  unit.identifierRef ??
+                  unit.alias ??
+                  unit.code ??
+                  unit.path ??
+                  unit.src ??
+                  unit.uri ??
+                  unit.file ??
+                  unit.fileName ??
+                  unit.filename ??
+                  unit.resourceId ??
+                  unit.moduleId ??
+                  unit.taskId ??
+                  unit.href ??
+                  unit.name ??
+                  ""
+              ).trim();
+              const originalUnitId = String(
+                unit.originalUnitId ??
+                  unit.originalUnitKey ??
+                  unit.unitId ??
+                  unit.id ??
+                  ""
+              ).trim();
               return {
-                unitKey: String(
-                  unit.unitKey ??
-                    unit.unitId ??
-                    unit.identifier ??
-                    unit.key ??
-                    unit.id ??
-                    unit.unitRef ??
-                    unit.ref ??
-                    unit.identifierref ??
-                    unit.identifierRef ??
-                    unit.alias ??
-                    unit.code ??
-                    unit.path ??
-                    unit.src ??
-                    unit.uri ??
-                    unit.file ??
-                    unit.fileName ??
-                    unit.filename ??
-                    unit.resourceId ??
-                    unit.moduleId ??
-                    unit.taskId ??
-                    unit.href ??
-                    unit.name ??
-                    ""
-                ).trim(),
+                unitKey,
+                ...(originalUnitId && originalUnitId !== unitKey
+                  ? { originalUnitId }
+                  : {}),
                 displayLabel: String(
                   unit.displayLabel ??
                     unit.label ??
@@ -7412,6 +7446,15 @@ const collectXmlBookletEntries = (
     )) {
       const unitAttributes = parseXmlAttributes(unitMatch[2] ?? "");
       const unitContent = unitMatch[3] ?? "";
+      const unitKey = readXmlUnitEntryKey(unitAttributes, unitContent);
+      const originalUnitId = String(
+        readXmlAttribute(
+          unitAttributes,
+          "originalUnitId",
+          "originalUnitKey",
+          "id"
+        ) ?? ""
+      ).trim();
       const description = normalizeUnitContent(
         readXmlAttribute(
           unitAttributes,
@@ -7451,7 +7494,10 @@ const collectXmlBookletEntries = (
           )
       );
       unitEntries.push({
-        unitKey: readXmlUnitEntryKey(unitAttributes, unitContent),
+        unitKey,
+        ...(originalUnitId && originalUnitId !== unitKey
+          ? { originalUnitId }
+          : {}),
         displayLabel: String(
           readXmlAttribute(
             unitAttributes,
@@ -11133,7 +11179,7 @@ const requireRuntimeUnitForBooklet = (
   contentRelease: ContentRelease,
   bookletKey: string,
   unitKey: string
-): void => {
+): ContentRelease["runtimeSnapshot"]["bookletEntries"][number]["unitEntries"][number] => {
   const bookletEntry =
     contentRelease.runtimeSnapshot.bookletEntries.find(
       candidate => candidate.bookletKey === bookletKey
@@ -11147,13 +11193,17 @@ const requireRuntimeUnitForBooklet = (
     );
   }
 
-  if (!bookletEntry.unitEntries.some(candidate => candidate.unitKey === unitKey)) {
+  const unitEntry = bookletEntry.unitEntries.find(
+    candidate => candidate.unitKey === unitKey
+  );
+  if (!unitEntry) {
     throw new FirstSliceError(
       404,
       "unit_not_found",
       `Unit '${unitKey}' was not found in booklet '${bookletKey}'.`
     );
   }
+  return unitEntry;
 };
 
 const sortWorkspaceContentReleases = (
@@ -16000,16 +16050,18 @@ export const createFirstSliceServices = (
         }
 
         const normalizedUnitKey = normalizeOptionalUnitKey(input.unitKey);
+        let originalUnitId: string | null = null;
         if (normalizedUnitKey) {
           const contentRelease = await requireContentRelease(
             repository,
             testRun.contentReleaseId
           );
-          requireRuntimeUnitForBooklet(
+          const unitEntry = requireRuntimeUnitForBooklet(
             contentRelease,
             testRun.bookletKey,
             normalizedUnitKey
           );
+          originalUnitId = unitEntry.originalUnitId ?? unitEntry.unitKey;
         }
 
         const categories = normalizeReviewCategories(
@@ -16033,8 +16085,10 @@ export const createFirstSliceServices = (
           participantSessionId: participantSession.participantSessionId,
           testRunId: testRun.testRunId,
           unitKey: normalizedUnitKey,
+          originalUnitId,
           page,
           pageLabel,
+          userAgent: normalizeReviewUserAgent(input.userAgent),
           reviewerId: normalizeReviewText(
             input.reviewerId,
             "reviewerId",
@@ -16065,8 +16119,10 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            originalUnitId: review.originalUnitId,
             page: review.page,
             pageLabel: review.pageLabel,
+            userAgent: review.userAgent,
             category: review.category,
             categories: review.categories,
             priority: review.priority
@@ -17418,12 +17474,14 @@ export const createFirstSliceServices = (
         const { participantSession, testRun, contentRelease } =
           await requireParticipantReviewContext(input.testRunId);
         const unitKey = normalizeOptionalUnitKey(input.unitKey);
+        let originalUnitId: string | null = null;
         if (unitKey) {
-          requireRuntimeUnitForBooklet(
+          const unitEntry = requireRuntimeUnitForBooklet(
             contentRelease,
             testRun.bookletKey,
             unitKey
           );
+          originalUnitId = unitEntry.originalUnitId ?? unitEntry.unitKey;
         }
         const categories = normalizeReviewCategories(
           input.categories,
@@ -17446,8 +17504,10 @@ export const createFirstSliceServices = (
           participantSessionId: participantSession.participantSessionId,
           testRunId: testRun.testRunId,
           unitKey,
+          originalUnitId,
           page,
           pageLabel,
+          userAgent: normalizeReviewUserAgent(input.userAgent),
           reviewerId: resolveParticipantReviewReviewerId(
             input.reviewerId,
             participantSession.loginKey
@@ -17476,8 +17536,10 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            originalUnitId: review.originalUnitId,
             page: review.page,
             pageLabel: review.pageLabel,
+            userAgent: review.userAgent,
             category: review.category,
             categories: review.categories,
             priority: review.priority,
