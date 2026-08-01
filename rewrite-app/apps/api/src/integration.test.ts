@@ -1927,7 +1927,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
     );
     assert.match(
       rosterCsvText,
@@ -11793,7 +11793,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n/
   );
   assert.match(
     rosterCsvText,
@@ -13370,7 +13370,7 @@ test("workspace participant-session list shows latest run and active release", a
   assert.equal(participantSessionsCsv.status, 200);
   assert.match(
     participantSessionsCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,loginKey,groupKey,sessionStatus,createdAt,contentReleaseId,releaseLabel,latestTestRunId,latestBookletKey,latestRunStatus,latestCurrentUnitKey,latestRunUpdatedAt,rosterBookletKey,rosterDisplayName,validUntil\n/
   );
   assert.match(participantSessionsCsv.body, /booklet:session/);
   assert.equal(participantSessionsCsv.body.trim().split("\n").length, 2);
@@ -13917,4 +13917,195 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.equal(stylesheetResponse.status, 200);
   assertSecurityHeaders(stylesheetResponse);
   assert.match(stylesheetResponse.headers.get("content-type") ?? "", /text\/css/);
+});
+
+test("participant access windows enforce Original Testcenter timing semantics", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false"
+  });
+
+  try {
+    const nowMs = Date.now();
+    const future = new Date(nowMs + 60 * 60_000).toISOString();
+    const past = new Date(nowMs - 60_000).toISOString();
+
+    const rosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        validFrom: string | null;
+        validForMinutes: number | null;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: {
+            participants: [
+              {
+                login: "scheduled-access",
+                group: "group:access",
+                booklet: "booklet:demo",
+                validFrom: future
+              },
+              {
+                login: "expired-access",
+                group: "group:access",
+                booklet: "booklet:demo",
+                validTo: past
+              },
+              {
+                login: "relative-access",
+                group: "group:access",
+                booklet: "booklet:demo",
+                validForMinutes: 10
+              }
+            ]
+          }
+        }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.equal(
+      rosterImport.body.items.find(item => item.loginKey === "scheduled-access")
+        ?.validFrom,
+      future
+    );
+    assert.equal(
+      rosterImport.body.items.find(item => item.loginKey === "relative-access")
+        ?.validForMinutes,
+      10
+    );
+
+    const scheduledSignIn = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "scheduled-access"
+        }
+      }
+    );
+    assert.equal(scheduledSignIn.status, 401);
+    assert.equal(scheduledSignIn.body.error, "participant_access_not_started");
+
+    const expiredSignIn = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "expired-access"
+        }
+      }
+    );
+    assert.equal(expiredSignIn.status, 410);
+    assert.equal(expiredSignIn.body.error, "participant_access_expired");
+
+    const relativeSignIn = await requestJsonAt<{
+      participantSession: {
+        participantSessionId: string;
+        createdAt: string;
+        validUntil: string | null;
+      };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "relative-access"
+      }
+    });
+    assert.equal(relativeSignIn.status, 200);
+    assert.equal(
+      Date.parse(relativeSignIn.body.participantSession.validUntil ?? "") -
+        Date.parse(relativeSignIn.body.participantSession.createdAt),
+      10 * 60_000
+    );
+
+    const launched = await requestJsonAt<{
+      testRun: { testRunId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${relativeSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(launched.status, 200);
+    const completed = await requestJsonAt<{
+      command: { testRun: { status: string } };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${launched.body.testRun.testRunId}/commands`,
+      {
+        method: "POST",
+        body: { commandType: "complete" }
+      }
+    );
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.command.testRun.status, "completed");
+
+    const secondRelativeSignIn = await requestJsonAt<{
+      participantSession: {
+        participantSessionId: string;
+        validUntil: string | null;
+      };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "relative-access"
+      }
+    });
+    assert.equal(secondRelativeSignIn.status, 200);
+    assert.notEqual(
+      secondRelativeSignIn.body.participantSession.participantSessionId,
+      relativeSignIn.body.participantSession.participantSessionId
+    );
+    assert.equal(
+      secondRelativeSignIn.body.participantSession.validUntil,
+      relativeSignIn.body.participantSession.validUntil
+    );
+
+    const shortenedRoster = await requestJsonAt<{ updatedCount: number }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: {
+            participants: [
+              {
+                login: "relative-access",
+                group: "group:access",
+                booklet: "booklet:demo",
+                validTo: past,
+                validForMinutes: 10
+              }
+            ]
+          }
+        }
+      }
+    );
+    assert.equal(shortenedRoster.status, 201);
+    assert.equal(shortenedRoster.body.updatedCount, 1);
+
+    const blockedResume = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${secondRelativeSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(blockedResume.status, 410);
+    assert.equal(blockedResume.body.error, "participant_access_expired");
+  } finally {
+    await closeServer(isolated.server);
+  }
 });

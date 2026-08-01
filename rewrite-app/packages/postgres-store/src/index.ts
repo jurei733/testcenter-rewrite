@@ -189,6 +189,10 @@ const mapParticipantSession = (row: Row | undefined): ParticipantSession | null 
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         status: row.status as ParticipantSession["status"],
+        validUntil:
+          row.valid_until === null || row.valid_until === undefined
+            ? null
+            : String(row.valid_until),
         createdAt: String(row.created_at)
       }
     : null;
@@ -255,6 +259,18 @@ const mapParticipantRosterEntry = (
               : String(row.display_name),
           passwordRequired:
             row.password_hash !== null && row.password_hash !== undefined,
+          validFrom:
+            row.valid_from === null || row.valid_from === undefined
+              ? null
+              : String(row.valid_from),
+          validTo:
+            row.valid_to === null || row.valid_to === undefined
+              ? null
+              : String(row.valid_to),
+          validForMinutes:
+            row.valid_for_minutes === null || row.valid_for_minutes === undefined
+              ? null
+              : Number(row.valid_for_minutes),
           importedAt: String(row.imported_at)
         };
       })()
@@ -401,7 +417,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 16;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 17;
 
 const migrations: PostgresMigration[] = [
   {
@@ -717,6 +733,16 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE test_runs
         ADD COLUMN IF NOT EXISTS booklet_states_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 17,
+    name: "add_participant_access_windows",
+    sql: `
+      ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS valid_from TEXT;
+      ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS valid_to TEXT;
+      ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS valid_for_minutes INTEGER;
+      ALTER TABLE participant_sessions ADD COLUMN IF NOT EXISTS valid_until TEXT;
     `
   }
 ];
@@ -1253,7 +1279,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getParticipantSessionById(participantSessionId) {
       return one(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
          FROM participant_sessions
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -1262,7 +1288,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+        `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
          FROM participant_sessions
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1272,8 +1298,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantSession(participantSession) {
       await pool.query(
         `INSERT INTO participant_sessions (
-          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT(participant_session_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
@@ -1281,6 +1307,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           login_key = EXCLUDED.login_key,
           group_key = EXCLUDED.group_key,
           status = EXCLUDED.status,
+          valid_until = EXCLUDED.valid_until,
           created_at = EXCLUDED.created_at`,
         [
           participantSession.participantSessionId,
@@ -1290,13 +1317,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantSession.loginKey,
           participantSession.groupKey,
           participantSession.status,
+          participantSession.validUntil ?? null,
           participantSession.createdAt
         ]
       );
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1315,8 +1343,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await pool.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           group_key = EXCLUDED.group_key,
@@ -1326,6 +1354,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           booklet_assignments_json = EXCLUDED.booklet_assignments_json,
           display_name = EXCLUDED.display_name,
           password_hash = EXCLUDED.password_hash,
+          valid_from = EXCLUDED.valid_from,
+          valid_to = EXCLUDED.valid_to,
+          valid_for_minutes = EXCLUDED.valid_for_minutes,
           imported_at = EXCLUDED.imported_at`,
         [
           participantRosterEntry.participantRosterEntryId,
@@ -1345,6 +1376,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
             : null,
           participantRosterEntry.displayName,
           passwordHash,
+          participantRosterEntry.validFrom ?? null,
+          participantRosterEntry.validTo ?? null,
+          participantRosterEntry.validForMinutes ?? null,
           participantRosterEntry.importedAt
         ]
       );

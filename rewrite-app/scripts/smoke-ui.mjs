@@ -3234,7 +3234,7 @@ try {
     "#entryRosterText",
     [
       "<Testtakers>",
-      "  <Group id=\"group:testcenter-login-entry\">",
+      "  <Group id=\"group:testcenter-login-entry\" validFor=\"45\">",
       "    <Login name=\"entry-student-login\">",
       `      <Booklet>${participantRouteBookletKey}</Booklet>`,
       "    </Login>",
@@ -3251,6 +3251,8 @@ try {
     .filter({ hasText: "entry-student-login" })
     .filter({ hasText: "group:testcenter-login-entry" })
     .filter({ hasText: participantRouteBookletKey })
+    .filter({ hasText: "time-limited" })
+    .filter({ hasText: "45 minute(s) after first sign-in" })
     .waitFor();
   await fillAndCommit(
     "#entryRosterText",

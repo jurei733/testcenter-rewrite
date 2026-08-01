@@ -207,6 +207,72 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("inherits Original Testcenter access windows and accepts JSON/CSV aliases", () => {
+    assert.deepEqual(
+      parseParticipantRosterText(
+        [
+          "<Testtakers>",
+          "  <Group id=\"scheduled\" validFrom=\"1/6/2023 10:00\" validTo=\"2/6/2023 10:00\" validFor=\"45\">",
+          "    <Login mode=\"run-hot-return\" name=\"xml-window\"><Booklet>BOOKLET.A</Booklet></Login>",
+          "  </Group>",
+          "</Testtakers>"
+        ].join("\n")
+      )[0],
+      {
+        loginKey: "xml-window",
+        groupKey: "scheduled",
+        bookletKey: "BOOKLET.A",
+        bookletAssignments: [
+          {
+            assignmentKey: "BOOKLET.A",
+            bookletKey: "BOOKLET.A",
+            statePreset: {}
+          }
+        ],
+        displayName: null,
+        validFrom: "1/6/2023 10:00",
+        validTo: "2/6/2023 10:00",
+        validForMinutes: 45
+      }
+    );
+
+    assert.deepEqual(
+      parseParticipantRosterText({
+        groups: [
+          {
+            id: "json-window",
+            validFrom: "2026-01-01T08:00:00Z",
+            validForMinutes: 30,
+            participants: [{ login: "json-window" }]
+          }
+        ]
+      })[0],
+      {
+        loginKey: "json-window",
+        groupKey: "json-window",
+        bookletKey: null,
+        displayName: null,
+        validFrom: "2026-01-01T08:00:00Z",
+        validForMinutes: 30
+      }
+    );
+
+    assert.deepEqual(
+      parseParticipantRosterText(
+        "login,group,valid-from,valid-to,valid-for\ncsv-window,csv-group,2026-01-01T08:00:00Z,2026-01-01T09:00:00Z,15"
+      )[0],
+      {
+        loginKey: "csv-window",
+        groupKey: "csv-group",
+        bookletKey: null,
+        displayName: null,
+        validFrom: "2026-01-01T08:00:00Z",
+        validTo: "2026-01-01T09:00:00Z",
+        validForMinutes: 15
+      }
+    );
+  });
+
   it("applies Testcenter login modes to JSON roster entries", () => {
     assert.deepEqual(
       parseParticipantRosterText({

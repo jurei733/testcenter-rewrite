@@ -54,6 +54,12 @@ test("original Testcenter compatibility corpus separates participant and operati
   ]);
   assert.equal(primaryParticipant?.groupKey, "sample_group");
   assert.equal(primaryParticipant?.password, "user123");
+  assert.equal(primaryParticipant?.validFrom, "1/3/2020 10:00");
+
+  const trialParticipant = entries.find(entry => entry.loginKey === "test-trial");
+  assert.equal(trialParticipant?.validForMinutes, 45);
+  const expiredParticipant = entries.find(entry => entry.loginKey === "test-expired");
+  assert.equal(expiredParticipant?.validTo, "1/3/2020 19:30");
 
   for (const resourcePackage of corpus.resourcePackages) {
     const packageBuffer = Buffer.from(

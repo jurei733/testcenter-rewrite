@@ -208,6 +208,10 @@ const mapParticipantSession = (
         loginKey: String(row.login_key),
         groupKey: String(row.group_key),
         status: row.status as ParticipantSession["status"],
+        validUntil:
+          row.valid_until === null || row.valid_until === undefined
+            ? null
+            : String(row.valid_until),
         createdAt: String(row.created_at)
       }
     : null;
@@ -274,6 +278,18 @@ const mapParticipantRosterEntry = (
               : String(row.display_name),
           passwordRequired:
             row.password_hash !== null && row.password_hash !== undefined,
+          validFrom:
+            row.valid_from === null || row.valid_from === undefined
+              ? null
+              : String(row.valid_from),
+          validTo:
+            row.valid_to === null || row.valid_to === undefined
+              ? null
+              : String(row.valid_to),
+          validForMinutes:
+            row.valid_for_minutes === null || row.valid_for_minutes === undefined
+              ? null
+              : Number(row.valid_for_minutes),
           importedAt: String(row.imported_at)
         };
       })()
@@ -421,7 +437,7 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 22;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 23;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -780,6 +796,16 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE test_runs
         ADD COLUMN booklet_states_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 23,
+    name: "add_participant_access_windows",
+    sql: `
+      ALTER TABLE participant_roster_entries ADD COLUMN valid_from TEXT;
+      ALTER TABLE participant_roster_entries ADD COLUMN valid_to TEXT;
+      ALTER TABLE participant_roster_entries ADD COLUMN valid_for_minutes INTEGER;
+      ALTER TABLE participant_sessions ADD COLUMN valid_until TEXT;
     `
   }
 ];
@@ -1378,7 +1404,7 @@ export const createSqliteFirstSliceRepository = (
     async getParticipantSessionById(participantSessionId) {
       const row = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
            FROM participant_sessions
            WHERE participant_session_id = ?`
         )
@@ -1388,7 +1414,7 @@ export const createSqliteFirstSliceRepository = (
     async listParticipantSessionsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
+          `SELECT participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
            FROM participant_sessions
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1401,8 +1427,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_sessions (
-            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            participant_session_id, tenant_id, workspace_id, content_release_id, login_key, group_key, status, valid_until, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(participant_session_id) DO UPDATE SET
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
@@ -1410,6 +1436,7 @@ export const createSqliteFirstSliceRepository = (
             login_key = excluded.login_key,
             group_key = excluded.group_key,
             status = excluded.status,
+            valid_until = excluded.valid_until,
             created_at = excluded.created_at`
         )
         .run(
@@ -1420,13 +1447,14 @@ export const createSqliteFirstSliceRepository = (
           participantSession.loginKey,
           participantSession.groupKey,
           participantSession.status,
+          participantSession.validUntil ?? null,
           participantSession.createdAt
         );
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(
-          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
+          `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
            FROM participant_roster_entries
            WHERE tenant_id = ? AND workspace_id = ?`
         )
@@ -1453,8 +1481,8 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO participant_roster_entries (
-            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, valid_from, valid_to, valid_for_minutes, imported_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
             participant_roster_entry_id = excluded.participant_roster_entry_id,
             group_key = excluded.group_key,
@@ -1464,6 +1492,9 @@ export const createSqliteFirstSliceRepository = (
             booklet_assignments_json = excluded.booklet_assignments_json,
             display_name = excluded.display_name,
             password_hash = excluded.password_hash,
+            valid_from = excluded.valid_from,
+            valid_to = excluded.valid_to,
+            valid_for_minutes = excluded.valid_for_minutes,
             imported_at = excluded.imported_at`
         )
         .run(
@@ -1484,6 +1515,9 @@ export const createSqliteFirstSliceRepository = (
             : null,
           participantRosterEntry.displayName,
           passwordHash,
+          participantRosterEntry.validFrom ?? null,
+          participantRosterEntry.validTo ?? null,
+          participantRosterEntry.validForMinutes ?? null,
           participantRosterEntry.importedAt
         );
     },

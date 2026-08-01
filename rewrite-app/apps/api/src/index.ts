@@ -422,7 +422,11 @@ const createApiRuntime = async () => {
   );
   const repositoryConfig = await createRepositoryFromEnvironment();
   const repository = repositoryConfig.repository;
-  const services = createFirstSliceServices({ repository });
+  const services = createFirstSliceServices({
+    repository,
+    participantAccessTimeZone:
+      process.env.FIRST_SLICE_PARTICIPANT_TIME_ZONE ?? "Europe/Berlin"
+  });
 
   if (demoBootstrapEnabled) {
     await bootstrapLocalDemoState({ repository, services });

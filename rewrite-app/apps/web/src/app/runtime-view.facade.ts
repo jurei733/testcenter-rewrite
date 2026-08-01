@@ -154,6 +154,12 @@ export class RuntimeViewFacade {
             {
               label: "Created",
               value: this.formatDateTime(item.participantSession.createdAt)
+            },
+            {
+              label: "Valid Until",
+              value: item.participantSession.validUntil
+                ? this.formatDateTime(item.participantSession.validUntil)
+                : "unlimited"
             }
           ],
           selected:
@@ -242,6 +248,12 @@ export class RuntimeViewFacade {
           {
             label: "Created",
             value: this.formatDateTime(detail.participantSession.createdAt)
+          },
+          {
+            label: "Valid Until",
+            value: detail.participantSession.validUntil
+              ? this.formatDateTime(detail.participantSession.validUntil)
+              : "unlimited"
           }
         ],
         selected:
@@ -536,7 +548,8 @@ export class RuntimeViewFacade {
           },
           {
             label: "Canonical Columns",
-            value: "loginKey, groupKey, bookletKey, displayName"
+            value:
+              "loginKey, groupKey, bookletKey, displayName, validFrom, validTo, validForMinutes"
           }
         ]
       },
@@ -564,7 +577,15 @@ export class RuntimeViewFacade {
                   ? assignmentKeys.join(" | ")
                   : "release defaults"
             },
-            { label: "Display Name", value: entry.displayName ?? "none" }
+            { label: "Display Name", value: entry.displayName ?? "none" },
+            { label: "Valid From", value: entry.validFrom ?? "immediately" },
+            { label: "Valid To", value: entry.validTo ?? "unlimited" },
+            {
+              label: "Valid For",
+              value: entry.validForMinutes
+                ? `${entry.validForMinutes} minute(s) after first sign-in`
+                : "unlimited"
+            }
           ]
         };
       })
@@ -700,7 +721,10 @@ export class RuntimeViewFacade {
               : "adaptive defaults",
             validationWarnings.length > 0
               ? `${validationWarnings.length} warning${validationWarnings.length === 1 ? "" : "s"}`
-              : "validated"
+              : "validated",
+            entry.validFrom || entry.validTo || entry.validForMinutes
+              ? "time-limited"
+              : "unlimited"
           ],
           rows: [
             { label: "Display Name", value: entry.displayName ?? "none" },
@@ -725,6 +749,24 @@ export class RuntimeViewFacade {
                       .map(warning => `${warning.code}: ${warning.message}`)
                       .join(" | ")
                   : "No roster warnings"
+            },
+            {
+              label: "Valid From",
+              value: entry.validFrom
+                ? this.formatDateTime(entry.validFrom)
+                : "immediately"
+            },
+            {
+              label: "Valid To",
+              value: entry.validTo
+                ? this.formatDateTime(entry.validTo)
+                : "unlimited"
+            },
+            {
+              label: "Valid For",
+              value: entry.validForMinutes
+                ? `${entry.validForMinutes} minute(s) after first sign-in`
+                : "unlimited"
             },
             { label: "Imported", value: this.formatDateTime(entry.importedAt) },
             {

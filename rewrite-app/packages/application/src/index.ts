@@ -829,6 +829,7 @@ export type FirstSliceDependencies = {
   idGenerator?: () => string;
   now?: () => string;
   adminSessionTtlMs?: number;
+  participantAccessTimeZone?: string;
 };
 
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
@@ -842,6 +843,170 @@ const ADMIN_USER_STATUSES: AdminUserStatus[] = ["active", "disabled"];
 const TEST_RUN_PROGRESS_STATUSES: Array<
   Extract<TestRunStatus, "running" | "paused">
 > = ["running", "paused"];
+const DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE = "Europe/Berlin";
+
+const readTimeZoneParts = (
+  timestampMs: number,
+  timeZone: string
+): [number, number, number, number, number, number] => {
+  const parts = new Intl.DateTimeFormat("en-US-u-ca-gregory-nu-latn", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date(timestampMs));
+  const valueByType = new Map(parts.map(part => [part.type, part.value]));
+  return [
+    Number(valueByType.get("year")),
+    Number(valueByType.get("month")),
+    Number(valueByType.get("day")),
+    Number(valueByType.get("hour")),
+    Number(valueByType.get("minute")),
+    Number(valueByType.get("second"))
+  ];
+};
+
+const localDateTimeToIso = (
+  parts: [number, number, number, number, number, number],
+  timeZone: string
+): string | null => {
+  const targetWallClockMs = Date.UTC(
+    parts[0],
+    parts[1] - 1,
+    parts[2],
+    parts[3],
+    parts[4],
+    parts[5]
+  );
+  let timestampMs = targetWallClockMs;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const currentParts = readTimeZoneParts(timestampMs, timeZone);
+    const currentWallClockMs = Date.UTC(
+      currentParts[0],
+      currentParts[1] - 1,
+      currentParts[2],
+      currentParts[3],
+      currentParts[4],
+      currentParts[5]
+    );
+    timestampMs += targetWallClockMs - currentWallClockMs;
+  }
+  return readTimeZoneParts(timestampMs, timeZone).every(
+    (value, index) => value === parts[index]
+  )
+    ? new Date(timestampMs).toISOString()
+    : null;
+};
+
+export const normalizeParticipantAccessBoundary = (
+  value: string | null | undefined,
+  timeZone = DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE
+): string | null => {
+  const normalizedValue = value?.trim();
+  if (!normalizedValue) {
+    return null;
+  }
+  if (/(?:z|[+-]\d{2}:?\d{2})$/i.test(normalizedValue)) {
+    const timestampMs = Date.parse(normalizedValue);
+    return Number.isFinite(timestampMs) ? new Date(timestampMs).toISOString() : null;
+  }
+
+  const originalMatch = normalizedValue.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\D+(\d{1,2}):(\d{2})$/
+  );
+  const localIsoMatch = normalizedValue.match(
+    /^(\d{4})-(\d{2})-(\d{2})[t ](\d{2}):(\d{2})(?::(\d{2}))?$/i
+  );
+  const parts: [number, number, number, number, number, number] | null =
+    originalMatch
+      ? [
+          Number(originalMatch[3]) < 100
+            ? Number(originalMatch[3]) + (Number(originalMatch[3]) <= 69 ? 2000 : 1900)
+            : Number(originalMatch[3]),
+          Number(originalMatch[2]),
+          Number(originalMatch[1]),
+          Number(originalMatch[4]),
+          Number(originalMatch[5]),
+          0
+        ]
+      : localIsoMatch
+        ? [
+            Number(localIsoMatch[1]),
+            Number(localIsoMatch[2]),
+            Number(localIsoMatch[3]),
+            Number(localIsoMatch[4]),
+            Number(localIsoMatch[5]),
+            Number(localIsoMatch[6] ?? 0)
+          ]
+        : null;
+  if (!parts) {
+    return null;
+  }
+  try {
+    return localDateTimeToIso(parts, timeZone);
+  } catch {
+    return null;
+  }
+};
+
+export const resolveParticipantSessionValidUntil = (
+  rosterEntry: Pick<ParticipantRosterEntry, "validTo" | "validForMinutes"> | null,
+  createdAt: string
+): string | null => {
+  if (!rosterEntry) {
+    return null;
+  }
+  const candidates = [
+    rosterEntry.validTo ? Date.parse(rosterEntry.validTo) : Number.NaN,
+    rosterEntry.validForMinutes
+      ? Date.parse(createdAt) + rosterEntry.validForMinutes * 60_000
+      : Number.NaN
+  ].filter(Number.isFinite);
+  return candidates.length > 0
+    ? new Date(Math.min(...candidates)).toISOString()
+    : null;
+};
+
+const assertParticipantAccessWindow = (
+  rosterEntry: Pick<ParticipantRosterEntry, "validFrom" | "validTo"> | null,
+  timestamp: string,
+  sessionValidUntil?: string | null
+): void => {
+  const timestampMs = Date.parse(timestamp);
+  const validTo = rosterEntry?.validTo ?? null;
+  const effectiveValidUntil = [validTo, sessionValidUntil]
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] ?? null;
+  if (
+    effectiveValidUntil &&
+    Number.isFinite(timestampMs) &&
+    Date.parse(effectiveValidUntil) < timestampMs
+  ) {
+    throw new FirstSliceError(
+      410,
+      "participant_access_expired",
+      `Participant access expired at '${effectiveValidUntil}'.`,
+      { validUntil: effectiveValidUntil }
+    );
+  }
+  const validFrom = rosterEntry?.validFrom ?? null;
+  if (
+    validFrom &&
+    Number.isFinite(timestampMs) &&
+    Date.parse(validFrom) > timestampMs
+  ) {
+    throw new FirstSliceError(
+      401,
+      "participant_access_not_started",
+      `Participant access starts at '${validFrom}'.`,
+      { validFrom }
+    );
+  }
+};
 
 type AdminRoleAssignmentInput = {
   role: AdminRole;
@@ -2512,7 +2677,10 @@ const formatParticipantRosterCsv = (input: {
     "validationWarningMessages",
     "bookletKeys",
     "bookletStatePresets",
-    "bookletAssignments"
+    "bookletAssignments",
+    "validFrom",
+    "validTo",
+    "validForMinutes"
   ];
   const rows = [...input.items].sort(
     (left, right) =>
@@ -2537,7 +2705,10 @@ const formatParticipantRosterCsv = (input: {
         item.validationWarnings.map(warning => warning.message).join("|"),
         getParticipantRosterBookletKeys(item).join("|"),
         JSON.stringify(item.bookletStatePresets ?? {}),
-        JSON.stringify(getParticipantRosterBookletAssignments(item))
+        JSON.stringify(getParticipantRosterBookletAssignments(item)),
+        item.validFrom ?? "",
+        item.validTo ?? "",
+        item.validForMinutes?.toString() ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -2566,7 +2737,8 @@ const formatParticipantSessionsCsv = (input: {
     "latestCurrentUnitKey",
     "latestRunUpdatedAt",
     "rosterBookletKey",
-    "rosterDisplayName"
+    "rosterDisplayName",
+    "validUntil"
   ];
 
   return [
@@ -2588,7 +2760,8 @@ const formatParticipantSessionsCsv = (input: {
         item.latestTestRun?.currentUnitKey ?? "",
         item.latestTestRun?.updatedAt ?? "",
         item.participantRosterEntry?.bookletKey ?? "",
-        item.participantRosterEntry?.displayName ?? ""
+        item.participantRosterEntry?.displayName ?? "",
+        item.participantSession.validUntil ?? ""
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -10273,6 +10446,16 @@ export const createFirstSliceServices = (
     return new Date(nextTimestampMs).toISOString();
   };
   const adminSessionTtlMs = dependencies.adminSessionTtlMs ?? ADMIN_SESSION_TTL_MS;
+  const participantAccessTimeZone =
+    dependencies.participantAccessTimeZone ??
+    DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE;
+  try {
+    readTimeZoneParts(Date.now(), participantAccessTimeZone);
+  } catch {
+    throw new Error(
+      `Invalid participant access timezone '${participantAccessTimeZone}'.`
+    );
+  }
 
   const recordWorkspaceActivity = async (input: {
     tenantId: string;
@@ -10296,6 +10479,27 @@ export const createFirstSliceServices = (
       summary: input.summary,
       details: input.details ?? {}
     });
+  };
+
+  const requireAccessibleParticipantSession = async (
+    participantSessionId: string
+  ): Promise<ParticipantSession> => {
+    const participantSession = await requireParticipantSession(
+      repository,
+      participantSessionId
+    );
+    const rosterEntry = await findParticipantRosterEntryByLoginKey(
+      repository,
+      participantSession.tenantId,
+      participantSession.workspaceId,
+      participantSession.loginKey
+    );
+    assertParticipantAccessWindow(
+      rosterEntry,
+      now(),
+      participantSession.validUntil
+    );
+    return participantSession;
   };
 
   const persistEffectiveTestletTimerState = async (input: {
@@ -12141,7 +12345,44 @@ export const createFirstSliceServices = (
         let importedCount = 0;
         let updatedCount = 0;
 
-        for (const parsedEntry of parsedEntries) {
+        const normalizedParsedEntries = parsedEntries.map(parsedEntry => {
+          const validFrom = normalizeParticipantAccessBoundary(
+            parsedEntry.validFrom,
+            participantAccessTimeZone
+          );
+          const validTo = normalizeParticipantAccessBoundary(
+            parsedEntry.validTo,
+            participantAccessTimeZone
+          );
+          if (parsedEntry.validFrom && !validFrom) {
+            throw new FirstSliceError(
+              400,
+              "participant_roster_valid_from_invalid",
+              `Participant '${parsedEntry.loginKey}' has an invalid valid-from timestamp.`
+            );
+          }
+          if (parsedEntry.validTo && !validTo) {
+            throw new FirstSliceError(
+              400,
+              "participant_roster_valid_to_invalid",
+              `Participant '${parsedEntry.loginKey}' has an invalid valid-to timestamp.`
+            );
+          }
+          if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
+            throw new FirstSliceError(
+              400,
+              "participant_roster_access_window_invalid",
+              `Participant '${parsedEntry.loginKey}' has a valid-from timestamp after valid-to.`
+            );
+          }
+          return { parsedEntry, validFrom, validTo };
+        });
+
+        for (const {
+          parsedEntry,
+          validFrom,
+          validTo
+        } of normalizedParsedEntries) {
           const existingEntry = entriesByLoginKey.get(parsedEntry.loginKey);
           const participantRosterEntry: ParticipantRosterEntry = {
             participantRosterEntryId:
@@ -12162,6 +12403,9 @@ export const createFirstSliceServices = (
               : {}),
             displayName: parsedEntry.displayName,
             passwordRequired: Boolean(parsedEntry.password),
+            validFrom,
+            validTo,
+            validForMinutes: parsedEntry.validForMinutes ?? null,
             importedAt: now()
           };
 
@@ -12175,6 +12419,44 @@ export const createFirstSliceServices = (
             updatedCount += 1;
           } else {
             importedCount += 1;
+          }
+        }
+
+        const participantSessions =
+          await repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+        const accessStartedAtByLoginKey = new Map<string, string>();
+        for (const participantSession of participantSessions) {
+          const currentStartedAt = accessStartedAtByLoginKey.get(
+            participantSession.loginKey
+          );
+          if (
+            !currentStartedAt ||
+            participantSession.createdAt.localeCompare(currentStartedAt) < 0
+          ) {
+            accessStartedAtByLoginKey.set(
+              participantSession.loginKey,
+              participantSession.createdAt
+            );
+          }
+        }
+        for (const participantSession of participantSessions) {
+          const rosterEntry = entriesByLoginKey.get(participantSession.loginKey);
+          if (!rosterEntry) {
+            continue;
+          }
+          const validUntil = resolveParticipantSessionValidUntil(
+            rosterEntry,
+            accessStartedAtByLoginKey.get(participantSession.loginKey) ??
+              participantSession.createdAt
+          );
+          if (validUntil !== participantSession.validUntil) {
+            await repository.saveParticipantSession({
+              ...participantSession,
+              validUntil
+            });
           }
         }
 
@@ -13250,16 +13532,30 @@ export const createFirstSliceServices = (
             );
           }
         }
+        const signInTimestamp = now();
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;
 
-        const reusableSession = (
+        const workspaceParticipantSessions =
           await repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
+          );
+        const loginSessions = workspaceParticipantSessions
+          .filter(
+            participantSession =>
+              participantSession.loginKey === loginKey
           )
-        )
+          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+        const accessStartedAt = loginSessions[0]?.createdAt ?? signInTimestamp;
+        const validUntil = resolveParticipantSessionValidUntil(
+          rosterEntry,
+          accessStartedAt
+        );
+        assertParticipantAccessWindow(rosterEntry, signInTimestamp, validUntil);
+
+        const reusableSession = workspaceParticipantSessions
           .filter(
             participantSession =>
               participantSession.loginKey === loginKey &&
@@ -13297,7 +13593,8 @@ export const createFirstSliceServices = (
           loginKey,
           groupKey,
           status: "signed_in",
-          createdAt: now()
+          validUntil,
+          createdAt: signInTimestamp
         };
         await repository.saveParticipantSession(participantSession);
         await recordWorkspaceActivity({
@@ -13320,8 +13617,7 @@ export const createFirstSliceServices = (
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
-        const participantSession = await requireParticipantSession(
-          repository,
+        const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
         const scope = await resolveParticipantSessionScope(
@@ -13394,8 +13690,7 @@ export const createFirstSliceServices = (
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
-        const participantSession = await requireParticipantSession(
-          repository,
+        const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
         const scope = await resolveParticipantSessionScope(
@@ -13510,8 +13805,7 @@ export const createFirstSliceServices = (
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
-        const participantSession = await requireParticipantSession(
-          repository,
+        const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
         const requestedPath = String(input.resourcePath ?? "")
@@ -13546,8 +13840,7 @@ export const createFirstSliceServices = (
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
-        const participantSession = await requireParticipantSession(
-          repository,
+        const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
         const contentRelease = await requireContentRelease(
@@ -13720,8 +14013,7 @@ export const createFirstSliceServices = (
         const participantSessionId = normalizeParticipantSessionId(
           input.participantSessionId
         );
-        const participantSession = await requireParticipantSession(
-          repository,
+        const participantSession = await requireAccessibleParticipantSession(
           participantSessionId
         );
         const requestedBookletKey = normalizeOptionalRuntimeBookletKey(
@@ -13794,6 +14086,10 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
+
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
 
         const contentRelease = await requireContentRelease(
           repository,
@@ -13955,6 +14251,9 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
         const contentRelease = await requireContentRelease(
           repository,
           storedTestRun.contentReleaseId
@@ -14062,6 +14361,10 @@ export const createFirstSliceServices = (
           );
         }
 
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
+
         const contentRelease = await requireContentRelease(
           repository,
           storedTestRun.contentReleaseId
@@ -14119,6 +14422,10 @@ export const createFirstSliceServices = (
             `Test run '${testRunId}' was not found.`
           );
         }
+
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
 
         const contentRelease = await requireContentRelease(
           repository,

@@ -306,7 +306,7 @@ const verifyBootstrappedDemo = async baseUrl => {
   const rosterCsvText = await rosterCsv.text();
   if (
     !rosterCsvText.startsWith(
-      "tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages\n"
+      "tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments,validFrom,validTo,validForMinutes\n"
     ) ||
     !/"demo-tenant","demo-workspace","[^"]+","student-demo","group:student-demo","booklet:demo","Demo Student","false"/.test(
       rosterCsvText

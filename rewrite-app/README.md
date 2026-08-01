@@ -153,6 +153,8 @@ FIRST_SLICE_STORE=postgres FIRST_SLICE_POSTGRES_URL=postgresql://rewrite:rewrite
 
 Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `APP_BUILD_SHA` and `APP_BUILD_TIMESTAMP` must be present. The preflight validates the selected `FIRST_SLICE_STORE` and requires a valid Postgres connection string when `FIRST_SLICE_STORE=postgres`. Set `RUNTIME_PREFLIGHT_SKIP_STORAGE_DOCTOR=true` only for image-only checks where the backing store is intentionally unavailable; store selection and Postgres URL validation still run.
 
+Original Testcenter roster timestamps such as `1/6/2023 10:00` are interpreted in `FIRST_SLICE_PARTICIPANT_TIME_ZONE` (default `Europe/Berlin`) and persisted as ISO timestamps. Set the variable to the field-operation timezone before importing participant rosters.
+
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 
 ```bash
@@ -393,6 +395,7 @@ The added read side now makes the first slice inspectable:
 - participant sign-in now reuses an existing non-closed session for the same login and active content release, preventing duplicate monitor rows when a participant re-enters, and sign-in/launch/runtime responses expose saved-roster display context for participant and operator surfaces
 - participant entry links and sign-in requests can now carry an explicit `groupKey`; omitted groups still default to `group:{loginKey}` for backward-compatible links
 - participant sign-in and starter launch now accept an optional participant password and reject missing or wrong passwords for roster entries imported with password/`pw`, while passwordless roster entries keep the existing link-based flow
+- participant roster imports now carry original group-level `validFrom`, `validTo`, and `validFor` access windows through XML, JSON, and header-mapped CSV; scheduled and expired logins are rejected with stable 401/410 errors, relative validity starts with the first saved participant session and cannot be reset by closing a run or changing releases, the earlier relative/absolute deadline wins, persisted runtime access is rechecked, and roster/session cards plus CSV exports expose the non-secret timing policy
 - participant sign-in now rejects tenant-less workspace keys that exist in multiple tenants, forcing callers to provide `tenantKey` instead of silently binding to the wrong workspace
 - participant launch/resume can now carry an explicit `tenantKey` and `bookletKey`, and `POST /api/v1/participant/starter:launch` can sign in by tenant/workspace/login/group and start the selected booklet in one request
 - participant progress saves now validate `currentUnitKey` against the selected booklet's runtime snapshot before storing responses, and status/response-only saves retain the current unit for player clients that do not repeat the unit key on every save

@@ -68,6 +68,9 @@ export type ParsedParticipantRosterEntry = {
   }>;
   displayName: string | null;
   password?: string | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
 };
 
 export type ParticipantRosterSource =
@@ -133,6 +136,13 @@ const rosterHeaderAliases = {
     "secret",
     "accesscode",
     "accesskey"
+  ]),
+  validFrom: new Set(["validfrom", "accessvalidfrom", "availablefrom"]),
+  validTo: new Set(["validto", "accessvalidto", "availableto", "validuntil"]),
+  validForMinutes: new Set([
+    "validfor",
+    "validforminutes",
+    "accessvalidforminutes"
   ])
 };
 
@@ -142,6 +152,9 @@ type RosterDelimitedHeader = {
   bookletKey: number | null;
   displayName: number | null;
   password: number | null;
+  validFrom: number | null;
+  validTo: number | null;
+  validForMinutes: number | null;
 };
 
 const findRosterHeaderIndex = (
@@ -174,7 +187,13 @@ const readRosterDelimitedHeader = (
     groupKey: findRosterHeaderIndex(values, rosterHeaderAliases.groupKey),
     bookletKey: findRosterHeaderIndex(values, rosterHeaderAliases.bookletKey),
     displayName: findRosterHeaderIndex(values, rosterHeaderAliases.displayName),
-    password: findRosterHeaderIndex(values, rosterHeaderAliases.password)
+    password: findRosterHeaderIndex(values, rosterHeaderAliases.password),
+    validFrom: findRosterHeaderIndex(values, rosterHeaderAliases.validFrom),
+    validTo: findRosterHeaderIndex(values, rosterHeaderAliases.validTo),
+    validForMinutes: findRosterHeaderIndex(
+      values,
+      rosterHeaderAliases.validForMinutes
+    )
   };
 };
 
@@ -186,6 +205,16 @@ const readRosterDelimitedValue = (
     return null;
   }
   return normalizeRosterTextValue(values[index]);
+};
+
+const parseRosterValidForMinutes = (
+  value: string | null | undefined
+): number | null => {
+  if (!value || !/^\d+$/.test(value)) {
+    return null;
+  }
+  const minutes = Number(value);
+  return Number.isSafeInteger(minutes) && minutes > 0 ? minutes : null;
 };
 
 const parseDelimitedRosterRows = (
@@ -224,6 +253,16 @@ const parseDelimitedRosterRows = (
     const password = header
       ? readRosterDelimitedValue(values, header.password)
       : normalizeRosterTextValue(values[4]);
+    const validFrom = header
+      ? readRosterDelimitedValue(values, header.validFrom)
+      : null;
+    const validTo = header
+      ? readRosterDelimitedValue(values, header.validTo)
+      : null;
+    const validForValue = header
+      ? readRosterDelimitedValue(values, header.validForMinutes)
+      : null;
+    const validForMinutes = parseRosterValidForMinutes(validForValue);
 
     return [
       {
@@ -231,7 +270,10 @@ const parseDelimitedRosterRows = (
         groupKey: groupKey || `group:${loginKey}`,
         bookletKey,
         displayName,
-        ...(password ? { password } : {})
+        ...(password ? { password } : {}),
+        ...(validFrom ? { validFrom } : {}),
+        ...(validTo ? { validTo } : {}),
+        ...(validForMinutes && validForMinutes > 0 ? { validForMinutes } : {})
       }
     ];
   });
@@ -461,6 +503,21 @@ const mergeParsedParticipantRosterEntries = (
         ? { password: entry.password }
         : existingEntry.password
           ? { password: existingEntry.password }
+          : {}),
+      ...(entry.validFrom
+        ? { validFrom: entry.validFrom }
+        : existingEntry.validFrom
+          ? { validFrom: existingEntry.validFrom }
+          : {}),
+      ...(entry.validTo
+        ? { validTo: entry.validTo }
+        : existingEntry.validTo
+          ? { validTo: existingEntry.validTo }
+          : {}),
+      ...(entry.validForMinutes
+        ? { validForMinutes: entry.validForMinutes }
+        : existingEntry.validForMinutes
+          ? { validForMinutes: existingEntry.validForMinutes }
           : {})
     });
   }
@@ -624,7 +681,13 @@ const parseParticipantRosterJsonValue = (
   const entries: ParsedParticipantRosterEntry[] = [];
   const visit = (
     candidate: unknown,
-    context: { groupKey: string | null; bookletKey: string | null }
+    context: {
+      groupKey: string | null;
+      bookletKey: string | null;
+      validFrom: string | null;
+      validTo: string | null;
+      validForMinutes: number | null;
+    }
   ): void => {
     if (Array.isArray(candidate)) {
       candidate.forEach(item => visit(item, context));
@@ -669,6 +732,26 @@ const parseParticipantRosterJsonValue = (
         "testlet",
         "testletId"
       ) ?? context.bookletKey;
+    const validFrom =
+      readJsonRosterString(objectValue, "validFrom", "valid-from", "accessValidFrom") ??
+      context.validFrom;
+    const validTo =
+      readJsonRosterString(
+        objectValue,
+        "validTo",
+        "valid-to",
+        "validUntil",
+        "accessValidTo"
+      ) ?? context.validTo;
+    const validForValue = readJsonRosterString(
+      objectValue,
+      "validFor",
+      "valid-for",
+      "validForMinutes",
+      "accessValidForMinutes"
+    );
+    const parsedValidForMinutes = parseRosterValidForMinutes(validForValue);
+    const validForMinutes = parsedValidForMinutes ?? context.validForMinutes;
 
     if (loginKey) {
       if (!isParticipantRosterMode(mode)) {
@@ -700,12 +783,21 @@ const parseParticipantRosterJsonValue = (
           readJsonRosterString(objectValue, "firstName", "firstname", "givenName"),
           readJsonRosterString(objectValue, "lastName", "lastname", "familyName")
         ),
-        ...(password ? { password } : {})
+        ...(password ? { password } : {}),
+        ...(validFrom ? { validFrom } : {}),
+        ...(validTo ? { validTo } : {}),
+        ...(validForMinutes ? { validForMinutes } : {})
       });
       return;
     }
 
-    const childContext = { groupKey, bookletKey };
+    const childContext = {
+      groupKey,
+      bookletKey,
+      validFrom,
+      validTo,
+      validForMinutes
+    };
     for (const childValue of readJsonRosterEntries(
       objectValue.participants,
       objectValue.participant,
@@ -753,7 +845,10 @@ const parseParticipantRosterJsonValue = (
               "ref"
             ) ?? groupKey
           : groupKey,
-        bookletKey
+        bookletKey,
+        validFrom,
+        validTo,
+        validForMinutes
       });
     }
 
@@ -779,12 +874,21 @@ const parseParticipantRosterJsonValue = (
               "identifier",
               "ref"
             ) ?? bookletKey
-          : bookletKey
+          : bookletKey,
+        validFrom,
+        validTo,
+        validForMinutes
       });
     }
   };
 
-  visit(parsed, { groupKey: null, bookletKey: null });
+  visit(parsed, {
+    groupKey: null,
+    bookletKey: null,
+    validFrom: null,
+    validTo: null,
+    validForMinutes: null
+  });
   return entries;
 };
 
@@ -935,6 +1039,49 @@ const parseParticipantRosterXmlText = (
     "name",
     "label"
   );
+  const validFromContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validFrom",
+    "valid-from"
+  );
+  const validToContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validTo",
+    "valid-to",
+    "validUntil"
+  );
+  const validForContextRanges = collectXmlRosterContextRanges(
+    rosterText,
+    "group|groupRef|group-ref|class|classRef|class-ref",
+    "validFor",
+    "valid-for",
+    "validForMinutes"
+  );
+  const readXmlAccessWindow = (
+    attributes: Record<string, string>,
+    entryOffset: number
+  ): Pick<
+    ParsedParticipantRosterEntry,
+    "validFrom" | "validTo" | "validForMinutes"
+  > => {
+    const validFrom = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "validFrom", "valid-from")
+    ) ?? findNearestXmlRosterContextValue(validFromContextRanges, entryOffset);
+    const validTo = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "validTo", "valid-to", "validUntil")
+    ) ?? findNearestXmlRosterContextValue(validToContextRanges, entryOffset);
+    const validForValue = normalizeRosterTextValue(
+      readXmlAttribute(attributes, "validFor", "valid-for", "validForMinutes")
+    ) ?? findNearestXmlRosterContextValue(validForContextRanges, entryOffset);
+    const validForMinutes = parseRosterValidForMinutes(validForValue);
+    return {
+      ...(validFrom ? { validFrom } : {}),
+      ...(validTo ? { validTo } : {}),
+      ...(validForMinutes ? { validForMinutes } : {})
+    };
+  };
   for (const match of rosterText.matchAll(
     /<((?:[a-zA-Z_][\w.-]*:)?(?:testtaker|test-taker|participant|person|student|user|examinee))\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
   )) {
@@ -1074,7 +1221,8 @@ const parseParticipantRosterXmlText = (
         };
       })(),
       displayName,
-      ...(password ? { password } : {})
+      ...(password ? { password } : {}),
+      ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
 
@@ -1195,7 +1343,8 @@ const parseParticipantRosterXmlText = (
         };
       })(),
       displayName,
-      ...(password ? { password } : {})
+      ...(password ? { password } : {}),
+      ...readXmlAccessWindow(attributes, entryOffset)
     });
   }
 

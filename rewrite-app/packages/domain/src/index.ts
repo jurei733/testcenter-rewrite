@@ -166,6 +166,9 @@ export type ParticipantRosterEntry = {
   bookletAssignments?: ParticipantBookletAssignment[];
   displayName: string | null;
   passwordRequired: boolean;
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
   importedAt: string;
 };
 
@@ -469,6 +472,7 @@ export type ParticipantSession = {
   loginKey: string;
   groupKey: string;
   status: ParticipantSessionStatus;
+  validUntil?: string | null;
   createdAt: string;
 };
 
