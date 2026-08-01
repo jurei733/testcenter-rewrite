@@ -173,6 +173,42 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
       <article class="card" id="participantRoutePlayer">
         <h2>Current Test</h2>
+        <section
+          *ngIf="view.showFullscreenPrompt"
+          id="participantRouteFullscreenPrompt"
+          class="participant-fullscreen-prompt"
+          role="dialog"
+          aria-labelledby="participantRouteFullscreenPromptTitle"
+        >
+          <div>
+            <span>Display Check</span>
+            <strong id="participantRouteFullscreenPromptTitle">Use fullscreen for this test?</strong>
+            <p>The booklet requests a distraction-free fullscreen presentation.</p>
+          </div>
+          <div class="actions">
+            <button id="participantRouteEnterFullscreenButton" class="primary" type="button" (click)="view.requestFullscreen()">Enter Fullscreen</button>
+            <button id="participantRouteDismissFullscreenButton" class="ghost" type="button" (click)="view.dismissFullscreenPrompt()">Continue In Window</button>
+          </div>
+        </section>
+        <div
+          *ngIf="view.screenHeaderLabel || view.showFullscreenButton"
+          class="participant-runtime-toolbar"
+        >
+          <strong id="participantRouteScreenHeader" *ngIf="view.screenHeaderLabel">{{ view.screenHeaderLabel }}</strong>
+          <button
+            *ngIf="view.showFullscreenButton"
+            id="participantRouteFullscreenButton"
+            class="ghost"
+            type="button"
+            (click)="view.toggleFullscreen()"
+          >{{ view.fullscreenActive() ? "Exit Fullscreen" : "Fullscreen" }}</button>
+        </div>
+        <p
+          *ngIf="view.fullscreenStatusText"
+          id="participantRouteFullscreenStatus"
+          class="participant-fullscreen-status"
+          role="status"
+        >{{ view.fullscreenStatusText }}</p>
         <div class="record-card" [class.is-selected]="view.player.runStatus !== 'idle'">
           <div class="participant-meta-grid">
             <div>
@@ -194,7 +230,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           </div>
           <header>
             <div>
-              <h3 id="participantRouteUnit">{{ view.player.headline }}</h3>
+              <h3 *ngIf="view.showUnitTitle" id="participantRouteUnit">{{ view.player.headline }}</h3>
               <span id="participantRouteBooklet">{{ view.player.detail }}</span>
             </div>
             <span id="participantRouteStatus">{{ view.player.runStatus }}</span>

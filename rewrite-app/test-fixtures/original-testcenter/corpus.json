@@ -51,6 +51,32 @@
         "pagingMode": "separate",
         "headerContent": "unit"
       }
+    },
+    {
+      "fixture": "booklets/CY_Bklt_BkltConfig_2.xml",
+      "sourcePath": "sampledata/system-test/booklet-config/CY_Bklt_BkltConfig_2.xml",
+      "bookletKey": "Cy-Bklt_BkltConfig-2",
+      "displayLabel": "Bklt-config-2",
+      "unitKeys": [
+        "CY-Unit.Sample-101",
+        "CY-Unit.Sample-102",
+        "CY-Unit.Sample-104"
+      ],
+      "testletTimeMax": [["Tslt1", 2, "confirm"]],
+      "policy": {
+        "pagingMode": "separate",
+        "unitMenuEnabled": true,
+        "unitControls": "hidden",
+        "playerEnd": "never",
+        "restoreCurrentPageOnReturn": true,
+        "lockOnTermination": true,
+        "headerContent": "unit",
+        "unitTitle": false,
+        "fullscreenPrompt": true,
+        "fullscreenButton": true,
+        "showTimeLeft": true,
+        "warningMinutes": [1]
+      }
     }
   ],
   "adaptiveDependencyPackages": [

@@ -24,7 +24,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
+  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
 let smokeAdminSessionToken = "";
 
 const createStoredZipBuffer = entries => {
@@ -2020,6 +2020,30 @@ try {
     [participantEntrySignInSessionId, participantEntryStartedRunId],
     { timeout: 15_000 }
   );
+  await page.locator("#participantRouteFullscreenPrompt").waitFor();
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Entry" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteUnit").count(), 0);
+  await page.locator("#participantRouteFullscreenButton").waitFor();
+  await page.locator("#participantRouteEnterFullscreenButton").click();
+  await page.waitForFunction(() => Boolean(document.fullscreenElement));
+  await page
+    .locator("#participantRouteFullscreenStatus")
+    .filter({ hasText: "active" })
+    .waitFor();
+  assert.equal(
+    (await page.locator("#participantRouteFullscreenButton").textContent())?.trim(),
+    "Exit Fullscreen"
+  );
+  await page.locator("#participantRouteFullscreenButton").click();
+  await page.waitForFunction(() => !document.fullscreenElement);
+  await page
+    .locator("#participantRouteFullscreenStatus")
+    .filter({ hasText: "closed" })
+    .waitFor();
+  await page.locator("#participantRouteFullscreenPrompt").waitFor({ state: "detached" });
   stopAfter("participant-entry-start-after-sign-in");
 
   logStep("participant-entry-protected-password");

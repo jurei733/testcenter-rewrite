@@ -967,6 +967,66 @@ pre {
   gap: 10px;
 }
 
+.participant-fullscreen-prompt,
+.participant-runtime-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(31, 92, 84, 0.28);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(215, 235, 231, 0.92), rgba(255, 252, 246, 0.94));
+}
+
+.participant-fullscreen-prompt span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--secondary);
+  font: 700 11px/1.2 "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.participant-fullscreen-prompt strong,
+.participant-runtime-toolbar strong {
+  display: block;
+  font-size: 18px;
+}
+
+.participant-fullscreen-prompt p,
+.participant-fullscreen-status {
+  margin: 5px 0 0;
+}
+
+.participant-runtime-toolbar {
+  min-height: 60px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.participant-runtime-toolbar button {
+  margin-left: auto;
+}
+
+.participant-fullscreen-status {
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .participant-fullscreen-prompt,
+  .participant-runtime-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .participant-runtime-toolbar button {
+    margin-left: 0;
+  }
+}
+
 .participant-meta-grid div {
   display: grid;
   gap: 5px;

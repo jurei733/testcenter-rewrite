@@ -284,6 +284,10 @@ export class RewriteAppContentService {
       `${payload.deletion.fileName} and its unused derivatives were deleted.`
     );
     await this.refreshContentReads();
+    this.contentState.sourcePackageId = "";
+    this.contentState.importJobId = "";
+    this.contentState.contentReleaseId = "";
+    host.persistShellState();
     return payload;
   }
 

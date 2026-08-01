@@ -178,7 +178,11 @@ export class ParticipantViewFacade {
     "not_saved";
   testletUnlockCode = "";
   readonly timerTick = signal(Date.now());
+  readonly fullscreenActive = signal(false);
+  readonly fullscreenStatus = signal("");
   private copiedSessionEntryLink = "";
+  private fullscreenPromptDismissedRunId = "";
+  private fullscreenStatusRunId = "";
   private timerTickerHandle: number | null = null;
   private timerExpiryRefreshPending = false;
   private activeTimerWarning: {
@@ -196,9 +200,17 @@ export class ParticipantViewFacade {
     status: "running" | "paused";
   } | null = null;
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private readonly fullscreenChangeListener = (): void => {
+    this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
+  };
 
   init(): void {
     this.viewState.setActiveView("participant");
+    globalThis.document?.addEventListener(
+      "fullscreenchange",
+      this.fullscreenChangeListener
+    );
+    this.fullscreenChangeListener();
     this.startTimerTicker();
   }
 
@@ -207,6 +219,10 @@ export class ParticipantViewFacade {
       globalThis.window?.clearInterval(this.timerTickerHandle);
       this.timerTickerHandle = null;
     }
+    globalThis.document?.removeEventListener(
+      "fullscreenchange",
+      this.fullscreenChangeListener
+    );
   }
 
   persistState(): void {
@@ -658,6 +674,108 @@ export class ParticipantViewFacade {
     }
 
     return this.describeParticipantEntryIssue(error);
+  }
+
+  get showUnitTitle(): boolean {
+    return this.readCurrentRunState()?.booklet.policy.display.unitTitle ?? true;
+  }
+
+  get screenHeaderLabel(): string {
+    const currentState = this.readCurrentRunState();
+    if (!currentState) {
+      return "";
+    }
+    switch (currentState.booklet.policy.display.headerContent) {
+      case "booklet":
+        return currentState.booklet.displayLabel;
+      case "block": {
+        const testletKey = currentState.currentUnit.testletPath.at(-1);
+        return (
+          currentState.booklet.testlets.find(
+            testlet => testlet.testletKey === testletKey
+          )?.displayLabel ?? ""
+        );
+      }
+      case "unit":
+        return currentState.currentUnit.displayLabel ?? "";
+      default:
+        return "";
+    }
+  }
+
+  get showFullscreenPrompt(): boolean {
+    const currentState = this.readCurrentRunState();
+    return Boolean(
+      currentState &&
+        currentState.testRun.status !== "completed" &&
+        currentState.booklet.policy.display.fullscreenPrompt &&
+        !this.fullscreenActive() &&
+        this.fullscreenPromptDismissedRunId !== currentState.testRun.testRunId
+    );
+  }
+
+  get showFullscreenButton(): boolean {
+    return Boolean(
+      this.readCurrentRunState()?.booklet.policy.display.fullscreenButton
+    );
+  }
+
+  get fullscreenStatusText(): string {
+    const testRunId = this.readCurrentRunState()?.testRun.testRunId ?? "";
+    return testRunId && testRunId === this.fullscreenStatusRunId
+      ? this.fullscreenStatus()
+      : "";
+  }
+
+  dismissFullscreenPrompt(): void {
+    this.fullscreenPromptDismissedRunId =
+      this.readCurrentRunState()?.testRun.testRunId ?? "";
+    this.setFullscreenStatus("Fullscreen prompt dismissed for this test run.");
+  }
+
+  async requestFullscreen(): Promise<void> {
+    const currentState = this.readCurrentRunState();
+    if (currentState) {
+      this.fullscreenPromptDismissedRunId = currentState.testRun.testRunId;
+    }
+    const root = globalThis.document?.documentElement;
+    if (!root?.requestFullscreen) {
+      this.setFullscreenStatus(
+        "Fullscreen is unavailable in this browser. Continue in the current window."
+      );
+      return;
+    }
+    try {
+      await root.requestFullscreen();
+      this.fullscreenChangeListener();
+      this.setFullscreenStatus("Fullscreen is active.");
+    } catch {
+      this.setFullscreenStatus(
+        "Fullscreen could not be started. Use the browser fullscreen control or continue in the current window."
+      );
+    }
+  }
+
+  async toggleFullscreen(): Promise<void> {
+    if (!this.fullscreenActive()) {
+      await this.requestFullscreen();
+      return;
+    }
+    try {
+      await globalThis.document?.exitFullscreen();
+      this.fullscreenChangeListener();
+      this.setFullscreenStatus("Fullscreen closed.");
+    } catch {
+      this.setFullscreenStatus(
+        "Fullscreen could not be closed. Use the browser fullscreen control."
+      );
+    }
+  }
+
+  private setFullscreenStatus(message: string): void {
+    this.fullscreenStatusRunId =
+      this.readCurrentRunState()?.testRun.testRunId ?? "";
+    this.fullscreenStatus.set(message);
   }
 
   get veronaPlayer(): ParticipantVeronaPlayerState | null {

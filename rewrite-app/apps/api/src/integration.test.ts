@@ -6085,11 +6085,21 @@ test("original Testcenter compatibility corpus imports representative booklets",
     unitKeys: string[];
     stateKeys?: string[];
     showRules?: Array<[string, string, string]>;
+    testletTimeMax?: Array<[string, number, string]>;
     policy: {
       logPolicy?: string;
       pagingMode?: string;
       headerContent?: string;
       unitMenuEnabled?: boolean;
+      unitControls?: string;
+      playerEnd?: string;
+      restoreCurrentPageOnReturn?: boolean;
+      lockOnTermination?: boolean;
+      unitTitle?: boolean;
+      fullscreenPrompt?: boolean;
+      fullscreenButton?: boolean;
+      showTimeLeft?: boolean;
+      warningMinutes?: number[];
     };
   };
   type InvalidXmlExpectation = {
@@ -6178,15 +6188,34 @@ test("original Testcenter compatibility corpus imports representative booklets",
               bookletKey: string;
               displayLabel: string;
               policy?: {
-                navigation: { unitMenuEnabled: boolean };
-                player: { logPolicy: string; pagingMode: string };
-                display: { headerContent: string };
+                navigation: {
+                  unitMenuEnabled: boolean;
+                  unitControls: string;
+                  playerEnd: string;
+                };
+                player: {
+                  logPolicy: string;
+                  pagingMode: string;
+                  restoreCurrentPageOnReturn: boolean;
+                };
+                completion: { lockOnTermination: boolean };
+                display: {
+                  headerContent: string;
+                  unitTitle: boolean;
+                  fullscreenPrompt: boolean;
+                  fullscreenButton: boolean;
+                };
+                timing: {
+                  showTimeLeft: boolean;
+                  warningMinutes: number[];
+                };
               };
               stateEntries?: Array<{ stateKey: string }>;
               testletEntries?: Array<{
                 testletKey: string;
                 restrictions?: {
                   show?: { stateKey: string; optionKey: string };
+                  timeMax?: { minutes: number; leave: string };
                 };
               }>;
               unitEntries: Array<{ unitKey: string }>;
@@ -6228,6 +6257,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
         expectation.sourcePath
       );
     }
+    if (expectation.testletTimeMax) {
+      assert.deepEqual(
+        booklet.testletEntries?.flatMap(testlet => {
+          const timeMax = testlet.restrictions?.timeMax;
+          return timeMax
+            ? [[testlet.testletKey, timeMax.minutes, timeMax.leave]]
+            : [];
+        }),
+        expectation.testletTimeMax,
+        expectation.sourcePath
+      );
+    }
     assert.ok(booklet.policy, expectation.sourcePath);
     if (expectation.policy.logPolicy) {
       assert.equal(booklet.policy.player.logPolicy, expectation.policy.logPolicy);
@@ -6245,6 +6286,57 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.navigation.unitMenuEnabled,
         expectation.policy.unitMenuEnabled
+      );
+    }
+    if (expectation.policy.unitControls) {
+      assert.equal(
+        booklet.policy.navigation.unitControls,
+        expectation.policy.unitControls
+      );
+    }
+    if (expectation.policy.playerEnd) {
+      assert.equal(
+        booklet.policy.navigation.playerEnd,
+        expectation.policy.playerEnd
+      );
+    }
+    if (expectation.policy.restoreCurrentPageOnReturn !== undefined) {
+      assert.equal(
+        booklet.policy.player.restoreCurrentPageOnReturn,
+        expectation.policy.restoreCurrentPageOnReturn
+      );
+    }
+    if (expectation.policy.lockOnTermination !== undefined) {
+      assert.equal(
+        booklet.policy.completion.lockOnTermination,
+        expectation.policy.lockOnTermination
+      );
+    }
+    if (expectation.policy.unitTitle !== undefined) {
+      assert.equal(booklet.policy.display.unitTitle, expectation.policy.unitTitle);
+    }
+    if (expectation.policy.fullscreenPrompt !== undefined) {
+      assert.equal(
+        booklet.policy.display.fullscreenPrompt,
+        expectation.policy.fullscreenPrompt
+      );
+    }
+    if (expectation.policy.fullscreenButton !== undefined) {
+      assert.equal(
+        booklet.policy.display.fullscreenButton,
+        expectation.policy.fullscreenButton
+      );
+    }
+    if (expectation.policy.showTimeLeft !== undefined) {
+      assert.equal(
+        booklet.policy.timing.showTimeLeft,
+        expectation.policy.showTimeLeft
+      );
+    }
+    if (expectation.policy.warningMinutes) {
+      assert.deepEqual(
+        booklet.policy.timing.warningMinutes,
+        expectation.policy.warningMinutes
       );
     }
   }
