@@ -1,6 +1,10 @@
 import { ApplicationRef, Injectable, inject } from "@angular/core";
+import { Router } from "@angular/router";
 
-import { parseParticipantRosterText } from "@testcenter-rewrite-app/contracts";
+import {
+  mapOriginalTestcenterOperationalLoginToMonitorRole,
+  parseParticipantRosterText
+} from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
   ImportParticipantRosterResponse,
@@ -65,6 +69,7 @@ export class RuntimeViewFacade {
   private readonly applicationRef = inject(ApplicationRef);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly router = inject(Router);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly monitorBatchSelection = new Set<string>();
@@ -830,43 +835,91 @@ export class RuntimeViewFacade {
       items: ImportParticipantRosterResponse["operationalLoginCandidates"];
     }>(this.runtime.operationalLoginCandidatesView);
     return Array.isArray(payload?.items)
-      ? payload.items.map(candidate => ({
-          headline: candidate.loginKey,
-          subline: "Explicit role mapping required before account creation",
-          badges: [
-            candidate.loginMode,
-            candidate.groupKey ?? "group missing",
-            candidate.passwordRequired ? "password protected" : "passwordless"
-          ],
-          rows: [
-            { label: "Original Mode", value: candidate.loginMode },
-            { label: "Original Group", value: candidate.groupKey ?? "none" },
-            {
-              label: "Profiles",
-              value:
-                candidate.profileIds.length > 0
-                  ? candidate.profileIds.join(" | ")
-                  : "none"
-            },
-            {
-              label: "Valid From",
-              value: candidate.validFrom ?? "immediately"
-            },
-            { label: "Valid To", value: candidate.validTo ?? "unlimited" },
-            {
-              label: "Valid For",
-              value: candidate.validForMinutes
-                ? `${candidate.validForMinutes} minute(s)`
-                : "unlimited"
-            },
-            {
-              label: "Migration Decision",
-              value:
-                "Choose a non-escalating monitor/sys-check role mapping; no admin account was created."
-            }
-          ]
-        }))
+      ? payload.items.map(candidate => {
+          const roleDraft =
+            mapOriginalTestcenterOperationalLoginToMonitorRole(candidate);
+          return {
+            headline: candidate.loginKey,
+            subline: roleDraft
+              ? `Ready to prepare a ${roleDraft.role} account draft`
+              : "No non-escalating account mapping is available yet",
+            badges: [
+              candidate.loginMode,
+              candidate.groupKey ?? "group missing",
+              candidate.passwordRequired ? "password protected" : "passwordless"
+            ],
+            rows: [
+              { label: "Original Mode", value: candidate.loginMode },
+              { label: "Original Group", value: candidate.groupKey ?? "none" },
+              {
+                label: "Profiles",
+                value:
+                  candidate.profileIds.length > 0
+                    ? candidate.profileIds.join(" | ")
+                    : "none"
+              },
+              {
+                label: "Valid From",
+                value: candidate.validFrom ?? "immediately"
+              },
+              { label: "Valid To", value: candidate.validTo ?? "unlimited" },
+              {
+                label: "Valid For",
+                value: candidate.validForMinutes
+                  ? `${candidate.validForMinutes} minute(s)`
+                  : "unlimited"
+              },
+              {
+                label: "Migration Decision",
+                value: roleDraft
+                  ? `Create a ${roleDraft.role} account with a newly assigned password; the source password remains unavailable.`
+                  : "sys-check-login still requires a dedicated protected system-check account model."
+              }
+            ],
+            ...(roleDraft
+              ? {
+                  actionLabel: "Prepare Monitor Account",
+                  actionPayload: {
+                    operationalLoginMigration: "prepareMonitorAccount",
+                    username: candidate.loginKey,
+                    role: roleDraft.role,
+                    groupKey: roleDraft.groupKey ?? ""
+                  }
+                }
+              : {})
+          };
+        })
       : [];
+  }
+
+  prepareOperationalLoginAccount(item: RecordCollectionItem): void {
+    if (
+      item.actionPayload?.operationalLoginMigration !== "prepareMonitorAccount"
+    ) {
+      return;
+    }
+    const role = item.actionPayload.role;
+    if (role !== "group_monitor" && role !== "study_monitor") {
+      return;
+    }
+
+    const ops = this.uiState.ops;
+    ops.adminCreateUsername = item.actionPayload.username?.trim() ?? "";
+    ops.adminCreateDisplayName = ops.adminCreateUsername;
+    ops.adminCreatePassword = "";
+    ops.adminCreateRole = role;
+    ops.adminCreateTenantKey = this.uiState.workspace.tenantKey.trim();
+    ops.adminCreateWorkspaceKey = this.uiState.workspace.workspaceKey.trim();
+    ops.adminCreateGroupKey =
+      role === "group_monitor"
+        ? item.actionPayload.groupKey?.trim() ?? ""
+        : "";
+    this.feedback.rememberActivity(
+      "Monitor Account Draft Prepared",
+      `${ops.adminCreateUsername} was mapped to ${role}. Assign a new password before creating the account; the original password was not copied.`
+    );
+    this.persistState();
+    void this.router.navigateByUrl("/ops");
   }
 
   get entryLinksCsvPreview(): string {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  mapOriginalTestcenterOperationalLoginToMonitorRole,
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText
 } from "./index.js";
@@ -251,6 +252,24 @@ describe("parseParticipantRosterText", () => {
       }
     ]);
     assert.equal(JSON.stringify(operationalLogins).includes("secret"), false);
+    assert.deepEqual(
+      mapOriginalTestcenterOperationalLoginToMonitorRole(operationalLogins[0]!),
+      { role: "group_monitor", groupKey: "scheduled-operators" }
+    );
+    assert.equal(
+      mapOriginalTestcenterOperationalLoginToMonitorRole(operationalLogins[1]!),
+      null
+    );
+    assert.deepEqual(
+      mapOriginalTestcenterOperationalLoginToMonitorRole({
+        loginKey: "study-monitor",
+        loginMode: "monitor-study",
+        groupKey: "ignored-study-group",
+        passwordRequired: true,
+        profileIds: []
+      }),
+      { role: "study_monitor", groupKey: null }
+    );
   });
 
   it("inherits Original Testcenter access windows and accepts JSON/CSV aliases", () => {

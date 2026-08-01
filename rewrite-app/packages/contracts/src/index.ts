@@ -108,6 +108,23 @@ export type OriginalTestcenterOperationalLoginCandidate = {
   validForMinutes?: number | null;
 };
 
+export type OriginalTestcenterMonitorRoleDraft = {
+  role: Extract<AdminRole, "group_monitor" | "study_monitor">;
+  groupKey: string | null;
+};
+
+export const mapOriginalTestcenterOperationalLoginToMonitorRole = (
+  candidate: OriginalTestcenterOperationalLoginCandidate
+): OriginalTestcenterMonitorRoleDraft | null => {
+  if (candidate.loginMode === "monitor-study") {
+    return { role: "study_monitor", groupKey: null };
+  }
+  if (candidate.loginMode === "monitor-group" && candidate.groupKey) {
+    return { role: "group_monitor", groupKey: candidate.groupKey };
+  }
+  return null;
+};
+
 export type ParticipantRosterSource =
   | string
   | Record<string, unknown>

@@ -36,8 +36,9 @@ participant rows and show the candidates in a dedicated Runtime card;
 operational-only rosters return the
 stable `participant_roster_operational_only` error. Administrators can create
 non-escalating `group_monitor` and `study_monitor` accounts with durable
-workspace/group scope; automatic candidate-to-account conversion remains a
-migration follow-up.
+workspace/group scope. Supported candidates can prepare that account form in
+one action, but require a newly assigned password because the source password
+is deliberately never exposed or copied.
 
 ## Workspace Shape
 

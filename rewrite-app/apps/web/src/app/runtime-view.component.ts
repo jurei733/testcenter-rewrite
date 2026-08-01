@@ -412,6 +412,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Operational Login Migration Candidates"
         subtitle="Password-redacted original Testtakers logins that need an explicit non-escalating role mapping."
         [items]="view.operationalLoginCandidateItems"
+        (itemAction)="view.prepareOperationalLoginAccount($event)"
         emptyState="The latest roster import did not contain operational logins."
       ></app-record-collection>
 

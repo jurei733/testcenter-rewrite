@@ -4465,6 +4465,25 @@ try {
   ) {
     throw new Error("Operational login migration card exposed a source password.");
   }
+  await operationalLoginCandidateCard
+    .getByRole("button", { name: "Prepare Monitor Account" })
+    .click();
+  await page.waitForURL(/\/app\/ops$/);
+  await expectInputValue("#adminCreateUsername", "entry-group-monitor");
+  assert.equal(
+    (await page.locator("#adminCreateRole option:checked").textContent())?.trim(),
+    "group_monitor"
+  );
+  await expectInputValue("#adminCreateTenantKey", tenantKey);
+  await expectInputValue("#adminCreateWorkspaceKey", workspaceKey);
+  await expectInputValue(
+    "#adminCreateGroupKey",
+    "group:testcenter-login-entry"
+  );
+  await expectInputValue("#adminCreatePassword", "");
+  await expectButtonSelectorDisabled("#adminCreateUserButton");
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
   stopAfter("operational-login-candidates");
   await fillAndCommit(
     "#entryRosterText",
