@@ -6058,7 +6058,16 @@ const validateTestcenterXmlSourceDocument = (
       }
       validateLastChange(codingSchemeReference, "CodingSchemeRef");
     }
-    validateLastChange(xmlChildrenNamed(root, "VariablesRef")[0], "VariablesRef");
+    const variablesReference = xmlChildrenNamed(root, "VariablesRef")[0];
+    validateLastChange(variablesReference, "VariablesRef");
+    if (variablesReference && !xmlElementText(variablesReference)) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_variables_reference_invalid",
+          `Original Testcenter unit '${sourceFileName}' contains a VariablesRef without a resource path.`
+        )
+      );
+    }
 
     const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
     for (const dependency of dependencies ? xmlChildElements(dependencies) : []) {
@@ -8440,6 +8449,7 @@ const extractZipUnitDefinition = (
 type DeclaredTestcenterUnitCrossReferences = {
   playerKey: string | null;
   definitionReference: string | null;
+  variablesReference: string | null;
   playerResourceReferences: string[];
 };
 
@@ -8487,6 +8497,8 @@ const extractDeclaredTestcenterUnitCrossReferences = (
     definition && xmlElementLocalName(definition) === "DefinitionRef"
       ? definitionReferenceAttribute || xmlElementText(definition) || null
       : null;
+  const variablesReference =
+    xmlElementText(xmlChildrenNamed(root, "VariablesRef")[0]) || null;
   const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
   const playerResourceReferences = dependencies
     ? xmlChildElements(dependencies)
@@ -8505,6 +8517,7 @@ const extractDeclaredTestcenterUnitCrossReferences = (
   return {
     playerKey,
     definitionReference: definitionReference || null,
+    variablesReference,
     playerResourceReferences: [...new Set(playerResourceReferences)]
   };
 };
@@ -9048,6 +9061,31 @@ const validateZipXmlEntries = (
           createImportDiagnostic(
             "source_document_unit_definition_unreadable",
             `Unit definition ZIP entry '${definitionEntry.fileName}' could not be read.`
+          )
+        );
+      }
+    }
+    if (declaredUnitReferences?.variablesReference) {
+      const variablesEntry = findZipUnitReferencedEntry(
+        manifestExtraction,
+        entry,
+        declaredUnitReferences.variablesReference,
+        manifestResources
+      );
+      if (!variablesEntry) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_variables_missing",
+            `Unit ZIP entry '${entry.fileName}' references missing variables resource '${declaredUnitReferences.variablesReference}'.`
+          )
+        );
+      } else if (
+        readZipEntryText(manifestExtraction.zipBuffer, variablesEntry) === null
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_unit_variables_unreadable",
+            `Unit variables ZIP entry '${variablesEntry.fileName}' could not be read.`
           )
         );
       }

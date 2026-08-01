@@ -6960,6 +6960,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_unit_child_version_invalid"
     },
     {
+      fileName: "unit-empty-variables-ref.xml",
+      sourceDocument: validUnitXml.replace(
+        "  <BaseVariables>",
+        "  <VariablesRef>  </VariablesRef>\n\n  <BaseVariables>"
+      ),
+      diagnosticCode: "source_document_variables_reference_invalid"
+    },
+    {
       fileName: "unit-14-page.xml",
       sourceDocument: validUnitXml
         .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
@@ -9288,6 +9296,7 @@ test("original Testcenter Unit cross-file references block incomplete packages",
             <resource identifier="UNIT.CROSS" href="units/unit.xml" />
             <resource identifier="cross-player@6.0" href="players/cross-player.html" />
             <resource identifier="../definitions/unit.voud" href="definitions/unit.voud" />
+            <resource identifier="UNIT.CROSS.VARIABLES" href="variables/unit.variables.json" />
             <resource identifier="runtime-assets.bin" href="resources/runtime-assets.bin" />
           </resources>
         </manifest>
@@ -9309,6 +9318,7 @@ test("original Testcenter Unit cross-file references block incomplete packages",
               xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
           <Metadata><Id>UNIT.CROSS</Id><Label>Cross-file unit</Label></Metadata>
           <DefinitionRef player="cross-player@6.0">../definitions/unit.voud</DefinitionRef>
+          <VariablesRef>UNIT.CROSS.VARIABLES</VariablesRef>
           <Dependencies><File for="player">runtime-assets.bin</File></Dependencies>
         </Unit>
       `
@@ -9321,6 +9331,11 @@ test("original Testcenter Unit cross-file references block incomplete packages",
       fileName: "export/players/cross-player.html",
       content:
         '<!doctype html><script type="application/ld+json">{"type":"player","id":"cross-player","specVersion":"6.0"}</script><main>Cross player</main>'
+    },
+    {
+      fileName: "export/variables/unit.variables.json",
+      content:
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}'
     },
     {
       fileName: "export/resources/runtime-assets.bin",
@@ -9347,6 +9362,11 @@ test("original Testcenter Unit cross-file references block incomplete packages",
       fileName: "unit-cross-reference-missing-resource.zip",
       omittedEntry: "export/resources/runtime-assets.bin",
       diagnosticCode: "source_document_unit_player_resource_missing"
+    },
+    {
+      fileName: "unit-cross-reference-missing-variables.zip",
+      omittedEntry: "export/variables/unit.variables.json",
+      diagnosticCode: "source_document_unit_variables_missing"
     }
   ];
 
