@@ -321,6 +321,9 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/source-packages.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/download`
+- `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/deletion-readiness`
+- `DELETE /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}`
+- `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/replacements`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/source-packages/{sourcePackageId}/retry-import`
 - `POST /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/import-jobs`
@@ -377,7 +380,9 @@ The added read side now makes the first slice inspectable:
 - study monitor participant matrix CSV export flattens participant-by-unit progress with session/run status, expected/answered flags, response lengths, review counts, and roster display context, and can be narrowed by the same login/group/booklet/unit/status/answer/limit filters used by the operator matrix
 - study monitor run-detail CSV export flattens the selected run into unit rows with expected/current/answered state, response length, review count, and response text for per-participant support handoff
 - open-run reads and CSV export flatten the current activation-blocking runs with participant, booklet, unit, status, timestamp, and saved-roster context for operator handoff, filterable by login, group, booklet, session, run, unit, status, and limit
-- source-package listing and CSV export show uploaded package files together with exact stored byte size, download availability, import/release dependency counts, latest import attempt, and package structure counts, filterable by status, media type, file name, latest import status, and limit; list responses omit the potentially large source document, while a protected binary route downloads text/JSON/XML or base64 ZIP uploads with safe attachment names and without routing file bytes through a JSON response
+- source-package listing and CSV export show uploaded package files together with exact stored byte size, download availability, import/release dependency counts, deletion safety, latest import attempt, and package structure counts, filterable by status, media type, file name, latest import status, and limit; list responses omit the potentially large source document, while a protected binary route downloads text/JSON/XML or base64 ZIP uploads with safe attachment names and without routing file bytes through a JSON response
+- source-package deletion readiness exposes active imports/releases and every participant-session/test-run reference; exact-file-name confirmation deletes only a rechecked safe aggregate and its unused import/release derivatives, while dependency changes fail closed and every successful deletion is audited
+- source-package replacement preserves the selected package, creates a new immutable package identity, runs its import immediately, selects the staged result in Angular, and records old/new package lineage in the workspace activity trail; retry is rejected for already accepted packages so successful import lineages cannot be overwritten in place
 - source-package detail now shows the full retry/import history and any releases that were produced from that package
 - import-job listing and CSV export show completed and failed imports together with persisted diagnostics and source-package context, filterable by status, source package, and limit
 - import-job detail now resolves a single import attempt together with its source package and resulting release, if one exists

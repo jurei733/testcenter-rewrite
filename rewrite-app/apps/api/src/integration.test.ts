@@ -1337,6 +1337,41 @@ test("operator API can require a platform-admin bearer session", async () => {
       "admin_session_missing"
     );
 
+    const rejectedSourcePackageDeletionReadiness = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages/not-authorized/deletion-readiness"
+    );
+    assert.equal(rejectedSourcePackageDeletionReadiness.status, 401);
+    assert.equal(
+      rejectedSourcePackageDeletionReadiness.body.error,
+      "admin_session_missing"
+    );
+
+    const rejectedSourcePackageDelete = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages/not-authorized",
+      { method: "DELETE", body: { confirmation: "not-authorized" } }
+    );
+    assert.equal(rejectedSourcePackageDelete.status, 401);
+    assert.equal(rejectedSourcePackageDelete.body.error, "admin_session_missing");
+
+    const rejectedSourcePackageReplace = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages/not-authorized/replacements",
+      {
+        method: "POST",
+        body: {
+          fileName: "not-authorized.xml",
+          mediaType: "application/xml",
+          sourceDocument: "<assessment />"
+        }
+      }
+    );
+    assert.equal(rejectedSourcePackageReplace.status, 401);
+    assert.equal(rejectedSourcePackageReplace.body.error, "admin_session_missing");
+
     const rejectedImportJobCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/import-jobs.csv"
@@ -4275,6 +4310,8 @@ test("failed import can be retried on the same source package", async () => {
       downloadAvailable: boolean;
       importJobCount: number;
       contentReleaseCount: number;
+      canDelete: boolean;
+      blockingDependencyCount: number;
     }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
@@ -4301,6 +4338,8 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(acceptedSourcePackages.body.items[0]?.downloadAvailable, true);
   assert.equal(acceptedSourcePackages.body.items[0]?.importJobCount, 2);
   assert.equal(acceptedSourcePackages.body.items[0]?.contentReleaseCount, 1);
+  assert.equal(acceptedSourcePackages.body.items[0]?.canDelete, true);
+  assert.equal(acceptedSourcePackages.body.items[0]?.blockingDependencyCount, 0);
 
   const sourcePackageDownload = await fetch(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${sourcePackage.body.sourcePackage.sourcePackageId}/download`
@@ -4325,12 +4364,12 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(sourcePackagesCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     sourcePackagesCsv.body,
-    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,fileSizeBytes,downloadAvailable,importJobCount,contentReleaseCount,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
+    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,fileSizeBytes,downloadAvailable,importJobCount,contentReleaseCount,canDelete,blockingDependencyCount,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
   );
   assert.match(
     sourcePackagesCsv.body,
     new RegExp(
-      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${Buffer.byteLength(persistedFixedSourceDocument)}","true","2","1","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
+      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${Buffer.byteLength(persistedFixedSourceDocument)}","true","2","1","true","0","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
     )
   );
 
@@ -4461,6 +4500,285 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(
     invalidContentReleaseLimit.body.error,
     "content_release_limit_invalid"
+  );
+});
+
+test("source-package replacement preserves versions and deletion honors dependencies", async () => {
+  const tenantKey = "integration-tenant-source-lifecycle";
+  const workspaceKey = "integration-workspace-source-lifecycle";
+  const sourceDocument = (bookletKey: string, unitKey: string): string =>
+    `<assessment><booklet key="${bookletKey}" label="${bookletKey}"><unit key="${unitKey}" label="${unitKey}" /></booklet></assessment>`;
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const original = await requestJson<{
+    sourcePackage: { sourcePackageId: string; fileName: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "lifecycle-v1.xml",
+      mediaType: "application/xml",
+      sourceDocument: sourceDocument("booklet:lifecycle-v1", "unit:lifecycle-v1")
+    }
+  });
+  const originalImport = await requestJson<{
+    importJob: { importJobId: string; status: string };
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: original.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(originalImport.body.importJob.status, "completed");
+
+  const rejectedInPlaceRetry = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${original.body.sourcePackage.sourcePackageId}/retry-import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "lifecycle-v2.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument(
+          "booklet:lifecycle-v2",
+          "unit:lifecycle-v2"
+        )
+      }
+    }
+  );
+  assert.equal(rejectedInPlaceRetry.status, 409);
+  assert.equal(rejectedInPlaceRetry.body.error, "source_package_retry_not_allowed");
+
+  const replacement = await requestJson<{
+    replacedSourcePackage: { sourcePackageId: string; fileName: string };
+    replacementSourcePackage: {
+      sourcePackageId: string;
+      fileName: string;
+      status: string;
+    };
+    importJob: { importJobId: string; status: string };
+    stagedContentRelease: { contentReleaseId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${original.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "lifecycle-v2.xml",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument(
+          "booklet:lifecycle-v2",
+          "unit:lifecycle-v2"
+        )
+      }
+    }
+  );
+  assert.equal(replacement.status, 201);
+  assert.equal(
+    replacement.body.replacedSourcePackage.sourcePackageId,
+    original.body.sourcePackage.sourcePackageId
+  );
+  assert.notEqual(
+    replacement.body.replacementSourcePackage.sourcePackageId,
+    original.body.sourcePackage.sourcePackageId
+  );
+  assert.equal(replacement.body.replacementSourcePackage.status, "accepted");
+  assert.equal(replacement.body.importJob.status, "completed");
+
+  const packagesAfterReplacement = await requestJson<{
+    items: Array<{ sourcePackage: { sourcePackageId: string } }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
+  assert.deepEqual(
+    new Set(
+      packagesAfterReplacement.body.items.map(
+        item => item.sourcePackage.sourcePackageId
+      )
+    ),
+    new Set([
+      original.body.sourcePackage.sourcePackageId,
+      replacement.body.replacementSourcePackage.sourcePackageId
+    ])
+  );
+
+  const activateOriginal = await requestJson<{
+    contentRelease: { status: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${originalImport.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "source-lifecycle-test" }
+    }
+  );
+  assert.equal(activateOriginal.status, 200);
+  assert.equal(activateOriginal.body.contentRelease.status, "active");
+
+  const participantSignIn = await requestJson<{
+    participantSession: { participantSessionId: string; contentReleaseId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "source-lifecycle-student"
+    }
+  });
+  assert.equal(participantSignIn.status, 200);
+  assert.equal(
+    participantSignIn.body.participantSession.contentReleaseId,
+    originalImport.body.stagedContentRelease.contentReleaseId
+  );
+
+  const activateReplacement = await requestJson<{
+    contentRelease: { status: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${replacement.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      body: { activatedByActorId: "source-lifecycle-test" }
+    }
+  );
+  assert.equal(activateReplacement.status, 200);
+
+  const originalReadiness = await requestJson<{
+    deletionReadiness: {
+      canDelete: boolean;
+      blockingDependencies: Array<{
+        dependencyType: string;
+        dependencyId: string;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${original.body.sourcePackage.sourcePackageId}/deletion-readiness`
+  );
+  assert.equal(originalReadiness.status, 200);
+  assert.equal(originalReadiness.body.deletionReadiness.canDelete, false);
+  assert.deepEqual(
+    originalReadiness.body.deletionReadiness.blockingDependencies.map(
+      blocker => [blocker.dependencyType, blocker.dependencyId]
+    ),
+    [["participant_session", participantSignIn.body.participantSession.participantSessionId]]
+  );
+
+  const blockedDelete = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${original.body.sourcePackage.sourcePackageId}`,
+    {
+      method: "DELETE",
+      body: { confirmation: "lifecycle-v1.xml" }
+    }
+  );
+  assert.equal(blockedDelete.status, 409);
+  assert.equal(blockedDelete.body.error, "source_package_delete_blocked");
+
+  const replacementReadiness = await requestJson<{
+    deletionReadiness: {
+      canDelete: boolean;
+      blockingDependencies: Array<{ dependencyType: string }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${replacement.body.replacementSourcePackage.sourcePackageId}/deletion-readiness`
+  );
+  assert.equal(replacementReadiness.body.deletionReadiness.canDelete, false);
+  assert.equal(
+    replacementReadiness.body.deletionReadiness.blockingDependencies[0]
+      ?.dependencyType,
+    "active_content_release"
+  );
+
+  const disposable = await requestJson<{
+    sourcePackage: { sourcePackageId: string; fileName: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "disposable.xml",
+      mediaType: "application/xml",
+      sourceDocument: sourceDocument("booklet:disposable", "unit:disposable")
+    }
+  });
+  const disposableImport = await requestJson<{
+    importJob: { importJobId: string };
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: disposable.body.sourcePackage.sourcePackageId }
+  });
+  const disposableReadiness = await requestJson<{
+    deletionReadiness: {
+      canDelete: boolean;
+      importJobs: unknown[];
+      contentReleases: unknown[];
+      blockingDependencies: unknown[];
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${disposable.body.sourcePackage.sourcePackageId}/deletion-readiness`
+  );
+  assert.equal(disposableReadiness.body.deletionReadiness.canDelete, true);
+  assert.equal(disposableReadiness.body.deletionReadiness.importJobs.length, 1);
+  assert.equal(disposableReadiness.body.deletionReadiness.contentReleases.length, 1);
+  assert.equal(
+    disposableReadiness.body.deletionReadiness.blockingDependencies.length,
+    0
+  );
+
+  const mismatchedConfirmation = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${disposable.body.sourcePackage.sourcePackageId}`,
+    { method: "DELETE", body: { confirmation: "wrong.xml" } }
+  );
+  assert.equal(mismatchedConfirmation.status, 400);
+  assert.equal(
+    mismatchedConfirmation.body.error,
+    "source_package_delete_confirmation_mismatch"
+  );
+
+  const deleted = await requestJson<{
+    deletion: {
+      sourcePackageId: string;
+      deletedImportJobCount: number;
+      deletedContentReleaseCount: number;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${disposable.body.sourcePackage.sourcePackageId}`,
+    {
+      method: "DELETE",
+      body: { confirmation: disposable.body.sourcePackage.fileName }
+    }
+  );
+  assert.equal(deleted.status, 200);
+  assert.equal(
+    deleted.body.deletion.sourcePackageId,
+    disposable.body.sourcePackage.sourcePackageId
+  );
+  assert.equal(deleted.body.deletion.deletedImportJobCount, 1);
+  assert.equal(deleted.body.deletion.deletedContentReleaseCount, 1);
+
+  const deletedPackage = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${disposable.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(deletedPackage.status, 404);
+  const deletedImport = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs/${disposableImport.body.importJob.importJobId}`
+  );
+  assert.equal(deletedImport.status, 404);
+  const deletedRelease = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${disposableImport.body.stagedContentRelease.contentReleaseId}`
+  );
+  assert.equal(deletedRelease.status, 404);
+
+  const deletionActivity = await requestJson<{
+    items: Array<{
+      activityEvent: { eventType: string; details: Record<string, unknown> };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=source_package_deleted&subjectId=${disposable.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(deletionActivity.body.items.length, 1);
+  assert.equal(deletionActivity.body.items[0]?.activityEvent.eventType, "source_package_deleted");
+  assert.equal(
+    deletionActivity.body.items[0]?.activityEvent.details.deletedContentReleaseCount,
+    1
   );
 });
 
@@ -13818,6 +14136,9 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportLogCsv: string;
         exportReviewCsv: string;
         downloadSourcePackage: string;
+        getSourcePackageDeletionReadiness: string;
+        deleteSourcePackage: string;
+        replaceSourcePackage: string;
         listReviews: string;
         deleteGroupResults: string;
         getContentReleaseActivationReadiness: string;
@@ -13855,6 +14176,8 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "workspace_overview_csv_export",
     "source_package_read",
     "source_package_download",
+    "source_package_delete",
+    "source_package_replace",
     "source_package_csv_export",
     "source_package_retry",
     "import_job_read",
@@ -13900,6 +14223,18 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(
     manifest.routes.workspace.downloadSourcePackage,
     /source-packages\/.+\/download/
+  );
+  assert.match(
+    manifest.routes.workspace.getSourcePackageDeletionReadiness,
+    /source-packages\/.+\/deletion-readiness/
+  );
+  assert.match(
+    manifest.routes.workspace.deleteSourcePackage,
+    /source-packages\/.+/
+  );
+  assert.match(
+    manifest.routes.workspace.replaceSourcePackage,
+    /source-packages\/.+\/replacements/
   );
   assert.match(
     manifest.routes.workspace.exportParticipantRosterCsv,

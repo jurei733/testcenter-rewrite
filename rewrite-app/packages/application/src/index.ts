@@ -79,6 +79,8 @@ import type {
   WorkspaceReview,
   WorkspaceReviewListItem,
   WorkspaceSourcePackageDetail,
+  WorkspaceSourcePackageDeletion,
+  WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorBookletDetail,
@@ -130,6 +132,26 @@ export type ContentIntakePort = {
     contentStructure?: SourcePackageContentStructure | null;
     sourceDocument?: SourceDocumentSource | null;
   }): Promise<CreateImportJobResult & { sourcePackage: SourcePackage }>;
+  replaceSourcePackage(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    sourcePackageId: string;
+    fileName: string;
+    mediaType: string;
+    contentStructure?: SourcePackageContentStructure;
+    sourceDocument?: SourceDocumentSource;
+  }): Promise<
+    CreateImportJobResult & {
+      replacedSourcePackage: SourcePackage;
+      replacementSourcePackage: SourcePackage;
+    }
+  >;
+  deleteSourcePackage(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    sourcePackageId: string;
+    confirmation: string;
+  }): Promise<WorkspaceSourcePackageDeletion>;
   activateContentRelease(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -230,6 +252,11 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     sourcePackageId: string;
   }): Promise<WorkspaceSourcePackageDownload>;
+  getSourcePackageDeletionReadiness(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    sourcePackageId: string;
+  }): Promise<WorkspaceSourcePackageDeletionReadiness>;
   listSourcePackages(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -690,11 +717,14 @@ export const firstSliceUseCases = {
   exportOpenRunsCsv: "ExportOpenRunsCsv",
   exportParticipantRosterCsv: "ExportParticipantRosterCsv",
   getSourcePackageDetail: "GetSourcePackageDetail",
+  getSourcePackageDeletionReadiness: "GetSourcePackageDeletionReadiness",
   listSourcePackages: "ListSourcePackages",
   exportSourcePackagesCsv: "ExportSourcePackagesCsv",
   createSourcePackage: "CreateSourcePackage",
   createImportJob: "CreateImportJob",
   retrySourcePackageImport: "RetrySourcePackageImport",
+  replaceSourcePackage: "ReplaceSourcePackage",
+  deleteSourcePackage: "DeleteSourcePackage",
   getImportJobDetail: "GetImportJobDetail",
   listParticipantSessions: "ListParticipantSessions",
   getParticipantSessionDetail: "GetParticipantSessionDetail",
@@ -797,6 +827,13 @@ export type FirstSliceRepository = {
     workspaceId: string
   ): Promise<SourcePackage[]>;
   saveSourcePackage(sourcePackage: SourcePackage): Promise<void>;
+  deleteSourcePackageAggregate(input: {
+    tenantId: string;
+    workspaceId: string;
+    sourcePackageId: string;
+    expectedImportJobIds: string[];
+    expectedContentReleaseIds: string[];
+  }): Promise<boolean>;
   getImportJobById(importJobId: string): Promise<ImportJob | null>;
   listImportJobsByWorkspace(
     tenantId: string,
@@ -2085,6 +2122,74 @@ const requireSourcePackage = async (
   return sourcePackage;
 };
 
+const buildSourcePackageDeletionReadiness = (input: {
+  sourcePackage: SourcePackage;
+  importJobs: ImportJob[];
+  contentReleases: ContentRelease[];
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+}): WorkspaceSourcePackageDeletionReadiness => {
+  const importJobs = input.importJobs
+    .filter(
+      importJob => importJob.sourcePackageId === input.sourcePackage.sourcePackageId
+    )
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const importJobIds = new Set(importJobs.map(importJob => importJob.importJobId));
+  const contentReleases = input.contentReleases
+    .filter(contentRelease => importJobIds.has(contentRelease.importJobId))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const contentReleaseIds = new Set(
+    contentReleases.map(contentRelease => contentRelease.contentReleaseId)
+  );
+  const blockingDependencies: WorkspaceSourcePackageDeletionReadiness["blockingDependencies"] = [
+    ...importJobs
+      .filter(importJob => importJob.status === "queued" || importJob.status === "running")
+      .map(importJob => ({
+        dependencyType: "active_import_job" as const,
+        dependencyId: importJob.importJobId,
+        status: importJob.status
+      })),
+    ...contentReleases
+      .filter(contentRelease => contentRelease.status === "active")
+      .map(contentRelease => ({
+        dependencyType: "active_content_release" as const,
+        dependencyId: contentRelease.contentReleaseId,
+        status: contentRelease.status
+      })),
+    ...input.participantSessions
+      .filter(participantSession =>
+        contentReleaseIds.has(participantSession.contentReleaseId)
+      )
+      .map(participantSession => ({
+        dependencyType: "participant_session" as const,
+        dependencyId: participantSession.participantSessionId,
+        status: participantSession.status
+      })),
+    ...input.testRuns
+      .filter(testRun => contentReleaseIds.has(testRun.contentReleaseId))
+      .map(testRun => ({
+        dependencyType: "test_run" as const,
+        dependencyId: testRun.testRunId,
+        status: testRun.status
+      }))
+  ].sort((left, right) =>
+    `${left.dependencyType}:${left.dependencyId}`.localeCompare(
+      `${right.dependencyType}:${right.dependencyId}`
+    )
+  );
+
+  return {
+    sourcePackage: {
+      ...input.sourcePackage,
+      sourceDocument: null
+    },
+    canDelete: blockingDependencies.length === 0,
+    importJobs,
+    contentReleases,
+    blockingDependencies
+  };
+};
+
 const requireContentRelease = async (
   repository: FirstSliceRepository,
   contentReleaseId: string
@@ -2588,6 +2693,8 @@ const formatSourcePackagesCsv = (input: {
     "downloadAvailable",
     "importJobCount",
     "contentReleaseCount",
+    "canDelete",
+    "blockingDependencyCount",
     "latestImportJobId",
     "latestImportStatus",
     "latestImportCreatedAt",
@@ -2620,6 +2727,8 @@ const formatSourcePackagesCsv = (input: {
         String(item.downloadAvailable),
         String(item.importJobCount),
         String(item.contentReleaseCount),
+        String(item.canDelete),
+        String(item.blockingDependencyCount),
         item.latestImportJob?.importJobId ?? "",
         item.latestImportJob?.status ?? "",
         item.latestImportJob?.createdAt ?? "",
@@ -12178,6 +12287,52 @@ export const createFirstSliceServices = (
           dataBase64: decodedDocument.bytes.toString("base64")
         };
       },
+      async getSourcePackageDeletionReadiness(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const sourcePackage = await requireSourcePackage(repository, input.sourcePackageId);
+        if (
+          sourcePackage.tenantId !== workspace.tenantId ||
+          sourcePackage.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "source_package_not_found",
+            `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const [importJobs, contentReleases, participantSessions, testRuns] =
+          await Promise.all([
+            repository.listImportJobsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+
+        return buildSourcePackageDeletionReadiness({
+          sourcePackage,
+          importJobs,
+          contentReleases,
+          participantSessions,
+          testRuns
+        });
+      },
       async listSourcePackages(input) {
         const workspace = await requireWorkspace(
           repository,
@@ -12188,12 +12343,21 @@ export const createFirstSliceServices = (
           workspace.tenantId,
           workspace.workspaceId
         );
-        const [importJobs, contentReleases] = await Promise.all([
+        const [importJobs, contentReleases, participantSessions, testRuns] =
+          await Promise.all([
           repository.listImportJobsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           ),
           repository.listContentReleasesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           )
@@ -12213,6 +12377,13 @@ export const createFirstSliceServices = (
               sourcePackageImportJobs.map(importJob => importJob.importJobId)
             );
             const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+            const deletionReadiness = buildSourcePackageDeletionReadiness({
+              sourcePackage,
+              importJobs: sourcePackageImportJobs,
+              contentReleases,
+              participantSessions,
+              testRuns
+            });
 
             return {
               sourcePackage: {
@@ -12225,7 +12396,10 @@ export const createFirstSliceServices = (
               importJobCount: sourcePackageImportJobs.length,
               contentReleaseCount: contentReleases.filter(contentRelease =>
                 importJobIds.has(contentRelease.importJobId)
-              ).length
+              ).length,
+              canDelete: deletionReadiness.canDelete,
+              blockingDependencyCount:
+                deletionReadiness.blockingDependencies.length
             };
           })
           .filter(
@@ -13529,6 +13703,13 @@ export const createFirstSliceServices = (
             `Source package '${input.sourcePackageId}' does not belong to workspace '${input.workspaceKey}'.`
           );
         }
+        if (sourcePackage.status === "accepted") {
+          throw new FirstSliceError(
+            409,
+            "source_package_retry_not_allowed",
+            `Source package '${sourcePackage.fileName}' was already imported successfully. Create a replacement to preserve the imported version.`
+          );
+        }
 
         const fileName = normalizeOptionalSourcePackageText(
           input.fileName,
@@ -13584,6 +13765,180 @@ export const createFirstSliceServices = (
           importJob: result.importJob,
           stagedContentRelease: result.stagedContentRelease
         };
+      },
+      async replaceSourcePackage(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const replacedSourcePackage = await requireSourcePackage(
+          repository,
+          input.sourcePackageId
+        );
+        if (
+          replacedSourcePackage.tenantId !== workspace.tenantId ||
+          replacedSourcePackage.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "source_package_not_found",
+            `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+
+        const replacementSourcePackage: SourcePackage = {
+          sourcePackageId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          fileName: normalizeSourcePackageText(
+            input.fileName,
+            "fileName",
+            "source_package_file_name_required"
+          ),
+          mediaType: normalizeSourcePackageText(
+            input.mediaType,
+            "mediaType",
+            "source_package_media_type_required"
+          ),
+          contentStructure: input.contentStructure ?? null,
+          sourceDocument: normalizeOptionalSourceDocument(input.sourceDocument) ?? null,
+          status: "uploaded",
+          uploadedAt: now()
+        };
+        await repository.saveSourcePackage(replacementSourcePackage);
+        const result = await createImportJobWithRelease({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          sourcePackageId: replacementSourcePackage.sourcePackageId
+        });
+        const persistedReplacement =
+          (await repository.getSourcePackageById(
+            replacementSourcePackage.sourcePackageId
+          )) ?? replacementSourcePackage;
+
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_replaced",
+          subjectType: "source_package",
+          subjectId: replacedSourcePackage.sourcePackageId,
+          summary: `Source package '${replacedSourcePackage.fileName}' replaced by '${persistedReplacement.fileName}'.`,
+          details: {
+            replacedSourcePackageId: replacedSourcePackage.sourcePackageId,
+            replacementSourcePackageId: persistedReplacement.sourcePackageId,
+            importJobId: result.importJob.importJobId,
+            stagedContentReleaseId: result.stagedContentRelease?.contentReleaseId ?? null
+          }
+        });
+
+        return {
+          replacedSourcePackage,
+          replacementSourcePackage: persistedReplacement,
+          importJob: result.importJob,
+          stagedContentRelease: result.stagedContentRelease
+        };
+      },
+      async deleteSourcePackage(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const sourcePackage = await requireSourcePackage(repository, input.sourcePackageId);
+        if (
+          sourcePackage.tenantId !== workspace.tenantId ||
+          sourcePackage.workspaceId !== workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "source_package_not_found",
+            `Source package '${input.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+          );
+        }
+        if (input.confirmation !== sourcePackage.fileName) {
+          throw new FirstSliceError(
+            400,
+            "source_package_delete_confirmation_mismatch",
+            `Confirm deletion by sending the exact file name '${sourcePackage.fileName}'.`
+          );
+        }
+
+        const [importJobs, contentReleases, participantSessions, testRuns] =
+          await Promise.all([
+            repository.listImportJobsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listContentReleasesByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listParticipantSessionsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            ),
+            repository.listTestRunsByWorkspace(
+              workspace.tenantId,
+              workspace.workspaceId
+            )
+          ]);
+        const readiness = buildSourcePackageDeletionReadiness({
+          sourcePackage,
+          importJobs,
+          contentReleases,
+          participantSessions,
+          testRuns
+        });
+        if (!readiness.canDelete) {
+          throw new FirstSliceError(
+            409,
+            "source_package_delete_blocked",
+            `Source package '${sourcePackage.fileName}' is still used and was not deleted.`,
+            readiness
+          );
+        }
+
+        const deleted = await repository.deleteSourcePackageAggregate({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          sourcePackageId: sourcePackage.sourcePackageId,
+          expectedImportJobIds: readiness.importJobs.map(
+            importJob => importJob.importJobId
+          ),
+          expectedContentReleaseIds: readiness.contentReleases.map(
+            contentRelease => contentRelease.contentReleaseId
+          )
+        });
+        if (!deleted) {
+          throw new FirstSliceError(
+            409,
+            "source_package_delete_conflict",
+            "Source package dependencies changed while deletion was being confirmed. Refresh deletion readiness and try again."
+          );
+        }
+
+        const deletion: WorkspaceSourcePackageDeletion = {
+          sourcePackageId: sourcePackage.sourcePackageId,
+          fileName: sourcePackage.fileName,
+          deletedImportJobCount: readiness.importJobs.length,
+          deletedContentReleaseCount: readiness.contentReleases.length
+        };
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_deleted",
+          subjectType: "source_package",
+          subjectId: sourcePackage.sourcePackageId,
+          summary: `Source package '${sourcePackage.fileName}' deleted.`,
+          details: {
+            fileName: sourcePackage.fileName,
+            mediaType: sourcePackage.mediaType,
+            deletedImportJobCount: deletion.deletedImportJobCount,
+            deletedContentReleaseCount: deletion.deletedContentReleaseCount
+          }
+        });
+        return deletion;
       },
       async activateContentRelease(input) {
         const workspace = await requireWorkspace(

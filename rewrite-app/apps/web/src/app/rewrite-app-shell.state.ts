@@ -155,6 +155,7 @@ export interface ShellContentState {
   importJobsView: string;
   contentReleasesView: string;
   sourcePackageDetailView: string;
+  sourcePackageDeletionReadinessView: string;
   importJobDetailView: string;
   contentReleaseActivationReadinessView: string;
   contentReleaseDetailView: string;
@@ -368,6 +369,7 @@ export function createInitialShellContentState(
     importJobsView: 'Use "Refresh Content Reads".',
     contentReleasesView: 'Use "Refresh Content Reads".',
     sourcePackageDetailView: 'Use "Source Package Detail".',
+    sourcePackageDeletionReadinessView: 'Use "Deletion Readiness".',
     importJobDetailView: 'Use "Import Job Detail".',
     contentReleaseActivationReadinessView: 'Use "Release Readiness".',
     contentReleaseDetailView: 'Use "Release Detail".',

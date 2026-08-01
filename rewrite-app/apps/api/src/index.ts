@@ -39,6 +39,8 @@ import {
   type CreateWorkspaceResponse,
   type DeleteGroupResultsResponse,
   type DeleteReviewResponse,
+  type DeleteSourcePackageRequest,
+  type DeleteSourcePackageResponse,
   type DetailedResponseListQuery,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
@@ -50,6 +52,7 @@ import {
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
   type GetSourcePackageResponse,
+  type GetSourcePackageDeletionReadinessResponse,
   type GetStudyMonitorBookletResponse,
   type GetStudyMonitorGroupResponse,
   type GetStudyMonitorParticipantResponse,
@@ -86,6 +89,8 @@ import {
   type ResumeParticipantSessionResponse,
   type RetrySourcePackageImportRequest,
   type RetrySourcePackageImportResponse,
+  type ReplaceSourcePackageRequest,
+  type ReplaceSourcePackageResponse,
   type ReviewResponse,
   type RuntimeOperationalEvent,
   type ResetAdminUserPasswordRequest,
@@ -1363,6 +1368,15 @@ const sourcePackageDetailPattern = createRoutePattern(
 const sourcePackageDownloadPattern = createRoutePattern(
   productionApiRoutes.workspace.downloadSourcePackage
 );
+const sourcePackageDeletionReadinessPattern = createRoutePattern(
+  productionApiRoutes.workspace.getSourcePackageDeletionReadiness
+);
+const sourcePackageDeletePattern = createRoutePattern(
+  productionApiRoutes.workspace.deleteSourcePackage
+);
+const sourcePackageReplacePattern = createRoutePattern(
+  productionApiRoutes.workspace.replaceSourcePackage
+);
 const sourcePackageCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSourcePackagesCsv
 );
@@ -1497,6 +1511,9 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", sourcePackageListPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
+  ["GET", sourcePackageDeletionReadinessPattern],
+  ["DELETE", sourcePackageDeletePattern],
+  ["POST", sourcePackageReplacePattern],
   ["GET", sourcePackageCsvExportPattern],
   ["POST", sourcePackageRetryImportPattern],
   ["POST", importJobCreatePattern],
@@ -1928,6 +1945,21 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       sourcePackageDownloadPattern,
       productionApiRoutes.workspace.downloadSourcePackage
+    ],
+    [
+      "GET",
+      sourcePackageDeletionReadinessPattern,
+      productionApiRoutes.workspace.getSourcePackageDeletionReadiness
+    ],
+    [
+      "DELETE",
+      sourcePackageDeletePattern,
+      productionApiRoutes.workspace.deleteSourcePackage
+    ],
+    [
+      "POST",
+      sourcePackageReplacePattern,
+      productionApiRoutes.workspace.replaceSourcePackage
     ],
     [
       "GET",
@@ -3486,6 +3518,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
       const sourcePackageDownloadMatch = sourcePackageDownloadPattern.exec(pathname);
+      const sourcePackageDeletionReadinessMatch =
+        sourcePackageDeletionReadinessPattern.exec(pathname);
+      const sourcePackageDeleteMatch = sourcePackageDeletePattern.exec(pathname);
+      const sourcePackageReplaceMatch = sourcePackageReplacePattern.exec(pathname);
       const sourcePackageCsvExportMatch =
         sourcePackageCsvExportPattern.exec(pathname);
       const sourcePackageRetryImportMatch =
@@ -3580,6 +3616,102 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           "content-disposition": buildAttachmentContentDisposition(download.fileName),
           "content-length": String(body.byteLength)
         });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        sourcePackageDeletionReadinessMatch?.groups
+      ) {
+        const tenantKey = decodeRouteGroup(
+          sourcePackageDeletionReadinessMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageDeletionReadinessMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageDeletionReadinessMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const deletionReadiness =
+          await services.workspaceAdminRead.getSourcePackageDeletionReadiness({
+            tenantKey,
+            workspaceKey,
+            sourcePackageId
+          });
+        sendJson<GetSourcePackageDeletionReadinessResponse>(response, 200, {
+          deletionReadiness
+        });
+        return;
+      }
+
+      if (request.method === "DELETE" && sourcePackageDeleteMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageDeleteMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageDeleteMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageDeleteMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<DeleteSourcePackageRequest>();
+        const deletion = await services.contentIntake.deleteSourcePackage({
+          tenantKey,
+          workspaceKey,
+          sourcePackageId,
+          confirmation: body.confirmation
+        });
+        sendJson<DeleteSourcePackageResponse>(response, 200, { deletion });
+        return;
+      }
+
+      if (request.method === "POST" && sourcePackageReplaceMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageReplaceMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageReplaceMatch.groups.workspaceKey
+        );
+        const sourcePackageId = decodeRouteGroup(
+          sourcePackageReplaceMatch.groups.sourcePackageId
+        );
+        if (!tenantKey || !workspaceKey || !sourcePackageId) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey, workspaceKey, and sourcePackageId are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<ReplaceSourcePackageRequest>();
+        const replacement = await services.contentIntake.replaceSourcePackage({
+          tenantKey,
+          workspaceKey,
+          sourcePackageId,
+          fileName: body.fileName,
+          mediaType: body.mediaType,
+          contentStructure: body.contentStructure,
+          sourceDocument: body.sourceDocument
+        });
+        sendJson<ReplaceSourcePackageResponse>(response, 201, replacement);
         return;
       }
 

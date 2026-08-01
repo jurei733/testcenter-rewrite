@@ -207,12 +207,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       </article>
 
       <article class="card">
-        <h2>Detail Reads And Retry</h2>
-        <p>Inspect individual package, import, and release history, or retry a failed import with corrected content.</p>
+        <h2>Detail Reads And Package Lifecycle</h2>
+        <p>Inspect dependencies, replace versions, and remove unused packages safely.</p>
         <div class="actions">
           <button id="sourcePackageDetailButton" class="primary" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.getSourcePackageDetail()">Source Package Detail</button>
           <button id="importJobDetailButton" class="secondary" type="button" [disabled]="!view.canUseSelectedImportJob" (click)="view.getImportJobDetail()">Import Job Detail</button>
           <button id="downloadSourceDocumentButton" class="secondary" type="button" [disabled]="!view.canDownloadSelectedSourcePackage" (click)="view.downloadSelectedSourceDocument()">Download Stored File</button>
+          <button id="sourcePackageDeletionReadinessButton" class="ghost" type="button" [disabled]="!view.canUseSelectedSourcePackage" (click)="view.getSourcePackageDeletionReadiness()">Deletion Readiness</button>
+          <button id="replaceSourcePackageButton" class="secondary" type="button" [disabled]="!view.canReplaceSelectedSourcePackage" (click)="view.confirmReplaceSourcePackage()">Replace With Loaded File</button>
+          <button id="deleteSourcePackageButton" class="ghost" type="button" [disabled]="!view.canDeleteSelectedSourcePackage" (click)="view.confirmDeleteSourcePackage()">Delete Safe Package</button>
           <button id="participantSessionDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedParticipantSession" (click)="view.getParticipantSessionDetail()">Participant Session Detail</button>
           <button id="releaseReadinessButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseActivationReadiness()">Release Readiness</button>
           <button id="releaseDetailButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.getContentReleaseDetail()">Release Detail</button>
@@ -226,6 +229,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         [items]="view.sourcePackageDetailItems"
         (itemAction)="view.selectSourcePackage($event)"
         emptyState="Load a source package detail to inspect it here."
+      ></app-record-collection>
+
+      <app-record-collection
+        title="Source Package Deletion Readiness"
+        subtitle="Dependencies checked before deletion."
+        [items]="view.sourcePackageDeletionReadinessItems"
+        emptyState="Load deletion readiness for the selected package."
       ></app-record-collection>
 
       <app-record-collection

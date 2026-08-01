@@ -1348,6 +1348,113 @@ export const createSqliteFirstSliceRepository = (
           sourcePackage.uploadedAt
         );
     },
+    async deleteSourcePackageAggregate(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const sourcePackage = database
+          .prepare(
+            `SELECT source_package_id
+             FROM source_packages
+             WHERE source_package_id = ? AND tenant_id = ? AND workspace_id = ?`
+          )
+          .get(
+            input.sourcePackageId,
+            input.tenantId,
+            input.workspaceId
+          ) as Record<string, unknown> | undefined;
+        if (!sourcePackage) {
+          database.exec("ROLLBACK");
+          return false;
+        }
+        const importJobs = database
+          .prepare(
+            `SELECT import_job_id, status
+             FROM import_jobs
+             WHERE tenant_id = ? AND workspace_id = ? AND source_package_id = ?`
+          )
+          .all(
+            input.tenantId,
+            input.workspaceId,
+            input.sourcePackageId
+          ) as Record<string, unknown>[];
+        const importJobIds = importJobs.map(row => String(row.import_job_id));
+        const contentReleases = importJobIds.length
+          ? (database
+              .prepare(
+                `SELECT content_release_id, status
+                 FROM content_releases
+                 WHERE tenant_id = ? AND workspace_id = ?
+                   AND import_job_id IN (${importJobIds.map(() => "?").join(", ")})`
+              )
+              .all(
+                input.tenantId,
+                input.workspaceId,
+                ...importJobIds
+              ) as Record<string, unknown>[])
+          : [];
+        const contentReleaseIds = contentReleases.map(row =>
+          String(row.content_release_id)
+        );
+        const idsMatch = (actual: string[], expected: string[]): boolean =>
+          JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const referenceCount = contentReleaseIds.length
+          ? Number(
+              (
+                database
+                  .prepare(
+                    `SELECT
+                       (SELECT COUNT(*) FROM participant_sessions
+                        WHERE content_release_id IN (${contentReleaseIds
+                          .map(() => "?")
+                          .join(", ")})) +
+                       (SELECT COUNT(*) FROM test_runs
+                        WHERE content_release_id IN (${contentReleaseIds
+                          .map(() => "?")
+                          .join(", ")})) AS reference_count`
+                  )
+                  .get(...contentReleaseIds, ...contentReleaseIds) as Record<
+                  string,
+                  unknown
+                >
+              ).reference_count
+            )
+          : 0;
+        const isBlocked =
+          importJobs.some(row => row.status === "queued" || row.status === "running") ||
+          contentReleases.some(row => row.status === "active") ||
+          referenceCount > 0;
+        if (
+          isBlocked ||
+          !idsMatch(importJobIds, input.expectedImportJobIds) ||
+          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds)
+        ) {
+          database.exec("ROLLBACK");
+          return false;
+        }
+
+        for (const contentReleaseId of contentReleaseIds) {
+          database
+            .prepare(`DELETE FROM content_releases WHERE content_release_id = ?`)
+            .run(contentReleaseId);
+        }
+        for (const importJobId of importJobIds) {
+          database.prepare(`DELETE FROM import_jobs WHERE import_job_id = ?`).run(
+            importJobId
+          );
+        }
+        const deletion = database
+          .prepare(
+            `DELETE FROM source_packages
+             WHERE source_package_id = ? AND tenant_id = ? AND workspace_id = ?`
+          )
+          .run(input.sourcePackageId, input.tenantId, input.workspaceId);
+        database.exec("COMMIT");
+        return Number(deletion.changes) === 1;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async getImportJobById(importJobId) {
       const row = database
         .prepare(

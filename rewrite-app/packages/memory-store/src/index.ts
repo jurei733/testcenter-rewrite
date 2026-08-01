@@ -168,6 +168,61 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     async saveSourcePackage(sourcePackage) {
       state.sourcePackages.set(sourcePackage.sourcePackageId, sourcePackage);
     },
+    async deleteSourcePackageAggregate(input) {
+      const sourcePackage = state.sourcePackages.get(input.sourcePackageId);
+      if (
+        !sourcePackage ||
+        sourcePackage.tenantId !== input.tenantId ||
+        sourcePackage.workspaceId !== input.workspaceId
+      ) {
+        return false;
+      }
+      const importJobs = Array.from(state.importJobs.values()).filter(
+        importJob =>
+          importJob.tenantId === input.tenantId &&
+          importJob.workspaceId === input.workspaceId &&
+          importJob.sourcePackageId === input.sourcePackageId
+      );
+      const importJobIds = new Set(importJobs.map(importJob => importJob.importJobId));
+      const contentReleases = Array.from(state.contentReleases.values()).filter(
+        contentRelease =>
+          contentRelease.tenantId === input.tenantId &&
+          contentRelease.workspaceId === input.workspaceId &&
+          importJobIds.has(contentRelease.importJobId)
+      );
+      const contentReleaseIds = new Set(
+        contentReleases.map(contentRelease => contentRelease.contentReleaseId)
+      );
+      const idsMatch = (actual: string[], expected: string[]): boolean =>
+        JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+      const isBlocked =
+        importJobs.some(
+          importJob => importJob.status === "queued" || importJob.status === "running"
+        ) ||
+        contentReleases.some(contentRelease => contentRelease.status === "active") ||
+        Array.from(state.participantSessions.values()).some(participantSession =>
+          contentReleaseIds.has(participantSession.contentReleaseId)
+        ) ||
+        Array.from(state.testRuns.values()).some(testRun =>
+          contentReleaseIds.has(testRun.contentReleaseId)
+        );
+      if (
+        isBlocked ||
+        !idsMatch([...importJobIds], input.expectedImportJobIds) ||
+        !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds)
+      ) {
+        return false;
+      }
+
+      for (const contentReleaseId of contentReleaseIds) {
+        state.contentReleases.delete(contentReleaseId);
+      }
+      for (const importJobId of importJobIds) {
+        state.importJobs.delete(importJobId);
+      }
+      state.sourcePackages.delete(input.sourcePackageId);
+      return true;
+    },
     async getImportJobById(importJobId) {
       return state.importJobs.get(importJobId) ?? null;
     },

@@ -77,6 +77,8 @@ export const adminAuditEventTypes = [
 export type WorkspaceActivityEventType =
   | "workspace_created"
   | "source_package_created"
+  | "source_package_replaced"
+  | "source_package_deleted"
   | "import_job_completed"
   | "import_job_failed"
   | "source_package_import_retried"
@@ -100,6 +102,8 @@ export type WorkspaceActivityEventType =
 export const workspaceActivityEventTypes = [
   "workspace_created",
   "source_package_created",
+  "source_package_replaced",
+  "source_package_deleted",
   "import_job_completed",
   "import_job_failed",
   "source_package_import_retried",
@@ -986,6 +990,8 @@ export type WorkspaceSourcePackageListItem = {
   downloadAvailable: boolean;
   importJobCount: number;
   contentReleaseCount: number;
+  canDelete: boolean;
+  blockingDependencyCount: number;
 };
 
 export type WorkspaceImportJobListItem = {
@@ -1097,6 +1103,31 @@ export type WorkspaceSourcePackageDownload = {
   dataBase64: string;
 };
 
+export type WorkspaceSourcePackageDeletionBlocker = {
+  dependencyType:
+    | "active_import_job"
+    | "active_content_release"
+    | "participant_session"
+    | "test_run";
+  dependencyId: string;
+  status: string;
+};
+
+export type WorkspaceSourcePackageDeletionReadiness = {
+  sourcePackage: SourcePackage;
+  canDelete: boolean;
+  importJobs: ImportJob[];
+  contentReleases: ContentRelease[];
+  blockingDependencies: WorkspaceSourcePackageDeletionBlocker[];
+};
+
+export type WorkspaceSourcePackageDeletion = {
+  sourcePackageId: string;
+  fileName: string;
+  deletedImportJobCount: number;
+  deletedContentReleaseCount: number;
+};
+
 export type FirstSliceCapability =
   | "admin_bootstrap"
   | "admin_authentication"
@@ -1119,6 +1150,8 @@ export type FirstSliceCapability =
   | "source_package_intake"
   | "source_package_read"
   | "source_package_download"
+  | "source_package_delete"
+  | "source_package_replace"
   | "source_package_csv_export"
   | "source_package_retry"
   | "import_job_intake"
@@ -1180,6 +1213,8 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "source_package_intake",
   "source_package_read",
   "source_package_download",
+  "source_package_delete",
+  "source_package_replace",
   "source_package_csv_export",
   "source_package_retry",
   "import_job_intake",

@@ -7,6 +7,7 @@ import type {
   GetImportJobResponse,
   ListParticipantSessionsResponse,
   GetSourcePackageResponse,
+  GetSourcePackageDeletionReadinessResponse,
   ListContentReleasesResponse,
   ListImportJobsResponse,
   ListSourcePackagesResponse
@@ -98,6 +99,23 @@ export class ContentViewFacade {
       item => item.sourcePackage.sourcePackageId === selectedSourcePackageId
     );
     return listedPackage?.downloadAvailable ?? true;
+  }
+
+  get canReplaceSelectedSourcePackage(): boolean {
+    return this.canCreateSourcePackage && this.canUseSelectedSourcePackage;
+  }
+
+  get canDeleteSelectedSourcePackage(): boolean {
+    if (!this.canUseSelectedSourcePackage) {
+      return false;
+    }
+    const selectedSourcePackageId = this.content.sourcePackageId.trim();
+    const listedPackage = parseJsonDocument<ListSourcePackagesResponse>(
+      this.content.sourcePackagesView
+    )?.items.find(
+      item => item.sourcePackage.sourcePackageId === selectedSourcePackageId
+    );
+    return listedPackage?.canDelete ?? true;
   }
 
   get canUseSelectedImportJob(): boolean {
@@ -575,6 +593,12 @@ export class ContentViewFacade {
             value: `${item.importJobCount} import(s), ${item.contentReleaseCount} release(s)`
           },
           {
+            label: "Deletion",
+            value: item.canDelete
+              ? "safe after exact-name confirmation"
+              : `blocked by ${item.blockingDependencyCount} active/reference dependency item(s)`
+          },
+          {
             label: "Uploaded",
             value: this.formatDateTime(item.sourcePackage.uploadedAt)
           }
@@ -726,6 +750,54 @@ export class ContentViewFacade {
           sourceMediaType: detail.sourcePackage.mediaType
         }
       }
+    ];
+  }
+
+  get sourcePackageDeletionReadinessItems(): RecordCollectionItem[] {
+    const readiness = parseJsonDocument<GetSourcePackageDeletionReadinessResponse>(
+      this.content.sourcePackageDeletionReadinessView
+    )?.deletionReadiness;
+    if (!readiness) {
+      return [];
+    }
+
+    return [
+      {
+        headline: readiness.canDelete ? "Deletion is safe" : "Deletion is blocked",
+        subline: readiness.sourcePackage.fileName,
+        badges: [
+          readiness.canDelete ? "safe" : "blocked",
+          `${readiness.blockingDependencies.length} blocker(s)`
+        ],
+        rows: [
+          {
+            label: "Package",
+            value: readiness.sourcePackage.sourcePackageId
+          },
+          {
+            label: "Cascade",
+            value: `${readiness.importJobs.length} import(s), ${readiness.contentReleases.length} unused release(s)`
+          },
+          {
+            label: "Confirmation",
+            value: readiness.canDelete
+              ? `Confirm with ${readiness.sourcePackage.fileName}`
+              : "Resolve all blockers first"
+          }
+        ],
+        selected: true
+      },
+      ...readiness.blockingDependencies.map(blocker => ({
+        headline: blocker.dependencyType.replaceAll("_", " "),
+        subline: blocker.dependencyId,
+        badges: [blocker.status, "blocks deletion"],
+        rows: [
+          {
+            label: "Dependency Type",
+            value: blocker.dependencyType
+          }
+        ]
+      }))
     ];
   }
 
@@ -1630,6 +1702,8 @@ export class ContentViewFacade {
     }
 
     this.content.sourcePackageId = sourcePackageId;
+    this.content.sourcePackageDeletionReadinessView =
+      'Use "Deletion Readiness".';
     if (item.actionPayload?.sourceFileName) {
       this.content.sourceFileName = item.actionPayload.sourceFileName;
     }
@@ -1943,6 +2017,48 @@ export class ContentViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.contentService.downloadSourcePackage());
+  }
+
+  getSourcePackageDeletionReadiness(): void {
+    if (!this.canUseSelectedSourcePackage) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.contentService.loadSourcePackageDeletionReadiness()
+    );
+  }
+
+  confirmReplaceSourcePackage(): void {
+    if (!this.canReplaceSelectedSourcePackage) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Import '${this.content.sourceFileName.trim()}' as a new version? The prior package remains.`
+    );
+    if (confirmed) {
+      this.viewState.onActionAsync(() => this.contentService.replaceSourcePackage());
+    }
+  }
+
+  confirmDeleteSourcePackage(): void {
+    if (!this.canDeleteSelectedSourcePackage) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      const readiness =
+        await this.contentService.loadSourcePackageDeletionReadiness();
+      if (!readiness.deletionReadiness.canDelete) {
+        return;
+      }
+      const fileName = readiness.deletionReadiness.sourcePackage.fileName;
+      const confirmation = globalThis.window?.prompt(
+        `Delete '${fileName}' and its unused derivatives? Type the exact file name.`,
+        ""
+      );
+      if (confirmation !== null && confirmation !== undefined) {
+        await this.contentService.deleteSourcePackage(confirmation);
+      }
+    });
   }
 
   retrySourcePackageImport(): void {

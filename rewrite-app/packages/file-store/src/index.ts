@@ -170,13 +170,14 @@ export const createFileFirstSliceRepository = (
     await writeFile(filePath, JSON.stringify(state, null, 2), "utf8");
   };
 
-  const mutate = async (
-    updater: (state: PersistedFirstSliceState) => void
-  ): Promise<void> => {
+  const mutate = async <Result>(
+    updater: (state: PersistedFirstSliceState) => Result
+  ): Promise<Result> => {
     const state = await getState();
-    updater(state);
+    const result = updater(state);
     writeQueue = writeQueue.then(() => persistState(state));
     await writeQueue;
+    return result;
   };
 
   return {
@@ -306,6 +307,63 @@ export const createFileFirstSliceRepository = (
     async saveSourcePackage(sourcePackage) {
       await mutate(state => {
         state.sourcePackages[sourcePackage.sourcePackageId] = sourcePackage;
+      });
+    },
+    async deleteSourcePackageAggregate(input) {
+      return mutate(state => {
+        const sourcePackage = state.sourcePackages[input.sourcePackageId];
+        if (
+          !sourcePackage ||
+          sourcePackage.tenantId !== input.tenantId ||
+          sourcePackage.workspaceId !== input.workspaceId
+        ) {
+          return false;
+        }
+        const importJobs = Object.values(state.importJobs).filter(
+          importJob =>
+            importJob.tenantId === input.tenantId &&
+            importJob.workspaceId === input.workspaceId &&
+            importJob.sourcePackageId === input.sourcePackageId
+        );
+        const importJobIds = new Set(importJobs.map(importJob => importJob.importJobId));
+        const contentReleases = Object.values(state.contentReleases).filter(
+          contentRelease =>
+            contentRelease.tenantId === input.tenantId &&
+            contentRelease.workspaceId === input.workspaceId &&
+            importJobIds.has(contentRelease.importJobId)
+        );
+        const contentReleaseIds = new Set(
+          contentReleases.map(contentRelease => contentRelease.contentReleaseId)
+        );
+        const idsMatch = (actual: string[], expected: string[]): boolean =>
+          JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const isBlocked =
+          importJobs.some(
+            importJob => importJob.status === "queued" || importJob.status === "running"
+          ) ||
+          contentReleases.some(contentRelease => contentRelease.status === "active") ||
+          Object.values(state.participantSessions).some(participantSession =>
+            contentReleaseIds.has(participantSession.contentReleaseId)
+          ) ||
+          Object.values(state.testRuns).some(testRun =>
+            contentReleaseIds.has(testRun.contentReleaseId)
+          );
+        if (
+          isBlocked ||
+          !idsMatch([...importJobIds], input.expectedImportJobIds) ||
+          !idsMatch([...contentReleaseIds], input.expectedContentReleaseIds)
+        ) {
+          return false;
+        }
+
+        for (const contentReleaseId of contentReleaseIds) {
+          delete state.contentReleases[contentReleaseId];
+        }
+        for (const importJobId of importJobIds) {
+          delete state.importJobs[importJobId];
+        }
+        delete state.sourcePackages[input.sourcePackageId];
+        return true;
       });
     },
     async getImportJobById(importJobId) {

@@ -1232,6 +1232,94 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         ]
       );
     },
+    async deleteSourcePackageAggregate(input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const sourcePackage = await client.query<{ source_package_id: string }>(
+          `SELECT source_package_id
+           FROM source_packages
+           WHERE source_package_id = $1 AND tenant_id = $2 AND workspace_id = $3
+           FOR UPDATE`,
+          [input.sourcePackageId, input.tenantId, input.workspaceId]
+        );
+        if (sourcePackage.rowCount !== 1) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+        const importJobs = await client.query<{
+          import_job_id: string;
+          status: string;
+        }>(
+          `SELECT import_job_id, status
+           FROM import_jobs
+           WHERE tenant_id = $1 AND workspace_id = $2 AND source_package_id = $3
+           FOR UPDATE`,
+          [input.tenantId, input.workspaceId, input.sourcePackageId]
+        );
+        const importJobIds = importJobs.rows.map(row => row.import_job_id);
+        const contentReleases = await client.query<{
+          content_release_id: string;
+          status: string;
+        }>(
+          `SELECT content_release_id, status
+           FROM content_releases
+           WHERE tenant_id = $1 AND workspace_id = $2
+             AND import_job_id = ANY($3::text[])
+           FOR UPDATE`,
+          [input.tenantId, input.workspaceId, importJobIds]
+        );
+        const contentReleaseIds = contentReleases.rows.map(
+          row => row.content_release_id
+        );
+        const references = await client.query<{ reference_count: string }>(
+          `SELECT
+             (SELECT COUNT(*) FROM participant_sessions
+              WHERE content_release_id = ANY($1::text[])) +
+             (SELECT COUNT(*) FROM test_runs
+              WHERE content_release_id = ANY($1::text[])) AS reference_count`,
+          [contentReleaseIds]
+        );
+        const idsMatch = (actual: string[], expected: string[]): boolean =>
+          JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+        const isBlocked =
+          importJobs.rows.some(
+            row => row.status === "queued" || row.status === "running"
+          ) ||
+          contentReleases.rows.some(row => row.status === "active") ||
+          Number(references.rows[0]?.reference_count ?? 0) > 0;
+        if (
+          isBlocked ||
+          !idsMatch(importJobIds, input.expectedImportJobIds) ||
+          !idsMatch(contentReleaseIds, input.expectedContentReleaseIds)
+        ) {
+          await client.query("ROLLBACK");
+          return false;
+        }
+
+        await client.query(
+          `DELETE FROM content_releases
+           WHERE content_release_id = ANY($1::text[])`,
+          [contentReleaseIds]
+        );
+        await client.query(
+          `DELETE FROM import_jobs WHERE import_job_id = ANY($1::text[])`,
+          [importJobIds]
+        );
+        const deletion = await client.query(
+          `DELETE FROM source_packages
+           WHERE source_package_id = $1 AND tenant_id = $2 AND workspace_id = $3`,
+          [input.sourcePackageId, input.tenantId, input.workspaceId]
+        );
+        await client.query("COMMIT");
+        return deletion.rowCount === 1;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async getImportJobById(importJobId) {
       return one(
         `SELECT import_job_id, tenant_id, workspace_id, source_package_id, status, created_at, finished_at, diagnostics_json

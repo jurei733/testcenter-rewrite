@@ -41,6 +41,8 @@ import type {
   WorkspaceActivityEventType,
   WorkspaceActivitySubjectType,
   WorkspaceSourcePackageDetail,
+  WorkspaceSourcePackageDeletion,
+  WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageListItem,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorGroupDetail,
@@ -1464,6 +1466,12 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
     downloadSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/download",
+    getSourcePackageDeletionReadiness:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/deletion-readiness",
+    deleteSourcePackage:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
+    replaceSourcePackage:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/replacements",
     exportSourcePackagesCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/source-packages.csv",
     retrySourcePackageImport:
@@ -1583,6 +1591,12 @@ export type RetrySourcePackageImportRequest = {
   contentStructure?: SourcePackageContentStructure | null;
   sourceDocument?: SourceDocumentSource | null;
 };
+
+export type DeleteSourcePackageRequest = {
+  confirmation: string;
+};
+
+export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
 
 export type ActivateContentReleaseRequest = {
   activatedByActorId: string;
@@ -1890,6 +1904,21 @@ export type CreateImportJobResponse = {
 
 export type RetrySourcePackageImportResponse = {
   sourcePackage: SourcePackage;
+  importJob: ImportJob;
+  stagedContentRelease: ContentRelease | null;
+};
+
+export type GetSourcePackageDeletionReadinessResponse = {
+  deletionReadiness: WorkspaceSourcePackageDeletionReadiness;
+};
+
+export type DeleteSourcePackageResponse = {
+  deletion: WorkspaceSourcePackageDeletion;
+};
+
+export type ReplaceSourcePackageResponse = {
+  replacedSourcePackage: SourcePackage;
+  replacementSourcePackage: SourcePackage;
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
 };

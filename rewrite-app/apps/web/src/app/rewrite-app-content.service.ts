@@ -1,10 +1,15 @@
 import { Injectable, inject } from "@angular/core";
 
 import {
+  type DeleteSourcePackageRequest,
+  type DeleteSourcePackageResponse,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetImportJobResponse,
   type GetSourcePackageResponse,
+  type GetSourcePackageDeletionReadinessResponse,
+  type ReplaceSourcePackageRequest,
+  type ReplaceSourcePackageResponse,
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
@@ -32,6 +37,7 @@ import {
   runImportActivateFlow
 } from "./rewrite-app-shell.workflows";
 import { downloadBlobFile, downloadTextFile } from "./download-text-file";
+import { prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppShellContentHostsService } from "./rewrite-app-shell-content-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
@@ -179,6 +185,106 @@ export class RewriteAppContentService {
       "Source Package Downloaded",
       `${filename} downloaded as ${download.blob.size} byte(s).`
     );
+  }
+
+  async loadSourcePackageDeletionReadiness(): Promise<GetSourcePackageDeletionReadinessResponse> {
+    const sourcePackageId = this.contentState.sourcePackageId.trim();
+    const payload = await this.requestState.request<GetSourcePackageDeletionReadinessResponse>(
+      "Source Package Deletion Readiness",
+      "GET",
+      resolveRoutePath(
+        productionApiRoutes.workspace.getSourcePackageDeletionReadiness,
+        {
+          tenantKey: this.uiState.workspace.tenantKey.trim(),
+          workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+          sourcePackageId
+        }
+      )
+    );
+    this.contentState.sourcePackageDeletionReadinessView = prettyPrintJson(
+      payload,
+      this.contentState.sourcePackageDeletionReadinessView
+    );
+    this.feedback.rememberActivity(
+      "Deletion Readiness Loaded",
+      payload.deletionReadiness.canDelete
+        ? `${payload.deletionReadiness.sourcePackage.fileName} can be deleted.`
+        : `${payload.deletionReadiness.blockingDependencies.length} dependency item(s) block deletion.`
+    );
+    return payload;
+  }
+
+  async replaceSourcePackage(): Promise<ReplaceSourcePackageResponse> {
+    const sourcePackageId = this.contentState.sourcePackageId.trim();
+    const payload = await this.requestState.request<ReplaceSourcePackageResponse>(
+      "Replace Source Package",
+      "POST",
+      resolveRoutePath(productionApiRoutes.workspace.replaceSourcePackage, {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+        sourcePackageId
+      }),
+      {
+        fileName: this.contentState.sourceFileName.trim(),
+        mediaType: this.contentState.sourceMediaType.trim(),
+        sourceDocument: this.contentState.sourceDocument
+      } satisfies ReplaceSourcePackageRequest
+    );
+    this.contentState.sourcePackageId =
+      payload.replacementSourcePackage.sourcePackageId;
+    this.contentState.importJobId = payload.importJob.importJobId;
+    this.contentState.contentReleaseId =
+      payload.stagedContentRelease?.contentReleaseId ?? "";
+    this.contentState.sourcePackageDeletionReadinessView =
+      'Use "Deletion Readiness".';
+    const host = this.createActionsHost();
+    host.persistShellState();
+    this.feedback.rememberActivity(
+      "Source Package Replaced",
+      `${payload.replacementSourcePackage.fileName} imported as ${payload.importJob.status}; the prior version remains.`
+    );
+    await this.refreshContentReads();
+    await this.loadSourcePackageDetail();
+    await this.loadImportJobDetail();
+    if (payload.stagedContentRelease) {
+      await this.loadContentReleaseActivationReadiness();
+      await this.loadContentReleaseDetail();
+    }
+    return payload;
+  }
+
+  async deleteSourcePackage(
+    confirmation: string
+  ): Promise<DeleteSourcePackageResponse> {
+    const sourcePackageId = this.contentState.sourcePackageId.trim();
+    const payload = await this.requestState.request<DeleteSourcePackageResponse>(
+      "Delete Source Package",
+      "DELETE",
+      resolveRoutePath(productionApiRoutes.workspace.deleteSourcePackage, {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim(),
+        sourcePackageId
+      }),
+      { confirmation } satisfies DeleteSourcePackageRequest
+    );
+    this.contentState.sourcePackageId = "";
+    this.contentState.importJobId = "";
+    this.contentState.contentReleaseId = "";
+    this.contentState.sourcePackageDetailView = 'Use "Source Package Detail".';
+    this.contentState.importJobDetailView = 'Use "Import Job Detail".';
+    this.contentState.contentReleaseDetailView = 'Use "Release Detail".';
+    this.contentState.contentReleaseActivationReadinessView =
+      'Use "Release Readiness".';
+    this.contentState.sourcePackageDeletionReadinessView =
+      'Use "Deletion Readiness".';
+    const host = this.createActionsHost();
+    host.persistShellState();
+    this.feedback.rememberActivity(
+      "Source Package Deleted",
+      `${payload.deletion.fileName} and its unused derivatives were deleted.`
+    );
+    await this.refreshContentReads();
+    return payload;
   }
 
   async loadImportJobDetail(): Promise<GetImportJobResponse> {

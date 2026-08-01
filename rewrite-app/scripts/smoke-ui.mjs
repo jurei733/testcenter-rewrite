@@ -1433,6 +1433,9 @@ try {
   await expectButtonSelectorDisabled("#sourcePackageDetailButton");
   await expectButtonSelectorDisabled("#importJobDetailButton");
   await expectButtonSelectorDisabled("#downloadSourceDocumentButton");
+  await expectButtonSelectorDisabled("#sourcePackageDeletionReadinessButton");
+  await expectButtonSelectorDisabled("#replaceSourcePackageButton");
+  await expectButtonSelectorDisabled("#deleteSourcePackageButton");
   await expectButtonSelectorDisabled("#participantSessionDetailButton");
   await expectButtonSelectorDisabled("#releaseReadinessButton");
   await expectButtonSelectorDisabled("#releaseDetailButton");
@@ -1518,6 +1521,103 @@ try {
   await zipDownload.saveAs(downloadedZipPath);
   const downloadedZip = await readFile(downloadedZipPath);
   assert.deepEqual(downloadedZip, uploadedZip);
+  await expectButtonSelectorEnabled("#sourcePackageDeletionReadinessButton");
+  await expectButtonSelectorEnabled("#deleteSourcePackageButton");
+  await page.locator("#sourcePackageDeletionReadinessButton").click();
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Source Package Deletion Readiness"
+      })
+    })
+    .filter({ hasText: "Deletion is safe" })
+    .filter({ hasText: "0 import(s), 0 unused release(s)" })
+    .waitFor({ timeout: 15_000 });
+  page.once("dialog", async dialog => {
+    assert.equal(dialog.type(), "prompt");
+    await dialog.accept(uploadedZipSourceFileName);
+  });
+  await page.locator("#deleteSourcePackageButton").click();
+  await expectInputValue("#sourcePackageId", "");
+
+  logStep("replace-and-delete-source-package");
+  const lifecycleOldFileName = `ui-lifecycle-old-${Date.now()}.xml`;
+  const lifecycleOldResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: lifecycleOldFileName,
+        mediaType: "application/xml",
+        sourceDocument: uploadedSourceDocument
+      }
+    }
+  );
+  const lifecycleOld = await lifecycleOldResponse.json();
+  const lifecycleOldSourcePackageId = lifecycleOld.sourcePackage?.sourcePackageId;
+  assert.ok(
+    lifecycleOldSourcePackageId,
+    "UI smoke expected an original source package id for replacement."
+  );
+  await fillAndCommit("#sourcePackageId", lifecycleOldSourcePackageId);
+  const lifecycleReplacementFileName = `ui-lifecycle-new-${Date.now()}.xml`;
+  const lifecycleReplacementPath = resolve(
+    ".data",
+    lifecycleReplacementFileName
+  );
+  await writeFile(lifecycleReplacementPath, uploadedSourceDocument, "utf8");
+  await page
+    .locator("#sourceDocumentFile")
+    .setInputFiles(lifecycleReplacementPath);
+  await expectButtonSelectorEnabled("#replaceSourcePackageButton");
+  page.once("dialog", async dialog => {
+    assert.equal(dialog.type(), "confirm");
+    await dialog.accept();
+  });
+  await page.locator("#replaceSourcePackageButton").click();
+  await page.waitForFunction(
+    oldSourcePackageId => {
+      const sourcePackageId = document.querySelector("#sourcePackageId");
+      return (
+        sourcePackageId instanceof HTMLInputElement &&
+        sourcePackageId.value.trim() !== "" &&
+        sourcePackageId.value !== oldSourcePackageId
+      );
+    },
+    lifecycleOldSourcePackageId,
+    { timeout: 15_000 }
+  );
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
+    .filter({ hasText: lifecycleReplacementFileName })
+    .filter({ hasText: "1 import(s), 1 release(s)" })
+    .filter({ hasText: "safe after exact-name confirmation" })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#sourcePackageDeletionReadinessButton").click();
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Source Package Deletion Readiness"
+      })
+    })
+    .filter({ hasText: lifecycleReplacementFileName })
+    .filter({ hasText: "1 import(s), 1 unused release(s)" })
+    .waitFor({ timeout: 15_000 });
+  page.once("dialog", async dialog => {
+    assert.equal(dialog.type(), "prompt");
+    await dialog.accept(lifecycleReplacementFileName);
+  });
+  await page.locator("#deleteSourcePackageButton").click();
+  await expectInputValue("#sourcePackageId", "");
+  await fillAndCommit("#sourcePackageId", lifecycleOldSourcePackageId);
+  page.once("dialog", async dialog => {
+    assert.equal(dialog.type(), "prompt");
+    await dialog.accept(lifecycleOldFileName);
+  });
+  await page.locator("#deleteSourcePackageButton").click();
+  await expectInputValue("#sourcePackageId", "");
   await fillAndCommit("#sourcePackageId", "");
   await fillAndCommit("#importJobId", "");
   await fillAndCommit("#contentReleaseId", "");
