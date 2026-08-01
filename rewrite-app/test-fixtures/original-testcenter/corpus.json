@@ -25,6 +25,13 @@
         "beginner-unit",
         "bonus-unit"
       ],
+      "stateKeys": ["level", "bonus"],
+      "showRules": [
+        ["stage1-professional", "level", "professional"],
+        ["stage1-advanced", "level", "advanced"],
+        ["stage1-beginner", "level", "beginner"],
+        ["optional-block", "bonus", "yes"]
+      ],
       "policy": {
         "pagingMode": "separate",
         "unitMenuEnabled": true

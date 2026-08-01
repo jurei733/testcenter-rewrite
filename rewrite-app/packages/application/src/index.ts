@@ -28,6 +28,8 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
+  BookletStateCondition,
+  BookletStateVariableSource,
   BookletLeaveRestriction,
   BookletRuntimePolicy,
   ContentReleaseActivationReadiness,
@@ -51,6 +53,7 @@ import type {
   SourcePackage,
   SourcePackageStatus,
   SourcePackageContentStructure,
+  SourcePackageBookletStateEntry,
   SourcePackageTestletEntry,
   Tenant,
   TestRun,
@@ -3033,6 +3036,119 @@ const normalizeContentStructure = (
     if (bookletEntry.config && Object.keys(bookletEntry.config).length > 0) {
       normalizedBooklet.policy = compileBookletRuntimePolicy(bookletEntry.config);
     }
+    const normalizeVariableSource = (
+      source: BookletStateVariableSource
+    ): BookletStateVariableSource | null => {
+      const type = source?.type;
+      const variableKey = normalizeManifestToken(source?.variableKey);
+      const unitKey = normalizeManifestToken(source?.unitKey);
+      return (type === "Code" ||
+        type === "Value" ||
+        type === "Status" ||
+        type === "Score") &&
+        variableKey &&
+        unitKey
+        ? {
+            type,
+            variableKey,
+            unitKey,
+            defaultValue: String(source.defaultValue ?? "0")
+          }
+        : null;
+    };
+    const normalizeCondition = (
+      condition: BookletStateCondition
+    ): BookletStateCondition | null => {
+      const expressionType = condition?.expression?.type;
+      if (
+        expressionType !== "equal" &&
+        expressionType !== "notEqual" &&
+        expressionType !== "greaterThan" &&
+        expressionType !== "lowerThan"
+      ) {
+        return null;
+      }
+      const source = condition?.source;
+      let normalizedSource: BookletStateCondition["source"] | null = null;
+      if (
+        source?.type === "Code" ||
+        source?.type === "Value" ||
+        source?.type === "Status" ||
+        source?.type === "Score"
+      ) {
+        normalizedSource = normalizeVariableSource(source);
+      } else if (
+        source?.type === "Sum" ||
+        source?.type === "Median" ||
+        source?.type === "Mean"
+      ) {
+        const sources = (source.sources ?? []).flatMap(item => {
+          const normalized = normalizeVariableSource(item);
+          return normalized ? [normalized] : [];
+        });
+        normalizedSource = { type: source.type, sources };
+      } else if (source?.type === "Count") {
+        normalizedSource = {
+          type: "Count",
+          conditions: (source.conditions ?? []).flatMap(item => {
+            const normalized = normalizeCondition(item);
+            return normalized ? [normalized] : [];
+          })
+        };
+      }
+      return normalizedSource
+        ? {
+            source: normalizedSource,
+            expression: {
+              type: expressionType,
+              value: String(condition.expression.value ?? "")
+            }
+          }
+        : null;
+    };
+    const stateKeys = new Set<string>();
+    const stateEntries = (bookletEntry.stateEntries ?? []).flatMap(stateEntry => {
+      const stateKey = normalizeManifestToken(stateEntry.stateKey);
+      if (!stateKey || stateKeys.has(stateKey)) {
+        return [];
+      }
+      const optionKeys = new Set<string>();
+      const options = (stateEntry.options ?? []).flatMap(option => {
+        const optionKey = normalizeManifestToken(option.optionKey);
+        if (!optionKey || optionKeys.has(optionKey)) {
+          return [];
+        }
+        optionKeys.add(optionKey);
+        return [{
+          optionKey,
+          displayLabel: normalizeManifestLabel(
+            option.displayLabel,
+            "Option",
+            optionKey
+          ),
+          conditions: (option.conditions ?? []).flatMap(condition => {
+            const normalized = normalizeCondition(condition);
+            return normalized ? [normalized] : [];
+          })
+        }];
+      });
+      if (options.length === 0) {
+        return [];
+      }
+      stateKeys.add(stateKey);
+      return [{
+        stateKey,
+        displayLabel: normalizeManifestLabel(
+          stateEntry.displayLabel,
+          "State",
+          stateKey
+        ),
+        options
+      }];
+    });
+    if (stateEntries.length > 0) {
+      normalizedBooklet.stateEntries = stateEntries;
+    }
     const testletEntriesByKey = new Map(
       (normalizedBooklet.testletEntries ?? []).map(testletEntry => [
         testletEntry.testletKey,
@@ -3054,6 +3170,12 @@ const normalizeContentStructure = (
       );
       const code = normalizeManifestToken(
         testletEntry.restrictions?.codeToEnter?.code
+      );
+      const showStateKey = normalizeManifestToken(
+        testletEntry.restrictions?.show?.stateKey
+      );
+      const showOptionKey = normalizeManifestToken(
+        testletEntry.restrictions?.show?.optionKey
       );
       const prompt = normalizeUnitContent(
         testletEntry.restrictions?.codeToEnter?.prompt
@@ -3086,6 +3208,14 @@ const normalizeContentStructure = (
       const restrictions: NonNullable<
         SourcePackageTestletEntry["restrictions"]
       > = {
+        ...(showStateKey && showOptionKey
+          ? {
+              show: {
+                stateKey: showStateKey,
+                optionKey: showOptionKey
+              }
+            }
+          : {}),
         ...(code
           ? {
               codeToEnter: {
@@ -4007,6 +4137,18 @@ const normalizeParsedJsonContentStructure = (
               booklet.config ??
               booklet.settings
           ),
+          ...(Array.isArray(booklet.stateEntries)
+            ? {
+                stateEntries:
+                  booklet.stateEntries as SourcePackageBookletStateEntry[]
+              }
+            : {}),
+          ...(Array.isArray(booklet.testletEntries)
+            ? {
+                testletEntries:
+                  booklet.testletEntries as SourcePackageTestletEntry[]
+              }
+            : {}),
           unitEntries: rawUnits
             .map(rawUnit => {
               if (typeof rawUnit === "string") {
@@ -4057,6 +4199,11 @@ const normalizeParsedJsonContentStructure = (
                   unit.playerType ??
                   playerKey
               ).trim();
+              const testletPath = Array.isArray(unit.testletPath)
+                ? unit.testletPath
+                    .map(testletKey => String(testletKey).trim())
+                    .filter(Boolean)
+                : [];
               return {
                 unitKey: String(
                   unit.unitKey ??
@@ -4091,6 +4238,7 @@ const normalizeParsedJsonContentStructure = (
                     unit.displayName ??
                     ""
                 ).trim(),
+                ...(testletPath.length > 0 ? { testletPath } : {}),
                 ...(description ? { description } : {}),
                 ...(content ? { content } : {}),
                 ...(playerKey ? { playerKey } : {}),
@@ -5045,6 +5193,7 @@ const readXmlUnitEntryIdentity = (
   ).trim();
 
 type XmlBookletHierarchy = {
+  stateEntries: SourcePackageBookletStateEntry[];
   testletEntries: SourcePackageTestletEntry[];
   unitTestletPaths: Map<string, string[]>;
 };
@@ -5085,6 +5234,108 @@ const collectXmlBookletHierarchies = (
     const testletEntries: SourcePackageTestletEntry[] = [];
     const unitTestletPaths = new Map<string, string[]>();
 
+    const parseVariableSource = (
+      sourceElement: XmlElement
+    ): BookletStateVariableSource | null => {
+      const type = xmlElementLocalName(sourceElement);
+      if (
+        type !== "Code" &&
+        type !== "Value" &&
+        type !== "Status" &&
+        type !== "Score"
+      ) {
+        return null;
+      }
+      const variableKey = sourceElement.getAttribute("of")?.trim() || "";
+      const unitKey = sourceElement.getAttribute("from")?.trim() || "";
+      if (!variableKey || !unitKey) {
+        return null;
+      }
+      return {
+        type,
+        variableKey,
+        unitKey,
+        defaultValue: sourceElement.getAttribute("or")?.trim() || "0"
+      };
+    };
+    const parseCondition = (ifElement: XmlElement): BookletStateCondition[] => {
+      const expressionElement = xmlChildrenNamed(ifElement, "Is")[0];
+      if (!expressionElement) {
+        return [];
+      }
+      const sourceElement = [...xmlChildElements(ifElement)].reverse().find(child =>
+        [
+          "Code",
+          "Value",
+          "Status",
+          "Score",
+          "Sum",
+          "Median",
+          "Mean",
+          "Count"
+        ].includes(xmlElementLocalName(child))
+      );
+      if (!sourceElement) {
+        return [];
+      }
+      const sourceType = xmlElementLocalName(sourceElement);
+      let source: BookletStateCondition["source"] | null =
+        parseVariableSource(sourceElement);
+      if (sourceType === "Sum" || sourceType === "Median" || sourceType === "Mean") {
+        const sources = xmlChildElements(sourceElement).flatMap(child => {
+          const parsed = parseVariableSource(child);
+          return parsed ? [parsed] : [];
+        });
+        source = { type: sourceType, sources };
+      } else if (sourceType === "Count") {
+        source = {
+          type: "Count",
+          conditions: xmlChildrenNamed(sourceElement, "If").flatMap(parseCondition)
+        };
+      }
+      if (!source) {
+        return [];
+      }
+      return (["equal", "notEqual", "greaterThan", "lowerThan"] as const)
+        .flatMap(expressionType => {
+          const value = expressionElement.getAttribute(expressionType);
+          return value == null
+            ? []
+            : [{ source, expression: { type: expressionType, value } }];
+        });
+    };
+    const statesElement = xmlChildrenNamed(booklet, "States")[0];
+    const stateEntries: SourcePackageBookletStateEntry[] = statesElement
+      ? xmlChildrenNamed(statesElement, "State").flatMap(stateElement => {
+          const stateKey = stateElement.getAttribute("id")?.trim() || "";
+          if (!stateKey) {
+            return [];
+          }
+          const options = xmlChildElements(stateElement).flatMap(optionElement => {
+            const optionElementName = xmlElementLocalName(optionElement);
+            if (optionElementName !== "Option" && optionElementName !== "DefaultOption") {
+              return [];
+            }
+            const optionKey = optionElement.getAttribute("id")?.trim() || "";
+            return optionKey
+              ? [{
+                  optionKey,
+                  displayLabel:
+                    optionElement.getAttribute("label")?.trim() || optionKey,
+                  conditions: xmlChildrenNamed(optionElement, "If").flatMap(parseCondition)
+                }]
+              : [];
+          });
+          return options.length > 0
+            ? [{
+                stateKey,
+                displayLabel: stateElement.getAttribute("label")?.trim() || stateKey,
+                options
+              }]
+            : [];
+        })
+      : [];
+
     const visitContainer = (
       container: XmlElement,
       testletPath: string[]
@@ -5117,6 +5368,9 @@ const collectXmlBookletHierarchies = (
         const restrictionsElement = xmlChildrenNamed(element, "Restrictions")[0];
         const codeElement = restrictionsElement
           ? xmlChildrenNamed(restrictionsElement, "CodeToEnter")[0]
+          : undefined;
+        const showElement = restrictionsElement
+          ? xmlChildrenNamed(restrictionsElement, "Show")[0]
           : undefined;
         const timeMaxElement = restrictionsElement
           ? xmlChildrenNamed(restrictionsElement, "TimeMax")[0]
@@ -5156,6 +5410,15 @@ const collectXmlBookletHierarchies = (
         const restrictions: NonNullable<
           SourcePackageTestletEntry["restrictions"]
         > = {
+          ...(showElement?.getAttribute("if")?.trim() &&
+          showElement.getAttribute("is")?.trim()
+            ? {
+                show: {
+                  stateKey: showElement.getAttribute("if")!.trim(),
+                  optionKey: showElement.getAttribute("is")!.trim()
+                }
+              }
+            : {}),
           ...(code
             ? {
                 codeToEnter: {
@@ -5211,7 +5474,11 @@ const collectXmlBookletHierarchies = (
     };
 
     visitContainer(units, []);
-    hierarchies.set(bookletKey, { testletEntries, unitTestletPaths });
+    hierarchies.set(bookletKey, {
+      stateEntries,
+      testletEntries,
+      unitTestletPaths
+    });
   }
 
   return hierarchies;
@@ -5386,6 +5653,9 @@ const collectXmlBookletEntries = (
           ""
       ).trim(),
       config: readBookletConfig(bookletMatch[3] ?? ""),
+      ...(hierarchy?.stateEntries.length
+        ? { stateEntries: hierarchy.stateEntries }
+        : {}),
       ...(hierarchy?.testletEntries.length
         ? { testletEntries: hierarchy.testletEntries }
         : {}),
@@ -6484,6 +6754,242 @@ const resolveRuntimeBooklet = (
   };
 };
 
+type AdaptiveResponseVariable = {
+  id: string;
+  status: string;
+  value: unknown;
+  code?: number;
+  score?: number;
+};
+
+const adaptiveStatusOrder = [
+  "UNSET",
+  "NOT_REACHED",
+  "DISPLAYED",
+  "VALUE_CHANGED",
+  "SOURCE_MISSING",
+  "DERIVE_ERROR",
+  "VALUE_DERIVED",
+  "NO_CODING",
+  "INVALID",
+  "CODING_INCOMPLETE",
+  "CODING_ERROR",
+  "CODING_COMPLETE"
+];
+
+const adaptiveValueAsNumber = (value: unknown): number => {
+  const truncate = (numberValue: number): number =>
+    Math.floor(numberValue * 1_000_000) / 1_000_000;
+  if (value === undefined || value === null) {
+    return 0;
+  }
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  return truncate(Number(value));
+};
+
+const adaptiveValueAsComparable = (value: unknown): string | number => {
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return JSON.stringify([...value].sort());
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  return typeof value === "number" || typeof value === "string" ? value : "";
+};
+
+const resolveAdaptiveVariables = (
+  testRun: TestRun
+): Map<string, Map<string, AdaptiveResponseVariable>> => {
+  const variablesByUnitKey = new Map<
+    string,
+    Map<string, AdaptiveResponseVariable>
+  >();
+  for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
+    const parsedResponse = parseVeronaUnitResponse(response);
+    if (
+      !parsedResponse?.unitState.unitStateDataType?.match(
+        /^iqb-standard@\d+(?:\.\d+)*$/i
+      )
+    ) {
+      continue;
+    }
+    const variables = new Map<string, AdaptiveResponseVariable>();
+    for (const dataPart of Object.values(
+      parsedResponse.unitState.dataParts ?? {}
+    )) {
+      try {
+        const values = JSON.parse(dataPart);
+        if (!Array.isArray(values)) {
+          continue;
+        }
+        for (const value of values) {
+          if (
+            typeof value !== "object" ||
+            value === null ||
+            typeof value.id !== "string" ||
+            typeof value.status !== "string" ||
+            !("value" in value)
+          ) {
+            continue;
+          }
+          variables.set(value.id, {
+            id: value.id,
+            status: value.status,
+            value: value.value,
+            ...(typeof value.code === "number" ? { code: value.code } : {}),
+            ...(typeof value.score === "number" ? { score: value.score } : {})
+          });
+        }
+      } catch {
+        // Invalid data parts remain persisted for player restoration, but cannot
+        // participate in server-side adaptive decisions.
+      }
+    }
+    variablesByUnitKey.set(unitKey, variables);
+  }
+  return variablesByUnitKey;
+};
+
+const resolveAdaptiveStates = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): ParticipantCurrentRunState["adaptiveStates"] => {
+  if (!booklet?.stateEntries?.length) {
+    return [];
+  }
+  const variablesByUnitKey = resolveAdaptiveVariables(testRun);
+  const readVariable = (
+    source: BookletStateVariableSource
+  ): AdaptiveResponseVariable | undefined =>
+    variablesByUnitKey.get(source.unitKey)?.get(source.variableKey);
+  const sourceAsNumber = (source: BookletStateVariableSource): number => {
+    const variable = readVariable(source);
+    if (!variable) {
+      return Number.NaN;
+    }
+    switch (source.type) {
+      case "Code":
+        return variable.code ?? adaptiveValueAsNumber(source.defaultValue);
+      case "Value":
+        return adaptiveValueAsNumber(variable.value);
+      case "Status":
+        return Math.max(adaptiveStatusOrder.indexOf(variable.status), 0);
+      case "Score":
+        return variable.score ?? adaptiveValueAsNumber(source.defaultValue);
+    }
+  };
+  const conditionSatisfied = (condition: BookletStateCondition): boolean => {
+    const source = condition.source;
+    let value: string | number;
+    if (
+      source.type === "Code" ||
+      source.type === "Value" ||
+      source.type === "Status" ||
+      source.type === "Score"
+    ) {
+      const variable = readVariable(source);
+      if (!variable) {
+        return false;
+      }
+      if (condition.expression.type === "greaterThan" ||
+          condition.expression.type === "lowerThan") {
+        value = sourceAsNumber(source);
+      } else if (source.type === "Code") {
+        value = variable.code ?? adaptiveValueAsNumber(source.defaultValue);
+      } else if (source.type === "Value") {
+        value = adaptiveValueAsComparable(variable.value);
+      } else if (source.type === "Status") {
+        value = variable.status || source.defaultValue || "UNSET";
+      } else {
+        value = variable.score ?? adaptiveValueAsNumber(source.defaultValue);
+      }
+    } else if (source.type === "Count") {
+      value = source.conditions.filter(conditionSatisfied).length;
+    } else {
+      const aggregation = source as Extract<
+        BookletStateCondition["source"],
+        { type: "Sum" | "Median" | "Mean" }
+      >;
+      const values = aggregation.sources.map(sourceAsNumber);
+      if (aggregation.type === "Sum") {
+        value = values.reduce((sum: number, item: number) => sum + item, 0);
+      } else if (aggregation.type === "Mean") {
+        value = values.length > 0
+          ? values.reduce((sum: number, item: number) => sum + item, 0) / values.length
+          : Number.NaN;
+      } else {
+        const sorted = [...values].sort((left, right) => left - right);
+        const middle = Math.floor(sorted.length / 2);
+        value = sorted.length === 0
+          ? Number.NaN
+          : sorted.length % 2 === 0
+            ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+            : sorted[middle] ?? Number.NaN;
+      }
+    }
+    let expected: string | number = condition.expression.value;
+    if (typeof value === "number") {
+      value = adaptiveValueAsNumber(value);
+      expected = adaptiveValueAsNumber(expected);
+    }
+    switch (condition.expression.type) {
+      case "equal":
+        return value === expected ||
+          (Number.isNaN(value) && Number.isNaN(expected));
+      case "notEqual":
+        return value !== expected;
+      case "greaterThan":
+        return adaptiveValueAsNumber(value) > adaptiveValueAsNumber(expected);
+      case "lowerThan":
+        return adaptiveValueAsNumber(value) < adaptiveValueAsNumber(expected);
+    }
+  };
+
+  return booklet.stateEntries.map(state => {
+    const selected = state.options.find(option =>
+      option.conditions.every(conditionSatisfied)
+    ) ?? state.options.at(-1)!;
+    return {
+      stateKey: state.stateKey,
+      displayLabel: state.displayLabel,
+      optionKey: selected.optionKey,
+      optionLabel: selected.displayLabel
+    };
+  });
+};
+
+const resolveVisibleBookletUnits = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testRun: TestRun
+): ContentReleaseBookletEntry["unitEntries"] => {
+  if (!booklet) {
+    return [];
+  }
+  const states = new Map(
+    resolveAdaptiveStates(booklet, testRun).map(state => [
+      state.stateKey,
+      state.optionKey
+    ])
+  );
+  const testletsByKey = new Map(
+    (booklet.testletEntries ?? []).map(testlet => [testlet.testletKey, testlet])
+  );
+  return booklet.unitEntries.filter(unit =>
+    (unit.testletPath ?? []).every(testletKey => {
+      const show = testletsByKey.get(testletKey)?.restrictions?.show;
+      return !show || states.get(show.stateKey) === show.optionKey;
+    })
+  );
+};
+
 const isUnitLeaveLocked = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun,
@@ -6608,12 +7114,20 @@ const findTestletCodeGate = (input: {
     return null;
   }
   const unlocked = new Set(input.testRun.unlockedTestletKeys ?? []);
+  const visibleUnitKeys = new Set(
+    resolveVisibleBookletUnits(input.booklet, input.testRun).map(
+      unit => unit.unitKey
+    )
+  );
   for (
     let unitIndex = Math.max(0, input.firstUnitIndex);
     unitIndex <= Math.min(input.lastUnitIndex, input.booklet.unitEntries.length - 1);
     unitIndex += 1
   ) {
     const unit = input.booklet.unitEntries[unitIndex];
+    if (!unit || !visibleUnitKeys.has(unit.unitKey)) {
+      continue;
+    }
     if (isUnitLeaveLocked(input.booklet, input.testRun, unit?.unitKey ?? null)) {
       continue;
     }
@@ -6862,13 +7376,21 @@ const reconcileExpiredTestletTimers = (
         unit.testletPath?.includes(activeExpiredTestletKey) ? index : lastIndex,
       -1
     );
-    const nextUnit = booklet.unitEntries[lastTimedUnitIndex + 1] ?? null;
+    const visibleUnitKeys = new Set(
+      resolveVisibleBookletUnits(booklet, testRun).map(unit => unit.unitKey)
+    );
+    const nextUnit = booklet.unitEntries
+      .slice(lastTimedUnitIndex + 1)
+      .find(unit => visibleUnitKeys.has(unit.unitKey)) ?? null;
     if (nextUnit) {
+      const nextUnitIndex = booklet.unitEntries.findIndex(
+        unit => unit.unitKey === nextUnit.unitKey
+      );
       const nextGate = findTestletCodeGate({
         booklet,
         testRun: { ...testRun, testletTimers },
         firstUnitIndex: lastTimedUnitIndex + 1,
-        lastUnitIndex: lastTimedUnitIndex + 1
+        lastUnitIndex: nextUnitIndex
       });
       currentUnitKey = nextGate
         ? booklet.unitEntries[lastTimedUnitIndex]?.unitKey ?? null
@@ -6995,6 +7517,17 @@ const applyMonitorGoto = (input: {
       400,
       "monitor_goto_target_unit_invalid",
       `Unit '${input.targetUnitKey}' does not belong to booklet '${input.testRun.bookletKey}'.`
+    );
+  }
+  if (
+    !resolveVisibleBookletUnits(booklet, input.testRun).some(
+      unit => unit.unitKey === input.targetUnitKey
+    )
+  ) {
+    throw new FirstSliceError(
+      409,
+      "monitor_goto_target_unit_hidden",
+      `Unit '${input.targetUnitKey}' is not part of the run's active adaptive route.`
     );
   }
 
@@ -7252,7 +7785,7 @@ const resolveBookletNavigationState = (
     testRun.currentUnitKey,
     policy
   );
-  const units = booklet?.unitEntries ?? [];
+  const units = resolveVisibleBookletUnits(booklet, testRun);
   const currentIndex = units.findIndex(
     unit => unit.unitKey === testRun.currentUnitKey
   );
@@ -7318,8 +7851,14 @@ const resolveBookletNavigationState = (
   const nextTestletGate = findTestletCodeGate({
     booklet,
     testRun,
-    firstUnitIndex: currentIndex + 1,
-    lastUnitIndex: nextUnitIndex >= 0 ? nextUnitIndex : currentIndex + 1
+    firstUnitIndex:
+      (booklet?.unitEntries.findIndex(
+        unit => unit.unitKey === testRun.currentUnitKey
+      ) ?? -1) + 1,
+    lastUnitIndex:
+      booklet?.unitEntries.findIndex(
+        unit => unit.unitKey === nextUnitKey
+      ) ?? -1
   });
   if (nextTestletGate) {
     forwardDeniedReasons.push("testlet_code_required");
@@ -7339,8 +7878,11 @@ const resolveBookletNavigationState = (
   const remainingTestletGate = findTestletCodeGate({
     booklet,
     testRun,
-    firstUnitIndex: currentIndex + 1,
-    lastUnitIndex: units.length - 1
+    firstUnitIndex:
+      (booklet?.unitEntries.findIndex(
+        unit => unit.unitKey === testRun.currentUnitKey
+      ) ?? -1) + 1,
+    lastUnitIndex: (booklet?.unitEntries.length ?? 0) - 1
   });
   const isLastUnit = currentIndex >= 0 && currentIndex === units.length - 1;
   const canComplete =
@@ -7404,6 +7946,13 @@ const requireBookletNavigationAllowed = (input: {
     direction === "forward"
       ? navigation.forwardDeniedReasons
       : navigation.backwardDeniedReasons;
+  const targetIsVisible = resolveVisibleBookletUnits(
+    booklet,
+    input.testRun
+  ).some(unit => unit.unitKey === input.targetUnitKey);
+  if (!targetIsVisible) {
+    deniedReasons.push("adaptive_unit_hidden");
+  }
   const directTestletGate =
     direction === "forward"
       ? findTestletCodeGate({
@@ -7555,7 +8104,7 @@ const resolveRuntimeBookletUnits = (
     ) ?? contentRelease.runtimeSnapshot.bookletEntries[0];
 
   return (
-    bookletEntry?.unitEntries.map(unitEntry => ({
+    resolveVisibleBookletUnits(bookletEntry, testRun).map(unitEntry => ({
       unitKey: unitEntry.unitKey,
       displayLabel: unitEntry.displayLabel,
       testletPath: unitEntry.testletPath ?? [],
@@ -7729,7 +8278,7 @@ const buildStudyMonitorUnitProgress = (input: {
     const responseUnitKeys = new Set(Object.keys(testRun.unitResponses));
     const expectedUnitKeys = new Set<string>();
 
-    for (const unitEntry of booklet?.unitEntries ?? []) {
+    for (const unitEntry of resolveVisibleBookletUnits(booklet, testRun)) {
       expectedUnitKeys.add(unitEntry.unitKey);
       const progress = ensureProgress(unitEntry.unitKey, unitEntry.displayLabel);
       progress.expectedRunCount += 1;
@@ -8289,7 +8838,9 @@ const buildStudyMonitorParticipantMatrix = (input: {
     booklet: ContentReleaseRuntimeSnapshot["bookletEntries"][number] | null;
     latestActivityAt: string | null;
   }): WorkspaceStudyMonitorParticipantMatrix["rows"] => {
-    const expectedUnits = inputRow.booklet?.unitEntries ?? [];
+    const expectedUnits = inputRow.testRun
+      ? resolveVisibleBookletUnits(inputRow.booklet ?? undefined, inputRow.testRun)
+      : inputRow.booklet?.unitEntries ?? [];
     const responseUnitKeys = Object.keys(inputRow.testRun?.unitResponses ?? {});
     const unitEntries =
       expectedUnits.length > 0
@@ -8828,9 +9379,9 @@ const buildStudyMonitorUnitDetail = (input: {
       const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
         bookletEntry => bookletEntry.bookletKey === testRun.bookletKey
       );
-      const expected =
-        booklet?.unitEntries.some(unitEntry => unitEntry.unitKey === normalizedUnitKey) ??
-        false;
+      const expected = resolveVisibleBookletUnits(booklet, testRun).some(
+        unitEntry => unitEntry.unitKey === normalizedUnitKey
+      );
       const response = testRun.unitResponses[normalizedUnitKey] ?? null;
       const answered = response != null;
 
@@ -8965,7 +9516,7 @@ const buildStudyMonitorRunDetail = (input: {
       .flatMap(candidate => candidate.runtimeSnapshot.bookletEntries)
       .find(candidate => candidate.bookletKey === testRun.bookletKey) ??
     null;
-  const expectedUnits = booklet?.unitEntries ?? [];
+  const expectedUnits = resolveVisibleBookletUnits(booklet ?? undefined, testRun);
   const expectedUnitKeys = new Set(expectedUnits.map(unit => unit.unitKey));
   const responseUnitKeys = Object.keys(testRun.unitResponses);
   const unexpectedUnitKeys = responseUnitKeys.filter(
@@ -12243,6 +12794,12 @@ export const createFirstSliceServices = (
             currentTestRun.bookletKey,
             currentTestRun
           ),
+          adaptiveStates: resolveAdaptiveStates(
+            contentRelease.runtimeSnapshot.bookletEntries.find(
+              booklet => booklet.bookletKey === currentTestRun.bookletKey
+            ),
+            currentTestRun
+          ),
           activeTestletTimer: resolveActiveTestletTimer(
             contentRelease,
             currentTestRun,
@@ -12401,16 +12958,7 @@ export const createFirstSliceServices = (
         }
 
         const timestamp = now();
-        const firstUnit = selectedBooklet.unitEntries[0];
-        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
-          testletKey =>
-            Boolean(
-              selectedBooklet.testletEntries?.find(
-                testlet => testlet.testletKey === testletKey
-              )?.restrictions?.codeToEnter?.code
-            )
-        );
-        const testRun: TestRun = {
+        const initialTestRun: TestRun = {
           testRunId: idGenerator(),
           participantSessionId: participantSession.participantSessionId,
           tenantId: participantSession.tenantId,
@@ -12418,9 +12966,7 @@ export const createFirstSliceServices = (
           contentReleaseId: participantSession.contentReleaseId,
           bookletKey: selectedBooklet.bookletKey,
           status: "running",
-          currentUnitKey: firstUnitRequiresCode
-            ? null
-            : firstUnit?.unitKey ?? "unit-1",
+          currentUnitKey: null,
           unitResponses: {},
           unlockedTestletKeys: [],
           monitorNavigationUnlocked: false,
@@ -12430,6 +12976,24 @@ export const createFirstSliceServices = (
           createdAt: timestamp,
           updatedAt: timestamp,
           completedAt: null
+        };
+        const firstUnit = resolveVisibleBookletUnits(
+          selectedBooklet,
+          initialTestRun
+        )[0];
+        const firstUnitRequiresCode = (firstUnit?.testletPath ?? []).some(
+          testletKey =>
+            Boolean(
+              selectedBooklet.testletEntries?.find(
+                testlet => testlet.testletKey === testletKey
+              )?.restrictions?.codeToEnter?.code
+            )
+        );
+        const testRun: TestRun = {
+          ...initialTestRun,
+          currentUnitKey: firstUnitRequiresCode
+            ? null
+            : firstUnit?.unitKey ?? null
         };
         await repository.saveTestRun(testRun);
         const effectiveTestRun = await persistEffectiveTestletTimerState({

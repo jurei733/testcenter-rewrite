@@ -5673,6 +5673,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
     bookletKey: string;
     displayLabel: string;
     unitKeys: string[];
+    stateKeys?: string[];
+    showRules?: Array<[string, string, string]>;
     policy: {
       logPolicy?: string;
       pagingMode?: string;
@@ -5770,6 +5772,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
                 player: { logPolicy: string; pagingMode: string };
                 display: { headerContent: string };
               };
+              stateEntries?: Array<{ stateKey: string }>;
+              testletEntries?: Array<{
+                testletKey: string;
+                restrictions?: {
+                  show?: { stateKey: string; optionKey: string };
+                };
+              }>;
               unitEntries: Array<{ unitKey: string }>;
             }>;
           };
@@ -5790,6 +5799,25 @@ test("original Testcenter compatibility corpus imports representative booklets",
       expectation.unitKeys,
       expectation.sourcePath
     );
+    if (expectation.stateKeys) {
+      assert.deepEqual(
+        booklet.stateEntries?.map(state => state.stateKey),
+        expectation.stateKeys,
+        expectation.sourcePath
+      );
+    }
+    if (expectation.showRules) {
+      assert.deepEqual(
+        booklet.testletEntries?.flatMap(testlet => {
+          const show = testlet.restrictions?.show;
+          return show
+            ? [[testlet.testletKey, show.stateKey, show.optionKey]]
+            : [];
+        }),
+        expectation.showRules,
+        expectation.sourcePath
+      );
+    }
     assert.ok(booklet.policy, expectation.sourcePath);
     if (expectation.policy.logPolicy) {
       assert.equal(booklet.policy.player.logPolicy, expectation.policy.logPolicy);
@@ -8720,6 +8748,381 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=testlet_leave_lock_activated`
   );
   assert.equal(lockActivities.body.items.length, 4);
+});
+
+test("original Testcenter adaptive states select and enforce visible testlets", async () => {
+  const tenantKey = "integration-tenant-adaptive-testlets";
+  const workspaceKey = "integration-workspace-adaptive-testlets";
+  const bookletKey = "BOOKLET.ADAPTIVE";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-adaptive.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Adaptive Booklet</Label></Metadata>
+          <BookletConfig><Config key="unit_menu">FULL</Config></BookletConfig>
+          <States>
+            <State id="level" label="Difficulty">
+              <Option id="professional" label="Professional">
+                <If>
+                  <Count>
+                    <If><Value of="derived_var" from="decision-unit"/><Is greaterThan="150"/></If>
+                    <If>
+                      <Sum>
+                        <Value of="var3" from="decision-unit"/>
+                        <Value of="var4" from="decision-unit"/>
+                        <Value of="var5" from="decision-unit"/>
+                      </Sum>
+                      <Is greaterThan="2"/>
+                    </If>
+                  </Count>
+                  <Is greaterThan="0"/>
+                </If>
+              </Option>
+              <Option id="advanced" label="Advanced">
+                <If><Value of="derived_var" from="decision-unit"/><Is greaterThan="-1"/></If>
+              </Option>
+              <Option id="beginner" label="Beginner"/>
+            </State>
+            <State id="quality" label="Coding Quality">
+              <Option id="gold" label="Gold">
+                <If><Code of="coded" from="decision-unit"/><Is greaterThan="1"/></If>
+                <If><Score of="coded" from="decision-unit"/><Is greaterThan="4"/></If>
+                <If><Status of="coded" from="decision-unit"/><Is equal="CODING_COMPLETE"/></If>
+              </Option>
+              <Option id="basic" label="Basic"/>
+            </State>
+            <State id="numeric" label="Numeric Route">
+              <Option id="high" label="High">
+                <If>
+                  <Mean>
+                    <Value of="var3" from="decision-unit"/>
+                    <Value of="var4" from="decision-unit"/>
+                  </Mean>
+                  <Is greaterThan="2"/>
+                </If>
+                <If>
+                  <Median>
+                    <Value of="var3" from="decision-unit"/>
+                    <Value of="var4" from="decision-unit"/>
+                    <Value of="var5" from="decision-unit"/>
+                  </Median>
+                  <Is greaterThan="2"/>
+                </If>
+              </Option>
+              <Option id="low" label="Low"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.DECISION" alias="decision-unit" label="Decision Unit"/>
+            <Testlet id="stage">
+              <Testlet id="professional-block" label="Professional Block">
+                <Restrictions><Show if="level" is="professional"/></Restrictions>
+                <Unit id="UNIT.PROFESSIONAL" alias="professional-unit" label="Professional Unit"/>
+              </Testlet>
+              <Testlet id="advanced-block" label="Advanced Block">
+                <Restrictions><Show if="level" is="advanced"/></Restrictions>
+                <Unit id="UNIT.ADVANCED" alias="advanced-unit" label="Advanced Unit"/>
+              </Testlet>
+              <Testlet id="beginner-block" label="Beginner Block">
+                <Restrictions><Show if="level" is="beginner"/></Restrictions>
+                <Unit id="UNIT.BEGINNER" alias="beginner-unit" label="Beginner Unit"/>
+              </Testlet>
+            </Testlet>
+            <Testlet id="quality-block" label="Quality Block">
+              <Restrictions><Show if="quality" is="gold"/></Restrictions>
+              <Unit id="UNIT.QUALITY" alias="quality-unit" label="Quality Unit"/>
+            </Testlet>
+            <Testlet id="numeric-block" label="Numeric Block">
+              <Restrictions><Show if="numeric" is="high"/></Restrictions>
+              <Unit id="UNIT.NUMERIC" alias="numeric-unit" label="Numeric Unit"/>
+            </Testlet>
+            <Unit id="UNIT.FINISH" alias="finish-unit" label="Finish Unit"/>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            stateEntries?: Array<{ stateKey: string; options: unknown[] }>;
+            testletEntries?: Array<{
+              testletKey: string;
+              restrictions?: { show?: { stateKey: string; optionKey: string } };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const importedBooklet =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries[0];
+  assert.deepEqual(
+    importedBooklet?.stateEntries?.map(state => [state.stateKey, state.options.length]),
+    [["level", 3], ["quality", 2], ["numeric", 2]]
+  );
+  assert.deepEqual(
+    importedBooklet?.testletEntries
+      ?.filter(testlet => testlet.restrictions?.show)
+      .map(testlet => [testlet.testletKey, testlet.restrictions?.show]),
+    [
+      ["professional-block", { stateKey: "level", optionKey: "professional" }],
+      ["advanced-block", { stateKey: "level", optionKey: "advanced" }],
+      ["beginner-block", { stateKey: "level", optionKey: "beginner" }],
+      ["quality-block", { stateKey: "quality", optionKey: "gold" }],
+      ["numeric-block", { stateKey: "numeric", optionKey: "high" }]
+    ]
+  );
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "adaptive-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.equal(resume.body.testRun.currentUnitKey, "decision-unit");
+  const testRunId = resume.body.testRun.testRunId;
+  const readState = () => requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null; canGoNext: boolean };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+
+  const initialState = await readState();
+  assert.deepEqual(
+    initialState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "beginner-unit", "finish-unit"]
+  );
+  assert.deepEqual(
+    initialState.body.currentRunState.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey
+    ]),
+    [["level", "beginner"], ["quality", "basic"], ["numeric", "low"]]
+  );
+  assert.equal(initialState.body.currentRunState.navigation.nextUnitKey, "beginner-unit");
+
+  const hiddenJump = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "professional-unit", status: "running" }
+  });
+  assert.equal(hiddenJump.status, 409);
+  assert.equal(hiddenJump.body.error, "booklet_navigation_denied");
+  assert.deepEqual(hiddenJump.body.details?.deniedReasons, ["adaptive_unit_hidden"]);
+
+  const hiddenMonitorGoto = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "goto",
+        targetUnitKey: "professional-unit",
+        actorId: "adaptive-monitor"
+      }
+    }
+  );
+  assert.equal(hiddenMonitorGoto.status, 409);
+  assert.equal(hiddenMonitorGoto.body.error, "monitor_goto_target_unit_hidden");
+
+  const adaptiveResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: {
+        responses: JSON.stringify([
+          { id: "derived_var", status: "VALUE_CHANGED", value: 20 },
+          { id: "var3", status: "VALUE_CHANGED", value: 3 },
+          { id: "var4", status: "VALUE_CHANGED", value: 3 },
+          { id: "var5", status: "VALUE_CHANGED", value: 3 },
+          {
+            id: "coded",
+            status: "CODING_COMPLETE",
+            value: "answer",
+            code: 2,
+            score: 5
+          }
+        ])
+      }
+    }
+  });
+  const savedDecision = await requestJson(
+    `/api/v1/participant/test-runs/${testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        currentUnitKey: "decision-unit",
+        status: "running",
+        unitResponse: adaptiveResponse
+      }
+    }
+  );
+  assert.equal(savedDecision.status, 200);
+
+  const routedState = await readState();
+  assert.deepEqual(
+    routedState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    [
+      "decision-unit",
+      "professional-unit",
+      "quality-unit",
+      "numeric-unit",
+      "finish-unit"
+    ]
+  );
+  assert.deepEqual(
+    routedState.body.currentRunState.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey
+    ]),
+    [["level", "professional"], ["quality", "gold"], ["numeric", "high"]]
+  );
+  assert.equal(routedState.body.currentRunState.navigation.nextUnitKey, "professional-unit");
+  assert.equal(routedState.body.currentRunState.navigation.canGoNext, true);
+
+  const hiddenFallbackJump = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "beginner-unit", status: "running" }
+  });
+  assert.equal(hiddenFallbackJump.status, 409);
+  assert.deepEqual(hiddenFallbackJump.body.details?.deniedReasons, [
+    "adaptive_unit_hidden"
+  ]);
+  const enteredRoute = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "professional-unit", status: "running" }
+  });
+  assert.equal(enteredRoute.status, 200);
+  assert.equal(enteredRoute.body.testRun.currentUnitKey, "professional-unit");
+
+  const monitorRun = await requestJson<{
+    studyMonitorRun: {
+      expectedUnitCount: number;
+      answeredExpectedUnitCount: number;
+      missingExpectedUnitCount: number;
+      unexpectedResponseCount: number;
+      units: Array<{ unitKey: string; expected: boolean }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${testRunId}`
+  );
+  assert.equal(monitorRun.status, 200);
+  assert.deepEqual(
+    monitorRun.body.studyMonitorRun.units.map(unit => [unit.unitKey, unit.expected]),
+    [
+      ["decision-unit", true],
+      ["professional-unit", true],
+      ["quality-unit", true],
+      ["numeric-unit", true],
+      ["finish-unit", true]
+    ]
+  );
+  assert.equal(monitorRun.body.studyMonitorRun.expectedUnitCount, 5);
+  assert.equal(monitorRun.body.studyMonitorRun.answeredExpectedUnitCount, 1);
+  assert.equal(monitorRun.body.studyMonitorRun.missingExpectedUnitCount, 4);
+  assert.equal(monitorRun.body.studyMonitorRun.unexpectedResponseCount, 0);
+
+  const monitorParticipants = await requestJson<{
+    studyMonitorParticipantMatrix: {
+      rows: Array<{ loginKey: string; unitKey: string; expected: boolean }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/participants`
+  );
+  assert.deepEqual(
+    monitorParticipants.body.studyMonitorParticipantMatrix.rows
+      .filter(row => row.loginKey === "adaptive-participant")
+      .map(row => [row.unitKey, row.expected]),
+    [
+      ["decision-unit", true],
+      ["finish-unit", true],
+      ["numeric-unit", true],
+      ["professional-unit", true],
+      ["quality-unit", true]
+    ]
+  );
+
+  const monitorSummary = await requestJson<{
+    studyMonitorSummary: {
+      unitProgress: Array<{
+        unitKey: string;
+        expectedRunCount: number;
+        missingResponseCount: number;
+      }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/summary`
+  );
+  assert.deepEqual(
+    monitorSummary.body.studyMonitorSummary.unitProgress.map(unit => [
+      unit.unitKey,
+      unit.expectedRunCount,
+      unit.missingResponseCount
+    ]),
+    [
+      ["decision-unit", 1, 0],
+      ["finish-unit", 1, 1],
+      ["numeric-unit", 1, 1],
+      ["professional-unit", 1, 1],
+      ["quality-unit", 1, 1]
+    ]
+  );
+
+  const hiddenMonitorUnit = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/units/beginner-unit`
+  );
+  assert.equal(hiddenMonitorUnit.status, 404);
+  assert.equal(hiddenMonitorUnit.body.error, "study_monitor_unit_not_found");
 });
 
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {

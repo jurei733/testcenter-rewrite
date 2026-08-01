@@ -241,8 +241,51 @@ export type SourcePackageBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   config?: Record<string, string>;
+  stateEntries?: SourcePackageBookletStateEntry[];
   testletEntries?: SourcePackageTestletEntry[];
   unitEntries: SourcePackageUnitEntry[];
+};
+
+export type BookletStateVariableSourceType =
+  | "Code"
+  | "Value"
+  | "Status"
+  | "Score";
+
+export type BookletStateVariableSource = {
+  type: BookletStateVariableSourceType;
+  variableKey: string;
+  unitKey: string;
+  defaultValue: string;
+};
+
+export type BookletStateConditionSource =
+  | BookletStateVariableSource
+  | {
+      type: "Sum" | "Median" | "Mean";
+      sources: BookletStateVariableSource[];
+    }
+  | {
+      type: "Count";
+      conditions: BookletStateCondition[];
+    };
+
+export type BookletStateCondition = {
+  source: BookletStateConditionSource;
+  expression: {
+    type: "equal" | "notEqual" | "greaterThan" | "lowerThan";
+    value: string;
+  };
+};
+
+export type SourcePackageBookletStateEntry = {
+  stateKey: string;
+  displayLabel: string;
+  options: Array<{
+    optionKey: string;
+    displayLabel: string;
+    conditions: BookletStateCondition[];
+  }>;
 };
 
 export type TestletTimeMaxLeavePolicy = "forbidden" | "confirm" | "allowed";
@@ -252,6 +295,10 @@ export type SourcePackageTestletEntry = {
   displayLabel: string;
   parentTestletKey?: string | null;
   restrictions?: {
+    show?: {
+      stateKey: string;
+      optionKey: string;
+    };
     codeToEnter?: {
       code: string;
       prompt: string;
@@ -332,6 +379,7 @@ export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   policy?: BookletRuntimePolicy;
+  stateEntries?: SourcePackageBookletStateEntry[];
   testletEntries?: ContentReleaseTestletEntry[];
   unitEntries: ContentReleaseUnitEntry[];
 };
@@ -349,7 +397,8 @@ export type BookletNavigationDeniedReason =
   | "testlet_time_leave_confirmation_required"
   | "testlet_time_closed"
   | "testlet_leave_confirmation_required"
-  | "testlet_leave_locked";
+  | "testlet_leave_locked"
+  | "adaptive_unit_hidden";
 
 export type BookletRuntimePolicy = {
   version: 1;
@@ -544,6 +593,12 @@ export type ParticipantCurrentRunState = {
     content?: string;
     testletPath: string[];
     isLocked: boolean;
+  }>;
+  adaptiveStates: Array<{
+    stateKey: string;
+    displayLabel: string;
+    optionKey: string;
+    optionLabel: string;
   }>;
   activeTestletTimer: {
     testletKey: string;
