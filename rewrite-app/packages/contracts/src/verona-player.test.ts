@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   isSupportedVeronaPlayerApiVersion,
+  mergeVeronaUnitResponse,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   readVeronaPlayerApiVersion,
@@ -32,6 +33,31 @@ test("Verona response envelopes normalize and restore player state", () => {
     playerState: { currentPage: "page-2" }
   });
   assert.equal(parseVeronaUnitResponse("legacy plain response"), null);
+});
+
+test("Verona response envelopes merge separately reported unit and player state", () => {
+  const playerResponse = mergeVeronaUnitResponse(null, {
+    playerState: { currentPage: "1", validPages: [{ id: "0" }, { id: "1" }] }
+  });
+  const completeResponse = mergeVeronaUnitResponse(playerResponse, {
+    unitState: {
+      dataParts: { elementCodes: '[{"id":"radio_1","value":2}]' },
+      responseProgress: "some"
+    }
+  });
+
+  assert.deepEqual(parseVeronaUnitResponse(completeResponse), {
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      dataParts: { elementCodes: '[{"id":"radio_1","value":2}]' },
+      responseProgress: "some"
+    },
+    playerState: {
+      currentPage: "1",
+      validPages: [{ id: "0" }, { id: "1" }]
+    }
+  });
 });
 
 test("Verona notifications and supported API versions are validated", () => {

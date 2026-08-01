@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from "@angular/core";
 
 import type {
   CompleteTestRunRequest,
+  CompleteTestRunResponse,
   CreateParticipantReviewRequest,
   DeleteParticipantReviewResponse,
   ListParticipantReviewsResponse,
@@ -251,6 +252,8 @@ export class ParticipantViewFacade {
   } | null = null;
   private readonly seenTimerWarnings = new Set<string>();
   private readonly timerRemainingSeconds = new Map<string, number>();
+  private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
+    null;
   private pendingVeronaSave: ParticipantSaveOutboxEntry | null = null;
   private optimisticVeronaResponse: {
     testRunId: string;
@@ -264,6 +267,7 @@ export class ParticipantViewFacade {
     entries: ParticipantTestLogEntryInput[];
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
+  private veronaForegroundSaveSettlement = false;
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
   };
@@ -356,6 +360,7 @@ export class ParticipantViewFacade {
       if (scopeChanged || loginChanged || assignmentChanged) {
         this.runtime.participantSessionId = "";
         this.runtime.testRunId = "";
+        this.currentRunState = null;
         this.runtime.currentRunStateView = 'Use "Start Or Resume".';
       }
     }
@@ -1534,6 +1539,7 @@ export class ParticipantViewFacade {
     this.runtime.testRunId = "";
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
+    this.currentRunState = null;
     this.adaptiveStateFeedback = "";
     this.adaptiveStateChangePending = "";
     this.participantCodeRequired = false;
@@ -1569,6 +1575,7 @@ export class ParticipantViewFacade {
     this.adaptiveStateChangePending = "";
     this.pendingVeronaSave = null;
     this.optimisticVeronaResponse = null;
+    this.currentRunState = null;
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
@@ -1693,7 +1700,8 @@ export class ParticipantViewFacade {
     currentUnitKey = this.runtime.currentUnitKey.trim() || undefined,
     unitResponse?: string | null,
     confirmTestletTimeLeave = false,
-    confirmTestletLeaveLock = false
+    confirmTestletLeaveLock = false,
+    refreshCurrentState = true
   ): Promise<void> {
     const testRunId = this.runtime.testRunId.trim();
     const matchingLogBatches = currentUnitKey
@@ -1743,11 +1751,13 @@ export class ParticipantViewFacade {
       this.runtime.runtimeMonitorView
     );
     this.persistState();
-    await this.refreshCurrentStateInternal(true);
+    if (refreshCurrentState) {
+      await this.refreshCurrentStateInternal(true);
+    }
   }
 
   private scheduleVeronaSaveDrain(): void {
-    if (this.veronaSaveDrainPromise) {
+    if (this.veronaSaveDrainPromise || this.veronaForegroundSaveSettlement) {
       return;
     }
     this.veronaSaveStatus = "saving";
@@ -1757,6 +1767,7 @@ export class ParticipantViewFacade {
       }
       if (
         this.pendingVeronaSave &&
+        !this.veronaForegroundSaveSettlement &&
         this.veronaSaveStatus !== "save_failed" &&
         this.veronaSaveStatus !== "queued_offline"
       ) {
@@ -1768,7 +1779,7 @@ export class ParticipantViewFacade {
   }
 
   private async drainVeronaSaveQueue(): Promise<void> {
-    while (this.pendingVeronaSave) {
+    while (this.pendingVeronaSave && !this.veronaForegroundSaveSettlement) {
       const save = this.pendingVeronaSave;
       this.pendingVeronaSave = null;
       try {
@@ -1807,6 +1818,10 @@ export class ParticipantViewFacade {
       }
     }
 
+    if (this.pendingVeronaSave) {
+      return;
+    }
+
     this.veronaSaveStatus = "saved";
     this.persistState();
     await this.refreshCurrentStateInternal(true);
@@ -1816,71 +1831,93 @@ export class ParticipantViewFacade {
     target: "previous" | "next" | string
   ): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
-    const player = this.player;
-    const targetUnitKey =
-      target === "previous"
-        ? player.previousUnitKey
-        : target === "next"
-          ? player.nextUnitKey
-          : target.trim();
-    if (!targetUnitKey) {
-      return;
-    }
+    this.veronaForegroundSaveSettlement = true;
+    try {
+      const player = this.player;
+      const targetUnitKey =
+        target === "previous"
+          ? player.previousUnitKey
+          : target === "next"
+            ? player.nextUnitKey
+            : target.trim();
+      if (!targetUnitKey) {
+        return;
+      }
 
-    const targetUnit = player.unitItems.find(unit => unit.unitKey === targetUnitKey);
-    if (targetUnitKey === player.unitKey || !targetUnit?.canOpen) {
-      return;
-    }
-
-    const currentState = this.readCurrentRunState();
-    const activeTimer = player.testletTimer;
-    const targetTestletPath =
-      currentState?.bookletUnits.find(
+      const targetUnit = player.unitItems.find(
         unit => unit.unitKey === targetUnitKey
-      )?.testletPath ?? [];
-    const leavesActiveTimedBlock =
-      activeTimer != null &&
-      !targetTestletPath.includes(activeTimer.testletKey);
-    const confirmTestletTimeLeave =
-      leavesActiveTimedBlock && activeTimer.leave === "confirm";
-    if (
-      confirmTestletTimeLeave &&
-      !globalThis.window?.confirm(
-        `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
-      )
-    ) {
-      return;
-    }
-    const activeLeaveLock = player.leaveLock;
-    const leavesLockScope =
-      activeLeaveLock != null &&
-      (activeLeaveLock.scope === "unit" ||
-        targetTestletPath.at(-1) !== activeLeaveLock.testletKey);
-    const confirmTestletLeaveLock =
-      leavesLockScope && activeLeaveLock?.confirm === true;
-    if (
-      confirmTestletLeaveLock &&
-      !globalThis.window?.confirm(
-        `${activeLeaveLock.detail} Continue?`
-      )
-    ) {
-      return;
-    }
-    const currentUnitKey = this.runtime.currentUnitKey.trim();
-    if (currentUnitKey) {
+      );
+      const usesUnitMenu = target !== "previous" && target !== "next";
+      if (
+        targetUnitKey === player.unitKey ||
+        !targetUnit ||
+        (usesUnitMenu && !targetUnit.canOpen)
+      ) {
+        return;
+      }
+
+      const currentState = this.readCurrentRunState();
+      const activeTimer = player.testletTimer;
+      const targetTestletPath =
+        currentState?.bookletUnits.find(
+          unit => unit.unitKey === targetUnitKey
+        )?.testletPath ?? [];
+      const leavesActiveTimedBlock =
+        activeTimer != null &&
+        !targetTestletPath.includes(activeTimer.testletKey);
+      const confirmTestletTimeLeave =
+        leavesActiveTimedBlock && activeTimer.leave === "confirm";
+      if (
+        confirmTestletTimeLeave &&
+        !globalThis.window?.confirm(
+          `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
+        )
+      ) {
+        return;
+      }
+      const activeLeaveLock = player.leaveLock;
+      const leavesLockScope =
+        activeLeaveLock != null &&
+        (activeLeaveLock.scope === "unit" ||
+          targetTestletPath.at(-1) !== activeLeaveLock.testletKey);
+      const confirmTestletLeaveLock =
+        leavesLockScope && activeLeaveLock?.confirm === true;
+      if (
+        confirmTestletLeaveLock &&
+        !globalThis.window?.confirm(
+          `${activeLeaveLock.detail} Continue?`
+        )
+      ) {
+        return;
+      }
+      const currentUnitKey = this.runtime.currentUnitKey.trim();
+      if (currentUnitKey) {
+        await this.saveProgressInternal(
+          "running",
+          currentUnitKey,
+          this.runtime.currentUnitResponse,
+          false,
+          false,
+          false
+        );
+      }
       await this.saveProgressInternal(
         "running",
-        currentUnitKey,
-        this.runtime.currentUnitResponse
+        targetUnitKey,
+        undefined,
+        confirmTestletTimeLeave,
+        confirmTestletLeaveLock
       );
+    } finally {
+      this.veronaForegroundSaveSettlement = false;
+      if (
+        this.pendingVeronaSave &&
+        this.veronaSaveStatus !== "save_failed" &&
+        this.veronaSaveStatus !== "queued_offline"
+      ) {
+        this.scheduleVeronaSaveDrain();
+      }
     }
-    await this.saveProgressInternal(
-      "running",
-      targetUnitKey,
-      undefined,
-      confirmTestletTimeLeave,
-      confirmTestletLeaveLock
-    );
   }
 
   private async unlockNextTestletInternal(gate: {
@@ -1929,14 +1966,7 @@ export class ParticipantViewFacade {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
     await this.saveCurrentDraftBeforeCompleteInternal();
 
-    const payload = await this.requestState.request<{
-      testRun: {
-        testRunId: string;
-        status: string;
-        currentUnitKey?: string | null;
-        completedAt?: string | null;
-      };
-    }>(
+    const payload = await this.requestState.request<CompleteTestRunResponse>(
       "Participant Complete Run",
       "POST",
       resolveRoutePath(productionApiRoutes.participant.completeRun, {
@@ -1976,25 +2006,29 @@ export class ParticipantViewFacade {
   }
 
   private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<void> {
-    const activeSave = this.veronaSaveDrainPromise;
-    if (activeSave) {
-      await activeSave;
-    }
-    // A failed background save remains queued for an explicit retry. Navigation
-    // and completion perform the same save in the foreground, so use the latest
-    // runtime response there instead of issuing the stale queued request later.
-    const pendingSave = this.pendingVeronaSave;
-    if (pendingSave) {
-      for (const batch of pendingSave.logs) {
-        this.queuedVeronaLogs.push({
-          testRunId: pendingSave.testRunId,
-          unitKey: batch.unitKey,
-          originalUnitId: batch.originalUnitId,
-          entries: batch.entries
-        });
+    this.veronaForegroundSaveSettlement = true;
+    try {
+      const activeSave = this.veronaSaveDrainPromise;
+      if (activeSave) {
+        await activeSave;
       }
+      // A failed or superseded background save is covered by the foreground
+      // action's latest response. Preserve only its logs for that request.
+      const pendingSave = this.pendingVeronaSave;
+      if (pendingSave) {
+        for (const batch of pendingSave.logs) {
+          this.queuedVeronaLogs.push({
+            testRunId: pendingSave.testRunId,
+            unitKey: batch.unitKey,
+            originalUnitId: batch.originalUnitId,
+            entries: batch.entries
+          });
+        }
+      }
+      this.pendingVeronaSave = null;
+    } finally {
+      this.veronaForegroundSaveSettlement = false;
     }
-    this.pendingVeronaSave = null;
   }
 
   private compactParticipantTestLogBatches(
@@ -2206,6 +2240,7 @@ export class ParticipantViewFacade {
         this.requestState.isApiError(error) &&
         error.error === "participant_session_has_no_current_run"
       ) {
+        this.currentRunState = null;
         this.runtime.currentRunStateView = prettyPrintJson(
           error,
           this.runtime.currentRunStateView
@@ -2217,13 +2252,22 @@ export class ParticipantViewFacade {
     }
   }
 
-  private syncRun(testRun: {
-    testRunId: string;
-    status?: string;
-    currentUnitKey?: string | null;
-    bookletKey?: string;
-    bookletAssignmentKey?: string;
-  }): void {
+  private syncRun(
+    testRun: Pick<
+      ParticipantCurrentRunStateResponse["currentRunState"]["testRun"],
+      "testRunId"
+    > &
+      Partial<ParticipantCurrentRunStateResponse["currentRunState"]["testRun"]>
+  ): void {
+    if (this.currentRunState?.testRun.testRunId === testRun.testRunId) {
+      this.currentRunState = {
+        ...this.currentRunState,
+        testRun: {
+          ...this.currentRunState.testRun,
+          ...testRun
+        }
+      };
+    }
     this.runtime.testRunId = testRun.testRunId;
     if (testRun.bookletAssignmentKey || testRun.bookletKey) {
       this.runtime.bookletKey =
@@ -2247,6 +2291,7 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
+    this.currentRunState = currentState;
     this.workspace.tenantKey = currentState.scope.tenantKey;
     this.workspace.workspaceKey = currentState.scope.workspaceKey;
     this.syncParticipantSessionFields(currentState.participantSession);
@@ -2526,11 +2571,15 @@ export class ParticipantViewFacade {
   private readCurrentRunState():
     | ParticipantCurrentRunStateResponse["currentRunState"]
     | null {
+    if (this.currentRunState) {
+      return this.currentRunState;
+    }
     try {
       const payload = JSON.parse(this.runtime.currentRunStateView) as Partial<
         ParticipantCurrentRunStateResponse
       >;
-      return payload.currentRunState ?? null;
+      this.currentRunState = payload.currentRunState ?? null;
+      return this.currentRunState;
     } catch {
       return null;
     }

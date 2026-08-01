@@ -8005,13 +8005,10 @@ const readZipEntryBuffer = (
 
 const readZipEntryText = (
   zipBuffer: Buffer,
-  entry: ZipEntry
+  entry: ZipEntry,
+  maxOutputBytes = MAX_EXTRACTED_RESOURCE_BYTES
 ): string | null =>
-  readZipEntryBuffer(
-    zipBuffer,
-    entry,
-    MAX_EXTRACTED_MANIFEST_BYTES
-  )?.toString("utf8") ?? null;
+  readZipEntryBuffer(zipBuffer, entry, maxOutputBytes)?.toString("utf8") ?? null;
 
 const normalizeZipEntryPath = (path: string): string => {
   const segments: string[] = [];
@@ -9149,7 +9146,11 @@ const extractXmlManifestFromZipSourceDocument = (
 
   let foundUnreadableCandidate = false;
   for (const entry of candidates) {
-    const text = readZipEntryText(zipBuffer, entry);
+    const text = readZipEntryText(
+      zipBuffer,
+      entry,
+      MAX_EXTRACTED_MANIFEST_BYTES
+    );
     if (!text) {
       foundUnreadableCandidate = true;
       continue;

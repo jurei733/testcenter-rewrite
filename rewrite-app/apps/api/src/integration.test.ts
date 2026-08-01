@@ -7728,17 +7728,23 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
 });
 
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
-  type PlayerPackage = {
-    bookletFixture: string;
+  type PlayerUnitPackage = {
+    unitKey: string;
     unitFixture: string;
     definitionFixture: string;
+    definitionEncoding: "utf8" | "brotli-base64";
+    unitSha256: string;
+    definitionSha256: string;
+  };
+  type PlayerPackage = {
+    bookletFixture: string;
     playerFixture: string;
     bookletKey: string;
-    unitKey: string;
     playerKey: string;
     playerModuleVersion: string;
     playerApiVersion: string;
     playerSha256: string;
+    units: PlayerUnitPackage[];
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
@@ -7749,14 +7755,31 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     resolve(originalTestcenterCorpusRoot, expectation.bookletFixture),
     "utf8"
   );
-  const unitDocument = readFileSync(
-    resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
-    "utf8"
-  );
-  const definitionDocument = readFileSync(
-    resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
-    "utf8"
-  );
+  const unitPackages = expectation.units.map(unit => {
+    const unitDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, unit.unitFixture),
+      "utf8"
+    );
+    const definitionDocument =
+      unit.definitionEncoding === "brotli-base64"
+        ? readBrotliBase64Fixture(
+            resolve(originalTestcenterCorpusRoot, unit.definitionFixture)
+          )
+        : readFileSync(
+            resolve(originalTestcenterCorpusRoot, unit.definitionFixture),
+            "utf8"
+          );
+    assert.equal(
+      createHash("sha256").update(unitDocument.trim()).digest("hex"),
+      unit.unitSha256
+    );
+    assert.equal(
+      createHash("sha256").update(definitionDocument.trim()).digest("hex"),
+      unit.definitionSha256
+    );
+    return { ...unit, unitDocument, definitionDocument };
+  });
+  assert.equal(unitPackages.length, 3);
   const playerDocument = readBrotliBase64Fixture(
     resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
   );
@@ -7781,8 +7804,12 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
           <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
             <resources>
               <resource identifier="${expectation.bookletKey}" href="booklets/Booklet.xml" />
-              <resource identifier="${expectation.unitKey}" href="units/Unit.xml" />
-              <resource identifier="testcenter-sample1.voud" href="units/testcenter-sample1.voud" />
+              ${unitPackages
+                .flatMap(unit => [
+                  `<resource identifier="${unit.unitKey}" href="units/${unit.unitKey}.xml" />`,
+                  `<resource identifier="${unit.unitKey}.voud" href="units/${unit.unitKey}.voud" />`
+                ])
+                .join("\n              ")}
               <resource identifier="${expectation.playerKey}" href="players/iqb-player-aspect-2.12.3.html" />
             </resources>
           </manifest>
@@ -7792,14 +7819,16 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
         fileName: "export/booklets/Booklet.xml",
         content: bookletDocument
       },
-      {
-        fileName: "export/units/Unit.xml",
-        content: unitDocument
-      },
-      {
-        fileName: "export/units/testcenter-sample1.voud",
-        content: definitionDocument
-      },
+      ...unitPackages.flatMap(unit => [
+        {
+          fileName: `export/units/${unit.unitKey}.xml`,
+          content: unit.unitDocument
+        },
+        {
+          fileName: `export/units/${unit.unitKey}.voud`,
+          content: unit.definitionDocument
+        }
+      ]),
       {
         fileName: "export/players/iqb-player-aspect-2.12.3.html",
         content: playerDocument
@@ -7839,13 +7868,14 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
   });
   assert.equal(importResult.status, 201);
-  assert.equal(importResult.body.importJob.status, "completed");
   assert.equal(
     importResult.body.importJob.diagnostics.some(
       diagnostic => diagnostic.severity === "error"
     ),
-    false
+    false,
+    JSON.stringify(importResult.body.importJob.diagnostics)
   );
+  assert.equal(importResult.body.importJob.status, "completed");
   const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
   assert.ok(contentReleaseId);
 
@@ -7871,13 +7901,24 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
   );
   const snapshot =
     releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
-  const aspectUnit = snapshot.bookletEntries
-    .find(booklet => booklet.bookletKey === expectation.bookletKey)
-    ?.unitEntries.find(unit => unit.unitKey === expectation.unitKey);
-  assert.ok(aspectUnit);
-  assert.equal(aspectUnit.playerKey, expectation.playerKey);
-  assert.equal(aspectUnit.unitDefinition, definitionDocument.trim());
-  assert.equal(aspectUnit.unitDefinitionType, expectation.playerKey);
+  const aspectBooklet = snapshot.bookletEntries.find(
+    booklet => booklet.bookletKey === expectation.bookletKey
+  );
+  assert.ok(aspectBooklet);
+  assert.deepEqual(
+    aspectBooklet.unitEntries.map(unit => unit.unitKey),
+    unitPackages.map(unit => unit.unitKey)
+  );
+  for (const expectedUnit of unitPackages) {
+    const aspectUnit: (typeof aspectBooklet.unitEntries)[number] | undefined =
+      aspectBooklet.unitEntries.find(
+      unit => unit.unitKey === expectedUnit.unitKey
+    );
+    assert.ok(aspectUnit);
+    assert.equal(aspectUnit.playerKey, expectation.playerKey);
+    assert.equal(aspectUnit.unitDefinition, expectedUnit.definitionDocument.trim());
+    assert.equal(aspectUnit.unitDefinitionType, expectation.playerKey);
+  }
   assert.deepEqual(snapshot.playerEntries, [
     { playerKey: expectation.playerKey, html: playerDocument }
   ]);
@@ -9708,6 +9749,48 @@ test("original Testcenter Unit cross-file references block incomplete packages",
       crossReferenceCase.fileName
     );
   }
+
+  const oversizedDefinitionZip = createZipBase64(
+    baseEntries.map(entry =>
+      entry.fileName === "export/definitions/unit.voud"
+        ? {
+            ...entry,
+            compressionMethod: 8 as const,
+            compressedContent: deflateRawSync(Buffer.from("{}", "utf8")),
+            uncompressedSize: 20 * 1024 * 1024 + 1
+          }
+        : entry
+    )
+  );
+  const oversizedDefinitionSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unit-cross-reference-oversized-definition.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${oversizedDefinitionZip}`
+    }
+  });
+  const oversizedDefinitionImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        oversizedDefinitionSource.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(oversizedDefinitionImport.body.importJob.status, "failed");
+  assert.equal(oversizedDefinitionImport.body.stagedContentRelease, null);
+  assert.equal(
+    oversizedDefinitionImport.body.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_unit_definition_unreadable"
+    ),
+    true
+  );
 });
 
 test("original Testcenter code-gated testlets require a durable run unlock", async () => {

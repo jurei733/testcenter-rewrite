@@ -217,8 +217,13 @@ const pollJsonWithPredicate = async (url, predicate, timeoutMs = 20_000) => {
     await delay(250);
   }
 
+  const serializedPayload = JSON.stringify(lastPayload);
+  const payloadPreview =
+    serializedPayload.length <= 4_000
+      ? serializedPayload
+      : `${serializedPayload.slice(0, 4_000)}... (${serializedPayload.length} characters total)`;
   throw new Error(
-    `Timed out waiting for predicate on ${url}. Last payload: ${JSON.stringify(lastPayload)}`
+    `Timed out waiting for predicate on ${url}. Last payload: ${payloadPreview}`
   );
 };
 
@@ -3903,8 +3908,15 @@ try {
   const aspectBookletKey = "booklet1";
   const aspectUnitKey = "testcenter-sample1";
   const aspectPlayerKey = "iqb-player-aspect@2.12";
-  const [aspectBookletDocument, aspectUnitDocument, aspectDefinitionDocument] =
-    await Promise.all([
+  const [
+    aspectBookletDocument,
+    aspectUnitDocument,
+    aspectDefinitionDocument,
+    aspectSecondUnitDocument,
+    aspectSecondDefinitionDocument,
+    aspectThirdUnitDocument,
+    aspectThirdDefinitionDocument
+  ] = await Promise.all([
       readFile(
         resolve("test-fixtures/original-testcenter/booklets/booklet-17.4.xml"),
         "utf8"
@@ -3918,6 +3930,29 @@ try {
       readFile(
         resolve(
           "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample1.voud"
+        ),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/units/aspect-testcenter-sample2.xml"
+        ),
+        "utf8"
+      ),
+      readBrotliBase64Text(
+        resolve(
+          "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample2.voud.br.base64"
+        )
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/units/aspect-testcenter-sample3.xml"
+        ),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample3.voud"
         ),
         "utf8"
       )
@@ -3934,8 +3969,12 @@ try {
         <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
           <resources>
             <resource identifier="${aspectBookletKey}" href="booklets/Booklet.xml" />
-            <resource identifier="${aspectUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${aspectUnitKey}" href="units/testcenter-sample1.xml" />
             <resource identifier="testcenter-sample1.voud" href="units/testcenter-sample1.voud" />
+            <resource identifier="testcenter-sample2" href="units/testcenter-sample2.xml" />
+            <resource identifier="testcenter-sample2.voud" href="units/testcenter-sample2.voud" />
+            <resource identifier="testcenter-sample3" href="units/testcenter-sample3.xml" />
+            <resource identifier="testcenter-sample3.voud" href="units/testcenter-sample3.voud" />
             <resource identifier="${aspectPlayerKey}" href="players/iqb-player-aspect-2.12.3.html" />
           </resources>
         </manifest>
@@ -3946,12 +3985,28 @@ try {
       content: aspectBookletDocument
     },
     {
-      fileName: "export/units/Unit.xml",
+      fileName: "export/units/testcenter-sample1.xml",
       content: aspectUnitDocument
     },
     {
       fileName: "export/units/testcenter-sample1.voud",
       content: aspectDefinitionDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample2.xml",
+      content: aspectSecondUnitDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample2.voud",
+      content: aspectSecondDefinitionDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample3.xml",
+      content: aspectThirdUnitDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample3.voud",
+      content: aspectThirdDefinitionDocument
     },
     {
       fileName: "export/players/iqb-player-aspect-2.12.3.html",
@@ -4026,7 +4081,12 @@ try {
   assert.ok(aspectParticipantSessionId);
   const aspectResponse = "Gespeichert durch den Rewrite-Host";
   await aspectFrame.locator("input").fill(aspectResponse);
-  await pollJsonWithPredicate(
+  await aspectFrame
+    .getByRole("button", { name: "Gehe zu Seite 2", exact: true })
+    .click();
+  await aspectFrame.locator("p", { hasText: "Seite 2" }).waitFor();
+  await aspectFrame.getByText("Option 2", { exact: true }).click();
+  const savedAspectState = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
     payload => {
       const response =
@@ -4037,11 +4097,18 @@ try {
         const elementCodes = JSON.parse(
           parsed.unitState?.dataParts?.elementCodes ?? "[]"
         );
-        return elementCodes.some(
-          elementCode =>
-            elementCode.id === "text-field_1" &&
-            elementCode.status === "VALUE_CHANGED" &&
-            elementCode.value === aspectResponse
+        const textField = elementCodes.find(
+          elementCode => elementCode.id === "text-field_1"
+        );
+        const radio = elementCodes.find(
+          elementCode => elementCode.id === "radio_1"
+        );
+        return (
+          textField?.status === "VALUE_CHANGED" &&
+          textField.value === aspectResponse &&
+          radio?.status === "VALUE_CHANGED" &&
+          radio.value === 2 &&
+          String(parsed.playerState?.currentPage) === "1"
         );
       } catch {
         return false;
@@ -4049,6 +4116,49 @@ try {
     },
     30_000
   );
+  assert.equal(
+    savedAspectState.currentRunState.navigation.canGoNext,
+    true,
+    "The original booklet should allow its separate next-unit control."
+  );
+  const aspectNextUnitButton = page.locator("#participantRouteNextUnitButton");
+  assert.equal(await aspectNextUnitButton.isEnabled(), true);
+  await aspectNextUnitButton.click();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+      "testcenter-sample2",
+    30_000
+  );
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "testcenter-sample2" })
+    .waitFor({ timeout: 30_000 });
+  await aspectFrame.getByText("Sample 2", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  await aspectFrame.getByText("Relativ große Bilder", { exact: true }).waitFor();
+  assert.ok(
+    (await aspectFrame.locator("img").count()) >= 4,
+    "The media-heavy Aspect unit should render its four original images."
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "testcenter-sample3" })
+    .waitFor({ timeout: 30_000 });
+  await aspectFrame.getByText("Sample Unit 3", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await aspectFrame.getByText("Sample 2", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  await page.locator("#participantRoutePreviousUnitButton").click();
+  await aspectFrame.getByText("Unit 1", { exact: true }).waitFor({
+    timeout: 30_000
+  });
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       aspectParticipantSessionId
@@ -4066,6 +4176,14 @@ try {
   assert.equal(
     await resumedAspectFrame.locator("input").inputValue(),
     aspectResponse
+  );
+  await resumedAspectFrame
+    .getByRole("button", { name: "Gehe zu Seite 2", exact: true })
+    .click();
+  await resumedAspectFrame.locator("p", { hasText: "Seite 2" }).waitFor();
+  assert.equal(
+    await resumedAspectFrame.getByRole("radio").nth(1).isChecked(),
+    true
   );
   stopAfter("participant-verona-player");
 

@@ -17,6 +17,7 @@ import type {
 
 import {
   isSupportedVeronaPlayerApiVersion,
+  mergeVeronaUnitResponse,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   readVeronaPlayerApiVersion,
@@ -112,6 +113,7 @@ export class VeronaPlayerHostComponent
   private focusLogTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingPlayerHasFocus: boolean | undefined;
   private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
+  private latestResponse = "";
   private viewReady = false;
 
   private get sessionId(): string {
@@ -219,12 +221,11 @@ export class VeronaPlayerHostComponent
             this.logEntries.emit(logEntries);
           }
         }
-        this.responseChange.emit(
-          serializeVeronaUnitResponse({
-            unitState: notification.unitState,
-            playerState: notification.playerState
-          })
-        );
+        this.latestResponse = mergeVeronaUnitResponse(this.latestResponse, {
+          unitState: notification.unitState,
+          playerState: notification.playerState
+        });
+        this.responseChange.emit(this.latestResponse);
         break;
       case "vopUnitNavigationRequestedNotification":
         this.handleNavigationRequest(notification);
@@ -265,6 +266,9 @@ export class VeronaPlayerHostComponent
     this.status = "loading";
     this.apiVersionLabel = "Waiting for player";
     this.errorMessage = "";
+    this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
+      ? this.savedResponse
+      : serializeVeronaUnitResponse({});
 
     if (!this.playerHtml.trim() || !this.unitDefinition.trim()) {
       this.fail("The release does not contain both player HTML and a unit definition.");

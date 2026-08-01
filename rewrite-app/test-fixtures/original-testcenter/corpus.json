@@ -301,21 +301,54 @@
   "playerPackages": [
     {
       "bookletFixture": "booklets/booklet-17.4.xml",
-      "unitFixture": "units/aspect-testcenter-sample1.xml",
-      "definitionFixture": "definitions/aspect-testcenter-sample1.voud",
       "playerFixture": "players/iqb-player-aspect-2.12.3.html.br.base64",
       "sourcePaths": {
         "booklet": "sampledata/aspect/booklet1.xml",
-        "unit": "sampledata/aspect/testcenter-sample1.xml",
-        "definition": "sampledata/aspect/testcenter-sample1.voud",
         "player": "sampledata/aspect/iqb-player-aspect-2.12.3.html"
       },
       "bookletKey": "booklet1",
-      "unitKey": "testcenter-sample1",
       "playerKey": "iqb-player-aspect@2.12",
       "playerModuleVersion": "2.12.3",
       "playerApiVersion": "6.0",
-      "playerSha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5"
+      "playerSha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5",
+      "units": [
+        {
+          "unitKey": "testcenter-sample1",
+          "unitFixture": "units/aspect-testcenter-sample1.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample1.voud",
+          "definitionEncoding": "utf8",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample1.xml",
+            "definition": "sampledata/aspect/testcenter-sample1.voud"
+          },
+          "unitSha256": "d4f699a4af07b36edfbe34e3fd0f7e02425df22b533d0c763877e2409416232c",
+          "definitionSha256": "2b62797529990581859363634476a4ca96d4c916b31b8655a2599511e89818f3"
+        },
+        {
+          "unitKey": "testcenter-sample2",
+          "unitFixture": "units/aspect-testcenter-sample2.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample2.voud.br.base64",
+          "definitionEncoding": "brotli-base64",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample2.xml",
+            "definition": "sampledata/aspect/testcenter-sample2.voud"
+          },
+          "unitSha256": "f3b6b9a6f6527d571d48432c29607c99cd5ba69fbff65efa54d8635f7f0b7300",
+          "definitionSha256": "c7af813cca325099fa7659cb7b2c5dd01a8e35cc2f3c96cf937c9769d05b6fa8"
+        },
+        {
+          "unitKey": "testcenter-sample3",
+          "unitFixture": "units/aspect-testcenter-sample3.xml",
+          "definitionFixture": "definitions/aspect-testcenter-sample3.voud",
+          "definitionEncoding": "utf8",
+          "sourcePaths": {
+            "unit": "sampledata/aspect/testcenter-sample3.xml",
+            "definition": "sampledata/aspect/testcenter-sample3.voud"
+          },
+          "unitSha256": "cdea5bcc2145e9d55e4a300eae8a99e39a9d4e836991c65c77f71d7ade6eca67",
+          "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a"
+        }
+      ]
     }
   ],
   "roster": {

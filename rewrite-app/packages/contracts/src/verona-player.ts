@@ -134,6 +134,24 @@ export const serializeVeronaUnitResponse = (input: {
   } satisfies PersistedVeronaUnitResponse);
 };
 
+export const mergeVeronaUnitResponse = (
+  previousValue: string | null | undefined,
+  update: {
+    unitState?: unknown;
+    playerState?: unknown;
+  }
+): string => {
+  const previous = parseVeronaUnitResponse(previousValue);
+  return serializeVeronaUnitResponse({
+    unitState:
+      update.unitState === undefined ? previous?.unitState : update.unitState,
+    playerState:
+      update.playerState === undefined
+        ? previous?.playerState
+        : update.playerState
+  });
+};
+
 export const parseVeronaUnitResponse = (
   value: string | null | undefined
 ): PersistedVeronaUnitResponse | null => {
