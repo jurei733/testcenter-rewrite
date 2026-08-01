@@ -1612,6 +1612,66 @@ try {
   await expectButtonSelectorDisabled("#releaseReadinessButton");
   await expectButtonSelectorDisabled("#releaseDetailButton");
   await expectButtonSelectorDisabled("#retrySourcePackageImportButton");
+  logStep("assemble-loose-original-source-files");
+  const looseAssemblyFileName = `ui-original-loose-${Date.now()}.zip`;
+  await page.locator("#sourcePackageAssemblyFiles").setInputFiles([
+    resolve("test-fixtures/original-testcenter/booklets/Booklet2.xml"),
+    resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+    resolve(
+      "test-fixtures/original-testcenter/schemes/coding-scheme.vocs.json"
+    ),
+    resolve(
+      "test-fixtures/original-testcenter/players/verona-player-simple-6.0.html"
+    )
+  ]);
+  await page
+    .locator("#sourcePackageAssemblySelection")
+    .filter({ hasText: "4 file(s) selected" })
+    .waitFor({ timeout: 20_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Assembly Candidates" }) })
+    .filter({ hasText: "Booklet2.xml" })
+    .filter({ hasText: "Unit2.xml" })
+    .filter({ hasText: "coding-scheme.vocs.json" })
+    .filter({ hasText: "verona-player-simple-6.0.html" })
+    .waitFor({ timeout: 20_000 });
+  await fillAndCommit("#sourcePackageAssemblyFileName", looseAssemblyFileName);
+  await expectButtonSelectorEnabled("#assembleSourcePackagesButton");
+  await page.locator("#assembleSourcePackagesButton").click();
+  await expectInputValue("#sourceFileName", looseAssemblyFileName);
+  await page
+    .locator("#sourcePackageAssemblySelection")
+    .filter({ hasText: "0 file(s) selected" })
+    .waitFor({ timeout: 20_000 });
+  await expectButtonSelectorDisabled("#assembleSourcePackagesButton");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(looseAssemblyFileName)}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.sourcePackage?.fileName === looseAssemblyFileName &&
+          item?.sourcePackage?.mediaType === "application/zip" &&
+          item?.sourcePackage?.status === "accepted" &&
+          item?.latestImportJob?.status === "completed" &&
+          item?.contentReleaseCount === 1
+      )
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=source_package_assembled&limit=1`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.activityEvent?.eventType === "source_package_assembled" &&
+          item?.activityEvent?.details?.sourcePackages?.length === 4
+      )
+  );
   logStep("load-zip-source-document-file");
   const uploadedZipSourceFileName = `ui-smoke-source-${Date.now()}.zip`;
   const uploadedZipSourcePath = resolve(".data", uploadedZipSourceFileName);

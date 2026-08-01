@@ -1,6 +1,10 @@
 import { Injectable, inject } from "@angular/core";
 
 import {
+  type AssembleSourcePackagesRequest,
+  type AssembleSourcePackagesResponse,
+  type CreateSourcePackageRequest,
+  type CreateSourcePackageResponse,
   type DeleteSourcePackageRequest,
   type DeleteSourcePackageResponse,
   type GetContentReleaseActivationReadinessResponse,
@@ -57,6 +61,75 @@ export class RewriteAppContentService {
       return;
     }
     await createSourcePackageAction(this.createActionsHost());
+  }
+
+  async assembleSourcePackages(
+    fileName: string,
+    sourcePackageIds: string[]
+  ): Promise<AssembleSourcePackagesResponse> {
+    const payload = await this.requestState.request<AssembleSourcePackagesResponse>(
+      "Assemble Source Packages",
+      "POST",
+      resolveRoutePath(productionApiRoutes.workspace.assembleSourcePackages, {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim()
+      }),
+      {
+        fileName: fileName.trim(),
+        sourcePackageIds
+      } satisfies AssembleSourcePackagesRequest
+    );
+    this.contentState.sourcePackageId = payload.sourcePackage.sourcePackageId;
+    this.contentState.sourceFileName = payload.sourcePackage.fileName;
+    this.contentState.sourceMediaType = payload.sourcePackage.mediaType;
+    this.contentState.importJobId = payload.importJob.importJobId;
+    this.contentState.contentReleaseId =
+      payload.stagedContentRelease?.contentReleaseId ?? "";
+    this.createActionsHost().persistShellState();
+    this.feedback.rememberActivity(
+      "Source Packages Assembled",
+      `${payload.assembledFrom.length} file(s) assembled as ${payload.sourcePackage.fileName}; import ${payload.importJob.status}.`
+    );
+    await this.refreshContentReads();
+    await this.loadSourcePackageDetail();
+    await this.loadImportJobDetail();
+    if (payload.stagedContentRelease) {
+      await this.loadContentReleaseActivationReadiness();
+      await this.loadContentReleaseDetail();
+    }
+    return payload;
+  }
+
+  async uploadLooseSourcePackages(
+    files: CreateSourcePackageRequest[]
+  ): Promise<CreateSourcePackageResponse[]> {
+    const route = resolveRoutePath(
+      productionApiRoutes.workspace.createSourcePackage,
+      {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim()
+      }
+    );
+    const uploads: CreateSourcePackageResponse[] = [];
+    try {
+      for (const file of files) {
+        uploads.push(
+          await this.requestState.request<CreateSourcePackageResponse>(
+            `Upload ${file.fileName}`,
+            "POST",
+            route,
+            file
+          )
+        );
+      }
+    } finally {
+      await this.refreshContentReads(true);
+    }
+    this.feedback.rememberActivity(
+      "Loose Source Files Uploaded",
+      `${uploads.length} file(s) are ready for package assembly.`
+    );
+    return uploads;
   }
 
   async createImportJob(): Promise<void> {

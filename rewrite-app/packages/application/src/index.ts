@@ -135,6 +135,21 @@ export type ContentIntakePort = {
     contentStructure?: SourcePackageContentStructure;
     sourceDocument?: SourceDocumentSource;
   }): Promise<SourcePackage>;
+  assembleSourcePackages(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    fileName: string;
+    sourcePackageIds: string[];
+  }): Promise<
+    CreateImportJobResult & {
+      sourcePackage: SourcePackage;
+      assembledFrom: Array<{
+        sourcePackageId: string;
+        fileName: string;
+        sizeBytes: number;
+      }>;
+    }
+  >;
   createImportJob(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -854,6 +869,7 @@ export const firstSliceUseCases = {
   listSourcePackages: "ListSourcePackages",
   exportSourcePackagesCsv: "ExportSourcePackagesCsv",
   createSourcePackage: "CreateSourcePackage",
+  assembleSourcePackages: "AssembleSourcePackages",
   createImportJob: "CreateImportJob",
   retrySourcePackageImport: "RetrySourcePackageImport",
   replaceSourcePackage: "ReplaceSourcePackage",
@@ -7363,6 +7379,239 @@ const normalizeZipEntryPath = (path: string): string => {
   }
 
   return segments.join("/");
+};
+
+type SourcePackageAssemblyEntry = {
+  sourcePackageId: string;
+  fileName: string;
+  bytes: Buffer;
+};
+
+const crc32Table = Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    crc = (crc & 1) !== 0 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+  }
+  return crc >>> 0;
+});
+
+const crc32 = (content: Buffer): number => {
+  let crc = 0xffffffff;
+  for (const byte of content) {
+    crc = crc32Table[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
+const createStoredZipArchive = (
+  entries: Array<{ fileName: string; bytes: Buffer }>
+): Buffer => {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+
+  for (const entry of entries) {
+    const fileName = Buffer.from(entry.fileName, "utf8");
+    const checksum = crc32(entry.bytes);
+    const localHeader = Buffer.alloc(30 + fileName.length);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0x0800, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(entry.bytes.length, 18);
+    localHeader.writeUInt32LE(entry.bytes.length, 22);
+    localHeader.writeUInt16LE(fileName.length, 26);
+    fileName.copy(localHeader, 30);
+    localParts.push(localHeader, entry.bytes);
+
+    const centralHeader = Buffer.alloc(46 + fileName.length);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0x0800, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(entry.bytes.length, 20);
+    centralHeader.writeUInt32LE(entry.bytes.length, 24);
+    centralHeader.writeUInt16LE(fileName.length, 28);
+    centralHeader.writeUInt32LE(localOffset, 42);
+    fileName.copy(centralHeader, 46);
+    centralParts.push(centralHeader);
+    localOffset += localHeader.length + entry.bytes.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
+  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
+  endOfCentralDirectory.writeUInt32LE(localOffset, 16);
+
+  return Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]);
+};
+
+const normalizeSourcePackageAssemblyPath = (fileName: string): string => {
+  const trimmedFileName = fileName.trim().replace(/\\/g, "/");
+  const pathSegments = trimmedFileName.split("/");
+  const normalizedPath = normalizeZipEntryPath(trimmedFileName);
+  if (
+    !normalizedPath ||
+    normalizedPath.length > 512 ||
+    trimmedFileName.startsWith("/") ||
+    /^[a-z]:\//i.test(trimmedFileName) ||
+    /^[a-z][a-z0-9+.-]*:/i.test(trimmedFileName) ||
+    pathSegments.some(segment => segment === "..") ||
+    normalizedPath.endsWith("/")
+  ) {
+    throw new FirstSliceError(
+      400,
+      "source_package_assembly_path_invalid",
+      `Source package file name '${fileName}' is not a safe relative archive path.`
+    );
+  }
+  return normalizedPath;
+};
+
+const xmlAttribute = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+const collectAssemblyResourceIdentifiers = (
+  entry: SourcePackageAssemblyEntry
+): string[] => {
+  const fileName = entry.fileName;
+  const baseName = fileName.split("/").at(-1) ?? fileName;
+  const stem = baseName.replace(/\.(?:html?|xml|json)$/i, "");
+  const identifiers = new Set([fileName, baseName, stem].filter(Boolean));
+  const text = entry.bytes.toString("utf8");
+  if (/^\s*(?:<\?xml[^>]*>\s*)?<(?:Booklet|Unit|SysCheck)\b/i.test(text)) {
+    const metadataId = text.match(
+      /<Metadata\b[^>]*>[\s\S]*?<Id\b[^>]*>([^<]+)<\/Id>/i
+    )?.[1]?.trim();
+    if (metadataId) {
+      identifiers.add(metadataId);
+    }
+  }
+  for (const metadataMatch of text.matchAll(
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  )) {
+    try {
+      const metadata = JSON.parse(metadataMatch[1] ?? "") as {
+        id?: unknown;
+        specVersion?: unknown;
+      };
+      const id = typeof metadata.id === "string" ? metadata.id.trim() : "";
+      const specVersion =
+        typeof metadata.specVersion === "string"
+          ? metadata.specVersion.trim()
+          : "";
+      if (id) {
+        identifiers.add(id);
+        if (specVersion) {
+          identifiers.add(`${id}@${specVersion}`);
+        }
+      }
+    } catch {
+      // Player metadata validation reports malformed JSON during the normal import.
+    }
+  }
+  return [...identifiers];
+};
+
+const createAssemblyManifest = (
+  entries: SourcePackageAssemblyEntry[]
+): string => {
+  const resources: string[] = [];
+  const identifiers = new Map<string, string>();
+  for (const entry of entries) {
+    for (const identifier of collectAssemblyResourceIdentifiers(entry)) {
+      const normalizedIdentifier = identifier.toLowerCase();
+      const existingFileName = identifiers.get(normalizedIdentifier);
+      if (existingFileName && existingFileName !== entry.fileName) {
+        continue;
+      }
+      identifiers.set(normalizedIdentifier, entry.fileName);
+      resources.push(
+        `    <resource identifier="${xmlAttribute(identifier)}" href="${xmlAttribute(entry.fileName)}" />`
+      );
+    }
+  }
+  return [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<manifest identifier="testcenter-rewrite-assembly">',
+    "  <resources>",
+    ...resources,
+    "  </resources>",
+    "</manifest>"
+  ].join("\n");
+};
+
+const assembleSourcePackageArchive = (
+  sourcePackages: SourcePackage[]
+): { archive: Buffer; members: SourcePackageAssemblyEntry[] } => {
+  const members = sourcePackages.map(sourcePackage => {
+    const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+    if (!decodedDocument) {
+      throw new FirstSliceError(
+        409,
+        "source_package_assembly_document_missing",
+        `Source package '${sourcePackage.sourcePackageId}' has no readable source document.`
+      );
+    }
+    if (decodedDocument.bytes.length > MAX_EXTRACTED_RESOURCE_BYTES) {
+      throw new FirstSliceError(
+        413,
+        "source_package_assembly_member_too_large",
+        `Source package '${sourcePackage.fileName}' exceeds the 20 MiB assembly member limit.`
+      );
+    }
+    return {
+      sourcePackageId: sourcePackage.sourcePackageId,
+      fileName: normalizeSourcePackageAssemblyPath(sourcePackage.fileName),
+      bytes: decodedDocument.bytes
+    };
+  });
+  const duplicateFileNames = members.filter(
+    (member, index) =>
+      members.findIndex(
+        candidate => candidate.fileName.toLowerCase() === member.fileName.toLowerCase()
+      ) !== index
+  );
+  if (duplicateFileNames.length > 0) {
+    throw new FirstSliceError(
+      409,
+      "source_package_assembly_file_name_duplicate",
+      `Assembly contains duplicate archive path '${duplicateFileNames[0]!.fileName}'.`
+    );
+  }
+  const totalBytes = members.reduce((total, member) => total + member.bytes.length, 0);
+  if (totalBytes > MAX_EXTRACTED_RESOURCE_TOTAL_BYTES) {
+    throw new FirstSliceError(
+      413,
+      "source_package_assembly_too_large",
+      "Selected source packages exceed the 50 MiB assembly limit."
+    );
+  }
+  const hasManifest = members.some(member =>
+    /(?:^|\/)(?:imsmanifest|manifest)\.xml$/i.test(member.fileName)
+  );
+  const archiveEntries = [
+    ...(hasManifest
+      ? []
+      : [
+          {
+            fileName: "imsmanifest.xml",
+            bytes: Buffer.from(createAssemblyManifest(members), "utf8")
+          }
+        ]),
+    ...members.map(member => ({ fileName: member.fileName, bytes: member.bytes }))
+  ];
+  return { archive: createStoredZipArchive(archiveEntries), members };
 };
 
 const resolveZipResourcePathCandidates = (
@@ -15379,6 +15628,110 @@ export const createFirstSliceServices = (
           }
         });
         return sourcePackage;
+      },
+      async assembleSourcePackages(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        if (
+          !Array.isArray(input.sourcePackageIds) ||
+          input.sourcePackageIds.length < 2 ||
+          input.sourcePackageIds.length > 100 ||
+          input.sourcePackageIds.some(
+            sourcePackageId =>
+              typeof sourcePackageId !== "string" || !sourcePackageId.trim()
+          )
+        ) {
+          throw new FirstSliceError(
+            400,
+            "source_package_assembly_selection_invalid",
+            "sourcePackageIds must contain between 2 and 100 source package ids."
+          );
+        }
+        const sourcePackageIds = input.sourcePackageIds.map(sourcePackageId =>
+          sourcePackageId.trim()
+        );
+        if (new Set(sourcePackageIds).size !== sourcePackageIds.length) {
+          throw new FirstSliceError(
+            400,
+            "source_package_assembly_selection_duplicate",
+            "sourcePackageIds must not contain duplicates."
+          );
+        }
+        const sourcePackages = await Promise.all(
+          sourcePackageIds.map(sourcePackageId =>
+            requireSourcePackage(repository, sourcePackageId)
+          )
+        );
+        for (const sourcePackage of sourcePackages) {
+          if (
+            sourcePackage.tenantId !== workspace.tenantId ||
+            sourcePackage.workspaceId !== workspace.workspaceId
+          ) {
+            throw new FirstSliceError(
+              404,
+              "source_package_not_found",
+              `Source package '${sourcePackage.sourcePackageId}' was not found in workspace '${input.workspaceKey}'.`
+            );
+          }
+        }
+        const fileNameInput = normalizeSourcePackageText(
+          input.fileName,
+          "fileName",
+          "source_package_file_name_required"
+        );
+        const fileName = fileNameInput.toLowerCase().endsWith(".zip")
+          ? fileNameInput
+          : `${fileNameInput}.zip`;
+        const { archive, members } = assembleSourcePackageArchive(sourcePackages);
+        const assembledSourcePackage: SourcePackage = {
+          sourcePackageId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          fileName,
+          mediaType: "application/zip",
+          contentStructure: null,
+          sourceDocument: `data:application/zip;base64,${archive.toString("base64")}`,
+          status: "uploaded",
+          uploadedAt: now()
+        };
+        await repository.saveSourcePackage(assembledSourcePackage);
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_assembled",
+          subjectType: "source_package",
+          subjectId: assembledSourcePackage.sourcePackageId,
+          summary: `Source package '${assembledSourcePackage.fileName}' assembled from ${members.length} uploaded files.`,
+          details: {
+            fileName: assembledSourcePackage.fileName,
+            sizeBytes: archive.length,
+            sourcePackages: members.map(member => ({
+              sourcePackageId: member.sourcePackageId,
+              fileName: member.fileName,
+              sizeBytes: member.bytes.length
+            }))
+          }
+        });
+        const importResult = await createImportJobWithRelease({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          sourcePackageId: assembledSourcePackage.sourcePackageId
+        });
+        return {
+          sourcePackage:
+            (await repository.getSourcePackageById(
+              assembledSourcePackage.sourcePackageId
+            )) ?? assembledSourcePackage,
+          assembledFrom: members.map(member => ({
+            sourcePackageId: member.sourcePackageId,
+            fileName: member.fileName,
+            sizeBytes: member.bytes.length
+          })),
+          ...importResult
+        };
       },
       async createImportJob(input) {
         const result = await createImportJobWithRelease(input);

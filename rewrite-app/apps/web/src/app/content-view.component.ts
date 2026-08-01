@@ -173,6 +173,37 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <article class="card">
+        <h2>Loose File Assembly</h2>
+        <p>Combine separately uploaded booklet, unit, coding-scheme, player, and manifest files into one immutable ZIP package and import it immediately.</p>
+        <div class="form-grid full">
+          <label>
+            Upload Loose Files
+            <input id="sourcePackageAssemblyFiles" name="sourcePackageAssemblyFiles" type="file" multiple accept=".xml,.json,.html,.htm,.imsmanifest,.manifest,.zip,application/xml,text/xml,application/json,text/html,application/zip,application/x-zip-compressed" [disabled]="!view.canUseWorkspaceScope" (change)="view.loadLooseSourceFiles($event)" />
+          </label>
+          <label>
+            Assembled Package Name
+            <input id="sourcePackageAssemblyFileName" name="sourcePackageAssemblyFileName" placeholder="assembled-source-package.zip" [(ngModel)]="view.assemblyFileName" />
+          </label>
+          <label>
+            Selection
+            <span id="sourcePackageAssemblySelection" class="inline-toggle">{{ view.assemblySelectionLabel }}</span>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="assembleSourcePackagesButton" class="primary" type="button" [disabled]="!view.canAssembleSourcePackages" (click)="view.assembleSourcePackages()">Assemble + Import</button>
+          <button id="clearSourcePackageAssemblyButton" class="ghost" type="button" [disabled]="view.assemblySelectionLabel === '0 file(s) selected'" (click)="view.clearAssemblySelection()">Clear Selection</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Assembly Candidates"
+        subtitle="Select two or more uploaded source files. Existing manifests are retained; otherwise a compatible manifest is generated."
+        [items]="view.sourcePackageAssemblyItems"
+        (itemAction)="view.toggleAssemblySourcePackage($event)"
+        emptyState="Refresh content reads after uploading loose files."
+      ></app-record-collection>
+
+      <article class="card">
         <h2>Source Packages CSV Export</h2>
         <p>Filtered package intake export with latest import status and package structure counts.</p>
         <pre id="sourcePackagesExportPreview">{{ view.content.sourcePackagesExportView }}</pre>

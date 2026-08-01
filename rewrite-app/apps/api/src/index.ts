@@ -21,6 +21,8 @@ import {
   type ApiErrorResponse,
   type ActivateContentReleaseRequest,
   type ActivateContentReleaseResponse,
+  type AssembleSourcePackagesRequest,
+  type AssembleSourcePackagesResponse,
   type AssignAdminRoleRequest,
   type AssignAdminRoleResponse,
   type BootstrapAdminUserRequest,
@@ -1487,6 +1489,9 @@ const workspaceActivityEventListPattern = createRoutePattern(
 const sourcePackageCreatePattern = createRoutePattern(
   productionApiRoutes.workspace.createSourcePackage
 );
+const sourcePackageAssemblyPattern = createRoutePattern(
+  productionApiRoutes.workspace.assembleSourcePackages
+);
 const sourcePackageListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSourcePackages
 );
@@ -1672,6 +1677,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", studyMonitorRunPattern],
   ["GET", workspaceActivityEventListPattern],
   ["POST", sourcePackageCreatePattern],
+  ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
   ["GET", sourcePackageDetailPattern],
   ["GET", sourcePackageDownloadPattern],
@@ -2127,6 +2133,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listWorkspaceActivityEvents
     ],
     ["POST", sourcePackageCreatePattern, productionApiRoutes.workspace.createSourcePackage],
+    [
+      "POST",
+      sourcePackageAssemblyPattern,
+      productionApiRoutes.workspace.assembleSourcePackages
+    ],
     ["GET", sourcePackageListPattern, productionApiRoutes.workspace.listSourcePackages],
     ["GET", sourcePackageDetailPattern, productionApiRoutes.workspace.getSourcePackage],
     [
@@ -3849,6 +3860,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const sourcePackageCreateMatch = sourcePackageCreatePattern.exec(pathname);
+      const sourcePackageAssemblyMatch = sourcePackageAssemblyPattern.exec(pathname);
       const sourcePackageListMatch = sourcePackageListPattern.exec(pathname);
       const sourcePackageDetailMatch = sourcePackageDetailPattern.exec(pathname);
       const sourcePackageDownloadMatch = sourcePackageDownloadPattern.exec(pathname);
@@ -4134,6 +4146,32 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           sourceDocument: body.sourceDocument
         });
         sendJson<CreateSourcePackageResponse>(response, 201, { sourcePackage });
+        return;
+      }
+
+      if (request.method === "POST" && sourcePackageAssemblyMatch?.groups) {
+        const tenantKey = decodeRouteGroup(sourcePackageAssemblyMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageAssemblyMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<AssembleSourcePackagesRequest>();
+        const result = await services.contentIntake.assembleSourcePackages({
+          tenantKey,
+          workspaceKey,
+          fileName: body.fileName,
+          sourcePackageIds: body.sourcePackageIds
+        });
+        sendJson<AssembleSourcePackagesResponse>(response, 201, result);
         return;
       }
 

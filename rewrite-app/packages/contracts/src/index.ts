@@ -1509,6 +1509,8 @@ export const productionApiRoutes = {
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
     createSourcePackage: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
+    assembleSourcePackages:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
     listSourcePackages: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     getSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
@@ -1655,6 +1657,11 @@ export type CreateSourcePackageRequest = {
   mediaType: string;
   contentStructure?: SourcePackageContentStructure;
   sourceDocument?: SourceDocumentSource;
+};
+
+export type AssembleSourcePackagesRequest = {
+  fileName: string;
+  sourcePackageIds: string[];
 };
 
 export type CreateImportJobRequest = {
@@ -2037,6 +2044,17 @@ export type ListWorkspaceActivityEventsResponse = {
 
 export type CreateSourcePackageResponse = {
   sourcePackage: SourcePackage;
+};
+
+export type AssembleSourcePackagesResponse = {
+  sourcePackage: SourcePackage;
+  assembledFrom: Array<{
+    sourcePackageId: string;
+    fileName: string;
+    sizeBytes: number;
+  }>;
+  importJob: ImportJob;
+  stagedContentRelease: ContentRelease | null;
 };
 
 export type CreateImportJobResponse = {

@@ -51,6 +51,8 @@ export class ContentViewFacade {
   readonly sourcePackageStatusOptions = sourcePackageStatuses;
   readonly importJobStatusOptions = importJobStatuses;
   readonly contentReleaseStatusOptions = contentReleaseStatuses;
+  assemblyFileName = "assembled-source-package.zip";
+  private readonly assemblySourcePackageIds = new Set<string>();
 
   private readonly participantSessionLinkRows = (
     participantSessionId?: string | null,
@@ -81,6 +83,18 @@ export class ContentViewFacade {
 
   get canCreateImportJob(): boolean {
     return this.isWorkspaceScopeComplete() && this.content.sourcePackageId.trim() !== "";
+  }
+
+  get canAssembleSourcePackages(): boolean {
+    return (
+      this.isWorkspaceScopeComplete() &&
+      this.assemblyFileName.trim() !== "" &&
+      this.assemblySourcePackageIds.size >= 2
+    );
+  }
+
+  get assemblySelectionLabel(): string {
+    return `${this.assemblySourcePackageIds.size} file(s) selected`;
   }
 
   get canUseSelectedSourcePackage(): boolean {
@@ -178,6 +192,39 @@ export class ContentViewFacade {
       "Source Document Loaded",
       `${file.name} loaded with ${sourceDocument.length} character(s) as ${this.content.sourceMediaType}.`
     );
+  }
+
+  async loadLooseSourceFiles(event: Event): Promise<void> {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    const files = Array.from(input.files ?? []);
+    input.value = "";
+    if (files.length === 0 || !this.isWorkspaceScopeComplete()) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      const sourcePackages = await this.contentService.uploadLooseSourcePackages(
+        await Promise.all(
+          files.map(async file => ({
+            fileName: file.name,
+            mediaType: this.inferMediaTypeFromFile(file),
+            sourceDocument: this.isZipSourceFile(file)
+              ? await this.readFileAsDataUrl(file)
+              : await file.text()
+          }))
+        )
+      );
+      for (const upload of sourcePackages) {
+        this.assemblySourcePackageIds.add(
+          upload.sourcePackage.sourcePackageId
+        );
+      }
+      if (files.length > 1 && this.assemblyFileName === "assembled-source-package.zip") {
+        this.assemblyFileName = `${files[0]!.name.replace(/\.[^.]+$/, "")}-bundle.zip`;
+      }
+    });
   }
 
   clearContentReadFilters(): void {
@@ -613,6 +660,37 @@ export class ContentViewFacade {
         }
       }))
     ];
+  }
+
+  get sourcePackageAssemblyItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListSourcePackagesResponse>(
+      this.content.sourcePackagesView
+    );
+    if (!payload) {
+      return [];
+    }
+    return payload.items.map(item => {
+      const sourcePackageId = item.sourcePackage.sourcePackageId;
+      const selected = this.assemblySourcePackageIds.has(sourcePackageId);
+      return {
+        headline: item.sourcePackage.fileName,
+        subline: sourcePackageId,
+        badges: [
+          item.sourcePackage.mediaType,
+          item.downloadAvailable ? `${item.fileSizeBytes ?? 0} byte(s)` : "no file"
+        ],
+        rows: [
+          { label: "Import State", value: item.latestImportJob?.status ?? "not imported" },
+          {
+            label: "Assembly",
+            value: selected ? "included in next package" : "not selected"
+          }
+        ],
+        selected,
+        actionLabel: selected ? "Remove from Assembly" : "Add to Assembly",
+        actionPayload: { sourcePackageId }
+      };
+    });
   }
 
   get importJobItems(): RecordCollectionItem[] {
@@ -1938,6 +2016,36 @@ export class ContentViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.contentService.createSourcePackage());
+  }
+
+  toggleAssemblySourcePackage(item: RecordCollectionItem): void {
+    const sourcePackageId = item.actionPayload?.sourcePackageId?.trim();
+    if (!sourcePackageId) {
+      return;
+    }
+    if (this.assemblySourcePackageIds.has(sourcePackageId)) {
+      this.assemblySourcePackageIds.delete(sourcePackageId);
+    } else {
+      this.assemblySourcePackageIds.add(sourcePackageId);
+    }
+  }
+
+  clearAssemblySelection(): void {
+    this.assemblySourcePackageIds.clear();
+  }
+
+  assembleSourcePackages(): void {
+    if (!this.canAssembleSourcePackages) {
+      return;
+    }
+    const sourcePackageIds = [...this.assemblySourcePackageIds];
+    this.viewState.onActionAsync(async () => {
+      await this.contentService.assembleSourcePackages(
+        this.assemblyFileName,
+        sourcePackageIds
+      );
+      this.assemblySourcePackageIds.clear();
+    });
   }
 
   createImportJob(): void {

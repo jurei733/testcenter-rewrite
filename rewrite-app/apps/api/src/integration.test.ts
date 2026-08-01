@@ -7340,6 +7340,281 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus assembles loose dependency files", async () => {
+  type AdaptiveDependencyPackage = {
+    bookletFixture: string;
+    unitFixture: string;
+    codingSchemeFixture: string;
+    playerFixture: string;
+    bookletKey: string;
+    playerKey: string;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    adaptiveDependencyPackages: AdaptiveDependencyPackage[];
+  };
+  const expectation = corpus.adaptiveDependencyPackages[0];
+  assert.ok(expectation);
+
+  const tenantKey = "integration-tenant-original-loose-assembly";
+  const workspaceKey = "integration-workspace-original-loose-assembly";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const fixtures = [
+    { fileName: "Booklet2.xml", fixture: expectation.bookletFixture },
+    { fileName: "Unit2.xml", fixture: expectation.unitFixture },
+    {
+      fileName: "coding-scheme.vocs.json",
+      fixture: expectation.codingSchemeFixture
+    },
+    {
+      fileName: "verona-player-simple-6.0.html",
+      fixture: expectation.playerFixture
+    }
+  ];
+  const sourcePackages: Array<{ sourcePackageId: string; fileName: string }> = [];
+  for (const fixture of fixtures) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: fixture.fileName,
+          mediaType: fixture.fileName.endsWith(".json")
+            ? "application/json"
+            : fixture.fileName.endsWith(".html")
+              ? "text/html"
+              : "application/xml",
+          sourceDocument: readFileSync(
+            resolve(originalTestcenterCorpusRoot, fixture.fixture),
+            "utf8"
+          )
+        }
+      }
+    );
+    assert.equal(upload.status, 201);
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const assemblyPath =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+    "/source-package-assemblies";
+  const duplicateSelection = await requestJson<{ error: string }>(assemblyPath, {
+    method: "POST",
+    body: {
+      fileName: "invalid.zip",
+      sourcePackageIds: [
+        sourcePackages[0]!.sourcePackageId,
+        sourcePackages[0]!.sourcePackageId
+      ]
+    }
+  });
+  assert.equal(duplicateSelection.status, 400);
+  assert.equal(
+    duplicateSelection.body.error,
+    "source_package_assembly_selection_duplicate"
+  );
+
+  const unsafePathSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "../escape.xml",
+      mediaType: "application/xml",
+      sourceDocument: "<Unit><Metadata><Id>escape</Id><Label>Escape</Label></Metadata><Definition>escape</Definition></Unit>"
+    }
+  });
+  const unsafePathAssembly = await requestJson<{ error: string }>(assemblyPath, {
+    method: "POST",
+    body: {
+      fileName: "invalid-path.zip",
+      sourcePackageIds: [
+        sourcePackages[0]!.sourcePackageId,
+        unsafePathSource.body.sourcePackage.sourcePackageId
+      ]
+    }
+  });
+  assert.equal(unsafePathAssembly.status, 400);
+  assert.equal(
+    unsafePathAssembly.body.error,
+    "source_package_assembly_path_invalid"
+  );
+
+  const duplicatePathSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "booklet2.XML",
+      mediaType: "application/xml",
+      sourceDocument: "<Booklet><Metadata><Id>duplicate</Id><Label>Duplicate</Label></Metadata><Units><Unit id=\"unit\" label=\"Unit\" /></Units></Booklet>"
+    }
+  });
+  const duplicatePathAssembly = await requestJson<{ error: string }>(assemblyPath, {
+    method: "POST",
+    body: {
+      fileName: "duplicate-path.zip",
+      sourcePackageIds: [
+        sourcePackages[0]!.sourcePackageId,
+        duplicatePathSource.body.sourcePackage.sourcePackageId
+      ]
+    }
+  });
+  assert.equal(duplicatePathAssembly.status, 409);
+  assert.equal(
+    duplicatePathAssembly.body.error,
+    "source_package_assembly_file_name_duplicate"
+  );
+
+  const missingDocumentSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "missing.xml",
+      mediaType: "application/xml"
+    }
+  });
+  const missingDocumentAssembly = await requestJson<{ error: string }>(
+    assemblyPath,
+    {
+      method: "POST",
+      body: {
+        fileName: "missing-document.zip",
+        sourcePackageIds: [
+          sourcePackages[0]!.sourcePackageId,
+          missingDocumentSource.body.sourcePackage.sourcePackageId
+        ]
+      }
+    }
+  );
+  assert.equal(missingDocumentAssembly.status, 409);
+  assert.equal(
+    missingDocumentAssembly.body.error,
+    "source_package_assembly_document_missing"
+  );
+
+  const assembly = await requestJson<{
+    sourcePackage: {
+      sourcePackageId: string;
+      fileName: string;
+      mediaType: string;
+      status: string;
+    };
+    assembledFrom: Array<{
+      sourcePackageId: string;
+      fileName: string;
+      sizeBytes: number;
+    }>;
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(assemblyPath, {
+    method: "POST",
+    body: {
+      fileName: "original-loose-adaptive",
+      sourcePackageIds: sourcePackages.map(
+        sourcePackage => sourcePackage.sourcePackageId
+      )
+    }
+  });
+  assert.equal(assembly.status, 201);
+  assert.equal(assembly.body.sourcePackage.fileName, "original-loose-adaptive.zip");
+  assert.equal(assembly.body.sourcePackage.mediaType, "application/zip");
+  assert.equal(assembly.body.sourcePackage.status, "accepted");
+  assert.deepEqual(
+    assembly.body.assembledFrom.map(member => ({
+      sourcePackageId: member.sourcePackageId,
+      fileName: member.fileName
+    })),
+    sourcePackages.map(sourcePackage => ({
+      sourcePackageId: sourcePackage.sourcePackageId,
+      fileName: sourcePackage.fileName
+    }))
+  );
+  assert.ok(assembly.body.assembledFrom.every(member => member.sizeBytes > 0));
+  assert.equal(assembly.body.importJob.status, "completed");
+  assert.deepEqual(assembly.body.importJob.diagnostics, []);
+  const contentReleaseId = assembly.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = snapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === expectation.bookletKey
+  );
+  assert.ok(booklet);
+  assert.equal(booklet.unitEntries.length, 5);
+  assert.ok(
+    booklet.unitEntries.every(
+      unit =>
+        unit.playerKey === expectation.playerKey &&
+        unit.codingScheme?.version === "3.0" &&
+        unit.codingScheme.variableCodings.length === 7
+    )
+  );
+  assert.equal(snapshot.playerEntries?.[0]?.playerKey, expectation.playerKey);
+
+  const download = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${assembly.body.sourcePackage.sourcePackageId}/download`
+  );
+  assert.equal(download.status, 200);
+  assert.equal(download.headers.get("content-type"), "application/zip");
+  assert.deepEqual(
+    [...new Uint8Array((await download.arrayBuffer()).slice(0, 4))],
+    [0x50, 0x4b, 0x03, 0x04]
+  );
+
+  const activity = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        eventType: string;
+        details: { sourcePackages?: Array<{ sourcePackageId: string }> };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/activity-events?eventType=source_package_assembled&subjectId=${assembly.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(activity.body.items.length, 1);
+  assert.deepEqual(
+    activity.body.items[0]?.activityEvent.details.sourcePackages?.map(
+      sourcePackage => sourcePackage.sourcePackageId
+    ),
+    sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId)
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";
