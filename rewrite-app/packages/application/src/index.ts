@@ -8144,17 +8144,17 @@ const collectAssemblyResourceIdentifiers = (
     try {
       const metadata = JSON.parse(metadataMatch[1] ?? "") as {
         id?: unknown;
-        specVersion?: unknown;
+        version?: unknown;
       };
       const id = typeof metadata.id === "string" ? metadata.id.trim() : "";
-      const specVersion =
-        typeof metadata.specVersion === "string"
-          ? metadata.specVersion.trim()
-          : "";
+      const moduleVersion =
+        typeof metadata.version === "string"
+          ? normalizeVeronaMajorMinorVersion(metadata.version)
+          : null;
       if (id) {
         identifiers.add(id);
-        if (specVersion) {
-          identifiers.add(`${id}@${specVersion}`);
+        if (moduleVersion) {
+          identifiers.add(`${id}@${moduleVersion}`);
         }
       }
     } catch {
@@ -8334,26 +8334,408 @@ type VeronaPlayerMetadataValidation =
   | { status: "missing" }
   | { status: "invalid"; reason: string }
   | {
+      status: "unsupported";
+      metadataVersion: string;
+      reason: string;
+    }
+  | {
       status: "valid";
-      id: string | null;
+      id: string;
+      version: string;
       specVersion: string;
+      metadataVersion: string;
     };
 
-const parseVeronaPlayerReference = (
-  playerKey: string
-): { id: string; specVersion: string | null } => {
-  const versionSeparator = playerKey.lastIndexOf("@");
-  if (versionSeparator <= 0) {
-    return { id: playerKey.trim(), specVersion: null };
+const veronaMetadataIdentifierPattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
+const veronaMetadataSemverPattern =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+const veronaMetadataMajorMinorPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+const asVeronaMetadataRecord = (
+  value: unknown
+): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const findUnexpectedVeronaMetadataProperty = (
+  value: Record<string, unknown>,
+  allowedProperties: ReadonlySet<string>
+): string | null =>
+  Object.keys(value).find(property => !allowedProperties.has(property)) ?? null;
+
+const validateVeronaLanguageTaggedStrings = (
+  value: unknown,
+  fieldName: string,
+  strict: boolean
+): string | null => {
+  if (!Array.isArray(value) || value.length === 0) {
+    return `player metadata field '${fieldName}' must be a non-empty language-tagged array`;
   }
-  const specVersion = playerKey.slice(versionSeparator + 1).trim();
+  for (const [index, entry] of value.entries()) {
+    const item = asVeronaMetadataRecord(entry);
+    if (!item) {
+      return `player metadata field '${fieldName}[${index}]' must be an object`;
+    }
+    if (strict) {
+      const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
+        item,
+        new Set(["lang", "value"])
+      );
+      if (unexpectedProperty) {
+        return `player metadata field '${fieldName}[${index}]' contains unsupported property '${unexpectedProperty}'`;
+      }
+    }
+    if (typeof item.value !== "string" || item.value.length === 0) {
+      return `player metadata field '${fieldName}[${index}].value' must be a non-empty string`;
+    }
+    if (
+      (strict || item.lang !== undefined) &&
+      (typeof item.lang !== "string" || !/^[a-z]{2}$/.test(item.lang))
+    ) {
+      return `player metadata field '${fieldName}[${index}].lang' must be a two-letter lowercase language code`;
+    }
+  }
+  return null;
+};
+
+const isVeronaMetadataUri = (value: unknown): value is string => {
+  if (typeof value !== "string" || value.length === 0) {
+    return false;
+  }
+  try {
+    return Boolean(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+};
+
+const validateVeronaMetadataMaintainer = (
+  value: unknown,
+  strict: boolean
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  const maintainer = asVeronaMetadataRecord(value);
+  if (!maintainer) {
+    return "player metadata field 'maintainer' must be an object";
+  }
+  if (strict) {
+    const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
+      maintainer,
+      new Set(["name", "url", "email"])
+    );
+    if (unexpectedProperty) {
+      return `player metadata field 'maintainer' contains unsupported property '${unexpectedProperty}'`;
+    }
+  }
+  if (maintainer.name !== undefined) {
+    const nameError = validateVeronaLanguageTaggedStrings(
+      maintainer.name,
+      "maintainer.name",
+      strict
+    );
+    if (nameError) {
+      return nameError;
+    }
+  }
+  if (maintainer.url !== undefined && !isVeronaMetadataUri(maintainer.url)) {
+    return "player metadata field 'maintainer.url' must be an absolute URI";
+  }
+  if (
+    maintainer.email !== undefined &&
+    (typeof maintainer.email !== "string" ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(maintainer.email))
+  ) {
+    return "player metadata field 'maintainer.email' must be an email address";
+  }
+  return null;
+};
+
+const validateVeronaMetadataCode = (
+  value: unknown,
+  strict: boolean
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  const code = asVeronaMetadataRecord(value);
+  if (!code) {
+    return "player metadata field 'code' must be an object";
+  }
+  const codeProperties = [
+    "repositoryType",
+    "repositoryUrl",
+    "licenseType",
+    "licenseUrl"
+  ];
+  if (strict) {
+    const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
+      code,
+      new Set(codeProperties)
+    );
+    if (unexpectedProperty) {
+      return `player metadata field 'code' contains unsupported property '${unexpectedProperty}'`;
+    }
+  }
+  for (const property of ["repositoryType", "licenseType"] as const) {
+    if (code[property] !== undefined && typeof code[property] !== "string") {
+      return `player metadata field 'code.${property}' must be a string`;
+    }
+  }
+  for (const property of ["repositoryUrl", "licenseUrl"] as const) {
+    if (code[property] !== undefined && !isVeronaMetadataUri(code[property])) {
+      return `player metadata field 'code.${property}' must be an absolute URI`;
+    }
+  }
+  return null;
+};
+
+const validateVeronaMetadataDependencies = (
+  value: unknown,
+  metadataMajor: number
+): string | null => {
+  if (value === undefined) {
+    return null;
+  }
+  if (!Array.isArray(value)) {
+    return "player metadata field 'dependencies' must be an array";
+  }
+  if (metadataMajor === 1 && value.length === 0) {
+    return "player metadata field 'dependencies' must not be empty for metadataVersion 1.x";
+  }
+  for (const [index, entry] of value.entries()) {
+    const dependency = asVeronaMetadataRecord(entry);
+    if (!dependency) {
+      return `player metadata field 'dependencies[${index}]' must be an object`;
+    }
+    if (metadataMajor === 3) {
+      const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
+        dependency,
+        new Set(["id", "description", "type", "required"])
+      );
+      if (unexpectedProperty) {
+        return `player metadata field 'dependencies[${index}]' contains unsupported property '${unexpectedProperty}'`;
+      }
+    }
+    if (typeof dependency.id !== "string") {
+      return `player metadata field 'dependencies[${index}].id' must be a string`;
+    }
+    if (
+      metadataMajor === 1 &&
+      !veronaMetadataIdentifierPattern.test(dependency.id)
+    ) {
+      return `player metadata field 'dependencies[${index}].id' must be a Verona identifier for metadataVersion 1.x`;
+    }
+    if (
+      dependency.description !== undefined &&
+      typeof dependency.description !== "string"
+    ) {
+      return `player metadata field 'dependencies[${index}].description' must be a string`;
+    }
+    if (metadataMajor >= 2) {
+      const supportedTypes =
+        metadataMajor === 3
+          ? new Set(["FILE", "WIDGET", "SERVICE"])
+          : new Set(["file", "service"]);
+      if (
+        typeof dependency.type !== "string" ||
+        !supportedTypes.has(dependency.type)
+      ) {
+        return `player metadata field 'dependencies[${index}].type' must use a supported dependency type`;
+      }
+    }
+    if (
+      (metadataMajor < 3 && typeof dependency.required !== "boolean") ||
+      (metadataMajor === 3 &&
+        dependency.required !== undefined &&
+        typeof dependency.required !== "boolean")
+    ) {
+      return `player metadata field 'dependencies[${index}].required' must be boolean${metadataMajor === 3 ? " when provided" : ""}`;
+    }
+  }
+  return null;
+};
+
+const validateVeronaPlayerMetadataDocument = (
+  metadata: Record<string, unknown>
+): VeronaPlayerMetadataValidation => {
+  const metadataVersion =
+    typeof metadata.metadataVersion === "string"
+      ? metadata.metadataVersion
+      : "";
+  const metadataVersionMatch = metadataVersion.match(
+    veronaMetadataMajorMinorPattern
+  );
+  if (!metadataVersionMatch) {
+    return {
+      status: "invalid",
+      reason: "player metadata must declare metadataVersion as MAJOR.MINOR"
+    };
+  }
+  const metadataMajor = Number.parseInt(metadataVersionMatch[1] ?? "", 10);
+  const metadataMinor = Number.parseInt(metadataVersionMatch[2] ?? "", 10);
+  if (
+    metadataMajor < 1 ||
+    metadataMajor > 3 ||
+    (metadataMajor === 3 && metadataMinor > 1)
+  ) {
+    return {
+      status: "unsupported",
+      metadataVersion,
+      reason: `declares unsupported metadataVersion '${metadataVersion}'`
+    };
+  }
+
+  const strict = metadataMajor === 3;
+  if (strict) {
+    const allowedProperties = new Set([
+      "id",
+      "name",
+      "type",
+      ...(metadataMinor >= 1 ? ["model"] : []),
+      "description",
+      "version",
+      "specVersion",
+      "metadataVersion",
+      "dependencies",
+      "maintainer",
+      "code"
+    ]);
+    const unexpectedProperty = findUnexpectedVeronaMetadataProperty(
+      metadata,
+      allowedProperties
+    );
+    if (unexpectedProperty) {
+      return {
+        status: "invalid",
+        reason: `player metadata contains unsupported property '${unexpectedProperty}' for metadataVersion '${metadataVersion}'`
+      };
+    }
+  }
+
+  const expectedType = strict ? "PLAYER" : "player";
+  if (metadata.type !== expectedType) {
+    return {
+      status: "invalid",
+      reason: `player metadata field 'type' must be '${expectedType}' for metadataVersion '${metadataVersion}'`
+    };
+  }
+  const id = typeof metadata.id === "string" ? metadata.id : "";
+  if (!veronaMetadataIdentifierPattern.test(id)) {
+    return {
+      status: "invalid",
+      reason: "player metadata field 'id' must start with a letter and contain only letters, digits, underscores, or hyphens"
+    };
+  }
+  const nameError = validateVeronaLanguageTaggedStrings(
+    metadata.name,
+    "name",
+    strict
+  );
+  if (nameError) {
+    return { status: "invalid", reason: nameError };
+  }
+  if (metadata.description !== undefined) {
+    const descriptionError = validateVeronaLanguageTaggedStrings(
+      metadata.description,
+      "description",
+      strict
+    );
+    if (descriptionError) {
+      return { status: "invalid", reason: descriptionError };
+    }
+  }
+  const version = typeof metadata.version === "string" ? metadata.version : "";
+  if (!veronaMetadataSemverPattern.test(version)) {
+    return {
+      status: "invalid",
+      reason: "player metadata field 'version' must use SemVer MAJOR.MINOR.PATCH notation"
+    };
+  }
+  const specVersion =
+    typeof metadata.specVersion === "string"
+      ? metadata.specVersion
+      : "";
+  if (!veronaMetadataMajorMinorPattern.test(specVersion)) {
+    return {
+      status: "invalid",
+      reason: "player metadata field 'specVersion' must use MAJOR.MINOR notation"
+    };
+  }
+  if (metadata.model !== undefined && typeof metadata.model !== "string") {
+    return {
+      status: "invalid",
+      reason: "player metadata field 'model' must be a string"
+    };
+  }
+  if (!strict && metadata.notSupportedFeatures !== undefined) {
+    const features = metadata.notSupportedFeatures;
+    const supportedFeatures = new Set([
+      "focus-notify",
+      "log-policy",
+      "paging-mode",
+      "navigation-denied",
+      "variable-data"
+    ]);
+    if (
+      !Array.isArray(features) ||
+      features.length === 0 ||
+      new Set(features).size !== features.length ||
+      features.some(
+        feature => typeof feature !== "string" || !supportedFeatures.has(feature)
+      )
+    ) {
+      return {
+        status: "invalid",
+        reason: "player metadata field 'notSupportedFeatures' must be a non-empty unique list of known feature keys"
+      };
+    }
+  }
+  const dependenciesError = validateVeronaMetadataDependencies(
+    metadata.dependencies,
+    metadataMajor
+  );
+  if (dependenciesError) {
+    return { status: "invalid", reason: dependenciesError };
+  }
+  const maintainerError = validateVeronaMetadataMaintainer(
+    metadata.maintainer,
+    strict
+  );
+  if (maintainerError) {
+    return { status: "invalid", reason: maintainerError };
+  }
+  const codeError = validateVeronaMetadataCode(metadata.code, strict);
+  if (codeError) {
+    return { status: "invalid", reason: codeError };
+  }
+
   return {
-    id: playerKey.slice(0, versionSeparator).trim(),
-    specVersion: specVersion || null
+    status: "valid",
+    id,
+    version,
+    specVersion,
+    metadataVersion
   };
 };
 
-const normalizeVeronaSpecVersion = (version: string): string | null => {
+const parseVeronaPlayerReference = (
+  playerKey: string
+): { id: string; moduleVersion: string | null } => {
+  const versionSeparator = playerKey.lastIndexOf("@");
+  if (versionSeparator <= 0) {
+    return { id: playerKey.trim(), moduleVersion: null };
+  }
+  const moduleVersion = playerKey.slice(versionSeparator + 1).trim();
+  return {
+    id: playerKey.slice(0, versionSeparator).trim(),
+    moduleVersion: moduleVersion || null
+  };
+};
+
+const normalizeVeronaMajorMinorVersion = (version: string): string | null => {
   const match = version.match(
     /^(\d+)(?:\.(\d+))?(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/
   );
@@ -8385,25 +8767,13 @@ const validateVeronaPlayerMetadata = (
         continue;
       }
       const metadata = parsed as Record<string, unknown>;
-      if (metadata.type !== "player") {
+      if (
+        typeof metadata.type !== "string" ||
+        metadata.type.toLowerCase() !== "player"
+      ) {
         continue;
       }
-      const specVersion =
-        typeof metadata.specVersion === "string"
-          ? metadata.specVersion.trim()
-          : "";
-      if (!/^\d+(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?$/.test(specVersion)) {
-        return {
-          status: "invalid",
-          reason: "player metadata must declare a numeric specVersion"
-        };
-      }
-      const id = typeof metadata.id === "string" ? metadata.id.trim() : "";
-      return {
-        status: "valid",
-        id: id || null,
-        specVersion
-      };
+      return validateVeronaPlayerMetadataDocument(metadata);
     } catch {
       invalidJson = true;
     }
@@ -9154,34 +9524,21 @@ const validateZipXmlEntries = (
                 `Verona player ZIP entry '${playerEntry.fileName}' ${metadata.reason}.`
               )
             );
-          } else if (metadata.status === "missing") {
-            const playerReference = parseVeronaPlayerReference(
-              unitDefinition.playerKey
+          } else if (metadata.status === "unsupported") {
+            diagnostics.push(
+              createImportDiagnostic(
+                "source_document_player_metadata_version_unsupported",
+                `Verona player ZIP entry '${playerEntry.fileName}' ${metadata.reason}.`
+              )
             );
-            const referencedSpecVersion = playerReference.specVersion
-              ? normalizeVeronaSpecVersion(playerReference.specVersion)
-              : null;
-            if (
-              referencedSpecVersion &&
-              !isSupportedVeronaPlayerApiVersion(referencedSpecVersion)
-            ) {
-              diagnostics.push(
-                createImportDiagnostic(
-                  "source_document_player_api_version_unsupported",
-                  `Unit ZIP entry '${entry.fileName}' references unsupported Verona player API version '${playerReference.specVersion}', and '${playerEntry.fileName}' has no application/ld+json metadata to provide a compatible version.`
-                )
-              );
-            } else {
-              diagnostics.push(
-                createImportDiagnostic(
-                  "source_document_player_metadata_missing",
-                  referencedSpecVersion
-                    ? `Verona player ZIP entry '${playerEntry.fileName}' has no application/ld+json metadata; legacy compatibility is inferred from unit reference '${unitDefinition.playerKey}' and remains gated by the runtime ready handshake.`
-                    : `Verona player ZIP entry '${playerEntry.fileName}' has no application/ld+json metadata and unit reference '${unitDefinition.playerKey}' has no numeric API version; import is allowed for legacy compatibility and the runtime ready handshake must confirm a supported version.`,
-                  "warning"
-                )
-              );
-            }
+          } else if (metadata.status === "missing") {
+            diagnostics.push(
+              createImportDiagnostic(
+                "source_document_player_metadata_missing",
+                `Verona player ZIP entry '${playerEntry.fileName}' has no application/ld+json metadata; unit reference '${unitDefinition.playerKey}' may identify a module version but cannot prove Verona API compatibility, so the runtime ready handshake remains authoritative.`,
+                "warning"
+              )
+            );
           } else if (
             metadata.status === "valid" &&
             !isSupportedVeronaPlayerApiVersion(metadata.specVersion)
@@ -9196,21 +9553,21 @@ const validateZipXmlEntries = (
             const playerReference = parseVeronaPlayerReference(
               unitDefinition.playerKey
             );
-            const referencedSpecVersion = playerReference.specVersion
-              ? normalizeVeronaSpecVersion(playerReference.specVersion)
+            const referencedModuleVersion = playerReference.moduleVersion
+              ? normalizeVeronaMajorMinorVersion(playerReference.moduleVersion)
               : null;
-            const declaredSpecVersion = normalizeVeronaSpecVersion(
-              metadata.specVersion
+            const declaredModuleVersion = normalizeVeronaMajorMinorVersion(
+              metadata.version
             );
             if (
-              referencedSpecVersion &&
-              declaredSpecVersion &&
-              referencedSpecVersion !== declaredSpecVersion
+              referencedModuleVersion &&
+              declaredModuleVersion &&
+              referencedModuleVersion !== declaredModuleVersion
             ) {
               diagnostics.push(
                 createImportDiagnostic(
-                  "source_document_player_api_version_mismatch",
-                  `Unit ZIP entry '${entry.fileName}' references player API version '${playerReference.specVersion}', but '${playerEntry.fileName}' declares '${metadata.specVersion}'.`
+                  "source_document_player_version_mismatch",
+                  `Unit ZIP entry '${entry.fileName}' references player module version '${playerReference.moduleVersion}', but '${playerEntry.fileName}' declares module version '${metadata.version}'.`
                 )
               );
             } else if (

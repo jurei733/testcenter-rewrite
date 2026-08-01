@@ -94,6 +94,30 @@ const createZipBase64 = (
   ]).toString("base64");
 };
 
+const createVeronaPlayerMetadataV2 = (
+  overrides: Record<string, unknown> = {}
+): string => JSON.stringify({
+  type: "player",
+  id: "verona-player-simple",
+  name: [{ lang: "en", value: "Simple Verona Player" }],
+  version: "6.0.4",
+  specVersion: "6.0",
+  metadataVersion: "2.0",
+  ...overrides
+});
+
+const createVeronaPlayerMetadataV3 = (
+  overrides: Record<string, unknown> = {}
+): string => JSON.stringify({
+  type: "PLAYER",
+  id: "verona-player-simple",
+  name: [{ lang: "en", value: "Simple Verona Player" }],
+  version: "6.0.4",
+  specVersion: "6.0",
+  metadataVersion: "3.1",
+  ...overrides
+});
+
 type JsonResponse<T> = {
   status: number;
   body: T;
@@ -9068,8 +9092,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     },
     {
       fileName: "export/players/simple.html",
-      content:
-        '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
+      content: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2()}</script><main>Player</main>`
     },
     {
       fileName: "export/resources/sample_resource_package.itcr.zip",
@@ -9201,8 +9224,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
       playerEntries: [
         {
           playerKey: "verona-player-simple@6.0",
-          html:
-            '<!doctype html><script type="application/ld+json">{"type":"player","specVersion":"6.0"}</script><main>Player</main>'
+          html: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2()}</script><main>Player</main>`
         }
       ],
       resourceEntries: [
@@ -9386,8 +9408,7 @@ test("original Testcenter Unit cross-file references block incomplete packages",
     },
     {
       fileName: "export/players/cross-player.html",
-      content:
-        '<!doctype html><script type="application/ld+json">{"type":"player","id":"cross-player","specVersion":"6.0"}</script><main>Cross player</main>'
+      content: `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2({ id: "cross-player" })}</script><main>Cross player</main>`
     },
     {
       fileName: "export/variables/unit.variables.json",
@@ -11892,44 +11913,117 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
     {
       name: "invalid-json",
       metadataDocument: "{",
-      expectedCode: "source_document_player_metadata_invalid"
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "not valid JSON"
     },
     {
       name: "missing-spec-version",
-      metadataDocument: JSON.stringify({ type: "player" }),
-      expectedCode: "source_document_player_metadata_invalid"
+      metadataDocument: createVeronaPlayerMetadataV2({
+        specVersion: undefined
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "specVersion"
     },
     {
       name: "non-player",
-      metadataDocument: JSON.stringify({ type: "editor", specVersion: "6.0" }),
-      expectedCode: "source_document_player_metadata_invalid"
+      metadataDocument: createVeronaPlayerMetadataV2({ type: "editor" }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "does not describe a Verona player"
+    },
+    {
+      name: "missing-name",
+      metadataDocument: createVeronaPlayerMetadataV2({ name: undefined }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field 'name'"
+    },
+    {
+      name: "invalid-id",
+      metadataDocument: createVeronaPlayerMetadataV2({ id: "6 player" }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field 'id'"
+    },
+    {
+      name: "invalid-name-language",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        name: [{ lang: "EN", value: "Player" }]
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "name[0].lang"
+    },
+    {
+      name: "invalid-semver",
+      metadataDocument: createVeronaPlayerMetadataV2({ version: "6.0" }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field 'version'"
+    },
+    {
+      name: "invalid-dependency",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        dependencies: [{ id: "runtime-file", type: "FILE", required: true }]
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "dependencies[0].type"
+    },
+    {
+      name: "invalid-maintainer-uri",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        maintainer: { url: "not a uri" }
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "maintainer.url"
+    },
+    {
+      name: "v3-lowercase-type",
+      metadataDocument: createVeronaPlayerMetadataV3({ type: "player" }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field 'type'"
+    },
+    {
+      name: "v3-unknown-property",
+      metadataDocument: createVeronaPlayerMetadataV3({ customField: true }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "customField"
+    },
+    {
+      name: "v3-model-before-3-1",
+      metadataDocument: createVeronaPlayerMetadataV3({
+        metadataVersion: "3.0",
+        model: "iqb-aspect@2.0"
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "property 'model'"
     },
     {
       name: "unsupported-api",
-      metadataDocument: JSON.stringify({
-        type: "player",
-        id: "verona-player-simple",
+      metadataDocument: createVeronaPlayerMetadataV2({
         specVersion: "7.0"
       }),
-      expectedCode: "source_document_player_api_version_unsupported"
+      expectedCode: "source_document_player_api_version_unsupported",
+      expectedMessage: "unsupported API version '7.0'"
     },
     {
-      name: "api-version-mismatch",
-      metadataDocument: JSON.stringify({
-        type: "player",
-        id: "verona-player-simple",
-        specVersion: "5.0"
+      name: "module-version-mismatch",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        version: "5.0.0"
       }),
-      expectedCode: "source_document_player_api_version_mismatch"
+      expectedCode: "source_document_player_version_mismatch",
+      expectedMessage: "declares module version '5.0.0'"
     },
     {
       name: "identity-mismatch",
-      metadataDocument: JSON.stringify({
-        type: "player",
-        id: "different-player",
-        specVersion: "6.0"
+      metadataDocument: createVeronaPlayerMetadataV2({
+        id: "different-player"
       }),
-      expectedCode: "source_document_player_identity_mismatch"
+      expectedCode: "source_document_player_identity_mismatch",
+      expectedMessage: "declares id 'different-player'"
+    },
+    {
+      name: "unsupported-metadata-version",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        metadataVersion: "4.0"
+      }),
+      expectedCode: "source_document_player_metadata_version_unsupported",
+      expectedMessage: "unsupported metadataVersion '4.0'"
     }
   ];
   for (const testCase of cases) {
@@ -11970,7 +12064,10 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
       }
     });
     const importResult = await requestJson<{
-      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; message: string }>;
+      };
       stagedContentRelease: null;
     }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
       method: "POST",
@@ -11979,12 +12076,292 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
     assert.equal(importResult.status, 201);
     assert.equal(importResult.body.importJob.status, "failed");
     assert.equal(importResult.body.stagedContentRelease, null);
+    const matchingDiagnostic = importResult.body.importJob.diagnostics.find(
+      diagnostic => diagnostic.code === testCase.expectedCode
+    );
+    assert.ok(matchingDiagnostic);
     assert.ok(
-      importResult.body.importJob.diagnostics.some(
-        diagnostic => diagnostic.code === testCase.expectedCode
-      )
+      matchingDiagnostic.message.includes(testCase.expectedMessage),
+      `Expected '${matchingDiagnostic.message}' to include '${testCase.expectedMessage}'.`
     );
   }
+});
+
+test("bundled Verona players accept supported metadata generations", async () => {
+  const tenantKey = "integration-tenant-player-metadata-generations";
+  const workspaceKey = "integration-workspace-player-metadata-generations";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const cases = [
+    {
+      name: "metadata-1",
+      playerId: "first-generation-player",
+      playerVersion: "1.8",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        id: "first-generation-player",
+        version: "1.8.2",
+        metadataVersion: "1.0",
+        dependencies: [{
+          id: "runtime_file",
+          description: "Original dependency shape without a type",
+          required: true
+        }]
+      })
+    },
+    {
+      name: "metadata-2",
+      playerId: "legacy-schema-player",
+      playerVersion: "2.12",
+      metadataDocument: createVeronaPlayerMetadataV2({
+        id: "legacy-schema-player",
+        version: "2.12.3",
+        $schema:
+          "https://raw.githubusercontent.com/verona-interfaces/metadata/master/verona-module-metadata.json",
+        notSupportedFeatures: ["log-policy"],
+        dependencies: [{
+          id: "runtime-file",
+          description: "Optional runtime file",
+          type: "file",
+          required: false
+        }],
+        maintainer: {
+          name: [{ value: "IQB" }],
+          email: "test@example.org"
+        }
+      })
+    },
+    {
+      name: "metadata-3-0",
+      playerId: "strict-schema-player",
+      playerVersion: "6.0",
+      metadataDocument: createVeronaPlayerMetadataV3({
+        id: "strict-schema-player",
+        metadataVersion: "3.0",
+        description: [{ lang: "en", value: "Strict schema player" }],
+        dependencies: [{
+          id: "runtime-file",
+          description: "Optional runtime file",
+          type: "FILE",
+          required: false
+        }]
+      })
+    },
+    {
+      name: "metadata-3-1",
+      playerId: "modeled-schema-player",
+      playerVersion: "6.0",
+      metadataDocument: createVeronaPlayerMetadataV3({
+        id: "modeled-schema-player",
+        model: "iqb-aspect@2.0",
+        maintainer: {
+          name: [{ lang: "en", value: "IQB" }],
+          url: "https://www.iqb.hu-berlin.de",
+          email: "test@example.org"
+        },
+        code: {
+          repositoryType: "git",
+          repositoryUrl: "https://github.com/iqb-berlin/example",
+          licenseType: "MIT",
+          licenseUrl: "https://opensource.org/licenses/MIT"
+        }
+      })
+    }
+  ];
+
+  for (const testCase of cases) {
+    const bookletKey = `BOOKLET.PLAYER.${testCase.name}`;
+    const unitKey = `UNIT.PLAYER.${testCase.name}`;
+    const playerKey = `${testCase.playerId}@${testCase.playerVersion}`;
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest>
+            <resources>
+              <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${unitKey}" href="units/Unit.xml" />
+              <resource identifier="${playerKey}" href="players/player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>${bookletKey}</Id><Label>Player Metadata Booklet</Label></Metadata>
+            <Units><Unit id="${unitKey}" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>${unitKey}</Id><Label>Player Metadata Unit</Label></Metadata>
+            <Definition player="${playerKey}"><![CDATA[<p>Player metadata validation</p>]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/player.html",
+        content: `<!doctype html><script type="application/ld+json">${testCase.metadataDocument}</script><main>Player</main>`
+      }
+    ]);
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `player-${testCase.name}.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ severity: string; code: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201);
+    assert.equal(importResult.body.importJob.status, "completed");
+    assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.severity === "error"
+      ),
+      false
+    );
+  }
+});
+
+test("loose assemblies resolve Verona players by module version instead of API version", async () => {
+  const tenantKey = "integration-tenant-player-module-version-assembly";
+  const workspaceKey = "integration-workspace-player-module-version-assembly";
+  const bookletKey = "BOOKLET.PLAYER.MODULE.VERSION";
+  const unitKey = "UNIT.PLAYER.MODULE.VERSION";
+  const playerKey = "iqb-player-aspect@2.12";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const files = [
+    {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Module Version Booklet</Label></Metadata>
+          <Units><Unit id="${unitKey}" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "Unit.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Unit>
+          <Metadata><Id>${unitKey}</Id><Label>Module Version Unit</Label></Metadata>
+          <DefinitionRef player="${playerKey}">aspect-unit.voud</DefinitionRef>
+        </Unit>
+      `
+    },
+    {
+      fileName: "aspect-unit.voud",
+      mediaType: "application/json",
+      sourceDocument: JSON.stringify({ id: "aspect-unit", tasks: [] })
+    },
+    {
+      fileName: "iqb-player-aspect-2.12.3.html",
+      mediaType: "text/html",
+      sourceDocument:
+        `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2({
+          id: "iqb-player-aspect",
+          name: [{ lang: "de", value: "IQB Aspect Player" }],
+          version: "2.12.3",
+          specVersion: "6.0"
+        })}</script><main>Aspect player</main>`
+    }
+  ];
+  const sourcePackageIds: string[] = [];
+  for (const file of files) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: file
+    });
+    assert.equal(upload.status, 201);
+    sourcePackageIds.push(upload.body.sourcePackage.sourcePackageId);
+  }
+
+  const assembly = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-package-assemblies`,
+    {
+      method: "POST",
+      body: {
+        fileName: "aspect-module-version.zip",
+        sourcePackageIds
+      }
+    }
+  );
+  assert.equal(assembly.status, 201);
+  assert.equal(assembly.body.importJob.status, "completed");
+  assert.equal(
+    assembly.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false
+  );
+  const contentReleaseId = assembly.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{ unitKey: string; playerKey?: string }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  assert.equal(
+    snapshot.bookletEntries.find(booklet => booklet.bookletKey === bookletKey)
+      ?.unitEntries.find(unit => unit.unitKey === unitKey)?.playerKey,
+    playerKey
+  );
+  assert.equal(snapshot.playerEntries?.[0]?.playerKey, playerKey);
 });
 
 test("metadata-free Verona players use an explicit legacy compatibility policy", async () => {
@@ -12017,12 +12394,12 @@ test("metadata-free Verona players use an explicit legacy compatibility policy",
       expectedCode: "source_document_player_metadata_missing"
     },
     {
-      name: "versioned-unsupported",
+      name: "module-version-not-api-version",
       playerKey: "legacy-player@7.0",
       runtimeVersion: "7.0",
-      expectedStatus: "failed",
-      expectedSeverity: "error",
-      expectedCode: "source_document_player_api_version_unsupported"
+      expectedStatus: "completed",
+      expectedSeverity: "warning",
+      expectedCode: "source_document_player_metadata_missing"
     }
   ];
 
