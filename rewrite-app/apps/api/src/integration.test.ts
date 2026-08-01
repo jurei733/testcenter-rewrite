@@ -10032,6 +10032,15 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
       expectedCode: "source_document_player_api_version_unsupported"
     },
     {
+      name: "api-version-mismatch",
+      metadataDocument: JSON.stringify({
+        type: "player",
+        id: "verona-player-simple",
+        specVersion: "5.0"
+      }),
+      expectedCode: "source_document_player_api_version_mismatch"
+    },
+    {
       name: "identity-mismatch",
       metadataDocument: JSON.stringify({
         type: "player",

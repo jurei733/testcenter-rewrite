@@ -6198,6 +6198,29 @@ type VeronaPlayerMetadataValidation =
       specVersion: string;
     };
 
+const parseVeronaPlayerReference = (
+  playerKey: string
+): { id: string; specVersion: string | null } => {
+  const versionSeparator = playerKey.lastIndexOf("@");
+  if (versionSeparator <= 0) {
+    return { id: playerKey.trim(), specVersion: null };
+  }
+  const specVersion = playerKey.slice(versionSeparator + 1).trim();
+  return {
+    id: playerKey.slice(0, versionSeparator).trim(),
+    specVersion: specVersion || null
+  };
+};
+
+const normalizeVeronaSpecVersion = (version: string): string | null => {
+  const match = version.match(
+    /^(\d+)(?:\.(\d+))?(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/
+  );
+  return match
+    ? `${Number.parseInt(match[1] ?? "", 10)}.${Number.parseInt(match[2] ?? "0", 10)}`
+    : null;
+};
+
 const validateVeronaPlayerMetadata = (
   playerHtml: string
 ): VeronaPlayerMetadataValidation => {
@@ -6806,12 +6829,31 @@ const validateZipXmlEntries = (
                 `Verona player ZIP entry '${playerEntry.fileName}' declares unsupported API version '${metadata.specVersion}'.`
               )
             );
-          } else if (metadata.status === "valid" && metadata.id) {
-            const referencedPlayerId =
-              unitDefinition.playerKey.split("@")[0]?.trim() ?? "";
+          } else if (metadata.status === "valid") {
+            const playerReference = parseVeronaPlayerReference(
+              unitDefinition.playerKey
+            );
+            const referencedSpecVersion = playerReference.specVersion
+              ? normalizeVeronaSpecVersion(playerReference.specVersion)
+              : null;
+            const declaredSpecVersion = normalizeVeronaSpecVersion(
+              metadata.specVersion
+            );
             if (
-              referencedPlayerId &&
-              referencedPlayerId.toLowerCase() !== metadata.id.toLowerCase()
+              referencedSpecVersion &&
+              declaredSpecVersion &&
+              referencedSpecVersion !== declaredSpecVersion
+            ) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "source_document_player_api_version_mismatch",
+                  `Unit ZIP entry '${entry.fileName}' references player API version '${playerReference.specVersion}', but '${playerEntry.fileName}' declares '${metadata.specVersion}'.`
+                )
+              );
+            } else if (
+              metadata.id &&
+              playerReference.id &&
+              playerReference.id.toLowerCase() !== metadata.id.toLowerCase()
             ) {
               diagnostics.push(
                 createImportDiagnostic(
