@@ -1927,7 +1927,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets\n/
     );
     assert.match(
       rosterCsvText,
@@ -9145,6 +9145,111 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   );
   assert.equal(hiddenMonitorUnit.status, 404);
   assert.equal(hiddenMonitorUnit.body.error, "study_monitor_unit_not_found");
+
+  const presetRoster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      bookletStatePresets?: Record<string, Record<string, string>>;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: [
+        "<Testtakers>",
+        "  <Group id=\"adaptive-preset-group\">",
+        "    <Login mode=\"run-hot-return\" name=\"adaptive-preset-participant\">",
+        `      <Booklet state="level:advanced;quality:basic;numeric:low">${bookletKey}</Booklet>`,
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    }
+  });
+  const presetRosterEntry = presetRoster.body.items.find(
+    item => item.loginKey === "adaptive-preset-participant"
+  );
+  assert.deepEqual(presetRosterEntry?.bookletStatePresets, {
+    [bookletKey]: { level: "advanced", quality: "basic", numeric: "low" }
+  });
+  assert.deepEqual(presetRosterEntry?.validationWarnings, []);
+
+  const presetSignIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "adaptive-preset-participant"
+    }
+  });
+  const presetSessionId = presetSignIn.body.participantSession.participantSessionId;
+  const presetResume = await requestJson<{
+    testRun: {
+      testRunId: string;
+      presetBookletStates?: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${presetSessionId}/resume`, {
+    method: "POST",
+    body: {}
+  });
+  assert.deepEqual(presetResume.body.testRun.presetBookletStates, {
+    level: "advanced",
+    quality: "basic",
+    numeric: "low"
+  });
+  const presetRunId = presetResume.body.testRun.testRunId;
+
+  const readPresetState = () => requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+    };
+  }>(`/api/v1/participant/sessions/${presetSessionId}/current-state`);
+  const initialPresetState = await readPresetState();
+  assert.deepEqual(
+    initialPresetState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "advanced-unit", "finish-unit"]
+  );
+  assert.deepEqual(
+    initialPresetState.body.currentRunState.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey
+    ]),
+    [["level", "advanced"], ["quality", "basic"], ["numeric", "low"]]
+  );
+
+  await requestJson(`/api/v1/participant/test-runs/${presetRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse: adaptiveResponse
+    }
+  });
+  const routedPresetState = await readPresetState();
+  assert.deepEqual(
+    routedPresetState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "advanced-unit", "finish-unit"]
+  );
+
+  const presetMonitorRun = await requestJson<{
+    studyMonitorRun: {
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      expectedUnitCount: number;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/study-monitor/runs/${presetRunId}`
+  );
+  assert.equal(presetMonitorRun.body.studyMonitorRun.expectedUnitCount, 3);
+  assert.deepEqual(
+    presetMonitorRun.body.studyMonitorRun.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey
+    ]),
+    [["level", "advanced"], ["quality", "basic"], ["numeric", "low"]]
+  );
 });
 
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {
@@ -10506,6 +10611,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       groupKey: string;
       bookletKey: string | null;
       bookletKeys?: string[];
+      bookletStatePresets?: Record<string, Record<string, string>>;
       displayName: string | null;
       passwordRequired: boolean;
       validationWarnings: Array<{ code: string; message: string }>;
@@ -10646,7 +10752,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
           "  <Group id=\"sample_group\" label=\"Primary Sample Group\">",
           "    <Login mode=\"run-hot-return\" name=\"test\" pw=\"user123\">",
           "      <Booklet codes=\"xxx yyy\">BOOKLET.SAMPLE-1</Booklet>",
-          "      <Booklet>BOOKLET.SAMPLE-2</Booklet>",
+          "      <Booklet state=\"level:professional;bonus:yes\">BOOKLET.SAMPLE-2</Booklet>",
           "    </Login>",
           "    <Login mode=\"monitor-group\" name=\"test-group-monitor\" pw=\"user123\" />",
           "  </Group>",
@@ -10668,6 +10774,12 @@ test("workspace participant roster can be imported, updated, and listed", async 
     "BOOKLET.SAMPLE-1",
     "BOOKLET.SAMPLE-2"
   ]);
+  assert.deepEqual(testcenterLogin?.bookletStatePresets, {
+    "BOOKLET.SAMPLE-2": {
+      level: "professional",
+      bonus: "yes"
+    }
+  });
   assert.equal(testcenterLogin?.displayName, null);
   assert.equal(testcenterLogin?.passwordRequired, true);
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
@@ -10816,7 +10928,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets\n/
   );
   assert.match(
     rosterCsvText,

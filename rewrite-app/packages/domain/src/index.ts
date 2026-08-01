@@ -162,13 +162,18 @@ export type ParticipantRosterEntry = {
   groupKey: string;
   bookletKey: string | null;
   bookletKeys?: string[];
+  bookletStatePresets?: Record<string, Record<string, string>>;
   displayName: string | null;
   passwordRequired: boolean;
   importedAt: string;
 };
 
 export type ParticipantRosterValidationWarning = {
-  code: "active_content_release_missing" | "booklet_not_found_in_active_release";
+  code:
+    | "active_content_release_missing"
+    | "booklet_not_found_in_active_release"
+    | "booklet_state_not_found_in_active_release"
+    | "booklet_state_option_not_found_in_active_release";
   message: string;
 };
 
@@ -459,6 +464,7 @@ export type TestRun = {
   workspaceId: string;
   contentReleaseId: string;
   bookletKey: string;
+  presetBookletStates?: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;

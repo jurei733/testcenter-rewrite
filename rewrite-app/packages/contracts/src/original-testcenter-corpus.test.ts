@@ -71,4 +71,7 @@ test("original Testcenter compatibility corpus separates participant and operati
     "BOOKLET.SAMPLE-1",
     "BOOKLET.SAMPLE-2"
   ]);
+  assert.deepEqual(reviewParticipant?.bookletStatePresets, {
+    "BOOKLET.SAMPLE-2": { bonus: "yes" }
+  });
 });

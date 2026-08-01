@@ -1553,6 +1553,28 @@ const buildParticipantRosterReadItems = (
               code: "booklet_not_found_in_active_release",
               message: `Booklet '${bookletKey}' is not part of the active content release.`
             });
+            continue;
+          }
+          const booklet = activeContentRelease?.runtimeSnapshot.bookletEntries.find(
+            candidate => candidate.bookletKey === bookletKey
+          );
+          for (const [stateKey, optionKey] of Object.entries(
+            entry.bookletStatePresets?.[bookletKey] ?? {}
+          )) {
+            const state = booklet?.stateEntries?.find(
+              candidate => candidate.stateKey === stateKey
+            );
+            if (!state) {
+              validationWarnings.push({
+                code: "booklet_state_not_found_in_active_release",
+                message: `State '${stateKey}' preset for booklet '${bookletKey}' is not part of the active content release.`
+              });
+            } else if (!state.options.some(option => option.optionKey === optionKey)) {
+              validationWarnings.push({
+                code: "booklet_state_option_not_found_in_active_release",
+                message: `Option '${optionKey}' for state '${stateKey}' preset for booklet '${bookletKey}' is not part of the active content release.`
+              });
+            }
           }
         }
       }
@@ -1851,6 +1873,17 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
 
   return {
     ...testRun,
+    presetBookletStates: Object.fromEntries(
+      Object.entries(testRun.presetBookletStates ?? {}).flatMap(
+        ([stateKey, optionKey]) => {
+          const normalizedStateKey = stateKey.trim();
+          const normalizedOptionKey = String(optionKey ?? "").trim();
+          return normalizedStateKey && normalizedOptionKey
+            ? [[normalizedStateKey, normalizedOptionKey]]
+            : [];
+        }
+      )
+    ),
     unitResponses: testRun.unitResponses ?? {},
     unlockedTestletKeys: Array.isArray(testRun.unlockedTestletKeys)
       ? [...new Set(testRun.unlockedTestletKeys.filter(Boolean))]
@@ -2381,7 +2414,8 @@ const formatParticipantRosterCsv = (input: {
     "importedAt",
     "validationWarningCodes",
     "validationWarningMessages",
-    "bookletKeys"
+    "bookletKeys",
+    "bookletStatePresets"
   ];
   const rows = [...input.items].sort(
     (left, right) =>
@@ -2404,7 +2438,8 @@ const formatParticipantRosterCsv = (input: {
         item.importedAt,
         item.validationWarnings.map(warning => warning.code).join("|"),
         item.validationWarnings.map(warning => warning.message).join("|"),
-        getParticipantRosterBookletKeys(item).join("|")
+        getParticipantRosterBookletKeys(item).join("|"),
+        JSON.stringify(item.bookletStatePresets ?? {})
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -6963,11 +6998,15 @@ const resolveAdaptiveStates = (
     const selected = state.options.find(option =>
       option.conditions.every(conditionSatisfied)
     ) ?? state.options.at(-1)!;
+    const presetOptionKey = testRun.presetBookletStates?.[state.stateKey];
+    const presetOption = presetOptionKey
+      ? state.options.find(option => option.optionKey === presetOptionKey)
+      : undefined;
     return {
       stateKey: state.stateKey,
       displayLabel: state.displayLabel,
-      optionKey: selected.optionKey,
-      optionLabel: selected.displayLabel
+      optionKey: presetOptionKey || selected.optionKey,
+      optionLabel: presetOption?.displayLabel ?? presetOptionKey ?? selected.displayLabel
     };
   });
 };
@@ -11489,6 +11528,9 @@ export const createFirstSliceServices = (
             ...(parsedEntry.bookletKeys?.length
               ? { bookletKeys: parsedEntry.bookletKeys }
               : {}),
+            ...(parsedEntry.bookletStatePresets
+              ? { bookletStatePresets: parsedEntry.bookletStatePresets }
+              : {}),
             displayName: parsedEntry.displayName,
             passwordRequired: Boolean(parsedEntry.password),
             importedAt: now()
@@ -12972,6 +13014,8 @@ export const createFirstSliceServices = (
           workspaceId: participantSession.workspaceId,
           contentReleaseId: participantSession.contentReleaseId,
           bookletKey: selectedBooklet.bookletKey,
+          presetBookletStates:
+            rosterEntry?.bookletStatePresets?.[selectedBooklet.bookletKey] ?? {},
           status: "running",
           currentUnitKey: null,
           unitResponses: {},

@@ -60,6 +60,7 @@ export type ParsedParticipantRosterEntry = {
   groupKey: string;
   bookletKey: string | null;
   bookletKeys?: string[];
+  bookletStatePresets?: Record<string, Record<string, string>>;
   displayName: string | null;
   password?: string | null;
 };
@@ -318,6 +319,45 @@ const readXmlChildTexts = (
     )
     .filter((value): value is string => Boolean(value));
 
+const parseBookletStatePreset = (
+  value: string | undefined
+): Record<string, string> => {
+  if (!value) {
+    return {};
+  }
+  return Object.fromEntries(
+    value.split(";").flatMap(tuple => {
+      const separatorIndex = tuple.indexOf(":");
+      if (separatorIndex < 1) {
+        return [];
+      }
+      const stateKey = tuple.slice(0, separatorIndex).trim();
+      const optionKey = tuple.slice(separatorIndex + 1).trim();
+      return stateKey && optionKey ? [[stateKey, optionKey]] : [];
+    })
+  );
+};
+
+const readXmlBookletStatePresets = (
+  content: string
+): Record<string, Record<string, string>> => {
+  const presets: Record<string, Record<string, string>> = {};
+  for (const match of content.matchAll(
+    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref))\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  )) {
+    const bookletKey = normalizeRosterTextValue(
+      decodeXmlText((match[3] ?? "").replace(/<[^>]+>/g, "").trim())
+    );
+    const preset = parseBookletStatePreset(
+      readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "state", "states")
+    );
+    if (bookletKey && Object.keys(preset).length > 0 && !presets[bookletKey]) {
+      presets[bookletKey] = preset;
+    }
+  }
+  return presets;
+};
+
 const withAdditionalBookletKeys = (
   bookletKeys: Array<string | null | undefined>
 ): Pick<ParsedParticipantRosterEntry, "bookletKey" | "bookletKeys"> => {
@@ -353,6 +393,14 @@ const mergeParsedParticipantRosterEntries = (
       ...bookletAssignment,
       groupKey: entry.groupKey || existingEntry.groupKey,
       displayName: entry.displayName ?? existingEntry.displayName,
+      ...((existingEntry.bookletStatePresets || entry.bookletStatePresets)
+        ? {
+            bookletStatePresets: {
+              ...(existingEntry.bookletStatePresets ?? {}),
+              ...(entry.bookletStatePresets ?? {})
+            }
+          }
+        : {}),
       ...(entry.password
         ? { password: entry.password }
         : existingEntry.password
@@ -959,6 +1007,12 @@ const parseParticipantRosterXmlText = (
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
+      ...(() => {
+        const bookletStatePresets = readXmlBookletStatePresets(content);
+        return Object.keys(bookletStatePresets).length > 0
+          ? { bookletStatePresets }
+          : {};
+      })(),
       displayName,
       ...(password ? { password } : {})
     });
@@ -1070,6 +1124,12 @@ const parseParticipantRosterXmlText = (
         bookletKey,
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
+      ...(() => {
+        const bookletStatePresets = readXmlBookletStatePresets(content);
+        return Object.keys(bookletStatePresets).length > 0
+          ? { bookletStatePresets }
+          : {};
+      })(),
       displayName,
       ...(password ? { password } : {})
     });

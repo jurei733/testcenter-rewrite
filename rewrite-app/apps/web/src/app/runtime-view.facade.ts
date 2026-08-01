@@ -641,6 +641,12 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(entry => {
         const validationWarnings = entry.validationWarnings ?? [];
+        const statePresets = Object.entries(entry.bookletStatePresets ?? {})
+          .flatMap(([bookletKey, states]) =>
+            Object.entries(states).map(
+              ([stateKey, optionKey]) => `${bookletKey}: ${stateKey}=${optionKey}`
+            )
+          );
         const link = {
           loginKey: entry.loginKey,
           groupKey: entry.groupKey,
@@ -658,6 +664,9 @@ export class RuntimeViewFacade {
           badges: [
             entry.groupKey,
             entry.bookletKey ?? "default booklet",
+            statePresets.length > 0
+              ? `${statePresets.length} state preset${statePresets.length === 1 ? "" : "s"}`
+              : "adaptive defaults",
             validationWarnings.length > 0
               ? `${validationWarnings.length} warning${validationWarnings.length === 1 ? "" : "s"}`
               : "validated"
@@ -666,6 +675,10 @@ export class RuntimeViewFacade {
             { label: "Display Name", value: entry.displayName ?? "none" },
             { label: "Group", value: entry.groupKey },
             { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+            {
+              label: "Adaptive Presets",
+              value: statePresets.length > 0 ? statePresets.join(" | ") : "none"
+            },
             {
               label: "Validation",
               value:
