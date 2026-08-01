@@ -2663,6 +2663,7 @@ const formatStudyMonitorRunCsv = (
     "bookletLabel",
     "testRunStatus",
     "currentUnitKey",
+    "adaptiveStates",
     "unitKey",
     "unitLabel",
     "expected",
@@ -2689,6 +2690,11 @@ const formatStudyMonitorRunCsv = (
         detail.bookletLabel,
         detail.testRun.status,
         detail.testRun.currentUnitKey ?? "",
+        JSON.stringify(
+          Object.fromEntries(
+            detail.adaptiveStates.map(state => [state.stateKey, state.optionKey])
+          )
+        ),
         unit.unitKey,
         unit.displayLabel,
         String(unit.expected),
@@ -9568,6 +9574,7 @@ const buildStudyMonitorRunDetail = (input: {
     participantRosterEntry,
     bookletKey: testRun.bookletKey,
     bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
+    adaptiveStates: resolveAdaptiveStates(booklet ?? undefined, testRun),
     responseCount: responseUnitKeys.length,
     reviewCount: runReviews.length,
     expectedUnitCount: expectedUnits.length,

@@ -1588,7 +1588,10 @@ export class WorkspaceViewFacade {
           detail.testRun.status,
           `${detail.responseCount}/${detail.expectedUnitCount} response(s)`,
           `${detail.missingExpectedUnitCount} missing`,
-          `${detail.reviewCount} review(s)`
+          `${detail.reviewCount} review(s)`,
+          ...detail.adaptiveStates.map(
+            state => `${state.displayLabel}: ${state.optionLabel}`
+          )
         ],
         rows: [
           { label: "Tenant", value: detail.tenantKey },
@@ -1597,6 +1600,14 @@ export class WorkspaceViewFacade {
           { label: "Group", value: detail.participantSession?.groupKey ?? "none" },
           { label: "Booklet", value: detail.bookletKey },
           { label: "Current Unit", value: detail.testRun.currentUnitKey ?? "none" },
+          {
+            label: "Adaptive States",
+            value: detail.adaptiveStates.length > 0
+              ? detail.adaptiveStates
+                  .map(state => `${state.displayLabel}: ${state.optionLabel}`)
+                  .join(", ")
+              : "none"
+          },
           { label: "Unexpected Responses", value: String(detail.unexpectedResponseCount) },
           { label: "Updated", value: this.formatDateTime(detail.testRun.updatedAt) },
           { label: "Generated", value: this.formatDateTime(detail.generatedAt) }

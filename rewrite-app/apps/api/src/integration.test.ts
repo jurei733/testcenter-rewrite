@@ -2769,15 +2769,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(studyMonitorRunCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       studyMonitorRunCsv.body,
-      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
+      /^tenantKey,workspaceKey,generatedAt,testRunId,participantSessionId,loginKey,groupKey,displayName,bookletKey,bookletLabel,testRunStatus,currentUnitKey,adaptiveStates,unitKey,unitLabel,expected,current,answered,responseLength,reviewCount,response\n/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","unit-intro","Introduction","true","false","true","22","0","My first demo response"/
     );
     assert.match(
       studyMonitorRunCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","[^"]+","student-demo","group:student-demo","Demo Student","booklet:demo","Demo Booklet","running","unit-practice","\{\}","unit-practice","Practice","true","true","true","43","0","Practice response without repeated unit key"/
     );
 
     const filteredStudyMonitorParticipantMatrixCsv = await requestTextAt(
@@ -9051,6 +9051,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
       answeredExpectedUnitCount: number;
       missingExpectedUnitCount: number;
       unexpectedResponseCount: number;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
       units: Array<{ unitKey: string; expected: boolean }>;
     };
   }>(
@@ -9071,6 +9072,27 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   assert.equal(monitorRun.body.studyMonitorRun.answeredExpectedUnitCount, 1);
   assert.equal(monitorRun.body.studyMonitorRun.missingExpectedUnitCount, 4);
   assert.equal(monitorRun.body.studyMonitorRun.unexpectedResponseCount, 0);
+  assert.deepEqual(
+    monitorRun.body.studyMonitorRun.adaptiveStates.map(state => [
+      state.stateKey,
+      state.optionKey
+    ]),
+    [["level", "professional"], ["quality", "gold"], ["numeric", "high"]]
+  );
+
+  const monitorRunCsv = await requestTextAt(
+    baseUrl,
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-runs/${testRunId}.csv`
+  );
+  assert.equal(monitorRunCsv.status, 200);
+  assert.match(
+    monitorRunCsv.body,
+    /"adaptiveStates"|adaptiveStates/
+  );
+  assert.match(
+    monitorRunCsv.body,
+    /level.*professional.*quality.*gold.*numeric.*high/
+  );
 
   const monitorParticipants = await requestJson<{
     studyMonitorParticipantMatrix: {

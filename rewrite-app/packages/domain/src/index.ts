@@ -753,6 +753,7 @@ export type WorkspaceStudyMonitorRunDetail = {
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
   bookletLabel: string;
+  adaptiveStates: ParticipantCurrentRunState["adaptiveStates"];
   responseCount: number;
   reviewCount: number;
   expectedUnitCount: number;
