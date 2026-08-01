@@ -12,6 +12,7 @@ import type { Response as IqbResponse } from "@iqb/responses";
 import {
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
+  isSupportedVeronaPlayerApiVersion,
   parseParticipantRosterText,
   parseVeronaUnitResponse,
   readBookletConfigValues
@@ -6188,6 +6189,70 @@ type ZipUnitDefinition = {
   unitDefinitionType: string | null;
 };
 
+type VeronaPlayerMetadataValidation =
+  | { status: "missing" }
+  | { status: "invalid"; reason: string }
+  | {
+      status: "valid";
+      id: string | null;
+      specVersion: string;
+    };
+
+const validateVeronaPlayerMetadata = (
+  playerHtml: string
+): VeronaPlayerMetadataValidation => {
+  const metadataScripts = [...playerHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(scriptMatch => {
+      const attributes = parseXmlAttributes(scriptMatch[1] ?? "");
+      return (
+        readXmlAttribute(attributes, "type")?.trim().toLowerCase() ===
+        "application/ld+json"
+      );
+    });
+  if (metadataScripts.length === 0) {
+    return { status: "missing" };
+  }
+
+  let invalidJson = false;
+  for (const scriptMatch of metadataScripts) {
+    try {
+      const parsed = JSON.parse((scriptMatch[2] ?? "").trim()) as unknown;
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        continue;
+      }
+      const metadata = parsed as Record<string, unknown>;
+      if (metadata.type !== "player") {
+        continue;
+      }
+      const specVersion =
+        typeof metadata.specVersion === "string"
+          ? metadata.specVersion.trim()
+          : "";
+      if (!/^\d+(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?$/.test(specVersion)) {
+        return {
+          status: "invalid",
+          reason: "player metadata must declare a numeric specVersion"
+        };
+      }
+      const id = typeof metadata.id === "string" ? metadata.id.trim() : "";
+      return {
+        status: "valid",
+        id: id || null,
+        specVersion
+      };
+    } catch {
+      invalidJson = true;
+    }
+  }
+
+  return {
+    status: "invalid",
+    reason: invalidJson
+      ? "application/ld+json metadata is not valid JSON"
+      : "application/ld+json metadata does not describe a Verona player"
+  };
+};
+
 const extractZipUnitDefinition = (
   sourceDocument: string
 ): ZipUnitDefinition => {
@@ -6346,6 +6411,25 @@ const findXmlManifestResource = (
       ([identifier]) => identifier.toLowerCase() === normalizedReference
     )?.[1] ?? null
   );
+};
+
+const findZipUnitPlayerEntry = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
+  unitEntry: ZipEntry,
+  playerKey: string,
+  manifestResources: Map<string, XmlManifestResource>
+): ZipEntry | null => {
+  const playerResource = findXmlManifestResource(manifestResources, playerKey);
+  return findZipEntryByPath(manifestExtraction.entries, [
+    ...(playerResource
+      ? resolveZipResourcePathCandidates(
+          manifestExtraction.manifestFileName,
+          playerResource.key
+        )
+      : []),
+    ...resolveZipResourcePathCandidates(unitEntry.fileName, playerKey),
+    ...resolveZipResourcePathCandidates(unitEntry.fileName, `${playerKey}.html`)
+  ]);
 };
 
 const extractZipUnitDescription = (sourceDocument: string): string | null => {
@@ -6606,29 +6690,12 @@ const normalizeParsedZipXmlContentStructure = (
         const description = unitEntry.description
           ? null
           : extractZipUnitDescription(sourceDocument);
-        const playerResource = findXmlManifestResource(
-          manifestResources,
-          unitDefinition.playerKey
-        );
         const playerEntry = unitDefinition.playerKey
-          ? findZipEntryByPath(
-              manifestExtraction.entries,
-              [
-                ...(playerResource
-                  ? resolveZipResourcePathCandidates(
-                      manifestExtraction.manifestFileName,
-                      playerResource.key
-                    )
-                  : []),
-                ...resolveZipResourcePathCandidates(
-                  referencedEntry.fileName,
-                  unitDefinition.playerKey
-                ),
-                ...resolveZipResourcePathCandidates(
-                  referencedEntry.fileName,
-                  `${unitDefinition.playerKey}.html`
-                )
-              ]
+          ? findZipUnitPlayerEntry(
+              manifestExtraction,
+              referencedEntry,
+              unitDefinition.playerKey,
+              manifestResources
             )
           : null;
         const playerHtml = playerEntry
@@ -6668,6 +6735,7 @@ const validateZipXmlEntries = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
+  const validatedPlayerKeys = new Set<string>();
   const manifestResources = collectXmlManifestResources(
     manifestExtraction.manifestText
   );
@@ -6695,6 +6763,67 @@ const validateZipXmlEntries = (
     diagnostics.push(
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
+    const unitDefinition = extractZipUnitDefinition(sourceDocument);
+    if (
+      unitDefinition.playerKey &&
+      !validatedPlayerKeys.has(unitDefinition.playerKey.toLowerCase())
+    ) {
+      validatedPlayerKeys.add(unitDefinition.playerKey.toLowerCase());
+      const playerEntry = findZipUnitPlayerEntry(
+        manifestExtraction,
+        entry,
+        unitDefinition.playerKey,
+        manifestResources
+      );
+      if (playerEntry) {
+        const playerHtml = readZipEntryText(
+          manifestExtraction.zipBuffer,
+          playerEntry
+        );
+        if (playerHtml === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "source_document_player_unreadable",
+              `Verona player ZIP entry '${playerEntry.fileName}' could not be read.`
+            )
+          );
+        } else {
+          const metadata = validateVeronaPlayerMetadata(playerHtml);
+          if (metadata.status === "invalid") {
+            diagnostics.push(
+              createImportDiagnostic(
+                "source_document_player_metadata_invalid",
+                `Verona player ZIP entry '${playerEntry.fileName}' ${metadata.reason}.`
+              )
+            );
+          } else if (
+            metadata.status === "valid" &&
+            !isSupportedVeronaPlayerApiVersion(metadata.specVersion)
+          ) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "source_document_player_api_version_unsupported",
+                `Verona player ZIP entry '${playerEntry.fileName}' declares unsupported API version '${metadata.specVersion}'.`
+              )
+            );
+          } else if (metadata.status === "valid" && metadata.id) {
+            const referencedPlayerId =
+              unitDefinition.playerKey.split("@")[0]?.trim() ?? "";
+            if (
+              referencedPlayerId &&
+              referencedPlayerId.toLowerCase() !== metadata.id.toLowerCase()
+            ) {
+              diagnostics.push(
+                createImportDiagnostic(
+                  "source_document_player_identity_mismatch",
+                  `Unit ZIP entry '${entry.fileName}' references player '${unitDefinition.playerKey}', but '${playerEntry.fileName}' declares id '${metadata.id}'.`
+                )
+              );
+            }
+          }
+        }
+      }
+    }
     const codingSchemeReference =
       extractZipUnitCodingSchemeReference(sourceDocument);
     if (!codingSchemeReference) {

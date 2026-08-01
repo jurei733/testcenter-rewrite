@@ -9993,6 +9993,109 @@ test("coding scheme references block incomplete or incompatible ZIP imports", as
   }
 });
 
+test("bundled Verona player metadata blocks incompatible ZIP imports", async () => {
+  const tenantKey = "integration-tenant-player-metadata-errors";
+  const workspaceKey = "integration-workspace-player-metadata-errors";
+  const playerKey = "verona-player-simple@6.0";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const cases = [
+    {
+      name: "invalid-json",
+      metadataDocument: "{",
+      expectedCode: "source_document_player_metadata_invalid"
+    },
+    {
+      name: "missing-spec-version",
+      metadataDocument: JSON.stringify({ type: "player" }),
+      expectedCode: "source_document_player_metadata_invalid"
+    },
+    {
+      name: "non-player",
+      metadataDocument: JSON.stringify({ type: "editor", specVersion: "6.0" }),
+      expectedCode: "source_document_player_metadata_invalid"
+    },
+    {
+      name: "unsupported-api",
+      metadataDocument: JSON.stringify({
+        type: "player",
+        id: "verona-player-simple",
+        specVersion: "7.0"
+      }),
+      expectedCode: "source_document_player_api_version_unsupported"
+    },
+    {
+      name: "identity-mismatch",
+      metadataDocument: JSON.stringify({
+        type: "player",
+        id: "different-player",
+        specVersion: "6.0"
+      }),
+      expectedCode: "source_document_player_identity_mismatch"
+    }
+  ];
+  for (const testCase of cases) {
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest>
+            <resources>
+              <resource identifier="UNIT.PLAYER.ERROR" href="units/Unit.xml" />
+              <resource identifier="${playerKey}" href="players/player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>UNIT.PLAYER.ERROR</Id><Label>Player Error Unit</Label></Metadata>
+            <Definition player="${playerKey}"><![CDATA[<p>Player metadata validation</p>]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/player.html",
+        content: `<!doctype html><script type="application/ld+json">${testCase.metadataDocument}</script><main>Player</main>`
+      }
+    ]);
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `player-metadata-${testCase.name}.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201);
+    assert.equal(importResult.body.importJob.status, "failed");
+    assert.equal(importResult.body.stagedContentRelease, null);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === testCase.expectedCode
+      )
+    );
+  }
+});
+
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {
   const tenantKey = "integration-tenant-booklet-policy";
   const workspaceKey = "integration-workspace-booklet-policy";
