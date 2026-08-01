@@ -905,6 +905,64 @@ const sendAsset = (
   endResponse(response, body);
 };
 
+type ResolvedByteRange = {
+  start: number;
+  end: number;
+};
+
+const resolveSingleByteRange = (
+  rangeHeader: string,
+  resourceSize: number
+): ResolvedByteRange | null => {
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+  if (!match || resourceSize <= 0) {
+    return null;
+  }
+
+  const startText = match[1] ?? "";
+  const endText = match[2] ?? "";
+  if (!startText && !endText) {
+    return null;
+  }
+
+  const resourceSizeBigInt = BigInt(resourceSize);
+  try {
+    if (!startText) {
+      const suffixLength = BigInt(endText);
+      if (suffixLength <= 0n) {
+        return null;
+      }
+      const boundedSuffixLength = suffixLength > resourceSizeBigInt
+        ? resourceSizeBigInt
+        : suffixLength;
+      return {
+        start: resourceSize - Number(boundedSuffixLength),
+        end: resourceSize - 1
+      };
+    }
+
+    const start = BigInt(startText);
+    if (start >= resourceSizeBigInt) {
+      return null;
+    }
+    const requestedEnd = endText
+      ? BigInt(endText)
+      : resourceSizeBigInt - 1n;
+    if (requestedEnd < start) {
+      return null;
+    }
+    const end = requestedEnd >= resourceSizeBigInt
+      ? resourceSizeBigInt - 1n
+      : requestedEnd;
+    return {
+      start: Number(start),
+      end: Number(end)
+    };
+  } catch {
+    return null;
+  }
+};
+
 const sendRedirect = (
   response: ServerResponse,
   statusCode: 301 | 302 | 307 | 308,
@@ -5320,12 +5378,48 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           participantSessionId,
           resourcePath
         });
+        const resourceBody = Buffer.from(resource.dataBase64, "base64");
+        const resourceHeaders = {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers":
+            "accept-ranges, content-length, content-range",
+          "accept-ranges": "bytes"
+        };
+        const rangeHeader = request.headers.range;
+        if (rangeHeader !== undefined) {
+          const byteRange = resolveSingleByteRange(
+            rangeHeader,
+            resourceBody.byteLength
+          );
+          if (!byteRange) {
+            sendAsset(response, 416, resource.mediaType, Buffer.alloc(0), {
+              ...resourceHeaders,
+              "content-length": "0",
+              "content-range": `bytes */${resourceBody.byteLength}`
+            });
+            return;
+          }
+          const partialBody = resourceBody.subarray(
+            byteRange.start,
+            byteRange.end + 1
+          );
+          sendAsset(response, 206, resource.mediaType, partialBody, {
+            ...resourceHeaders,
+            "content-length": String(partialBody.byteLength),
+            "content-range":
+              `bytes ${byteRange.start}-${byteRange.end}/${resourceBody.byteLength}`
+          });
+          return;
+        }
         sendAsset(
           response,
           200,
           resource.mediaType,
-          Buffer.from(resource.dataBase64, "base64"),
-          { "access-control-allow-origin": "*" }
+          resourceBody,
+          {
+            ...resourceHeaders,
+            "content-length": String(resourceBody.byteLength)
+          }
         );
         return;
       }

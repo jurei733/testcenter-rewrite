@@ -2905,6 +2905,7 @@ try {
   const veronaLoginKey = "student-verona-smoke";
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+  const expectedVeronaResourceRange = expectedVeronaResourceContent.slice(5, 20);
   const originalVeronaResourcePackage = Buffer.from(
     (
       await readFile(
@@ -2922,6 +2923,7 @@ try {
       <output id="playerConfig"></output>
       <output id="playerStartPage"></output>
       <output id="playerResource"></output>
+      <output id="playerResourceRange"></output>
       <label>Player answer <input id="playerAnswer" /></label>
       <button id="playerEnd" type="button">End from player</button>
       <script>
@@ -2964,6 +2966,20 @@ try {
             })
             .catch(error => {
               document.querySelector("#playerResource").textContent = "resource-error: " + error.message;
+            });
+          fetch(event.data.playerConfig.directDownloadUrl + "/sample_resource_package/file.text", {
+            headers: { Range: "bytes=5-19" }
+          })
+            .then(async response => {
+              if (response.status !== 206) throw new Error("range status " + response.status);
+              const content = await response.text();
+              return response.headers.get("content-range") + "|" + content;
+            })
+            .then(content => {
+              document.querySelector("#playerResourceRange").textContent = content;
+            })
+            .catch(error => {
+              document.querySelector("#playerResourceRange").textContent = "resource-range-error: " + error.message;
             });
         });
         document.querySelector("#playerEnd").addEventListener("click", () => parent.postMessage({
@@ -3089,12 +3105,18 @@ try {
       }
     }
   );
-  const veronaResourceResponsePromise = page.waitForResponse(response =>
-    response
-      .url()
-      .endsWith(
-        "/resources/sample_resource_package/file.text"
-      )
+  const isVeronaResourceResponse = response => response
+    .url()
+    .endsWith("/resources/sample_resource_package/file.text");
+  const veronaResourceResponsePromise = page.waitForResponse(
+    response =>
+      isVeronaResourceResponse(response) &&
+      !response.request().headers()["range"]
+  );
+  const veronaRangeResponsePromise = page.waitForResponse(
+    response =>
+      isVeronaResourceResponse(response) &&
+      response.request().headers()["range"] === "bytes=5-19"
   );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
@@ -3167,6 +3189,10 @@ try {
     .locator("#playerResource")
     .filter({ hasText: expectedVeronaResourceContent.trim() })
     .waitFor({ timeout: 15_000 });
+  await veronaFrame
+    .locator("#playerResourceRange")
+    .filter({ hasText: expectedVeronaResourceRange })
+    .waitFor({ timeout: 15_000 });
   const veronaResourceResponse = await veronaResourceResponsePromise;
   assert.equal(veronaResourceResponse.status(), 200);
   assert.equal(
@@ -3176,6 +3202,16 @@ try {
   assert.equal(
     await veronaFrame.locator("#playerResource").textContent(),
     expectedVeronaResourceContent
+  );
+  const veronaRangeResponse = await veronaRangeResponsePromise;
+  assert.equal(veronaRangeResponse.status(), 206);
+  assert.equal(
+    veronaRangeResponse.headers()["content-range"],
+    `bytes 5-19/${Buffer.byteLength(expectedVeronaResourceContent, "utf8")}`
+  );
+  assert.equal(
+    await veronaFrame.locator("#playerResourceRange").textContent(),
+    `${veronaRangeResponse.headers()["content-range"]}|${expectedVeronaResourceRange}`
   );
   await page
     .locator("#participantRouteNavigationNotice")

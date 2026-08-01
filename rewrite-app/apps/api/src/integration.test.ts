@@ -8148,6 +8148,9 @@ test("source document import derives ZIP runtime structure from referenced bookl
 test("source document import resolves ZIP Testcenter unit definitions", async () => {
   const tenantKey = "integration-tenant-zip-testcenter-definition";
   const workspaceKey = "integration-workspace-zip-testcenter-definition";
+  const expectedResourceContent =
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+  const expectedResourceBytes = Buffer.from(expectedResourceContent, "utf8");
 
   await requestJson("/api/v1/platform/tenants", {
     method: "POST",
@@ -8383,10 +8386,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
         {
           resourcePath: "sample_resource_package/file.text",
           mediaType: "text/plain; charset=utf-8",
-          dataBase64: Buffer.from(
-            'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n',
-            "utf8"
-          ).toString("base64")
+          dataBase64: expectedResourceBytes.toString("base64")
         }
       ]
     }
@@ -8416,15 +8416,85 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     currentState.body.currentRunState.resourceBasePath,
     `/api/v1/participant/sessions/${participantSessionId}/resources`
   );
-  const resourceResponse = await fetch(
-    `${baseUrl}${currentState.body.currentRunState.resourceBasePath}/sample_resource_package/file.text`
-  );
+  const resourceUrl =
+    `${baseUrl}${currentState.body.currentRunState.resourceBasePath}/sample_resource_package/file.text`;
+  const resourceResponse = await fetch(resourceUrl);
   assert.equal(resourceResponse.status, 200);
   assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
   assert.equal(resourceResponse.headers.get("access-control-allow-origin"), "*");
+  assert.equal(resourceResponse.headers.get("accept-ranges"), "bytes");
   assert.equal(
-    await resourceResponse.text(),
-    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
+    resourceResponse.headers.get("access-control-expose-headers"),
+    "accept-ranges, content-length, content-range"
+  );
+  assert.equal(
+    resourceResponse.headers.get("content-length"),
+    String(expectedResourceBytes.byteLength)
+  );
+  assert.equal(await resourceResponse.text(), expectedResourceContent);
+
+  const fixedRangeResponse = await fetch(resourceUrl, {
+    headers: { range: "bytes=5-19" }
+  });
+  assert.equal(fixedRangeResponse.status, 206);
+  assert.equal(
+    fixedRangeResponse.headers.get("content-range"),
+    `bytes 5-19/${expectedResourceBytes.byteLength}`
+  );
+  assert.equal(fixedRangeResponse.headers.get("content-length"), "15");
+  assert.deepEqual(
+    Buffer.from(await fixedRangeResponse.arrayBuffer()),
+    expectedResourceBytes.subarray(5, 20)
+  );
+
+  const openRangeStart = expectedResourceBytes.byteLength - 9;
+  const openRangeResponse = await fetch(resourceUrl, {
+    headers: { range: `bytes=${openRangeStart}-` }
+  });
+  assert.equal(openRangeResponse.status, 206);
+  assert.equal(
+    openRangeResponse.headers.get("content-range"),
+    `bytes ${openRangeStart}-${expectedResourceBytes.byteLength - 1}/${expectedResourceBytes.byteLength}`
+  );
+  assert.deepEqual(
+    Buffer.from(await openRangeResponse.arrayBuffer()),
+    expectedResourceBytes.subarray(openRangeStart)
+  );
+
+  const suffixRangeResponse = await fetch(resourceUrl, {
+    headers: { range: "bytes=-7" }
+  });
+  assert.equal(suffixRangeResponse.status, 206);
+  assert.deepEqual(
+    Buffer.from(await suffixRangeResponse.arrayBuffer()),
+    expectedResourceBytes.subarray(-7)
+  );
+
+  const rangeHeadResponse = await fetch(resourceUrl, {
+    method: "HEAD",
+    headers: { range: "bytes=0-3" }
+  });
+  assert.equal(rangeHeadResponse.status, 206);
+  assert.equal(rangeHeadResponse.headers.get("content-length"), "4");
+  assert.equal(await rangeHeadResponse.text(), "");
+
+  const unsatisfiedRangeResponse = await fetch(resourceUrl, {
+    headers: { range: `bytes=${expectedResourceBytes.byteLength}-` }
+  });
+  assert.equal(unsatisfiedRangeResponse.status, 416);
+  assert.equal(
+    unsatisfiedRangeResponse.headers.get("content-range"),
+    `bytes */${expectedResourceBytes.byteLength}`
+  );
+  assert.equal(await unsatisfiedRangeResponse.text(), "");
+
+  const multipleRangeResponse = await fetch(resourceUrl, {
+    headers: { range: "bytes=0-1,4-5" }
+  });
+  assert.equal(multipleRangeResponse.status, 416);
+  assert.equal(
+    multipleRangeResponse.headers.get("content-range"),
+    `bytes */${expectedResourceBytes.byteLength}`
   );
   const missingResource = await requestJson<{ error: string }>(
     `/api/v1/participant/sessions/${participantSessionId}/resources/sample_resource_package/missing.text`
