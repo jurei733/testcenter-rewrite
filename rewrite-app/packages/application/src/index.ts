@@ -1457,7 +1457,9 @@ const getParticipantRosterBookletKeys = (
   entry: ParticipantRosterEntry | null | undefined
 ): string[] => [
   ...new Set(
-    (entry?.bookletKeys?.length
+    (entry?.bookletAssignments?.length
+      ? entry.bookletAssignments.map(assignment => assignment.bookletKey)
+      : entry?.bookletKeys?.length
       ? entry.bookletKeys
       : entry?.bookletKey
         ? [entry.bookletKey]
@@ -1468,36 +1470,106 @@ const getParticipantRosterBookletKeys = (
   )
 ];
 
+const getParticipantRosterBookletAssignments = (
+  entry: ParticipantRosterEntry | null | undefined
+): NonNullable<ParticipantRosterEntry["bookletAssignments"]> => {
+  const assignments = entry?.bookletAssignments?.length
+    ? entry.bookletAssignments
+    : getParticipantRosterBookletKeys(entry).map(bookletKey => {
+        const statePreset = entry?.bookletStatePresets?.[bookletKey] ?? {};
+        const stateSuffix = Object.entries(statePreset)
+          .map(([stateKey, optionKey]) => `${stateKey}:${optionKey}`)
+          .join(";");
+        return {
+          assignmentKey: stateSuffix ? `${bookletKey}#${stateSuffix}` : bookletKey,
+          bookletKey,
+          statePreset
+        };
+      });
+  return assignments
+    .flatMap(assignment => {
+      const bookletKey = String(assignment.bookletKey ?? "").trim();
+      const assignmentKey = String(assignment.assignmentKey ?? "").trim();
+      if (!bookletKey || !assignmentKey) {
+        return [];
+      }
+      return [
+        {
+          assignmentKey,
+          bookletKey,
+          statePreset: Object.fromEntries(
+            Object.entries(assignment.statePreset ?? {}).flatMap(
+              ([stateKey, optionKey]) => {
+                const normalizedStateKey = stateKey.trim();
+                const normalizedOptionKey = String(optionKey ?? "").trim();
+                return normalizedStateKey && normalizedOptionKey
+                  ? [[normalizedStateKey, normalizedOptionKey]]
+                  : [];
+              }
+            )
+          )
+        }
+      ];
+    })
+    .filter(
+      (assignment, index, allAssignments) =>
+        allAssignments.findIndex(
+          candidate => candidate.assignmentKey === assignment.assignmentKey
+        ) === index
+    );
+};
+
 const buildParticipantRuntimeBooklets = (input: {
   contentRelease: ContentRelease;
   participantRosterEntry: ParticipantRosterEntry | null;
   testRuns: TestRun[];
 }): ParticipantRuntimeBooklet[] => {
-  const assignedBookletKeys = getParticipantRosterBookletKeys(
+  const assignedBooklets = getParticipantRosterBookletAssignments(
     input.participantRosterEntry
   );
-  const allowedBookletKeys = assignedBookletKeys.length
-    ? new Set(assignedBookletKeys)
-    : null;
+  const releaseBooklets = new Map(
+    input.contentRelease.runtimeSnapshot.bookletEntries.map(booklet => [
+      booklet.bookletKey,
+      booklet
+    ])
+  );
+  const runtimeAssignments =
+    assignedBooklets.length > 0
+      ? assignedBooklets
+      : input.contentRelease.runtimeSnapshot.bookletEntries.map(booklet => ({
+          assignmentKey: booklet.bookletKey,
+          bookletKey: booklet.bookletKey,
+          statePreset: {}
+        }));
 
-  return input.contentRelease.runtimeSnapshot.bookletEntries
-    .filter(booklet => !allowedBookletKeys || allowedBookletKeys.has(booklet.bookletKey))
-    .map(booklet => {
-      const bookletRuns = input.testRuns.filter(
-        testRun => testRun.bookletKey === booklet.bookletKey
-      );
-      const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed");
-      const hasCompletedRun = bookletRuns.some(testRun => testRun.status === "completed");
-      return {
-        bookletKey: booklet.bookletKey,
+  return runtimeAssignments.flatMap(assignment => {
+    const booklet = releaseBooklets.get(assignment.bookletKey);
+    if (!booklet) {
+      return [];
+    }
+    const bookletRuns = input.testRuns.filter(
+      testRun =>
+        (testRun.bookletAssignmentKey ?? testRun.bookletKey) ===
+        assignment.assignmentKey
+    );
+    const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed");
+    const hasCompletedRun = bookletRuns.some(
+      testRun => testRun.status === "completed"
+    );
+    return [
+      {
+        bookletKey: assignment.assignmentKey,
+        sourceBookletKey: booklet.bookletKey,
+        statePreset: assignment.statePreset,
         displayLabel: booklet.displayLabel,
         status: hasOpenRun
-          ? "in_progress" as const
+          ? ("in_progress" as const)
           : hasCompletedRun
-            ? "completed" as const
-            : "available" as const
-      };
-    });
+            ? ("completed" as const)
+            : ("available" as const)
+      }
+    ];
+  });
 };
 
 const resolveParticipantSessionStatusAfterCompletion = async (
@@ -1558,8 +1630,11 @@ const buildParticipantRosterReadItems = (
           const booklet = activeContentRelease?.runtimeSnapshot.bookletEntries.find(
             candidate => candidate.bookletKey === bookletKey
           );
-          for (const [stateKey, optionKey] of Object.entries(
-            entry.bookletStatePresets?.[bookletKey] ?? {}
+          const assignmentPresets = getParticipantRosterBookletAssignments(entry)
+            .filter(assignment => assignment.bookletKey === bookletKey)
+            .map(assignment => assignment.statePreset);
+          for (const [stateKey, optionKey] of assignmentPresets.flatMap(
+            statePreset => Object.entries(statePreset)
           )) {
             const state = booklet?.stateEntries?.find(
               candidate => candidate.stateKey === stateKey
@@ -1806,6 +1881,8 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
           ) ?? null
         : null,
       bookletKey: testRun.bookletKey,
+      bookletAssignmentKey:
+        testRun.bookletAssignmentKey ?? testRun.bookletKey,
       status: testRun.status,
       currentUnitKey: testRun.currentUnitKey,
       updatedAt: testRun.updatedAt
@@ -1873,6 +1950,8 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
 
   return {
     ...testRun,
+    bookletAssignmentKey:
+      String(testRun.bookletAssignmentKey ?? "").trim() || testRun.bookletKey,
     presetBookletStates: Object.fromEntries(
       Object.entries(testRun.presetBookletStates ?? {}).flatMap(
         ([stateKey, optionKey]) => {
@@ -1967,6 +2046,7 @@ const filterOpenMonitorRuns = (
         (!filters.groupKey || item.groupKey === filters.groupKey) &&
         (!filters.bookletKey ||
           item.bookletKey === filters.bookletKey ||
+          item.bookletAssignmentKey === filters.bookletKey ||
           item.participantRosterEntry?.bookletKey === filters.bookletKey) &&
         (!filters.participantSessionId ||
           item.participantSessionId === filters.participantSessionId) &&
@@ -2415,7 +2495,8 @@ const formatParticipantRosterCsv = (input: {
     "validationWarningCodes",
     "validationWarningMessages",
     "bookletKeys",
-    "bookletStatePresets"
+    "bookletStatePresets",
+    "bookletAssignments"
   ];
   const rows = [...input.items].sort(
     (left, right) =>
@@ -2439,7 +2520,8 @@ const formatParticipantRosterCsv = (input: {
         item.validationWarnings.map(warning => warning.code).join("|"),
         item.validationWarnings.map(warning => warning.message).join("|"),
         getParticipantRosterBookletKeys(item).join("|"),
-        JSON.stringify(item.bookletStatePresets ?? {})
+        JSON.stringify(item.bookletStatePresets ?? {}),
+        JSON.stringify(getParticipantRosterBookletAssignments(item))
       ]
         .map(escapeCsvCell)
         .join(",")
@@ -2816,6 +2898,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "loginKey",
     "groupKey",
     "bookletKey",
+    "bookletAssignmentKey",
     "status",
     "currentUnitKey",
     "updatedAt",
@@ -2834,6 +2917,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.loginKey,
         item.groupKey,
         item.bookletKey,
+        item.bookletAssignmentKey,
         item.status,
         item.currentUnitKey ?? "",
         item.updatedAt,
@@ -11531,6 +11615,9 @@ export const createFirstSliceServices = (
             ...(parsedEntry.bookletStatePresets
               ? { bookletStatePresets: parsedEntry.bookletStatePresets }
               : {}),
+            ...(parsedEntry.bookletAssignments?.length
+              ? { bookletAssignments: parsedEntry.bookletAssignments }
+              : {}),
             displayName: parsedEntry.displayName,
             passwordRequired: Boolean(parsedEntry.password),
             importedAt: now()
@@ -12926,7 +13013,9 @@ export const createFirstSliceServices = (
         if (existingRun) {
           if (
             requestedBookletKey &&
-            existingRun.bookletKey !== requestedBookletKey
+            existingRun.bookletKey !== requestedBookletKey &&
+            (existingRun.bookletAssignmentKey ?? existingRun.bookletKey) !==
+              requestedBookletKey
           ) {
             throw new FirstSliceError(
               409,
@@ -12945,17 +13034,6 @@ export const createFirstSliceServices = (
           participantSession.loginKey
         );
         const assignedBookletKeys = getParticipantRosterBookletKeys(rosterEntry);
-        if (
-          requestedBookletKey &&
-          assignedBookletKeys.length > 0 &&
-          !assignedBookletKeys.includes(requestedBookletKey)
-        ) {
-          throw new FirstSliceError(
-            403,
-            "booklet_not_assigned",
-            `Booklet '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
-          );
-        }
         const testRuns = (
           await repository.listTestRunsByParticipantSessionId(
             participantSession.participantSessionId
@@ -12967,10 +13045,22 @@ export const createFirstSliceServices = (
           testRuns
         });
         const selectedRuntimeBooklet = requestedBookletKey
-          ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey)
+          ? runtimeBooklets.find(booklet => booklet.bookletKey === requestedBookletKey) ??
+            runtimeBooklets.find(
+              booklet =>
+                booklet.sourceBookletKey === requestedBookletKey &&
+                booklet.status === "available"
+            )
           : runtimeBooklets.find(booklet => booklet.status === "available");
+        if (requestedBookletKey && assignedBookletKeys.length > 0 && !selectedRuntimeBooklet) {
+          throw new FirstSliceError(
+            403,
+            "booklet_not_assigned",
+            `Booklet assignment '${requestedBookletKey}' is not assigned to participant '${participantSession.loginKey}'.`
+          );
+        }
         const effectiveBookletKey =
-          requestedBookletKey || selectedRuntimeBooklet?.bookletKey || "";
+          selectedRuntimeBooklet?.sourceBookletKey || requestedBookletKey || "";
         const bookletSource = requestedBookletKey
           ? "request"
           : assignedBookletKeys.length > 0
@@ -13014,8 +13104,9 @@ export const createFirstSliceServices = (
           workspaceId: participantSession.workspaceId,
           contentReleaseId: participantSession.contentReleaseId,
           bookletKey: selectedBooklet.bookletKey,
-          presetBookletStates:
-            rosterEntry?.bookletStatePresets?.[selectedBooklet.bookletKey] ?? {},
+          bookletAssignmentKey:
+            selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
+          presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
           status: "running",
           currentUnitKey: null,
           unitResponses: {},
@@ -13066,6 +13157,7 @@ export const createFirstSliceServices = (
           details: {
             participantSessionId: participantSession.participantSessionId,
             bookletKey: effectiveTestRun.bookletKey,
+            bookletAssignmentKey: effectiveTestRun.bookletAssignmentKey,
             currentUnitKey: effectiveTestRun.currentUnitKey,
             bookletSource
           }
@@ -13682,6 +13774,8 @@ export const createFirstSliceServices = (
                   ) ?? null
                 : null,
               bookletKey: testRun.bookletKey,
+              bookletAssignmentKey:
+                testRun.bookletAssignmentKey ?? testRun.bookletKey,
               status: testRun.status,
               currentUnitKey: testRun.currentUnitKey,
               updatedAt: testRun.updatedAt

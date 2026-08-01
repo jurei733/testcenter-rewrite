@@ -163,9 +163,16 @@ export type ParticipantRosterEntry = {
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
+  bookletAssignments?: ParticipantBookletAssignment[];
   displayName: string | null;
   passwordRequired: boolean;
   importedAt: string;
+};
+
+export type ParticipantBookletAssignment = {
+  assignmentKey: string;
+  bookletKey: string;
+  statePreset: Record<string, string>;
 };
 
 export type ParticipantRosterValidationWarning = {
@@ -464,6 +471,7 @@ export type TestRun = {
   workspaceId: string;
   contentReleaseId: string;
   bookletKey: string;
+  bookletAssignmentKey?: string;
   presetBookletStates?: Record<string, string>;
   status: TestRunStatus;
   currentUnitKey: string | null;
@@ -515,6 +523,7 @@ export type OpenMonitorRun = {
   groupKey: string;
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
+  bookletAssignmentKey: string;
   status: TestRunStatus;
   currentUnitKey: string | null;
   updatedAt: string;
@@ -551,7 +560,10 @@ export type ParticipantRuntimeState = {
 };
 
 export type ParticipantRuntimeBooklet = {
+  /** Stable assignment identity; equals bookletKey when no state preset exists. */
   bookletKey: string;
+  sourceBookletKey: string;
+  statePreset: Record<string, string>;
   displayLabel: string;
   status: "available" | "in_progress" | "completed";
 };

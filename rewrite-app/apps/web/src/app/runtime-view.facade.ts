@@ -540,17 +540,34 @@ export class RuntimeViewFacade {
           }
         ]
       },
-      ...previewEntries.map(entry => ({
-        headline: entry.displayName ?? entry.loginKey,
-        subline: entry.loginKey,
-        badges: [entry.groupKey, entry.bookletKey ?? "default booklet"],
-        rows: [
-          { label: "Login", value: entry.loginKey },
-          { label: "Group", value: entry.groupKey },
-          { label: "Booklet", value: entry.bookletKey ?? "active release default" },
-          { label: "Display Name", value: entry.displayName ?? "none" }
-        ]
-      }))
+      ...previewEntries.map(entry => {
+        const assignmentKeys =
+          entry.bookletAssignments?.map(assignment => assignment.assignmentKey) ??
+          entry.bookletKeys ??
+          (entry.bookletKey ? [entry.bookletKey] : []);
+        return {
+          headline: entry.displayName ?? entry.loginKey,
+          subline: entry.loginKey,
+          badges: [
+            entry.groupKey,
+            entry.bookletKey ?? "default booklet",
+            `${assignmentKeys.length} assignment${assignmentKeys.length === 1 ? "" : "s"}`
+          ],
+          rows: [
+            { label: "Login", value: entry.loginKey },
+            { label: "Group", value: entry.groupKey },
+            { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+            {
+              label: "Booklet Assignments",
+              value:
+                assignmentKeys.length > 0
+                  ? assignmentKeys.join(" | ")
+                  : "release defaults"
+            },
+            { label: "Display Name", value: entry.displayName ?? "none" }
+          ]
+        };
+      })
     ];
 
     if (remainingCount > 0) {
@@ -641,12 +658,25 @@ export class RuntimeViewFacade {
     return (
       payload?.items.map(entry => {
         const validationWarnings = entry.validationWarnings ?? [];
-        const statePresets = Object.entries(entry.bookletStatePresets ?? {})
-          .flatMap(([bookletKey, states]) =>
-            Object.entries(states).map(
-              ([stateKey, optionKey]) => `${bookletKey}: ${stateKey}=${optionKey}`
-            )
-          );
+        const assignments = entry.bookletAssignments ?? [];
+        const assignmentKeys =
+          assignments.length > 0
+            ? assignments.map(assignment => assignment.assignmentKey)
+            : entry.bookletKeys ?? (entry.bookletKey ? [entry.bookletKey] : []);
+        const statePresets =
+          assignments.length > 0
+            ? assignments.flatMap(assignment =>
+                Object.entries(assignment.statePreset).map(
+                  ([stateKey, optionKey]) =>
+                    `${assignment.assignmentKey}: ${stateKey}=${optionKey}`
+                )
+              )
+            : Object.entries(entry.bookletStatePresets ?? {}).flatMap(
+                ([bookletKey, states]) =>
+                  Object.entries(states).map(
+                    ([stateKey, optionKey]) => `${bookletKey}: ${stateKey}=${optionKey}`
+                  )
+              );
         const link = {
           loginKey: entry.loginKey,
           groupKey: entry.groupKey,
@@ -664,6 +694,7 @@ export class RuntimeViewFacade {
           badges: [
             entry.groupKey,
             entry.bookletKey ?? "default booklet",
+            `${assignmentKeys.length} assignment${assignmentKeys.length === 1 ? "" : "s"}`,
             statePresets.length > 0
               ? `${statePresets.length} state preset${statePresets.length === 1 ? "" : "s"}`
               : "adaptive defaults",
@@ -675,6 +706,13 @@ export class RuntimeViewFacade {
             { label: "Display Name", value: entry.displayName ?? "none" },
             { label: "Group", value: entry.groupKey },
             { label: "Booklet", value: entry.bookletKey ?? "active release default" },
+            {
+              label: "Booklet Assignments",
+              value:
+                assignmentKeys.length > 0
+                  ? assignmentKeys.join(" | ")
+                  : "release defaults"
+            },
             {
               label: "Adaptive Presets",
               value: statePresets.length > 0 ? statePresets.join(" | ") : "none"
@@ -751,11 +789,15 @@ export class RuntimeViewFacade {
         headline: testRun.testRunId,
         subline: testRun.status,
         badges: [
-          testRun.bookletKey,
+          testRun.bookletAssignmentKey ?? testRun.bookletKey,
           `${summary.responseCount} response(s)`,
           `${summary.reviewCount} review(s)`
         ],
         rows: [
+          {
+            label: "Booklet Assignment",
+            value: testRun.bookletAssignmentKey ?? testRun.bookletKey
+          },
           {
             label: "Current Unit",
             value: testRun.currentUnitKey ?? "none"
@@ -1024,6 +1066,10 @@ export class RuntimeViewFacade {
         rows: [
           { label: "Run", value: selectedRun.testRunId },
           { label: "Booklet", value: selectedRun.bookletKey },
+          {
+            label: "Booklet Assignment",
+            value: selectedRun.bookletAssignmentKey ?? selectedRun.bookletKey
+          },
           {
             label: "Missing Responses",
             value: missingCount === 0 ? "none" : String(missingCount)
@@ -1467,6 +1513,7 @@ export class RuntimeViewFacade {
           badges: [
             openRun.status,
             openRun.groupKey,
+            openRun.bookletAssignmentKey,
             openRun.participantRosterEntry ? "roster" : "ad hoc"
           ],
           rows: [
@@ -1488,6 +1535,10 @@ export class RuntimeViewFacade {
             {
               label: "Booklet",
               value: openRun.bookletKey
+            },
+            {
+              label: "Booklet Assignment",
+              value: openRun.bookletAssignmentKey
             },
             {
               label: "Current Unit",

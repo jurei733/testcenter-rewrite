@@ -1927,7 +1927,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     const rosterCsvText = await rosterCsv.text();
     assert.match(
       rosterCsvText,
-      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets\n/
+      /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments\n/
     );
     assert.match(
       rosterCsvText,
@@ -2816,11 +2816,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,bookletKey,bookletAssignmentKey,status,currentUnitKey,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","booklet:demo","booklet:demo","running","unit-practice","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -9150,6 +9150,11 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     items: Array<{
       loginKey: string;
       bookletStatePresets?: Record<string, Record<string, string>>;
+      bookletAssignments?: Array<{
+        assignmentKey: string;
+        bookletKey: string;
+        statePreset: Record<string, string>;
+      }>;
       validationWarnings: Array<{ code: string }>;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
@@ -9160,6 +9165,10 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
         "  <Group id=\"adaptive-preset-group\">",
         "    <Login mode=\"run-hot-return\" name=\"adaptive-preset-participant\">",
         `      <Booklet state="level:advanced;quality:basic;numeric:low">${bookletKey}</Booklet>`,
+        "    </Login>",
+        "    <Login mode=\"run-hot-return\" name=\"adaptive-variant-participant\">",
+        `      <Booklet state="level:advanced;quality:basic;numeric:low">${bookletKey}</Booklet>`,
+        `      <Booklet state="level:beginner;quality:basic;numeric:low">${bookletKey}</Booklet>`,
         "    </Login>",
         "  </Group>",
         "</Testtakers>"
@@ -9173,6 +9182,18 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     [bookletKey]: { level: "advanced", quality: "basic", numeric: "low" }
   });
   assert.deepEqual(presetRosterEntry?.validationWarnings, []);
+  const variantRosterEntry = presetRoster.body.items.find(
+    item => item.loginKey === "adaptive-variant-participant"
+  );
+  assert.deepEqual(
+    variantRosterEntry?.bookletAssignments?.map(
+      assignment => assignment.assignmentKey
+    ),
+    [
+      `${bookletKey}#level:advanced;quality:basic;numeric:low`,
+      `${bookletKey}#level:beginner;quality:basic;numeric:low`
+    ]
+  );
 
   const presetSignIn = await requestJson<{
     participantSession: { participantSessionId: string };
@@ -9249,6 +9270,114 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
       state.optionKey
     ]),
     [["level", "advanced"], ["quality", "basic"], ["numeric", "low"]]
+  );
+
+  const variantSignIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+    booklets: Array<{
+      bookletKey: string;
+      sourceBookletKey: string;
+      statePreset: Record<string, string>;
+      status: string;
+    }>;
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "adaptive-variant-participant" }
+  });
+  const variantSessionId =
+    variantSignIn.body.participantSession.participantSessionId;
+  assert.deepEqual(
+    variantSignIn.body.booklets.map(booklet => [
+      booklet.bookletKey,
+      booklet.sourceBookletKey,
+      booklet.status
+    ]),
+    [
+      [`${bookletKey}#level:advanced;quality:basic;numeric:low`, bookletKey, "available"],
+      [`${bookletKey}#level:beginner;quality:basic;numeric:low`, bookletKey, "available"]
+    ]
+  );
+
+  const firstVariantAssignmentKey = variantSignIn.body.booklets[0]!.bookletKey;
+  const firstVariantRun = await requestJson<{
+    testRun: {
+      testRunId: string;
+      bookletKey: string;
+      bookletAssignmentKey: string;
+      presetBookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${variantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: firstVariantAssignmentKey }
+  });
+  assert.equal(firstVariantRun.body.testRun.bookletKey, bookletKey);
+  assert.equal(
+    firstVariantRun.body.testRun.bookletAssignmentKey,
+    firstVariantAssignmentKey
+  );
+  assert.equal(firstVariantRun.body.testRun.presetBookletStates.level, "advanced");
+  await requestJson(
+    `/api/v1/participant/test-runs/${firstVariantRun.body.testRun.testRunId}/complete`,
+    { method: "POST", body: {} }
+  );
+
+  const variantRuntimeAfterFirst = await requestJson<{
+    runtimeState: {
+      runtimeStatus: string;
+      booklets: Array<{ bookletKey: string; status: string }>;
+    };
+  }>(`/api/v1/participant/sessions/${variantSessionId}/runtime-state`);
+  assert.equal(
+    variantRuntimeAfterFirst.body.runtimeState.runtimeStatus,
+    "ready_to_launch"
+  );
+  assert.deepEqual(
+    variantRuntimeAfterFirst.body.runtimeState.booklets.map(booklet => [
+      booklet.bookletKey,
+      booklet.status
+    ]),
+    [
+      [firstVariantAssignmentKey, "completed"],
+      [`${bookletKey}#level:beginner;quality:basic;numeric:low`, "available"]
+    ]
+  );
+
+  const secondVariantAssignmentKey =
+    variantRuntimeAfterFirst.body.runtimeState.booklets[1]!.bookletKey;
+  const secondVariantRun = await requestJson<{
+    testRun: {
+      testRunId: string;
+      bookletAssignmentKey: string;
+      presetBookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${variantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: secondVariantAssignmentKey }
+  });
+  assert.equal(
+    secondVariantRun.body.testRun.bookletAssignmentKey,
+    secondVariantAssignmentKey
+  );
+  assert.equal(secondVariantRun.body.testRun.presetBookletStates.level, "beginner");
+  const variantOpenRuns = await requestJson<{
+    items: Array<{
+      testRunId: string;
+      bookletKey: string;
+      bookletAssignmentKey: string;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=adaptive-variant-participant`
+  );
+  assert.equal(variantOpenRuns.status, 200);
+  assert.equal(variantOpenRuns.body.items.length, 1);
+  assert.equal(
+    variantOpenRuns.body.items[0]?.testRunId,
+    secondVariantRun.body.testRun.testRunId
+  );
+  assert.equal(variantOpenRuns.body.items[0]?.bookletKey, bookletKey);
+  assert.equal(
+    variantOpenRuns.body.items[0]?.bookletAssignmentKey,
+    secondVariantAssignmentKey
   );
 });
 
@@ -10612,6 +10741,11 @@ test("workspace participant roster can be imported, updated, and listed", async 
       bookletKey: string | null;
       bookletKeys?: string[];
       bookletStatePresets?: Record<string, Record<string, string>>;
+      bookletAssignments?: Array<{
+        assignmentKey: string;
+        bookletKey: string;
+        statePreset: Record<string, string>;
+      }>;
       displayName: string | null;
       passwordRequired: boolean;
       validationWarnings: Array<{ code: string; message: string }>;
@@ -10780,6 +10914,13 @@ test("workspace participant roster can be imported, updated, and listed", async 
       bonus: "yes"
     }
   });
+  assert.deepEqual(
+    testcenterLogin?.bookletAssignments?.map(assignment => assignment.assignmentKey),
+    [
+      "BOOKLET.SAMPLE-1",
+      "BOOKLET.SAMPLE-2#level:professional;bonus:yes"
+    ]
+  );
   assert.equal(testcenterLogin?.displayName, null);
   assert.equal(testcenterLogin?.passwordRequired, true);
   const testcenterMonitorLogin = testcenterLoginImport.body.items.find(
@@ -10928,7 +11069,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
   const rosterCsvText = await rosterCsv.text();
   assert.match(
     rosterCsvText,
-    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets\n/
+    /^tenantKey,workspaceKey,participantRosterEntryId,loginKey,groupKey,bookletKey,displayName,passwordRequired,importedAt,validationWarningCodes,validationWarningMessages,bookletKeys,bookletStatePresets,bookletAssignments\n/
   );
   assert.match(
     rosterCsvText,
@@ -11772,8 +11913,8 @@ test("participant session launch can target a specific booklet", async () => {
       status: booklet.status
     })),
     [
-    { bookletKey: "booklet:alpha", status: "available" },
-    { bookletKey: "booklet:beta", status: "completed" }
+      { bookletKey: "booklet:beta", status: "completed" },
+      { bookletKey: "booklet:alpha", status: "available" }
     ]
   );
 

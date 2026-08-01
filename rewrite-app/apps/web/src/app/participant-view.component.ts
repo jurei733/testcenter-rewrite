@@ -119,7 +119,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 [value]="booklet.bookletKey"
                 [disabled]="booklet.status === 'completed'"
               >
-                {{ booklet.displayLabel }} · {{ booklet.status }}
+                {{ booklet.displayLabel }}{{ view.formatBookletVariant(booklet) }} · {{ booklet.status }}
               </option>
             </select>
             <ng-template #manualBookletKey>
@@ -146,9 +146,10 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [class.has-response]="booklet.status === 'completed'"
               [disabled]="booklet.status !== 'available'"
               [attr.data-booklet-key]="booklet.bookletKey"
+              [attr.data-source-booklet-key]="booklet.sourceBookletKey"
               (click)="view.runtime.bookletKey = booklet.bookletKey; view.persistState()"
             >
-              <strong>{{ booklet.displayLabel }}</strong>
+              <strong>{{ booklet.displayLabel }}{{ view.formatBookletVariant(booklet) }}</strong>
               <em>{{ booklet.status }}</em>
             </button>
           </div>

@@ -74,4 +74,12 @@ test("original Testcenter compatibility corpus separates participant and operati
   assert.deepEqual(reviewParticipant?.bookletStatePresets, {
     "BOOKLET.SAMPLE-2": { bonus: "yes" }
   });
+  assert.deepEqual(
+    reviewParticipant?.bookletAssignments?.map(assignment => assignment.assignmentKey),
+    [
+      "BOOKLET.SAMPLE-1",
+      "BOOKLET.SAMPLE-2#bonus:yes",
+      "BOOKLET.SAMPLE-2#bonus:no"
+    ]
+  );
 });

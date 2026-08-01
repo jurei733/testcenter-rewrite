@@ -61,6 +61,11 @@ export type ParsedParticipantRosterEntry = {
   bookletKey: string | null;
   bookletKeys?: string[];
   bookletStatePresets?: Record<string, Record<string, string>>;
+  bookletAssignments?: Array<{
+    assignmentKey: string;
+    bookletKey: string;
+    statePreset: Record<string, string>;
+  }>;
   displayName: string | null;
   password?: string | null;
 };
@@ -338,21 +343,59 @@ const parseBookletStatePreset = (
   );
 };
 
+const buildBookletAssignmentKey = (
+  bookletKey: string,
+  statePreset: Record<string, string>
+): string => {
+  const stateTuples = Object.entries(statePreset).map(
+    ([stateKey, optionKey]) => `${stateKey}:${optionKey}`
+  );
+  return stateTuples.length > 0
+    ? `${bookletKey}#${stateTuples.join(";")}`
+    : bookletKey;
+};
+
+const readXmlBookletAssignments = (
+  content: string
+): NonNullable<ParsedParticipantRosterEntry["bookletAssignments"]> => {
+  const assignments = Array.from(
+    content.matchAll(
+      /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref))\b([^>]*)>([\s\S]*?)<\/\1>/gi
+    )
+  ).flatMap(match => {
+    const bookletKey = normalizeRosterTextValue(
+      decodeXmlText((match[3] ?? "").replace(/<[^>]+>/g, "").trim())
+    );
+    if (!bookletKey) {
+      return [];
+    }
+    const statePreset = parseBookletStatePreset(
+      readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "state", "states")
+    );
+    return [{
+      assignmentKey: buildBookletAssignmentKey(bookletKey, statePreset),
+      bookletKey,
+      statePreset
+    }];
+  });
+  return assignments.filter(
+    (assignment, index) =>
+      assignments.findIndex(
+        candidate => candidate.assignmentKey === assignment.assignmentKey
+      ) === index
+  );
+};
+
 const readXmlBookletStatePresets = (
   content: string
 ): Record<string, Record<string, string>> => {
   const presets: Record<string, Record<string, string>> = {};
-  for (const match of content.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?(?:booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref))\b([^>]*)>([\s\S]*?)<\/\1>/gi
-  )) {
-    const bookletKey = normalizeRosterTextValue(
-      decodeXmlText((match[3] ?? "").replace(/<[^>]+>/g, "").trim())
-    );
-    const preset = parseBookletStatePreset(
-      readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "state", "states")
-    );
-    if (bookletKey && Object.keys(preset).length > 0 && !presets[bookletKey]) {
-      presets[bookletKey] = preset;
+  for (const assignment of readXmlBookletAssignments(content)) {
+    if (
+      Object.keys(assignment.statePreset).length > 0 &&
+      !presets[assignment.bookletKey]
+    ) {
+      presets[assignment.bookletKey] = assignment.statePreset;
     }
   }
   return presets;
@@ -393,6 +436,19 @@ const mergeParsedParticipantRosterEntries = (
       ...bookletAssignment,
       groupKey: entry.groupKey || existingEntry.groupKey,
       displayName: entry.displayName ?? existingEntry.displayName,
+      ...((existingEntry.bookletAssignments || entry.bookletAssignments)
+        ? {
+            bookletAssignments: [
+              ...(existingEntry.bookletAssignments ?? []),
+              ...(entry.bookletAssignments ?? [])
+            ].filter(
+              (assignment, index, assignments) =>
+                assignments.findIndex(
+                  candidate => candidate.assignmentKey === assignment.assignmentKey
+                ) === index
+            )
+          }
+        : {}),
       ...((existingEntry.bookletStatePresets || entry.bookletStatePresets)
         ? {
             bookletStatePresets: {
@@ -1008,10 +1064,14 @@ const parseParticipantRosterXmlText = (
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
       ...(() => {
+        const bookletAssignments = readXmlBookletAssignments(content);
         const bookletStatePresets = readXmlBookletStatePresets(content);
-        return Object.keys(bookletStatePresets).length > 0
-          ? { bookletStatePresets }
-          : {};
+        return {
+          ...(bookletAssignments.length > 0 ? { bookletAssignments } : {}),
+          ...(Object.keys(bookletStatePresets).length > 0
+            ? { bookletStatePresets }
+            : {})
+        };
       })(),
       displayName,
       ...(password ? { password } : {})
@@ -1125,10 +1185,14 @@ const parseParticipantRosterXmlText = (
         ...readXmlChildTexts(content, "booklet|bookletRef|booklet-ref|testlet|testletRef|testlet-ref")
       ]),
       ...(() => {
+        const bookletAssignments = readXmlBookletAssignments(content);
         const bookletStatePresets = readXmlBookletStatePresets(content);
-        return Object.keys(bookletStatePresets).length > 0
-          ? { bookletStatePresets }
-          : {};
+        return {
+          ...(bookletAssignments.length > 0 ? { bookletAssignments } : {}),
+          ...(Object.keys(bookletStatePresets).length > 0
+            ? { bookletStatePresets }
+            : {})
+        };
       })(),
       displayName,
       ...(password ? { password } : {})

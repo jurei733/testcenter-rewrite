@@ -1462,10 +1462,12 @@ export class ParticipantViewFacade {
     status?: string;
     currentUnitKey?: string | null;
     bookletKey?: string;
+    bookletAssignmentKey?: string;
   }): void {
     this.runtime.testRunId = testRun.testRunId;
-    if (testRun.bookletKey) {
-      this.runtime.bookletKey = testRun.bookletKey;
+    if (testRun.bookletAssignmentKey || testRun.bookletKey) {
+      this.runtime.bookletKey =
+        testRun.bookletAssignmentKey ?? testRun.bookletKey ?? "";
     }
     if (testRun.currentUnitKey != null) {
       this.runtime.currentUnitKey = testRun.currentUnitKey;
@@ -1517,6 +1519,13 @@ export class ParticipantViewFacade {
     if (nextBooklet) {
       this.runtime.bookletKey = nextBooklet.bookletKey;
     }
+  }
+
+  formatBookletVariant(booklet: ParticipantRuntimeBooklet): string {
+    const preset = Object.entries(booklet.statePreset ?? {})
+      .map(([stateKey, optionKey]) => `${stateKey}=${optionKey}`)
+      .join(", ");
+    return preset ? ` · ${preset}` : "";
   }
 
   private syncCurrentUnitResponse(

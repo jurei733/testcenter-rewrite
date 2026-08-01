@@ -174,6 +174,18 @@ describe("parseParticipantRosterText", () => {
           groupKey: "sample_group",
           bookletKey: "BOOKLET.SAMPLE-1",
           bookletKeys: ["BOOKLET.SAMPLE-1", "BOOKLET.SAMPLE-2"],
+          bookletAssignments: [
+            {
+              assignmentKey: "BOOKLET.SAMPLE-1",
+              bookletKey: "BOOKLET.SAMPLE-1",
+              statePreset: {}
+            },
+            {
+              assignmentKey: "BOOKLET.SAMPLE-2",
+              bookletKey: "BOOKLET.SAMPLE-2",
+              statePreset: {}
+            }
+          ],
           displayName: null,
           password: "user123"
         },
@@ -181,6 +193,13 @@ describe("parseParticipantRosterText", () => {
           loginKey: "test-review",
           groupKey: "sample_group",
           bookletKey: "BOOKLET.REVIEW",
+          bookletAssignments: [
+            {
+              assignmentKey: "BOOKLET.REVIEW",
+              bookletKey: "BOOKLET.REVIEW",
+              statePreset: {}
+            }
+          ],
           displayName: null,
           password: "user123"
         }

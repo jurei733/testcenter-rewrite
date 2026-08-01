@@ -220,30 +220,43 @@ const mapParticipantRosterEntry = (
             return {};
           }
         })();
+        const bookletAssignments = (() => {
+          try {
+            const parsed = JSON.parse(
+              String(row.booklet_assignments_json ?? "[]")
+            );
+            return Array.isArray(parsed)
+              ? (parsed as NonNullable<ParticipantRosterEntry["bookletAssignments"]>)
+              : [];
+          } catch {
+            return [];
+          }
+        })();
         return {
-        participantRosterEntryId: String(row.participant_roster_entry_id),
-        tenantId: String(row.tenant_id),
-        workspaceId: String(row.workspace_id),
-        loginKey: String(row.login_key),
-        groupKey: String(row.group_key),
-        bookletKey:
-          row.booklet_key === null || row.booklet_key === undefined
-            ? null
-            : String(row.booklet_key),
-        ...(parsedBookletKeys.length > 1
-          ? { bookletKeys: parsedBookletKeys }
-          : {}),
-        ...(Object.keys(bookletStatePresets).length > 0
-          ? { bookletStatePresets }
-          : {}),
-        displayName:
-          row.display_name === null || row.display_name === undefined
-            ? null
-            : String(row.display_name),
-        passwordRequired:
-          row.password_hash !== null && row.password_hash !== undefined,
-        importedAt: String(row.imported_at)
-      };
+          participantRosterEntryId: String(row.participant_roster_entry_id),
+          tenantId: String(row.tenant_id),
+          workspaceId: String(row.workspace_id),
+          loginKey: String(row.login_key),
+          groupKey: String(row.group_key),
+          bookletKey:
+            row.booklet_key === null || row.booklet_key === undefined
+              ? null
+              : String(row.booklet_key),
+          ...(parsedBookletKeys.length > 1
+            ? { bookletKeys: parsedBookletKeys }
+            : {}),
+          ...(Object.keys(bookletStatePresets).length > 0
+            ? { bookletStatePresets }
+            : {}),
+          ...(bookletAssignments.length > 0 ? { bookletAssignments } : {}),
+          displayName:
+            row.display_name === null || row.display_name === undefined
+              ? null
+              : String(row.display_name),
+          passwordRequired:
+            row.password_hash !== null && row.password_hash !== undefined,
+          importedAt: String(row.imported_at)
+        };
       })()
     : null;
 
@@ -256,6 +269,11 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
         workspaceId: String(row.workspace_id),
         contentReleaseId: String(row.content_release_id),
         bookletKey: String(row.booklet_key),
+        bookletAssignmentKey:
+          row.booklet_assignment_key === null ||
+          row.booklet_assignment_key === undefined
+            ? String(row.booklet_key)
+            : String(row.booklet_assignment_key),
         status: row.status as TestRun["status"],
         currentUnitKey:
           row.current_unit_key === null || row.current_unit_key === undefined
@@ -373,7 +391,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 14;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 15;
 
 const migrations: PostgresMigration[] = [
   {
@@ -671,6 +689,16 @@ const migrations: PostgresMigration[] = [
         ADD COLUMN IF NOT EXISTS booklet_state_presets_json TEXT;
       ALTER TABLE test_runs
         ADD COLUMN IF NOT EXISTS preset_booklet_states_json TEXT NOT NULL DEFAULT '{}';
+    `
+  },
+  {
+    version: 15,
+    name: "add_participant_booklet_assignment_variants",
+    sql: `
+      ALTER TABLE participant_roster_entries
+        ADD COLUMN IF NOT EXISTS booklet_assignments_json TEXT;
+      ALTER TABLE test_runs
+        ADD COLUMN IF NOT EXISTS booklet_assignment_key TEXT;
     `
   }
 ];
@@ -1250,7 +1278,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listParticipantRosterEntriesByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, display_name, password_hash, imported_at
+        `SELECT participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
          FROM participant_roster_entries
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1269,14 +1297,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveParticipantRosterEntry(participantRosterEntry, passwordHash) {
       await pool.query(
         `INSERT INTO participant_roster_entries (
-          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, display_name, password_hash, imported_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          participant_roster_entry_id, tenant_id, workspace_id, login_key, group_key, booklet_key, booklet_keys_json, booklet_state_presets_json, booklet_assignments_json, display_name, password_hash, imported_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
           participant_roster_entry_id = EXCLUDED.participant_roster_entry_id,
           group_key = EXCLUDED.group_key,
           booklet_key = EXCLUDED.booklet_key,
           booklet_keys_json = EXCLUDED.booklet_keys_json,
           booklet_state_presets_json = EXCLUDED.booklet_state_presets_json,
+          booklet_assignments_json = EXCLUDED.booklet_assignments_json,
           display_name = EXCLUDED.display_name,
           password_hash = EXCLUDED.password_hash,
           imported_at = EXCLUDED.imported_at`,
@@ -1293,6 +1322,9 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.bookletStatePresets
             ? JSON.stringify(participantRosterEntry.bookletStatePresets)
             : null,
+          participantRosterEntry.bookletAssignments?.length
+            ? JSON.stringify(participantRosterEntry.bookletAssignments)
+            : null,
           participantRosterEntry.displayName,
           passwordHash,
           participantRosterEntry.importedAt
@@ -1301,7 +1333,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, booklet_assignment_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE test_run_id = $1`,
         [testRunId],
@@ -1310,7 +1342,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, booklet_assignment_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -1319,7 +1351,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, booklet_assignment_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1 AND status != 'completed'
          ORDER BY updated_at ASC
@@ -1330,7 +1362,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, booklet_assignment_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1340,14 +1372,15 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveTestRun(testRun) {
       await pool.query(
         `INSERT INTO test_runs (
-          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, booklet_assignment_key, preset_booklet_states_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         ON CONFLICT(test_run_id) DO UPDATE SET
           participant_session_id = EXCLUDED.participant_session_id,
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
           content_release_id = EXCLUDED.content_release_id,
           booklet_key = EXCLUDED.booklet_key,
+          booklet_assignment_key = EXCLUDED.booklet_assignment_key,
           preset_booklet_states_json = EXCLUDED.preset_booklet_states_json,
           status = EXCLUDED.status,
           current_unit_key = EXCLUDED.current_unit_key,
@@ -1367,6 +1400,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           testRun.workspaceId,
           testRun.contentReleaseId,
           testRun.bookletKey,
+          testRun.bookletAssignmentKey ?? testRun.bookletKey,
           JSON.stringify(testRun.presetBookletStates ?? {}),
           testRun.status,
           testRun.currentUnitKey,
