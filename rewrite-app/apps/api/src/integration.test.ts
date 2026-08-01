@@ -6112,6 +6112,223 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.equal(operationalOnlyRoster.body.error, "participant_roster_empty");
 });
 
+test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
+  type AdaptiveDependencyPackage = {
+    bookletFixture: string;
+    unitFixture: string;
+    codingSchemeFixture: string;
+    playerFixture: string;
+    bookletKey: string;
+    decisionUnitKey: string;
+    playerKey: string;
+    rawResponses: Array<{ id: string; status: string; value: unknown }>;
+    expectedStates: Record<string, string>;
+    expectedVisibleUnitKeys: string[];
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    adaptiveDependencyPackages: AdaptiveDependencyPackage[];
+  };
+  const expectation = corpus.adaptiveDependencyPackages[0];
+  assert.ok(expectation);
+  const bookletDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.bookletFixture),
+    "utf8"
+  );
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
+    "utf8"
+  );
+  const codingSchemeDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.codingSchemeFixture),
+    "utf8"
+  );
+  const playerDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.playerFixture),
+    "utf8"
+  );
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${expectation.bookletKey}" href="booklets/Booklet2.xml" />
+            <resource identifier="UNIT.SAMPLE-2" href="units/Unit2.xml" />
+            <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
+            <resource identifier="${expectation.playerKey}" href="players/verona-player-simple-6.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet2.xml",
+      content: bookletDocument
+    },
+    {
+      fileName: "export/units/Unit2.xml",
+      content: unitDocument
+    },
+    {
+      fileName: "export/schemes/coding-scheme.vocs.json",
+      content: codingSchemeDocument
+    },
+    {
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: playerDocument
+    }
+  ]);
+
+  const tenantKey = "integration-tenant-original-adaptive-package";
+  const workspaceKey = "integration-workspace-original-adaptive-package";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-adaptive-dependencies.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const runtimeSnapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = runtimeSnapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === expectation.bookletKey
+  );
+  assert.ok(booklet);
+  assert.equal(booklet.unitEntries.length, 5);
+  assert.ok(
+    booklet.unitEntries.every(
+      unit =>
+        unit.playerKey === expectation.playerKey &&
+        unit.unitDefinition?.includes("<input id=\"var1\"") &&
+        unit.codingScheme?.version === "3.0" &&
+        unit.codingScheme.variableCodings.length === 7
+    )
+  );
+  assert.deepEqual(runtimeSnapshot.playerEntries, [
+    { playerKey: expectation.playerKey, html: playerDocument }
+  ]);
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "original-adaptive-participant"
+    }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.bookletKey }
+  });
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    level: "beginner",
+    bonus: "no"
+  });
+  const rawPlayerResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: {
+        responses: JSON.stringify(expectation.rawResponses)
+      }
+    }
+  });
+  const saveResult = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: expectation.decisionUnitKey,
+      status: "running",
+      unitResponse: rawPlayerResponse
+    }
+  });
+  assert.equal(saveResult.status, 200);
+  assert.deepEqual(
+    saveResult.body.testRun.bookletStates,
+    expectation.expectedStates
+  );
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    expectation.expectedVisibleUnitKeys
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      currentState.body.currentRunState.adaptiveStates.map(state => [
+        state.stateKey,
+        state.optionKey
+      ])
+    ),
+    expectation.expectedStates
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "professional-unit"
+  );
+});
+
 test("source document import accepts testcenter-style XML aliases", async () => {
   const tenantKey = "integration-tenant-xml-aliases";
   const workspaceKey = "integration-workspace-xml-aliases";

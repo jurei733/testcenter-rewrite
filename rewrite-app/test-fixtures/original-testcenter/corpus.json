@@ -53,6 +53,32 @@
       }
     }
   ],
+  "adaptiveDependencyPackages": [
+    {
+      "bookletFixture": "booklets/Booklet2.xml",
+      "unitFixture": "units/Unit2.xml",
+      "codingSchemeFixture": "schemes/coding-scheme.vocs.json",
+      "playerFixture": "players/verona-player-simple-6.0.html",
+      "sourcePaths": {
+        "booklet": "sampledata/Booklet2.xml",
+        "unit": "sampledata/Unit2.xml",
+        "codingScheme": "sampledata/coding-scheme.vocs.json",
+        "player": "sampledata/verona-player-simple-6.0.html"
+      },
+      "bookletKey": "BOOKLET.SAMPLE-2",
+      "decisionUnitKey": "decision-unit",
+      "playerKey": "verona-player-simple@6.0",
+      "rawResponses": [
+        { "id": "var1", "status": "VALUE_CHANGED", "value": "a" },
+        { "id": "var2", "status": "VALUE_CHANGED", "value": "a" }
+      ],
+      "expectedStates": {
+        "level": "professional",
+        "bonus": "no"
+      },
+      "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
+    }
+  ],
   "roster": {
     "fixture": "rosters/Testtakers.xml",
     "sourcePath": "sampledata/Testtakers.xml",
