@@ -1185,6 +1185,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         ]
       );
     },
+    async deleteWorkspaceActivityEventsByIds(activityEventIds) {
+      if (activityEventIds.length === 0) {
+        return 0;
+      }
+      const result = await pool.query(
+        "DELETE FROM workspace_activity_events WHERE activity_event_id = ANY($1::text[])",
+        [activityEventIds]
+      );
+      return result.rowCount ?? 0;
+    },
     async getSourcePackageById(sourcePackageId) {
       return one(
         `SELECT source_package_id, tenant_id, workspace_id, file_name, media_type, content_structure_json, source_document_text, status, uploaded_at

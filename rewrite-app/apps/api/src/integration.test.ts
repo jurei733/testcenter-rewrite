@@ -1553,6 +1553,31 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(rejectedSystemCheckReports.status, 401);
     assert.equal(rejectedSystemCheckReports.body.error, "admin_session_missing");
 
+    const rejectedSystemCheckReportStatistics = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-check-reports/statistics"
+    );
+    assert.equal(rejectedSystemCheckReportStatistics.status, 401);
+    assert.equal(
+      rejectedSystemCheckReportStatistics.body.error,
+      "admin_session_missing"
+    );
+
+    const rejectedSystemCheckReportDeletion = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-check-reports",
+      { method: "DELETE", body: { checkIds: ["sample"], confirmation: "no" } }
+    );
+    assert.equal(rejectedSystemCheckReportDeletion.status, 401);
+    assert.equal(
+      rejectedSystemCheckReportDeletion.body.error,
+      "admin_session_missing"
+    );
+
     const rejectedSystemCheckReportsCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/system-check-reports.csv"
@@ -15333,6 +15358,46 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(saved.body.report.title, "SAMPLE SYS-CHECK REPORT");
   assert.equal(saved.body.report.environment.length, 1);
 
+  const secondSaved = await requestJson<{
+    report: { systemCheckReportId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
+    {
+      method: "POST",
+      body: {
+        ...reportBody,
+        title: "SECOND SYS-CHECK REPORT",
+        keyPhrase: "SAVEME",
+        environment: [
+          {
+            id: "os",
+            type: "environment",
+            label: "Betriebssystem",
+            value: "Linux",
+            warning: false
+          },
+          {
+            id: "browser",
+            type: "environment",
+            label: "Browser",
+            value: "Firefox",
+            warning: false
+          }
+        ],
+        network: [
+          {
+            id: "nw-overall",
+            type: "network",
+            label: "Gesamtbewertung",
+            value: "insufficient",
+            warning: true
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(secondSaved.status, 201);
+
   const reports = await requestJson<{
     items: Array<{ systemCheckReportId: string; checkId: string }>;
   }>(
@@ -15342,8 +15407,36 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(reports.body.items.length, 1);
   assert.equal(
     reports.body.items[0]?.systemCheckReportId,
-    saved.body.report.systemCheckReportId
+    secondSaved.body.report.systemCheckReportId
   );
+
+  const statistics = await requestJson<{
+    items: Array<{
+      checkId: string;
+      reportCount: number;
+      operatingSystems: Array<{ value: string; count: number }>;
+      browsers: Array<{ value: string; count: number }>;
+      overallRatings: Array<{ value: string; count: number }>;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports/statistics`
+  );
+  assert.equal(statistics.status, 200);
+  assert.equal(statistics.body.items.length, 1);
+  assert.equal(statistics.body.items[0]?.checkId, "SYSCHECK.SAMPLE");
+  assert.equal(statistics.body.items[0]?.reportCount, 2);
+  assert.deepEqual(statistics.body.items[0]?.browsers, [
+    { value: "Chrome", count: 1 },
+    { value: "Firefox", count: 1 }
+  ]);
+  assert.deepEqual(statistics.body.items[0]?.operatingSystems, [
+    { value: "Linux", count: 1 },
+    { value: "unknown", count: 1 }
+  ]);
+  assert.deepEqual(statistics.body.items[0]?.overallRatings, [
+    { value: "good", count: 1 },
+    { value: "insufficient", count: 1 }
+  ]);
 
   const csv = await requestText(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.csv?checkId=SYSCHECK.SAMPLE`
@@ -15352,7 +15445,53 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(csv.contentType, "text/csv; charset=utf-8");
   assert.match(
     csv.body,
-    /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"Datum";"Report-Id";"SourcePackage-Id";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"\n/
+    /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"Datum";"Report-Id";"SourcePackage-Id";"Betriebssystem";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"\n/
   );
   assert.match(csv.body, /"SAMPLE SYS-CHECK REPORT";"SYSCHECK\.SAMPLE"/);
+
+  const rejectedDeletion = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,
+    {
+      method: "DELETE",
+      body: { checkIds: ["SYSCHECK.SAMPLE"], confirmation: "wrong" }
+    }
+  );
+  assert.equal(rejectedDeletion.status, 400);
+  assert.equal(
+    rejectedDeletion.body.error,
+    "system_check_report_delete_confirmation_mismatch"
+  );
+
+  const deleted = await requestJson<{
+    deletion: { deletedCount: number; deletedReportIds: string[] };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,
+    {
+      method: "DELETE",
+      body: {
+        checkIds: ["SYSCHECK.SAMPLE"],
+        confirmation: workspaceKey
+      }
+    }
+  );
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.deletion.deletedCount, 2);
+  assert.deepEqual(
+    deleted.body.deletion.deletedReportIds.sort(),
+    [saved.body.report.systemCheckReportId, secondSaved.body.report.systemCheckReportId].sort()
+  );
+
+  const reportsAfterDeletion = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`
+  );
+  assert.equal(reportsAfterDeletion.status, 200);
+  assert.deepEqual(reportsAfterDeletion.body.items, []);
+
+  const deletionAudit = await requestJson<{
+    items: Array<{ activityEvent: { details: { deletedCount: number } } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=system_check_reports_deleted`
+  );
+  assert.equal(deletionAudit.status, 200);
+  assert.equal(deletionAudit.body.items[0]?.activityEvent.details.deletedCount, 2);
 });

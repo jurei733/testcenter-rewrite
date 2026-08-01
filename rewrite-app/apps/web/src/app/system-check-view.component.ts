@@ -8,8 +8,10 @@ import {
   productionApiRoutes,
   resolveRoutePath,
   type GetSystemCheckResponse,
+  type GetSystemCheckReportStatisticsResponse,
   type ListSystemCheckReportsResponse,
   type ListSystemChecksResponse,
+  type DeleteSystemCheckReportsResponse,
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type SystemCheckSpeedTestUploadResponse
@@ -17,6 +19,7 @@ import {
 import type {
   SystemCheckReport,
   SystemCheckReportEntry,
+  SystemCheckReportStatistics,
   SystemCheckSpeedParameters,
   WorkspaceSystemCheck
 } from "@testcenter-rewrite-app/domain";
@@ -219,14 +222,49 @@ type ThroughputResult = {
           </section>
           <section class="system-check-operator">
             <h3>Operator report access</h3>
-            <p>Signed-in workspace operators can inspect recent reports or export the original-style CSV.</p>
+            <p>Signed-in workspace operators can inspect report distributions, drill into recent reports, export CSV, or delete reports for selected checks.</p>
             <div class="actions">
               <button id="loadSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="loadOperatorReports()">Load Reports</button>
               <button id="exportSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReports()">Export CSV</button>
+              <button id="deleteSystemCheckReportsButton" class="danger" type="button" [disabled]="!hasAdminSession || busy || selectedOperatorCheckIds.length === 0" (click)="deleteOperatorReports()">Delete selected</button>
             </div>
-            <ol *ngIf="operatorReports.length > 0">
-              <li *ngFor="let report of operatorReports"><strong>{{ report.title }}</strong><span>{{ report.createdAt }}</span></li>
+            <p id="systemCheckReportOperatorStatus" *ngIf="operatorStatusMessage">{{ operatorStatusMessage }}</p>
+            <div class="system-check-statistics" *ngIf="operatorStatistics.length > 0">
+              <article *ngFor="let statistics of operatorStatistics">
+                <label class="choice-row">
+                  <input
+                    type="checkbox"
+                    [attr.aria-label]="'Select reports for ' + statistics.checkId"
+                    [checked]="isOperatorCheckSelected(statistics.checkId)"
+                    (change)="toggleOperatorCheckSelection(statistics.checkId)"
+                  />
+                  <strong>{{ statistics.checkLabel }} ({{ statistics.checkId }})</strong>
+                </label>
+                <span class="report-count">{{ statistics.reportCount }} report(s) · latest {{ statistics.latestReportAt }}</span>
+                <dl>
+                  <div><dt>Operating systems</dt><dd>{{ formatBreakdown(statistics.operatingSystems) }}</dd></div>
+                  <div><dt>Browsers</dt><dd>{{ formatBreakdown(statistics.browsers) }}</dd></div>
+                  <div><dt>Overall ratings</dt><dd>{{ formatBreakdown(statistics.overallRatings) }}</dd></div>
+                </dl>
+              </article>
+            </div>
+            <ol class="system-check-report-list" *ngIf="operatorReports.length > 0">
+              <li *ngFor="let report of operatorReports">
+                <button type="button" class="ghost" (click)="selectedOperatorReport = report">
+                  <strong>{{ report.title }}</strong><span>{{ report.createdAt }}</span>
+                </button>
+              </li>
             </ol>
+            <section class="system-check-report-detail" *ngIf="selectedOperatorReport as report">
+              <h4>{{ report.title }}</h4>
+              <p>{{ report.checkLabel }} · {{ report.systemCheckReportId }}</p>
+              <dl>
+                <div *ngFor="let entry of report.environment"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.network"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.questionnaire"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+                <div *ngFor="let entry of report.unit"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
+              </dl>
+            </section>
             <small *ngIf="!hasAdminSession">Sign in under Diagnostics first.</small>
           </section>
         </article>
@@ -272,6 +310,13 @@ type ThroughputResult = {
     .system-check-operator ol { display: grid; gap: 8px; padding-left: 24px; }
     .system-check-operator li { padding: 8px; }
     .system-check-operator li span { display: block; color: var(--muted); font-size: 12px; }
+    .system-check-statistics { display: grid; gap: 12px; margin-top: 16px; }
+    .system-check-statistics article, .system-check-report-detail { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: white; }
+    .system-check-statistics dl, .system-check-report-detail dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 0; }
+    .system-check-statistics dl div, .system-check-report-detail dl div { min-width: 0; }
+    .report-count { display: block; margin: 8px 0; color: var(--muted); font-size: 12px; }
+    .system-check-report-list button { width: 100%; text-align: left; }
+    .system-check-report-detail { margin-top: 16px; }
     .system-check-navigation { justify-content: space-between; }
     @media (max-width: 680px) { .system-check-hero { display: grid; } .system-check-facts, .system-check-results { grid-template-columns: 1fr; } }
   `]
@@ -301,6 +346,10 @@ export class SystemCheckViewComponent implements OnInit {
   reportKey = "";
   savedReport: SystemCheckReport | null = null;
   operatorReports: SystemCheckReport[] = [];
+  operatorStatistics: SystemCheckReportStatistics[] = [];
+  selectedOperatorCheckIds: string[] = [];
+  selectedOperatorReport: SystemCheckReport | null = null;
+  operatorStatusMessage = "";
   busy = false;
   errorMessage = "";
   questionnaireIssue = "";
@@ -689,16 +738,73 @@ export class SystemCheckViewComponent implements OnInit {
     const check = this.systemCheck;
     if (!check || !this.hasAdminSession) return;
     await this.run(async () => {
-      const path = `${this.workspaceRoute(
+      const reportsPath = `${this.workspaceRoute(
         productionApiRoutes.workspace.listSystemCheckReports
       )}?checkId=${encodeURIComponent(check.checkId)}&limit=25`;
-      const { payload } = await this.api.send<ListSystemCheckReportsResponse>(
-        "GET",
-        path,
-        undefined,
+      const statisticsPath = this.workspaceRoute(
+        productionApiRoutes.workspace.getSystemCheckReportStatistics
+      );
+      const [reports, statistics] = await Promise.all([
+        this.api.send<ListSystemCheckReportsResponse>(
+          "GET",
+          reportsPath,
+          undefined,
+          this.adminHeaders
+        ),
+        this.api.send<GetSystemCheckReportStatisticsResponse>(
+          "GET",
+          statisticsPath,
+          undefined,
+          this.adminHeaders
+        )
+      ]);
+      this.operatorReports = reports.payload.items;
+      this.operatorStatistics = statistics.payload.items;
+      this.selectedOperatorReport = this.operatorReports[0] ?? null;
+      this.selectedOperatorCheckIds = this.selectedOperatorCheckIds.filter(checkId =>
+        this.operatorStatistics.some(item => item.checkId === checkId)
+      );
+      this.operatorStatusMessage = `${this.operatorReports.length} recent report(s), ${this.operatorStatistics.length} check(s).`;
+    });
+  }
+
+  isOperatorCheckSelected(checkId: string): boolean {
+    return this.selectedOperatorCheckIds.includes(checkId);
+  }
+
+  toggleOperatorCheckSelection(checkId: string): void {
+    this.selectedOperatorCheckIds = this.isOperatorCheckSelected(checkId)
+      ? this.selectedOperatorCheckIds.filter(candidate => candidate !== checkId)
+      : [...this.selectedOperatorCheckIds, checkId];
+  }
+
+  formatBreakdown(items: Array<{ value: string; count: number }>): string {
+    return items.map(item => `${item.value}: ${item.count}`).join(", ");
+  }
+
+  async deleteOperatorReports(): Promise<void> {
+    if (!this.hasAdminSession || this.selectedOperatorCheckIds.length === 0) return;
+    const confirmation = globalThis.window?.prompt(
+      `Delete all reports for ${this.selectedOperatorCheckIds.join(", ")}? Enter workspace key '${this.workspaceKey}' to confirm.`
+    );
+    if (confirmation == null) return;
+    await this.run(async () => {
+      const { payload } = await this.api.send<DeleteSystemCheckReportsResponse>(
+        "DELETE",
+        this.workspaceRoute(productionApiRoutes.workspace.deleteSystemCheckReports),
+        { checkIds: this.selectedOperatorCheckIds, confirmation },
         this.adminHeaders
       );
-      this.operatorReports = payload.items;
+      const deletedCount = payload.deletion.deletedCount;
+      this.selectedOperatorCheckIds = [];
+      this.operatorReports = this.operatorReports.filter(
+        report => !payload.deletion.deletedReportIds.includes(report.systemCheckReportId)
+      );
+      this.operatorStatistics = this.operatorStatistics.filter(
+        item => !payload.deletion.checkIds.includes(item.checkId)
+      );
+      this.selectedOperatorReport = this.operatorReports[0] ?? null;
+      this.operatorStatusMessage = `${deletedCount} report(s) deleted.`;
     });
   }
 

@@ -61,7 +61,9 @@ import type {
   SourcePackageSystemCheckEntry,
   SourcePackageTestletEntry,
   SystemCheckReport,
+  SystemCheckReportDeletion,
   SystemCheckReportEntry,
+  SystemCheckReportStatistics,
   Tenant,
   TestRun,
   TestRunStatus,
@@ -402,6 +404,11 @@ export type WorkspaceAdminReadPort = {
     checkId?: string;
     limit?: number;
   }): Promise<string>;
+  getSystemCheckReportStatistics(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+  }): Promise<SystemCheckReportStatistics[]>;
 };
 
 export type SystemCheckPort = {
@@ -434,6 +441,12 @@ export type WorkspaceResultsPort = {
     workspaceKey: string;
     groupKey: string;
   }): Promise<WorkspaceGroupResultDeletion>;
+  deleteSystemCheckReports(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkIds: string[];
+    confirmation: string;
+  }): Promise<SystemCheckReportDeletion>;
 };
 
 export type WorkspaceReviewPort = {
@@ -862,6 +875,7 @@ export type FirstSliceRepository = {
   saveWorkspaceActivityEvent(
     activityEvent: WorkspaceActivityEvent
   ): Promise<void>;
+  deleteWorkspaceActivityEventsByIds(activityEventIds: string[]): Promise<number>;
   getSourcePackageById(sourcePackageId: string): Promise<SourcePackage | null>;
   listSourcePackagesByWorkspace(
     tenantId: string,
@@ -11423,12 +11437,12 @@ export const createFirstSliceServices = (
     return systemCheck;
   };
 
-  const readSystemCheckReports = async (input: {
+  const readSystemCheckReportRecords = async (input: {
     tenantKey: string;
     workspaceKey: string;
     checkId?: string;
     limit?: number;
-  }): Promise<SystemCheckReport[]> => {
+  }): Promise<Array<{ activityEventId: string; report: SystemCheckReport }>> => {
     const workspace = await requireWorkspace(
       repository,
       input.tenantKey,
@@ -11440,20 +11454,95 @@ export const createFirstSliceServices = (
       workspace.tenantId,
       workspace.workspaceId
     );
-    return events
+    const records = events
       .filter(event => event.eventType === "system_check_report_saved")
       .flatMap(event => {
         const report = event.details.report;
         return report && typeof report === "object" && !Array.isArray(report)
-          ? [report as SystemCheckReport]
+          ? [{ activityEventId: event.activityEventId, report: report as SystemCheckReport }]
           : [];
       })
       .filter(
-        report =>
-          !normalizedCheckId || report.checkId.toUpperCase() === normalizedCheckId
+        record =>
+          !normalizedCheckId ||
+          record.report.checkId.toUpperCase() === normalizedCheckId
       )
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .slice(0, limit);
+      .sort((left, right) =>
+        right.report.createdAt.localeCompare(left.report.createdAt)
+      );
+    return input.limit == null ? records : records.slice(0, limit);
+  };
+
+  const readSystemCheckReports = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<SystemCheckReport[]> => {
+    const records = await readSystemCheckReportRecords({
+      ...input,
+      limit: input.limit ?? 100
+    });
+    return records.map(record => record.report);
+  };
+
+  const buildSystemCheckReportStatistics = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+  }): Promise<SystemCheckReportStatistics[]> => {
+    const reports = (await readSystemCheckReportRecords(input)).map(
+      record => record.report
+    );
+    const breakdown = (values: string[]): Array<{ value: string; count: number }> => {
+      const counts = new Map<string, number>();
+      for (const rawValue of values) {
+        const value = rawValue.trim() || "unknown";
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      return Array.from(counts, ([value, count]) => ({ value, count })).sort(
+        (left, right) => right.count - left.count || left.value.localeCompare(right.value)
+      );
+    };
+    const entryValue = (
+      report: SystemCheckReport,
+      section: "environment" | "network",
+      ids: string[],
+      labels: string[]
+    ): string => {
+      const entry = report[section].find(
+        candidate =>
+          ids.includes(candidate.id.toLowerCase()) ||
+          labels.includes(candidate.label.toLowerCase())
+      );
+      return String(entry?.value ?? "unknown");
+    };
+    const byCheckId = new Map<string, SystemCheckReport[]>();
+    for (const report of reports) {
+      const key = report.checkId.toUpperCase();
+      byCheckId.set(key, [...(byCheckId.get(key) ?? []), report]);
+    }
+    return Array.from(byCheckId.values())
+      .map(group => ({
+        checkId: group[0].checkId,
+        checkLabel: group[0].checkLabel,
+        reportCount: group.length,
+        latestReportAt: group[0].createdAt,
+        operatingSystems: breakdown(
+          group.map(report =>
+            entryValue(report, "environment", ["os"], ["betriebssystem", "betriebsystem"])
+          )
+        ),
+        browsers: breakdown(
+          group.map(report => entryValue(report, "environment", ["browser"], ["browser"]))
+        ),
+        overallRatings: breakdown(
+          group.map(report =>
+            entryValue(report, "network", ["nw-overall"], ["gesamtbewertung"])
+          )
+        )
+      }))
+      .sort((left, right) => left.checkId.localeCompare(right.checkId));
   };
 
   const exportSystemCheckReportsCsv = async (input: {
@@ -13725,6 +13814,9 @@ export const createFirstSliceServices = (
       },
       async exportSystemCheckReportsCsv(input) {
         return exportSystemCheckReportsCsv(input);
+      },
+      async getSystemCheckReportStatistics(input) {
+        return buildSystemCheckReportStatistics(input);
       }
     },
     workspaceResults: {
@@ -13793,6 +13885,57 @@ export const createFirstSliceServices = (
           affectedParticipantSessionIds,
           deletedTestRunIds
         };
+      },
+      async deleteSystemCheckReports(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        if (input.confirmation !== input.workspaceKey) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_delete_confirmation_mismatch",
+            "The workspace key confirmation does not match."
+          );
+        }
+        if (!Array.isArray(input.checkIds) || input.checkIds.length === 0) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_check_ids_required",
+            "At least one system-check ID is required."
+          );
+        }
+        const checkIds = Array.from(
+          new Set(input.checkIds.map(checkId => String(checkId).trim()).filter(Boolean))
+        );
+        if (checkIds.length === 0 || checkIds.length > 100) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_check_ids_invalid",
+            "Between 1 and 100 distinct system-check IDs are required."
+          );
+        }
+        const normalizedCheckIds = new Set(checkIds.map(checkId => checkId.toUpperCase()));
+        const records = (await readSystemCheckReportRecords({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey
+        })).filter(record => normalizedCheckIds.has(record.report.checkId.toUpperCase()));
+        const deletedReportIds = records.map(record => record.report.systemCheckReportId);
+        const deletedCount = await repository.deleteWorkspaceActivityEventsByIds(
+          records.map(record => record.activityEventId)
+        );
+        const deletedAt = now();
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "system_check_reports_deleted",
+          subjectType: "workspace",
+          subjectId: workspace.workspaceId,
+          summary: `Deleted ${deletedCount} system-check report(s) for ${checkIds.join(", ")}.`,
+          details: { checkIds, deletedReportIds, deletedCount }
+        });
+        return { checkIds, deletedReportIds, deletedCount, deletedAt };
       }
     },
     workspaceReview: {

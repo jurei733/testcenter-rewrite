@@ -1119,6 +1119,25 @@ try {
       systemCheckReportDownload.suggestedFilename(),
       `${systemCheckWorkspaceKey}-system-check-reports.csv`
     );
+    await page
+      .locator(".system-check-statistics")
+      .filter({ hasText: "Chrome" })
+      .filter({ hasText: "good" })
+      .waitFor();
+    await page
+      .getByLabel("Select reports for SYSCHECK.SAMPLE", { exact: true })
+      .check();
+    page.once("dialog", async dialog => {
+      assert.equal(dialog.type(), "prompt");
+      assert.match(dialog.message(), /Delete all reports for SYSCHECK\.SAMPLE/);
+      await dialog.accept(systemCheckWorkspaceKey);
+    });
+    await expectButtonSelectorEnabled("#deleteSystemCheckReportsButton");
+    await page.locator("#deleteSystemCheckReportsButton").click();
+    await page
+      .locator("#systemCheckReportOperatorStatus")
+      .filter({ hasText: "1 report(s) deleted." })
+      .waitFor({ timeout: 15_000 });
     stopAfter("system-check-report");
 
     await page.evaluate(

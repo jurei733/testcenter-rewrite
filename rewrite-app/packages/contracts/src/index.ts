@@ -25,7 +25,9 @@ import type {
   SourcePackageStatus,
   SourcePackageContentStructure,
   SystemCheckReport,
+  SystemCheckReportDeletion,
   SystemCheckReportEntry,
+  SystemCheckReportStatistics,
   Tenant,
   TestRun,
   Workspace,
@@ -1535,6 +1537,10 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-checks/:checkId/reports",
     listSystemCheckReports:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports",
+    getSystemCheckReportStatistics:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports/statistics",
+    deleteSystemCheckReports:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports",
     exportSystemCheckReportsCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.csv",
     getContentRelease:
@@ -1707,6 +1713,11 @@ export type SaveSystemCheckReportRequest = {
   network: SystemCheckReportEntry[];
   questionnaire: SystemCheckReportEntry[];
   unit: SystemCheckReportEntry[];
+};
+
+export type DeleteSystemCheckReportsRequest = {
+  checkIds: string[];
+  confirmation: string;
 };
 
 export type AdminUserListQuery = {
@@ -2066,6 +2077,14 @@ export type SaveSystemCheckReportResponse = {
 
 export type ListSystemCheckReportsResponse = {
   items: SystemCheckReport[];
+};
+
+export type GetSystemCheckReportStatisticsResponse = {
+  items: SystemCheckReportStatistics[];
+};
+
+export type DeleteSystemCheckReportsResponse = {
+  deletion: SystemCheckReportDeletion;
 };
 
 export type ParticipantSignInResponse = {

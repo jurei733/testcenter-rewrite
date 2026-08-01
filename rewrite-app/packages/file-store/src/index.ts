@@ -292,6 +292,18 @@ export const createFileFirstSliceRepository = (
         state.workspaceActivityEvents[activityEvent.activityEventId] = activityEvent;
       });
     },
+    async deleteWorkspaceActivityEventsByIds(activityEventIds) {
+      let deletedCount = 0;
+      await mutate(state => {
+        for (const activityEventId of activityEventIds) {
+          if (state.workspaceActivityEvents[activityEventId]) {
+            delete state.workspaceActivityEvents[activityEventId];
+            deletedCount += 1;
+          }
+        }
+      });
+      return deletedCount;
+    },
     async getSourcePackageById(sourcePackageId) {
       const state = await getState();
       return state.sourcePackages[sourcePackageId] ?? null;

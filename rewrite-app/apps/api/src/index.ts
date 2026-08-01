@@ -42,6 +42,8 @@ import {
   type DeleteReviewResponse,
   type DeleteSourcePackageRequest,
   type DeleteSourcePackageResponse,
+  type DeleteSystemCheckReportsRequest,
+  type DeleteSystemCheckReportsResponse,
   type DetailedResponseListQuery,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
@@ -81,6 +83,7 @@ import {
   type ListSourcePackagesResponse,
   type ListSystemChecksResponse,
   type GetSystemCheckResponse,
+  type GetSystemCheckReportStatisticsResponse,
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type ListSystemCheckReportsResponse,
@@ -1529,6 +1532,9 @@ const systemCheckReportSavePattern = createRoutePattern(
 const systemCheckReportListPattern = createRoutePattern(
   productionApiRoutes.workspace.listSystemCheckReports
 );
+const systemCheckReportStatisticsPattern = createRoutePattern(
+  productionApiRoutes.workspace.getSystemCheckReportStatistics
+);
 const systemCheckReportCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSystemCheckReportsCsv
 );
@@ -1622,6 +1628,8 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", contentReleaseActivationReadinessPattern],
   ["POST", contentReleaseActivatePattern],
   ["GET", systemCheckReportListPattern],
+  ["GET", systemCheckReportStatisticsPattern],
+  ["DELETE", systemCheckReportListPattern],
   ["GET", systemCheckReportCsvExportPattern],
   ["GET", monitorOpenRunsPattern],
   ["POST", monitorRunCommandsPattern],
@@ -2207,6 +2215,16 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       systemCheckReportListPattern,
       productionApiRoutes.workspace.listSystemCheckReports
+    ],
+    [
+      "GET",
+      systemCheckReportStatisticsPattern,
+      productionApiRoutes.workspace.getSystemCheckReportStatistics
+    ],
+    [
+      "DELETE",
+      systemCheckReportListPattern,
+      productionApiRoutes.workspace.deleteSystemCheckReports
     ],
     [
       "GET",
@@ -4902,6 +4920,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         systemCheckReportSavePattern.exec(pathname);
       const systemCheckReportListMatch =
         systemCheckReportListPattern.exec(pathname);
+      const systemCheckReportStatisticsMatch =
+        systemCheckReportStatisticsPattern.exec(pathname);
       const systemCheckReportCsvExportMatch =
         systemCheckReportCsvExportPattern.exec(pathname);
       if (request.method === "GET" && systemCheckListMatch?.groups) {
@@ -5044,6 +5064,58 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             limit
           });
         sendJson<ListSystemCheckReportsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && systemCheckReportStatisticsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          systemCheckReportStatisticsMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          systemCheckReportStatisticsMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const checkId = url.searchParams.get("checkId")?.trim() || undefined;
+        const items =
+          await services.workspaceAdminRead.getSystemCheckReportStatistics({
+            tenantKey,
+            workspaceKey,
+            checkId
+          });
+        sendJson<GetSystemCheckReportStatisticsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "DELETE" && systemCheckReportListMatch?.groups) {
+        const tenantKey = decodeRouteGroup(systemCheckReportListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          systemCheckReportListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const body = await readRequestJsonBody<DeleteSystemCheckReportsRequest>();
+        const deletion = await services.workspaceResults.deleteSystemCheckReports({
+          tenantKey,
+          workspaceKey,
+          checkIds: body.checkIds,
+          confirmation: body.confirmation
+        });
+        sendJson<DeleteSystemCheckReportsResponse>(response, 200, { deletion });
         return;
       }
 

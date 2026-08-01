@@ -99,7 +99,8 @@ export type WorkspaceActivityEventType =
   | "review_created"
   | "review_updated"
   | "review_deleted"
-  | "system_check_report_saved";
+  | "system_check_report_saved"
+  | "system_check_reports_deleted";
 export const workspaceActivityEventTypes = [
   "workspace_created",
   "source_package_created",
@@ -125,7 +126,8 @@ export const workspaceActivityEventTypes = [
   "review_created",
   "review_updated",
   "review_deleted",
-  "system_check_report_saved"
+  "system_check_report_saved",
+  "system_check_reports_deleted"
 ] as const satisfies readonly WorkspaceActivityEventType[];
 export type WorkspaceActivitySubjectType =
   | "workspace"
@@ -482,6 +484,28 @@ export type SystemCheckReport = {
   questionnaire: SystemCheckReportEntry[];
   unit: SystemCheckReportEntry[];
   createdAt: string;
+};
+
+export type SystemCheckReportBreakdown = {
+  value: string;
+  count: number;
+};
+
+export type SystemCheckReportStatistics = {
+  checkId: string;
+  checkLabel: string;
+  reportCount: number;
+  latestReportAt: string;
+  operatingSystems: SystemCheckReportBreakdown[];
+  browsers: SystemCheckReportBreakdown[];
+  overallRatings: SystemCheckReportBreakdown[];
+};
+
+export type SystemCheckReportDeletion = {
+  checkIds: string[];
+  deletedReportIds: string[];
+  deletedCount: number;
+  deletedAt: string;
 };
 
 export type ContentReleasePlayerEntry = {

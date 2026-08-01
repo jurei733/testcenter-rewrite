@@ -155,6 +155,15 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
         activityEvent
       );
     },
+    async deleteWorkspaceActivityEventsByIds(activityEventIds) {
+      let deletedCount = 0;
+      for (const activityEventId of activityEventIds) {
+        if (state.workspaceActivityEvents.delete(activityEventId)) {
+          deletedCount += 1;
+        }
+      }
+      return deletedCount;
+    },
     async getSourcePackageById(sourcePackageId) {
       return state.sourcePackages.get(sourcePackageId) ?? null;
     },

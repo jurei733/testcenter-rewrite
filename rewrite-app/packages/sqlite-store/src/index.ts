@@ -1298,6 +1298,18 @@ export const createSqliteFirstSliceRepository = (
           JSON.stringify(activityEvent.details)
         );
     },
+    async deleteWorkspaceActivityEventsByIds(activityEventIds) {
+      if (activityEventIds.length === 0) {
+        return 0;
+      }
+      const placeholders = activityEventIds.map(() => "?").join(", ");
+      const result = database
+        .prepare(
+          `DELETE FROM workspace_activity_events WHERE activity_event_id IN (${placeholders})`
+        )
+        .run(...activityEventIds);
+      return Number(result.changes);
+    },
     async getSourcePackageById(sourcePackageId) {
       const row = database
         .prepare(
