@@ -513,13 +513,27 @@ try {
   };
   const expectButtonSelectorEnabled = async selector => {
     const button = page.locator(selector);
-    await button.waitFor({ timeout: 15_000 });
-    assert.equal(await button.isEnabled(), true);
+    await button.waitFor({ state: "attached", timeout: 15_000 });
+    await page.waitForFunction(
+      targetSelector => {
+        const element = document.querySelector(targetSelector);
+        return element instanceof HTMLButtonElement && !element.disabled;
+      },
+      selector,
+      { timeout: 15_000 }
+    );
   };
   const expectButtonSelectorDisabled = async selector => {
     const button = page.locator(selector);
-    await button.waitFor({ timeout: 15_000 });
-    assert.equal(await button.isDisabled(), true);
+    await button.waitFor({ state: "attached", timeout: 15_000 });
+    await page.waitForFunction(
+      targetSelector => {
+        const element = document.querySelector(targetSelector);
+        return element instanceof HTMLButtonElement && element.disabled;
+      },
+      selector,
+      { timeout: 15_000 }
+    );
   };
   const acceptNextDialog = expectedMessagePattern =>
     new Promise((resolvePromise, reject) => {
@@ -6195,14 +6209,16 @@ try {
       Array.isArray(payload.items) &&
       payload.items.some(
         item =>
+          item?.sourcePackage?.fileName === "broken.json" &&
           item?.sourcePackage?.mediaType === "application/json" &&
-          item?.sourcePackage?.sourceDocument === failedImportSourceDocument
+          item?.sourcePackage?.sourceDocument == null
       )
   );
   const failedSourcePackageId = failedSourcePackagesPayload.items.find(
     item =>
+      item?.sourcePackage?.fileName === "broken.json" &&
       item?.sourcePackage?.mediaType === "application/json" &&
-      item?.sourcePackage?.sourceDocument === failedImportSourceDocument
+      item?.sourcePackage?.sourceDocument == null
   )?.sourcePackage?.sourcePackageId;
   assert.ok(
     failedSourcePackageId,

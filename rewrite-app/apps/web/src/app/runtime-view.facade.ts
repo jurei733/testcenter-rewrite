@@ -2353,6 +2353,7 @@ export class RuntimeViewFacade {
     const links = this.parseEntryRosterRows();
     this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
     this.persistState();
+    this.renderNow();
   }
 
   importParticipantRoster(): void {
@@ -2425,6 +2426,7 @@ export class RuntimeViewFacade {
     }));
     this.runtime.entryLinksView = JSON.stringify({ links }, null, 2);
     this.persistState();
+    this.renderNow();
   }
 
   downloadEntryLinksCsv(): void {
@@ -2820,6 +2822,7 @@ export class RuntimeViewFacade {
     this.runtime.bookletKey = item.actionPayload?.bookletKey ?? "";
     this.syncParticipantDisplayName(item);
     this.persistState();
+    this.renderNow();
 
     const url = item.actionPayload?.url?.trim();
     if (url) {
@@ -3048,6 +3051,11 @@ export class RuntimeViewFacade {
     if (item.actionPayload?.displayName != null) {
       this.runtime.participantDisplayName = item.actionPayload.displayName;
     }
+  }
+
+  private renderNow(): void {
+    this.uiState.renderVersion.update(version => version + 1);
+    this.applicationRef.tick();
   }
 
   private parseEntryRosterRows(): RuntimeEntryLink[] {
