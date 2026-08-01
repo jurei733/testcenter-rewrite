@@ -1347,6 +1347,10 @@ export type WorkspaceReview = {
   participantSessionId: string;
   testRunId: string;
   unitKey: string | null;
+  /** Original task-page index; null for whole-test/unit reviews or non-numeric player pages. */
+  page: number | null;
+  /** Participant-authored task/page label from the Original Testcenter review dialog. */
+  pageLabel: string | null;
   reviewerId: string;
   /** Space-separated compatibility projection of `categories`. */
   category: string;

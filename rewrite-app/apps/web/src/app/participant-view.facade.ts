@@ -23,6 +23,7 @@ import type {
   UpdateParticipantReviewRequest
 } from "@testcenter-rewrite-app/contracts";
 import {
+  parseVeronaUnitResponse,
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
@@ -199,13 +200,15 @@ export class ParticipantViewFacade {
     "not_saved";
   testletUnlockCode = "";
   participantReviews: WorkspaceReview[] = [];
-  reviewTarget: "unit" | "test" = "unit";
+  reviewTarget: "unit" | "test" | "task" = "unit";
+  reviewPageLabel = "";
   reviewerId = "";
   reviewPriority: 0 | 1 | 2 | 3 = 0;
   reviewCategories: string[] = [];
   reviewComment = "";
   editingReviewId = "";
   editingReviewUnitKey: string | null = null;
+  editingReviewPage: number | null = null;
   reviewFeedback = "";
   adaptiveStateFeedback = "";
   adaptiveStateChangePending = "";
@@ -1061,7 +1064,13 @@ export class ParticipantViewFacade {
   beginReviewEdit(review: WorkspaceReview): void {
     this.editingReviewId = review.reviewId;
     this.editingReviewUnitKey = review.unitKey;
-    this.reviewTarget = review.unitKey ? "unit" : "test";
+    this.editingReviewPage = review.page;
+    this.reviewTarget = review.unitKey
+      ? review.page != null || review.pageLabel
+        ? "task"
+        : "unit"
+      : "test";
+    this.reviewPageLabel = review.pageLabel ?? "";
     this.reviewerId = review.reviewerId;
     this.reviewPriority = review.priority ?? 0;
     this.reviewCategories = [...(review.categories ?? [])];
@@ -1097,7 +1106,46 @@ export class ParticipantViewFacade {
   }
 
   reviewTargetLabel(review: WorkspaceReview): string {
-    return review.unitKey ? `Unit · ${review.unitKey}` : "Whole test";
+    if (!review.unitKey) {
+      return "Whole test";
+    }
+    if (review.page != null || review.pageLabel) {
+      const pageReference = [
+        review.page == null ? "" : `Page ${review.page}`,
+        review.pageLabel ?? ""
+      ].filter(Boolean).join(" · ");
+      return `Task · ${review.unitKey}${pageReference ? ` · ${pageReference}` : ""}`;
+    }
+    return `Unit · ${review.unitKey}`;
+  }
+
+  get currentReviewPage(): number | null {
+    const currentPage = parseVeronaUnitResponse(
+      this.runtime.currentUnitResponse
+    )?.playerState?.currentPage;
+    if (
+      typeof currentPage === "number" &&
+      Number.isInteger(currentPage) &&
+      currentPage >= 0
+    ) {
+      return currentPage;
+    }
+    if (
+      typeof currentPage === "string" &&
+      currentPage.trim() &&
+      Number.isInteger(Number(currentPage)) &&
+      Number(currentPage) >= 0
+    ) {
+      return Number(currentPage);
+    }
+    return null;
+  }
+
+  get currentReviewPageReference(): string {
+    const currentPage = parseVeronaUnitResponse(
+      this.runtime.currentUnitResponse
+    )?.playerState?.currentPage;
+    return currentPage === undefined ? "Player page unavailable" : `Player page ${currentPage}`;
   }
 
   reviewPriorityLabel(priority: number): string {
@@ -1897,7 +1945,9 @@ export class ParticipantViewFacade {
   private resetReviewEditor(): void {
     this.editingReviewId = "";
     this.editingReviewUnitKey = null;
+    this.editingReviewPage = null;
     this.reviewTarget = "unit";
+    this.reviewPageLabel = "";
     this.reviewerId = "";
     this.reviewPriority = 0;
     this.reviewCategories = [];
@@ -1968,9 +2018,17 @@ export class ParticipantViewFacade {
       return;
     }
     const unitKey =
-      this.reviewTarget === "unit"
+      this.reviewTarget !== "test"
         ? this.editingReviewUnitKey ?? currentState.currentUnit.unitKey
         : null;
+    const page =
+      this.reviewTarget === "task"
+        ? this.editingReviewId
+          ? this.editingReviewPage
+          : this.currentReviewPage
+        : null;
+    const pageLabel =
+      this.reviewTarget === "task" ? this.reviewPageLabel.trim() || null : null;
     const reviewId = this.editingReviewId;
     if (reviewId) {
       await this.requestState.request<ParticipantReviewResponse>(
@@ -1982,6 +2040,8 @@ export class ParticipantViewFacade {
         }),
         {
           unitKey,
+          page,
+          pageLabel,
           reviewerId: this.reviewerId.trim() || undefined,
           categories: this.reviewCategories,
           priority: this.reviewPriority,
@@ -1998,6 +2058,8 @@ export class ParticipantViewFacade {
         }),
         {
           unitKey,
+          page,
+          pageLabel,
           reviewerId: this.reviewerId.trim() || undefined,
           categories: this.reviewCategories,
           priority: this.reviewPriority,

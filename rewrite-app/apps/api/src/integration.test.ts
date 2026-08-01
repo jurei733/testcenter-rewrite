@@ -3619,7 +3619,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.match(reviewCsv.body, /^tenantKey,workspaceKey,reviewId,loginKey,/);
     assert.match(
       reviewCsv.body,
-      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","integration-reviewer","0","final-check","final-check","Updated integration review"/
+      /"demo-tenant","demo-workspace".*"student-demo","group:student-demo".*"unit-intro","","","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const filteredReviewCsv = await requestTextAt(
@@ -3635,7 +3635,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(filteredReviewCsv.status, 200);
     assert.match(
       filteredReviewCsv.body,
-      /"unit-intro","integration-reviewer","0","final-check","final-check","Updated integration review"/
+      /"unit-intro","","","integration-reviewer","0","final-check","final-check","Updated integration review"/
     );
 
     const deletedReview = await requestJsonAt<{ deletedReviewId: string }>(
@@ -12713,6 +12713,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       testRunId: string;
       participantSessionId: string;
       unitKey: string | null;
+      page: number | null;
+      pageLabel: string | null;
       reviewerId: string;
       category: string;
       categories: string[];
@@ -12723,6 +12725,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     method: "POST",
     body: {
       unitKey: "UNIT.INTRO",
+      page: 2,
+      pageLabel: "Task 2b",
       reviewerId: "Mode Reviewer",
       categories: ["tech", "content"],
       priority: 1,
@@ -12736,6 +12740,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     review.participantSessionId
   );
   assert.equal(createdParticipantReview.body.review.unitKey, "UNIT.INTRO");
+  assert.equal(createdParticipantReview.body.review.page, 2);
+  assert.equal(createdParticipantReview.body.review.pageLabel, "Task 2b");
   assert.equal(createdParticipantReview.body.review.category, "tech content");
   assert.deepEqual(createdParticipantReview.body.review.categories, [
     "tech",
@@ -12747,6 +12753,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       reviewId: string;
       priority: number;
       categories: string[];
+      page: number | null;
+      pageLabel: string | null;
       comment: string;
     }>;
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
@@ -12755,6 +12763,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       item.reviewId,
       item.priority,
       item.categories,
+      item.page,
+      item.pageLabel,
       item.comment
     ]),
     [
@@ -12762,6 +12772,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
         createdParticipantReview.body.review.reviewId,
         1,
         ["tech", "content"],
+        2,
+        "Task 2b",
         "Participant-authored review"
       ]
     ]
@@ -12769,6 +12781,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   const updatedParticipantReview = await requestJson<{
     review: {
       unitKey: string | null;
+      page: number | null;
+      pageLabel: string | null;
       category: string;
       categories: string[];
       priority: number;
@@ -12788,6 +12802,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   );
   assert.equal(updatedParticipantReview.status, 200);
   assert.equal(updatedParticipantReview.body.review.unitKey, null);
+  assert.equal(updatedParticipantReview.body.review.page, null);
+  assert.equal(updatedParticipantReview.body.review.pageLabel, null);
   assert.equal(updatedParticipantReview.body.review.category, "content design");
   assert.deepEqual(updatedParticipantReview.body.review.categories, [
     "content",
@@ -14021,7 +14037,7 @@ test("participant runtime uses saved roster defaults for group and booklet", asy
   assert.equal(reviewCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     reviewCsv.body,
-    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,reviewerId,priority,categories,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
+    /^tenantKey,workspaceKey,reviewId,loginKey,groupKey,participantSessionId,testRunId,bookletKey,unitKey,page,pageLabel,reviewerId,priority,categories,category,comment,createdAt,updatedAt,participantDisplayName,rosterGroupKey,rosterBookletKey\n/
   );
   assert.match(
     reviewCsv.body,

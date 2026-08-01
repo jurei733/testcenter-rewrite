@@ -2259,6 +2259,10 @@ try {
     .selectOption({ label: "Critical / urgent" });
   await page.locator("#participantRouteReviewCategory-tech").check();
   await page.locator("#participantRouteReviewCategory-content").check();
+  await page.locator("#participantRouteReviewTargetTask").click();
+  await page
+    .locator("#participantRouteReviewPageLabel")
+    .fill("Browser smoke task");
   await page
     .locator("#participantRouteReviewComment")
     .fill("Participant review comment from browser smoke");
@@ -2282,6 +2286,7 @@ try {
         item =>
           item?.comment === "Participant review comment from browser smoke" &&
           item?.priority === 1 &&
+          item?.pageLabel === "Browser smoke task" &&
           Array.isArray(item?.categories) &&
           item.categories.join(" ") === "tech content"
       )
@@ -2312,6 +2317,8 @@ try {
         item =>
           item?.reviewId === participantReviewId &&
           item?.unitKey === null &&
+          item?.page === null &&
+          item?.pageLabel === null &&
           item?.priority === 1 &&
           item?.categories?.join(" ") === "tech content" &&
           item?.comment === "Updated whole-test review comment"

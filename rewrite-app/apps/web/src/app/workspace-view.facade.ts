@@ -1729,7 +1729,11 @@ export class WorkspaceViewFacade {
 
         return {
           headline: `${review.category || "uncategorized"} by ${review.reviewerId}`,
-          subline: review.unitKey ?? "whole run",
+          subline: review.unitKey
+            ? review.page != null || review.pageLabel
+              ? `${review.unitKey} · task ${review.pageLabel ?? review.page ?? ""}`
+              : review.unitKey
+            : "whole run",
           badges: [
             "review",
             `priority ${review.priority}`,
@@ -1738,6 +1742,10 @@ export class WorkspaceViewFacade {
           rows: [
             { label: "Review", value: review.reviewId },
             { label: "Unit", value: review.unitKey ?? "whole run" },
+            {
+              label: "Task / Page",
+              value: review.pageLabel ?? (review.page == null ? "none" : String(review.page))
+            },
             { label: "Priority", value: String(review.priority) },
             {
               label: "Categories",

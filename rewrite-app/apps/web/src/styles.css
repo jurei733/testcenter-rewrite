@@ -1312,6 +1312,11 @@ pre {
   margin: 0;
 }
 
+.participant-review-page-label small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .participant-review-categories {
   display: flex;
   flex-wrap: wrap;

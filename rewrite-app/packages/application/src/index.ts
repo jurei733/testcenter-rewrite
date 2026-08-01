@@ -502,6 +502,8 @@ export type WorkspaceReviewPort = {
     participantSessionId: string;
     testRunId: string;
     unitKey?: string | null;
+    page?: number | null;
+    pageLabel?: string | null;
     reviewerId: string;
     category?: string;
     categories?: string[];
@@ -513,6 +515,8 @@ export type WorkspaceReviewPort = {
     workspaceKey: string;
     reviewId: string;
     unitKey?: string | null;
+    page?: number | null;
+    pageLabel?: string | null;
     reviewerId?: string;
     category?: string;
     categories?: string[];
@@ -585,6 +589,8 @@ export type ParticipantRuntimePort = {
   createReview(input: {
     testRunId: string;
     unitKey?: string | null;
+    page?: number | null;
+    pageLabel?: string | null;
     reviewerId?: string;
     category?: string;
     categories?: string[];
@@ -595,6 +601,8 @@ export type ParticipantRuntimePort = {
     testRunId: string;
     reviewId: string;
     unitKey?: string | null;
+    page?: number | null;
+    pageLabel?: string | null;
     reviewerId?: string;
     category?: string;
     categories?: string[];
@@ -1717,6 +1725,17 @@ const normalizeWorkspaceReview = (review: WorkspaceReview): WorkspaceReview => {
   const priority = Number(review.priority);
   return {
     ...review,
+    page:
+      review.page !== null &&
+      review.page !== undefined &&
+      Number.isInteger(Number(review.page)) &&
+      Number(review.page) >= 0
+        ? Number(review.page)
+        : null,
+    pageLabel:
+      typeof review.pageLabel === "string" && review.pageLabel.trim()
+        ? review.pageLabel.trim()
+        : null,
     category: categories.join(" "),
     categories,
     priority:
@@ -1739,6 +1758,39 @@ const normalizeOptionalUnitKey = (value: unknown): string | null => {
     );
   }
 
+  return value.trim() || null;
+};
+
+const normalizeOptionalReviewPage = (value: unknown): number | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > 100_000
+  ) {
+    throw new FirstSliceError(
+      400,
+      "review_page_invalid",
+      "page must be a non-negative integer when provided."
+    );
+  }
+  return value;
+};
+
+const normalizeOptionalReviewPageLabel = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "string" || value.trim().length > 256) {
+    throw new FirstSliceError(
+      400,
+      "review_page_label_invalid",
+      "pageLabel must be a string with up to 256 characters when provided."
+    );
+  }
   return value.trim() || null;
 };
 
@@ -3903,6 +3955,8 @@ const formatReviewCsv = (input: {
     "testRunId",
     "bookletKey",
     "unitKey",
+    "page",
+    "pageLabel",
     "reviewerId",
     "priority",
     "categories",
@@ -3928,6 +3982,8 @@ const formatReviewCsv = (input: {
         item.review.testRunId,
         item.testRun?.bookletKey ?? "",
         item.review.unitKey ?? "",
+        item.review.page === null ? "" : String(item.review.page),
+        item.review.pageLabel ?? "",
         item.review.reviewerId,
         String(item.review.priority),
         item.review.categories.join(" "),
@@ -14857,6 +14913,15 @@ export const createFirstSliceServices = (
           input.categories,
           input.category
         );
+        const page = normalizeOptionalReviewPage(input.page);
+        const pageLabel = normalizeOptionalReviewPageLabel(input.pageLabel);
+        if (!normalizedUnitKey && (page !== null || pageLabel !== null)) {
+          throw new FirstSliceError(
+            400,
+            "review_page_requires_unit",
+            "Task-page metadata requires a unitKey."
+          );
+        }
         const timestamp = now();
         const review: WorkspaceReview = {
           reviewId: idGenerator(),
@@ -14865,6 +14930,8 @@ export const createFirstSliceServices = (
           participantSessionId: participantSession.participantSessionId,
           testRunId: testRun.testRunId,
           unitKey: normalizedUnitKey,
+          page,
+          pageLabel,
           reviewerId: normalizeReviewText(
             input.reviewerId,
             "reviewerId",
@@ -14895,6 +14962,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority
@@ -14974,9 +15043,21 @@ export const createFirstSliceServices = (
           input.categories === undefined && input.category === undefined
             ? existingReview.categories
             : normalizeReviewCategories(input.categories, input.category);
+        const page = nextUnitKey
+          ? input.page === undefined
+            ? existingReview.page
+            : normalizeOptionalReviewPage(input.page)
+          : null;
+        const pageLabel = nextUnitKey
+          ? input.pageLabel === undefined
+            ? existingReview.pageLabel
+            : normalizeOptionalReviewPageLabel(input.pageLabel)
+          : null;
         const review: WorkspaceReview = {
           ...existingReview,
           unitKey: nextUnitKey,
+          page,
+          pageLabel,
           reviewerId:
             input.reviewerId === undefined
               ? existingReview.reviewerId
@@ -15015,6 +15096,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority
@@ -15075,6 +15158,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority
@@ -16137,6 +16222,15 @@ export const createFirstSliceServices = (
           input.categories,
           input.category
         );
+        const page = normalizeOptionalReviewPage(input.page);
+        const pageLabel = normalizeOptionalReviewPageLabel(input.pageLabel);
+        if (!unitKey && (page !== null || pageLabel !== null)) {
+          throw new FirstSliceError(
+            400,
+            "review_page_requires_unit",
+            "Task-page metadata requires a unitKey."
+          );
+        }
         const timestamp = now();
         const review: WorkspaceReview = {
           reviewId: idGenerator(),
@@ -16145,6 +16239,8 @@ export const createFirstSliceServices = (
           participantSessionId: participantSession.participantSessionId,
           testRunId: testRun.testRunId,
           unitKey,
+          page,
+          pageLabel,
           reviewerId: resolveParticipantReviewReviewerId(
             input.reviewerId,
             participantSession.loginKey
@@ -16173,6 +16269,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority,
@@ -16205,9 +16303,21 @@ export const createFirstSliceServices = (
           input.categories === undefined && input.category === undefined
             ? existingReview.categories
             : normalizeReviewCategories(input.categories, input.category);
+        const page = unitKey
+          ? input.page === undefined
+            ? existingReview.page
+            : normalizeOptionalReviewPage(input.page)
+          : null;
+        const pageLabel = unitKey
+          ? input.pageLabel === undefined
+            ? existingReview.pageLabel
+            : normalizeOptionalReviewPageLabel(input.pageLabel)
+          : null;
         const review: WorkspaceReview = {
           ...existingReview,
           unitKey,
+          page,
+          pageLabel,
           reviewerId:
             input.reviewerId === undefined
               ? existingReview.reviewerId
@@ -16244,6 +16354,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority,
@@ -16271,6 +16383,8 @@ export const createFirstSliceServices = (
             reviewId: review.reviewId,
             participantSessionId: review.participantSessionId,
             unitKey: review.unitKey,
+            page: review.page,
+            pageLabel: review.pageLabel,
             category: review.category,
             categories: review.categories,
             priority: review.priority,

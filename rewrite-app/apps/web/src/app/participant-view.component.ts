@@ -383,6 +383,14 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (click)="view.reviewTarget = 'unit'"
               >{{ view.reviewUnitTargetLabel }}</button>
               <button
+                id="participantRouteReviewTargetTask"
+                type="button"
+                class="unit-chip"
+                [class.is-current]="view.reviewTarget === 'task'"
+                [disabled]="!view.player.unitKey || view.player.unitKey === 'n/a'"
+                (click)="view.reviewTarget = 'task'"
+              >Current Task / Page</button>
+              <button
                 id="participantRouteReviewTargetTest"
                 type="button"
                 class="unit-chip"
@@ -390,6 +398,16 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 (click)="view.reviewTarget = 'test'"
               >Whole Test</button>
             </div>
+            <label *ngIf="view.reviewTarget === 'task'" class="participant-review-page-label">
+              Task or page label
+              <input
+                id="participantRouteReviewPageLabel"
+                name="participantRouteReviewPageLabel"
+                [(ngModel)]="view.reviewPageLabel"
+                placeholder="Optional label for the current task or page"
+              />
+              <small>{{ view.currentReviewPageReference }}</small>
+            </label>
             <div class="form-grid participant-review-form">
               <label>
                 Reviewer name (optional)

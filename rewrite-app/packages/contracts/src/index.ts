@@ -1885,6 +1885,8 @@ export type SelectParticipantAdaptiveStateRequest = {
 
 export type CreateParticipantReviewRequest = {
   unitKey?: string | null;
+  page?: number | null;
+  pageLabel?: string | null;
   reviewerId?: string;
   category?: string;
   categories?: string[];
@@ -1894,6 +1896,8 @@ export type CreateParticipantReviewRequest = {
 
 export type UpdateParticipantReviewRequest = {
   unitKey?: string | null;
+  page?: number | null;
+  pageLabel?: string | null;
   reviewerId?: string;
   category?: string;
   categories?: string[];
@@ -2103,6 +2107,8 @@ export type CreateReviewRequest = {
   participantSessionId: string;
   testRunId: string;
   unitKey?: string | null;
+  page?: number | null;
+  pageLabel?: string | null;
   reviewerId: string;
   category?: string;
   categories?: string[];
@@ -2112,6 +2118,8 @@ export type CreateReviewRequest = {
 
 export type UpdateReviewRequest = {
   unitKey?: string | null;
+  page?: number | null;
+  pageLabel?: string | null;
   reviewerId?: string;
   category?: string;
   categories?: string[];

@@ -1329,6 +1329,10 @@ export class RuntimeViewFacade {
             value: review.categories.join(", ") || "none"
           },
           {
+            label: "Task / Page",
+            value: review.pageLabel ?? (review.page === null ? "none" : String(review.page))
+          },
+          {
             label: "Participant",
             value:
               detail.participantRosterEntry?.displayName ??
@@ -1414,6 +1418,12 @@ export class RuntimeViewFacade {
             {
               label: "Categories",
               value: item.review.categories.join(", ") || "none"
+            },
+            {
+              label: "Task / Page",
+              value:
+                item.review.pageLabel ??
+                (item.review.page === null ? "none" : String(item.review.page))
             },
             {
               label: "Comment",

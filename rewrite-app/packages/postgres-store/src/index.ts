@@ -453,6 +453,12 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
           row.unit_key === null || row.unit_key === undefined
             ? null
             : String(row.unit_key),
+        page:
+          row.page === null || row.page === undefined ? null : Number(row.page),
+        pageLabel:
+          row.page_label === null || row.page_label === undefined
+            ? null
+            : String(row.page_label),
         reviewerId: String(row.reviewer_id),
         category: String(row.category),
         categories: String(row.category ?? "")
@@ -486,7 +492,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 23;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 24;
 
 const migrations: PostgresMigration[] = [
   {
@@ -884,6 +890,14 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE workspace_reviews
         ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    version: 24,
+    name: "add_review_task_pages",
+    sql: `
+      ALTER TABLE workspace_reviews ADD COLUMN IF NOT EXISTS page INTEGER;
+      ALTER TABLE workspace_reviews ADD COLUMN IF NOT EXISTS page_label TEXT;
     `
   }
 ];
@@ -1833,7 +1847,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getWorkspaceReviewById(reviewId) {
       return one(
-        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
          FROM workspace_reviews
          WHERE review_id = $1`,
         [reviewId],
@@ -1842,7 +1856,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listWorkspaceReviewsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
+        `SELECT review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
          FROM workspace_reviews
          WHERE tenant_id = $1 AND workspace_id = $2
          ORDER BY updated_at DESC, created_at DESC`,
@@ -1853,14 +1867,16 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveWorkspaceReview(review) {
       await pool.query(
         `INSERT INTO workspace_reviews (
-          review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, reviewer_id, category, priority, comment_text, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          review_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, page, page_label, reviewer_id, category, priority, comment_text, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT(review_id) DO UPDATE SET
           tenant_id = EXCLUDED.tenant_id,
           workspace_id = EXCLUDED.workspace_id,
           participant_session_id = EXCLUDED.participant_session_id,
           test_run_id = EXCLUDED.test_run_id,
           unit_key = EXCLUDED.unit_key,
+          page = EXCLUDED.page,
+          page_label = EXCLUDED.page_label,
           reviewer_id = EXCLUDED.reviewer_id,
           category = EXCLUDED.category,
           priority = EXCLUDED.priority,
@@ -1874,6 +1890,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           review.participantSessionId,
           review.testRunId,
           review.unitKey,
+          review.page,
+          review.pageLabel,
           review.reviewerId,
           review.category,
           review.priority,
