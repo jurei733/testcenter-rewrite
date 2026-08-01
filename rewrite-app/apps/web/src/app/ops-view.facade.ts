@@ -153,12 +153,41 @@ export class OpsViewFacade {
       this.canUseAdminSession &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.ops.adminCreatePassword !== "" &&
+      this.isAdminCreateAccessWindowValid &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminCreateRole,
         this.ops.adminCreateTenantKey,
         this.ops.adminCreateWorkspaceKey,
         this.ops.adminCreateGroupKey
       )
+    );
+  }
+
+  get isAdminCreateAccessWindowValid(): boolean {
+    const validFrom = this.ops.adminCreateValidFrom.trim();
+    const validTo = this.ops.adminCreateValidTo.trim();
+    const validForMinutes = this.ops.adminCreateValidForMinutes.trim();
+    const parsedValidFrom = validFrom === "" ? null : Date.parse(validFrom);
+    const parsedValidTo = validTo === "" ? null : Date.parse(validTo);
+
+    if (
+      (parsedValidFrom !== null && !Number.isFinite(parsedValidFrom)) ||
+      (parsedValidTo !== null && !Number.isFinite(parsedValidTo)) ||
+      (parsedValidFrom !== null &&
+        parsedValidTo !== null &&
+        parsedValidFrom > parsedValidTo)
+    ) {
+      return false;
+    }
+
+    if (validForMinutes === "") {
+      return true;
+    }
+    const parsedValidForMinutes = Number(validForMinutes);
+    return (
+      Number.isInteger(parsedValidForMinutes) &&
+      parsedValidForMinutes >= 1 &&
+      parsedValidForMinutes <= 5_256_000
     );
   }
 
@@ -693,6 +722,30 @@ export class OpsViewFacade {
           {
             label: "Created",
             value: this.formatDateTime(item.adminUser.createdAt)
+          },
+          {
+            label: "Access Starts",
+            value: item.adminUser.validFrom
+              ? this.formatDateTime(item.adminUser.validFrom)
+              : "immediately"
+          },
+          {
+            label: "Access Ends",
+            value: item.adminUser.validTo
+              ? this.formatDateTime(item.adminUser.validTo)
+              : "no fixed end"
+          },
+          {
+            label: "Valid For",
+            value: item.adminUser.validForMinutes
+              ? `${item.adminUser.validForMinutes} minute(s) after first sign-in`
+              : "unlimited"
+          },
+          {
+            label: "First Sign-In",
+            value: item.adminUser.firstSignedInAt
+              ? this.formatDateTime(item.adminUser.firstSignedInAt)
+              : "not yet"
           },
           {
             label: "Role Scopes",

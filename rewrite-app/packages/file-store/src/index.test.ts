@@ -7,6 +7,41 @@ import { describe, it } from "node:test";
 import { createFileFirstSliceRepository } from "./index.js";
 
 describe("createFileFirstSliceRepository", () => {
+  it("normalizes legacy admin users without access windows", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-admin-"));
+    const filePath = join(tempDirectory, "state.json");
+
+    try {
+      await writeFile(
+        filePath,
+        JSON.stringify({
+          adminUsers: {
+            "admin-user-id": {
+              adminUserId: "admin-user-id",
+              username: "legacy.admin",
+              displayName: "Legacy Admin",
+              passwordHash: "stored-password-hash",
+              status: "active",
+              createdAt: "2026-01-01T00:00:00.000Z"
+            }
+          }
+        }),
+        "utf8"
+      );
+
+      const repository = createFileFirstSliceRepository(filePath);
+      const [adminUser] = await repository.listAdminUsers();
+
+      assert.equal(adminUser?.username, "legacy.admin");
+      assert.equal(adminUser?.validFrom, null);
+      assert.equal(adminUser?.validTo, null);
+      assert.equal(adminUser?.validForMinutes, null);
+      assert.equal(adminUser?.firstSignedInAt, null);
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("normalizes legacy participant roster password flags from hash storage", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-roster-"));
     const filePath = join(tempDirectory, "state.json");

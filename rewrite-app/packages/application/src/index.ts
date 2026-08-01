@@ -766,6 +766,9 @@ export type AdminDirectoryPort = {
     username: string;
     displayName?: string;
     password: string;
+    validFrom?: string | null;
+    validTo?: string | null;
+    validForMinutes?: number | null;
     roleAssignments?: Array<{
       role: AdminRole;
       tenantKey?: string | null;
@@ -1886,6 +1889,99 @@ const requireAdminCredentialsPassword = (value: unknown): string => {
   return value;
 };
 
+const normalizeOptionalAdminAccessTimestamp = (
+  value: unknown,
+  fieldName: "validFrom" | "validTo"
+): string | null => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) {
+    throw new FirstSliceError(
+      400,
+      "admin_access_window_invalid",
+      `${fieldName} must be a valid ISO timestamp when provided.`
+    );
+  }
+  return new Date(Date.parse(value)).toISOString();
+};
+
+const normalizeOptionalAdminValidForMinutes = (value: unknown): number | null => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > 5_256_000
+  ) {
+    throw new FirstSliceError(
+      400,
+      "admin_access_window_invalid",
+      "validForMinutes must be an integer from 1 through 5256000 when provided."
+    );
+  }
+  return value;
+};
+
+const normalizeAdminAccessWindow = (input: {
+  validFrom?: unknown;
+  validTo?: unknown;
+  validForMinutes?: unknown;
+}): Pick<AdminUser, "validFrom" | "validTo" | "validForMinutes"> => {
+  const validFrom = normalizeOptionalAdminAccessTimestamp(
+    input.validFrom,
+    "validFrom"
+  );
+  const validTo = normalizeOptionalAdminAccessTimestamp(input.validTo, "validTo");
+  if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
+    throw new FirstSliceError(
+      400,
+      "admin_access_window_invalid",
+      "validFrom must not be later than validTo."
+    );
+  }
+  return {
+    validFrom,
+    validTo,
+    validForMinutes: normalizeOptionalAdminValidForMinutes(
+      input.validForMinutes
+    )
+  };
+};
+
+const resolveAdminAccessValidUntil = (adminUser: AdminUser): string | null => {
+  const candidates = [
+    adminUser.validTo ? Date.parse(adminUser.validTo) : Number.NaN,
+    adminUser.validForMinutes && adminUser.firstSignedInAt
+      ? Date.parse(adminUser.firstSignedInAt) +
+        adminUser.validForMinutes * 60_000
+      : Number.NaN
+  ].filter(Number.isFinite);
+  return candidates.length > 0
+    ? new Date(Math.min(...candidates)).toISOString()
+    : null;
+};
+
+const resolveAdminAccessFailureReason = (
+  adminUser: AdminUser,
+  timestamp: string
+): "admin_access_not_started" | "admin_access_expired" | null => {
+  const timestampMs = Date.parse(timestamp);
+  if (
+    adminUser.validFrom &&
+    Number.isFinite(timestampMs) &&
+    Date.parse(adminUser.validFrom) > timestampMs
+  ) {
+    return "admin_access_not_started";
+  }
+  const validUntil = resolveAdminAccessValidUntil(adminUser);
+  return validUntil && Date.parse(validUntil) <= timestampMs
+    ? "admin_access_expired"
+    : null;
+};
+
 const hashPassword = (password: string): string => {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = scryptSync(password, salt, PASSWORD_HASH_KEY_LENGTH);
@@ -1914,8 +2010,19 @@ const createAdminSessionToken = (): string => randomBytes(32).toString("base64ur
 
 const calculateAdminSessionExpiry = (
   createdAt: string,
-  sessionTtlMs: number
-): string => new Date(Date.parse(createdAt) + sessionTtlMs).toISOString();
+  sessionTtlMs: number,
+  accessValidUntil: string | null = null
+): string => {
+  const sessionExpiryMs = Date.parse(createdAt) + sessionTtlMs;
+  const accessExpiryMs = accessValidUntil
+    ? Date.parse(accessValidUntil)
+    : Number.NaN;
+  return new Date(
+    Number.isFinite(accessExpiryMs)
+      ? Math.min(sessionExpiryMs, accessExpiryMs)
+      : sessionExpiryMs
+  ).toISOString();
+};
 
 const resolveAdminSessionStatus = (
   adminSession: AdminSession,
@@ -14036,6 +14143,10 @@ export const createFirstSliceServices = (
           displayName,
           passwordHash: hashAdminPassword(password),
           status: "active",
+          validFrom: null,
+          validTo: null,
+          validForMinutes: null,
+          firstSignedInAt: null,
           createdAt: timestamp
         };
         const platformAdminRoleAssignment: AdminRoleAssignment = {
@@ -14068,13 +14179,19 @@ export const createFirstSliceServices = (
         const username = normalizeAdminUsername(input.username);
         const password = requireAdminCredentialsPassword(input.password);
         const adminUser = await repository.getAdminUserByUsername(username);
+        const timestamp = now();
+        const accessFailureReason = adminUser
+          ? resolveAdminAccessFailureReason(adminUser, timestamp)
+          : null;
         const signInFailureReason = !adminUser
           ? "admin_user_not_found"
           : adminUser.status !== "active"
             ? "admin_user_not_active"
             : !verifyAdminPassword(password, adminUser.passwordHash)
               ? "password_mismatch"
-              : null;
+              : accessFailureReason
+                ? accessFailureReason
+                : null;
         if (
           !adminUser ||
           adminUser.status !== "active" ||
@@ -14097,33 +14214,45 @@ export const createFirstSliceServices = (
           );
         }
 
-        const timestamp = now();
+        const signedInAdminUser =
+          adminUser.validForMinutes && !adminUser.firstSignedInAt
+            ? { ...adminUser, firstSignedInAt: timestamp }
+            : adminUser;
+        if (signedInAdminUser !== adminUser) {
+          await repository.saveAdminUser(signedInAdminUser);
+        }
+        const accessValidUntil = resolveAdminAccessValidUntil(signedInAdminUser);
         const adminSession: AdminSession = {
           adminSessionId: idGenerator(),
-          adminUserId: adminUser.adminUserId,
+          adminUserId: signedInAdminUser.adminUserId,
           token: createAdminSessionToken(),
           createdAt: timestamp,
-          expiresAt: calculateAdminSessionExpiry(timestamp, adminSessionTtlMs),
+          expiresAt: calculateAdminSessionExpiry(
+            timestamp,
+            adminSessionTtlMs,
+            accessValidUntil
+          ),
           revokedAt: null
         };
 
         await repository.saveAdminSession(adminSession);
         const roleAssignments = await listAdminRoleAssignmentsForUser(
           repository,
-          adminUser.adminUserId
+          signedInAdminUser.adminUserId
         );
         await recordAdminAuditEvent({
           eventType: "admin_sign_in_succeeded",
-          actorAdminUserId: adminUser.adminUserId,
-          subjectAdminUserId: adminUser.adminUserId,
-          summary: `Admin '${adminUser.username}' signed in.`,
+          actorAdminUserId: signedInAdminUser.adminUserId,
+          subjectAdminUserId: signedInAdminUser.adminUserId,
+          summary: `Admin '${signedInAdminUser.username}' signed in.`,
           details: {
-            username: adminUser.username,
-            adminSessionId: adminSession.adminSessionId
+            username: signedInAdminUser.username,
+            adminSessionId: adminSession.adminSessionId,
+            accessValidUntil
           }
         });
         return {
-          adminUser,
+          adminUser: signedInAdminUser,
           adminSession,
           roleAssignments
         };
@@ -14342,12 +14471,15 @@ export const createFirstSliceServices = (
 
         const password = requireAdminPassword(input.password);
         const timestamp = now();
+        const accessWindow = normalizeAdminAccessWindow(input);
         const adminUser: AdminUser = {
           adminUserId: idGenerator(),
           username,
           displayName: normalizeAdminDisplayName(input.displayName, username),
           passwordHash: hashAdminPassword(password),
           status: "active",
+          ...accessWindow,
+          firstSignedInAt: null,
           createdAt: timestamp
         };
         const requestedRoleAssignments = normalizeAdminRoleAssignmentInputs(
@@ -14390,6 +14522,9 @@ export const createFirstSliceServices = (
             username: adminUser.username,
             displayName: adminUser.displayName,
             status: adminUser.status,
+            validFrom: adminUser.validFrom,
+            validTo: adminUser.validTo,
+            validForMinutes: adminUser.validForMinutes,
             roleAssignments: savedRoleAssignments.map(summarizeAdminRoleAssignment)
           }
         });

@@ -69,6 +69,12 @@ const mapAdminUser = (row: Record<string, unknown> | undefined): AdminUser | nul
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
         status: row.status as AdminUser["status"],
+        validFrom: row.valid_from == null ? null : String(row.valid_from),
+        validTo: row.valid_to == null ? null : String(row.valid_to),
+        validForMinutes:
+          row.valid_for_minutes == null ? null : Number(row.valid_for_minutes),
+        firstSignedInAt:
+          row.first_signed_in_at == null ? null : String(row.first_signed_in_at),
         createdAt: String(row.created_at)
       }
     : null;
@@ -526,7 +532,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 32;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 33;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -991,6 +997,16 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE admin_role_assignments ADD COLUMN group_key TEXT;
     `
+  },
+  {
+    version: 33,
+    name: "add_admin_access_windows",
+    sql: `
+      ALTER TABLE admin_users ADD COLUMN valid_from TEXT;
+      ALTER TABLE admin_users ADD COLUMN valid_to TEXT;
+      ALTER TABLE admin_users ADD COLUMN valid_for_minutes INTEGER;
+      ALTER TABLE admin_users ADD COLUMN first_signed_in_at TEXT;
+    `
   }
 ];
 
@@ -1103,7 +1119,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminUsers() {
       const rows = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            ORDER BY created_at ASC`
         )
@@ -1113,7 +1129,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserById(adminUserId) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE admin_user_id = ?`
         )
@@ -1123,7 +1139,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserByUsername(username) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE username = ?`
         )
@@ -1134,13 +1150,17 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_users (
-            admin_user_id, username, display_name, password_hash, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?)
+            admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(admin_user_id) DO UPDATE SET
             username = excluded.username,
             display_name = excluded.display_name,
             password_hash = excluded.password_hash,
             status = excluded.status,
+            valid_from = excluded.valid_from,
+            valid_to = excluded.valid_to,
+            valid_for_minutes = excluded.valid_for_minutes,
+            first_signed_in_at = excluded.first_signed_in_at,
             created_at = excluded.created_at`
         )
         .run(
@@ -1149,6 +1169,10 @@ export const createSqliteFirstSliceRepository = (
           adminUser.displayName,
           adminUser.passwordHash,
           adminUser.status,
+          adminUser.validFrom,
+          adminUser.validTo,
+          adminUser.validForMinutes,
+          adminUser.firstSignedInAt,
           adminUser.createdAt
         );
     },

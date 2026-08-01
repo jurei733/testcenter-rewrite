@@ -2015,6 +2015,9 @@ export type CreateAdminUserRequest = {
   username: string;
   displayName?: string;
   password: string;
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
   roleAssignments?: AdminRoleAssignmentRequest[];
 };
 

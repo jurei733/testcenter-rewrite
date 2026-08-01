@@ -51,6 +51,9 @@ export interface ShellOpsState {
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
+  adminCreateValidFrom: string;
+  adminCreateValidTo: string;
+  adminCreateValidForMinutes: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
   adminRoleTenantKey: string;
@@ -269,6 +272,9 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateTenantKey: "demo-tenant",
     adminCreateWorkspaceKey: "demo-workspace",
     adminCreateGroupKey: "group:student-demo",
+    adminCreateValidFrom: "",
+    adminCreateValidTo: "",
+    adminCreateValidForMinutes: "",
     adminRoleTargetUserId: "",
     adminRoleRole: "workspace_admin",
     adminRoleTenantKey: "demo-tenant",

@@ -83,6 +83,18 @@ const readStateFromFile = async (
       ...createInitialState(),
       ...(JSON.parse(raw) as Partial<PersistedFirstSliceState>)
     };
+    state.adminUsers = Object.fromEntries(
+      Object.entries(state.adminUsers).map(([adminUserId, adminUser]) => [
+        adminUserId,
+        {
+          ...adminUser,
+          validFrom: adminUser.validFrom ?? null,
+          validTo: adminUser.validTo ?? null,
+          validForMinutes: adminUser.validForMinutes ?? null,
+          firstSignedInAt: adminUser.firstSignedInAt ?? null
+        }
+      ])
+    );
     state.participantRosterEntries = Object.fromEntries(
       Object.entries(state.participantRosterEntries).map(([entryId, entry]) => [
         entryId,

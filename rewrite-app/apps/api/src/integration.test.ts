@@ -784,6 +784,175 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "string"
   );
 
+  const invalidAdminAccessWindow = await requestJson<{ error: string }>(
+    "/api/v1/admin/users",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        username: "invalid.access.window",
+        password: "invalid-access-window-secret",
+        validFrom: "2999-01-02T00:00:00.000Z",
+        validTo: "2999-01-01T00:00:00.000Z",
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            tenantKey: adminTenantKey,
+            workspaceKey: adminWorkspaceKey
+          }
+        ]
+      }
+    }
+  );
+
+  assert.equal(invalidAdminAccessWindow.status, 400);
+  assert.equal(
+    invalidAdminAccessWindow.body.error,
+    "admin_access_window_invalid"
+  );
+
+  const futureAccessAdmin = await requestJson<{
+    adminUser: { validFrom: string | null; firstSignedInAt: string | null };
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      username: "future.access.admin",
+      password: "future-access-secret",
+      validFrom: "2999-01-01T00:00:00.000Z",
+      roleAssignments: [
+        {
+          role: "workspace_admin",
+          tenantKey: adminTenantKey,
+          workspaceKey: adminWorkspaceKey
+        }
+      ]
+    }
+  });
+
+  assert.equal(futureAccessAdmin.status, 201);
+  assert.equal(
+    futureAccessAdmin.body.adminUser.validFrom,
+    "2999-01-01T00:00:00.000Z"
+  );
+  assert.equal(futureAccessAdmin.body.adminUser.firstSignedInAt, null);
+  const futureAccessSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "future.access.admin",
+        password: "future-access-secret"
+      }
+    }
+  );
+  assert.equal(futureAccessSignIn.status, 401);
+  assert.equal(futureAccessSignIn.body.error, "admin_credentials_invalid");
+
+  const expiredAccessAdmin = await requestJson<{
+    adminUser: { validTo: string | null; firstSignedInAt: string | null };
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      username: "expired.access.admin",
+      password: "expired-access-secret",
+      validTo: "2000-01-01T00:00:00.000Z",
+      roleAssignments: [
+        {
+          role: "workspace_admin",
+          tenantKey: adminTenantKey,
+          workspaceKey: adminWorkspaceKey
+        }
+      ]
+    }
+  });
+
+  assert.equal(expiredAccessAdmin.status, 201);
+  assert.equal(
+    expiredAccessAdmin.body.adminUser.validTo,
+    "2000-01-01T00:00:00.000Z"
+  );
+  const expiredAccessSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "expired.access.admin",
+        password: "expired-access-secret"
+      }
+    }
+  );
+  assert.equal(expiredAccessSignIn.status, 401);
+  assert.equal(expiredAccessSignIn.body.error, "admin_credentials_invalid");
+
+  const firstLoginWindowValidTo = new Date(
+    Date.now() + 10 * 60_000
+  ).toISOString();
+  const firstLoginWindowAdmin = await requestJson<{
+    adminUser: {
+      validTo: string | null;
+      validForMinutes: number | null;
+      firstSignedInAt: string | null;
+    };
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      username: "first.login.window.admin",
+      password: "first-login-window-secret",
+      validTo: firstLoginWindowValidTo,
+      validForMinutes: 45,
+      roleAssignments: [
+        {
+          role: "workspace_admin",
+          tenantKey: adminTenantKey,
+          workspaceKey: adminWorkspaceKey
+        }
+      ]
+    }
+  });
+
+  assert.equal(firstLoginWindowAdmin.status, 201);
+  assert.equal(
+    firstLoginWindowAdmin.body.adminUser.validTo,
+    firstLoginWindowValidTo
+  );
+  assert.equal(firstLoginWindowAdmin.body.adminUser.validForMinutes, 45);
+  assert.equal(firstLoginWindowAdmin.body.adminUser.firstSignedInAt, null);
+  const firstLoginWindowSignIn = await requestJson<{
+    adminUser: { validForMinutes: number; firstSignedInAt: string };
+    adminSession: { createdAt: string; expiresAt: string };
+    sessionToken: string;
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "first.login.window.admin",
+      password: "first-login-window-secret"
+    }
+  });
+
+  assert.equal(firstLoginWindowSignIn.status, 200);
+  assert.equal(firstLoginWindowSignIn.body.adminUser.validForMinutes, 45);
+  assert.ok(firstLoginWindowSignIn.body.adminUser.firstSignedInAt);
+  assert.equal(
+    firstLoginWindowSignIn.body.adminUser.firstSignedInAt,
+    firstLoginWindowSignIn.body.adminSession.createdAt
+  );
+  assert.equal(
+    Date.parse(firstLoginWindowSignIn.body.adminSession.expiresAt),
+    Date.parse(firstLoginWindowValidTo)
+  );
+  assert.ok(firstLoginWindowSignIn.body.sessionToken.length > 20);
+
   const duplicateRoleAssignment = await requestJson<{
     roleAssignments: Array<{ role: string }>;
   }>(
@@ -1027,7 +1196,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
   assert.match(
     adminUsersCsvBody,
-    /^"adminUserId","username","displayName","status","createdAt","roleAssignments"/
+    /^"adminUserId","username","displayName","status","validFrom","validTo","validForMinutes","firstSignedInAt","createdAt","roleAssignments"/
   );
   assert.match(adminUsersCsvBody, /"workspace\.admin"/);
   assert.match(adminUsersCsvBody, /"disabled"/);

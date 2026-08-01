@@ -38,9 +38,14 @@ stable `participant_roster_operational_only` error. Administrators can create
 non-escalating `group_monitor` and `study_monitor` accounts with durable
 workspace/group scope. Supported candidates can prepare that account form in
 one action and complete creation after a newly assigned password is entered;
-the source password is deliberately never exposed or copied. The protected
-browser flow carries one original `monitor-group` login through import, account
-creation, sign-in, route isolation, and group-scoped monitoring. When either
+the source password is deliberately never exposed or copied. Imported
+`validFrom`, `validTo`, and `validFor` values are copied into the account draft,
+persisted by every store, and enforced at operator sign-in. Relative validity
+starts with the first successful sign-in, and the shorter of the configured
+account window and normal session lifetime becomes the session expiry. The
+protected browser flow carries one original `monitor-group` login through
+import, account creation with its 45-minute first-login window, sign-in, route
+isolation, and group-scoped monitoring. When either
 monitor role signs in,
 the Angular shell switches to a focused monitor console: workspace/content and
 platform-administration navigation disappear, runtime refreshes use only

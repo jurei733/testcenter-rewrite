@@ -4483,6 +4483,9 @@ try {
     "#adminCreateGroupKey",
     participantGroupKey
   );
+  await expectInputValue("#adminCreateValidFrom", "");
+  await expectInputValue("#adminCreateValidTo", "");
+  await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
@@ -4497,7 +4500,45 @@ try {
     .filter({ hasText: groupMonitorUsername })
     .filter({ hasText: "group_monitor" })
     .filter({ hasText: participantGroupKey })
+    .filter({ hasText: "45 minute(s) after first sign-in" })
     .waitFor();
+
+  logStep("group-monitor-access-window");
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommit("#adminUsername", groupMonitorUsername);
+  await fillAndCommit("#adminPassword", groupMonitorPassword);
+  const initialGroupMonitorSignInResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-in")
+  );
+  await clickAction("Sign In");
+  const initialGroupMonitorSignInResponse =
+    await initialGroupMonitorSignInResponsePromise;
+  assert.equal(initialGroupMonitorSignInResponse.status(), 200);
+  const initialGroupMonitorSignIn =
+    await initialGroupMonitorSignInResponse.json();
+  assert.equal(initialGroupMonitorSignIn.adminUser.validForMinutes, 45);
+  assert.equal(
+    initialGroupMonitorSignIn.adminUser.firstSignedInAt,
+    initialGroupMonitorSignIn.adminSession.createdAt
+  );
+  assert.equal(
+    Date.parse(initialGroupMonitorSignIn.adminSession.expiresAt),
+    Date.parse(initialGroupMonitorSignIn.adminUser.firstSignedInAt) +
+      45 * 60_000
+  );
+  await waitForInputMinLength("#adminSessionToken", 20);
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommit("#adminUsername", adminUsername);
+  await fillAndCommit("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  stopAfter("group-monitor-access-window");
+
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   stopAfter("operational-login-candidates");
@@ -5617,7 +5658,21 @@ try {
   await expectInputValue("#adminSessionToken", "");
   await fillAndCommit("#adminUsername", groupMonitorUsername);
   await fillAndCommit("#adminPassword", groupMonitorPassword);
+  const groupMonitorSignInResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-in")
+  );
   await clickAction("Sign In");
+  const groupMonitorSignInResponse = await groupMonitorSignInResponsePromise;
+  assert.equal(groupMonitorSignInResponse.status(), 200);
+  const groupMonitorSignIn = await groupMonitorSignInResponse.json();
+  assert.equal(groupMonitorSignIn.adminUser.validForMinutes, 45);
+  assert.ok(groupMonitorSignIn.adminUser.firstSignedInAt);
+  assert.equal(
+    Date.parse(groupMonitorSignIn.adminSession.expiresAt),
+    Date.parse(groupMonitorSignIn.adminUser.firstSignedInAt) + 45 * 60_000
+  );
   await waitForInputMinLength("#adminSessionToken", 20);
   await page
     .locator("app-record-collection")

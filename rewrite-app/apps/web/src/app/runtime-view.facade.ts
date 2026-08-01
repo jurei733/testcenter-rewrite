@@ -894,7 +894,12 @@ export class RuntimeViewFacade {
                     operationalLoginMigration: "prepareMonitorAccount",
                     username: candidate.loginKey,
                     role: roleDraft.role,
-                    groupKey: roleDraft.groupKey ?? ""
+                    groupKey: roleDraft.groupKey ?? "",
+                    validFrom: candidate.validFrom ?? "",
+                    validTo: candidate.validTo ?? "",
+                    validForMinutes: candidate.validForMinutes
+                      ? String(candidate.validForMinutes)
+                      : ""
                   }
                 }
               : {})
@@ -925,6 +930,10 @@ export class RuntimeViewFacade {
       role === "group_monitor"
         ? item.actionPayload.groupKey?.trim() ?? ""
         : "";
+    ops.adminCreateValidFrom = item.actionPayload.validFrom?.trim() ?? "";
+    ops.adminCreateValidTo = item.actionPayload.validTo?.trim() ?? "";
+    ops.adminCreateValidForMinutes =
+      item.actionPayload.validForMinutes?.trim() ?? "";
     this.feedback.rememberActivity(
       "Monitor Account Draft Prepared",
       `${ops.adminCreateUsername} was mapped to ${role}. Assign a new password before creating the account; the original password was not copied.`

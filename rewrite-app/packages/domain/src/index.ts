@@ -357,6 +357,10 @@ export type AdminUser = {
   displayName: string;
   passwordHash: string;
   status: AdminUserStatus;
+  validFrom: string | null;
+  validTo: string | null;
+  validForMinutes: number | null;
+  firstSignedInAt: string | null;
   createdAt: string;
 };
 

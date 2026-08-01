@@ -335,6 +335,11 @@ export class RewriteAppOpsService {
         username: this.opsState.adminCreateUsername.trim(),
         displayName: this.opsState.adminCreateDisplayName.trim() || undefined,
         password: this.opsState.adminCreatePassword,
+        validFrom: this.opsState.adminCreateValidFrom.trim() || undefined,
+        validTo: this.opsState.adminCreateValidTo.trim() || undefined,
+        validForMinutes: this.opsState.adminCreateValidForMinutes.trim()
+          ? Number(this.opsState.adminCreateValidForMinutes.trim())
+          : undefined,
         roleAssignments: [
           this.createRoleAssignmentRequest(
             this.opsState.adminCreateRole,
@@ -348,6 +353,9 @@ export class RewriteAppOpsService {
     );
 
     this.opsState.adminCreatePassword = "";
+    this.opsState.adminCreateValidFrom = "";
+    this.opsState.adminCreateValidTo = "";
+    this.opsState.adminCreateValidForMinutes = "";
     this.opsState.adminRoleTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeRoleAssignmentId =

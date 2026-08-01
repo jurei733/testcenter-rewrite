@@ -1191,6 +1191,10 @@ const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
       "username",
       "displayName",
       "status",
+      "validFrom",
+      "validTo",
+      "validForMinutes",
+      "firstSignedInAt",
       "createdAt",
       "roleAssignments"
     ]
@@ -1202,6 +1206,10 @@ const formatAdminUsersCsv = (items: AdminUserDirectoryItem[]): string => {
       item.adminUser.username,
       item.adminUser.displayName,
       item.adminUser.status,
+      item.adminUser.validFrom,
+      item.adminUser.validTo,
+      item.adminUser.validForMinutes,
+      item.adminUser.firstSignedInAt,
       item.adminUser.createdAt,
       item.roleAssignments
     ]);
@@ -1250,6 +1258,10 @@ const toPublicAdminUser = (adminUser: AdminUser): PublicAdminUser => {
     username: adminUser.username,
     displayName: adminUser.displayName,
     status: adminUser.status,
+    validFrom: adminUser.validFrom,
+    validTo: adminUser.validTo,
+    validForMinutes: adminUser.validForMinutes,
+    firstSignedInAt: adminUser.firstSignedInAt,
     createdAt: adminUser.createdAt
   };
 };
@@ -3556,6 +3568,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           username: body.username,
           displayName: body.displayName,
           password: body.password,
+          validFrom: body.validFrom,
+          validTo: body.validTo,
+          validForMinutes: body.validForMinutes,
           roleAssignments: body.roleAssignments
         });
         sendJson<CreateAdminUserResponse>(

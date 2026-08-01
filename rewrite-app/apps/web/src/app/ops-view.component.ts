@@ -161,11 +161,28 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Initial Group Key
             <input id="adminCreateGroupKey" name="adminCreateGroupKey" [(ngModel)]="view.ops.adminCreateGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'group_monitor'" />
           </label>
+          <label>
+            Access Starts (ISO timestamp)
+            <input id="adminCreateValidFrom" name="adminCreateValidFrom" placeholder="2026-08-01T08:00:00Z" [(ngModel)]="view.ops.adminCreateValidFrom" (change)="view.persistState()" />
+          </label>
+          <label>
+            Access Ends (ISO timestamp)
+            <input id="adminCreateValidTo" name="adminCreateValidTo" placeholder="2026-08-31T18:00:00Z" [(ngModel)]="view.ops.adminCreateValidTo" (change)="view.persistState()" />
+          </label>
+          <label>
+            Valid For After First Sign-In (minutes)
+            <input id="adminCreateValidForMinutes" name="adminCreateValidForMinutes" type="number" min="1" max="5256000" step="1" [(ngModel)]="view.ops.adminCreateValidForMinutes" (change)="view.persistState()" />
+          </label>
         </div>
         <p *ngIf="view.isCreatingMonitorAccount">
           Monitor accounts receive only the selected workspace/group scope. For
           imported original logins, assign a new password here because source
-          passwords are deliberately never copied.
+          passwords are deliberately never copied. Original access dates and
+          first-login durations are copied into these fields and enforced at sign-in.
+        </p>
+        <p *ngIf="!view.isAdminCreateAccessWindowValid">
+          Enter valid ISO timestamps with the start no later than the end, and a
+          whole duration between 1 and 5,256,000 minutes.
         </p>
         <div class="actions">
           <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">{{ view.isCreatingMonitorAccount ? "Create Monitor Account" : "Create Admin User" }}</button>

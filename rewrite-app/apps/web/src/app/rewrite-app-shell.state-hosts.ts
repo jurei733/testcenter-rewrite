@@ -702,6 +702,24 @@ export function createShellPersistenceStateHost(args: {
     set adminCreateGroupKey(nextValue) {
       args.opsState.adminCreateGroupKey = nextValue;
     },
+    get adminCreateValidFrom() {
+      return args.opsState.adminCreateValidFrom;
+    },
+    set adminCreateValidFrom(nextValue) {
+      args.opsState.adminCreateValidFrom = nextValue;
+    },
+    get adminCreateValidTo() {
+      return args.opsState.adminCreateValidTo;
+    },
+    set adminCreateValidTo(nextValue) {
+      args.opsState.adminCreateValidTo = nextValue;
+    },
+    get adminCreateValidForMinutes() {
+      return args.opsState.adminCreateValidForMinutes;
+    },
+    set adminCreateValidForMinutes(nextValue) {
+      args.opsState.adminCreateValidForMinutes = nextValue;
+    },
     get adminRoleTargetUserId() {
       return args.opsState.adminRoleTargetUserId;
     },

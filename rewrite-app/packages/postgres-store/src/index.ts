@@ -62,6 +62,12 @@ const mapAdminUser = (row: Row | undefined): AdminUser | null =>
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
         status: row.status as AdminUser["status"],
+        validFrom: row.valid_from == null ? null : String(row.valid_from),
+        validTo: row.valid_to == null ? null : String(row.valid_to),
+        validForMinutes:
+          row.valid_for_minutes == null ? null : Number(row.valid_for_minutes),
+        firstSignedInAt:
+          row.first_signed_in_at == null ? null : String(row.first_signed_in_at),
         createdAt: String(row.created_at)
       }
     : null;
@@ -504,7 +510,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 26;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 27;
 
 const migrations: PostgresMigration[] = [
   {
@@ -926,6 +932,16 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE admin_role_assignments ADD COLUMN IF NOT EXISTS group_key TEXT;
     `
+  },
+  {
+    version: 27,
+    name: "add_admin_access_windows",
+    sql: `
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS valid_from TEXT;
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS valid_to TEXT;
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS valid_for_minutes INTEGER;
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS first_signed_in_at TEXT;
+    `
   }
 ];
 
@@ -1045,7 +1061,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   return {
     async listAdminUsers() {
       return many(
-        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          ORDER BY created_at ASC`,
         [],
@@ -1054,7 +1070,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserById(adminUserId) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE admin_user_id = $1`,
         [adminUserId],
@@ -1063,7 +1079,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserByUsername(username) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE username = $1`,
         [username],
@@ -1073,13 +1089,17 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveAdminUser(adminUser) {
       await pool.query(
         `INSERT INTO admin_users (
-          admin_user_id, username, display_name, password_hash, status, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT(admin_user_id) DO UPDATE SET
           username = EXCLUDED.username,
           display_name = EXCLUDED.display_name,
           password_hash = EXCLUDED.password_hash,
           status = EXCLUDED.status,
+          valid_from = EXCLUDED.valid_from,
+          valid_to = EXCLUDED.valid_to,
+          valid_for_minutes = EXCLUDED.valid_for_minutes,
+          first_signed_in_at = EXCLUDED.first_signed_in_at,
           created_at = EXCLUDED.created_at`,
         [
           adminUser.adminUserId,
@@ -1087,6 +1107,10 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           adminUser.displayName,
           adminUser.passwordHash,
           adminUser.status,
+          adminUser.validFrom,
+          adminUser.validTo,
+          adminUser.validForMinutes,
+          adminUser.firstSignedInAt,
           adminUser.createdAt
         ]
       );
