@@ -2366,6 +2366,7 @@ export type GetRuntimeConfigResponse = {
     port: number;
     shutdownDrainDelayMs: number;
     maxJsonBodyBytes: number;
+    maxSourcePackageJsonBodyBytes: number;
     httpTimeouts: {
       headersTimeoutMs: number;
       requestTimeoutMs: number;
@@ -2387,6 +2388,7 @@ export type GetRuntimeConfigResponse = {
       firstSliceSqliteFilePresent: boolean;
       firstSlicePostgresUrlPresent: boolean;
       firstSliceMaxJsonBodyBytesPresent: boolean;
+      firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
       firstSliceParticipantLoginMaxFailuresPresent: boolean;
       firstSliceParticipantLoginFailureWindowMsPresent: boolean;

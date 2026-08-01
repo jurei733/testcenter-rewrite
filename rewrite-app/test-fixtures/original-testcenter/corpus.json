@@ -298,6 +298,26 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "playerPackages": [
+    {
+      "bookletFixture": "booklets/booklet-17.4.xml",
+      "unitFixture": "units/aspect-testcenter-sample1.xml",
+      "definitionFixture": "definitions/aspect-testcenter-sample1.voud",
+      "playerFixture": "players/iqb-player-aspect-2.12.3.html.br.base64",
+      "sourcePaths": {
+        "booklet": "sampledata/aspect/booklet1.xml",
+        "unit": "sampledata/aspect/testcenter-sample1.xml",
+        "definition": "sampledata/aspect/testcenter-sample1.voud",
+        "player": "sampledata/aspect/iqb-player-aspect-2.12.3.html"
+      },
+      "bookletKey": "booklet1",
+      "unitKey": "testcenter-sample1",
+      "playerKey": "iqb-player-aspect@2.12",
+      "playerModuleVersion": "2.12.3",
+      "playerApiVersion": "6.0",
+      "playerSha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5"
+    }
+  ],
   "roster": {
     "fixture": "rosters/Testtakers.xml",
     "sourcePath": "sampledata/Testtakers.xml",

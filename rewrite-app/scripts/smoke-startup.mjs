@@ -323,6 +323,10 @@ try {
 
   for (const [label, value] of [
     ["maxJsonBodyBytes", config.runtimeConfig?.maxJsonBodyBytes],
+    [
+      "maxSourcePackageJsonBodyBytes",
+      config.runtimeConfig?.maxSourcePackageJsonBodyBytes
+    ],
     ["headersTimeoutMs", config.runtimeConfig?.httpTimeouts?.headersTimeoutMs],
     ["requestTimeoutMs", config.runtimeConfig?.httpTimeouts?.requestTimeoutMs],
     ["keepAliveTimeoutMs", config.runtimeConfig?.httpTimeouts?.keepAliveTimeoutMs]

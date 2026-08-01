@@ -1309,6 +1309,10 @@ export class OpsViewFacade {
             value: `${config.maxJsonBodyBytes} bytes`
           },
           {
+            label: "Source Package JSON Limit",
+            value: `${config.maxSourcePackageJsonBodyBytes} bytes`
+          },
+          {
             label: "HTTP Timeouts",
             value: `headers ${config.httpTimeouts.headersTimeoutMs}ms, request ${config.httpTimeouts.requestTimeoutMs}ms, keep-alive ${config.httpTimeouts.keepAliveTimeoutMs}ms`
           },

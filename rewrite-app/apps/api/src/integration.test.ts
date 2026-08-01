@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { deflateRawSync } from "node:zlib";
+import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
 import { createProductionApiServer } from "./index.js";
 
@@ -16,6 +17,11 @@ const originalTestcenterCorpusRoot = resolve(
   process.cwd(),
   "test-fixtures/original-testcenter"
 );
+
+const readBrotliBase64Fixture = (fixturePath: string): string =>
+  brotliDecompressSync(
+    Buffer.from(readFileSync(fixturePath, "utf8"), "base64")
+  ).toString("utf8");
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -1893,19 +1899,22 @@ test("operator API can require a platform-admin bearer session", async () => {
 test("API rejects JSON request bodies above the configured limit", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
-    FIRST_SLICE_MAX_JSON_BODY_BYTES: "96"
+    FIRST_SLICE_MAX_JSON_BODY_BYTES: "96",
+    FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES: "512"
   });
 
   try {
     const config = await requestJsonAt<{
       runtimeConfig: {
         maxJsonBodyBytes: number;
+        maxSourcePackageJsonBodyBytes: number;
         environment: { firstSliceMaxJsonBodyBytesPresent: boolean };
       };
     }>(isolated.baseUrl, "/diagnostics/config");
 
     assert.equal(config.status, 200);
     assert.equal(config.body.runtimeConfig.maxJsonBodyBytes, 96);
+    assert.equal(config.body.runtimeConfig.maxSourcePackageJsonBodyBytes, 512);
     assert.equal(
       config.body.runtimeConfig.environment.firstSliceMaxJsonBodyBytesPresent,
       true
@@ -1931,6 +1940,60 @@ test("API rejects JSON request bodies above the configured limit", async () => {
     assert.equal(oversizedResponse.status, 413);
     assert.equal(oversizedBody.error, "request_body_too_large");
     assert.equal(oversizedBody.details.maxJsonBodyBytes, 96);
+
+    const tenant = await requestJsonAt<{ tenant: { tenantKey: string } }>(
+      isolated.baseUrl,
+      "/api/v1/platform/tenants",
+      {
+        method: "POST",
+        body: { tenantKey: "body-limit", displayName: "Body Limit" }
+      }
+    );
+    assert.equal(tenant.status, 201);
+    const workspace = await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/body-limit/workspaces",
+      {
+        method: "POST",
+        body: { workspaceKey: "uploads", displayName: "Uploads" }
+      }
+    );
+    assert.equal(workspace.status, 201);
+    const sourcePackageWithinUploadLimit = await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/body-limit/workspaces/uploads/source-packages",
+      {
+        method: "POST",
+        body: {
+          fileName: "above-command-limit.txt",
+          mediaType: "text/plain",
+          sourceDocument: "x".repeat(128)
+        }
+      }
+    );
+    assert.equal(sourcePackageWithinUploadLimit.status, 201);
+
+    const sourcePackageAboveUploadLimit = await requestJsonAt<{
+      error: string;
+      details: { maxJsonBodyBytes: number };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/body-limit/workspaces/uploads/source-packages",
+      {
+        method: "POST",
+        body: {
+          fileName: "above-upload-limit.txt",
+          mediaType: "text/plain",
+          sourceDocument: "x".repeat(512)
+        }
+      }
+    );
+    assert.equal(sourcePackageAboveUploadLimit.status, 413);
+    assert.equal(sourcePackageAboveUploadLimit.body.error, "request_body_too_large");
+    assert.equal(
+      sourcePackageAboveUploadLimit.body.details.maxJsonBodyBytes,
+      512
+    );
   } finally {
     await closeServer(isolated.server);
   }
@@ -7662,6 +7725,162 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
     currentState.body.currentRunState.navigation.nextUnitKey,
     "professional-unit"
   );
+});
+
+test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
+  type PlayerPackage = {
+    bookletFixture: string;
+    unitFixture: string;
+    definitionFixture: string;
+    playerFixture: string;
+    bookletKey: string;
+    unitKey: string;
+    playerKey: string;
+    playerModuleVersion: string;
+    playerApiVersion: string;
+    playerSha256: string;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { playerPackages: PlayerPackage[] };
+  const expectation = corpus.playerPackages[0];
+  assert.ok(expectation);
+  const bookletDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.bookletFixture),
+    "utf8"
+  );
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
+    "utf8"
+  );
+  const definitionDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
+    "utf8"
+  );
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    expectation.playerSha256
+  );
+  assert.match(
+    playerDocument,
+    new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`)
+  );
+  assert.match(
+    playerDocument,
+    new RegExp(`"specVersion"\\s*:\\s*"${expectation.playerApiVersion}"`)
+  );
+
+  const zipPayload = createZipBase64(
+    [
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="${expectation.bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${expectation.unitKey}" href="units/Unit.xml" />
+              <resource identifier="testcenter-sample1.voud" href="units/testcenter-sample1.voud" />
+              <resource identifier="${expectation.playerKey}" href="players/iqb-player-aspect-2.12.3.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: bookletDocument
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: unitDocument
+      },
+      {
+        fileName: "export/units/testcenter-sample1.voud",
+        content: definitionDocument
+      },
+      {
+        fileName: "export/players/iqb-player-aspect-2.12.3.html",
+        content: playerDocument
+      }
+    ],
+    { compressionMethod: 8 }
+  );
+  const tenantKey = "integration-tenant-original-aspect-package";
+  const workspaceKey = "integration-workspace-original-aspect-package";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-aspect-player.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.equal(
+    importResult.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false
+  );
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+              unitDefinitionType?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const aspectUnit = snapshot.bookletEntries
+    .find(booklet => booklet.bookletKey === expectation.bookletKey)
+    ?.unitEntries.find(unit => unit.unitKey === expectation.unitKey);
+  assert.ok(aspectUnit);
+  assert.equal(aspectUnit.playerKey, expectation.playerKey);
+  assert.equal(aspectUnit.unitDefinition, definitionDocument.trim());
+  assert.equal(aspectUnit.unitDefinitionType, expectation.playerKey);
+  assert.deepEqual(snapshot.playerEntries, [
+    { playerKey: expectation.playerKey, html: playerDocument }
+  ]);
 });
 
 test("original Testcenter compatibility corpus assembles loose dependency files", async () => {
@@ -16778,6 +16997,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       port: number;
       shutdownDrainDelayMs: number;
       maxJsonBodyBytes: number;
+      maxSourcePackageJsonBodyBytes: number;
       httpTimeouts: {
         headersTimeoutMs: number;
         requestTimeoutMs: number;
@@ -16787,6 +17007,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       environment: {
         firstSliceStore: string;
         firstSlicePostgresUrlPresent: boolean;
+        firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
       };
     };
   };
@@ -16794,6 +17015,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.equal(typeof config.runtimeConfig.port, "number");
   assert.equal(typeof config.runtimeConfig.shutdownDrainDelayMs, "number");
   assert.equal(typeof config.runtimeConfig.maxJsonBodyBytes, "number");
+  assert.equal(
+    typeof config.runtimeConfig.maxSourcePackageJsonBodyBytes,
+    "number"
+  );
   assert.equal(typeof config.runtimeConfig.httpTimeouts.headersTimeoutMs, "number");
   assert.equal(typeof config.runtimeConfig.httpTimeouts.requestTimeoutMs, "number");
   assert.equal(
@@ -16807,6 +17032,11 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.equal(
     typeof config.runtimeConfig.environment.firstSlicePostgresUrlPresent,
+    "boolean"
+  );
+  assert.equal(
+    typeof config.runtimeConfig.environment
+      .firstSliceMaxSourcePackageJsonBodyBytesPresent,
     "boolean"
   );
   assertPostgresLocationRedacted(

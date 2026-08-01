@@ -4,6 +4,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
 
@@ -26,6 +27,11 @@ const repairedImportSourceDocument =
 const uploadedSourceDocument =
   '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="toolbar_show_reload_button">TRUE</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
 let smokeAdminSessionToken = "";
+
+const readBrotliBase64Text = async fixturePath =>
+  brotliDecompressSync(
+    Buffer.from(await readFile(fixturePath, "utf8"), "base64")
+  ).toString("utf8");
 
 const createStoredZipBuffer = entries => {
   const localFileHeaders = [];
@@ -3890,6 +3896,176 @@ try {
   assert.equal(
     await page.locator("#participantRouteAdaptiveState-level").inputValue(),
     "beginner"
+  );
+
+  logStep("participant-original-aspect-player");
+  const aspectLoginKey = "student-original-aspect-smoke";
+  const aspectBookletKey = "booklet1";
+  const aspectUnitKey = "testcenter-sample1";
+  const aspectPlayerKey = "iqb-player-aspect@2.12";
+  const [aspectBookletDocument, aspectUnitDocument, aspectDefinitionDocument] =
+    await Promise.all([
+      readFile(
+        resolve("test-fixtures/original-testcenter/booklets/booklet-17.4.xml"),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/units/aspect-testcenter-sample1.xml"
+        ),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample1.voud"
+        ),
+        "utf8"
+      )
+    ]);
+  const aspectPlayerDocument = await readBrotliBase64Text(
+    resolve(
+      "test-fixtures/original-testcenter/players/iqb-player-aspect-2.12.3.html.br.base64"
+    )
+  );
+  const aspectZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${aspectBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${aspectUnitKey}" href="units/Unit.xml" />
+            <resource identifier="testcenter-sample1.voud" href="units/testcenter-sample1.voud" />
+            <resource identifier="${aspectPlayerKey}" href="players/iqb-player-aspect-2.12.3.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: aspectBookletDocument
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: aspectUnitDocument
+    },
+    {
+      fileName: "export/units/testcenter-sample1.voud",
+      content: aspectDefinitionDocument
+    },
+    {
+      fileName: "export/players/iqb-player-aspect-2.12.3.html",
+      content: aspectPlayerDocument
+    }
+  ]);
+  const aspectSourcePackageResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "original-aspect-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${aspectZip.toString("base64")}`
+      }
+    }
+  );
+  const aspectSourcePackagePayload = await aspectSourcePackageResponse.json();
+  assert.equal(aspectSourcePackageResponse.status, 201);
+  const aspectImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: aspectSourcePackagePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const aspectImportPayload = await aspectImportResponse.json();
+  const aspectReleaseId =
+    aspectImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(aspectReleaseId, "Original Aspect import should stage a release.");
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${aspectReleaseId}/activate`,
+    { body: { forceActivation: true } }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          {
+            loginKey: aspectLoginKey,
+            groupKey: "group:original-aspect-smoke",
+            bookletKey: aspectBookletKey,
+            displayName: "Original Aspect Smoke Participant",
+            executionMode: "run-hot-return"
+          }
+        ]
+      }
+    }
+  );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: aspectLoginKey,
+      bookletKey: aspectBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 30_000 });
+  const aspectFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await aspectFrame.getByText("Unit 1", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  await aspectFrame.getByText("Eingabefeld", { exact: true }).waitFor();
+  const aspectParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(aspectParticipantSessionId);
+  const aspectResponse = "Gespeichert durch den Rewrite-Host";
+  await aspectFrame.locator("input").fill(aspectResponse);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[aspectUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const parsed = JSON.parse(response);
+        const elementCodes = JSON.parse(
+          parsed.unitState?.dataParts?.elementCodes ?? "[]"
+        );
+        return elementCodes.some(
+          elementCode =>
+            elementCode.id === "text-field_1" &&
+            elementCode.status === "VALUE_CHANGED" &&
+            elementCode.value === aspectResponse
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      aspectParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 30_000 });
+  const resumedAspectFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await resumedAspectFrame.getByText("Unit 1", { exact: true }).waitFor({
+    timeout: 30_000
+  });
+  assert.equal(
+    await resumedAspectFrame.locator("input").inputValue(),
+    aspectResponse
   );
   stopAfter("participant-verona-player");
 

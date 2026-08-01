@@ -7685,9 +7685,21 @@ const collectXmlBookletUnitContentPathCandidates = (
 const parseSystemCheckSourceDocument = (
   sourceDocument: string
 ): SourcePackageSystemCheckEntry[] => {
+  if (
+    !/^\uFEFF?\s*(?:<\?xml\b[^?]*\?>\s*)?<SysCheck(?:\s|>)/i.test(
+      sourceDocument
+    )
+  ) {
+    return [];
+  }
   let document: XmlDocument | null = null;
   try {
-    document = new DOMParser().parseFromString(sourceDocument, "application/xml");
+    document = new DOMParser({
+      onError() {
+        // Malformed SysCheck candidates are handled as non-matches here and by
+        // the dedicated XML validation path without leaking parser diagnostics.
+      }
+    }).parseFromString(sourceDocument, "application/xml");
   } catch {
     return [];
   }
