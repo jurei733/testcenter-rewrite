@@ -2868,6 +2868,213 @@ try {
     await resumedVeronaFrame.locator("#playerStartPage").textContent(),
     "page-1"
   );
+
+  logStep("participant-original-verona-player");
+  const originalAdaptiveLoginKey = "student-original-adaptive-smoke";
+  const originalAdaptiveBookletKey = "BOOKLET.SAMPLE-2";
+  const originalAdaptiveUnitKey = "decision-unit";
+  const [
+    originalAdaptiveBookletDocument,
+    originalAdaptiveUnitDocument,
+    originalAdaptiveCodingSchemeDocument,
+    originalAdaptivePlayerDocument
+  ] = await Promise.all([
+    readFile(
+      resolve("test-fixtures/original-testcenter/booklets/Booklet2.xml"),
+      "utf8"
+    ),
+    readFile(
+      resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter/schemes/coding-scheme.vocs.json"
+      ),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter/players/verona-player-simple-6.0.html"
+      ),
+      "utf8"
+    )
+  ]);
+  const originalAdaptiveZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${originalAdaptiveBookletKey}" href="booklets/Booklet2.xml" />
+            <resource identifier="UNIT.SAMPLE-2" href="units/Unit2.xml" />
+            <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
+            <resource identifier="verona-player-simple@6.0" href="players/verona-player-simple-6.0.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet2.xml",
+      content: originalAdaptiveBookletDocument
+    },
+    {
+      fileName: "export/units/Unit2.xml",
+      content: originalAdaptiveUnitDocument
+    },
+    {
+      fileName: "export/schemes/coding-scheme.vocs.json",
+      content: originalAdaptiveCodingSchemeDocument
+    },
+    {
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: originalAdaptivePlayerDocument
+    }
+  ]);
+  const originalAdaptiveSourcePackageResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "original-adaptive-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${originalAdaptiveZip.toString("base64")}`
+      }
+    }
+  );
+  const originalAdaptiveSourcePackagePayload =
+    await originalAdaptiveSourcePackageResponse.json();
+  const originalAdaptiveImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          originalAdaptiveSourcePackagePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const originalAdaptiveImportPayload = await originalAdaptiveImportResponse.json();
+  const originalAdaptiveReleaseId =
+    originalAdaptiveImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    originalAdaptiveReleaseId,
+    "Original adaptive browser smoke import should stage a release."
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${originalAdaptiveReleaseId}/activate`,
+    { body: { forceActivation: true } }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          {
+            loginKey: originalAdaptiveLoginKey,
+            groupKey: "group:original-adaptive-smoke",
+            bookletKey: originalAdaptiveBookletKey,
+            displayName: "Original Adaptive Smoke Participant"
+          }
+        ]
+      }
+    }
+  );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: originalAdaptiveLoginKey,
+      bookletKey: originalAdaptiveBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  const originalAdaptiveFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await originalAdaptiveFrame.locator("#var1").waitFor({ timeout: 15_000 });
+  await originalAdaptiveFrame.locator("#var2").waitFor();
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor();
+  await originalAdaptiveFrame
+    .locator("label[for='var1']")
+    .filter({ hasText: "var1" })
+    .waitFor();
+  const originalAdaptiveParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(originalAdaptiveParticipantSessionId);
+  await originalAdaptiveFrame.locator("#var1").fill("a");
+  await originalAdaptiveFrame.locator("#var1").dispatchEvent("keyup", {
+    key: "a",
+    code: "KeyA"
+  });
+  await originalAdaptiveFrame.locator("#var2").fill("a");
+  await originalAdaptiveFrame.locator("#var2").dispatchEvent("keyup", {
+    key: "a",
+    code: "KeyA"
+  });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
+    payload => {
+      if (
+        payload?.currentRunState?.testRun?.bookletStates?.level !==
+          "professional" ||
+        payload.currentRunState.testRun.bookletStates?.bonus !== "no"
+      ) {
+        return false;
+      }
+      const response =
+        payload.currentRunState.testRun.unitResponses?.[originalAdaptiveUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const parsed = JSON.parse(response);
+        const answers = JSON.parse(parsed.unitState?.dataParts?.answers ?? "[]");
+        return (
+          answers.find(answer => answer.id === "var1")?.value === "a" &&
+          answers.find(answer => answer.id === "var2")?.value === "a"
+        );
+      } catch {
+        return false;
+      }
+    }
+  );
+  await page.waitForFunction(
+    () => {
+      const unitKeys = [
+        ...document.querySelectorAll(
+          "#participantRouteUnitRail [data-unit-key]"
+        )
+      ].map(element => element.getAttribute("data-unit-key"));
+      return (
+        unitKeys.length === 2 &&
+        unitKeys[0] === "decision-unit" &&
+        unitKeys[1] === "professional-unit"
+      );
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      originalAdaptiveParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  const resumedOriginalAdaptiveFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await resumedOriginalAdaptiveFrame
+    .locator("#var1")
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await resumedOriginalAdaptiveFrame.locator("#var1").inputValue(),
+    "a"
+  );
+  assert.equal(
+    await resumedOriginalAdaptiveFrame.locator("#var2").inputValue(),
+    "a"
+  );
   stopAfter("participant-verona-player");
 
   logStep("nav-runtime");
@@ -3201,14 +3408,14 @@ try {
   await page
     .locator("#entryLinkSummary")
     .filter({ hasText: "Entry Links" })
-    .filter({ hasText: "9" })
+    .filter({ hasText: "10" })
     .filter({ hasText: workspaceKey })
     .filter({ hasText: "Ready" })
     .waitFor();
   await page
     .locator("#participantLaunchpad")
     .filter({ hasText: "Roster Entries" })
-    .filter({ hasText: "9" })
+    .filter({ hasText: "10" })
     .filter({ hasText: "Generated Links" })
     .filter({ hasText: "Link CSV" })
     .filter({ hasText: "Ready" })
@@ -4521,11 +4728,11 @@ try {
     .filter({ hasText: `${studyMonitorSummary.participantSessionCount} session(s)` })
     .filter({ hasText: `${studyMonitorSummary.testRunCount} run(s)` })
     .filter({ hasText: `${studyMonitorSummary.groups.length} group(s)` })
-    .filter({ hasText: "3 unit(s)" })
+    .filter({ hasText: `${studyMonitorSummary.unitProgress.length} unit(s)` })
     .filter({ hasText: `${studyMonitorMissingResponseCount} missing response(s)` })
     .filter({ hasText: "Roster Entries" })
     .filter({ hasText: "Not Started" })
-    .filter({ hasText: "3" })
+    .filter({ hasText: String(studyMonitorSummary.notStartedCount) })
     .waitFor();
   const participantUnitMatrixCard = page.locator("article.card").filter({
     has: page.getByRole("heading", {

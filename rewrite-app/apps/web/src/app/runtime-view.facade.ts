@@ -1236,6 +1236,7 @@ export class RuntimeViewFacade {
             { label: "Login", value: item.loginKey },
             { label: "Group", value: item.groupKey || "unknown" },
             { label: "Session", value: item.participantSessionId },
+            { label: "Test Run", value: item.testRunId },
             { label: "Updated", value: this.formatDateTime(item.updatedAt) }
           ],
           selected:

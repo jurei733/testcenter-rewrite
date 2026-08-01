@@ -542,7 +542,7 @@ export class RewriteAppWorkspaceService {
       ["unitKey", this.workspaceState.studyMonitorMatrixUnitFilter],
       ["testRunStatus", this.workspaceState.studyMonitorMatrixStatusFilter],
       ["answerState", this.workspaceState.studyMonitorMatrixAnswerFilter],
-      ["limit", this.workspaceState.studyMonitorMatrixLimit]
+      ["limit", "200"]
     ];
     for (const [key, value] of matrixFilters) {
       const trimmedValue = value.trim();
