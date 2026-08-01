@@ -6,6 +6,7 @@
   "main": "dist/packages/application/src/index.js",
   "types": "dist/packages/application/src/index.d.ts",
   "dependencies": {
+    "@iqb/responses": "3.6.0",
     "@testcenter-rewrite-app/contracts": "0.0.0",
     "@testcenter-rewrite-app/domain": "0.0.0",
     "@xmldom/xmldom": "^0.9.10"

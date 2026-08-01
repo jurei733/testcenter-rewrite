@@ -6,6 +6,8 @@ import type {
   Document as XmlDocument,
   Element as XmlElement
 } from "@xmldom/xmldom";
+import { CodingScheme } from "@iqb/responses";
+import type { Response as IqbResponse } from "@iqb/responses";
 
 import {
   bookletNavigationDeniedReasons,
@@ -58,6 +60,7 @@ import type {
   Tenant,
   TestRun,
   TestRunStatus,
+  UnitCodingScheme,
   Workspace,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
@@ -3135,6 +3138,32 @@ const normalizeRuntimeDocument = (value: unknown): string | undefined => {
   return document || undefined;
 };
 
+const normalizeUnitCodingScheme = (value: unknown): UnitCodingScheme | null => {
+  const rawScheme = Array.isArray(value)
+    ? { variableCodings: value }
+    : typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>)
+      : null;
+  if (
+    !rawScheme ||
+    !Array.isArray(rawScheme.variableCodings) ||
+    !rawScheme.variableCodings.every(
+      variableCoding =>
+        typeof variableCoding === "object" &&
+        variableCoding !== null &&
+        !Array.isArray(variableCoding)
+    )
+  ) {
+    return null;
+  }
+  const version =
+    typeof rawScheme.version === "string" ? rawScheme.version.trim() : "";
+  return {
+    ...(version ? { version } : {}),
+    variableCodings: rawScheme.variableCodings as Array<Record<string, unknown>>
+  };
+};
+
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
@@ -3415,6 +3444,7 @@ const normalizeContentStructure = (
       const unitDefinitionType = normalizeManifestToken(
         unitEntry.unitDefinitionType
       );
+      const codingScheme = normalizeUnitCodingScheme(unitEntry.codingScheme);
       normalizedBooklet.unitEntries.push({
         unitKey,
         displayLabel: normalizeManifestLabel(
@@ -3433,7 +3463,8 @@ const normalizeContentStructure = (
         ...(content ? { content } : {}),
         ...(playerKey ? { playerKey } : {}),
         ...(unitDefinition ? { unitDefinition } : {}),
-        ...(unitDefinitionType ? { unitDefinitionType } : {})
+        ...(unitDefinitionType ? { unitDefinitionType } : {}),
+        ...(codingScheme ? { codingScheme } : {})
       });
       unitKeys.add(unitKey);
     }
@@ -3674,6 +3705,8 @@ const normalizeParsedJsonContentStructure = (
         "itemBody",
         "item-body",
         "definition",
+        "codingScheme",
+        "codingSchemeDefinition",
         "text",
         "stimulus",
         "markdown",
@@ -4338,6 +4371,11 @@ const normalizeParsedJsonContentStructure = (
                   unit.playerType ??
                   playerKey
               ).trim();
+              const codingScheme = normalizeUnitCodingScheme(
+                unit.codingScheme ??
+                  unit.codingSchemeDefinition ??
+                  unit.scheme
+              );
               const testletPath = Array.isArray(unit.testletPath)
                 ? unit.testletPath
                     .map(testletKey => String(testletKey).trim())
@@ -4382,7 +4420,8 @@ const normalizeParsedJsonContentStructure = (
                 ...(content ? { content } : {}),
                 ...(playerKey ? { playerKey } : {}),
                 ...(unitDefinition ? { unitDefinition } : {}),
-                ...(unitDefinitionType ? { unitDefinitionType } : {})
+                ...(unitDefinitionType ? { unitDefinitionType } : {}),
+                ...(codingScheme ? { codingScheme } : {})
               };
             })
             .filter(Boolean) as SourcePackageContentStructure["bookletEntries"][number]["unitEntries"]
@@ -6198,6 +6237,98 @@ const extractZipUnitDefinition = (
   };
 };
 
+type ZipUnitCodingSchemeReference = {
+  reference: string;
+  schemer: string | null;
+  schemeType: string | null;
+};
+
+const extractZipUnitCodingSchemeReference = (
+  sourceDocument: string
+): ZipUnitCodingSchemeReference | null => {
+  const referenceMatch = sourceDocument.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?CodingSchemeRef)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/i
+  );
+  if (!referenceMatch) {
+    return null;
+  }
+  const attributes = parseXmlAttributes(referenceMatch[2] ?? "");
+  const reference = normalizeManifestToken(
+    readXmlAttribute(
+      attributes,
+      "href",
+      "path",
+      "src",
+      "uri",
+      "file",
+      "fileName",
+      "filename"
+    ) ?? decodeXmlTextContent(referenceMatch[3] ?? "")
+  );
+  return {
+    reference,
+    schemer:
+      normalizeManifestToken(readXmlAttribute(attributes, "schemer")) || null,
+    schemeType:
+      normalizeManifestToken(
+        readXmlAttribute(attributes, "schemeType", "type")
+      ) || null
+  };
+};
+
+const parseUnitCodingSchemeDocument = (
+  sourceDocument: string
+):
+  | { status: "valid"; codingScheme: UnitCodingScheme }
+  | { status: "invalid" | "unsupported" } => {
+  try {
+    const codingScheme = normalizeUnitCodingScheme(JSON.parse(sourceDocument));
+    if (!codingScheme) {
+      return { status: "invalid" };
+    }
+    if (codingScheme.version && !/^\d+\.\d+$/.test(codingScheme.version)) {
+      return { status: "invalid" };
+    }
+    if (CodingScheme.checkVersion(codingScheme) === "MAJOR_GREATER") {
+      return { status: "unsupported" };
+    }
+    const normalizedScheme = new CodingScheme(codingScheme);
+    const structurallyUsable = normalizedScheme.variableCodings.every(
+      variableCoding =>
+        typeof variableCoding.id === "string" &&
+        typeof variableCoding.alias === "string" &&
+        typeof variableCoding.sourceType === "string" &&
+        typeof variableCoding.sourceParameters === "object" &&
+        variableCoding.sourceParameters !== null &&
+        Array.isArray(variableCoding.deriveSources) &&
+        Array.isArray(variableCoding.codes)
+    );
+    return structurallyUsable
+      ? { status: "valid", codingScheme }
+      : { status: "invalid" };
+  } catch {
+    return { status: "invalid" };
+  }
+};
+
+const findZipUnitCodingSchemeEntry = (
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>,
+  unitEntry: ZipEntry,
+  reference: string,
+  manifestResources = collectXmlManifestResources(
+    manifestExtraction.manifestText
+  )
+): ZipEntry | null => {
+  const manifestResource = findXmlManifestResource(manifestResources, reference);
+  return findZipEntryByPath(manifestExtraction.entries, [
+    ...resolveZipResourcePathCandidates(unitEntry.fileName, reference),
+    ...resolveZipResourcePathCandidates(
+      manifestExtraction.manifestFileName,
+      manifestResource?.key ?? reference
+    )
+  ]);
+};
+
 const findXmlManifestResource = (
   resources: Map<string, XmlManifestResource>,
   reference: string | null
@@ -6400,12 +6531,24 @@ const normalizeParsedZipXmlContentStructure = (
         ];
         const referencedEntry = findZipEntryByPath(
           manifestExtraction.entries,
-          resourcePathCandidates.flatMap(candidate =>
-            resolveZipResourcePathCandidates(
-              candidate.baseFileName,
+          resourcePathCandidates.flatMap(candidate => {
+            const manifestResource = findXmlManifestResource(
+              manifestResources,
               candidate.resourcePath
-            )
-          )
+            );
+            return [
+              ...resolveZipResourcePathCandidates(
+                candidate.baseFileName,
+                candidate.resourcePath
+              ),
+              ...(manifestResource
+                ? resolveZipResourcePathCandidates(
+                    manifestExtraction.manifestFileName,
+                    manifestResource.key
+                  )
+                : [])
+            ];
+          })
         );
         if (!referencedEntry) {
           return unitEntry;
@@ -6420,6 +6563,22 @@ const normalizeParsedZipXmlContentStructure = (
         }
 
         const unitDefinition = extractZipUnitDefinition(sourceDocument);
+        const codingSchemeReference =
+          extractZipUnitCodingSchemeReference(sourceDocument);
+        const codingSchemeEntry = codingSchemeReference?.reference
+          ? findZipUnitCodingSchemeEntry(
+              manifestExtraction,
+              referencedEntry,
+              codingSchemeReference.reference,
+              manifestResources
+            )
+          : null;
+        const codingSchemeDocument = codingSchemeEntry
+          ? readZipEntryText(manifestExtraction.zipBuffer, codingSchemeEntry)
+          : null;
+        const codingSchemeResult = codingSchemeDocument
+          ? parseUnitCodingSchemeDocument(codingSchemeDocument)
+          : null;
         const definitionReference = unitDefinition.reference;
         const definitionEntry = definitionReference
           ? findZipEntryByPath(
@@ -6492,6 +6651,9 @@ const normalizeParsedZipXmlContentStructure = (
           ...(runtimeUnitDefinition ? { unitDefinition: runtimeUnitDefinition } : {}),
           ...(unitDefinition.unitDefinitionType
             ? { unitDefinitionType: unitDefinition.unitDefinitionType }
+            : {}),
+          ...(codingSchemeResult?.status === "valid"
+            ? { codingScheme: codingSchemeResult.codingScheme }
             : {})
         };
       })
@@ -6506,6 +6668,9 @@ const validateZipXmlEntries = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
+  const manifestResources = collectXmlManifestResources(
+    manifestExtraction.manifestText
+  );
   for (const entry of manifestExtraction.entries) {
     if (
       entry.fileName.endsWith("/") ||
@@ -6530,6 +6695,63 @@ const validateZipXmlEntries = (
     diagnostics.push(
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
+    const codingSchemeReference =
+      extractZipUnitCodingSchemeReference(sourceDocument);
+    if (!codingSchemeReference) {
+      continue;
+    }
+    if (!codingSchemeReference.reference) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_coding_scheme_reference_invalid",
+          `Unit ZIP entry '${entry.fileName}' contains a CodingSchemeRef without a resource path.`
+        )
+      );
+      continue;
+    }
+    const codingSchemeEntry = findZipUnitCodingSchemeEntry(
+      manifestExtraction,
+      entry,
+      codingSchemeReference.reference,
+      manifestResources
+    );
+    if (!codingSchemeEntry) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_coding_scheme_missing",
+          `Unit ZIP entry '${entry.fileName}' references missing coding scheme '${codingSchemeReference.reference}'.`
+        )
+      );
+      continue;
+    }
+    const codingSchemeDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      codingSchemeEntry
+    );
+    if (codingSchemeDocument === null) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_coding_scheme_unreadable",
+          `Coding scheme ZIP entry '${codingSchemeEntry.fileName}' could not be read.`
+        )
+      );
+      continue;
+    }
+    const parsedCodingScheme = parseUnitCodingSchemeDocument(
+      codingSchemeDocument
+    );
+    if (parsedCodingScheme.status !== "valid") {
+      diagnostics.push(
+        createImportDiagnostic(
+          parsedCodingScheme.status === "unsupported"
+            ? "source_document_coding_scheme_version_unsupported"
+            : "source_document_coding_scheme_invalid",
+          parsedCodingScheme.status === "unsupported"
+            ? `Coding scheme ZIP entry '${codingSchemeEntry.fileName}' uses a newer unsupported major version.`
+            : `Coding scheme ZIP entry '${codingSchemeEntry.fileName}' is not a valid IQB coding scheme.`
+        )
+      );
+    }
   }
   return diagnostics;
 };
@@ -6944,7 +7166,38 @@ const adaptiveValueAsComparable = (value: unknown): string | number => {
   return typeof value === "number" || typeof value === "string" ? value : "";
 };
 
+const collectAdaptiveVariableKeys = (
+  booklet: ContentReleaseBookletEntry
+): Map<string, Set<string>> => {
+  const variableKeysByUnitKey = new Map<string, Set<string>>();
+  const registerVariable = (source: BookletStateVariableSource): void => {
+    const variableKeys = variableKeysByUnitKey.get(source.unitKey) ?? new Set();
+    variableKeys.add(source.variableKey);
+    variableKeysByUnitKey.set(source.unitKey, variableKeys);
+  };
+  const registerCondition = (condition: BookletStateCondition): void => {
+    const source = condition.source;
+    if (
+      source.type === "Code" ||
+      source.type === "Value" ||
+      source.type === "Status" ||
+      source.type === "Score"
+    ) {
+      registerVariable(source);
+    } else if (source.type === "Count") {
+      source.conditions.forEach(registerCondition);
+    } else if ("sources" in source) {
+      source.sources.forEach(registerVariable);
+    }
+  };
+  booklet.stateEntries?.forEach(state =>
+    state.options.forEach(option => option.conditions.forEach(registerCondition))
+  );
+  return variableKeysByUnitKey;
+};
+
 const resolveAdaptiveVariables = (
+  booklet: ContentReleaseBookletEntry,
   testRun: TestRun
 ): Map<string, Map<string, AdaptiveResponseVariable>> => {
   const variablesByUnitKey = new Map<
@@ -6994,6 +7247,57 @@ const resolveAdaptiveVariables = (
     }
     variablesByUnitKey.set(unitKey, variables);
   }
+
+  const trackedVariablesByUnitKey = collectAdaptiveVariableKeys(booklet);
+  for (const unitEntry of booklet.unitEntries) {
+    const trackedVariableKeys = trackedVariablesByUnitKey.get(unitEntry.unitKey);
+    if (!unitEntry.codingScheme || !trackedVariableKeys?.size) {
+      continue;
+    }
+    const variables = variablesByUnitKey.get(unitEntry.unitKey) ?? new Map();
+    try {
+      const codingScheme = new CodingScheme(unitEntry.codingScheme);
+      const baseVariableKeys = codingScheme.getBaseVarsList([
+        ...trackedVariableKeys
+      ]);
+      const baseResponses = baseVariableKeys.map(variableKey => {
+        const variable = variables.get(variableKey);
+        return variable
+          ? ({
+              id: variable.id,
+              status: variable.status as IqbResponse["status"],
+              value: variable.value as IqbResponse["value"],
+              ...(variable.code === undefined ? {} : { code: variable.code }),
+              ...(variable.score === undefined ? {} : { score: variable.score })
+            } satisfies IqbResponse)
+          : ({
+              id: variableKey,
+              status: "UNSET",
+              value: null
+            } satisfies IqbResponse);
+      });
+      for (const codedVariable of codingScheme.code(baseResponses)) {
+        if (!trackedVariableKeys.has(codedVariable.id)) {
+          continue;
+        }
+        variables.set(codedVariable.id, {
+          id: codedVariable.id,
+          status: codedVariable.status,
+          value: codedVariable.value,
+          ...(codedVariable.code === undefined
+            ? {}
+            : { code: codedVariable.code }),
+          ...(codedVariable.score === undefined
+            ? {}
+            : { score: codedVariable.score })
+        });
+      }
+      variablesByUnitKey.set(unitEntry.unitKey, variables);
+    } catch {
+      // Keep the player's raw variables available when a staged legacy scheme
+      // cannot code an individual response payload.
+    }
+  }
   return variablesByUnitKey;
 };
 
@@ -7004,7 +7308,7 @@ const evaluateAdaptiveStates = (
   if (!booklet?.stateEntries?.length) {
     return [];
   }
-  const variablesByUnitKey = resolveAdaptiveVariables(testRun);
+  const variablesByUnitKey = resolveAdaptiveVariables(booklet, testRun);
   const readVariable = (
     source: BookletStateVariableSource
   ): AdaptiveResponseVariable | undefined =>

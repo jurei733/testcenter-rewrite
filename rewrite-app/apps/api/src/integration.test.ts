@@ -9449,6 +9449,333 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
   );
 });
 
+test("original coding schemes derive adaptive variables server-side", async () => {
+  const tenantKey = "integration-tenant-adaptive-coding";
+  const workspaceKey = "integration-workspace-adaptive-coding";
+  const bookletKey = "BOOKLET.ADAPTIVE.CODING";
+  const createBaseCoding = (
+    id: string,
+    matches: Array<{ value: string; code: number; score: number }>
+  ) => ({
+    id,
+    alias: id,
+    label: "",
+    sourceType: "BASE",
+    sourceParameters: { solverExpression: "", processing: [] },
+    deriveSources: [],
+    processing: [],
+    fragmenting: "",
+    manualInstruction: "",
+    codeModel: "NONE",
+    codes: [
+      ...matches.map(match => ({
+        id: match.code,
+        type: match.score === 100 ? "FULL_CREDIT" : "PARTIAL_CREDIT",
+        label: "",
+        score: match.score,
+        ruleSetOperatorAnd: false,
+        ruleSets: [
+          {
+            ruleOperatorAnd: true,
+            rules: [{ method: "MATCH", parameters: [match.value] }]
+          }
+        ],
+        manualInstruction: ""
+      })),
+      {
+        id: 0,
+        type: "RESIDUAL_AUTO",
+        label: "",
+        score: 0,
+        ruleSetOperatorAnd: false,
+        ruleSets: [],
+        manualInstruction: ""
+      }
+    ]
+  });
+  const codingSchemeDocument = JSON.stringify({
+    version: "3.0",
+    variableCodings: [
+      createBaseCoding("var1", [{ value: "a", code: 1, score: 100 }]),
+      createBaseCoding("var2", [
+        { value: "a", code: 1, score: 100 },
+        { value: "b", code: 2, score: 50 }
+      ]),
+      {
+        id: "derived_var",
+        alias: "derived_var",
+        label: "",
+        sourceType: "SUM_SCORE",
+        sourceParameters: { solverExpression: "", processing: [] },
+        deriveSources: ["var1", "var2"],
+        processing: [],
+        codeModel: "NONE",
+        manualInstruction: "",
+        page: "",
+        codes: []
+      }
+    ]
+  });
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-adaptive-coding.xml" />
+            <resource identifier="UNIT.DECISION" href="units/Unit-decision.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-adaptive-coding.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Adaptive Coding Booklet</Label></Metadata>
+          <States>
+            <State id="route" label="Server-coded route">
+              <Option id="professional" label="Professional">
+                <If><Value of="derived_var" from="decision-unit"/><Is greaterThan="149"/></If>
+                <If><Code of="var2" from="decision-unit"/><Is equal="2"/></If>
+                <If><Score of="var1" from="decision-unit"/><Is greaterThan="99"/></If>
+              </Option>
+              <Option id="basic" label="Basic"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.DECISION" alias="decision-unit" label="Decision Unit"/>
+            <Testlet id="professional-block">
+              <Restrictions><Show if="route" is="professional"/></Restrictions>
+              <Unit id="UNIT.PROFESSIONAL" alias="professional-unit" label="Professional Unit"/>
+            </Testlet>
+            <Testlet id="basic-block">
+              <Restrictions><Show if="route" is="basic"/></Restrictions>
+              <Unit id="UNIT.BASIC" alias="basic-unit" label="Basic Unit"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit-decision.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>UNIT.DECISION</Id><Label>Decision Unit</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>Decision</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@3.0">../schemes/coding-scheme.vocs.json</CodingSchemeRef>
+          <BaseVariables>
+            <Variable id="var1" type="string"/>
+            <Variable id="var2" type="string"/>
+          </BaseVariables>
+          <DerivedVariables><Variable id="derived_var" type="number"/></DerivedVariables>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/schemes/coding-scheme.vocs.json",
+      content: codingSchemeDocument
+    }
+  ]);
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "adaptive-coding-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const decisionUnit =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries.find(unit => unit.unitKey === "decision-unit");
+  assert.equal(decisionUnit?.codingScheme?.version, "3.0");
+  assert.equal(decisionUnit?.codingScheme?.variableCodings.length, 3);
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "adaptive-coding-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.deepEqual(resume.body.testRun.bookletStates, { route: "basic" });
+
+  const rawPlayerResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: {
+        responses: JSON.stringify([
+          { id: "var1", status: "VALUE_CHANGED", value: "a" },
+          { id: "var2", status: "VALUE_CHANGED", value: "b" }
+        ])
+      }
+    }
+  });
+  const saveResult = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse: rawPlayerResponse
+    }
+  });
+  assert.equal(saveResult.status, 200);
+  assert.deepEqual(saveResult.body.testRun.bookletStates, {
+    route: "professional"
+  });
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "professional-unit"]
+  );
+  assert.deepEqual(currentState.body.currentRunState.adaptiveStates, [
+    {
+      stateKey: "route",
+      displayLabel: "Server-coded route",
+      optionKey: "professional",
+      optionLabel: "Professional"
+    }
+  ]);
+});
+
+test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
+  const tenantKey = "integration-tenant-coding-import-errors";
+  const workspaceKey = "integration-workspace-coding-import-errors";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const cases = [
+    {
+      name: "missing",
+      schemeDocument: null,
+      expectedCode: "source_document_coding_scheme_missing"
+    },
+    {
+      name: "invalid",
+      schemeDocument: JSON.stringify({ version: "3.0", variableCodings: {} }),
+      expectedCode: "source_document_coding_scheme_invalid"
+    },
+    {
+      name: "newer-major",
+      schemeDocument: JSON.stringify({ version: "4.0", variableCodings: [] }),
+      expectedCode: "source_document_coding_scheme_version_unsupported"
+    }
+  ];
+  for (const testCase of cases) {
+    const entries: ZipFixtureEntry[] = [
+      { fileName: "imsmanifest.xml", content: "<manifest/>" },
+      {
+        fileName: "units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>UNIT.CODING.ERROR</Id><Label>Coding Error Unit</Label></Metadata>
+            <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@3.0">../schemes/coding-scheme.vocs.json</CodingSchemeRef>
+          </Unit>
+        `
+      },
+      ...(testCase.schemeDocument === null
+        ? []
+        : [
+            {
+              fileName: "schemes/coding-scheme.vocs.json",
+              content: testCase.schemeDocument
+            }
+          ])
+    ];
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `coding-scheme-${testCase.name}.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${createZipBase64(entries)}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201);
+    assert.equal(importResult.body.importJob.status, "failed");
+    assert.equal(importResult.body.stagedContentRelease, null);
+    assert.ok(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === testCase.expectedCode
+      )
+    );
+  }
+});
+
 test("original BookletConfig compiles into enforced participant navigation policy", async () => {
   const tenantKey = "integration-tenant-booklet-policy";
   const workspaceKey = "integration-workspace-booklet-policy";

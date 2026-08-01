@@ -339,6 +339,13 @@ export type SourcePackageUnitEntry = {
   playerKey?: string;
   unitDefinition?: string;
   unitDefinitionType?: string;
+  codingScheme?: UnitCodingScheme;
+};
+
+/** Serializable IQB variable-coding definition retained with a content release. */
+export type UnitCodingScheme = {
+  version?: string;
+  variableCodings: Array<Record<string, unknown>>;
 };
 
 export type ImportJob = {
@@ -451,6 +458,7 @@ export type ContentReleaseUnitEntry = {
   playerKey?: string;
   unitDefinition?: string;
   unitDefinitionType?: string;
+  codingScheme?: UnitCodingScheme;
 };
 
 export type ParticipantSession = {
