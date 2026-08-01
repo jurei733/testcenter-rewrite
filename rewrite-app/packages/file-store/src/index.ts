@@ -9,6 +9,7 @@ import type {
   AdminUser,
   ContentRelease,
   ImportJob,
+  ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
@@ -35,6 +36,7 @@ type PersistedFirstSliceState = {
   participantSessions: Record<string, ParticipantSession>;
   participantRosterEntries: Record<string, ParticipantRosterEntry>;
   participantRosterPasswordHashes: Record<string, string>;
+  participantLoginAttempts: Record<string, ParticipantLoginAttempt>;
   testRuns: Record<string, TestRun>;
 };
 
@@ -54,6 +56,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   participantSessions: {},
   participantRosterEntries: {},
   participantRosterPasswordHashes: {},
+  participantLoginAttempts: {},
   testRuns: {}
 });
 
@@ -65,6 +68,8 @@ const participantRosterPasswordKey = (
   workspaceId: string,
   loginKey: string
 ): string => `${tenantId}::${workspaceId}::${loginKey}`;
+
+const participantLoginAttemptKey = participantRosterPasswordKey;
 
 const readStateFromFile = async (
   filePath: string
@@ -383,6 +388,41 @@ export const createFileFirstSliceRepository = (
           delete state.participantRosterPasswordHashes[passwordKey];
         }
       });
+    },
+    async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
+      const state = await getState();
+      return (
+        state.participantLoginAttempts[
+          participantLoginAttemptKey(tenantId, workspaceId, loginKey)
+        ] ?? null
+      );
+    },
+    async recordParticipantLoginFailure(input) {
+      let result: ParticipantLoginAttempt | null = null;
+      await mutate(state => {
+        const attemptKey = participantLoginAttemptKey(
+          input.tenantId,
+          input.workspaceId,
+          input.loginKey
+        );
+        const current = state.participantLoginAttempts[attemptKey];
+        result = {
+          tenantId: input.tenantId,
+          workspaceId: input.workspaceId,
+          loginKey: input.loginKey,
+          failedAttempts:
+            !current || current.expiresAt <= input.attemptedAt
+              ? 1
+              : current.failedAttempts + 1,
+          expiresAt: input.expiresAt,
+          updatedAt: input.attemptedAt
+        };
+        state.participantLoginAttempts[attemptKey] = result;
+      });
+      if (!result) {
+        throw new Error("Participant login failure could not be persisted.");
+      }
+      return result;
     },
     async getTestRunById(testRunId) {
       const state = await getState();

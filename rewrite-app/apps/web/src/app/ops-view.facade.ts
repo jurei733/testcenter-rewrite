@@ -1301,6 +1301,10 @@ export class OpsViewFacade {
             value: config.operatorAuthRequired ? "yes" : "no"
           },
           {
+            label: "Participant Login Sink",
+            value: `${config.participantLoginProtection.maxFailures} failures / ${config.participantLoginProtection.failureWindowMs}ms`
+          },
+          {
             label: "JSON Body Limit",
             value: `${config.maxJsonBodyBytes} bytes`
           },

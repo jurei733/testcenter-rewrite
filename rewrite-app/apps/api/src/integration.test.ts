@@ -97,6 +97,7 @@ const createZipBase64 = (
 type JsonResponse<T> = {
   status: number;
   body: T;
+  headers: Headers;
 };
 
 const requestJsonAt = async <T>(
@@ -119,7 +120,8 @@ const requestJsonAt = async <T>(
   });
   return {
     status: response.status,
-    body: (await response.json()) as T
+    body: (await response.json()) as T,
+    headers: response.headers
   };
 };
 
@@ -1854,6 +1856,24 @@ test("runtime port and shutdown drain settings are validated and exposed", async
         SHUTDOWN_DRAIN_DELAY_MS: "250ms"
       }),
     /SHUTDOWN_DRAIN_DELAY_MS must be a non-negative integer/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "0"
+      }),
+    /FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES must be a positive integer/
+  );
+
+  await assert.rejects(
+    () =>
+      createIsolatedServer({
+        FIRST_SLICE_STORE: "memory",
+        FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "1.5"
+      }),
+    /FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS must be a non-negative integer/
   );
 });
 
@@ -14105,6 +14125,167 @@ test("participant access windows enforce Original Testcenter timing semantics", 
     );
     assert.equal(blockedResume.status, 410);
     assert.equal(blockedResume.body.error, "participant_access_expired");
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
+test("password-protected participant logins use a shared persistent login sink", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true",
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "2",
+    FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "500"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        participantLoginProtection: {
+          maxFailures: number;
+          failureWindowMs: number;
+        };
+        environment: {
+          firstSliceParticipantLoginMaxFailuresPresent: boolean;
+          firstSliceParticipantLoginFailureWindowMsPresent: boolean;
+        };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+    assert.deepEqual(config.body.runtimeConfig.participantLoginProtection, {
+      maxFailures: 2,
+      failureWindowMs: 500
+    });
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceParticipantLoginMaxFailuresPresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceParticipantLoginFailureWindowMsPresent,
+      true
+    );
+
+    const rosterImport = await requestJsonAt<{ updatedCount: number }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/participant-roster",
+      {
+        method: "POST",
+        body: {
+          rosterText: [
+            "loginKey,groupKey,bookletKey,displayName,pw",
+            "sink-protected,group:sink,booklet:demo,Sink Protected,correct-secret",
+            "sink-other,group:sink,booklet:demo,Sink Other,other-secret"
+          ].join("\n")
+        }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const unknownLogin = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/participant/auth/sign-in",
+        {
+          method: "POST",
+          body: {
+            tenantKey: "demo-tenant",
+            workspaceKey: "demo-workspace",
+            loginKey: "sink-unknown",
+            password: "wrong-secret"
+          }
+        }
+      );
+      assert.equal(unknownLogin.status, 401);
+      assert.equal(unknownLogin.body.error, "participant_login_invalid");
+    }
+
+    const firstFailure = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "sink-protected",
+          password: "wrong-secret"
+        }
+      }
+    );
+    assert.equal(firstFailure.status, 401);
+    assert.equal(firstFailure.body.error, "participant_password_invalid");
+
+    const secondFailureThroughStarter = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/participant/starter:launch",
+      {
+        method: "POST",
+        body: {
+          tenantKey: "demo-tenant",
+          workspaceKey: "demo-workspace",
+          loginKey: "sink-protected",
+          password: "still-wrong"
+        }
+      }
+    );
+    assert.equal(secondFailureThroughStarter.status, 401);
+    assert.equal(
+      secondFailureThroughStarter.body.error,
+      "participant_password_invalid"
+    );
+
+    const blockedCorrectStarter = await requestJsonAt<{
+      error: string;
+      details: { retryAfterSeconds: number; maxFailures: number };
+    }>(isolated.baseUrl, "/api/v1/participant/starter:launch", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "sink-protected",
+        password: "correct-secret"
+      }
+    });
+    assert.equal(blockedCorrectStarter.status, 429);
+    assert.equal(
+      blockedCorrectStarter.body.error,
+      "participant_login_rate_limited"
+    );
+    assert.equal(blockedCorrectStarter.body.details.maxFailures, 2);
+    assert.ok(blockedCorrectStarter.body.details.retryAfterSeconds >= 1);
+    assert.equal(blockedCorrectStarter.headers.get("retry-after"), "1");
+
+    const unaffectedLogin = await requestJsonAt<{
+      participantSession: { loginKey: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "sink-other",
+        password: "other-secret"
+      }
+    });
+    assert.equal(unaffectedLogin.status, 200);
+    assert.equal(unaffectedLogin.body.participantSession.loginKey, "sink-other");
+
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    const recoveredLogin = await requestJsonAt<{
+      participantSession: { loginKey: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey: "demo-tenant",
+        workspaceKey: "demo-workspace",
+        loginKey: "sink-protected",
+        password: "correct-secret"
+      }
+    });
+    assert.equal(recoveredLogin.status, 200);
+    assert.equal(recoveredLogin.body.participantSession.loginKey, "sink-protected");
   } finally {
     await closeServer(isolated.server);
   }

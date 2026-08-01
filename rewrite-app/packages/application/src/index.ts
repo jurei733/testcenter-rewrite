@@ -47,6 +47,7 @@ import type {
   MonitorRunCommandType,
   OpenMonitorRun,
   ParticipantCurrentRunState,
+  ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantRuntimeBooklet,
   ParticipantSession,
@@ -804,6 +805,18 @@ export type FirstSliceRepository = {
     participantRosterEntry: ParticipantRosterEntry,
     passwordHash: string | null
   ): Promise<void>;
+  getParticipantLoginAttempt(
+    tenantId: string,
+    workspaceId: string,
+    loginKey: string
+  ): Promise<ParticipantLoginAttempt | null>;
+  recordParticipantLoginFailure(input: {
+    tenantId: string;
+    workspaceId: string;
+    loginKey: string;
+    attemptedAt: string;
+    expiresAt: string;
+  }): Promise<ParticipantLoginAttempt>;
   getTestRunById(testRunId: string): Promise<TestRun | null>;
   listTestRunsByParticipantSessionId(
     participantSessionId: string
@@ -830,6 +843,8 @@ export type FirstSliceDependencies = {
   now?: () => string;
   adminSessionTtlMs?: number;
   participantAccessTimeZone?: string;
+  participantLoginMaxFailures?: number;
+  participantLoginFailureWindowMs?: number;
 };
 
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
@@ -844,6 +859,8 @@ const TEST_RUN_PROGRESS_STATUSES: Array<
   Extract<TestRunStatus, "running" | "paused">
 > = ["running", "paused"];
 const DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE = "Europe/Berlin";
+const DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES = 5;
+const DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 
 const readTimeZoneParts = (
   timestampMs: number,
@@ -10449,6 +10466,24 @@ export const createFirstSliceServices = (
   const participantAccessTimeZone =
     dependencies.participantAccessTimeZone ??
     DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE;
+  const participantLoginMaxFailures =
+    dependencies.participantLoginMaxFailures ??
+    DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES;
+  const participantLoginFailureWindowMs =
+    dependencies.participantLoginFailureWindowMs ??
+    DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS;
+  if (
+    !Number.isInteger(participantLoginMaxFailures) ||
+    participantLoginMaxFailures <= 0
+  ) {
+    throw new Error("participantLoginMaxFailures must be a positive integer.");
+  }
+  if (
+    !Number.isInteger(participantLoginFailureWindowMs) ||
+    participantLoginFailureWindowMs <= 0
+  ) {
+    throw new Error("participantLoginFailureWindowMs must be a positive integer.");
+  }
   try {
     readTimeZoneParts(Date.now(), participantAccessTimeZone);
   } catch {
@@ -13514,7 +13549,36 @@ export const createFirstSliceServices = (
             "Participant login is invalid."
           );
         }
+        const signInTimestamp = now();
         if (rosterEntry?.passwordRequired) {
+          const loginAttempt = await repository.getParticipantLoginAttempt(
+            workspace.tenantId,
+            workspace.workspaceId,
+            loginKey
+          );
+          const loginAttemptExpiresAtMs = Date.parse(
+            loginAttempt?.expiresAt ?? ""
+          );
+          const signInTimestampMs = Date.parse(signInTimestamp);
+          if (
+            loginAttempt &&
+            loginAttempt.failedAttempts >= participantLoginMaxFailures &&
+            Number.isFinite(loginAttemptExpiresAtMs) &&
+            loginAttemptExpiresAtMs > signInTimestampMs
+          ) {
+            throw new FirstSliceError(
+              429,
+              "participant_login_rate_limited",
+              "Too many failed participant login attempts. Try again later.",
+              {
+                retryAfterSeconds: Math.max(
+                  1,
+                  Math.ceil((loginAttemptExpiresAtMs - signInTimestampMs) / 1_000)
+                ),
+                maxFailures: participantLoginMaxFailures
+              }
+            );
+          }
           const passwordHash = await repository.getParticipantRosterPasswordHash(
             workspace.tenantId,
             workspace.workspaceId,
@@ -13525,6 +13589,16 @@ export const createFirstSliceServices = (
             typeof input.password !== "string" ||
             !verifyPassword(input.password, passwordHash)
           ) {
+            const failedAt = now();
+            await repository.recordParticipantLoginFailure({
+              tenantId: workspace.tenantId,
+              workspaceId: workspace.workspaceId,
+              loginKey,
+              attemptedAt: failedAt,
+              expiresAt: new Date(
+                Date.parse(failedAt) + participantLoginFailureWindowMs
+              ).toISOString()
+            });
             throw new FirstSliceError(
               401,
               "participant_password_invalid",
@@ -13532,7 +13606,6 @@ export const createFirstSliceServices = (
             );
           }
         }
-        const signInTimestamp = now();
         const requestedGroupKey = String(input.groupKey ?? "").trim();
         const groupKey =
           rosterEntry?.groupKey || requestedGroupKey || `group:${loginKey}`;

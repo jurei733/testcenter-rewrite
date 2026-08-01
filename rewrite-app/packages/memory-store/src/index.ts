@@ -6,6 +6,7 @@ import type {
   AdminUser,
   ContentRelease,
   ImportJob,
+  ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
@@ -33,6 +34,7 @@ type InMemoryFirstSliceState = {
   participantSessions: Map<string, ParticipantSession>;
   participantRosterEntries: Map<string, ParticipantRosterEntry>;
   participantRosterPasswordHashes: Map<string, string>;
+  participantLoginAttempts: Map<string, ParticipantLoginAttempt>;
   testRuns: Map<string, TestRun>;
 };
 
@@ -53,6 +55,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   participantSessions: new Map(),
   participantRosterEntries: new Map(),
   participantRosterPasswordHashes: new Map(),
+  participantLoginAttempts: new Map(),
   testRuns: new Map()
 });
 
@@ -64,6 +67,8 @@ const participantRosterPasswordKey = (
   workspaceId: string,
   loginKey: string
 ): string => `${tenantId}::${workspaceId}::${loginKey}`;
+
+const participantLoginAttemptKey = participantRosterPasswordKey;
 
 export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
@@ -230,6 +235,34 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       } else {
         state.participantRosterPasswordHashes.delete(passwordKey);
       }
+    },
+    async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
+      return (
+        state.participantLoginAttempts.get(
+          participantLoginAttemptKey(tenantId, workspaceId, loginKey)
+        ) ?? null
+      );
+    },
+    async recordParticipantLoginFailure(input) {
+      const attemptKey = participantLoginAttemptKey(
+        input.tenantId,
+        input.workspaceId,
+        input.loginKey
+      );
+      const current = state.participantLoginAttempts.get(attemptKey);
+      const next: ParticipantLoginAttempt = {
+        tenantId: input.tenantId,
+        workspaceId: input.workspaceId,
+        loginKey: input.loginKey,
+        failedAttempts:
+          !current || current.expiresAt <= input.attemptedAt
+            ? 1
+            : current.failedAttempts + 1,
+        expiresAt: input.expiresAt,
+        updatedAt: input.attemptedAt
+      };
+      state.participantLoginAttempts.set(attemptKey, next);
+      return next;
     },
     async getTestRunById(testRunId) {
       return state.testRuns.get(testRunId) ?? null;

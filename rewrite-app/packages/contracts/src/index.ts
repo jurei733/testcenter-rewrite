@@ -2072,6 +2072,10 @@ export type GetRuntimeConfigResponse = {
       keepAliveTimeoutMs: number;
     };
     operatorAuthRequired: boolean;
+    participantLoginProtection: {
+      maxFailures: number;
+      failureWindowMs: number;
+    };
     storage: {
       kind: "memory" | "file" | "sqlite" | "postgres";
       location: string | null;
@@ -2084,6 +2088,8 @@ export type GetRuntimeConfigResponse = {
       firstSlicePostgresUrlPresent: boolean;
       firstSliceMaxJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
+      firstSliceParticipantLoginMaxFailuresPresent: boolean;
+      firstSliceParticipantLoginFailureWindowMsPresent: boolean;
       firstSliceBootstrapDemo: boolean;
       httpHeadersTimeoutMsPresent: boolean;
       httpRequestTimeoutMsPresent: boolean;

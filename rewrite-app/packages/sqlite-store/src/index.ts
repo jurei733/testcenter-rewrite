@@ -12,6 +12,7 @@ import type {
   ContentReleaseRuntimeSnapshot,
   ImportJob,
   ImportJobDiagnostic,
+  ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
@@ -394,6 +395,20 @@ const mapTestRun = (row: Record<string, unknown> | undefined): TestRun | null =>
       }
     : null;
 
+const mapParticipantLoginAttempt = (
+  row: Record<string, unknown> | undefined
+): ParticipantLoginAttempt | null =>
+  row
+    ? {
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        loginKey: String(row.login_key),
+        failedAttempts: Number(row.failed_attempts),
+        expiresAt: String(row.expires_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+
 const mapWorkspaceActivityEvent = (
   row: Record<string, unknown> | undefined
 ): WorkspaceActivityEvent | null =>
@@ -437,7 +452,7 @@ const mapWorkspaceReview = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 23;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 24;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -806,6 +821,23 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE participant_roster_entries ADD COLUMN valid_to TEXT;
       ALTER TABLE participant_roster_entries ADD COLUMN valid_for_minutes INTEGER;
       ALTER TABLE participant_sessions ADD COLUMN valid_until TEXT;
+    `
+  },
+  {
+    version: 24,
+    name: "add_participant_login_attempts",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_login_attempts (
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        login_key TEXT NOT NULL,
+        failed_attempts INTEGER NOT NULL,
+        expires_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, workspace_id, login_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_participant_login_attempts_expiry
+        ON participant_login_attempts (expires_at);
     `
   }
 ];
@@ -1520,6 +1552,47 @@ export const createSqliteFirstSliceRepository = (
           participantRosterEntry.validForMinutes ?? null,
           participantRosterEntry.importedAt
         );
+    },
+    async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
+      return mapParticipantLoginAttempt(
+        database
+          .prepare(
+            `SELECT tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at
+             FROM participant_login_attempts
+             WHERE tenant_id = ? AND workspace_id = ? AND login_key = ?`
+          )
+          .get(tenantId, workspaceId, loginKey) as
+          | Record<string, unknown>
+          | undefined
+      );
+    },
+    async recordParticipantLoginFailure(input) {
+      const row = database
+        .prepare(
+          `INSERT INTO participant_login_attempts (
+            tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at
+          ) VALUES (?, ?, ?, 1, ?, ?)
+          ON CONFLICT(tenant_id, workspace_id, login_key) DO UPDATE SET
+            failed_attempts = CASE
+              WHEN participant_login_attempts.expires_at <= excluded.updated_at THEN 1
+              ELSE participant_login_attempts.failed_attempts + 1
+            END,
+            expires_at = excluded.expires_at,
+            updated_at = excluded.updated_at
+          RETURNING tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at`
+        )
+        .get(
+          input.tenantId,
+          input.workspaceId,
+          input.loginKey,
+          input.expiresAt,
+          input.attemptedAt
+        ) as Record<string, unknown> | undefined;
+      const result = mapParticipantLoginAttempt(row);
+      if (!result) {
+        throw new Error("Participant login failure could not be persisted.");
+      }
+      return result;
     },
     async getTestRunById(testRunId) {
       const row = database

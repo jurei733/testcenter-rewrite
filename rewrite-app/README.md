@@ -155,6 +155,8 @@ Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `AP
 
 Original Testcenter roster timestamps such as `1/6/2023 10:00` are interpreted in `FIRST_SLICE_PARTICIPANT_TIME_ZONE` (default `Europe/Berlin`) and persisted as ISO timestamps. Set the variable to the field-operation timezone before importing participant rosters.
 
+Password-protected participant accounts use the original login-sink threshold by default: after five failed password attempts, the same tenant/workspace/login is blocked for 30 minutes, including attempts with the correct password. The persisted counter is shared by participant sign-in and starter launch across all storage adapters; unknown and passwordless logins do not increase it. Tune the positive integer settings with `FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES` and `FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS`. Blocked requests return `429 participant_login_rate_limited` and a `Retry-After` header.
+
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:
 
 ```bash
@@ -361,6 +363,7 @@ The added read side now makes the first slice inspectable:
 - protected admin directory reads are filterable by username, status, role, tenant/workspace scope, and limit so platform operators can narrow user-management follow-up without leaving the shell, with a matching CSV export for access reviews
 - admin audit events persist a protected platform-admin trail for bootstrap, failed/successful sign-in, sign-out, targeted session revoke, user management, password reset, and role assignment/revocation, filterable by event type, actor admin id, subject admin id, and limit, with a matching CSV export endpoint
 - `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true` protects platform/workspace/content/monitor routes with scoped admin bearer sessions while leaving participant runtime routes available to participants
+- password-protected participant sign-in and starter launch share a durable, workspace-scoped login sink with the original five-failure/30-minute defaults and stable `429` retry responses
 - tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts, with a one-row CSV export for operator handoff
 - study monitor summary returns workspace-wide group, booklet, and unit progress with participant sessions, saved-roster expected/not-started participants for groups and booklets, roster-derived missing unit expectations, prioritized attention items, latest run states, response counts, review counts, and latest activity timestamps
@@ -553,7 +556,7 @@ For runtime probes:
 - `/metrics` returns JSON runtime metrics including normalized request counts by route, route latency summaries, and process memory
 - `/metrics/prometheus` exposes the same runtime counters in Prometheus text format
 - `/diagnostics/runtime` returns recent in-process operational events together with build, storage, and memory context
-- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, and whether operator auth is required
+- `/diagnostics/config` returns the effective redacted runtime configuration, including storage mode, port, drain timing, JSON body limit, HTTP timeouts, participant login-protection thresholds, and whether operator auth is required
 - `/manifest` exposes the active storage mode, schema version, routes, use-case surface, and operator/production capability list
 - JSON, HTML, text, CSV, asset, and redirect responses include baseline security headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, and `Permissions-Policy`)
 - `db:doctor` reports storage reachability plus current vs. target schema version where applicable

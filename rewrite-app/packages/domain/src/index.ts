@@ -172,6 +172,15 @@ export type ParticipantRosterEntry = {
   importedAt: string;
 };
 
+export type ParticipantLoginAttempt = {
+  tenantId: string;
+  workspaceId: string;
+  loginKey: string;
+  failedAttempts: number;
+  expiresAt: string;
+  updatedAt: string;
+};
+
 export type ParticipantBookletAssignment = {
   assignmentKey: string;
   bookletKey: string;
@@ -1124,6 +1133,7 @@ export type FirstSliceCapability =
   | "monitor_open_runs_csv_export"
   | "monitor_run_control"
   | "participant_sign_in"
+  | "participant_login_protection"
   | "participant_launch"
   | "participant_runtime_state"
   | "participant_current_run_state"
@@ -1182,6 +1192,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "monitor_open_runs_csv_export",
   "monitor_run_control",
   "participant_sign_in",
+  "participant_login_protection",
   "participant_launch",
   "participant_runtime_state",
   "participant_current_run_state",

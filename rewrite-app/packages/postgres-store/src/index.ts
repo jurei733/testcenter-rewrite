@@ -10,6 +10,7 @@ import type {
   ContentReleaseRuntimeSnapshot,
   ImportJob,
   ImportJobDiagnostic,
+  ParticipantLoginAttempt,
   ParticipantRosterEntry,
   ParticipantSession,
   SourcePackage,
@@ -376,6 +377,20 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
       }
     : null;
 
+const mapParticipantLoginAttempt = (
+  row: Row | undefined
+): ParticipantLoginAttempt | null =>
+  row
+    ? {
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        loginKey: String(row.login_key),
+        failedAttempts: Number(row.failed_attempts),
+        expiresAt: String(row.expires_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+
 const mapWorkspaceActivityEvent = (
   row: Row | undefined
 ): WorkspaceActivityEvent | null =>
@@ -417,7 +432,7 @@ const mapWorkspaceReview = (row: Row | undefined): WorkspaceReview | null =>
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 17;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 18;
 
 const migrations: PostgresMigration[] = [
   {
@@ -743,6 +758,23 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS valid_to TEXT;
       ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS valid_for_minutes INTEGER;
       ALTER TABLE participant_sessions ADD COLUMN IF NOT EXISTS valid_until TEXT;
+    `
+  },
+  {
+    version: 18,
+    name: "add_participant_login_attempts",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_login_attempts (
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        login_key TEXT NOT NULL,
+        failed_attempts INTEGER NOT NULL,
+        expires_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (tenant_id, workspace_id, login_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_participant_login_attempts_expiry
+        ON participant_login_attempts (expires_at);
     `
   }
 ];
@@ -1382,6 +1414,42 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           participantRosterEntry.importedAt
         ]
       );
+    },
+    async getParticipantLoginAttempt(tenantId, workspaceId, loginKey) {
+      return one(
+        `SELECT tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at
+         FROM participant_login_attempts
+         WHERE tenant_id = $1 AND workspace_id = $2 AND login_key = $3`,
+        [tenantId, workspaceId, loginKey],
+        mapParticipantLoginAttempt
+      );
+    },
+    async recordParticipantLoginFailure(input) {
+      const result = await pool.query<Row>(
+        `INSERT INTO participant_login_attempts (
+          tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at
+        ) VALUES ($1, $2, $3, 1, $4, $5)
+        ON CONFLICT (tenant_id, workspace_id, login_key) DO UPDATE SET
+          failed_attempts = CASE
+            WHEN participant_login_attempts.expires_at <= EXCLUDED.updated_at THEN 1
+            ELSE participant_login_attempts.failed_attempts + 1
+          END,
+          expires_at = EXCLUDED.expires_at,
+          updated_at = EXCLUDED.updated_at
+        RETURNING tenant_id, workspace_id, login_key, failed_attempts, expires_at, updated_at`,
+        [
+          input.tenantId,
+          input.workspaceId,
+          input.loginKey,
+          input.expiresAt,
+          input.attemptedAt
+        ]
+      );
+      const loginAttempt = mapParticipantLoginAttempt(result.rows[0]);
+      if (!loginAttempt) {
+        throw new Error("Participant login failure could not be persisted.");
+      }
+      return loginAttempt;
     },
     async getTestRunById(testRunId) {
       return one(
