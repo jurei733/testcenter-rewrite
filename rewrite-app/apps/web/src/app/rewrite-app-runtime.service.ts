@@ -1,8 +1,11 @@
 import { Injectable, inject } from "@angular/core";
 
 import {
+  type DeleteGroupResultsBulkResponse,
   type GetParticipantSessionResponse,
-  type IssueMonitorRunCommandsResponse
+  type IssueMonitorRunCommandsResponse,
+  productionApiRoutes,
+  resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import {
   createParticipantHappyPathFlowHost
@@ -45,6 +48,7 @@ import { downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppRuntimeService {
@@ -55,6 +59,7 @@ export class RewriteAppRuntimeService {
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly contentService = inject(RewriteAppContentService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly requestState = inject(RewriteAppShellRequestService);
 
   private readonly runtimeState = this.uiState.runtime;
 
@@ -338,6 +343,62 @@ export class RewriteAppRuntimeService {
     return csv;
   }
 
+  async exportSelectedGroupResponsesCsv(groupKeys: string[]): Promise<string> {
+    return this.exportSelectedGroupCsv({
+      groupKeys,
+      route: productionApiRoutes.workspace.exportResponseCsv,
+      label: "Selected Group Response CSV Export",
+      filenameSuffix: "selected-responses",
+      view: "responses"
+    });
+  }
+
+  async exportSelectedGroupReviewsCsv(groupKeys: string[]): Promise<string> {
+    return this.exportSelectedGroupCsv({
+      groupKeys,
+      route: productionApiRoutes.workspace.exportReviewCsv,
+      label: "Selected Group Review CSV Export",
+      filenameSuffix: "selected-reviews",
+      view: "reviews"
+    });
+  }
+
+  async exportSelectedGroupLogsCsv(groupKeys: string[]): Promise<string> {
+    return this.exportSelectedGroupCsv({
+      groupKeys,
+      route: productionApiRoutes.workspace.exportLogCsv,
+      label: "Selected Group Test Log CSV Export",
+      filenameSuffix: "selected-logs",
+      view: "logs"
+    });
+  }
+
+  async deleteSelectedGroupResults(
+    groupKeys: string[],
+    confirmation: string
+  ): Promise<DeleteGroupResultsBulkResponse> {
+    const normalizedGroupKeys = this.normalizeSelectedGroupKeys(groupKeys);
+    const payload = await this.requestState.request<DeleteGroupResultsBulkResponse>(
+      "Delete Selected Group Results",
+      "DELETE",
+      this.selectedGroupPath(
+        productionApiRoutes.workspace.deleteGroupResultsBulk,
+        []
+      ),
+      { groupKeys: normalizedGroupKeys, confirmation }
+    );
+    await Promise.all([
+      loadGroupResultsAction(this.hosts.createRuntimeReadsHost()),
+      loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost()),
+      loadReviewsAction(this.hosts.createRuntimeReadsHost())
+    ]);
+    this.feedback.rememberActivity(
+      "Selected Group Results Deleted",
+      `${payload.deletion.deletedTestRunCount} run(s), ${payload.deletion.deletedResponseCount} response(s), ${payload.deletion.deletedReviewCount} review(s), and ${payload.deletion.deletedTestLogCount} test log(s) deleted for ${payload.deletion.groupKeys.length} selected group(s).`
+    );
+    return payload;
+  }
+
   async loadDetailedResponses(): Promise<void> {
     if (!this.hasWorkspaceScope()) {
       return;
@@ -347,6 +408,69 @@ export class RewriteAppRuntimeService {
       "Detailed Responses Loaded",
       `${payload.items.length} response row(s) loaded.`
     );
+  }
+
+  private async exportSelectedGroupCsv(input: {
+    groupKeys: string[];
+    route: string;
+    label: string;
+    filenameSuffix: string;
+    view: "responses" | "reviews" | "logs";
+  }): Promise<string> {
+    const groupKeys = this.normalizeSelectedGroupKeys(input.groupKeys);
+    const csv = await this.requestState.request<string>(
+      input.label,
+      "GET",
+      this.selectedGroupPath(input.route, groupKeys, true)
+    );
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    downloadTextFile({
+      filename: `${workspaceKey}-${input.filenameSuffix}.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: csv
+    });
+    if (input.view === "responses") {
+      this.runtimeState.responseExportView = csv;
+    } else if (input.view === "reviews") {
+      this.runtimeState.reviewExportView = csv;
+    } else {
+      this.uiState.workspace.workspaceLogExportView = csv;
+    }
+    this.feedback.rememberActivity(
+      "Selected Group CSV Downloaded",
+      `${input.filenameSuffix} export saved for ${groupKeys.length} selected group(s).`
+    );
+    return csv;
+  }
+
+  private selectedGroupPath(
+    route: string,
+    groupKeys: string[],
+    includeExportLimit = false
+  ): string {
+    const path = resolveRoutePath(route, {
+      tenantKey: this.uiState.workspace.tenantKey.trim(),
+      workspaceKey: this.uiState.workspace.workspaceKey.trim()
+    });
+    const query = new URLSearchParams();
+    for (const groupKey of groupKeys) {
+      query.append("groupKey", groupKey);
+    }
+    if (includeExportLimit) {
+      query.set("limit", "50000");
+    }
+    const queryString = query.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  }
+
+  private normalizeSelectedGroupKeys(groupKeys: string[]): string[] {
+    const normalized = Array.from(
+      new Set(groupKeys.map(groupKey => groupKey.trim()).filter(Boolean))
+    ).sort();
+    if (normalized.length === 0) {
+      throw new Error("At least one result group must be selected.");
+    }
+    return normalized;
   }
 
   async loadGroupResults(): Promise<void> {

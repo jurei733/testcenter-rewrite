@@ -92,6 +92,7 @@ import type {
   WorkspaceDetailedResponse,
   WorkspaceGroupResultSummary,
   WorkspaceGroupResultDeletion,
+  WorkspaceGroupResultsDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
   WorkspaceParticipantRosterItem,
@@ -263,6 +264,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     testRunId?: string;
     unitKey?: string;
@@ -278,6 +280,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     testRunId?: string;
     unitKey?: string;
@@ -392,6 +395,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -408,6 +412,7 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -505,6 +510,12 @@ export type WorkspaceResultsPort = {
     workspaceKey: string;
     groupKey: string;
   }): Promise<WorkspaceGroupResultDeletion>;
+  deleteGroupResultsBulk(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    groupKeys: string[];
+    confirmation: string;
+  }): Promise<WorkspaceGroupResultsDeletion>;
   deleteSystemCheckReports(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -519,6 +530,7 @@ export type WorkspaceReviewPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -565,6 +577,7 @@ export type WorkspaceReviewPort = {
     workspaceKey: string;
     loginKey?: string;
     groupKey?: string;
+    groupKeys?: string[];
     bookletKey?: string;
     participantSessionId?: string;
     testRunId?: string;
@@ -3709,17 +3722,20 @@ const escapeCsvCell = (value: string | null | undefined): string => {
 type DetailedResponseFilters = {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;
   status?: TestRun["status"];
   limit?: number;
+  limitMaximum?: number;
 };
 
 type WorkspaceReviewFilters = {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
@@ -3727,6 +3743,7 @@ type WorkspaceReviewFilters = {
   reviewerId?: string;
   category?: string;
   limit?: number;
+  limitMaximum?: number;
 };
 
 type OpenMonitorRunFilters = {
@@ -3747,8 +3764,10 @@ const normalizeExactFilter = (value: string | undefined): string | undefined => 
   return normalizedValue ? normalizedValue : undefined;
 };
 
-const resolveOperatorReadLimit = (limit: number | undefined): number =>
-  Math.max(1, Math.min(limit ?? 500, 500));
+const resolveOperatorReadLimit = (
+  limit: number | undefined,
+  maximum = 500
+): number => Math.max(1, Math.min(limit ?? maximum, maximum));
 
 const filterOpenMonitorRuns = (
   items: OpenMonitorRun[],
@@ -3808,6 +3827,9 @@ const listDetailedResponsesForWorkspace = (input: {
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
     groupKey: normalizeExactFilter(input.groupKey),
+    groupKeys: input.groupKeys
+      ?.map(groupKey => normalizeExactFilter(groupKey))
+      .filter((groupKey): groupKey is string => Boolean(groupKey)),
     bookletKey: normalizeExactFilter(input.bookletKey),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
@@ -3847,6 +3869,7 @@ const listDetailedResponsesForWorkspace = (input: {
       row =>
         (!filters.loginKey || row.loginKey === filters.loginKey) &&
         (!filters.groupKey || row.groupKey === filters.groupKey) &&
+        (!filters.groupKeys?.length || filters.groupKeys.includes(row.groupKey)) &&
         (!filters.bookletKey ||
           row.bookletKey === filters.bookletKey ||
           row.participantRosterEntry?.bookletKey === filters.bookletKey) &&
@@ -3863,7 +3886,7 @@ const listDetailedResponsesForWorkspace = (input: {
         left.testRunId.localeCompare(right.testRunId) ||
         left.unitKey.localeCompare(right.unitKey)
     )
-    .slice(0, resolveOperatorReadLimit(input.limit));
+    .slice(0, resolveOperatorReadLimit(input.limit, input.limitMaximum));
 };
 
 const listGroupResultsForWorkspace = (input: {
@@ -4064,6 +4087,7 @@ const listParticipantTestLogsForWorkspace = (input: {
   testRuns: TestRun[];
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   testRunId?: string;
   unitKey?: string;
@@ -4094,6 +4118,7 @@ const listParticipantTestLogsForWorkspace = (input: {
     .filter(item =>
       (!input.loginKey || item.loginKey === input.loginKey) &&
       (!input.groupKey || item.groupKey === input.groupKey) &&
+      (!input.groupKeys?.length || input.groupKeys.includes(item.groupKey)) &&
       (!input.bookletKey || item.bookletKey === input.bookletKey) &&
       (!input.testRunId || item.testLog.testRunId === input.testRunId) &&
       (!input.unitKey || item.testLog.unitKey === input.unitKey) &&
@@ -4922,6 +4947,9 @@ const buildWorkspaceReviewListItems = (input: {
   const filters = {
     loginKey: normalizeExactFilter(input.loginKey),
     groupKey: normalizeExactFilter(input.groupKey),
+    groupKeys: input.groupKeys
+      ?.map(groupKey => normalizeExactFilter(groupKey))
+      .filter((groupKey): groupKey is string => Boolean(groupKey)),
     bookletKey: normalizeExactFilter(input.bookletKey),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
@@ -4952,6 +4980,9 @@ const buildWorkspaceReviewListItems = (input: {
           item.participantSession?.loginKey === filters.loginKey) &&
         (!filters.groupKey ||
           item.participantSession?.groupKey === filters.groupKey) &&
+        (!filters.groupKeys?.length ||
+          (item.participantSession !== null &&
+            filters.groupKeys.includes(item.participantSession.groupKey))) &&
         (!filters.bookletKey ||
           item.testRun?.bookletKey === filters.bookletKey ||
           item.participantRosterEntry?.bookletKey === filters.bookletKey) &&
@@ -4969,7 +5000,7 @@ const buildWorkspaceReviewListItems = (input: {
         right.review.createdAt.localeCompare(left.review.createdAt) ||
         left.review.reviewId.localeCompare(right.review.reviewId)
     )
-    .slice(0, resolveOperatorReadLimit(input.limit));
+    .slice(0, resolveOperatorReadLimit(input.limit, input.limitMaximum));
 };
 
 const formatReviewCsv = (input: {
@@ -4993,7 +5024,8 @@ const formatReviewCsv = (input: {
     unitKey: input.unitKey,
     reviewerId: input.reviewerId,
     category: input.category,
-    limit: input.limit
+    limit: input.limit,
+    limitMaximum: input.limitMaximum
   });
   const header = [
     "tenantKey",
@@ -14965,6 +14997,106 @@ export const createFirstSliceServices = (
     ].join("\n")}\n`;
   };
 
+  const deleteWorkspaceGroupResults = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    groupKeys: string[];
+    legacySingleGroupActivity?: boolean;
+  }): Promise<WorkspaceGroupResultsDeletion> => {
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const groupKeys = Array.from(
+      new Set(input.groupKeys.map(groupKey => normalizeGroupKey(groupKey)))
+    ).sort();
+    if (groupKeys.length === 0 || groupKeys.length > 100) {
+      throw new FirstSliceError(
+        400,
+        "group_result_group_keys_invalid",
+        "Between 1 and 100 distinct group keys are required."
+      );
+    }
+
+    const groupKeySet = new Set(groupKeys);
+    const [participantSessions, testRuns] = await Promise.all([
+      repository.listParticipantSessionsByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      ),
+      repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
+    ]);
+    const affectedParticipantSessionIds = participantSessions
+      .filter(participantSession => groupKeySet.has(participantSession.groupKey))
+      .map(participantSession => participantSession.participantSessionId)
+      .sort();
+    const affectedParticipantSessionIdSet = new Set(
+      affectedParticipantSessionIds
+    );
+    const deletedTestRuns = testRuns
+      .filter(testRun =>
+        affectedParticipantSessionIdSet.has(testRun.participantSessionId)
+      )
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    const deletedTestRunIds = deletedTestRuns.map(testRun => testRun.testRunId);
+    const deletedResponseCount = deletedTestRuns.reduce(
+      (total, testRun) =>
+        total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
+      0
+    );
+    const deletedReviewCount =
+      await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
+    const deletedTestLogCount =
+      await repository.deleteParticipantTestLogsByTestRunIds(deletedTestRunIds);
+    const deletedTestRunCount = await repository.deleteTestRunsByIds(
+      deletedTestRunIds
+    );
+    const legacyGroupKey = groupKeys[0];
+
+    await recordWorkspaceActivity({
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      eventType: "group_results_deleted",
+      subjectType: "workspace",
+      subjectId: workspace.workspaceId,
+      summary: input.legacySingleGroupActivity
+        ? `Deleted ${deletedTestRunCount} test run(s) for group '${legacyGroupKey}'.`
+        : `Deleted ${deletedTestRunCount} test run(s) for ${groupKeys.length} selected group(s).`,
+      details: input.legacySingleGroupActivity
+        ? {
+            groupKey: legacyGroupKey,
+            deletedTestRunCount,
+            deletedResponseCount,
+            deletedReviewCount,
+            deletedTestLogCount,
+            affectedParticipantSessionIds,
+            deletedTestRunIds
+          }
+        : {
+            groupKeys,
+            deletedTestRunCount,
+            deletedResponseCount,
+            deletedReviewCount,
+            deletedTestLogCount,
+            affectedParticipantSessionIds,
+            deletedTestRunIds
+          }
+    });
+
+    return {
+      tenantKey: input.tenantKey,
+      workspaceKey: input.workspaceKey,
+      groupKeys,
+      deletedTestRunCount,
+      deletedResponseCount,
+      deletedReviewCount,
+      deletedTestLogCount,
+      affectedParticipantSessionIds,
+      deletedTestRunIds
+    };
+  };
+
   return {
     adminAuth: {
       async bootstrapAdminUser(input) {
@@ -16267,6 +16399,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          groupKeys: input.groupKeys,
           bookletKey: input.bookletKey,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
@@ -17197,6 +17330,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          groupKeys: input.groupKeys,
           bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
@@ -17274,12 +17408,14 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          groupKeys: input.groupKeys,
           bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
           status: input.status,
-          limit: input.limit
+          limit: input.limit ?? 50_000,
+          limitMaximum: 50_000
         });
       },
       async getContentReleaseActivationReadiness(input) {
@@ -17412,74 +17548,46 @@ export const createFirstSliceServices = (
     },
     workspaceResults: {
       async deleteGroupResults(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
         const groupKey = normalizeGroupKey(input.groupKey);
-        const [participantSessions, testRuns] = await Promise.all([
-          repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          ),
-          repository.listTestRunsByWorkspace(workspace.tenantId, workspace.workspaceId)
-        ]);
-        const affectedParticipantSessionIds = participantSessions
-          .filter(participantSession => participantSession.groupKey === groupKey)
-          .map(participantSession => participantSession.participantSessionId)
-          .sort();
-        const affectedParticipantSessionIdSet = new Set(
-          affectedParticipantSessionIds
-        );
-        const deletedTestRuns = testRuns
-          .filter(testRun =>
-            affectedParticipantSessionIdSet.has(testRun.participantSessionId)
-          )
-          .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-        const deletedTestRunIds = deletedTestRuns.map(testRun => testRun.testRunId);
-        const deletedResponseCount = deletedTestRuns.reduce(
-          (total, testRun) =>
-            total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
-          0
-        );
-        const deletedReviewCount =
-          await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
-        const deletedTestLogCount =
-          await repository.deleteParticipantTestLogsByTestRunIds(deletedTestRunIds);
-        const deletedTestRunCount = await repository.deleteTestRunsByIds(
-          deletedTestRunIds
-        );
-
-        await recordWorkspaceActivity({
-          tenantId: workspace.tenantId,
-          workspaceId: workspace.workspaceId,
-          eventType: "group_results_deleted",
-          subjectType: "workspace",
-          subjectId: workspace.workspaceId,
-          summary: `Deleted ${deletedTestRunCount} test run(s) for group '${groupKey}'.`,
-          details: {
-            groupKey,
-            deletedTestRunCount,
-            deletedResponseCount,
-            deletedReviewCount,
-            deletedTestLogCount,
-            affectedParticipantSessionIds,
-            deletedTestRunIds
-          }
+        const deletion = await deleteWorkspaceGroupResults({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          groupKeys: [groupKey],
+          legacySingleGroupActivity: true
         });
 
         return {
+          tenantKey: deletion.tenantKey,
+          workspaceKey: deletion.workspaceKey,
+          groupKey,
+          deletedTestRunCount: deletion.deletedTestRunCount,
+          deletedResponseCount: deletion.deletedResponseCount,
+          deletedReviewCount: deletion.deletedReviewCount,
+          deletedTestLogCount: deletion.deletedTestLogCount,
+          affectedParticipantSessionIds: deletion.affectedParticipantSessionIds,
+          deletedTestRunIds: deletion.deletedTestRunIds
+        };
+      },
+      async deleteGroupResultsBulk(input) {
+        if (input.confirmation !== input.workspaceKey) {
+          throw new FirstSliceError(
+            400,
+            "group_result_delete_confirmation_mismatch",
+            "The workspace key confirmation does not match."
+          );
+        }
+        if (!Array.isArray(input.groupKeys) || input.groupKeys.length === 0) {
+          throw new FirstSliceError(
+            400,
+            "group_result_group_keys_required",
+            "At least one group key is required."
+          );
+        }
+        return deleteWorkspaceGroupResults({
           tenantKey: input.tenantKey,
           workspaceKey: input.workspaceKey,
-          groupKey,
-          deletedTestRunCount,
-          deletedResponseCount,
-          deletedReviewCount,
-          deletedTestLogCount,
-          affectedParticipantSessionIds,
-          deletedTestRunIds
-        };
+          groupKeys: input.groupKeys
+        });
       },
       async deleteSystemCheckReports(input) {
         const workspace = await requireWorkspace(
@@ -17567,6 +17675,7 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          groupKeys: input.groupKeys,
           bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
@@ -17925,13 +18034,15 @@ export const createFirstSliceServices = (
           testRuns,
           loginKey: input.loginKey,
           groupKey: input.groupKey,
+          groupKeys: input.groupKeys,
           bookletKey: input.bookletKey,
           participantSessionId: input.participantSessionId,
           testRunId: input.testRunId,
           unitKey: input.unitKey,
           reviewerId: input.reviewerId,
           category: input.category,
-          limit: input.limit
+          limit: input.limit ?? 50_000,
+          limitMaximum: 50_000
         });
       }
     },

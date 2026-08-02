@@ -1523,6 +1523,18 @@ export type WorkspaceGroupResultDeletion = {
   deletedTestRunIds: string[];
 };
 
+export type WorkspaceGroupResultsDeletion = {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKeys: string[];
+  deletedTestRunCount: number;
+  deletedResponseCount: number;
+  deletedReviewCount: number;
+  deletedTestLogCount: number;
+  affectedParticipantSessionIds: string[];
+  deletedTestRunIds: string[];
+};
+
 export type WorkspaceActivityEventListItem = {
   activityEvent: WorkspaceActivityEvent;
 };

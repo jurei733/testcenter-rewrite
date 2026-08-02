@@ -4416,9 +4416,67 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       lastChangeAt: "checked-separately"
     });
 
+    const selectedResponseCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/responses.csv?groupKey=group%3Amissing&groupKey=group%3Astudent-demo&limit=50000",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(selectedResponseCsv.status, 200);
+    assert.match(selectedResponseCsv.body, /"group:student-demo"/);
+
+    const selectedReviewCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/reviews.csv?groupKey=group%3Astudent-demo&groupKey=group%3Amissing&limit=50000",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(selectedReviewCsv.status, 200);
+    assert.match(selectedReviewCsv.body, /"cleanup-check"/);
+
+    const selectedLogCsv = await requestTextAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/logs.csv?groupKey=group%3Amissing&groupKey=group%3Astudent-demo",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(selectedLogCsv.status, 200);
+    assert.match(selectedLogCsv.body, /"group:student-demo"/);
+
+    const rejectedGroupDeletion = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups",
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          groupKeys: ["group:student-demo"],
+          confirmation: "wrong-workspace"
+        }
+      }
+    );
+    assert.equal(rejectedGroupDeletion.status, 400);
+    assert.equal(
+      rejectedGroupDeletion.body.error,
+      "group_result_delete_confirmation_mismatch"
+    );
+
     const groupDeletion = await requestJsonAt<{
       deletion: {
-        groupKey: string;
+        groupKeys: string[];
         deletedTestRunCount: number;
         deletedResponseCount: number;
         deletedReviewCount: number;
@@ -4428,17 +4486,24 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       };
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups/group%3Astudent-demo",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups",
       {
         method: "DELETE",
         headers: {
           authorization: `Bearer ${signIn.body.sessionToken}`
+        },
+        body: {
+          groupKeys: ["group:student-demo", "group:missing", "group:student-demo"],
+          confirmation: "demo-workspace"
         }
       }
     );
 
     assert.equal(groupDeletion.status, 200);
-    assert.equal(groupDeletion.body.deletion.groupKey, "group:student-demo");
+    assert.deepEqual(groupDeletion.body.deletion.groupKeys, [
+      "group:missing",
+      "group:student-demo"
+    ]);
     assert.equal(groupDeletion.body.deletion.deletedTestRunCount, 1);
     assert.equal(groupDeletion.body.deletion.deletedResponseCount, 2);
     assert.equal(groupDeletion.body.deletion.deletedReviewCount, 1);
@@ -4539,7 +4604,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
           eventType: string;
           summary: string;
           details: {
-            groupKey?: string;
+            groupKeys?: string[];
             deletedTestRunCount?: number;
             deletedResponseCount?: number;
             deletedReviewCount?: number;
@@ -4567,7 +4632,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       /Deleted 1 test run/
     );
     assert.deepEqual(deletionActivity.body.items[0]?.activityEvent.details, {
-      groupKey: "group:student-demo",
+      groupKeys: ["group:missing", "group:student-demo"],
       deletedTestRunCount: 1,
       deletedResponseCount: 2,
       deletedReviewCount: 1,
@@ -4577,6 +4642,22 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       ],
       deletedTestRunIds: [resumed.body.testRun.testRunId]
     });
+
+    const legacyEmptyGroupDeletion = await requestJsonAt<{
+      deletion: { groupKey: string; deletedTestRunCount: number };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups/group%3Amissing",
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(legacyEmptyGroupDeletion.status, 200);
+    assert.equal(legacyEmptyGroupDeletion.body.deletion.groupKey, "group:missing");
+    assert.equal(legacyEmptyGroupDeletion.body.deletion.deletedTestRunCount, 0);
 
     const protectedRosterImport = await requestJsonAt<{
       items: Array<{
@@ -18160,6 +18241,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         replaceSourcePackage: string;
         listReviews: string;
         deleteGroupResults: string;
+        deleteGroupResultsBulk: string;
         getContentReleaseActivationReadiness: string;
       };
       system: {
@@ -18303,6 +18385,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(manifest.routes.workspace.exportReviewCsv, /reviews\.csv/);
   assert.match(manifest.routes.workspace.listReviews, /reviews/);
   assert.match(manifest.routes.workspace.deleteGroupResults, /results\/groups/);
+  assert.equal(
+    manifest.routes.workspace.deleteGroupResultsBulk,
+    manifest.routes.workspace.listGroupResults
+  );
   assert.match(
     manifest.routes.workspace.getContentReleaseActivationReadiness,
     /activation-readiness/

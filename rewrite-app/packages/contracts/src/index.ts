@@ -43,6 +43,7 @@ import type {
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
+  WorkspaceGroupResultsDeletion,
   WorkspaceGroupResultSummary,
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
@@ -1858,6 +1859,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews/:reviewId",
     deleteGroupResults:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups/:groupKey",
+    deleteGroupResultsBulk:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
     listContentReleases:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases",
     exportContentReleasesCsv:
@@ -2003,6 +2006,7 @@ export type ParticipantSessionListQuery = {
 export type DetailedResponseListQuery = {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
@@ -2014,6 +2018,7 @@ export type DetailedResponseListQuery = {
 export type WorkspaceReviewListQuery = {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   participantSessionId?: string;
   testRunId?: string;
@@ -2580,6 +2585,15 @@ export type DeleteReviewResponse = {
 
 export type DeleteGroupResultsResponse = {
   deletion: WorkspaceGroupResultDeletion;
+};
+
+export type DeleteGroupResultsBulkRequest = {
+  groupKeys: string[];
+  confirmation: string;
+};
+
+export type DeleteGroupResultsBulkResponse = {
+  deletion: WorkspaceGroupResultsDeletion;
 };
 
 export type ListContentReleasesResponse = {

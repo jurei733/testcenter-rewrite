@@ -7787,18 +7787,37 @@ try {
   await expectInputValue("#reviewGroupFilter", participantGroupKey);
   await expectInputValue("#participantSessionGroupFilter", participantGroupKey);
   await expectInputValue("#openRunGroupFilter", participantGroupKey);
+  await selectedResultGroup
+    .getByRole("button", { name: "Add to Selection" })
+    .click();
+  await page
+    .locator("#resultGroupSelectionActions")
+    .filter({ hasText: "1 selected group" })
+    .waitFor();
+  for (const [selector, filenamePattern] of [
+    ["#exportSelectedGroupResponsesButton", /selected-responses\.csv$/],
+    ["#exportSelectedGroupLogsButton", /selected-logs\.csv$/],
+    ["#exportSelectedGroupReviewsButton", /selected-reviews\.csv$/]
+  ]) {
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator(selector).click()
+    ]);
+    assert.match(download.suggestedFilename(), filenamePattern);
+  }
   const deleteGroupResultsDialog = new Promise((resolvePromise, reject) => {
     page.once("dialog", async dialog => {
       try {
-        assert.match(dialog.message(), new RegExp(participantGroupKey));
-        await dialog.accept(participantGroupKey);
+        assert.match(dialog.message(), /1 selected group/);
+        assert.match(dialog.message(), new RegExp(workspaceKey));
+        await dialog.accept(workspaceKey);
         resolvePromise(undefined);
       } catch (error) {
         reject(error);
       }
     });
   });
-  await clickAction("Delete Group Results");
+  await page.locator("#deleteSelectedGroupResultsButton").click();
   await deleteGroupResultsDialog;
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/responses/detailed?groupKey=${encodeURIComponent(participantGroupKey)}&testRunId=${pausedTestRunId}&limit=1`,
@@ -7823,7 +7842,7 @@ try {
       payload != null &&
       Array.isArray(payload.items) &&
       payload.items.some(
-        item => item?.activityEvent?.details?.groupKey === participantGroupKey
+        item => item?.activityEvent?.details?.groupKeys?.includes(participantGroupKey)
       )
   );
   await selectedResultGroup.waitFor({ state: "detached" });

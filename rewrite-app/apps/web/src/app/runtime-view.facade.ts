@@ -84,6 +84,8 @@ export class RuntimeViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly monitorBatchSelection = new Set<string>();
+  private readonly resultGroupSelection = new Set<string>();
+  private resultGroupSelectionScope = "";
 
   readonly runtime = this.uiState.runtime;
   readonly workspace = this.uiState.workspace;
@@ -1542,6 +1544,7 @@ export class RuntimeViewFacade {
   }
 
   get groupResultItems(): RecordCollectionItem[] {
+    this.ensureResultGroupSelectionScope();
     const payload = parseJsonDocument<ListGroupResultsResponse>(
       this.runtime.groupResultsView
     );
@@ -1565,10 +1568,32 @@ export class RuntimeViewFacade {
         { label: "Units Average", value: item.numUnitsAvg.toFixed(1) },
         { label: "Last Test Activity", value: this.formatDateTime(item.lastChangeAt) }
       ],
-      selected: this.runtime.groupKey.trim() === item.groupKey,
+      selected: this.resultGroupSelection.has(item.groupKey),
       actionLabel: "Use Result Group",
-      actionPayload: { groupKey: item.groupKey }
+      actionPayload: { groupKey: item.groupKey },
+      actions: [
+        {
+          label: this.resultGroupSelection.has(item.groupKey)
+            ? "Remove from Selection"
+            : "Add to Selection",
+          payload: { groupKey: item.groupKey, resultGroupAction: "toggle" }
+        }
+      ]
     }));
+  }
+
+  get selectedResultGroupKeys(): string[] {
+    this.ensureResultGroupSelectionScope();
+    return [...this.resultGroupSelection].sort();
+  }
+
+  get selectedResultGroupCount(): number {
+    this.ensureResultGroupSelectionScope();
+    return this.resultGroupSelection.size;
+  }
+
+  get canUseSelectedResultGroups(): boolean {
+    return this.canUseWorkspaceScope && this.selectedResultGroupCount > 0;
   }
 
   get selectedSessionReviewItems(): RecordCollectionItem[] {
@@ -3128,7 +3153,20 @@ export class RuntimeViewFacade {
     if (!this.canUseWorkspaceScope) {
       return;
     }
-    this.viewState.onActionAsync(() => this.runtimeService.loadGroupResults());
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.loadGroupResults();
+      const visibleGroupKeys = new Set(
+        parseJsonDocument<ListGroupResultsResponse>(
+          this.runtime.groupResultsView
+        )?.items.map(item => item.groupKey) ?? []
+      );
+      for (const groupKey of this.resultGroupSelection) {
+        if (!visibleGroupKeys.has(groupKey)) {
+          this.resultGroupSelection.delete(groupKey);
+        }
+      }
+      this.uiState.renderVersion.update(version => version + 1);
+    });
   }
 
   loadReviews(): void {
@@ -3201,8 +3239,18 @@ export class RuntimeViewFacade {
   }
 
   selectResultGroup(item: RecordCollectionItem): void {
+    this.ensureResultGroupSelectionScope();
     const groupKey = item.actionPayload?.groupKey?.trim();
     if (!groupKey) {
+      return;
+    }
+    if (item.actionPayload?.resultGroupAction === "toggle") {
+      if (this.resultGroupSelection.has(groupKey)) {
+        this.resultGroupSelection.delete(groupKey);
+      } else {
+        this.resultGroupSelection.add(groupKey);
+      }
+      this.uiState.renderVersion.update(version => version + 1);
       return;
     }
     this.runtime.groupKey = groupKey;
@@ -3218,6 +3266,85 @@ export class RuntimeViewFacade {
         this.runtimeService.loadReviews()
       ]);
     });
+  }
+
+  selectAllVisibleResultGroups(): void {
+    this.ensureResultGroupSelectionScope();
+    const payload = parseJsonDocument<ListGroupResultsResponse>(
+      this.runtime.groupResultsView
+    );
+    for (const item of payload?.items ?? []) {
+      this.resultGroupSelection.add(item.groupKey);
+    }
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  clearResultGroupSelection(): void {
+    this.ensureResultGroupSelectionScope();
+    this.resultGroupSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  exportSelectedGroupResponsesCsv(): void {
+    if (!this.canUseSelectedResultGroups) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportSelectedGroupResponsesCsv(
+        this.selectedResultGroupKeys
+      )
+    );
+  }
+
+  exportSelectedGroupReviewsCsv(): void {
+    if (!this.canUseSelectedResultGroups) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportSelectedGroupReviewsCsv(
+        this.selectedResultGroupKeys
+      )
+    );
+  }
+
+  exportSelectedGroupLogsCsv(): void {
+    if (!this.canUseSelectedResultGroups) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportSelectedGroupLogsCsv(this.selectedResultGroupKeys)
+    );
+  }
+
+  confirmDeleteSelectedGroupResults(): void {
+    if (!this.canUseSelectedResultGroups) {
+      return;
+    }
+    const workspaceKey = this.workspace.workspaceKey.trim();
+    const confirmation = globalThis.window?.prompt(
+      `Type '${workspaceKey}' to delete all responses, reviews, and logs for ${this.selectedResultGroupCount} selected group(s).`
+    );
+    if (confirmation !== workspaceKey) {
+      return;
+    }
+    const groupKeys = this.selectedResultGroupKeys;
+    this.viewState.onActionAsync(async () => {
+      await this.runtimeService.deleteSelectedGroupResults(
+        groupKeys,
+        confirmation
+      );
+      this.resultGroupSelection.clear();
+      this.uiState.renderVersion.update(version => version + 1);
+    });
+  }
+
+  private ensureResultGroupSelectionScope(): void {
+    const scope = `${this.workspace.tenantKey.trim()}\u0000${this.workspace.workspaceKey.trim()}`;
+    if (scope === this.resultGroupSelectionScope) {
+      return;
+    }
+    this.resultGroupSelection.clear();
+    this.resultGroupSelectionScope = scope;
   }
 
   selectEntryLink(item: RecordCollectionItem): void {

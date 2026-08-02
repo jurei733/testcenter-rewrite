@@ -42,6 +42,8 @@ import {
   type CreateWorkspaceRequest,
   type CreateWorkspaceResponse,
   type DeleteGroupResultsResponse,
+  type DeleteGroupResultsBulkRequest,
+  type DeleteGroupResultsBulkResponse,
   type DeleteParticipantReviewResponse,
   type DeleteReviewResponse,
   type DeleteSourcePackageRequest,
@@ -1739,6 +1741,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
   ["GET", groupResultsPattern],
+  ["DELETE", groupResultsPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
   ["PATCH", reviewDetailPattern],
@@ -2496,6 +2499,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listGroupResults
     ],
     [
+      "DELETE",
+      groupResultsPattern,
+      productionApiRoutes.workspace.deleteGroupResultsBulk
+    ],
+    [
       "GET",
       reviewListPattern,
       productionApiRoutes.workspace.listReviews
@@ -2667,17 +2675,44 @@ const decodeRouteGroup = (value: string | undefined): string | null =>
 const readOptionalQueryValue = (url: URL, key: string): string | undefined =>
   url.searchParams.get(key)?.trim() || undefined;
 
+const parseGroupKeyQuery = (
+  url: URL,
+  response: ServerResponse
+): { ok: true; groupKey?: string; groupKeys?: string[] } | { ok: false } => {
+  const groupKeys = Array.from(
+    new Set(
+      url.searchParams
+        .getAll("groupKey")
+        .map(value => value.trim())
+        .filter(Boolean)
+    )
+  );
+  if (groupKeys.length > 100) {
+    sendError(
+      response,
+      400,
+      "group_key_filter_invalid",
+      "At most 100 distinct groupKey filters are supported."
+    );
+    return { ok: false };
+  }
+  return groupKeys.length > 1
+    ? { ok: true, groupKeys }
+    : { ok: true, groupKey: groupKeys[0] };
+};
+
 const parseOperatorReadLimit = (
   url: URL,
   response: ServerResponse,
   error: string,
-  message: string
+  message: string,
+  maximum = 500
 ): { ok: true; limit?: number } | { ok: false } => {
   const limitRawValue = readOptionalQueryValue(url, "limit");
   const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
   if (
     limitRawValue &&
-    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > 500)
+    (!/^\d+$/.test(limitRawValue) || !limit || limit < 1 || limit > maximum)
   ) {
     sendError(response, 400, error, message);
     return { ok: false };
@@ -2813,8 +2848,13 @@ const parseContentReleaseListQuery = (
 
 const parseDetailedResponseListQuery = (
   url: URL,
-  response: ServerResponse
+  response: ServerResponse,
+  maximumLimit = 500
 ): DetailedResponseListQuery | null => {
+  const groupFilter = parseGroupKeyQuery(url, response);
+  if (!groupFilter.ok) {
+    return null;
+  }
   const status = readOptionalQueryValue(url, "status");
   if (status && !testRunStatuses.includes(status as TestRunStatus)) {
     sendError(
@@ -2830,7 +2870,8 @@ const parseDetailedResponseListQuery = (
     url,
     response,
     "detailed_response_limit_invalid",
-    "Detailed response limit must be an integer between 1 and 500."
+    `Detailed response limit must be an integer between 1 and ${maximumLimit}.`,
+    maximumLimit
   );
   if (!limitResult.ok) {
     return null;
@@ -2838,7 +2879,8 @@ const parseDetailedResponseListQuery = (
 
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
-    groupKey: readOptionalQueryValue(url, "groupKey"),
+    groupKey: groupFilter.groupKey,
+    groupKeys: groupFilter.groupKeys,
     bookletKey: readOptionalQueryValue(url, "bookletKey"),
     participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
@@ -2854,12 +2896,17 @@ const parseParticipantTestLogListQuery = (
 ): {
   loginKey?: string;
   groupKey?: string;
+  groupKeys?: string[];
   bookletKey?: string;
   testRunId?: string;
   unitKey?: string;
   logKey?: string;
   limit?: number;
 } | null => {
+  const groupFilter = parseGroupKeyQuery(url, response);
+  if (!groupFilter.ok) {
+    return null;
+  }
   const limitRawValue = url.searchParams.get("limit")?.trim() || undefined;
   const limit = limitRawValue ? Number.parseInt(limitRawValue, 10) : undefined;
   if (
@@ -2876,7 +2923,8 @@ const parseParticipantTestLogListQuery = (
   }
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
-    groupKey: readOptionalQueryValue(url, "groupKey"),
+    groupKey: groupFilter.groupKey,
+    groupKeys: groupFilter.groupKeys,
     bookletKey: readOptionalQueryValue(url, "bookletKey"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
     unitKey: readOptionalQueryValue(url, "unitKey"),
@@ -2887,13 +2935,19 @@ const parseParticipantTestLogListQuery = (
 
 const parseWorkspaceReviewListQuery = (
   url: URL,
-  response: ServerResponse
+  response: ServerResponse,
+  maximumLimit = 500
 ): WorkspaceReviewListQuery | null => {
+  const groupFilter = parseGroupKeyQuery(url, response);
+  if (!groupFilter.ok) {
+    return null;
+  }
   const limitResult = parseOperatorReadLimit(
     url,
     response,
     "workspace_review_limit_invalid",
-    "Workspace review limit must be an integer between 1 and 500."
+    `Workspace review limit must be an integer between 1 and ${maximumLimit}.`,
+    maximumLimit
   );
   if (!limitResult.ok) {
     return null;
@@ -2901,7 +2955,8 @@ const parseWorkspaceReviewListQuery = (
 
   return {
     loginKey: readOptionalQueryValue(url, "loginKey"),
-    groupKey: readOptionalQueryValue(url, "groupKey"),
+    groupKey: groupFilter.groupKey,
+    groupKeys: groupFilter.groupKeys,
     bookletKey: readOptionalQueryValue(url, "bookletKey"),
     participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
@@ -5067,6 +5122,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (request.method === "DELETE" && groupResultsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(groupResultsMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          groupResultsMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const body = await readRequestJsonBody<DeleteGroupResultsBulkRequest>();
+        const deletion = await services.workspaceResults.deleteGroupResultsBulk({
+          tenantKey,
+          workspaceKey,
+          groupKeys: body.groupKeys,
+          confirmation: body.confirmation
+        });
+        sendJson<DeleteGroupResultsBulkResponse>(response, 200, { deletion });
+        return;
+      }
+
       if (request.method === "GET" && participantTestLogListMatch?.groups) {
         const tenantKey = decodeRouteGroup(
           participantTestLogListMatch.groups.tenantKey
@@ -5422,7 +5502,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const query = parseDetailedResponseListQuery(url, response);
+        const query = parseDetailedResponseListQuery(url, response, 50_000);
         if (!query) {
           return;
         }
@@ -5499,7 +5579,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const query = parseWorkspaceReviewListQuery(url, response);
+        const query = parseWorkspaceReviewListQuery(url, response, 50_000);
         if (!query) {
           return;
         }
