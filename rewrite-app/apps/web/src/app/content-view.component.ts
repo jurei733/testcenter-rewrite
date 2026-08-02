@@ -278,6 +278,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Workspace File Dependency Graph"
+        subtitle="Direct and transitive assembly, booklet, unit, player, definition, coding-scheme, resource, and system-check relationships."
+        [items]="view.sourcePackageDependencyGraphItems"
+        (itemAction)="view.selectSourcePackage($event)"
+        emptyState="Load a source package detail to inspect its dependency graph."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Source Package Deletion Readiness"
         subtitle="Dependencies checked before deletion."
         [items]="view.sourcePackageDeletionReadinessItems"

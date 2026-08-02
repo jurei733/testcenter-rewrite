@@ -1721,6 +1721,32 @@ try {
           item?.activityEvent?.details?.sourcePackages?.length === 4
       )
   );
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace File Dependency Graph"
+      })
+    })
+    .filter({ hasText: looseAssemblyFileName })
+    .filter({ hasText: "transitive requirement(s)" })
+    .filter({ hasText: "assembled from" })
+    .filter({ hasText: "contains booklet" })
+    .filter({ hasText: "contains unit" })
+    .filter({ hasText: "uses player" })
+    .filter({ hasText: "uses definition" })
+    .filter({ hasText: "uses coding scheme" })
+    .waitFor({ timeout: 20_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace File Dependency Graph"
+      })
+    })
+    .getByRole("button", { name: "Select Related File" })
+    .first()
+    .waitFor({ timeout: 20_000 });
   logStep("load-zip-source-document-file");
   const uploadedZipSourceFileName = `ui-smoke-source-${Date.now()}.zip`;
   const uploadedZipSourcePath = resolve(".data", uploadedZipSourceFileName);

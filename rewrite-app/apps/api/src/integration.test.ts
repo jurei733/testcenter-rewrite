@@ -8982,6 +8982,88 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     ),
     sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId)
   );
+
+  const assembledDetail = await requestJson<{
+    sourcePackageDetail: {
+      dependencyGraph: {
+        rootNodeId: string;
+        nodes: Array<{
+          nodeId: string;
+          nodeType: string;
+          key: string;
+          label: string;
+          sourcePackageId: string;
+        }>;
+        edges: Array<{
+          fromNodeId: string;
+          toNodeId: string;
+          relationshipType: string;
+        }>;
+        directDependencyNodeIds: string[];
+        transitiveDependencyNodeIds: string[];
+        directDependentNodeIds: string[];
+        transitiveDependentNodeIds: string[];
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${assembly.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(assembledDetail.status, 200);
+  const assembledGraph = assembledDetail.body.sourcePackageDetail.dependencyGraph;
+  assert.equal(
+    assembledGraph.rootNodeId,
+    `source-package:${assembly.body.sourcePackage.sourcePackageId}`
+  );
+  assert.equal(
+    assembledGraph.edges.filter(edge => edge.relationshipType === "assembled_from")
+      .length,
+    sourcePackages.length
+  );
+  for (const relationshipType of [
+    "contains_booklet",
+    "contains_unit",
+    "uses_player",
+    "uses_definition",
+    "uses_coding_scheme"
+  ]) {
+    assert.ok(
+      assembledGraph.edges.some(
+        edge => edge.relationshipType === relationshipType
+      ),
+      `Expected dependency relationship '${relationshipType}'.`
+    );
+  }
+  assert.ok(
+    assembledGraph.directDependencyNodeIds.includes(
+      `source-package:${sourcePackages[0]!.sourcePackageId}`
+    )
+  );
+  assert.ok(
+    assembledGraph.transitiveDependencyNodeIds.some(nodeId =>
+      nodeId.includes(":unit:")
+    )
+  );
+  assert.deepEqual(assembledGraph.directDependentNodeIds, []);
+  assert.deepEqual(assembledGraph.transitiveDependentNodeIds, []);
+
+  const memberDetail = await requestJson<{
+    sourcePackageDetail: {
+      dependencyGraph: {
+        rootNodeId: string;
+        nodes: Array<{ nodeId: string; label: string }>;
+        directDependentNodeIds: string[];
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${sourcePackages[0]!.sourcePackageId}`
+  );
+  const memberGraph = memberDetail.body.sourcePackageDetail.dependencyGraph;
+  assert.deepEqual(memberGraph.directDependentNodeIds, [assembledGraph.rootNodeId]);
+  assert.ok(
+    memberGraph.nodes.some(node => node.nodeId === assembledGraph.rootNodeId)
+  );
 });
 
 test("source document import accepts testcenter-style XML aliases", async () => {

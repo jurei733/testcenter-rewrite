@@ -102,7 +102,10 @@ import type {
   WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
+  WorkspaceFileDependencyEdge,
+  WorkspaceFileDependencyNode,
   WorkspaceFileType,
+  WorkspaceSourcePackageDependencyGraph,
   WorkspaceSystemCheck,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
@@ -1759,6 +1762,433 @@ const classifyWorkspaceSourcePackage = (
   }
 
   return "Resource";
+};
+
+const buildWorkspaceSourcePackageDependencyGraph = (input: {
+  rootSourcePackage: SourcePackage;
+  sourcePackages: SourcePackage[];
+  importJobs: ImportJob[];
+  contentReleases: ContentRelease[];
+  activityEvents: WorkspaceActivityEvent[];
+}): WorkspaceSourcePackageDependencyGraph => {
+  const nodes = new Map<string, WorkspaceFileDependencyNode>();
+  const edges = new Map<string, WorkspaceFileDependencyEdge>();
+  const sourceNodeId = (sourcePackageId: string): string =>
+    `source-package:${sourcePackageId}`;
+  const assetNodeId = (
+    sourcePackageId: string,
+    nodeType: WorkspaceFileDependencyNode["nodeType"],
+    key: string
+  ): string =>
+    `source-package:${sourcePackageId}:${nodeType}:${encodeURIComponent(key)}`;
+  const addNode = (node: WorkspaceFileDependencyNode): string => {
+    if (!nodes.has(node.nodeId)) {
+      nodes.set(node.nodeId, node);
+    }
+    return node.nodeId;
+  };
+  const addEdge = (edge: WorkspaceFileDependencyEdge): void => {
+    if (edge.fromNodeId === edge.toNodeId) {
+      return;
+    }
+    edges.set(
+      `${edge.fromNodeId}\u0000${edge.relationshipType}\u0000${edge.toNodeId}`,
+      edge
+    );
+  };
+
+  const knownSourcePackageIds = new Set(
+    input.sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId)
+  );
+  for (const event of input.activityEvents) {
+    if (
+      event.eventType !== "source_package_assembled" ||
+      !knownSourcePackageIds.has(event.subjectId)
+    ) {
+      continue;
+    }
+    const members = event.details.sourcePackages;
+    if (!Array.isArray(members)) {
+      continue;
+    }
+    for (const member of members) {
+      if (
+        !member ||
+        typeof member !== "object" ||
+        !("sourcePackageId" in member) ||
+        typeof member.sourcePackageId !== "string" ||
+        !knownSourcePackageIds.has(member.sourcePackageId)
+      ) {
+        continue;
+      }
+      addEdge({
+        fromNodeId: sourceNodeId(event.subjectId),
+        toNodeId: sourceNodeId(member.sourcePackageId),
+        relationshipType: "assembled_from"
+      });
+    }
+  }
+
+  const relatedSourceNodeIds = new Set<string>([
+    sourceNodeId(input.rootSourcePackage.sourcePackageId)
+  ]);
+  const pendingSourceNodeIds = [...relatedSourceNodeIds];
+  const assemblyEdges = [...edges.values()];
+  while (pendingSourceNodeIds.length > 0) {
+    const currentNodeId = pendingSourceNodeIds.shift();
+    if (!currentNodeId) {
+      continue;
+    }
+    for (const edge of assemblyEdges) {
+      const relatedNodeId =
+        edge.fromNodeId === currentNodeId
+          ? edge.toNodeId
+          : edge.toNodeId === currentNodeId
+            ? edge.fromNodeId
+            : null;
+      if (relatedNodeId && !relatedSourceNodeIds.has(relatedNodeId)) {
+        relatedSourceNodeIds.add(relatedNodeId);
+        pendingSourceNodeIds.push(relatedNodeId);
+      }
+    }
+  }
+
+  const sourcePackageIdByImportJobId = new Map(
+    input.importJobs.map(importJob => [
+      importJob.importJobId,
+      importJob.sourcePackageId
+    ])
+  );
+  const releasesBySourcePackageId = new Map<string, ContentRelease[]>();
+  for (const release of input.contentReleases) {
+    const sourcePackageId = sourcePackageIdByImportJobId.get(release.importJobId);
+    if (!sourcePackageId) {
+      continue;
+    }
+    const releases = releasesBySourcePackageId.get(sourcePackageId) ?? [];
+    releases.push(release);
+    releasesBySourcePackageId.set(sourcePackageId, releases);
+  }
+
+  for (const sourcePackage of input.sourcePackages) {
+    if (!relatedSourceNodeIds.has(sourceNodeId(sourcePackage.sourcePackageId))) {
+      continue;
+    }
+    addNode({
+      nodeId: sourceNodeId(sourcePackage.sourcePackageId),
+      nodeType: "source_package",
+      key: sourcePackage.sourcePackageId,
+      label: sourcePackage.fileName,
+      sourcePackageId: sourcePackage.sourcePackageId,
+      fileType: classifyWorkspaceSourcePackage(
+        sourcePackage,
+        decodePersistedSourceDocument(sourcePackage)
+      ),
+      status: sourcePackage.status
+    });
+    const latestRelease = (releasesBySourcePackageId.get(
+      sourcePackage.sourcePackageId
+    ) ?? [])
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+    const runtimeSnapshot = latestRelease?.runtimeSnapshot;
+    const bookletEntries =
+      runtimeSnapshot?.bookletEntries ??
+      sourcePackage.contentStructure?.bookletEntries ??
+      [];
+    const playerEntries =
+      runtimeSnapshot?.playerEntries ??
+      sourcePackage.contentStructure?.playerEntries ??
+      [];
+    const systemCheckEntries =
+      runtimeSnapshot?.systemCheckEntries ??
+      sourcePackage.contentStructure?.systemCheckEntries ??
+      [];
+    const rootId = sourceNodeId(sourcePackage.sourcePackageId);
+    const playerNodeIds = new Map<string, string>();
+    for (const player of playerEntries) {
+      const nodeId = addNode({
+        nodeId: assetNodeId(
+          sourcePackage.sourcePackageId,
+          "player",
+          player.playerKey
+        ),
+        nodeType: "player",
+        key: player.playerKey,
+        label: player.playerKey,
+        sourcePackageId: sourcePackage.sourcePackageId
+      });
+      playerNodeIds.set(player.playerKey.toLowerCase(), nodeId);
+      addEdge({
+        fromNodeId: rootId,
+        toNodeId: nodeId,
+        relationshipType: "contains_resource"
+      });
+    }
+
+    const unitNodeIds = new Map<string, string>();
+    const ensureUnitNode = (unit: {
+      unitKey: string;
+      originalUnitId?: string;
+      displayLabel: string;
+      playerKey?: string;
+      unitDefinition?: string;
+      unitDefinitionType?: string;
+      codingScheme?: UnitCodingScheme;
+    }): string => {
+      const unitIdentity = unit.originalUnitId || unit.unitKey;
+      const normalizedUnitIdentity = unitIdentity.toLowerCase();
+      const existingNodeId = unitNodeIds.get(normalizedUnitIdentity);
+      if (existingNodeId) {
+        return existingNodeId;
+      }
+      const unitNodeId = addNode({
+        nodeId: assetNodeId(
+          sourcePackage.sourcePackageId,
+          "unit",
+          unitIdentity
+        ),
+        nodeType: "unit",
+        key: unitIdentity,
+        label: unit.displayLabel || unit.unitKey,
+        sourcePackageId: sourcePackage.sourcePackageId
+      });
+      unitNodeIds.set(normalizedUnitIdentity, unitNodeId);
+      if (unit.playerKey) {
+        const playerNodeId =
+          playerNodeIds.get(unit.playerKey.toLowerCase()) ??
+          addNode({
+            nodeId: assetNodeId(
+              sourcePackage.sourcePackageId,
+              "player",
+              unit.playerKey
+            ),
+            nodeType: "player",
+            key: unit.playerKey,
+            label: unit.playerKey,
+            sourcePackageId: sourcePackage.sourcePackageId
+          });
+        playerNodeIds.set(unit.playerKey.toLowerCase(), playerNodeId);
+        addEdge({
+          fromNodeId: unitNodeId,
+          toNodeId: playerNodeId,
+          relationshipType: "uses_player"
+        });
+      }
+      if (unit.unitDefinition) {
+        const definitionNodeId = addNode({
+          nodeId: assetNodeId(
+            sourcePackage.sourcePackageId,
+            "definition",
+            unitIdentity
+          ),
+          nodeType: "definition",
+          key: unitIdentity,
+          label: unit.unitDefinitionType || `${unit.displayLabel} definition`,
+          sourcePackageId: sourcePackage.sourcePackageId
+        });
+        addEdge({
+          fromNodeId: unitNodeId,
+          toNodeId: definitionNodeId,
+          relationshipType: "uses_definition"
+        });
+      }
+      if (unit.codingScheme) {
+        const codingSchemeNodeId = addNode({
+          nodeId: assetNodeId(
+            sourcePackage.sourcePackageId,
+            "coding_scheme",
+            unitIdentity
+          ),
+          nodeType: "coding_scheme",
+          key: unitIdentity,
+          label: `${unit.displayLabel} coding scheme${
+            unit.codingScheme.version ? ` ${unit.codingScheme.version}` : ""
+          }`,
+          sourcePackageId: sourcePackage.sourcePackageId
+        });
+        addEdge({
+          fromNodeId: unitNodeId,
+          toNodeId: codingSchemeNodeId,
+          relationshipType: "uses_coding_scheme"
+        });
+      }
+      return unitNodeId;
+    };
+
+    for (const booklet of bookletEntries) {
+      const bookletNodeId = addNode({
+        nodeId: assetNodeId(
+          sourcePackage.sourcePackageId,
+          "booklet",
+          booklet.bookletKey
+        ),
+        nodeType: "booklet",
+        key: booklet.bookletKey,
+        label: booklet.displayLabel,
+        sourcePackageId: sourcePackage.sourcePackageId
+      });
+      addEdge({
+        fromNodeId: rootId,
+        toNodeId: bookletNodeId,
+        relationshipType: "contains_booklet"
+      });
+      for (const unit of booklet.unitEntries) {
+        addEdge({
+          fromNodeId: bookletNodeId,
+          toNodeId: ensureUnitNode(unit),
+          relationshipType: "contains_unit"
+        });
+      }
+    }
+
+    for (const systemCheck of systemCheckEntries) {
+      const systemCheckNodeId = addNode({
+        nodeId: assetNodeId(
+          sourcePackage.sourcePackageId,
+          "system_check",
+          systemCheck.checkId
+        ),
+        nodeType: "system_check",
+        key: systemCheck.checkId,
+        label: systemCheck.displayLabel,
+        sourcePackageId: sourcePackage.sourcePackageId
+      });
+      addEdge({
+        fromNodeId: rootId,
+        toNodeId: systemCheckNodeId,
+        relationshipType: "contains_system_check"
+      });
+      if (systemCheck.unitKey) {
+        const unitNodeId =
+          unitNodeIds.get(systemCheck.unitKey.toLowerCase()) ??
+          ensureUnitNode({
+            unitKey: systemCheck.unitKey,
+            displayLabel: systemCheck.unitKey
+          });
+        addEdge({
+          fromNodeId: systemCheckNodeId,
+          toNodeId: unitNodeId,
+          relationshipType: "uses_unit"
+        });
+      }
+    }
+
+    for (const resource of runtimeSnapshot?.resourceEntries ?? []) {
+      const resourceNodeId = addNode({
+        nodeId: assetNodeId(
+          sourcePackage.sourcePackageId,
+          "resource",
+          resource.resourcePath
+        ),
+        nodeType: "resource",
+        key: resource.resourcePath,
+        label: resource.resourcePath,
+        sourcePackageId: sourcePackage.sourcePackageId
+      });
+      addEdge({
+        fromNodeId: rootId,
+        toNodeId: resourceNodeId,
+        relationshipType: "contains_resource"
+      });
+    }
+  }
+
+  const rootNodeId = sourceNodeId(input.rootSourcePackage.sourcePackageId);
+  const allEdges = [...edges.values()];
+  const outgoingNodeIds = new Map<string, Set<string>>();
+  const incomingNodeIds = new Map<string, Set<string>>();
+  const connectedNodeIdsByNodeId = new Map<string, Set<string>>();
+  const addAdjacentNode = (
+    adjacency: Map<string, Set<string>>,
+    nodeId: string,
+    adjacentNodeId: string
+  ): void => {
+    const adjacentNodeIds = adjacency.get(nodeId) ?? new Set<string>();
+    adjacentNodeIds.add(adjacentNodeId);
+    adjacency.set(nodeId, adjacentNodeIds);
+  };
+  for (const edge of allEdges) {
+    addAdjacentNode(outgoingNodeIds, edge.fromNodeId, edge.toNodeId);
+    addAdjacentNode(incomingNodeIds, edge.toNodeId, edge.fromNodeId);
+    addAdjacentNode(connectedNodeIdsByNodeId, edge.fromNodeId, edge.toNodeId);
+    addAdjacentNode(connectedNodeIdsByNodeId, edge.toNodeId, edge.fromNodeId);
+  }
+  const walk = (direction: "outgoing" | "incoming"): Set<string> => {
+    const visited = new Set<string>();
+    const pending = [rootNodeId];
+    while (pending.length > 0) {
+      const currentNodeId = pending.shift();
+      if (!currentNodeId) {
+        continue;
+      }
+      const adjacentNodeIds =
+        direction === "outgoing"
+          ? outgoingNodeIds.get(currentNodeId)
+          : incomingNodeIds.get(currentNodeId);
+      for (const nextNodeId of adjacentNodeIds ?? []) {
+        if (nextNodeId !== rootNodeId && !visited.has(nextNodeId)) {
+          visited.add(nextNodeId);
+          pending.push(nextNodeId);
+        }
+      }
+    }
+    return visited;
+  };
+  const connectedNodeIds = new Set<string>([rootNodeId]);
+  const pendingConnected = [rootNodeId];
+  while (pendingConnected.length > 0) {
+    const currentNodeId = pendingConnected.shift();
+    if (!currentNodeId) {
+      continue;
+    }
+    for (const nextNodeId of connectedNodeIdsByNodeId.get(currentNodeId) ?? []) {
+      if (!connectedNodeIds.has(nextNodeId)) {
+        connectedNodeIds.add(nextNodeId);
+        pendingConnected.push(nextNodeId);
+      }
+    }
+  }
+  const directDependencyNodeIds = allEdges
+    .filter(edge => edge.fromNodeId === rootNodeId)
+    .map(edge => edge.toNodeId);
+  const directDependentNodeIds = allEdges
+    .filter(edge => edge.toNodeId === rootNodeId)
+    .map(edge => edge.fromNodeId);
+  const compareNodeIds = (left: string, right: string): number =>
+    (nodes.get(left)?.label ?? left).localeCompare(nodes.get(right)?.label ?? right);
+
+  return {
+    rootNodeId,
+    nodes: [...nodes.values()]
+      .filter(node => connectedNodeIds.has(node.nodeId))
+      .sort((left, right) =>
+        left.nodeId === rootNodeId
+          ? -1
+          : right.nodeId === rootNodeId
+            ? 1
+            : left.nodeType.localeCompare(right.nodeType) ||
+              left.label.localeCompare(right.label)
+      ),
+    edges: allEdges
+      .filter(
+        edge =>
+          connectedNodeIds.has(edge.fromNodeId) &&
+          connectedNodeIds.has(edge.toNodeId)
+      )
+      .sort((left, right) =>
+        left.relationshipType.localeCompare(right.relationshipType) ||
+        left.fromNodeId.localeCompare(right.fromNodeId) ||
+        left.toNodeId.localeCompare(right.toNodeId)
+      ),
+    directDependencyNodeIds: [...new Set(directDependencyNodeIds)].sort(
+      compareNodeIds
+    ),
+    transitiveDependencyNodeIds: [...walk("outgoing")].sort(compareNodeIds),
+    directDependentNodeIds: [...new Set(directDependentNodeIds)].sort(
+      compareNodeIds
+    ),
+    transitiveDependentNodeIds: [...walk("incoming")].sort(compareNodeIds)
+  };
 };
 
 const normalizeReviewText = (
@@ -15805,28 +16235,48 @@ export const createFirstSliceServices = (
           );
         }
 
-        const importJobs = (
-          await repository.listImportJobsByWorkspace(
+        const [
+          allSourcePackages,
+          allImportJobs,
+          allContentReleases,
+          activityEvents
+        ] = await Promise.all([
+          repository.listSourcePackagesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listImportJobsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listContentReleasesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
           )
-        )
+        ]);
+        const importJobs = allImportJobs
           .filter(importJob => importJob.sourcePackageId === sourcePackage.sourcePackageId)
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
         const importJobIds = new Set(importJobs.map(importJob => importJob.importJobId));
-        const contentReleases = (
-          await repository.listContentReleasesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          )
-        )
+        const contentReleases = allContentReleases
           .filter(contentRelease => importJobIds.has(contentRelease.importJobId))
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
         return {
           sourcePackage,
           importJobs,
-          contentReleases
+          contentReleases,
+          dependencyGraph: buildWorkspaceSourcePackageDependencyGraph({
+            rootSourcePackage: sourcePackage,
+            sourcePackages: allSourcePackages,
+            importJobs: allImportJobs,
+            contentReleases: allContentReleases,
+            activityEvents
+          })
         };
       },
       async downloadSourcePackage(input) {

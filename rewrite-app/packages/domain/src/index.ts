@@ -1358,6 +1358,53 @@ export type WorkspaceSourcePackageListItem = {
   blockingDependencyCount: number;
 };
 
+export type WorkspaceFileDependencyNodeType =
+  | "source_package"
+  | "booklet"
+  | "system_check"
+  | "unit"
+  | "player"
+  | "definition"
+  | "coding_scheme"
+  | "resource";
+
+export type WorkspaceFileDependencyRelationshipType =
+  | "assembled_from"
+  | "contains_booklet"
+  | "contains_system_check"
+  | "contains_unit"
+  | "uses_unit"
+  | "uses_player"
+  | "uses_definition"
+  | "uses_coding_scheme"
+  | "contains_resource";
+
+export type WorkspaceFileDependencyNode = {
+  nodeId: string;
+  nodeType: WorkspaceFileDependencyNodeType;
+  key: string;
+  label: string;
+  sourcePackageId: string;
+  fileType?: WorkspaceFileType;
+  status?: SourcePackageStatus;
+};
+
+export type WorkspaceFileDependencyEdge = {
+  fromNodeId: string;
+  toNodeId: string;
+  relationshipType: WorkspaceFileDependencyRelationshipType;
+};
+
+export type WorkspaceSourcePackageDependencyGraph = {
+  rootNodeId: string;
+  nodes: WorkspaceFileDependencyNode[];
+  edges: WorkspaceFileDependencyEdge[];
+  directDependencyNodeIds: string[];
+  transitiveDependencyNodeIds: string[];
+  directDependentNodeIds: string[];
+  transitiveDependentNodeIds: string[];
+};
+
 export type WorkspaceImportJobListItem = {
   importJob: ImportJob;
   sourcePackage: SourcePackage | null;
@@ -1471,6 +1518,7 @@ export type WorkspaceSourcePackageDetail = {
   sourcePackage: SourcePackage;
   importJobs: ImportJob[];
   contentReleases: ContentRelease[];
+  dependencyGraph: WorkspaceSourcePackageDependencyGraph;
 };
 
 export type WorkspaceSourcePackageDownload = {

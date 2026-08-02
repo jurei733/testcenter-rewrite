@@ -968,6 +968,100 @@ export class ContentViewFacade {
     );
   }
 
+  get sourcePackageDependencyGraphItems(): RecordCollectionItem[] {
+    const graph = parseJsonDocument<GetSourcePackageResponse>(
+      this.content.sourcePackageDetailView
+    )?.sourcePackageDetail.dependencyGraph;
+    if (!graph) {
+      return [];
+    }
+    const nodesById = new Map(graph.nodes.map(node => [node.nodeId, node]));
+    const formatNodeList = (nodeIds: string[]): string => {
+      const labels = nodeIds
+        .map(nodeId => nodesById.get(nodeId)?.label ?? nodeId)
+        .slice(0, 8);
+      return labels.length > 0
+        ? `${labels.join(", ")}${nodeIds.length > labels.length ? ", …" : ""}`
+        : "none";
+    };
+    const rootNode = nodesById.get(graph.rootNodeId);
+    const visibleEdges = graph.edges.slice(0, 100);
+    return [
+      {
+        headline: rootNode?.label ?? "Selected workspace file",
+        subline: `${graph.nodes.length} related node(s), ${graph.edges.length} relationship(s)`,
+        badges: [
+          `${graph.directDependencyNodeIds.length} direct requirement(s)`,
+          `${graph.transitiveDependencyNodeIds.length} transitive requirement(s)`,
+          `${graph.transitiveDependentNodeIds.length} transitive user(s)`
+        ],
+        rows: [
+          {
+            label: "Direct Requirements",
+            value: formatNodeList(graph.directDependencyNodeIds)
+          },
+          {
+            label: "Direct Users",
+            value: formatNodeList(graph.directDependentNodeIds)
+          },
+          {
+            label: "Graph Coverage",
+            value:
+              visibleEdges.length === graph.edges.length
+                ? "all relationships shown"
+                : `${visibleEdges.length} of ${graph.edges.length} relationships shown`
+          }
+        ],
+        selected: true
+      },
+      ...visibleEdges.map(edge => {
+        const fromNode = nodesById.get(edge.fromNodeId);
+        const toNode = nodesById.get(edge.toNodeId);
+        const relatedSourceNode = [fromNode, toNode].find(
+          node =>
+            node?.nodeType === "source_package" &&
+            node.nodeId !== graph.rootNodeId
+        );
+        return {
+          headline: toNode?.label ?? edge.toNodeId,
+          subline: `${fromNode?.label ?? edge.fromNodeId} → ${
+            toNode?.label ?? edge.toNodeId
+          }`,
+          badges: [
+            edge.relationshipType.replaceAll("_", " "),
+            `${fromNode?.nodeType ?? "unknown"} → ${
+              toNode?.nodeType ?? "unknown"
+            }`
+          ],
+          rows: [
+            {
+              label: "From Key",
+              value: fromNode?.key ?? edge.fromNodeId
+            },
+            {
+              label: "To Key",
+              value: toNode?.key ?? edge.toNodeId
+            },
+            {
+              label: "Owning Package",
+              value: toNode?.sourcePackageId ?? fromNode?.sourcePackageId ?? "unknown"
+            }
+          ],
+          selected:
+            edge.fromNodeId === graph.rootNodeId || edge.toNodeId === graph.rootNodeId,
+          ...(relatedSourceNode
+            ? {
+                actionLabel: "Select Related File",
+                actionPayload: {
+                  sourcePackageId: relatedSourceNode.sourcePackageId
+                }
+              }
+            : {})
+        } satisfies RecordCollectionItem;
+      })
+    ];
+  }
+
   get draftSourceDocumentPreviewItems(): RecordCollectionItem[] {
     return this.createSourceDocumentPreviewItems({
       fileName: this.content.sourceFileName,
