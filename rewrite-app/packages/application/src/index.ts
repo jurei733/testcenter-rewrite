@@ -9295,6 +9295,223 @@ const assembleSourcePackageArchive = (
   return { archive: createStoredZipArchive(archiveEntries), members };
 };
 
+const collectLooseSourcePackageDependencyReferences = (
+  sourcePackage: SourcePackage
+): string[] => {
+  const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+  if (
+    !decodedDocument ||
+    sourcePackage.fileName.toLowerCase().endsWith(".zip") ||
+    sourcePackage.mediaType.toLowerCase().includes("zip")
+  ) {
+    return [];
+  }
+
+  const sourceDocument = decodedDocument.bytes.toString("utf8");
+  if (
+    !sourceDocument.trimStart().startsWith("<") ||
+    /<!DOCTYPE\b/i.test(sourceDocument)
+  ) {
+    return [];
+  }
+
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(_level, message) {
+        parserErrors.push(message);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return [];
+  }
+  if (parserErrors.length > 0 || !document?.documentElement) {
+    return [];
+  }
+
+  const root = document.documentElement;
+  const rootName = xmlElementLocalName(root).toLowerCase();
+  const references = new Set<string>();
+  const addReference = (value: string | null | undefined): void => {
+    const normalizedValue = value?.trim();
+    if (normalizedValue) {
+      references.add(normalizedValue);
+    }
+  };
+
+  if (rootName === "booklet") {
+    const units = xmlChildrenNamed(root, "Units")[0];
+    for (const unit of units ? xmlDescendantsNamed(units, "Unit") : []) {
+      addReference(unit.getAttribute("id"));
+    }
+  }
+
+  if (rootName === "unit") {
+    const definition =
+      xmlChildrenNamed(root, "DefinitionRef")[0] ??
+      xmlChildrenNamed(root, "Definition")[0];
+    addReference(definition?.getAttribute("player"));
+    if (definition && xmlElementLocalName(definition) === "DefinitionRef") {
+      addReference(
+        ["href", "path", "src", "uri", "file", "fileName", "filename"]
+          .map(attributeName => definition.getAttribute(attributeName))
+          .find(Boolean) ?? xmlElementText(definition)
+      );
+    }
+    addReference(xmlElementText(xmlChildrenNamed(root, "VariablesRef")[0]));
+    const codingSchemeReference = xmlChildrenNamed(root, "CodingSchemeRef")[0];
+    addReference(
+      codingSchemeReference
+        ? ["href", "path", "src", "uri", "file", "fileName", "filename"]
+            .map(attributeName => codingSchemeReference.getAttribute(attributeName))
+            .find(Boolean) ?? xmlElementText(codingSchemeReference)
+        : null
+    );
+    const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
+    for (const dependency of dependencies
+      ? xmlChildElements(dependencies)
+      : []) {
+      if (xmlElementLocalName(dependency).toLowerCase() === "file") {
+        addReference(xmlElementText(dependency));
+      }
+    }
+  }
+
+  if (rootName === "syscheck") {
+    addReference(xmlChildrenNamed(root, "Config")[0]?.getAttribute("unit"));
+  }
+
+  return [...references];
+};
+
+const workspaceDependencyReferenceKeys = (reference: string): string[] => {
+  const normalizedReference = reference.trim().replace(/\\/g, "/");
+  const normalizedPath = normalizeZipEntryPath(normalizedReference);
+  const baseName = normalizedReference.split("/").at(-1) ?? normalizedReference;
+  return [normalizedReference, normalizedPath, baseName]
+    .map(value => value.trim().toLowerCase())
+    .filter((value, index, values) => value && values.indexOf(value) === index);
+};
+
+type WorkspaceDependencySourceResolution =
+  | { status: "not_applicable" }
+  | { status: "resolved"; sourcePackages: SourcePackage[] }
+  | { status: "blocked"; diagnostic: ImportJobDiagnostic };
+
+const resolveWorkspaceDependencySourcePackages = (input: {
+  rootSourcePackage: SourcePackage;
+  workspaceSourcePackages: SourcePackage[];
+}): WorkspaceDependencySourceResolution => {
+  const rootReferences = collectLooseSourcePackageDependencyReferences(
+    input.rootSourcePackage
+  );
+  if (rootReferences.length === 0) {
+    return { status: "not_applicable" };
+  }
+
+  const candidates = input.workspaceSourcePackages
+    .filter(
+      sourcePackage =>
+        sourcePackage.sourcePackageId !== input.rootSourcePackage.sourcePackageId &&
+        sourcePackage.sourceDocument
+    )
+    .map(sourcePackage => {
+      const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+      if (!decodedDocument) {
+        return null;
+      }
+      const assemblyEntry: SourcePackageAssemblyEntry = {
+        sourcePackageId: sourcePackage.sourcePackageId,
+        fileName: sourcePackage.fileName.trim().replace(/\\/g, "/"),
+        bytes: decodedDocument.bytes
+      };
+      const normalizedFileName = assemblyEntry.fileName.toLowerCase();
+      const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
+      const metadataReadable =
+        normalizedMediaType.startsWith("text/") ||
+        normalizedMediaType.includes("json") ||
+        normalizedMediaType.includes("xml") ||
+        /\.(?:html?|json|xml|manifest|imsmanifest)$/i.test(normalizedFileName);
+      const fileBaseName =
+        assemblyEntry.fileName.split("/").at(-1) ?? assemblyEntry.fileName;
+      const identifierKeys = new Set(
+        (metadataReadable
+          ? collectAssemblyResourceIdentifiers(assemblyEntry)
+          : [assemblyEntry.fileName, fileBaseName]
+        ).flatMap(workspaceDependencyReferenceKeys)
+      );
+      return { sourcePackage, identifierKeys };
+    })
+    .filter(Boolean) as Array<{
+      sourcePackage: SourcePackage;
+      identifierKeys: Set<string>;
+    }>;
+
+  const selected = new Map<string, SourcePackage>([
+    [input.rootSourcePackage.sourcePackageId, input.rootSourcePackage]
+  ]);
+  const pending = [input.rootSourcePackage];
+  const missingReferences = new Set<string>();
+  while (pending.length > 0) {
+    const currentSourcePackage = pending.shift();
+    if (!currentSourcePackage) {
+      continue;
+    }
+    for (const reference of collectLooseSourcePackageDependencyReferences(
+      currentSourcePackage
+    )) {
+      const referenceKeys = workspaceDependencyReferenceKeys(reference);
+      const exactReferenceKey = reference.trim().toLowerCase();
+      const exactMatches = candidates.filter(
+        candidate => candidate.identifierKeys.has(exactReferenceKey)
+      );
+      const matches =
+        exactMatches.length > 0
+          ? exactMatches
+          : candidates.filter(
+              candidate =>
+                referenceKeys.some(key => candidate.identifierKeys.has(key))
+            );
+      if (matches.length > 1) {
+        return {
+          status: "blocked",
+          diagnostic: createImportDiagnostic(
+            "source_document_workspace_dependency_ambiguous",
+            `Workspace dependency '${reference}' referenced by '${currentSourcePackage.fileName}' matches multiple uploaded files. Use explicit loose-file assembly to select the intended immutable dependency set.`
+          )
+        };
+      }
+      if (matches.length === 0) {
+        missingReferences.add(reference);
+        continue;
+      }
+      const dependency = matches[0]!.sourcePackage;
+      if (selected.has(dependency.sourcePackageId)) {
+        continue;
+      }
+      selected.set(dependency.sourcePackageId, dependency);
+      pending.push(dependency);
+    }
+  }
+
+  if (missingReferences.size > 0) {
+    return selected.size > 1
+      ? {
+          status: "blocked",
+          diagnostic: createImportDiagnostic(
+            "source_document_workspace_dependency_incomplete",
+            `Workspace dependency resolution for '${input.rootSourcePackage.fileName}' found a partial chain but could not resolve: ${[...missingReferences].join(", ")}. Upload the missing files or use explicit loose-file assembly.`
+          )
+        }
+      : { status: "not_applicable" };
+  }
+
+  return selected.size > 1
+    ? { status: "resolved", sourcePackages: [...selected.values()] }
+    : { status: "not_applicable" };
+};
+
 const resolveZipResourcePathCandidates = (
   manifestFileName: string,
   resourcePath: string
@@ -14564,7 +14781,9 @@ export const createFirstSliceServices = (
     tenantKey: string;
     workspaceKey: string;
     sourcePackageId: string;
-  }): Promise<CreateImportJobResult> => {
+  }, options: {
+    resolveWorkspaceDependencies?: boolean;
+  } = {}): Promise<CreateImportJobResult> => {
     const workspace = await requireWorkspace(
       repository,
       input.tenantKey,
@@ -14583,6 +14802,77 @@ export const createFirstSliceServices = (
       );
     }
 
+    const standaloneImportResolution = buildRuntimeSnapshot(sourcePackage);
+    let workspaceDependencyDiagnostic: ImportJobDiagnostic | null = null;
+    if (
+      options.resolveWorkspaceDependencies !== false &&
+      standaloneImportResolution.runtimeSnapshot
+    ) {
+      const workspaceSourcePackages =
+        await repository.listSourcePackagesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        );
+      const workspaceDependencyResolution =
+        resolveWorkspaceDependencySourcePackages({
+          rootSourcePackage: sourcePackage,
+          workspaceSourcePackages
+        });
+      if (workspaceDependencyResolution.status === "blocked") {
+        workspaceDependencyDiagnostic = workspaceDependencyResolution.diagnostic;
+      }
+      if (workspaceDependencyResolution.status === "resolved") {
+        const { archive, members } = assembleSourcePackageArchive(
+          workspaceDependencyResolution.sourcePackages
+        );
+        const sourceBaseName = (sourcePackage.fileName
+          .replace(/\\/g, "/")
+          .split("/")
+          .at(-1) ?? sourcePackage.fileName)
+          .replace(/\.[^.]+$/, "")
+          .trim() || "workspace-source";
+        const dependencySnapshot: SourcePackage = {
+          sourcePackageId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          fileName: `${sourceBaseName}.workspace-dependencies.zip`,
+          mediaType: "application/zip",
+          contentStructure: null,
+          sourceDocument: `data:application/zip;base64,${archive.toString("base64")}`,
+          status: "uploaded",
+          uploadedAt: now()
+        };
+        await repository.saveSourcePackage(dependencySnapshot);
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "source_package_assembled",
+          subjectType: "source_package",
+          subjectId: dependencySnapshot.sourcePackageId,
+          summary: `Workspace dependencies for '${sourcePackage.fileName}' resolved into immutable package '${dependencySnapshot.fileName}'.`,
+          details: {
+            fileName: dependencySnapshot.fileName,
+            sizeBytes: archive.length,
+            assemblyMode: "workspace_dependencies",
+            rootSourcePackageId: sourcePackage.sourcePackageId,
+            sourcePackages: members.map(member => ({
+              sourcePackageId: member.sourcePackageId,
+              fileName: member.fileName,
+              sizeBytes: member.bytes.length
+            }))
+          }
+        });
+        return createImportJobWithRelease(
+          {
+            tenantKey: input.tenantKey,
+            workspaceKey: input.workspaceKey,
+            sourcePackageId: dependencySnapshot.sourcePackageId
+          },
+          { resolveWorkspaceDependencies: false }
+        );
+      }
+    }
+
     const timestamp = now();
     const importJob: ImportJob = {
       importJobId: idGenerator(),
@@ -14594,7 +14884,12 @@ export const createFirstSliceServices = (
       finishedAt: null,
       diagnostics: []
     };
-    const importResolution = buildRuntimeSnapshot(sourcePackage);
+    const importResolution = workspaceDependencyDiagnostic
+      ? {
+          runtimeSnapshot: null,
+          diagnostics: [workspaceDependencyDiagnostic]
+        }
+      : standaloneImportResolution;
 
     if (!importResolution.runtimeSnapshot) {
       const failedImportJob: ImportJob = {

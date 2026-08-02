@@ -66,6 +66,7 @@ export async function createSourcePackageAction(
 }
 
 export async function createImportJobAction(host: ContentActionsHost): Promise<void> {
+  const requestedSourcePackageId = host.getSourcePackageId();
   const payload = await host.request<CreateImportJobResponse>(
     "Create Import Job",
     "POST",
@@ -78,17 +79,27 @@ export async function createImportJobAction(host: ContentActionsHost): Promise<v
     } satisfies CreateImportJobRequest
   );
 
+  const resolvedWorkspaceDependencies =
+    payload.importJob.sourcePackageId !== requestedSourcePackageId;
+  if (resolvedWorkspaceDependencies) {
+    host.setSourcePackageId(payload.importJob.sourcePackageId);
+  }
   host.setImportJobId(payload.importJob.importJobId);
   host.setContentReleaseId(
     payload.stagedContentRelease?.contentReleaseId ?? host.getContentReleaseId()
   );
   host.persistShellState();
   host.rememberActivity(
-    "Import Started",
-    `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.`
+    resolvedWorkspaceDependencies
+      ? "Workspace Dependencies Resolved"
+      : "Import Started",
+    resolvedWorkspaceDependencies
+      ? `Import ${payload.importJob.importJobId} captured matching workspace files in immutable package ${payload.importJob.sourcePackageId}.`
+      : `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.`
   );
 
   await host.refreshContentReads();
+  await host.loadSourcePackageDetail();
   await host.loadImportJobDetail();
   if (host.getContentReleaseId()) {
     await host.loadContentReleaseActivationReadiness();

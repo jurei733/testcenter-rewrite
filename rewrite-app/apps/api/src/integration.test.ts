@@ -8915,6 +8915,145 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     sourcePackages.push(upload.body.sourcePackage);
   }
 
+  const automaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+    }
+  );
+  assert.equal(automaticImport.status, 201);
+  assert.equal(automaticImport.body.importJob.status, "completed");
+  assert.deepEqual(automaticImport.body.importJob.diagnostics, []);
+  assert.notEqual(
+    automaticImport.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  assert.ok(automaticImport.body.stagedContentRelease?.contentReleaseId);
+
+  const automaticSnapshotDetail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: {
+        fileName: string;
+        mediaType: string;
+        status: string;
+      };
+      dependencyGraph: {
+        edges: Array<{
+          relationshipType: string;
+          toNodeId: string;
+        }>;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${automaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    automaticSnapshotDetail.body.sourcePackageDetail.sourcePackage.fileName,
+    "Booklet2.workspace-dependencies.zip"
+  );
+  assert.equal(
+    automaticSnapshotDetail.body.sourcePackageDetail.sourcePackage.mediaType,
+    "application/zip"
+  );
+  assert.equal(
+    automaticSnapshotDetail.body.sourcePackageDetail.sourcePackage.status,
+    "accepted"
+  );
+  assert.equal(
+    automaticSnapshotDetail.body.sourcePackageDetail.dependencyGraph.edges.filter(
+      edge => edge.relationshipType === "assembled_from"
+    ).length,
+    4
+  );
+
+  const automaticAssemblyActivity = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        details: {
+          assemblyMode?: string;
+          rootSourcePackageId?: string;
+          sourcePackages?: Array<{ sourcePackageId: string }>;
+        };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/activity-events?eventType=source_package_assembled&subjectId=${automaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.equal(automaticAssemblyActivity.body.items.length, 1);
+  assert.equal(
+    automaticAssemblyActivity.body.items[0]?.activityEvent.details.assemblyMode,
+    "workspace_dependencies"
+  );
+  assert.equal(
+    automaticAssemblyActivity.body.items[0]?.activityEvent.details
+      .rootSourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  const automaticallyResolvedSourcePackageIds =
+    automaticAssemblyActivity.body.items[0]?.activityEvent.details.sourcePackages?.map(
+      sourcePackage => sourcePackage.sourcePackageId
+    ) ?? [];
+  assert.equal(
+    automaticallyResolvedSourcePackageIds[0],
+    sourcePackages[0]!.sourcePackageId
+  );
+  assert.deepEqual(
+    [...automaticallyResolvedSourcePackageIds].sort(),
+    sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId).sort()
+  );
+
+  const duplicateUnitUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Unit2-copy.xml",
+      mediaType: "application/xml",
+      sourceDocument: readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
+        "utf8"
+      )
+    }
+  });
+  assert.equal(duplicateUnitUpload.status, 201);
+  const ambiguousAutomaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+    }
+  );
+  assert.equal(ambiguousAutomaticImport.status, 201);
+  assert.equal(ambiguousAutomaticImport.body.importJob.status, "failed");
+  assert.equal(
+    ambiguousAutomaticImport.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  assert.deepEqual(
+    ambiguousAutomaticImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_workspace_dependency_ambiguous"]
+  );
+  assert.equal(ambiguousAutomaticImport.body.stagedContentRelease, null);
+
   const assemblyPath =
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
     "/source-package-assemblies";
@@ -9156,8 +9295,11 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     `source-package:${assembly.body.sourcePackage.sourcePackageId}`
   );
   assert.equal(
-    assembledGraph.edges.filter(edge => edge.relationshipType === "assembled_from")
-      .length,
+    assembledGraph.edges.filter(
+      edge =>
+        edge.relationshipType === "assembled_from" &&
+        edge.fromNodeId === assembledGraph.rootNodeId
+    ).length,
     sourcePackages.length
   );
   for (const relationshipType of [
@@ -9200,9 +9342,19 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
       `/source-packages/${sourcePackages[0]!.sourcePackageId}`
   );
   const memberGraph = memberDetail.body.sourcePackageDetail.dependencyGraph;
-  assert.deepEqual(memberGraph.directDependentNodeIds, [assembledGraph.rootNodeId]);
+  const automaticDependencySnapshotNodeId =
+    `source-package:${automaticImport.body.importJob.sourcePackageId}`;
+  assert.deepEqual(
+    [...memberGraph.directDependentNodeIds].sort(),
+    [assembledGraph.rootNodeId, automaticDependencySnapshotNodeId].sort()
+  );
   assert.ok(
     memberGraph.nodes.some(node => node.nodeId === assembledGraph.rootNodeId)
+  );
+  assert.ok(
+    memberGraph.nodes.some(
+      node => node.nodeId === automaticDependencySnapshotNodeId
+    )
   );
 });
 

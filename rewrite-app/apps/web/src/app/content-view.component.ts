@@ -189,7 +189,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Loose File Assembly</h2>
-        <p>Combine separately uploaded booklet, unit, coding-scheme, player, and manifest files into one immutable ZIP package and import it immediately.</p>
+        <p>Upload related booklet, unit, coding-scheme, player, resource, and manifest files together. Importing a booklet captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
         <div class="form-grid full">
           <label>
             Upload Loose Files
@@ -212,7 +212,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Assembly Candidates"
-        subtitle="Select two or more uploaded source files. Existing manifests are retained; otherwise a compatible manifest is generated."
+        subtitle="Optional explicit fallback: select two or more uploaded source files. Existing manifests are retained; otherwise a compatible manifest is generated."
         [items]="view.sourcePackageAssemblyItems"
         (itemAction)="view.toggleAssemblySourcePackage($event)"
         emptyState="Refresh content reads after uploading loose files."

@@ -1685,6 +1685,59 @@ try {
     .filter({ hasText: "coding-scheme.vocs.json" })
     .filter({ hasText: "verona-player-simple-6.0.html" })
     .waitFor({ timeout: 20_000 });
+  logStep("resolve-loose-original-workspace-dependencies");
+  const sourcePackageCollection = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Source Packages" }) });
+  await sourcePackageCollection
+    .locator("article.record-card")
+    .filter({ has: page.getByRole("heading", { name: "Booklet2.xml" }) })
+    .getByRole("button", { name: "Select + Load" })
+    .click();
+  await expectInputValue("#sourceFileName", "Booklet2.xml");
+  await expectButtonSelectorEnabled("#createImportJobButton");
+  await page.locator("#createImportJobButton").click();
+  const automaticDependencySnapshotFileName =
+    "Booklet2.workspace-dependencies.zip";
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileName=${encodeURIComponent(automaticDependencySnapshotFileName)}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.sourcePackage?.fileName === automaticDependencySnapshotFileName &&
+          item?.sourcePackage?.status === "accepted" &&
+          item?.latestImportJob?.status === "completed" &&
+          item?.contentReleaseCount === 1
+      )
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=source_package_assembled&limit=10`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.activityEvent?.details?.assemblyMode ===
+            "workspace_dependencies" &&
+          item?.activityEvent?.details?.sourcePackages?.length === 4
+      )
+  );
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace File Dependency Graph"
+      })
+    })
+    .filter({ hasText: automaticDependencySnapshotFileName })
+    .filter({ hasText: "assembled from" })
+    .filter({ hasText: "uses player" })
+    .filter({ hasText: "uses coding scheme" })
+    .waitFor({ timeout: 20_000 });
   await fillAndCommit("#sourcePackageAssemblyFileName", looseAssemblyFileName);
   await expectButtonSelectorEnabled("#assembleSourcePackagesButton");
   await page.locator("#assembleSourcePackagesButton").click();
