@@ -35,6 +35,7 @@ import {
   loadParticipantSessionsAction,
   loadParticipantRosterAction,
   loadDetailedResponsesAction,
+  loadGroupResultsAction,
   loadReviewsAction,
   refreshRuntimeReadsAction
 } from "./rewrite-app-shell.runtime-reads";
@@ -348,6 +349,17 @@ export class RewriteAppRuntimeService {
     );
   }
 
+  async loadGroupResults(): Promise<void> {
+    if (!this.hasWorkspaceScope()) {
+      return;
+    }
+    const payload = await loadGroupResultsAction(this.hosts.createRuntimeReadsHost());
+    this.feedback.rememberActivity(
+      "Result Groups Loaded",
+      `${payload.items.length} result group(s) loaded.`
+    );
+  }
+
   async loadReviews(): Promise<void> {
     if (!this.hasWorkspaceScope()) {
       return;
@@ -408,6 +420,7 @@ export class RewriteAppRuntimeService {
       )
     );
     await Promise.all([
+      loadGroupResultsAction(this.hosts.createRuntimeReadsHost()),
       loadDetailedResponsesAction(this.hosts.createRuntimeReadsHost()),
       loadReviewsAction(this.hosts.createRuntimeReadsHost())
     ]);

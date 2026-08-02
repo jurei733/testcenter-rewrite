@@ -215,6 +215,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <span>Review And Export</span>
             <div class="actions">
               <button id="runtimeLoadDetailedResponsesButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadDetailedResponses()">Detailed Responses</button>
+              <button id="runtimeLoadGroupResultsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.loadGroupResults()">Load Result Groups</button>
               <button class="ghost" type="button" [disabled]="!view.canCreateReviewAction" (click)="view.createReview()">Create Review</button>
               <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.updateReview()">Update Review</button>
               <button class="ghost" type="button" [disabled]="!view.canUseSelectedReviewActions" (click)="view.confirmDeleteReview()">Delete Review</button>
@@ -568,6 +569,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       </article>
 
       <app-record-collection
+        title="Result Groups"
+        subtitle="Original-compatible group result inventory with started booklets, unit statistics, and latest test activity."
+        [items]="view.groupResultItems"
+        (itemAction)="view.selectResultGroup($event)"
+        emptyState="Load result groups to inspect collected results by login group."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Detailed Responses"
         subtitle="Workspace-wide response inspection with participant, run, unit, and status context."
         [items]="view.detailedResponseItems"
@@ -800,6 +809,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <app-json-panel title="Current Run State" subtitle="Booklet Context" viewId="currentRunStateView" [content]="view.runtime.currentRunStateView"></app-json-panel>
       <app-json-panel title="Monitor Open Runs" subtitle="Activation Guard Signal" viewId="openRunsView" [content]="view.runtime.openRunsView"></app-json-panel>
       <app-json-panel title="Detailed Responses" subtitle="Workspace Response Read Model" viewId="detailedResponsesView" [content]="view.runtime.detailedResponsesView"></app-json-panel>
+      <app-json-panel title="Result Groups" subtitle="Workspace Result Inventory" viewId="groupResultsView" [content]="view.runtime.groupResultsView"></app-json-panel>
       <app-json-panel title="Reviews" subtitle="Workspace Review Read Model" viewId="reviewsView" [content]="view.runtime.reviewsView"></app-json-panel>
       <app-json-panel title="Response CSV Export" subtitle="Workspace Responses" viewId="responseExportView" [content]="view.runtime.responseExportView"></app-json-panel>
       <app-json-panel title="Review CSV Export" subtitle="Workspace Reviews" viewId="reviewExportView" [content]="view.runtime.reviewExportView"></app-json-panel>

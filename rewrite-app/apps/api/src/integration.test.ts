@@ -4369,6 +4369,53 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(cleanupReview.status, 201);
 
+    const groupResultsBeforeDeletion = await requestJsonAt<{
+      items: Array<{
+        groupKey: string;
+        groupLabel: string;
+        bookletsStarted: number;
+        numUnitsMin: number;
+        numUnitsMax: number;
+        numUnitsTotal: number;
+        numUnitsAvg: number;
+        responseCount: number;
+        reviewCount: number;
+        testLogCount: number;
+        lastChangeAt: string;
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(groupResultsBeforeDeletion.status, 200);
+    assert.equal(groupResultsBeforeDeletion.body.items.length, 1);
+    const groupResultBeforeDeletion = groupResultsBeforeDeletion.body.items[0];
+    assert.ok(groupResultBeforeDeletion);
+    assert.match(groupResultBeforeDeletion.lastChangeAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.deepEqual({
+      ...groupResultBeforeDeletion,
+      lastChangeAt: "checked-separately"
+    }, {
+      tenantKey: "demo-tenant",
+      workspaceKey: "demo-workspace",
+      groupKey: "group:student-demo",
+      groupLabel: "group:student-demo",
+      bookletsStarted: 1,
+      numUnitsMin: 2,
+      numUnitsMax: 2,
+      numUnitsTotal: 2,
+      numUnitsAvg: 2,
+      responseCount: 2,
+      reviewCount: 1,
+      testLogCount: participantTestLogs.body.items.length,
+      lastChangeAt: "checked-separately"
+    });
+
     const groupDeletion = await requestJsonAt<{
       deletion: {
         groupKey: string;
@@ -4445,6 +4492,18 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     );
     assert.equal(testLogsAfterDeletion.status, 200);
     assert.deepEqual(testLogsAfterDeletion.body.items, []);
+
+    const groupResultsAfterDeletion = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/results/groups",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(groupResultsAfterDeletion.status, 200);
+    assert.deepEqual(groupResultsAfterDeletion.body.items, []);
 
     const groupMonitorAfterDeletion = await requestJsonAt<{
       studyMonitorGroup: {
@@ -18085,6 +18144,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportImportJobsCsv: string;
         exportContentReleasesCsv: string;
         listDetailedResponses: string;
+        listGroupResults: string;
         exportStudyMonitorCsv: string;
         getStudyMonitorParticipantMatrix: string;
         getStudyMonitorParticipant: string;
@@ -18152,6 +18212,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "participant_session_csv_export",
     "detailed_response_read",
     "response_csv_export",
+    "result_group_read",
     "review_workflow",
     "review_csv_export",
     "log_csv_export",
@@ -18218,6 +18279,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     /content-releases\.csv/
   );
   assert.match(manifest.routes.workspace.listDetailedResponses, /responses\/detailed/);
+  assert.match(manifest.routes.workspace.listGroupResults, /results\/groups/);
   assert.match(manifest.routes.workspace.exportStudyMonitorCsv, /study-monitor\.csv/);
   assert.match(
     manifest.routes.workspace.getStudyMonitorParticipantMatrix,

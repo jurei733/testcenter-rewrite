@@ -304,9 +304,17 @@ export function createRuntimeReadsStateHost(args: {
       buildReviewsPath(productionApiRoutes.workspace.exportReviewCsv),
     getDetailedResponsesPath: () =>
       buildDetailedResponsesPath(productionApiRoutes.workspace.listDetailedResponses),
+    getGroupResultsPath: () =>
+      resolveRoutePath(productionApiRoutes.workspace.listGroupResults, {
+        tenantKey: args.workspaceState.tenantKey.trim(),
+        workspaceKey: args.workspaceState.workspaceKey.trim()
+      }),
     getReviewsPath: () => buildReviewsPath(productionApiRoutes.workspace.listReviews),
     setDetailedResponsesView: nextValue => {
       args.runtimeState.detailedResponsesView = nextValue;
+    },
+    setGroupResultsView: nextValue => {
+      args.runtimeState.groupResultsView = nextValue;
     },
     setReviewsView: nextValue => {
       args.runtimeState.reviewsView = nextValue;

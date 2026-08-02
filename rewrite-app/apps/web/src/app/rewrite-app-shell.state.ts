@@ -143,6 +143,7 @@ export interface ShellRuntimeState {
   openRunsExportView: string;
   monitorCommandHistoryView: string;
   detailedResponsesView: string;
+  groupResultsView: string;
   reviewsView: string;
   participantRosterExportView: string;
   responseExportView: string;
@@ -370,6 +371,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     openRunsExportView: 'Use "Export Open Runs CSV".',
     monitorCommandHistoryView: 'Use "Refresh Runtime Reads".',
     detailedResponsesView: 'Use "Detailed Responses".',
+    groupResultsView: 'Use "Load Result Groups".',
     reviewsView: 'Use "Load Reviews".',
     participantRosterExportView: 'Use "Export Saved Roster CSV".',
     responseExportView: 'Use "Export Responses CSV".',

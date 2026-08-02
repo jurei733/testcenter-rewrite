@@ -90,6 +90,7 @@ import type {
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
+  WorkspaceGroupResultSummary,
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantSessionListItem,
@@ -398,6 +399,10 @@ export type WorkspaceAdminReadPort = {
     status?: TestRun["status"];
     limit?: number;
   }): Promise<WorkspaceDetailedResponse[]>;
+  listGroupResults(input: {
+    tenantKey: string;
+    workspaceKey: string;
+  }): Promise<WorkspaceGroupResultSummary[]>;
   exportResponseCsv(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -3859,6 +3864,99 @@ const listDetailedResponsesForWorkspace = (input: {
         left.unitKey.localeCompare(right.unitKey)
     )
     .slice(0, resolveOperatorReadLimit(input.limit));
+};
+
+const listGroupResultsForWorkspace = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+  testLogs: ParticipantTestLog[];
+}): WorkspaceGroupResultSummary[] => {
+  const participantSessionsById = new Map(
+    input.participantSessions.map(participantSession => [
+      participantSession.participantSessionId,
+      participantSession
+    ])
+  );
+  const reviewsByTestRunId = new Map<string, number>();
+  for (const review of input.reviews) {
+    reviewsByTestRunId.set(
+      review.testRunId,
+      (reviewsByTestRunId.get(review.testRunId) ?? 0) + 1
+    );
+  }
+  const testLogsByTestRunId = new Map<string, number>();
+  for (const testLog of input.testLogs) {
+    testLogsByTestRunId.set(
+      testLog.testRunId,
+      (testLogsByTestRunId.get(testLog.testRunId) ?? 0) + 1
+    );
+  }
+
+  const groupRuns = new Map<
+    string,
+    Array<{
+      testRun: TestRun;
+      responseCount: number;
+      reviewCount: number;
+      testLogCount: number;
+    }>
+  >();
+  for (const rawTestRun of input.testRuns) {
+    const testRun = normalizeTestRun(rawTestRun);
+    const participantSession = participantSessionsById.get(
+      testRun.participantSessionId
+    );
+    if (!participantSession?.groupKey) {
+      continue;
+    }
+    const rows = groupRuns.get(participantSession.groupKey) ?? [];
+    rows.push({
+      testRun,
+      responseCount: Object.keys(testRun.unitResponses).length,
+      reviewCount: reviewsByTestRunId.get(testRun.testRunId) ?? 0,
+      testLogCount: testLogsByTestRunId.get(testRun.testRunId) ?? 0
+    });
+    groupRuns.set(participantSession.groupKey, rows);
+  }
+
+  return [...groupRuns.entries()]
+    .map(([groupKey, rows]) => {
+      const responseCounts = rows.map(row => row.responseCount);
+      const responseCount = responseCounts.reduce((total, count) => total + count, 0);
+      const lastChangeAt = rows.reduce(
+        (latest, row) =>
+          row.testRun.updatedAt.localeCompare(latest) > 0
+            ? row.testRun.updatedAt
+            : latest,
+        rows[0]?.testRun.updatedAt ?? ""
+      );
+
+      return {
+        tenantKey: input.tenantKey,
+        workspaceKey: input.workspaceKey,
+        groupKey,
+        // The rewrite roster currently stores a stable group key but no separate
+        // group label, so use the key as the lossless operator-facing fallback.
+        groupLabel: groupKey,
+        bookletsStarted: rows.length,
+        numUnitsMin: Math.min(...responseCounts),
+        numUnitsMax: Math.max(...responseCounts),
+        numUnitsTotal: responseCount,
+        numUnitsAvg: responseCount / rows.length,
+        responseCount,
+        reviewCount: rows.reduce((total, row) => total + row.reviewCount, 0),
+        testLogCount: rows.reduce((total, row) => total + row.testLogCount, 0),
+        lastChangeAt
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.lastChangeAt.localeCompare(left.lastChangeAt) ||
+        left.groupKey.localeCompare(right.groupKey)
+    );
 };
 
 const formatResponseCsv = (input: {
@@ -17105,6 +17203,45 @@ export const createFirstSliceServices = (
           unitKey: input.unitKey,
           status: input.status,
           limit: input.limit
+        });
+      },
+      async listGroupResults(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const [
+          participantSessions,
+          testRuns,
+          reviews,
+          testLogs
+        ] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantTestLogsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+
+        return listGroupResultsForWorkspace({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          participantSessions,
+          testRuns,
+          reviews,
+          testLogs
         });
       },
       async exportResponseCsv(input) {

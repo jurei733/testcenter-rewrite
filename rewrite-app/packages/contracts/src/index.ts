@@ -43,6 +43,7 @@ import type {
   WorkspaceImportJobDetail,
   WorkspaceImportJobListItem,
   WorkspaceDetailedResponse,
+  WorkspaceGroupResultSummary,
   WorkspaceGroupResultDeletion,
   WorkspaceParticipantSessionDetail,
   WorkspaceParticipantRosterItem,
@@ -1845,6 +1846,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/reviews.csv",
     listDetailedResponses:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/responses/detailed",
+    listGroupResults:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/results/groups",
     listReviews:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/reviews",
     createReview:
@@ -2533,6 +2536,10 @@ export type ListParticipantRosterResponse = {
 
 export type ListDetailedResponsesResponse = {
   items: WorkspaceDetailedResponse[];
+};
+
+export type ListGroupResultsResponse = {
+  items: WorkspaceGroupResultSummary[];
 };
 
 export type CreateReviewRequest = {

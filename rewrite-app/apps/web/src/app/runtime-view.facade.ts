@@ -10,6 +10,7 @@ import type {
   GetParticipantSessionResponse,
   ImportParticipantRosterResponse,
   ListDetailedResponsesResponse,
+  ListGroupResultsResponse,
   ListReviewsResponse,
   ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
@@ -1538,6 +1539,36 @@ export class RuntimeViewFacade {
         };
       })
     ];
+  }
+
+  get groupResultItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListGroupResultsResponse>(
+      this.runtime.groupResultsView
+    );
+    if (!payload) {
+      return [];
+    }
+
+    return payload.items.map(item => ({
+      headline: item.groupLabel || item.groupKey,
+      subline: item.groupKey,
+      badges: [
+        `${item.bookletsStarted} booklet(s)`,
+        `${item.responseCount} response(s)`,
+        `${item.reviewCount} review(s)`,
+        `${item.testLogCount} log(s)`
+      ],
+      rows: [
+        { label: "Booklets Started", value: String(item.bookletsStarted) },
+        { label: "Units Minimum", value: String(item.numUnitsMin) },
+        { label: "Units Maximum", value: String(item.numUnitsMax) },
+        { label: "Units Average", value: item.numUnitsAvg.toFixed(1) },
+        { label: "Last Test Activity", value: this.formatDateTime(item.lastChangeAt) }
+      ],
+      selected: this.runtime.groupKey.trim() === item.groupKey,
+      actionLabel: "Use Result Group",
+      actionPayload: { groupKey: item.groupKey }
+    }));
   }
 
   get selectedSessionReviewItems(): RecordCollectionItem[] {
@@ -3093,6 +3124,13 @@ export class RuntimeViewFacade {
     this.viewState.onActionAsync(() => this.runtimeService.loadDetailedResponses());
   }
 
+  loadGroupResults(): void {
+    if (!this.canUseWorkspaceScope) {
+      return;
+    }
+    this.viewState.onActionAsync(() => this.runtimeService.loadGroupResults());
+  }
+
   loadReviews(): void {
     if (!this.canUseWorkspaceScope) {
       return;
@@ -3160,6 +3198,26 @@ export class RuntimeViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.runtimeService.deleteGroupResults());
+  }
+
+  selectResultGroup(item: RecordCollectionItem): void {
+    const groupKey = item.actionPayload?.groupKey?.trim();
+    if (!groupKey) {
+      return;
+    }
+    this.runtime.groupKey = groupKey;
+    this.runtime.detailedResponseGroupFilter = groupKey;
+    this.runtime.reviewGroupFilter = groupKey;
+    this.runtime.participantSessionGroupFilter = groupKey;
+    this.runtime.openRunGroupFilter = groupKey;
+    this.persistState();
+    this.renderNow();
+    this.viewState.onActionAsync(async () => {
+      await Promise.all([
+        this.runtimeService.loadDetailedResponses(),
+        this.runtimeService.loadReviews()
+      ]);
+    });
   }
 
   selectEntryLink(item: RecordCollectionItem): void {

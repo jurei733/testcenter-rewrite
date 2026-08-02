@@ -7757,7 +7757,36 @@ try {
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);
   logStep("delete-group-results");
-  await fillAndCommit("#groupKey", participantGroupKey);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/results/groups`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(item => item?.groupKey === participantGroupKey)
+  );
+  await clickAction("Load Result Groups");
+  const resultGroups = page
+    .locator("app-record-collection")
+    .filter({ hasText: "Result Groups" });
+  const selectedResultGroup = resultGroups
+    .locator(".record-card")
+    .filter({ hasText: participantGroupKey });
+  await resultGroups.filter({ hasText: participantGroupKey }).waitFor();
+  await selectedResultGroup
+    .filter({ hasText: "Booklets Started" })
+    .filter({ hasText: "Units Minimum" })
+    .filter({ hasText: "Units Maximum" })
+    .filter({ hasText: "Units Average" })
+    .filter({ hasText: "Last Test Activity" })
+    .waitFor();
+  await fillAndCommit("#groupKey", "group:selection-placeholder");
+  await selectedResultGroup.getByRole("button", { name: "Use Result Group" }).click();
+  await expectInputValue("#groupKey", participantGroupKey);
+  await expectInputValue("#detailedResponseGroupFilter", participantGroupKey);
+  await expectInputValue("#reviewGroupFilter", participantGroupKey);
+  await expectInputValue("#participantSessionGroupFilter", participantGroupKey);
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
   const deleteGroupResultsDialog = new Promise((resolvePromise, reject) => {
     page.once("dialog", async dialog => {
       try {
@@ -7797,6 +7826,7 @@ try {
         item => item?.activityEvent?.details?.groupKey === participantGroupKey
       )
   );
+  await selectedResultGroup.waitFor({ state: "detached" });
   stopAfter("delete-group-results");
 
   process.stdout.write(

@@ -1457,6 +1457,27 @@ export type WorkspaceDetailedResponse = {
   completedAt: string | null;
 };
 
+/**
+ * Operator-facing result inventory compatible with the Original Testcenter's
+ * group result table. Unit statistics count distinct saved unit responses per
+ * started test run, including zero-response runs.
+ */
+export type WorkspaceGroupResultSummary = {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKey: string;
+  groupLabel: string;
+  bookletsStarted: number;
+  numUnitsMin: number;
+  numUnitsMax: number;
+  numUnitsTotal: number;
+  numUnitsAvg: number;
+  responseCount: number;
+  reviewCount: number;
+  testLogCount: number;
+  lastChangeAt: string;
+};
+
 export type WorkspaceReview = {
   reviewId: string;
   tenantId: string;
@@ -1593,6 +1614,7 @@ export type FirstSliceCapability =
   | "participant_session_csv_export"
   | "detailed_response_read"
   | "response_csv_export"
+  | "result_group_read"
   | "review_workflow"
   | "review_csv_export"
   | "log_csv_export"
@@ -1657,6 +1679,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "participant_session_csv_export",
   "detailed_response_read",
   "response_csv_export",
+  "result_group_read",
   "review_workflow",
   "review_csv_export",
   "log_csv_export",

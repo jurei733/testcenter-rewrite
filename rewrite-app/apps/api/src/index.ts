@@ -55,6 +55,7 @@ import {
   type GetImportJobResponse,
   type GetParticipantSessionResponse,
   type ListDetailedResponsesResponse,
+  type ListGroupResultsResponse,
   type ListReviewsResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
@@ -1599,6 +1600,9 @@ const reviewCsvExportPattern = createRoutePattern(
 const detailedResponsesPattern = createRoutePattern(
   productionApiRoutes.workspace.listDetailedResponses
 );
+const groupResultsPattern = createRoutePattern(
+  productionApiRoutes.workspace.listGroupResults
+);
 const reviewListPattern = createRoutePattern(
   productionApiRoutes.workspace.listReviews
 );
@@ -1734,6 +1738,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", studyMonitorRunCsvExportPattern],
   ["GET", openRunsCsvExportPattern],
   ["GET", detailedResponsesPattern],
+  ["GET", groupResultsPattern],
   ["GET", reviewListPattern],
   ["POST", reviewListPattern],
   ["PATCH", reviewDetailPattern],
@@ -2484,6 +2489,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       detailedResponsesPattern,
       productionApiRoutes.workspace.listDetailedResponses
+    ],
+    [
+      "GET",
+      groupResultsPattern,
+      productionApiRoutes.workspace.listGroupResults
     ],
     [
       "GET",
@@ -4681,6 +4691,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const participantRosterCsvExportMatch =
         participantRosterCsvExportPattern.exec(pathname);
       const detailedResponsesMatch = detailedResponsesPattern.exec(pathname);
+      const groupResultsMatch = groupResultsPattern.exec(pathname);
       const reviewListMatch = reviewListPattern.exec(pathname);
       const reviewDetailMatch = reviewDetailPattern.exec(pathname);
       const deleteGroupResultsMatch = deleteGroupResultsPattern.exec(pathname);
@@ -5030,6 +5041,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           ...query
         });
         sendJson<ListDetailedResponsesResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && groupResultsMatch?.groups) {
+        const tenantKey = decodeRouteGroup(groupResultsMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          groupResultsMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const items = await services.workspaceAdminRead.listGroupResults({
+          tenantKey,
+          workspaceKey
+        });
+        sendJson<ListGroupResultsResponse>(response, 200, { items });
         return;
       }
 

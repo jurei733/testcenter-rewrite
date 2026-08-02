@@ -1,6 +1,7 @@
 import type {
   GetParticipantSessionResponse,
   ListDetailedResponsesResponse,
+  ListGroupResultsResponse,
   ListParticipantRosterResponse,
   ListParticipantSessionsResponse,
   ListWorkspaceActivityEventsResponse,
@@ -43,6 +44,8 @@ export interface ShellRuntimeReadsHost {
   getParticipantSessionDetailPath(): string;
   getDetailedResponsesPath(): string;
   setDetailedResponsesView(nextValue: string): void;
+  getGroupResultsPath(): string;
+  setGroupResultsView(nextValue: string): void;
   getReviewsPath(): string;
   setReviewsView(nextValue: string): void;
   getResponseCsvExportPath(): string;
@@ -256,6 +259,18 @@ export async function loadDetailedResponsesAction(
     host.getDetailedResponsesPath()
   );
   host.setDetailedResponsesView(JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+export async function loadGroupResultsAction(
+  host: ShellRuntimeReadsHost
+): Promise<ListGroupResultsResponse> {
+  const payload = await host.request<ListGroupResultsResponse>(
+    "Result Groups",
+    "GET",
+    host.getGroupResultsPath()
+  );
+  host.setGroupResultsView(JSON.stringify(payload, null, 2));
   return payload;
 }
 
