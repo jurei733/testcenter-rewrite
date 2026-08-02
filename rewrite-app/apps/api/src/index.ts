@@ -155,6 +155,7 @@ import {
   type ParticipantSessionStatus,
   type SourcePackageStatus,
   type TestRunStatus,
+  type WorkspaceFileType,
   type WorkspaceActivityEventType,
   type WorkspaceActivitySubjectType,
   adminAuditEventTypes,
@@ -165,6 +166,7 @@ import {
   testRunStatuses,
   workspaceActivityEventTypes,
   workspaceActivitySubjectTypes,
+  workspaceFileTypes,
   firstProductionSliceCapabilities
 } from "@testcenter-rewrite-app/domain";
 import {
@@ -2703,6 +2705,17 @@ const parseSourcePackageListQuery = (
     return null;
   }
 
+  const fileType = readOptionalQueryValue(url, "fileType");
+  if (fileType && !workspaceFileTypes.includes(fileType as WorkspaceFileType)) {
+    sendError(
+      response,
+      400,
+      "source_package_file_type_invalid",
+      `Workspace file type '${fileType}' is not supported.`
+    );
+    return null;
+  }
+
   const limit = parseOperatorReadLimit(
     url,
     response,
@@ -2715,6 +2728,7 @@ const parseSourcePackageListQuery = (
 
   return {
     status: status as SourcePackageStatus | undefined,
+    fileType: fileType as WorkspaceFileType | undefined,
     mediaType: readOptionalQueryValue(url, "mediaType"),
     fileName: readOptionalQueryValue(url, "fileName"),
     latestImportStatus: latestImportStatus as ImportJobStatus | undefined,

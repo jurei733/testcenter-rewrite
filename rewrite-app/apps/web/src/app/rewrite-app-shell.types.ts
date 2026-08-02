@@ -33,6 +33,7 @@ export type PersistedShellState = {
   importJobId: string;
   contentReleaseId: string;
   sourcePackageStatusFilter: string;
+  sourcePackageFileTypeFilter: string;
   sourcePackageMediaTypeFilter: string;
   sourcePackageFileNameFilter: string;
   sourcePackageLatestImportStatusFilter: string;

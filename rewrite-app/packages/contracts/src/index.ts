@@ -29,6 +29,7 @@ import type {
   SourcePackage,
   SourcePackageStatus,
   SourcePackageContentStructure,
+  WorkspaceFileType,
   SystemCheckReport,
   SystemCheckReportDeletion,
   SystemCheckReportEntry,
@@ -2021,6 +2022,7 @@ export type WorkspaceReviewListQuery = {
 
 export type SourcePackageListQuery = {
   status?: SourcePackageStatus;
+  fileType?: WorkspaceFileType;
   mediaType?: string;
   fileName?: string;
   latestImportStatus?: ImportJobStatus;

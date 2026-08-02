@@ -5294,6 +5294,65 @@ test("monitor event stream publishes authenticated snapshots and run changes", a
   }
 });
 
+test("workspace files are classified by original Testcenter type", async () => {
+  const tenantKey = "integration-tenant-file-types";
+  const workspaceKey = "integration-workspace-file-types";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const fixtures = [
+    ["participants.xml", "application/xml", "<?xml version=\"1.0\"?><Testtakers/>", "Testtakers"],
+    ["booklet.xml", "application/xml", "<tc:Booklet xmlns:tc=\"urn:testcenter\"/>", "Booklet"],
+    ["system-check.xml", "application/xml", "<SysCheck/>", "SysCheck"],
+    ["unit.xml", "application/xml", "<Unit/>", "Unit"],
+    ["player.html", "text/html", "<!doctype html><html></html>", "Resource"],
+    ["delivery.zip", "application/zip", "data:application/zip;base64,UEs=", "Package"]
+  ] as const;
+
+  for (const [fileName, mediaType, sourceDocument] of fixtures) {
+    const upload = await requestJson<{ sourcePackage: { sourcePackageId: string } }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: { fileName, mediaType, sourceDocument }
+      }
+    );
+    assert.equal(upload.status, 201);
+  }
+
+  const files = await requestJson<{
+    items: Array<{
+      sourcePackage: { fileName: string };
+      fileType: string;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
+  assert.equal(files.status, 200);
+  assert.deepEqual(
+    Object.fromEntries(
+      files.body.items.map(item => [item.sourcePackage.fileName, item.fileType])
+    ),
+    Object.fromEntries(fixtures.map(([fileName, , , fileType]) => [fileName, fileType]))
+  );
+
+  const booklets = await requestJson<{
+    items: Array<{ sourcePackage: { fileName: string }; fileType: string }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileType=Booklet`
+  );
+  assert.equal(booklets.status, 200);
+  assert.deepEqual(
+    booklets.body.items.map(item => [item.sourcePackage.fileName, item.fileType]),
+    [["booklet.xml", "Booklet"]]
+  );
+});
+
 test("failed import can be retried on the same source package", async () => {
   const tenantKey = "integration-tenant-retry";
   const workspaceKey = "integration-workspace-retry";
@@ -5386,6 +5445,7 @@ test("failed import can be retried on the same source package", async () => {
         status: string;
         sourceDocument: string | null;
       };
+      fileType: string;
       latestImportJob: { status: string } | null;
       fileSizeBytes: number | null;
       downloadAvailable: boolean;
@@ -5395,7 +5455,7 @@ test("failed import can be retried on the same source package", async () => {
       blockingDependencyCount: number;
     }>;
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?status=accepted&fileType=Package&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
   );
 
   assert.equal(acceptedSourcePackages.status, 200);
@@ -5408,6 +5468,7 @@ test("failed import can be retried on the same source package", async () => {
     acceptedSourcePackages.body.items[0]?.sourcePackage.sourceDocument,
     null
   );
+  assert.equal(acceptedSourcePackages.body.items[0]?.fileType, "Package");
   assert.equal(
     acceptedSourcePackages.body.items[0]?.latestImportJob?.status,
     "completed"
@@ -5438,19 +5499,19 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(await sourcePackageDownload.text(), persistedFixedSourceDocument);
 
   const sourcePackagesCsv = await requestText(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/source-packages.csv?status=accepted&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/source-packages.csv?status=accepted&fileType=Package&mediaType=application%2Fjson&fileName=fixed.json&latestImportStatus=completed&limit=1`
   );
 
   assert.equal(sourcePackagesCsv.status, 200);
   assert.equal(sourcePackagesCsv.contentType, "text/csv; charset=utf-8");
   assert.match(
     sourcePackagesCsv.body,
-    /^tenantKey,workspaceKey,sourcePackageId,fileName,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,fileSizeBytes,downloadAvailable,importJobCount,contentReleaseCount,canDelete,blockingDependencyCount,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
+    /^tenantKey,workspaceKey,sourcePackageId,fileName,fileType,mediaType,status,uploadedAt,bookletCount,unitCount,hasSourceDocument,fileSizeBytes,downloadAvailable,importJobCount,contentReleaseCount,canDelete,blockingDependencyCount,latestImportJobId,latestImportStatus,latestImportCreatedAt,latestImportFinishedAt,latestImportDiagnosticCount\n/
   );
   assert.match(
     sourcePackagesCsv.body,
     new RegExp(
-      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","application/json","accepted","[^"]+","0","0","true","${Buffer.byteLength(persistedFixedSourceDocument)}","true","2","1","true","0","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
+      `"${tenantKey}","${workspaceKey}","${sourcePackage.body.sourcePackage.sourcePackageId}","fixed.json","Package","application/json","accepted","[^"]+","0","0","true","${Buffer.byteLength(persistedFixedSourceDocument)}","true","2","1","true","0","${retriedImport.body.importJob.importJobId}","completed","[^"]+","[^"]+","0"`
     )
   );
 
@@ -5545,6 +5606,15 @@ test("failed import can be retried on the same source package", async () => {
   assert.equal(
     invalidSourcePackageLatestImportStatus.body.error,
     "source_package_latest_import_status_invalid"
+  );
+
+  const invalidSourcePackageFileType = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages?fileType=booklet`
+  );
+  assert.equal(invalidSourcePackageFileType.status, 400);
+  assert.equal(
+    invalidSourcePackageFileType.body.error,
+    "source_package_file_type_invalid"
   );
 
   const invalidSourcePackageLimit = await requestJson<{ error: string }>(

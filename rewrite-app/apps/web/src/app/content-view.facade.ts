@@ -15,7 +15,8 @@ import type {
 import {
   contentReleaseStatuses,
   importJobStatuses,
-  sourcePackageStatuses
+  sourcePackageStatuses,
+  workspaceFileTypes
 } from "@testcenter-rewrite-app/domain";
 import { DEFAULT_SOURCE_DOCUMENT, type SummaryCard } from "./rewrite-app-shell.types";
 import {
@@ -49,6 +50,7 @@ export class ContentViewFacade {
 
   readonly content = this.uiState.content;
   readonly sourcePackageStatusOptions = sourcePackageStatuses;
+  readonly sourcePackageFileTypeOptions = workspaceFileTypes;
   readonly importJobStatusOptions = importJobStatuses;
   readonly contentReleaseStatusOptions = contentReleaseStatuses;
   assemblyFileName = "assembled-source-package.zip";
@@ -229,6 +231,7 @@ export class ContentViewFacade {
 
   clearContentReadFilters(): void {
     this.content.sourcePackageStatusFilter = "";
+    this.content.sourcePackageFileTypeFilter = "";
     this.content.sourcePackageMediaTypeFilter = "";
     this.content.sourcePackageFileNameFilter = "";
     this.content.sourcePackageLatestImportStatusFilter = "";
@@ -613,6 +616,7 @@ export class ContentViewFacade {
         this.content.sourcePackageLimit,
         [
           this.content.sourcePackageStatusFilter.trim() ? "status" : "",
+          this.content.sourcePackageFileTypeFilter.trim() ? "file type" : "",
           this.content.sourcePackageMediaTypeFilter.trim() ? "media type" : "",
           this.content.sourcePackageFileNameFilter.trim() ? "file name" : "",
           this.content.sourcePackageLatestImportStatusFilter.trim()
@@ -624,11 +628,13 @@ export class ContentViewFacade {
         headline: item.sourcePackage.fileName,
         subline: item.sourcePackage.sourcePackageId,
         badges: [
+          item.fileType,
           item.sourcePackage.status,
           item.latestImportJob?.status ?? "no import"
         ],
         rows: [
           { label: "Media Type", value: item.sourcePackage.mediaType },
+          { label: "File Type", value: item.fileType },
           {
             label: "Stored File",
             value: item.downloadAvailable
@@ -662,6 +668,54 @@ export class ContentViewFacade {
     ];
   }
 
+  get sourcePackageFileTypeItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListSourcePackagesResponse>(
+      this.content.sourcePackagesView
+    );
+    if (!payload) {
+      return [];
+    }
+
+    return workspaceFileTypes.flatMap(fileType => {
+      const matches = payload.items.filter(item => item.fileType === fileType);
+      if (matches.length === 0) {
+        return [];
+      }
+      const previewNames = matches
+        .slice(0, 5)
+        .map(item => item.sourcePackage.fileName);
+      return [{
+        headline: fileType,
+        subline: `${matches.length} ${matches.length === 1 ? "file" : "files"}`,
+        badges: [
+          `${matches.filter(item => item.sourcePackage.status === "accepted").length} accepted`,
+          `${matches.filter(item => !item.canDelete).length} protected`
+        ],
+        rows: [
+          {
+            label: "Files",
+            value: `${previewNames.join(", ")}${
+              matches.length > previewNames.length ? ", …" : ""
+            }`
+          }
+        ],
+        selected: this.content.sourcePackageFileTypeFilter === fileType,
+        actionLabel: "Filter This Type",
+        actionPayload: { fileType }
+      } satisfies RecordCollectionItem];
+    });
+  }
+
+  filterSourcePackagesByFileType(item: RecordCollectionItem): void {
+    const fileType = item.actionPayload?.fileType?.trim();
+    if (!fileType) {
+      return;
+    }
+    this.content.sourcePackageFileTypeFilter = fileType;
+    this.persistState();
+    this.refreshContentReads();
+  }
+
   get sourcePackageAssemblyItems(): RecordCollectionItem[] {
     const payload = parseJsonDocument<ListSourcePackagesResponse>(
       this.content.sourcePackagesView
@@ -676,6 +730,7 @@ export class ContentViewFacade {
         headline: item.sourcePackage.fileName,
         subline: sourcePackageId,
         badges: [
+          item.fileType,
           item.sourcePackage.mediaType,
           item.downloadAvailable ? `${item.fileSizeBytes ?? 0} byte(s)` : "no file"
         ],

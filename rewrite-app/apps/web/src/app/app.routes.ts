@@ -1,6 +1,5 @@
 import type { Routes } from "@angular/router";
 
-import { ContentViewComponent } from "./content-view.component";
 import { OpsViewComponent } from "./ops-view.component";
 import { RuntimeViewComponent } from "./runtime-view.component";
 import { WorkspaceViewComponent } from "./workspace-view.component";
@@ -18,7 +17,10 @@ export const appRoutes: Routes = [
   },
   {
     path: "content",
-    component: ContentViewComponent,
+    loadComponent: () =>
+      import("./content-view.component").then(
+        module => module.ContentViewComponent
+      ),
     canActivate: [requireAdministrativeOperator]
   },
   {

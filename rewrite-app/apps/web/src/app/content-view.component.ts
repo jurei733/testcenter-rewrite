@@ -93,6 +93,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             </select>
           </label>
           <label>
+            Workspace File Type
+            <select id="sourcePackageFileTypeFilter" name="sourcePackageFileTypeFilter" [(ngModel)]="view.content.sourcePackageFileTypeFilter" (change)="view.persistState()">
+              <option value="">All file types</option>
+              <option *ngFor="let fileType of view.sourcePackageFileTypeOptions" [value]="fileType">{{ fileType }}</option>
+            </select>
+          </label>
+          <label>
             Source Package Media Type
             <input id="sourcePackageMediaTypeFilter" name="sourcePackageMediaTypeFilter" placeholder="application/xml" [(ngModel)]="view.content.sourcePackageMediaTypeFilter" (change)="view.persistState()" />
           </label>
@@ -165,8 +172,16 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       ></app-record-collection>
 
       <app-record-collection
+        title="Workspace Files By Type"
+        subtitle="Original Testcenter categories plus immutable package bundles."
+        [items]="view.sourcePackageFileTypeItems"
+        (itemAction)="view.filterSourcePackagesByFileType($event)"
+        emptyState="No typed workspace files in the current read window."
+      ></app-record-collection>
+
+      <app-record-collection
         title="Source Packages"
-        subtitle="Recent uploads and their latest import state."
+        subtitle="Typed uploads and their latest import state."
         [items]="view.sourcePackageItems"
         (itemAction)="view.selectSourcePackage($event)"
         emptyState="No source packages yet."

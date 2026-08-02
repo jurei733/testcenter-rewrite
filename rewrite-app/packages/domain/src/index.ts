@@ -25,6 +25,21 @@ export const sourcePackageStatuses = [
   "accepted",
   "rejected"
 ] as const satisfies readonly SourcePackageStatus[];
+export type WorkspaceFileType =
+  | "Testtakers"
+  | "Booklet"
+  | "SysCheck"
+  | "Unit"
+  | "Resource"
+  | "Package";
+export const workspaceFileTypes = [
+  "Testtakers",
+  "Booklet",
+  "SysCheck",
+  "Unit",
+  "Resource",
+  "Package"
+] as const satisfies readonly WorkspaceFileType[];
 export type ImportJobStatus = "queued" | "running" | "failed" | "completed";
 export const importJobStatuses = [
   "queued",
@@ -1333,6 +1348,7 @@ export type WorkspaceContentReleaseDetail = {
 
 export type WorkspaceSourcePackageListItem = {
   sourcePackage: SourcePackage;
+  fileType: WorkspaceFileType;
   latestImportJob: ImportJob | null;
   fileSizeBytes: number | null;
   downloadAvailable: boolean;

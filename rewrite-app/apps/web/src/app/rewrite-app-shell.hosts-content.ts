@@ -84,6 +84,7 @@ export function createContentReadsStateHost(args: {
       }),
       [
         ["status", args.contentState.sourcePackageStatusFilter],
+        ["fileType", args.contentState.sourcePackageFileTypeFilter],
         ["mediaType", args.contentState.sourcePackageMediaTypeFilter],
         ["fileName", args.contentState.sourcePackageFileNameFilter],
         [

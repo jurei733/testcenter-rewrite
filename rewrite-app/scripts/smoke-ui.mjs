@@ -1787,8 +1787,16 @@ try {
   await page
     .locator("app-record-collection")
     .filter({ hasText: "Source Packages" })
+    .filter({ hasText: "Package" })
+    .filter({ hasText: "File Type" })
     .filter({ hasText: `${uploadedZip.byteLength} byte(s), downloadable` })
     .filter({ hasText: "0 import(s), 0 release(s)" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Workspace Files By Type" }) })
+    .filter({ hasText: "Package" })
+    .filter({ hasText: uploadedZipSourceFileName })
     .waitFor({ timeout: 15_000 });
   await expectButtonSelectorEnabled("#downloadSourceDocumentButton");
   const zipDownloadPromise = page.waitForEvent("download");
@@ -7525,6 +7533,7 @@ try {
   assert.equal(typeof retriedSourcePackageFileName, "string");
   logStep("content-read-filters");
   await selectAndCommit("#sourcePackageStatusFilter", "accepted");
+  await selectAndCommit("#sourcePackageFileTypeFilter", "Resource");
   await fillAndCommit("#sourcePackageMediaTypeFilter", "application/xml");
   await fillAndCommit("#sourcePackageFileNameFilter", retriedSourcePackageFileName);
   await selectAndCommit("#sourcePackageLatestImportStatusFilter", "completed");
@@ -7543,15 +7552,17 @@ try {
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "Source package window" }) })
     .filter({ hasText: "1 source package row(s) loaded for the current filters" })
-    .filter({ hasText: "4 active filter(s)" })
+    .filter({ hasText: "5 active filter(s)" })
     .filter({ hasText: "limit 1" })
     .filter({ hasText: "Loaded Records" })
-    .filter({ hasText: "status, media type, file name, latest import" })
+    .filter({ hasText: "status, file type, media type, file name, latest import" })
     .waitFor();
   await page
     .locator("article.card")
     .filter({ has: page.getByRole("heading", { name: "Source Packages" }) })
     .filter({ hasText: retriedSourcePackageFileName })
+    .filter({ hasText: "File Type" })
+    .filter({ hasText: "Resource" })
     .filter({ hasText: "completed" })
     .waitFor();
   await page

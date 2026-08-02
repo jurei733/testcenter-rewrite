@@ -150,6 +150,12 @@ export function createShellPersistenceStateHost(args: {
     set sourcePackageStatusFilter(nextValue) {
       args.contentState.sourcePackageStatusFilter = nextValue;
     },
+    get sourcePackageFileTypeFilter() {
+      return args.contentState.sourcePackageFileTypeFilter;
+    },
+    set sourcePackageFileTypeFilter(nextValue) {
+      args.contentState.sourcePackageFileTypeFilter = nextValue;
+    },
     get sourcePackageMediaTypeFilter() {
       return args.contentState.sourcePackageMediaTypeFilter;
     },

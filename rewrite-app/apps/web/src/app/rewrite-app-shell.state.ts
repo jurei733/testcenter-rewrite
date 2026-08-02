@@ -159,6 +159,7 @@ export interface ShellContentState {
   importJobId: string;
   contentReleaseId: string;
   sourcePackageStatusFilter: string;
+  sourcePackageFileTypeFilter: string;
   sourcePackageMediaTypeFilter: string;
   sourcePackageFileNameFilter: string;
   sourcePackageLatestImportStatusFilter: string;
@@ -389,6 +390,7 @@ export function createInitialShellContentState(
     importJobId: "",
     contentReleaseId: "",
     sourcePackageStatusFilter: "",
+    sourcePackageFileTypeFilter: "",
     sourcePackageMediaTypeFilter: "",
     sourcePackageFileNameFilter: "",
     sourcePackageLatestImportStatusFilter: "",

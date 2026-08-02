@@ -102,6 +102,7 @@ import type {
   WorkspaceSourcePackageDeletionReadiness,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
+  WorkspaceFileType,
   WorkspaceSystemCheck,
   WorkspaceStudyMonitorBookletDetail,
   WorkspaceStudyMonitorBookletProgress,
@@ -318,6 +319,7 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
     status?: SourcePackageStatus;
+    fileType?: WorkspaceFileType;
     mediaType?: string;
     fileName?: string;
     latestImportStatus?: ImportJobStatus;
@@ -327,6 +329,7 @@ export type WorkspaceAdminReadPort = {
     tenantKey: string;
     workspaceKey: string;
     status?: SourcePackageStatus;
+    fileType?: WorkspaceFileType;
     mediaType?: string;
     fileName?: string;
     latestImportStatus?: ImportJobStatus;
@@ -1683,6 +1686,79 @@ const decodePersistedSourceDocument = (
   } catch {
     return null;
   }
+};
+
+const classifyWorkspaceSourcePackage = (
+  sourcePackage: SourcePackage,
+  decodedDocument: { mediaType: string; bytes: Buffer } | null
+): WorkspaceFileType => {
+  const normalizedFileName = sourcePackage.fileName.trim().toLowerCase();
+  const normalizedMediaType = (
+    decodedDocument?.mediaType ?? sourcePackage.mediaType
+  ).toLowerCase();
+
+  if (
+    normalizedFileName.endsWith(".itcr.zip") ||
+    normalizedMediaType.includes("verona-resource")
+  ) {
+    return "Resource";
+  }
+  if (normalizedFileName.endsWith(".zip") || normalizedMediaType.includes("zip")) {
+    return "Package";
+  }
+
+  const structure = sourcePackage.contentStructure;
+  if (
+    structure?.systemCheckEntries?.length &&
+    structure.bookletEntries.length === 0
+  ) {
+    return "SysCheck";
+  }
+
+  const documentText = decodedDocument?.bytes
+    .subarray(0, 64 * 1024)
+    .toString("utf8")
+    .replace(/^\uFEFF/, "")
+    .trimStart();
+  const looksLikeXml =
+    normalizedMediaType.includes("xml") ||
+    normalizedFileName.endsWith(".xml") ||
+    normalizedFileName.endsWith(".manifest") ||
+    normalizedFileName.endsWith(".imsmanifest") ||
+    documentText?.startsWith("<");
+
+  if (documentText && looksLikeXml) {
+    const rootName = documentText
+      .match(
+        /^(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)\b/i
+      )?.[1]
+      ?.toLowerCase();
+    if (rootName === "testtakers") {
+      return "Testtakers";
+    }
+    if (rootName === "booklet") {
+      return "Booklet";
+    }
+    if (rootName === "syscheck") {
+      return "SysCheck";
+    }
+    if (rootName === "unit") {
+      return "Unit";
+    }
+    if (rootName === "manifest") {
+      return "Package";
+    }
+  }
+
+  if (
+    structure?.bookletEntries.length ||
+    (documentText &&
+      /["'](?:booklets|bookletEntries)["']\s*:/i.test(documentText))
+  ) {
+    return "Package";
+  }
+
+  return "Resource";
 };
 
 const normalizeReviewText = (
@@ -3558,6 +3634,7 @@ const formatSourcePackagesCsv = (input: {
     "workspaceKey",
     "sourcePackageId",
     "fileName",
+    "fileType",
     "mediaType",
     "status",
     "uploadedAt",
@@ -3592,6 +3669,7 @@ const formatSourcePackagesCsv = (input: {
         input.workspaceKey,
         sourcePackage.sourcePackageId,
         sourcePackage.fileName,
+        item.fileType,
         sourcePackage.mediaType,
         sourcePackage.status,
         sourcePackage.uploadedAt,
@@ -15888,6 +15966,10 @@ export const createFirstSliceServices = (
                 ...sourcePackage,
                 sourceDocument: null
               },
+              fileType: classifyWorkspaceSourcePackage(
+                sourcePackage,
+                decodedDocument
+              ),
               latestImportJob,
               fileSizeBytes: decodedDocument?.bytes.byteLength ?? null,
               downloadAvailable: decodedDocument !== null,
@@ -15903,6 +15985,7 @@ export const createFirstSliceServices = (
           .filter(
             item =>
               (!input.status || item.sourcePackage.status === input.status) &&
+              (!input.fileType || item.fileType === input.fileType) &&
               (!input.mediaType || item.sourcePackage.mediaType === input.mediaType) &&
               (!input.fileName || item.sourcePackage.fileName === input.fileName) &&
               (!input.latestImportStatus ||
