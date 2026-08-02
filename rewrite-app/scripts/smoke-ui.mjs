@@ -3223,6 +3223,10 @@ try {
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
   const expectedVeronaResourceRange = expectedVeronaResourceContent.slice(5, 20);
+  const expectedVeronaResourceMultiRanges = [
+    expectedVeronaResourceContent.slice(0, 4),
+    expectedVeronaResourceContent.slice(10, 16)
+  ];
   const originalVeronaResourcePackage = Buffer.from(
     (
       await readFile(
@@ -3241,6 +3245,7 @@ try {
       <output id="playerStartPage"></output>
       <output id="playerResource"></output>
       <output id="playerResourceRange"></output>
+      <output id="playerResourceMultiRange"></output>
       <label>Player answer <input id="playerAnswer" /></label>
       <button id="playerEnd" type="button">End from player</button>
       <script>
@@ -3297,6 +3302,19 @@ try {
             })
             .catch(error => {
               document.querySelector("#playerResourceRange").textContent = "resource-range-error: " + error.message;
+            });
+          fetch(event.data.playerConfig.directDownloadUrl + "/sample_resource_package/file.text", {
+            headers: { Range: "bytes=0-3,10-15" }
+          })
+            .then(async response => {
+              if (response.status !== 206) throw new Error("multi-range status " + response.status);
+              return (response.headers.get("content-type") || "") + "|" + await response.text();
+            })
+            .then(content => {
+              document.querySelector("#playerResourceMultiRange").textContent = content;
+            })
+            .catch(error => {
+              document.querySelector("#playerResourceMultiRange").textContent = "resource-multi-range-error: " + error.message;
             });
         });
         document.querySelector("#playerEnd").addEventListener("click", () => parent.postMessage({
@@ -3444,6 +3462,11 @@ try {
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=5-19"
   );
+  const veronaMultiRangeResponsePromise = page.waitForResponse(
+    response =>
+      isVeronaResourceResponse(response) &&
+      response.request().headers()["range"] === "bytes=0-3,10-15"
+  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -3519,6 +3542,10 @@ try {
     .locator("#playerResourceRange")
     .filter({ hasText: expectedVeronaResourceRange })
     .waitFor({ timeout: 15_000 });
+  await veronaFrame
+    .locator("#playerResourceMultiRange")
+    .filter({ hasText: "multipart/byteranges" })
+    .waitFor({ timeout: 15_000 });
   const veronaResourceResponse = await veronaResourceResponsePromise;
   assert.equal(veronaResourceResponse.status(), 200);
   assert.equal(
@@ -3539,6 +3566,20 @@ try {
     await veronaFrame.locator("#playerResourceRange").textContent(),
     `${veronaRangeResponse.headers()["content-range"]}|${expectedVeronaResourceRange}`
   );
+  const veronaMultiRangeResponse = await veronaMultiRangeResponsePromise;
+  assert.equal(veronaMultiRangeResponse.status(), 206);
+  assert.match(
+    veronaMultiRangeResponse.headers()["content-type"] ?? "",
+    /^multipart\/byteranges; boundary=/i
+  );
+  assert.equal(veronaMultiRangeResponse.headers()["content-range"], undefined);
+  const veronaMultiRangeContent =
+    (await veronaFrame.locator("#playerResourceMultiRange").textContent()) ?? "";
+  assert.match(veronaMultiRangeContent, /Content-Range: bytes 0-3\//);
+  assert.match(veronaMultiRangeContent, /Content-Range: bytes 10-15\//);
+  for (const expectedRange of expectedVeronaResourceMultiRanges) {
+    assert.ok(veronaMultiRangeContent.includes(expectedRange));
+  }
   await page
     .locator("#participantRouteNavigationNotice")
     .filter({ hasText: "Complete the required response" })

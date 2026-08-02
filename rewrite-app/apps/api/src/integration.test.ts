@@ -10530,6 +10530,31 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   );
   const resourceUrl =
     `${baseUrl}${currentState.body.currentRunState.resourceBasePath}/sample_resource_package/file.text`;
+  const resourcePreflightResponse = await fetch(resourceUrl, {
+    method: "OPTIONS",
+    headers: {
+      origin: "null",
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "range"
+    }
+  });
+  assert.equal(resourcePreflightResponse.status, 204);
+  assert.equal(
+    resourcePreflightResponse.headers.get("access-control-allow-origin"),
+    "*"
+  );
+  assert.equal(
+    resourcePreflightResponse.headers.get("access-control-allow-methods"),
+    "GET, HEAD, OPTIONS"
+  );
+  assert.equal(
+    resourcePreflightResponse.headers.get("access-control-allow-headers"),
+    "range"
+  );
+  assert.equal(
+    resourcePreflightResponse.headers.get("access-control-max-age"),
+    "600"
+  );
   const resourceResponse = await fetch(resourceUrl);
   assert.equal(resourceResponse.status, 200);
   assert.match(resourceResponse.headers.get("content-type") ?? "", /^text\/plain/);
@@ -10603,9 +10628,75 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   const multipleRangeResponse = await fetch(resourceUrl, {
     headers: { range: "bytes=0-1,4-5" }
   });
-  assert.equal(multipleRangeResponse.status, 416);
+  assert.equal(multipleRangeResponse.status, 206);
+  const multipleRangeContentType =
+    multipleRangeResponse.headers.get("content-type") ?? "";
+  const multipleRangeBoundary =
+    /^multipart\/byteranges; boundary=(.+)$/i.exec(multipleRangeContentType)?.[1];
+  assert.ok(multipleRangeBoundary);
+  assert.equal(multipleRangeResponse.headers.get("content-range"), null);
+  const multipleRangeBody = Buffer.from(
+    await multipleRangeResponse.arrayBuffer()
+  );
   assert.equal(
-    multipleRangeResponse.headers.get("content-range"),
+    multipleRangeResponse.headers.get("content-length"),
+    String(multipleRangeBody.byteLength)
+  );
+  assert.deepEqual(
+    multipleRangeBody,
+    Buffer.concat([
+      Buffer.from(
+        `--${multipleRangeBoundary}\r\n` +
+          "Content-Type: text/plain; charset=utf-8\r\n" +
+          `Content-Range: bytes 0-1/${expectedResourceBytes.byteLength}\r\n\r\n`
+      ),
+      expectedResourceBytes.subarray(0, 2),
+      Buffer.from("\r\n"),
+      Buffer.from(
+        `--${multipleRangeBoundary}\r\n` +
+          "Content-Type: text/plain; charset=utf-8\r\n" +
+          `Content-Range: bytes 4-5/${expectedResourceBytes.byteLength}\r\n\r\n`
+      ),
+      expectedResourceBytes.subarray(4, 6),
+      Buffer.from(`\r\n--${multipleRangeBoundary}--\r\n`)
+    ])
+  );
+
+  const mixedRangeResponse = await fetch(resourceUrl, {
+    headers: {
+      range: `bytes=${expectedResourceBytes.byteLength}-,7-9`
+    }
+  });
+  assert.equal(mixedRangeResponse.status, 206);
+  assert.equal(
+    mixedRangeResponse.headers.get("content-range"),
+    `bytes 7-9/${expectedResourceBytes.byteLength}`
+  );
+  assert.deepEqual(
+    Buffer.from(await mixedRangeResponse.arrayBuffer()),
+    expectedResourceBytes.subarray(7, 10)
+  );
+
+  const multipleRangeHeadResponse = await fetch(resourceUrl, {
+    method: "HEAD",
+    headers: { range: "bytes=0-1,4-5" }
+  });
+  assert.equal(multipleRangeHeadResponse.status, 206);
+  assert.match(
+    multipleRangeHeadResponse.headers.get("content-type") ?? "",
+    /^multipart\/byteranges; boundary=/i
+  );
+  assert.ok(Number(multipleRangeHeadResponse.headers.get("content-length")) > 0);
+  assert.equal(await multipleRangeHeadResponse.text(), "");
+
+  const excessiveRangeResponse = await fetch(resourceUrl, {
+    headers: {
+      range: `bytes=${Array.from({ length: 17 }, (_, index) => `${index}-${index}`).join(",")}`
+    }
+  });
+  assert.equal(excessiveRangeResponse.status, 416);
+  assert.equal(
+    excessiveRangeResponse.headers.get("content-range"),
     `bytes */${expectedResourceBytes.byteLength}`
   );
   const missingResource = await requestJson<{ error: string }>(

@@ -936,57 +936,103 @@ type ResolvedByteRange = {
   end: number;
 };
 
-const resolveSingleByteRange = (
+const MAX_PARTICIPANT_RESOURCE_BYTE_RANGES = 16;
+
+const resolveByteRanges = (
   rangeHeader: string,
   resourceSize: number
-): ResolvedByteRange | null => {
-  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+): ResolvedByteRange[] | null => {
+  const match = /^bytes=(.+)$/i.exec(rangeHeader.trim());
   if (!match || resourceSize <= 0) {
     return null;
   }
 
-  const startText = match[1] ?? "";
-  const endText = match[2] ?? "";
-  if (!startText && !endText) {
+  const rangeTexts = (match[1] ?? "").split(",");
+  if (
+    rangeTexts.length === 0 ||
+    rangeTexts.length > MAX_PARTICIPANT_RESOURCE_BYTE_RANGES
+  ) {
     return null;
   }
 
   const resourceSizeBigInt = BigInt(resourceSize);
-  try {
-    if (!startText) {
-      const suffixLength = BigInt(endText);
-      if (suffixLength <= 0n) {
-        return null;
-      }
-      const boundedSuffixLength = suffixLength > resourceSizeBigInt
-        ? resourceSizeBigInt
-        : suffixLength;
-      return {
-        start: resourceSize - Number(boundedSuffixLength),
-        end: resourceSize - 1
-      };
+  const ranges: ResolvedByteRange[] = [];
+  for (const rangeText of rangeTexts) {
+    const rangeMatch = /^(\d*)-(\d*)$/.exec(rangeText.trim());
+    if (!rangeMatch) {
+      return null;
     }
 
-    const start = BigInt(startText);
-    if (start >= resourceSizeBigInt) {
+    const startText = rangeMatch[1] ?? "";
+    const endText = rangeMatch[2] ?? "";
+    if (!startText && !endText) {
       return null;
     }
-    const requestedEnd = endText
-      ? BigInt(endText)
-      : resourceSizeBigInt - 1n;
-    if (requestedEnd < start) {
+
+    try {
+      if (!startText) {
+        const suffixLength = BigInt(endText);
+        if (suffixLength <= 0n) {
+          continue;
+        }
+        const boundedSuffixLength = suffixLength > resourceSizeBigInt
+          ? resourceSizeBigInt
+          : suffixLength;
+        ranges.push({
+          start: resourceSize - Number(boundedSuffixLength),
+          end: resourceSize - 1
+        });
+        continue;
+      }
+
+      const start = BigInt(startText);
+      if (start >= resourceSizeBigInt) {
+        continue;
+      }
+      const requestedEnd = endText
+        ? BigInt(endText)
+        : resourceSizeBigInt - 1n;
+      if (requestedEnd < start) {
+        return null;
+      }
+      const end = requestedEnd >= resourceSizeBigInt
+        ? resourceSizeBigInt - 1n
+        : requestedEnd;
+      ranges.push({
+        start: Number(start),
+        end: Number(end)
+      });
+    } catch {
       return null;
     }
-    const end = requestedEnd >= resourceSizeBigInt
-      ? resourceSizeBigInt - 1n
-      : requestedEnd;
-    return {
-      start: Number(start),
-      end: Number(end)
-    };
-  } catch {
-    return null;
   }
+
+  return ranges.length > 0 ? ranges : null;
+};
+
+const createMultipartByteRangeBody = (input: {
+  boundary: string;
+  contentType: string;
+  resourceBody: Buffer;
+  byteRanges: ResolvedByteRange[];
+}): Buffer => {
+  const contentType = input.contentType.replace(/[\r\n]/g, "");
+  const parts: Buffer[] = [];
+  for (const byteRange of input.byteRanges) {
+    parts.push(
+      Buffer.from(
+        `--${input.boundary}\r\n` +
+          `Content-Type: ${contentType}\r\n` +
+          `Content-Range: bytes ${byteRange.start}-${byteRange.end}/${input.resourceBody.byteLength}\r\n` +
+          "\r\n",
+        "utf8"
+      ),
+      input.resourceBody.subarray(byteRange.start, byteRange.end + 1),
+      Buffer.from("\r\n", "utf8")
+    );
+  }
+  parts.push(Buffer.from(`--${input.boundary}--\r\n`, "utf8"));
+  return Buffer.concat(parts);
 };
 
 const sendRedirect = (
@@ -2628,6 +2674,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
+    ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
     [
       "POST",
@@ -6084,6 +6131,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const participantResourceMatch = participantResourcePattern.exec(pathname);
+      if (request.method === "OPTIONS" && participantResourceMatch?.groups) {
+        response.writeHead(204, {
+          ...securityHeaders,
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET, HEAD, OPTIONS",
+          "access-control-allow-headers": "range",
+          "access-control-max-age": "600",
+          "content-length": "0"
+        });
+        endResponse(response);
+        return;
+      }
       if (request.method === "GET" && participantResourceMatch?.groups) {
         const participantSessionId = decodeRouteGroup(
           participantResourceMatch.groups.participantSessionId
@@ -6113,11 +6172,11 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         };
         const rangeHeader = request.headers.range;
         if (rangeHeader !== undefined) {
-          const byteRange = resolveSingleByteRange(
+          const byteRanges = resolveByteRanges(
             rangeHeader,
             resourceBody.byteLength
           );
-          if (!byteRange) {
+          if (!byteRanges) {
             sendAsset(response, 416, resource.mediaType, Buffer.alloc(0), {
               ...resourceHeaders,
               "content-length": "0",
@@ -6125,6 +6184,27 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             });
             return;
           }
+          if (byteRanges.length > 1) {
+            const boundary = `rewrite-range-${randomUUID().replaceAll("-", "")}`;
+            const multipartBody = createMultipartByteRangeBody({
+              boundary,
+              contentType: resource.mediaType,
+              resourceBody,
+              byteRanges
+            });
+            sendAsset(
+              response,
+              206,
+              `multipart/byteranges; boundary=${boundary}`,
+              multipartBody,
+              {
+                ...resourceHeaders,
+                "content-length": String(multipartBody.byteLength)
+              }
+            );
+            return;
+          }
+          const byteRange = byteRanges[0]!;
           const partialBody = resourceBody.subarray(
             byteRange.start,
             byteRange.end + 1
