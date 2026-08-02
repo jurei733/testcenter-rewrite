@@ -20,6 +20,7 @@ const createOpenRun = (
   executionMode: "run-hot-return",
   participantRosterEntry: null,
   bookletKey: "booklet:starter",
+  bookletSpecies: "species: 2",
   bookletAssignmentKey: "booklet:starter",
   bookletStates,
   status,
@@ -109,5 +110,31 @@ test("monitor profiles hide pending runs and filter projected block labels", () 
   assert.equal(
     filterOpenMonitorRunsByProfile([created, running], null).length,
     2
+  );
+});
+
+test("monitor profiles filter runs by original booklet species", () => {
+  const matching = createOpenRun("matching-ui", "running");
+  const other = createOpenRun("other-ui", "running");
+  other.bookletSpecies = "species: 3";
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "bookletSpecies",
+        value: "species: 2",
+        subValue: null,
+        label: "Same booklet structure",
+        type: "equal",
+        not: true
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([matching, other], profile).map(
+      run => run.loginKey
+    ),
+    ["matching-ui"]
   );
 });

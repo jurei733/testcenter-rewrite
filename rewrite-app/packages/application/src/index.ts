@@ -657,6 +657,7 @@ export type MonitorReadPort = {
     groupKey?: string;
     groupKeys?: string[];
     bookletKey?: string;
+    bookletSpecies?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -670,6 +671,7 @@ export type MonitorReadPort = {
     groupKey?: string;
     groupKeys?: string[];
     bookletKey?: string;
+    bookletSpecies?: string;
     participantSessionId?: string;
     testRunId?: string;
     unitKey?: string;
@@ -2994,6 +2996,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
           : null,
         bookletKey: testRun.bookletKey,
         bookletLabel: location.bookletLabel,
+        bookletSpecies: location.bookletSpecies,
         bookletAssignmentKey:
           testRun.bookletAssignmentKey ?? testRun.bookletKey,
         bookletStates: normalizedTestRun.bookletStates ?? {},
@@ -3018,7 +3021,11 @@ const resolveOpenMonitorRunLocation = (
   testRun: TestRun
 ): Pick<
   OpenMonitorRun,
-  "bookletLabel" | "currentUnitLabel" | "currentBlockKey" | "currentBlockLabel"
+  | "bookletLabel"
+  | "bookletSpecies"
+  | "currentUnitLabel"
+  | "currentBlockKey"
+  | "currentBlockLabel"
 > => {
   const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
     entry => entry.bookletKey === testRun.bookletKey
@@ -3032,6 +3039,11 @@ const resolveOpenMonitorRunLocation = (
     : null;
   return {
     bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
+    bookletSpecies: booklet
+      ? `species: ${(booklet.testletEntries ?? []).filter(
+          entry => !entry.parentTestletKey
+        ).length}`
+      : null,
     currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
     currentBlockKey,
     currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey
@@ -3211,6 +3223,7 @@ type OpenMonitorRunFilters = {
   groupKey?: string;
   groupKeys?: string[];
   bookletKey?: string;
+  bookletSpecies?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;
@@ -3237,6 +3250,7 @@ const filterOpenMonitorRuns = (
       ?.map(groupKey => normalizeExactFilter(groupKey))
       .filter((groupKey): groupKey is string => Boolean(groupKey)),
     bookletKey: normalizeExactFilter(input.bookletKey),
+    bookletSpecies: normalizeExactFilter(input.bookletSpecies),
     participantSessionId: normalizeExactFilter(input.participantSessionId),
     testRunId: normalizeExactFilter(input.testRunId),
     unitKey: normalizeExactFilter(input.unitKey),
@@ -3253,6 +3267,8 @@ const filterOpenMonitorRuns = (
           item.bookletKey === filters.bookletKey ||
           item.bookletAssignmentKey === filters.bookletKey ||
           item.participantRosterEntry?.bookletKey === filters.bookletKey) &&
+        (!filters.bookletSpecies ||
+          item.bookletSpecies === filters.bookletSpecies) &&
         (!filters.participantSessionId ||
           item.participantSessionId === filters.participantSessionId) &&
         (!filters.testRunId || item.testRunId === filters.testRunId) &&
@@ -4231,6 +4247,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "executionMode",
     "bookletKey",
     "bookletLabel",
+    "bookletSpecies",
     "bookletAssignmentKey",
     "bookletStates",
     "status",
@@ -4257,6 +4274,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.executionMode,
         item.bookletKey,
         item.bookletLabel ?? item.bookletKey,
+        item.bookletSpecies ?? "",
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
         item.status,
@@ -19572,6 +19590,7 @@ export const createFirstSliceServices = (
                 : null,
               bookletKey: testRun.bookletKey,
               bookletLabel: location.bookletLabel,
+              bookletSpecies: location.bookletSpecies,
               bookletAssignmentKey:
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},

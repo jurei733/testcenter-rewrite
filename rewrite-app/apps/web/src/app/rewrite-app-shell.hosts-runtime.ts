@@ -221,6 +221,11 @@ export function createRuntimeReadsStateHost(args: {
     appendQueryValue(query, "bookletKey", args.runtimeState.openRunBookletFilter);
     appendQueryValue(
       query,
+      "bookletSpecies",
+      args.runtimeState.openRunSpeciesFilter
+    );
+    appendQueryValue(
+      query,
       "participantSessionId",
       args.runtimeState.openRunSessionFilter
     );

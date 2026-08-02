@@ -3605,11 +3605,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","booklet:demo","\{\}","running","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","booklet:demo","\{\}","running","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -4701,6 +4701,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
         loginKey: string;
         groupKey: string;
         bookletKey: string;
+        bookletSpecies: string | null;
         currentUnitKey: string | null;
       }>;
     }>(
@@ -4719,6 +4720,23 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(openRunsAfterPause.body.items[0]?.loginKey, "student-demo");
     assert.equal(openRunsAfterPause.body.items[0]?.groupKey, "group:student-demo");
     assert.equal(openRunsAfterPause.body.items[0]?.bookletKey, "booklet:demo");
+    assert.equal(openRunsAfterPause.body.items[0]?.bookletSpecies, "species: 0");
+
+    const openRunsBySpecies = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?bookletSpecies=species%3A%200",
+      { headers: { authorization } }
+    );
+    assert.equal(openRunsBySpecies.status, 200);
+    assert.equal(openRunsBySpecies.body.items.length, 1);
+
+    const openRunsByOtherSpecies = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?bookletSpecies=species%3A%209",
+      { headers: { authorization } }
+    );
+    assert.equal(openRunsByOtherSpecies.status, 200);
+    assert.equal(openRunsByOtherSpecies.body.items.length, 0);
 
     const unlockNavigationCommand = await requestJsonAt<{
       command: {
@@ -7147,6 +7165,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     bookletKey: string;
     displayLabel: string;
     unitKeys: string[];
+    topLevelTestletCount?: number;
     stateKeys?: string[];
     showRules?: Array<[string, string, string]>;
     testletTimeMax?: Array<[string, number, string]>;
@@ -7157,7 +7176,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       denyNavigation?: [string, string];
       lockAfterLeaving?: [boolean, string];
     }>;
-    policy: {
+    policy?: {
       logPolicy?: string;
       pagingMode?: string;
       headerContent?: string;
@@ -7289,6 +7308,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
               stateEntries?: Array<{ stateKey: string }>;
               testletEntries?: Array<{
                 testletKey: string;
+                parentTestletKey?: string | null;
                 restrictions?: {
                   show?: { stateKey: string; optionKey: string };
                   codeToEnter?: { code: string; prompt: string };
@@ -7313,13 +7333,26 @@ test("original Testcenter compatibility corpus imports representative booklets",
       contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries.find(
         candidate => candidate.bookletKey === expectation.bookletKey
       );
-    assert.ok(booklet, expectation.sourcePath);
+    assert.ok(
+      booklet,
+      `${expectation.sourcePath}: imported ${contentRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot.bookletEntries
+        .map(candidate => candidate.bookletKey)
+        .join(", ")}`
+    );
     assert.equal(booklet.displayLabel, expectation.displayLabel);
     assert.deepEqual(
       booklet.unitEntries.map(unit => unit.unitKey),
       expectation.unitKeys,
       expectation.sourcePath
     );
+    if (expectation.topLevelTestletCount != null) {
+      assert.equal(
+        booklet.testletEntries?.filter(testlet => !testlet.parentTestletKey)
+          .length,
+        expectation.topLevelTestletCount,
+        expectation.sourcePath
+      );
+    }
     if (expectation.stateKeys) {
       assert.deepEqual(
         booklet.stateEntries?.map(state => state.stateKey),
@@ -7397,6 +7430,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
           );
         }
       }
+    }
+    if (!expectation.policy) {
+      continue;
     }
     assert.ok(booklet.policy, expectation.sourcePath);
     if (expectation.policy.logPolicy) {
@@ -10919,6 +10955,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     items: Array<{
       testRunId: string;
       bookletLabel: string;
+      bookletSpecies: string | null;
       currentUnitKey: string | null;
       currentUnitLabel: string | null;
       currentBlockKey: string | null;
@@ -10944,6 +10981,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.deepEqual(
     {
       bookletLabel: openRunsWithTimer.body.items[0]?.bookletLabel,
+      bookletSpecies: openRunsWithTimer.body.items[0]?.bookletSpecies,
       currentUnitKey: openRunsWithTimer.body.items[0]?.currentUnitKey,
       currentUnitLabel: openRunsWithTimer.body.items[0]?.currentUnitLabel,
       currentBlockKey: openRunsWithTimer.body.items[0]?.currentBlockKey,
@@ -10951,6 +10989,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     },
     {
       bookletLabel: "Timer Booklet",
+      bookletSpecies: "species: 1",
       currentUnitKey: "UNIT.TIMED",
       currentUnitLabel: "Timed Unit",
       currentBlockKey: testletKey,
@@ -10999,7 +11038,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
 

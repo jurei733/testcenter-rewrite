@@ -1883,6 +1883,10 @@ export class RuntimeViewFacade {
                     value: openRun.bookletLabel ?? openRun.bookletKey
                   },
                   {
+                    label: "Booklet Species",
+                    value: openRun.bookletSpecies ?? "unknown"
+                  },
+                  {
                     label: "Booklet Assignment",
                     value: openRun.bookletAssignmentKey
                   }
@@ -1934,6 +1938,7 @@ export class RuntimeViewFacade {
             loginKey: openRun.loginKey,
             groupKey: openRun.groupKey,
             bookletKey: openRun.bookletKey,
+            bookletSpecies: openRun.bookletSpecies ?? "",
             displayName: displayName ?? ""
           },
           actions: [
@@ -2663,6 +2668,7 @@ export class RuntimeViewFacade {
     this.runtime.openRunLoginFilter = "";
     this.runtime.openRunGroupFilter = "";
     this.runtime.openRunBookletFilter = "";
+    this.runtime.openRunSpeciesFilter = "";
     this.runtime.openRunSessionFilter = "";
     this.runtime.openRunRunFilter = "";
     this.runtime.openRunUnitFilter = "";
@@ -3236,6 +3242,8 @@ export class RuntimeViewFacade {
     this.runtime.openRunLoginFilter = loginKey;
     this.runtime.openRunGroupFilter = groupKey;
     this.runtime.openRunBookletFilter = bookletKey;
+    this.runtime.openRunSpeciesFilter =
+      item.actionPayload?.bookletSpecies?.trim() ?? "";
     this.runtime.openRunSessionFilter = participantSessionId;
     this.runtime.openRunRunFilter = testRunId;
     this.runtime.openRunUnitFilter = currentUnitKey;
@@ -3367,6 +3375,8 @@ export class RuntimeViewFacade {
     this.runtime.openRunLoginFilter = this.runtime.loginKey.trim();
     this.runtime.openRunGroupFilter = this.runtime.groupKey.trim();
     this.runtime.openRunBookletFilter = this.runtime.bookletKey.trim();
+    this.runtime.openRunSpeciesFilter =
+      item.actionPayload?.bookletSpecies?.trim() ?? "";
     this.runtime.openRunSessionFilter = participantSessionId;
     this.runtime.openRunRunFilter = testRunId;
     this.runtime.openRunUnitFilter = currentUnitKey;

@@ -2917,6 +2917,7 @@ const parseMonitorOpenRunsQuery = (
     loginKey: readOptionalQueryValue(url, "loginKey"),
     groupKey: readOptionalQueryValue(url, "groupKey"),
     bookletKey: readOptionalQueryValue(url, "bookletKey"),
+    bookletSpecies: readOptionalQueryValue(url, "bookletSpecies"),
     participantSessionId: readOptionalQueryValue(url, "participantSessionId"),
     testRunId: readOptionalQueryValue(url, "testRunId"),
     unitKey: readOptionalQueryValue(url, "unitKey"),

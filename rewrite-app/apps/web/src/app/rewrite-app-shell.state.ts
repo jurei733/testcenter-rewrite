@@ -132,6 +132,7 @@ export interface ShellRuntimeState {
   openRunLoginFilter: string;
   openRunGroupFilter: string;
   openRunBookletFilter: string;
+  openRunSpeciesFilter: string;
   openRunSessionFilter: string;
   openRunRunFilter: string;
   openRunUnitFilter: string;
@@ -357,6 +358,7 @@ export function createInitialShellRuntimeState(): ShellRuntimeState {
     openRunLoginFilter: "",
     openRunGroupFilter: "",
     openRunBookletFilter: "",
+    openRunSpeciesFilter: "",
     openRunSessionFilter: "",
     openRunRunFilter: "",
     openRunUnitFilter: "",

@@ -60,6 +60,7 @@ export type ShellPersistenceTarget = {
   openRunLoginFilter: string;
   openRunGroupFilter: string;
   openRunBookletFilter: string;
+  openRunSpeciesFilter: string;
   openRunSessionFilter: string;
   openRunRunFilter: string;
   openRunUnitFilter: string;
@@ -185,6 +186,7 @@ export const createPersistedShellState = (
   openRunLoginFilter: target.openRunLoginFilter,
   openRunGroupFilter: target.openRunGroupFilter,
   openRunBookletFilter: target.openRunBookletFilter,
+  openRunSpeciesFilter: target.openRunSpeciesFilter,
   openRunSessionFilter: target.openRunSessionFilter,
   openRunRunFilter: target.openRunRunFilter,
   openRunUnitFilter: target.openRunUnitFilter,
@@ -467,6 +469,10 @@ export const applyHydratedShellState = (
   target.openRunBookletFilter = hydrateString(
     snapshot.openRunBookletFilter,
     target.openRunBookletFilter
+  );
+  target.openRunSpeciesFilter = hydrateString(
+    snapshot.openRunSpeciesFilter,
+    target.openRunSpeciesFilter
   );
   target.openRunSessionFilter = hydrateString(
     snapshot.openRunSessionFilter,

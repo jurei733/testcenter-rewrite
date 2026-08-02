@@ -883,6 +883,7 @@ export type OpenMonitorRun = {
   participantRosterEntry: ParticipantRosterEntry | null;
   bookletKey: string;
   bookletLabel?: string;
+  bookletSpecies: string | null;
   bookletAssignmentKey: string;
   bookletStates: Record<string, string>;
   status: TestRunStatus;

@@ -420,6 +420,12 @@ export function createShellPersistenceStateHost(args: {
     set openRunBookletFilter(nextValue) {
       args.runtimeState.openRunBookletFilter = nextValue;
     },
+    get openRunSpeciesFilter() {
+      return args.runtimeState.openRunSpeciesFilter;
+    },
+    set openRunSpeciesFilter(nextValue) {
+      args.runtimeState.openRunSpeciesFilter = nextValue;
+    },
     get openRunSessionFilter() {
       return args.runtimeState.openRunSessionFilter;
     },

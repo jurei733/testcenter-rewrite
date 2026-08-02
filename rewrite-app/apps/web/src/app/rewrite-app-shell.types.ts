@@ -78,6 +78,7 @@ export type PersistedShellState = {
   openRunLoginFilter: string;
   openRunGroupFilter: string;
   openRunBookletFilter: string;
+  openRunSpeciesFilter: string;
   openRunSessionFilter: string;
   openRunRunFilter: string;
   openRunUnitFilter: string;

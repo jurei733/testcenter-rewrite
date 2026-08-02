@@ -680,7 +680,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Open Run Filters</h2>
-        <p>Narrow activation-guard open runs and CSV export by participant, booklet, run, unit, status, or limit.</p>
+        <p>Filter open runs and CSV by status and booklet species.</p>
         <div class="form-grid">
           <label>
             Login Key
@@ -693,6 +693,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <label>
             Booklet Key
             <input id="openRunBookletFilter" name="openRunBookletFilter" [(ngModel)]="view.runtime.openRunBookletFilter" (change)="view.persistState()" placeholder="Optional booklet key" />
+          </label>
+          <label>
+            Booklet Species
+            <input id="openRunSpeciesFilter" name="openRunSpeciesFilter" [(ngModel)]="view.runtime.openRunSpeciesFilter" (change)="view.persistState()" placeholder="species: 2" />
           </label>
           <label>
             Session Id

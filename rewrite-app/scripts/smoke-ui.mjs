@@ -5651,6 +5651,8 @@ try {
   await openRunStudentCard.waitFor();
   await openRunStudentCard
     .filter({ hasText: "Timed Paused Work" })
+    .filter({ hasText: "Booklet Species" })
+    .filter({ hasText: "species: 1" })
     .filter({ hasText: "Active Timer" })
     .filter({ hasText: "Timer Remaining" })
     .filter({ hasText: "Timer Expires" })
@@ -5863,6 +5865,7 @@ try {
   await fillAndCommit("#openRunLoginFilter", participantLoginKey);
   await fillAndCommit("#openRunGroupFilter", participantGroupKey);
   await fillAndCommit("#openRunBookletFilter", participantBookletKey);
+  await fillAndCommit("#openRunSpeciesFilter", "species: 1");
   await fillAndCommit("#openRunSessionFilter", participantSessionId);
   await fillAndCommit("#openRunRunFilter", pausedTestRunId);
   await fillAndCommit("#openRunUnitFilter", "unit-paused");
@@ -5870,7 +5873,7 @@ try {
   await fillAndCommit("#openRunLimit", "1");
   await clickAction("Apply Open Run Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=running&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&bookletSpecies=${encodeURIComponent("species: 1")}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=running&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&

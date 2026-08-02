@@ -4,7 +4,8 @@ These fixtures are pinned from IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20). Their source
 paths and executable expectations are declared in `corpus.json`.
 
-The corpus deliberately contains both current 17.6 examples, a 17.4 booklet,
+The corpus deliberately contains current 17.6 examples, including the original
+`Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
 all 17 original Test-Controller system booklets, all four original
 BookletConfig variants, the adaptive `Booklet2.xml` + `Unit2.xml` + coding
 scheme + Verona 6 player dependency set, and the original XSD-backed rejection

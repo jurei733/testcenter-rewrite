@@ -2134,6 +2134,9 @@ const monitorProfileFilterExcludesRun = (
     case "bookletLabel":
       subject = openRun.bookletLabel ?? openRun.bookletKey;
       break;
+    case "bookletSpecies":
+      subject = openRun.bookletSpecies ?? "";
+      break;
     case "unitId":
       subject = openRun.currentUnitKey ?? "";
       break;
@@ -2699,6 +2702,7 @@ export type MonitorOpenRunsQuery = {
   loginKey?: string;
   groupKey?: string;
   bookletKey?: string;
+  bookletSpecies?: string;
   participantSessionId?: string;
   testRunId?: string;
   unitKey?: string;

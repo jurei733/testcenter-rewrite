@@ -2932,6 +2932,7 @@ export class WorkspaceViewFacade {
     runtime.openRunLoginFilter = runtime.loginKey.trim();
     runtime.openRunGroupFilter = runtime.groupKey.trim();
     runtime.openRunBookletFilter = runtime.bookletKey.trim();
+    runtime.openRunSpeciesFilter = "";
     runtime.openRunSessionFilter = participantSessionId;
     runtime.openRunRunFilter = testRunId;
     runtime.openRunUnitFilter = runtime.currentUnitKey.trim();

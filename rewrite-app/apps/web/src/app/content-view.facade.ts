@@ -1895,6 +1895,7 @@ export class ContentViewFacade {
     runtime.openRunLoginFilter = loginKey;
     runtime.openRunGroupFilter = groupKey;
     runtime.openRunBookletFilter = bookletKey;
+    runtime.openRunSpeciesFilter = "";
     runtime.openRunSessionFilter = participantSessionId;
     runtime.openRunRunFilter = testRunId;
     runtime.openRunUnitFilter = currentUnitKey;

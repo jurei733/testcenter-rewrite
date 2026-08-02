@@ -7,11 +7,20 @@
       "bookletKey": "BOOKLET.SAMPLE-1",
       "displayLabel": "Sample booklet",
       "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"],
+      "topLevelTestletCount": 2,
       "policy": {
         "logPolicy": "debug",
         "pagingMode": "concat-scroll-snap",
         "headerContent": "booklet"
       }
+    },
+    {
+      "fixture": "booklets/Booklet3.xml",
+      "sourcePath": "sampledata/Booklet3.xml",
+      "bookletKey": "BOOKLET.SAMPLE-3",
+      "displayLabel": "Similar Booklet to Sample 1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"],
+      "topLevelTestletCount": 2
     },
     {
       "fixture": "booklets/Booklet2.xml",
