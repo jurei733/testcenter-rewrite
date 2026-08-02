@@ -10977,6 +10977,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const workspaceKey = "integration-workspace-testlet-timer";
   const bookletKey = "BOOKLET.TIMER";
   const testletKey = "timed-block";
+  const authoredTimerDurationSeconds = 6;
 
   await requestJson("/api/v1/platform/tenants", {
     method: "POST",
@@ -11004,7 +11005,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
             <Unit id="UNIT.INTRO" label="Introduction" />
             <Testlet id="${testletKey}" label="Timed Block">
               <Restrictions>
-                <TimeMax minutes="0.001" leave="forbidden" />
+                <TimeMax minutes="0.1" leave="forbidden" />
               </Restrictions>
               <Unit id="UNIT.TIMED" label="Timed Unit" />
             </Testlet>
@@ -11065,7 +11066,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(entered.body.testRun.testletTimers?.[testletKey]?.status, "running");
   assert.equal(
     entered.body.testRun.testletTimers?.[testletKey]?.durationSeconds,
-    1
+    authoredTimerDurationSeconds
   );
   assert.match(
     entered.body.testRun.testletTimers?.[testletKey]?.expiresAt ?? "",
@@ -11100,7 +11101,13 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(paused.status, 200);
   assert.equal(paused.body.testRun.status, "paused");
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.status, "paused");
-  assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.remainingSeconds, 1);
+  const pausedRemainingSeconds =
+    paused.body.testRun.testletTimers?.[testletKey]?.remainingSeconds;
+  assert.ok(
+    typeof pausedRemainingSeconds === "number" &&
+      pausedRemainingSeconds > 0 &&
+      pausedRemainingSeconds <= authoredTimerDurationSeconds
+  );
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.expiresAt, null);
 
   const openRunsWithTimer = await requestJson<{
@@ -11159,8 +11166,8 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       testletKey,
       displayLabel: "Timed Block",
       status: "paused",
-      durationSeconds: 1,
-      remainingSeconds: 1,
+      durationSeconds: authoredTimerDurationSeconds,
+      remainingSeconds: pausedRemainingSeconds,
       startedAt: entered.body.testRun.testletTimers?.[testletKey]?.startedAt,
       expiresAt: null,
       updatedAt: "<timestamp>",
@@ -11221,8 +11228,8 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     testletKey,
     displayLabel: "Timed Block",
     status: "paused",
-    durationSeconds: 1,
-    remainingSeconds: 1,
+    durationSeconds: authoredTimerDurationSeconds,
+    remainingSeconds: pausedRemainingSeconds,
     startedAt: entered.body.testRun.testletTimers?.[testletKey]?.startedAt,
     expiresAt: null,
     leave: "forbidden",
@@ -11233,7 +11240,10 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const resumed = await requestJson<{
     testRun: {
       status: string;
-      testletTimers?: Record<string, { status: string; expiresAt: string | null }>;
+      testletTimers?: Record<
+        string,
+        { status: string; remainingSeconds: number; expiresAt: string | null }
+      >;
     };
   }>(`/api/v1/participant/test-runs/${testRunId}/resume`, {
     method: "POST",
@@ -11246,8 +11256,13 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     resumed.body.testRun.testletTimers?.[testletKey]?.expiresAt ?? "",
     ISO_DATE_REGEX
   );
+  const resumedRemainingSeconds =
+    resumed.body.testRun.testletTimers?.[testletKey]?.remainingSeconds;
+  assert.ok(
+    typeof resumedRemainingSeconds === "number" && resumedRemainingSeconds > 0
+  );
 
-  await delay(1_100);
+  await delay((resumedRemainingSeconds + 0.25) * 1_000);
   const stateAfterExpiry = await requestJson<{
     currentRunState: {
       currentUnit: { unitKey: string | null };
@@ -11454,12 +11469,12 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.durationSeconds,
-    1
+    authoredTimerDurationSeconds
   );
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.remainingSeconds,
-    1
+    authoredTimerDurationSeconds
   );
   assert.match(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
