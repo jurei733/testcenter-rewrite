@@ -307,6 +307,105 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "testControllerPackages": [
+    {
+      "bookletKeys": [
+        "Cy-Bklt_TC-1",
+        "Cy-Bklt_TC-2",
+        "Cy-Bklt_TC-3",
+        "Cy-Bklt_TC-4",
+        "Cy-Bklt_TC-5",
+        "Cy-Bklt_TC-6",
+        "Cy-Bklt_TC-7",
+        "Cy-Bklt_TC-8",
+        "Cy-Bklt_TC-9",
+        "Cy-Bklt_TC-10",
+        "Cy-Bklt_TC-11",
+        "Cy-Bklt_TC-12",
+        "Cy-Bklt_TC-13",
+        "Cy-Bklt_TC-14",
+        "Cy-Bklt_TC-15",
+        "Cy-Bklt_TC-16",
+        "Cy-Bklt_TC-17"
+      ],
+      "units": [
+        ["units/CY_Unit100.xml", "CY-Unit.Sample-100"],
+        ["units/CY_Unit101.xml", "CY-Unit.Sample-101"],
+        ["units/CY_Unit102.xml", "CY-Unit.Sample-102"],
+        ["units/CY_Unit103.xml", "CY-Unit.Sample-103"],
+        ["units/CY_Unit104.xml", "CY-Unit.Sample-104"]
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_TestController.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/test-controller/CY_Logins_TestController.xml",
+        "sha256": "cc00c9495ffd0160772cc53957cead0b67003a136020a652a5d81a8191bf4114",
+        "groups": [
+          {
+            "groupKey": "demo",
+            "participants": [["Test_Ctrl-1", "run-demo", "Cy-Bklt_TC-1"]]
+          },
+          {
+            "groupKey": "review",
+            "participants": [["Test_Ctrl-2", "run-review", "Cy-Bklt_TC-2"]]
+          },
+          {
+            "groupKey": "hot-return",
+            "participants": [
+              ["Test_Ctrl-3", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-4", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-5", "run-hot-return", "Cy-Bklt_TC-3"],
+              ["Test_Ctrl-6", "run-hot-return", "Cy-Bklt_TC-3"]
+            ]
+          },
+          {
+            "groupKey": "hot-restart",
+            "participants": [
+              ["Test_Ctrl-7", "run-hot-restart", "Cy-Bklt_TC-4"],
+              ["Test_Ctrl-8", "run-hot-restart", "Cy-Bklt_TC-4"],
+              ["Test_Ctrl-9", "run-hot-restart", "Cy-Bklt_TC-4"]
+            ]
+          },
+          {
+            "groupKey": "time-restr",
+            "participants": [
+              ["Test_Ctrl-10", "run-hot-return", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-11", "run-hot-return", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-12", "run-hot-restart", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-13", "run-demo", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-14", "run-review", "Cy-Bklt_TC-5"],
+              ["Test_Ctrl-15", "run-hot-restart", "Cy-Bklt_TC-6"],
+              ["Test_Ctrl-16", "run-hot-restart", "Cy-Bklt_TC-7"],
+              ["Test_Ctrl-17", "run-hot-restart", "Cy-Bklt_TC-8"]
+            ]
+          },
+          {
+            "groupKey": "tslt-restr",
+            "participants": [
+              ["Test_Ctrl-18", "run-hot-restart", "Cy-Bklt_TC-9"],
+              ["Test_Ctrl-19", "run-hot-restart", "Cy-Bklt_TC-10"],
+              ["Test_Ctrl-20", "run-hot-restart", "Cy-Bklt_TC-11"],
+              ["Test_Ctrl-21", "run-hot-restart", "Cy-Bklt_TC-12"],
+              ["Test_Ctrl-22", "run-hot-restart", "Cy-Bklt_TC-13"]
+            ]
+          },
+          {
+            "groupKey": "bklt-cfg-restr",
+            "participants": [
+              ["Test_Ctrl-23", "run-hot-restart", "Cy-Bklt_TC-14"],
+              ["Test_Ctrl-24", "run-hot-restart", "Cy-Bklt_TC-15"],
+              ["Test_Ctrl-25", "run-hot-restart", "Cy-Bklt_TC-16"],
+              ["Test_Ctrl-26", "run-hot-restart", "Cy-Bklt_TC-17"]
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "groupMonitoringPackages": [
     {
       "booklet": {

@@ -8736,6 +8736,522 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus executes the complete official Test Controller package", async () => {
+  type SystemBooklet = {
+    fixture: string;
+    bookletKey: string;
+    displayLabel: string;
+    unitKeys: string[];
+  };
+  type TestControllerPackage = {
+    bookletKeys: string[];
+    units: Array<[fixture: string, unitKey: string]>;
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      encoding: "base64";
+      groups: Array<{
+        groupKey: string;
+        participants: Array<
+          [loginKey: string, executionMode: string, bookletKey: string]
+        >;
+      }>;
+    };
+  };
+  type ExecutionModeState = {
+    mode: string;
+    alwaysNewSession: boolean;
+    monitorable: boolean;
+    canReview: boolean;
+    saveResponses: boolean;
+    forceTimeRestrictions: boolean;
+    forceNaviRestrictions: boolean;
+    presetCode: boolean;
+    showTimeLeft: boolean;
+    showUnitMenu: boolean;
+    receiveRemoteCommands: boolean;
+  };
+
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    systemBooklets: SystemBooklet[];
+    testControllerPackages: TestControllerPackage[];
+  };
+  const expectation = corpus.testControllerPackages[0];
+  assert.ok(expectation);
+  const booklets = expectation.bookletKeys.map(bookletKey => {
+    const booklet = corpus.systemBooklets.find(
+      candidate => candidate.bookletKey === bookletKey
+    );
+    assert.ok(booklet, `Missing official Controller booklet ${bookletKey}`);
+    return booklet;
+  });
+  assert.equal(booklets.length, 17);
+
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.original-test-controller`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.original-test-controller.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+
+  try {
+    const tenantKey = "integration-tenant-original-test-controller";
+    const workspaceKey = "integration-workspace-original-test-controller";
+    assert.equal(
+      (
+        await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", {
+          method: "POST",
+          body: { tenantKey, displayName: tenantKey }
+        })
+      ).status,
+      201
+    );
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces`,
+          {
+            method: "POST",
+            body: { workspaceKey, displayName: workspaceKey }
+          }
+        )
+      ).status,
+      201
+    );
+
+    const bookletDocuments = booklets.map(booklet => ({
+      ...booklet,
+      content: readFileSync(
+        resolve(originalTestcenterCorpusRoot, booklet.fixture),
+        "utf8"
+      )
+    }));
+    const unitDocuments = expectation.units.map(([fixture, unitKey]) => ({
+      fixture,
+      unitKey,
+      content: readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8")
+    }));
+    const playerDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
+      "utf8"
+    );
+    const manifestResources = [
+      ...booklets.map(
+        booklet =>
+          `<resource identifier="${booklet.bookletKey}" href="${booklet.fixture}" />`
+      ),
+      ...unitDocuments.map(
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+      ),
+      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+    ].join("\n");
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>${manifestResources}</resources>
+          </manifest>
+        `
+      },
+      ...bookletDocuments.map(booklet => ({
+        fileName: `export/${booklet.fixture}`,
+        content: booklet.content
+      })),
+      ...unitDocuments.map(unit => ({
+        fileName: `export/${unit.fixture}`,
+        content: unit.content
+      })),
+      {
+        fileName: `export/${expectation.player.fixture}`,
+        content: playerDocument
+      }
+    ]);
+    const sourcePackage = await requestJsonAt<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: "original-test-controller.zip",
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${zipPayload}`
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201);
+    const imported = await requestJsonAt<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; severity: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: {
+          sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    assert.equal(
+      imported.body.importJob.status,
+      "completed",
+      JSON.stringify(imported.body.importJob.diagnostics)
+    );
+    assert.deepEqual(imported.body.importJob.diagnostics, []);
+    const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+    assert.ok(contentReleaseId);
+
+    const release = await requestJsonAt<{
+      contentReleaseDetail: {
+        contentRelease: {
+          runtimeSnapshot: {
+            bookletEntries: Array<{
+              bookletKey: string;
+              displayLabel: string;
+              unitEntries: Array<{
+                unitKey: string;
+                playerKey?: string;
+              }>;
+            }>;
+            playerEntries?: Array<{ playerKey: string; html: string }>;
+          };
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+    );
+    const runtimeSnapshot =
+      release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+    assert.equal(runtimeSnapshot.bookletEntries.length, 17);
+    for (const expectedBooklet of booklets) {
+      const importedBooklet = runtimeSnapshot.bookletEntries.find(
+        candidate => candidate.bookletKey === expectedBooklet.bookletKey
+      );
+      assert.ok(importedBooklet);
+      assert.equal(importedBooklet.displayLabel, expectedBooklet.displayLabel);
+      assert.deepEqual(
+        importedBooklet.unitEntries.map(unit => unit.unitKey),
+        expectedBooklet.unitKeys
+      );
+      assert.ok(
+        importedBooklet.unitEntries.every(
+          unit => unit.playerKey === expectation.player.playerKey
+        )
+      );
+    }
+    assert.deepEqual(runtimeSnapshot.playerEntries, [
+      { playerKey: expectation.player.playerKey, html: playerDocument }
+    ]);
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+          { method: "POST", body: { activatedByActorId: "original-controller-gate" } }
+        )
+      ).status,
+      200
+    );
+
+    const rosterXml = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+        "utf8"
+      ).trim(),
+      expectation.roster.encoding
+    ).toString("utf8");
+    const rosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        executionMode?: string;
+        bookletKey: string | null;
+        passwordRequired: boolean;
+        validationWarnings: Array<{ code: string }>;
+      }>;
+      operationalLoginCandidates: unknown[];
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      { method: "POST", body: { rosterText: rosterXml } }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.equal(rosterImport.body.items.length, 26);
+    assert.deepEqual(rosterImport.body.operationalLoginCandidates, []);
+    const rosterByLoginKey = new Map(
+      rosterImport.body.items.map(item => [item.loginKey, item])
+    );
+    for (const group of expectation.roster.groups) {
+      for (const [loginKey, executionMode, bookletKey] of group.participants) {
+        const participant = rosterByLoginKey.get(loginKey);
+        assert.ok(participant);
+        assert.equal(participant.groupKey, group.groupKey);
+        assert.equal(participant.executionMode, executionMode);
+        assert.equal(participant.bookletKey, bookletKey);
+        assert.equal(participant.passwordRequired, true);
+        assert.deepEqual(participant.validationWarnings, []);
+      }
+    }
+
+    const start = async (loginKey: string, bookletKey: string) => {
+      const signIn = await requestJsonAt<{
+        participantSession: {
+          participantSessionId: string;
+          executionMode?: string;
+        };
+      }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: { tenantKey, workspaceKey, loginKey, password: "123" }
+      });
+      assert.equal(signIn.status, 200);
+      const participantSessionId =
+        signIn.body.participantSession.participantSessionId;
+      const resumed = await requestJsonAt<{
+        testRun: {
+          testRunId: string;
+          executionMode?: string;
+          currentUnitKey: string | null;
+          unlockedTestletKeys?: string[];
+          testletTimers?: Record<string, unknown>;
+          unitResponses: Record<string, string>;
+        };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${participantSessionId}/resume`,
+        { method: "POST", body: { bookletKey } }
+      );
+      assert.equal(resumed.status, 200);
+      assert.equal(
+        resumed.body.testRun.executionMode,
+        signIn.body.participantSession.executionMode
+      );
+      const state = await requestJsonAt<{
+        currentRunState: {
+          executionMode: ExecutionModeState;
+          availableActions: string[];
+          booklet: {
+            policy: {
+              navigation: { unitMenuEnabled: boolean };
+              timing: { showTimeLeft: boolean };
+            };
+          };
+          navigation: {
+            nextTestletGate: {
+              testletKey: string;
+              displayLabel: string;
+              prompt: string;
+            } | null;
+          };
+        };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${participantSessionId}/current-state`
+      );
+      assert.equal(state.status, 200);
+      return {
+        signIn,
+        participantSessionId,
+        testRun: resumed.body.testRun,
+        currentRunState: state.body.currentRunState
+      };
+    };
+
+    const demo = await start("Test_Ctrl-1", "Cy-Bklt_TC-1");
+    assert.equal(demo.currentRunState.executionMode.mode, "run-demo");
+    assert.equal(demo.currentRunState.executionMode.monitorable, false);
+    assert.equal(demo.currentRunState.executionMode.saveResponses, false);
+    assert.equal(demo.currentRunState.executionMode.forceTimeRestrictions, false);
+    assert.equal(demo.currentRunState.executionMode.forceNaviRestrictions, false);
+    assert.equal(demo.currentRunState.executionMode.presetCode, true);
+    assert.equal(
+      demo.currentRunState.booklet.policy.navigation.unitMenuEnabled,
+      false
+    );
+    assert.equal(demo.currentRunState.booklet.policy.timing.showTimeLeft, false);
+    assert.deepEqual(demo.testRun.unlockedTestletKeys, ["Tslt1"]);
+    assert.deepEqual(demo.testRun.testletTimers, {});
+    assert.equal(demo.currentRunState.navigation.nextTestletGate, null);
+
+    const review = await start("Test_Ctrl-2", "Cy-Bklt_TC-2");
+    assert.equal(review.currentRunState.executionMode.mode, "run-review");
+    assert.equal(review.currentRunState.executionMode.monitorable, false);
+    assert.equal(review.currentRunState.executionMode.canReview, true);
+    assert.equal(review.currentRunState.executionMode.saveResponses, false);
+    assert.equal(review.currentRunState.executionMode.presetCode, true);
+    assert.equal(
+      review.currentRunState.booklet.policy.navigation.unitMenuEnabled,
+      true
+    );
+    assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
+    assert.equal(review.currentRunState.availableActions.includes("review"), true);
+    assert.deepEqual(review.testRun.unlockedTestletKeys, ["Tslt1"]);
+    assert.deepEqual(review.testRun.testletTimers, {});
+
+    const hotReturn = await start("Test_Ctrl-3", "Cy-Bklt_TC-3");
+    assert.equal(hotReturn.currentRunState.executionMode.mode, "run-hot-return");
+    assert.equal(hotReturn.currentRunState.executionMode.alwaysNewSession, false);
+    assert.equal(hotReturn.currentRunState.executionMode.monitorable, true);
+    assert.equal(hotReturn.currentRunState.executionMode.saveResponses, true);
+    assert.equal(hotReturn.currentRunState.executionMode.forceTimeRestrictions, true);
+    assert.equal(hotReturn.currentRunState.executionMode.forceNaviRestrictions, true);
+    assert.equal(hotReturn.currentRunState.executionMode.presetCode, false);
+    assert.deepEqual(hotReturn.testRun.unlockedTestletKeys, []);
+    assert.deepEqual(hotReturn.testRun.testletTimers, {});
+    assert.deepEqual(hotReturn.currentRunState.navigation.nextTestletGate, {
+      testletKey: "Tslt1",
+      displayLabel: "Aufgabenblock",
+      prompt: "Bitte gib das Freigabewort ein."
+    });
+    const savedHotReturn = await requestJsonAt<{
+      testRun: { unitResponses: Record<string, string> };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${hotReturn.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "CY-Unit.Sample-100",
+          unitResponse: "official Controller hot-return response",
+          status: "running"
+        }
+      }
+    );
+    assert.equal(savedHotReturn.status, 200);
+    assert.equal(
+      savedHotReturn.body.testRun.unitResponses["CY-Unit.Sample-100"],
+      "official Controller hot-return response"
+    );
+    const blockedHotReturn = await requestJsonAt<{
+      error: string;
+      details?: { deniedReasons?: string[] };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${hotReturn.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: { currentUnitKey: "CY-Unit.Sample-101", status: "running" }
+      }
+    );
+    assert.equal(blockedHotReturn.status, 409);
+    assert.equal(blockedHotReturn.body.error, "booklet_navigation_denied");
+    assert.deepEqual(blockedHotReturn.body.details?.deniedReasons, [
+      "testlet_code_required"
+    ]);
+    const unlockedHotReturn = await requestJsonAt<{
+      testRun: {
+        currentUnitKey: string | null;
+        unlockedTestletKeys?: string[];
+        testletTimers?: Record<string, unknown>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${hotReturn.testRun.testRunId}/testlets/Tslt1/unlock`,
+      { method: "POST", body: { code: "hase" } }
+    );
+    assert.equal(unlockedHotReturn.status, 200);
+    assert.equal(
+      unlockedHotReturn.body.testRun.currentUnitKey,
+      "CY-Unit.Sample-101"
+    );
+    assert.deepEqual(unlockedHotReturn.body.testRun.unlockedTestletKeys, [
+      "Tslt1"
+    ]);
+    assert.ok(unlockedHotReturn.body.testRun.testletTimers?.Tslt1);
+
+    const resumedHotReturn = await start("Test_Ctrl-3", "Cy-Bklt_TC-3");
+    assert.equal(
+      resumedHotReturn.participantSessionId,
+      hotReturn.participantSessionId
+    );
+    assert.equal(
+      resumedHotReturn.testRun.testRunId,
+      hotReturn.testRun.testRunId
+    );
+    assert.equal(
+      resumedHotReturn.testRun.unitResponses["CY-Unit.Sample-100"],
+      "official Controller hot-return response"
+    );
+
+    const hotRestart = await start("Test_Ctrl-7", "Cy-Bklt_TC-4");
+    assert.equal(hotRestart.currentRunState.executionMode.mode, "run-hot-restart");
+    assert.equal(hotRestart.currentRunState.executionMode.alwaysNewSession, true);
+    assert.equal(hotRestart.currentRunState.executionMode.monitorable, true);
+    assert.equal(hotRestart.currentRunState.executionMode.saveResponses, true);
+    const savedHotRestart = await requestJsonAt<{
+      testRun: { unitResponses: Record<string, string> };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${hotRestart.testRun.testRunId}/save-progress`,
+      {
+        method: "POST",
+        body: {
+          currentUnitKey: "CY-Unit.Sample-100",
+          unitResponse: "official Controller hot-restart response",
+          status: "running"
+        }
+      }
+    );
+    assert.equal(
+      savedHotRestart.body.testRun.unitResponses["CY-Unit.Sample-100"],
+      "official Controller hot-restart response"
+    );
+    const restartedHotRun = await start("Test_Ctrl-7", "Cy-Bklt_TC-4");
+    assert.notEqual(
+      restartedHotRun.participantSessionId,
+      hotRestart.participantSessionId
+    );
+    assert.notEqual(
+      restartedHotRun.testRun.testRunId,
+      hotRestart.testRun.testRunId
+    );
+    assert.deepEqual(restartedHotRun.testRun.unitResponses, {});
+
+    for (const [testRunId, expectedModes] of [
+      [demo.testRun.testRunId, []],
+      [review.testRun.testRunId, []],
+      [resumedHotReturn.testRun.testRunId, ["run-hot-return"]],
+      [restartedHotRun.testRun.testRunId, ["run-hot-restart"]]
+    ] as Array<[string, string[]]>) {
+      const openRuns = await requestJsonAt<{
+        items: Array<{ testRunId: string; executionMode: string }>;
+      }>(
+        isolated.baseUrl,
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${testRunId}`
+      );
+      assert.deepEqual(
+        openRuns.body.items.map(item => item.executionMode),
+        expectedModes
+      );
+    }
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("original Testcenter compatibility corpus executes the official group monitoring package", async () => {
   type GroupMonitoringPackage = {
     booklet: {
