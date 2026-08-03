@@ -344,6 +344,7 @@ export class RewriteAppOpsService {
         roleAssignments: [
           this.createRoleAssignmentRequest(
             this.opsState.adminCreateRole,
+            this.opsState.adminCreateAccessMode,
             this.opsState.adminCreateTenantKey,
             this.opsState.adminCreateWorkspaceKey,
             this.opsState.adminCreateGroupKey,
@@ -384,6 +385,7 @@ export class RewriteAppOpsService {
       resolveRoutePath(productionApiRoutes.admin.assignRole, { adminUserId }),
       this.createRoleAssignmentRequest(
         this.opsState.adminRoleRole,
+        this.opsState.adminRoleAccessMode,
         this.opsState.adminRoleTenantKey,
         this.opsState.adminRoleWorkspaceKey,
         this.opsState.adminRoleGroupKey
@@ -601,6 +603,7 @@ export class RewriteAppOpsService {
 
   private createRoleAssignmentRequest(
     role: AssignAdminRoleRequest["role"],
+    accessMode: NonNullable<AssignAdminRoleRequest["accessMode"]>,
     tenantKey: string,
     workspaceKey: string,
     groupKey: string,
@@ -619,6 +622,7 @@ export class RewriteAppOpsService {
 
     return {
       role,
+      ...(role === "workspace_admin" ? { accessMode } : {}),
       tenantKey: tenantKey.trim(),
       workspaceKey: workspaceKey.trim(),
       ...(role === "group_monitor" ? { groupKey: groupKey.trim() } : {}),

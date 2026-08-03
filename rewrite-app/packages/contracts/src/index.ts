@@ -2206,6 +2206,7 @@ export type PublicAdminRoleAssignment = AdminRoleAssignment;
 
 export type OperatorAccessMode =
   | "admin"
+  | "admin_read_only"
   | "study_monitor"
   | "group_monitor"
   | "system_check"
@@ -2309,16 +2310,23 @@ export const filterOpenMonitorRunsByProfile = (
 };
 
 export const resolveOperatorAccessMode = (
-  roleAssignments: ReadonlyArray<Pick<AdminRoleAssignment, "role">>
+  roleAssignments: ReadonlyArray<
+    Pick<AdminRoleAssignment, "role"> &
+      Partial<Pick<AdminRoleAssignment, "accessMode">>
+  >
 ): OperatorAccessMode => {
   if (
-    roleAssignments.some(({ role }) =>
-      role === "platform_admin" ||
-      role === "tenant_admin" ||
-      role === "workspace_admin"
+    roleAssignments.some(
+      ({ role, accessMode }) =>
+        role === "platform_admin" ||
+        role === "tenant_admin" ||
+        (role === "workspace_admin" && accessMode !== "read_only")
     )
   ) {
     return "admin";
+  }
+  if (roleAssignments.some(({ role }) => role === "workspace_admin")) {
+    return "admin_read_only";
   }
   if (roleAssignments.some(({ role }) => role === "study_monitor")) {
     return "study_monitor";
@@ -2345,6 +2353,7 @@ export type AdminSignInRequest = {
 
 export type AdminRoleAssignmentRequest = {
   role: AdminRole;
+  accessMode?: AdminRoleAssignment["accessMode"] | "RW" | "RO";
   tenantKey?: string | null;
   workspaceKey?: string | null;
   groupKey?: string | null;

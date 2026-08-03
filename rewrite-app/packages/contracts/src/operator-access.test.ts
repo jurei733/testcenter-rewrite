@@ -13,6 +13,26 @@ test("operator access mode prefers any administrative assignment", () => {
   );
 });
 
+test("operator access mode exposes read-only workspace administrators", () => {
+  assert.equal(
+    resolveOperatorAccessMode([
+      { role: "workspace_admin", accessMode: "read_only" }
+    ]),
+    "admin_read_only"
+  );
+  assert.equal(
+    resolveOperatorAccessMode([
+      { role: "workspace_admin", accessMode: "read_only" },
+      { role: "workspace_admin", accessMode: "read_write" }
+    ]),
+    "admin"
+  );
+  assert.equal(
+    resolveOperatorAccessMode([{ role: "workspace_admin" }]),
+    "admin"
+  );
+});
+
 test("operator access mode distinguishes study and group monitors", () => {
   assert.equal(
     resolveOperatorAccessMode([

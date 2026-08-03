@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import type { TestRun } from "@testcenter-rewrite-app/domain";
+import type { AdminRoleAssignment, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
 
@@ -51,4 +55,74 @@ test("SQLite preserves whole-test locks through every run lookup", async () => {
       ?.locked,
     true
   );
+});
+
+test("SQLite preserves workspace-admin access modes", async () => {
+  const repository = createSqliteFirstSliceRepository(":memory:");
+  const roleAssignment: AdminRoleAssignment = {
+    roleAssignmentId: "role-read-only",
+    adminUserId: "admin-read-only",
+    role: "workspace_admin",
+    accessMode: "read_only",
+    tenantId: "tenant-read-only",
+    workspaceId: "workspace-read-only",
+    groupKey: null,
+    monitorProfiles: [],
+    createdAt: "2026-08-03T00:00:00.000Z"
+  };
+
+  await repository.saveAdminRoleAssignment(roleAssignment);
+
+  assert.equal(
+    (await repository.listAdminRoleAssignmentsByUserId("admin-read-only"))[0]
+      ?.accessMode,
+    "read_only"
+  );
+});
+
+test("SQLite upgrades legacy admin roles to read-write access", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-admin-mode-"));
+  const databasePath = join(tempDirectory, "legacy.sqlite");
+  const database = new DatabaseSync(databasePath);
+  try {
+    database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations (version, name, applied_at)
+      VALUES (36, 'add_test_run_lock', '2026-08-03T00:00:00.000Z');
+      CREATE TABLE admin_role_assignments (
+        role_assignment_id TEXT PRIMARY KEY,
+        admin_user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tenant_id TEXT,
+        workspace_id TEXT,
+        group_key TEXT,
+        monitor_profiles_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO admin_role_assignments (
+        role_assignment_id, admin_user_id, role, tenant_id, workspace_id,
+        group_key, monitor_profiles_json, created_at
+      ) VALUES (
+        'legacy-role', 'legacy-admin', 'workspace_admin', 'legacy-tenant',
+        'legacy-workspace', NULL, '[]', '2026-08-03T00:00:00.000Z'
+      );
+    `);
+  } finally {
+    database.close();
+  }
+
+  try {
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    assert.equal(
+      (await repository.listAdminRoleAssignmentsByUserId("legacy-admin"))[0]
+        ?.accessMode,
+      "read_write"
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
 });

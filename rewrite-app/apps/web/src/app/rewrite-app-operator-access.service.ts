@@ -36,6 +36,10 @@ export class RewriteAppOperatorAccessService {
     return this.mode === "system_check";
   }
 
+  get isReadOnlyAdmin(): boolean {
+    return this.mode === "admin_read_only";
+  }
+
   get monitorProfiles(): MonitorViewProfile[] {
     const session = parseJsonDocument<OperatorSessionView>(
       this.uiState.ops.adminSessionView
@@ -67,6 +71,8 @@ export class RewriteAppOperatorAccessService {
         return "System check";
       case "admin":
         return "Administrator";
+      case "admin_read_only":
+        return "Read-only workspace administrator";
       case "unassigned":
         return "Unassigned operator";
       default:

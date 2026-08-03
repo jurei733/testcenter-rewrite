@@ -1,5 +1,6 @@
 import type {
   AdminRole,
+  AdminRoleAccessMode,
   AdminSessionStatus,
   AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
@@ -126,6 +127,7 @@ export type PersistedShellState = {
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreateRole: AdminRole;
+  adminCreateAccessMode: AdminRoleAccessMode;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
@@ -135,6 +137,7 @@ export type PersistedShellState = {
   adminCreateValidForMinutes: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
+  adminRoleAccessMode: AdminRoleAccessMode;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;

@@ -33,6 +33,7 @@ import type {
   AdminAuditEvent,
   AdminAuditEventType,
   AdminRole,
+  AdminRoleAccessMode,
   AdminRoleAssignment,
   AdminSession,
   AdminSessionStatus,
@@ -801,6 +802,7 @@ export type AdminDirectoryPort = {
     validForMinutes?: number | null;
     roleAssignments?: Array<{
       role: AdminRole;
+      accessMode?: AdminRoleAccessMode | "RW" | "RO";
       tenantKey?: string | null;
       workspaceKey?: string | null;
       groupKey?: string | null;
@@ -822,6 +824,7 @@ export type AdminDirectoryPort = {
     sessionToken: string;
     adminUserId: string;
     role: AdminRole;
+    accessMode?: AdminRoleAccessMode | "RW" | "RO";
     tenantKey?: string | null;
     workspaceKey?: string | null;
     groupKey?: string | null;
@@ -1297,6 +1300,7 @@ const assertParticipantAccessWindow = (
 
 type AdminRoleAssignmentInput = {
   role: AdminRole;
+  accessMode?: AdminRoleAccessMode | "RW" | "RO";
   tenantKey?: string | null;
   workspaceKey?: string | null;
   groupKey?: string | null;
@@ -1305,6 +1309,7 @@ type AdminRoleAssignmentInput = {
 
 type ResolvedAdminRoleScope = {
   role: AdminRole;
+  accessMode: AdminRoleAccessMode;
   tenantId: string | null;
   workspaceId: string | null;
   groupKey: string | null;
@@ -1584,6 +1589,34 @@ const normalizeAdminRole = (value: unknown): AdminRole => {
   }
 
   return value as AdminRole;
+};
+
+const normalizeAdminRoleAccessMode = (
+  value: unknown,
+  role: AdminRole
+): AdminRoleAccessMode => {
+  const normalized = value === undefined ? "read_write" : value;
+  const accessMode =
+    normalized === "RW"
+      ? "read_write"
+      : normalized === "RO"
+        ? "read_only"
+        : normalized;
+  if (accessMode !== "read_write" && accessMode !== "read_only") {
+    throw new FirstSliceError(
+      400,
+      "admin_role_access_mode_invalid",
+      "Admin role accessMode must be 'read_write', 'read_only', 'RW', or 'RO'."
+    );
+  }
+  if (accessMode === "read_only" && role !== "workspace_admin") {
+    throw new FirstSliceError(
+      400,
+      "admin_role_access_mode_invalid",
+      "Read-only access is only supported for workspace admin role assignments."
+    );
+  }
+  return accessMode;
 };
 
 const normalizeOptionalScopeKey = (value: unknown, fieldName: string): string | null => {
@@ -2734,9 +2767,12 @@ const listAdminRoleAssignmentsForUser = async (
   repository: FirstSliceRepository,
   adminUserId: string
 ): Promise<AdminRoleAssignment[]> =>
-  (await repository.listAdminRoleAssignmentsByUserId(adminUserId)).sort(
-    (left, right) => left.createdAt.localeCompare(right.createdAt)
-  );
+  (await repository.listAdminRoleAssignmentsByUserId(adminUserId))
+    .map(roleAssignment => ({
+      ...roleAssignment,
+      accessMode: roleAssignment.accessMode ?? "read_write"
+    }))
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 
 const requireActiveAdminSession = async (
   repository: FirstSliceRepository,
@@ -3178,6 +3214,7 @@ const resolveAdminRoleScope = async (
   input: AdminRoleAssignmentInput
 ): Promise<ResolvedAdminRoleScope> => {
   const role = normalizeAdminRole(input.role);
+  const accessMode = normalizeAdminRoleAccessMode(input.accessMode, role);
   const tenantKey = normalizeOptionalScopeKey(input.tenantKey, "tenantKey");
   const workspaceKey = normalizeOptionalScopeKey(input.workspaceKey, "workspaceKey");
   const groupKey = normalizeOptionalScopeKey(input.groupKey, "groupKey");
@@ -3206,6 +3243,7 @@ const resolveAdminRoleScope = async (
 
     return {
       role,
+      accessMode,
       tenantId: null,
       workspaceId: null,
       groupKey: null,
@@ -3233,6 +3271,7 @@ const resolveAdminRoleScope = async (
     const tenant = await requireTenant(repository, tenantKey);
     return {
       role,
+      accessMode,
       tenantId: tenant.tenantId,
       workspaceId: null,
       groupKey: null,
@@ -3265,6 +3304,7 @@ const resolveAdminRoleScope = async (
   }
   return {
     role,
+    accessMode,
     tenantId: workspace.tenantId,
     workspaceId: workspace.workspaceId,
     groupKey: role === "group_monitor" ? groupKey : null,
@@ -3286,6 +3326,7 @@ const summarizeAdminRoleAssignment = (
 ): Record<string, string | null> => ({
   roleAssignmentId: roleAssignment.roleAssignmentId,
   role: roleAssignment.role,
+  accessMode: roleAssignment.accessMode,
   tenantId: roleAssignment.tenantId,
   workspaceId: roleAssignment.workspaceId,
   groupKey: roleAssignment.groupKey,
@@ -15707,6 +15748,7 @@ export const createFirstSliceServices = (
           roleAssignmentId: idGenerator(),
           adminUserId: adminUser.adminUserId,
           role: "platform_admin",
+          accessMode: "read_write",
           tenantId: null,
           workspaceId: null,
           groupKey: null,
@@ -16058,6 +16100,7 @@ export const createFirstSliceServices = (
             roleAssignmentId: idGenerator(),
             adminUserId: adminUser.adminUserId,
             role: scope.role,
+            accessMode: scope.accessMode,
             tenantId: scope.tenantId,
             workspaceId: scope.workspaceId,
             groupKey: scope.groupKey,
@@ -16190,14 +16233,22 @@ export const createFirstSliceServices = (
         const existingRoleAssignment = existingRoleAssignments.find(roleAssignment =>
           isSameAdminRoleScope(roleAssignment, scope)
         );
-        if (existingRoleAssignment && input.monitorProfiles === undefined) {
+        if (
+          existingRoleAssignment &&
+          input.monitorProfiles === undefined &&
+          input.accessMode === undefined
+        ) {
           return { adminUser, roleAssignments: existingRoleAssignments };
         }
 
         if (existingRoleAssignment) {
           const updatedRoleAssignment: AdminRoleAssignment = {
             ...existingRoleAssignment,
-            monitorProfiles: scope.monitorProfiles
+            accessMode: scope.accessMode,
+            monitorProfiles:
+              input.monitorProfiles === undefined
+                ? existingRoleAssignment.monitorProfiles
+                : scope.monitorProfiles
           };
           await repository.saveAdminRoleAssignment(updatedRoleAssignment);
           const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
@@ -16218,6 +16269,7 @@ export const createFirstSliceServices = (
           roleAssignmentId: idGenerator(),
           adminUserId: adminUser.adminUserId,
           role: scope.role,
+          accessMode: scope.accessMode,
           tenantId: scope.tenantId,
           workspaceId: scope.workspaceId,
           groupKey: scope.groupKey,

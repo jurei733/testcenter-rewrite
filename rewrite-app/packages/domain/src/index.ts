@@ -8,6 +8,7 @@ export type AdminRole =
   | "study_monitor"
   | "group_monitor"
   | "system_check";
+export type AdminRoleAccessMode = "read_write" | "read_only";
 export type AdminAuditEventType =
   | "admin_user_bootstrapped"
   | "admin_sign_in_failed"
@@ -430,6 +431,7 @@ export type AdminRoleAssignment = {
   roleAssignmentId: string;
   adminUserId: string;
   role: AdminRole;
+  accessMode: AdminRoleAccessMode;
   tenantId: string | null;
   workspaceId: string | null;
   groupKey: string | null;

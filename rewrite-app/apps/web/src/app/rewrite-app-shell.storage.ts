@@ -1,6 +1,7 @@
 import type { AppView, PersistedShellState } from "./rewrite-app-shell.types";
 import type {
   AdminRole,
+  AdminRoleAccessMode,
   AdminSessionStatus,
   AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
@@ -108,6 +109,7 @@ export type ShellPersistenceTarget = {
   adminCreateUsername: string;
   adminCreateDisplayName: string;
   adminCreateRole: AdminRole;
+  adminCreateAccessMode: AdminRoleAccessMode;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
@@ -117,6 +119,7 @@ export type ShellPersistenceTarget = {
   adminCreateValidForMinutes: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
+  adminRoleAccessMode: AdminRoleAccessMode;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
@@ -235,6 +238,7 @@ export const createPersistedShellState = (
   adminCreateUsername: target.adminCreateUsername,
   adminCreateDisplayName: target.adminCreateDisplayName,
   adminCreateRole: target.adminCreateRole,
+  adminCreateAccessMode: target.adminCreateAccessMode,
   adminCreateTenantKey: target.adminCreateTenantKey,
   adminCreateWorkspaceKey: target.adminCreateWorkspaceKey,
   adminCreateGroupKey: target.adminCreateGroupKey,
@@ -244,6 +248,7 @@ export const createPersistedShellState = (
   adminCreateValidForMinutes: target.adminCreateValidForMinutes,
   adminRoleTargetUserId: target.adminRoleTargetUserId,
   adminRoleRole: target.adminRoleRole,
+  adminRoleAccessMode: target.adminRoleAccessMode,
   adminRoleTenantKey: target.adminRoleTenantKey,
   adminRoleWorkspaceKey: target.adminRoleWorkspaceKey,
   adminRoleGroupKey: target.adminRoleGroupKey,
@@ -648,6 +653,8 @@ export const applyHydratedShellState = (
       target.adminCreateDisplayName
     );
   target.adminCreateRole = snapshot.adminCreateRole ?? target.adminCreateRole;
+  target.adminCreateAccessMode =
+    snapshot.adminCreateAccessMode ?? target.adminCreateAccessMode;
   target.adminCreateTenantKey =
     hydrateString(snapshot.adminCreateTenantKey, target.adminCreateTenantKey);
   target.adminCreateWorkspaceKey =
@@ -676,6 +683,8 @@ export const applyHydratedShellState = (
   target.adminRoleTargetUserId =
     hydrateString(snapshot.adminRoleTargetUserId, target.adminRoleTargetUserId);
   target.adminRoleRole = snapshot.adminRoleRole ?? target.adminRoleRole;
+  target.adminRoleAccessMode =
+    snapshot.adminRoleAccessMode ?? target.adminRoleAccessMode;
   target.adminRoleTenantKey =
     hydrateString(snapshot.adminRoleTenantKey, target.adminRoleTenantKey);
   target.adminRoleWorkspaceKey =

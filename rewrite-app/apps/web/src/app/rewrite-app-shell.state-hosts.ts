@@ -708,6 +708,12 @@ export function createShellPersistenceStateHost(args: {
     set adminCreateRole(nextValue) {
       args.opsState.adminCreateRole = nextValue;
     },
+    get adminCreateAccessMode() {
+      return args.opsState.adminCreateAccessMode;
+    },
+    set adminCreateAccessMode(nextValue) {
+      args.opsState.adminCreateAccessMode = nextValue;
+    },
     get adminCreateTenantKey() {
       return args.opsState.adminCreateTenantKey;
     },
@@ -761,6 +767,12 @@ export function createShellPersistenceStateHost(args: {
     },
     set adminRoleRole(nextValue) {
       args.opsState.adminRoleRole = nextValue;
+    },
+    get adminRoleAccessMode() {
+      return args.opsState.adminRoleAccessMode;
+    },
+    set adminRoleAccessMode(nextValue) {
+      args.opsState.adminRoleAccessMode = nextValue;
     },
     get adminRoleTenantKey() {
       return args.opsState.adminRoleTenantKey;

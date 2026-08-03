@@ -50,6 +50,7 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(adminUser?.firstSignedInAt, null);
       const [roleAssignment] =
         await repository.listAdminRoleAssignmentsByUserId("admin-user-id");
+      assert.equal(roleAssignment?.accessMode, "read_write");
       assert.deepEqual(roleAssignment?.monitorProfiles, []);
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });

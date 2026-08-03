@@ -104,6 +104,8 @@ const mapAdminRoleAssignment = (
         roleAssignmentId: String(row.role_assignment_id),
         adminUserId: String(row.admin_user_id),
         role: row.role as AdminRoleAssignment["role"],
+        accessMode:
+          row.access_mode === "read_only" ? "read_only" : "read_write",
         tenantId:
           row.tenant_id === null || row.tenant_id === undefined
             ? null
@@ -565,7 +567,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 36;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 37;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -1061,6 +1063,13 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE test_runs ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    version: 37,
+    name: "add_admin_role_access_mode",
+    sql: `
+      ALTER TABLE admin_role_assignments ADD COLUMN access_mode TEXT NOT NULL DEFAULT 'read_write';
+    `
   }
 ];
 
@@ -1233,7 +1242,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const rows = database
         .prepare(
-          `SELECT role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
+          `SELECT role_assignment_id, admin_user_id, role, access_mode, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
            FROM admin_role_assignments
            WHERE admin_user_id = ?`
         )
@@ -1246,11 +1255,12 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_role_assignments (
-            role_assignment_id, admin_user_id, role, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            role_assignment_id, admin_user_id, role, access_mode, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(role_assignment_id) DO UPDATE SET
             admin_user_id = excluded.admin_user_id,
             role = excluded.role,
+            access_mode = excluded.access_mode,
             tenant_id = excluded.tenant_id,
             workspace_id = excluded.workspace_id,
             group_key = excluded.group_key,
@@ -1261,6 +1271,7 @@ export const createSqliteFirstSliceRepository = (
           roleAssignment.roleAssignmentId,
           roleAssignment.adminUserId,
           roleAssignment.role,
+          roleAssignment.accessMode,
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
           roleAssignment.groupKey,

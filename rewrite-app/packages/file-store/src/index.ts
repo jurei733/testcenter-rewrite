@@ -227,6 +227,7 @@ export const createFileFirstSliceRepository = (
         .filter(roleAssignment => roleAssignment.adminUserId === adminUserId)
         .map(roleAssignment => ({
           ...roleAssignment,
+          accessMode: roleAssignment.accessMode ?? "read_write",
           groupKey: roleAssignment.groupKey ?? null,
           monitorProfiles: Array.isArray(roleAssignment.monitorProfiles)
             ? roleAssignment.monitorProfiles

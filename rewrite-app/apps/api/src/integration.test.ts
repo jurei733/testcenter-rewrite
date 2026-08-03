@@ -749,6 +749,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     roleAssignments: Array<{
       roleAssignmentId: string;
       role: string;
+      accessMode: string;
       tenantId: string | null;
       workspaceId: string | null;
     }>;
@@ -778,6 +779,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(createdAdminUser.body.adminUser.passwordHash, undefined);
   assert.equal(createdAdminUser.body.roleAssignments.length, 1);
   assert.equal(createdAdminUser.body.roleAssignments[0]?.role, "workspace_admin");
+  assert.equal(createdAdminUser.body.roleAssignments[0]?.accessMode, "read_write");
   assert.equal(typeof createdAdminUser.body.roleAssignments[0]?.tenantId, "string");
   assert.equal(
     typeof createdAdminUser.body.roleAssignments[0]?.workspaceId,
@@ -954,7 +956,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.ok(firstLoginWindowSignIn.body.sessionToken.length > 20);
 
   const duplicateRoleAssignment = await requestJson<{
-    roleAssignments: Array<{ role: string }>;
+    roleAssignments: Array<{ role: string; accessMode: string }>;
   }>(
     `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments`,
     {
@@ -964,6 +966,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       },
       body: {
         role: "workspace_admin",
+        accessMode: "RO",
         tenantKey: adminTenantKey,
         workspaceKey: adminWorkspaceKey
       }
@@ -976,6 +979,36 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       roleAssignment => roleAssignment.role === "workspace_admin"
     ).length,
     1
+  );
+  assert.equal(
+    duplicateRoleAssignment.body.roleAssignments.find(
+      roleAssignment => roleAssignment.role === "workspace_admin"
+    )?.accessMode,
+    "read_only"
+  );
+
+  const restoredWriteRoleAssignment = await requestJson<{
+    roleAssignments: Array<{ role: string; accessMode: string }>;
+  }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/role-assignments`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        role: "workspace_admin",
+        accessMode: "RW",
+        tenantKey: adminTenantKey,
+        workspaceKey: adminWorkspaceKey
+      }
+    }
+  );
+  assert.equal(
+    restoredWriteRoleAssignment.body.roleAssignments.find(
+      roleAssignment => roleAssignment.role === "workspace_admin"
+    )?.accessMode,
+    "read_write"
   );
 
   const assignedTenantRole = await requestJson<{
@@ -1937,6 +1970,93 @@ test("operator API can require a platform-admin bearer session", async () => {
       "auth-required-workspace"
     );
 
+    const readOnlyWorkspaceAdmin = await requestJsonAt<{
+      adminUser: { username: string };
+      roleAssignments: Array<{ role: string; accessMode: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Workspace.Read.Only",
+        password: "workspace-read-only-secret",
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            accessMode: "RO",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace"
+          }
+        ]
+      }
+    });
+    assert.equal(readOnlyWorkspaceAdmin.status, 201);
+    assert.equal(
+      readOnlyWorkspaceAdmin.body.roleAssignments[0]?.accessMode,
+      "read_only"
+    );
+
+    const readOnlySignIn = await requestJsonAt<{
+      sessionToken: string;
+      roleAssignments: Array<{ accessMode: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "workspace.read.only",
+        password: "workspace-read-only-secret"
+      }
+    });
+    assert.equal(readOnlySignIn.status, 200);
+    assert.equal(readOnlySignIn.body.roleAssignments[0]?.accessMode, "read_only");
+    const readOnlyHeaders = {
+      authorization: `Bearer ${readOnlySignIn.body.sessionToken}`
+    };
+
+    const readOnlyOverview = await requestJsonAt<{
+      workspaceOverview: { workspace: { workspaceKey: string } };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      { headers: readOnlyHeaders }
+    );
+    assert.equal(readOnlyOverview.status, 200);
+
+    const readOnlySourcePackages = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages",
+      { headers: readOnlyHeaders }
+    );
+    assert.equal(readOnlySourcePackages.status, 200);
+
+    const rejectedWriteByReadOnlyAdmin = await requestJsonAt<{
+      error: string;
+      details: { requiredAccessMode: string; scope: string };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-packages",
+      {
+        method: "POST",
+        headers: readOnlyHeaders,
+        body: {
+          fileName: "read-only-denied.xml",
+          mediaType: "application/xml",
+          sourceDocument: "<assessment />"
+        }
+      }
+    );
+    assert.equal(rejectedWriteByReadOnlyAdmin.status, 403);
+    assert.equal(
+      rejectedWriteByReadOnlyAdmin.body.error,
+      "admin_write_role_required"
+    );
+    assert.equal(
+      rejectedWriteByReadOnlyAdmin.body.details.requiredAccessMode,
+      "read_write"
+    );
+    assert.equal(
+      rejectedWriteByReadOnlyAdmin.body.details.scope,
+      "workspace:auth-required-tenant/auth-required-workspace"
+    );
+
     const rejectedWorkspaceListByWorkspaceAdmin = await requestJsonAt<{
       error: string;
     }>(
@@ -2030,6 +2150,31 @@ test("operator API can require a platform-admin bearer session", async () => {
     assert.equal(
       rejectedProfilesOnAdminRole.body.error,
       "admin_monitor_profiles_invalid"
+    );
+
+    const rejectedReadOnlyTenantAdmin = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          username: "read.only.tenant.admin",
+          password: "read-only-tenant-secret",
+          roleAssignments: [
+            {
+              role: "tenant_admin",
+              accessMode: "RO",
+              tenantKey: "auth-required-tenant"
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(rejectedReadOnlyTenantAdmin.status, 400);
+    assert.equal(
+      rejectedReadOnlyTenantAdmin.body.error,
+      "admin_role_access_mode_invalid"
     );
 
     const groupMonitor = await requestJsonAt<{

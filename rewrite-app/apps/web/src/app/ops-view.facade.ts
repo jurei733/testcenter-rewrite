@@ -14,6 +14,7 @@ import type {
 import {
   adminAuditEventTypes,
   type AdminRole,
+  type AdminRoleAccessMode,
   type AdminSessionStatus,
   type AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
@@ -117,6 +118,13 @@ export class OpsViewFacade {
     "workspace_admin",
     "tenant_admin",
     "platform_admin"
+  ];
+  readonly adminRoleAccessModeOptions: Array<{
+    value: AdminRoleAccessMode;
+    label: string;
+  }> = [
+    { value: "read_write", label: "Read and write (RW)" },
+    { value: "read_only", label: "Read only (RO)" }
   ];
   readonly adminStatusOptions: AdminUserStatus[] = ["active", "disabled"];
   readonly adminSessionStatusOptions: AdminSessionStatus[] = [
@@ -770,6 +778,7 @@ export class OpsViewFacade {
               .map(roleAssignment =>
                 [
                   roleAssignment.role,
+                  roleAssignment.accessMode,
                   roleAssignment.tenantId ?? "platform",
                   roleAssignment.workspaceId ?? "all-workspaces",
                   roleAssignment.groupKey ?? "all-groups",
@@ -807,6 +816,7 @@ export class OpsViewFacade {
         subline: item.adminUser.username,
         badges: [
           item.adminUser.status,
+          roleAssignment.accessMode,
           roleAssignment.workspaceId
             ? "workspace-scope"
             : roleAssignment.tenantId
@@ -824,6 +834,10 @@ export class OpsViewFacade {
           {
             label: "Role Assignment ID",
             value: roleAssignment.roleAssignmentId
+          },
+          {
+            label: "Access Mode",
+            value: roleAssignment.accessMode
           },
           {
             label: "Tenant ID",

@@ -62,11 +62,13 @@
   <ng-template #operatorShell>
     <section class="hero">
       <div class="hero-panel">
-        <span class="eyebrow">{{ app.isMonitorOnlySession ? app.operatorAccessLabel : "Rewrite App Frontend Start" }}</span>
-        <h1>{{ app.isMonitorOnlySession ? "Monitor The Active Test Session." : "Operate The First Slice Without Leaving The Browser." }}</h1>
+        <span class="eyebrow">{{ app.isMonitorOnlySession || app.isReadOnlyAdminSession ? app.operatorAccessLabel : "Rewrite App Frontend Start" }}</span>
+        <h1>{{ app.isMonitorOnlySession ? "Monitor The Active Test Session." : app.isReadOnlyAdminSession ? "Inspect The Workspace Without Changing It." : "Operate The First Slice Without Leaving The Browser." }}</h1>
         <p class="lead">
           {{ app.isMonitorOnlySession
             ? "This console is limited to the assigned monitor scope and exposes only live runs and permitted monitor controls."
+            : app.isReadOnlyAdminSession
+              ? "This workspace administrator session can inspect operational data and exports. Changes require an RW role assignment."
             : "This Angular app now runs as routed frontend surface for workspace setup, content intake, participant runtime, and operator diagnostics." }}
         </p>
         <section

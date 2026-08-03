@@ -67,6 +67,10 @@ export class AppShellFacade {
     return this.operatorAccess.isMonitorOnly;
   }
 
+  get isReadOnlyAdminSession(): boolean {
+    return this.operatorAccess.isReadOnlyAdmin;
+  }
+
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
   }

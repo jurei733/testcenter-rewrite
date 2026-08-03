@@ -1,5 +1,6 @@
 import type {
   AdminRole,
+  AdminRoleAccessMode,
   AdminSessionStatus,
   AdminUserStatus
 } from "@testcenter-rewrite-app/domain";
@@ -48,6 +49,7 @@ export interface ShellOpsState {
   adminCreateDisplayName: string;
   adminCreatePassword: string;
   adminCreateRole: AdminRole;
+  adminCreateAccessMode: AdminRoleAccessMode;
   adminCreateTenantKey: string;
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
@@ -57,6 +59,7 @@ export interface ShellOpsState {
   adminCreateValidForMinutes: string;
   adminRoleTargetUserId: string;
   adminRoleRole: AdminRole;
+  adminRoleAccessMode: AdminRoleAccessMode;
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
@@ -275,6 +278,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateDisplayName: "Workspace Admin",
     adminCreatePassword: "",
     adminCreateRole: "workspace_admin",
+    adminCreateAccessMode: "read_write",
     adminCreateTenantKey: "demo-tenant",
     adminCreateWorkspaceKey: "demo-workspace",
     adminCreateGroupKey: "group:student-demo",
@@ -284,6 +288,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateValidForMinutes: "",
     adminRoleTargetUserId: "",
     adminRoleRole: "workspace_admin",
+    adminRoleAccessMode: "read_write",
     adminRoleTenantKey: "demo-tenant",
     adminRoleWorkspaceKey: "demo-workspace",
     adminRoleGroupKey: "group:student-demo",

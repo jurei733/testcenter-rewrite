@@ -150,6 +150,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             </select>
           </label>
           <label>
+            Initial Access Mode
+            <select id="adminCreateAccessMode" name="adminCreateAccessMode" [(ngModel)]="view.ops.adminCreateAccessMode" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'workspace_admin'">
+              <option *ngFor="let option of view.adminRoleAccessModeOptions" [value]="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+          <label>
             Initial Tenant Key
             <input id="adminCreateTenantKey" name="adminCreateTenantKey" [(ngModel)]="view.ops.adminCreateTenantKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole === 'platform_admin'" />
           </label>
@@ -201,6 +207,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Role To Assign
             <select id="adminRoleRole" name="adminRoleRole" [(ngModel)]="view.ops.adminRoleRole" (change)="view.persistState()">
               <option *ngFor="let role of view.adminRoleOptions" [ngValue]="role">{{ role }}</option>
+            </select>
+          </label>
+          <label>
+            Role Access Mode
+            <select id="adminRoleAccessMode" name="adminRoleAccessMode" [(ngModel)]="view.ops.adminRoleAccessMode" (change)="view.persistState()" [disabled]="view.ops.adminRoleRole !== 'workspace_admin'">
+              <option *ngFor="let option of view.adminRoleAccessModeOptions" [value]="option.value">{{ option.label }}</option>
             </select>
           </label>
           <label>

@@ -1866,22 +1866,22 @@ const resolveOperatorAccessScope = (
   return null;
 };
 
-const hasOperatorAccess = async (
+const resolveOperatorAdminAccess = async (
   repository: FirstSliceRepository,
   roleAssignments: AdminRoleAssignment[],
   scope: OperatorAccessScope
-): Promise<boolean> => {
+): Promise<AdminRoleAssignment["accessMode"] | null> => {
   if (roleAssignments.some(roleAssignment => roleAssignment.role === "platform_admin")) {
-    return true;
+    return "read_write";
   }
 
   if (scope.kind === "platform") {
-    return false;
+    return null;
   }
 
   const tenant = await repository.getTenantByKey(scope.tenantKey);
   if (!tenant) {
-    return false;
+    return null;
   }
 
   if (
@@ -1891,11 +1891,11 @@ const hasOperatorAccess = async (
         roleAssignment.tenantId === tenant.tenantId
     )
   ) {
-    return true;
+    return "read_write";
   }
 
   if (scope.kind === "tenant") {
-    return false;
+    return null;
   }
 
   const workspace = await repository.getWorkspaceByScope(
@@ -1903,14 +1903,22 @@ const hasOperatorAccess = async (
     scope.workspaceKey
   );
   if (!workspace) {
-    return false;
+    return null;
   }
 
-  return roleAssignments.some(
+  const workspaceAdminAssignments = roleAssignments.filter(
     roleAssignment =>
       roleAssignment.role === "workspace_admin" &&
       roleAssignment.workspaceId === workspace.workspaceId
   );
+  if (
+    workspaceAdminAssignments.some(
+      roleAssignment => roleAssignment.accessMode !== "read_only"
+    )
+  ) {
+    return "read_write";
+  }
+  return workspaceAdminAssignments.length > 0 ? "read_only" : null;
 };
 
 const hasSystemCheckAccess = async (input: {
@@ -3922,6 +3930,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           sessionToken,
           adminUserId,
           role: body.role,
+          accessMode: body.accessMode,
           tenantKey: body.tenantKey,
           workspaceKey: body.workspaceKey,
           groupKey: body.groupKey,
@@ -3991,19 +4000,20 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         const { roleAssignments } = await services.adminAuth.getCurrentSession({
           sessionToken
         });
-        const hasAdminAccess = operatorAccessScope
-          ? await hasOperatorAccess(
+        const adminAccessMode = operatorAccessScope
+          ? await resolveOperatorAdminAccess(
               runtime.repository,
               roleAssignments,
               operatorAccessScope
             )
-          : false;
+          : null;
+        const requiresWriteAccess = request.method !== "GET";
         const monitorRouteScope = resolveMonitorRouteScope(
           request.method,
           pathname
         );
         const monitorAccess =
-          !hasAdminAccess &&
+          adminAccessMode !== "read_write" &&
           operatorAccessScope?.kind === "workspace" &&
           monitorRouteScope
             ? await resolveMonitorOperatorAccess({
@@ -4014,7 +4024,25 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
                 routeScope: monitorRouteScope
               })
             : null;
-        if (!operatorAccessScope || (!hasAdminAccess && !monitorAccess)) {
+        if (
+          operatorAccessScope &&
+          requiresWriteAccess &&
+          adminAccessMode === "read_only" &&
+          !monitorAccess
+        ) {
+          sendError(
+            response,
+            403,
+            "admin_write_role_required",
+            "The admin session has read-only access to this workspace.",
+            {
+              requiredAccessMode: "read_write",
+              scope: describeOperatorAccessScope(operatorAccessScope)
+            }
+          );
+          return;
+        }
+        if (!operatorAccessScope || (!adminAccessMode && !monitorAccess)) {
           sendError(
             response,
             403,
@@ -4036,7 +4064,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         if (monitorRouteScope) {
           monitorOperatorAccessByRequest.set(
             request,
-            hasAdminAccess ? { kind: "full" } : monitorAccess!
+            adminAccessMode ? { kind: "full" } : monitorAccess!
           );
         }
       }
@@ -6555,12 +6583,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
                   }
                   const { roleAssignments } =
                     await services.adminAuth.getCurrentSession({ sessionToken });
-                  const hasAdminAccess = await hasOperatorAccess(
+                  const adminAccessMode = await resolveOperatorAdminAccess(
                     runtime.repository,
                     roleAssignments,
                     { kind: "workspace", tenantKey, workspaceKey }
                   );
-                  const monitorAccess = hasAdminAccess
+                  const monitorAccess = adminAccessMode
                     ? { kind: "full" as const }
                     : await resolveMonitorOperatorAccess({
                         repository: runtime.repository,

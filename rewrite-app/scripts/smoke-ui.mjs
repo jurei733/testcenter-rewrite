@@ -9,6 +9,8 @@ import { brotliDecompressSync } from "node:zlib";
 import { chromium } from "playwright";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
+const operatorAuthRequired =
+  process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true";
 const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
 const skipRuntimeCsvExports = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_SKIP_RUNTIME_CSV_EXPORTS ?? "").toLowerCase()
@@ -729,7 +731,7 @@ try {
         buildRef !== "unknown"
       );
     },
-    [port, process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true" ? "required" : "open"],
+    [port, operatorAuthRequired ? "required" : "open"],
     { timeout: 15_000 }
   );
   logStep("offline-app-shell");
@@ -1572,6 +1574,7 @@ try {
   await fillAndCommit("#adminCreateDisplayName", "UI Workspace Admin");
   await fillAndCommit("#adminCreatePassword", workspaceAdminPassword);
   await selectAndCommit("#adminCreateRole", "workspace_admin");
+  await selectAndCommit("#adminCreateAccessMode", "read_only");
   await fillAndCommit("#adminCreateTenantKey", tenantKey);
   await fillAndCommit("#adminCreateWorkspaceKey", workspaceKey);
   const workspaceAdminUsername = (
@@ -1596,7 +1599,9 @@ try {
           item?.adminUser?.status === "active" &&
           Array.isArray(item?.roleAssignments) &&
           item.roleAssignments.some(
-            roleAssignment => roleAssignment?.role === "workspace_admin"
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_only"
           )
       )
   );
@@ -1614,6 +1619,7 @@ try {
     })
     .filter({ hasText: workspaceAdminUsername })
     .filter({ hasText: "workspace_admin" })
+    .filter({ hasText: "read_only" })
     .waitFor();
 
   await fillAndCommit("#adminRoleTargetUserId", workspaceAdminUserId);
@@ -1774,6 +1780,76 @@ try {
     }
   );
   assert.equal(resetWorkspaceAdminPasswordSignIn.status, 200);
+  const resetWorkspaceAdminPasswordPayload =
+    await resetWorkspaceAdminPasswordSignIn.json();
+  assert.equal(
+    resetWorkspaceAdminPasswordPayload.roleAssignments.find(
+      roleAssignment => roleAssignment?.role === "workspace_admin"
+    )?.accessMode,
+    "read_only"
+  );
+
+  logStep("read-only-workspace-admin");
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommitUntilValue("#adminUsername", workspaceAdminUsername);
+  await fillAndCommitUntilValue("#adminPassword", workspaceAdminResetPassword);
+  const readOnlyAdminSignInResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/sign-in")
+  );
+  await clickAction("Sign In");
+  const readOnlyAdminSignInResponse = await readOnlyAdminSignInResponsePromise;
+  assert.equal(readOnlyAdminSignInResponse.status(), 200);
+  await waitForInputMinLength("#adminSessionToken", 20);
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Operator Session" }) })
+    .filter({ hasText: "workspace_admin" })
+    .filter({ hasText: "Active access: Read-only workspace administrator" })
+    .waitFor();
+  await page
+    .locator(".hero-panel")
+    .filter({ hasText: "Inspect The Workspace Without Changing It." })
+    .filter({ hasText: "Changes require an RW role assignment." })
+    .waitFor();
+  if (operatorAuthRequired) {
+    await page.locator('[data-view-nav="content"]').click();
+    await page.waitForURL(/\/app\/content$/);
+    await page.locator("#createSourcePackageButton").waitFor();
+    await fillAndCommit("#sourceFileName", "read-only-denied.xml");
+    await fillAndCommit("#sourceMediaType", "application/xml");
+    await fillAndCommit("#sourceDocument", "<assessment />");
+    const deniedReadOnlyWriteResponsePromise = page.waitForResponse(
+      response =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(
+          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`
+        )
+    );
+    await clickAction("Create Source Package");
+    const deniedReadOnlyWriteResponse = await deniedReadOnlyWriteResponsePromise;
+    assert.equal(deniedReadOnlyWriteResponse.status(), 403);
+    assert.equal(
+      (await deniedReadOnlyWriteResponse.json()).error,
+      "admin_write_role_required"
+    );
+    await page
+      .locator(".status-banner.is-error")
+      .filter({ hasText: "read-only access" })
+      .waitFor();
+  }
+  await page.locator('[data-view-nav="ops"]').click();
+  await page.waitForURL(/\/app\/ops$/);
+  await clickAction("Sign Out");
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommitUntilValue("#adminUsername", adminUsername);
+  await fillAndCommitUntilValue("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  stopAfter("read-only-workspace-admin");
 
   await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminStatusValue", "disabled");
