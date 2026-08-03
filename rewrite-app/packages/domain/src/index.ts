@@ -1055,6 +1055,8 @@ export type ParticipantCurrentRunState = {
     canPlayerEnd: boolean;
     backwardDeniedReasons: BookletNavigationDeniedReason[];
     forwardDeniedReasons: BookletNavigationDeniedReason[];
+    backwardAdvisoryReasons: BookletNavigationDeniedReason[];
+    forwardAdvisoryReasons: BookletNavigationDeniedReason[];
     nextTestletGate: {
       testletKey: string;
       displayLabel: string;

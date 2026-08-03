@@ -3577,6 +3577,7 @@ try {
   const veronaTestletKey = "testlet:verona-protected";
   const veronaTestletCode = "open-verona";
   const veronaLoginKey = "student-verona-smoke";
+  const veronaAdvisoryLoginKey = "student-verona-advisory";
   const expectedVeronaResourceContent =
     'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
   const expectedVeronaResourceRange = expectedVeronaResourceContent.slice(5, 20);
@@ -3823,6 +3824,13 @@ try {
               booklet_msgNavigationDeniedText_responsesIncomplete:
                 "Answer the project task before continuing."
             }
+          },
+          {
+            loginKey: veronaAdvisoryLoginKey,
+            groupKey: "group:verona-smoke",
+            bookletKey: veronaBookletKey,
+            displayName: "Verona Advisory Participant",
+            executionMode: "run-trial"
           }
         ]
       }
@@ -4288,6 +4296,45 @@ try {
     await resumedVeronaFrame.locator("#playerStartPage").textContent(),
     "page-1"
   );
+
+  logStep("participant-test-mode-navigation-advisory");
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey,
+      workspaceKey,
+      loginKey: veronaAdvisoryLoginKey,
+      bookletKey: veronaBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  const advisoryVeronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await advisoryVeronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-trial" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#participantRouteCompleteButton");
+  const acceptAdvisoryCompletionDialog = dialog => dialog.accept();
+  page.on("dialog", acceptAdvisoryCompletionDialog);
+  try {
+    await page.locator("#participantRouteCompleteButton").click();
+  } finally {
+    page.off("dialog", acceptAdvisoryCompletionDialog);
+  }
+  await page
+    .locator("#participantRouteNavigationNoticeTitle")
+    .filter({ hasText: "Test mode: navigation remains available" })
+    .waitFor();
+  await page
+    .locator("#participantRouteNavigationNotice")
+    .filter({ hasText: "In an enforced test, this action would be blocked." })
+    .filter({ hasText: "Complete the required response" })
+    .waitFor();
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "completed" })
+    .waitFor({ timeout: 15_000 });
+  stopAfter("participant-test-mode-navigation-advisory");
 
   logStep("participant-original-verona-player");
   const originalAdaptiveLoginKey = "student-original-adaptive-smoke";

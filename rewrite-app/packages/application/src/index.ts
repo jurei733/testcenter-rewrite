@@ -12753,22 +12753,30 @@ const resolveBookletNavigationState = (
           : "none";
   const restrictionsBypassed =
     testRun.monitorNavigationUnlocked || !executionMode.forceNaviRestrictions;
+  const backwardCompletenessReasons = bookletNavigationDeniedReasons({
+    policy: completenessPolicy,
+    direction: "backward",
+    presentationProgress,
+    responseProgress
+  });
+  const forwardCompletenessReasons = bookletNavigationDeniedReasons({
+    policy: completenessPolicy,
+    direction: "forward",
+    presentationProgress,
+    responseProgress
+  });
   const backwardDeniedReasons = restrictionsBypassed
     ? []
-    : bookletNavigationDeniedReasons({
-        policy: completenessPolicy,
-        direction: "backward",
-        presentationProgress,
-        responseProgress
-      });
+    : [...backwardCompletenessReasons];
   const forwardDeniedReasons = restrictionsBypassed
     ? []
-    : bookletNavigationDeniedReasons({
-        policy: completenessPolicy,
-        direction: "forward",
-        presentationProgress,
-        responseProgress
-      });
+    : [...forwardCompletenessReasons];
+  const backwardAdvisoryReasons = executionMode.forceNaviRestrictions
+    ? []
+    : backwardCompletenessReasons;
+  const forwardAdvisoryReasons = executionMode.forceNaviRestrictions
+    ? []
+    : forwardCompletenessReasons;
   const isUnitInaccessible = (unitKey: string | null): boolean =>
     executionMode.forceNaviRestrictions &&
     (isUnitLeaveLocked(booklet, testRun, unitKey) ||
@@ -12865,6 +12873,8 @@ const resolveBookletNavigationState = (
     canPlayerEnd,
     backwardDeniedReasons,
     forwardDeniedReasons,
+    backwardAdvisoryReasons,
+    forwardAdvisoryReasons,
     nextTestletGate
   };
 };

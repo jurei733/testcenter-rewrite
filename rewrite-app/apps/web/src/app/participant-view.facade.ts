@@ -292,6 +292,11 @@ export class ParticipantViewFacade {
   private veronaForegroundSaveSettlement = false;
   private veronaSaveBufferTimeout: number | null = null;
   private veronaSaveBufferDueAtMs: number | null = null;
+  private readonly navigationAdvisory = signal<{
+    title: string;
+    message: string;
+  } | null>(null);
+  private navigationAdvisoryTimeout: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
   };
@@ -321,6 +326,7 @@ export class ParticipantViewFacade {
     );
     globalThis.window?.removeEventListener("online", this.onlineListener);
     this.clearVeronaSaveBuffer();
+    this.clearNavigationAdvisory();
   }
 
   persistState(): void {
@@ -715,6 +721,8 @@ export class ParticipantViewFacade {
                 )
         }
       : null;
+    const navigationDenial = this.describeNavigationDenial(currentState);
+    const navigationAdvisory = this.navigationAdvisory();
 
     return {
       headline: unitLabel,
@@ -793,15 +801,15 @@ export class ParticipantViewFacade {
       hasUnsavedResponse,
       navigationNoticeTitle: policy.display.silentMode
         ? ""
-        : this.describeNavigationDenial(currentState)
+        : navigationDenial
           ? this.customText(
               "booklet_msgNavigationDeniedTitle",
               "This unit cannot be left yet"
             )
-          : "",
+          : navigationAdvisory?.title ?? "",
       navigationNotice: policy.display.silentMode
         ? ""
-        : this.describeNavigationDenial(currentState),
+        : navigationDenial || navigationAdvisory?.message || "",
       nextTestletGate: currentState.navigation.nextTestletGate,
       testletTimer,
       timerLifecycleEvent,
@@ -1045,18 +1053,31 @@ export class ParticipantViewFacade {
         "This test is currently paused."
       );
     }
-    const reasons = currentState.navigation.forwardDeniedReasons;
+    return this.describeNavigationReasons(
+      currentState.navigation.forwardDeniedReasons
+    );
+  }
+
+  private describeNavigationReasons(reasons: readonly string[]): string {
+    const messages: string[] = [];
     if (reasons.includes("presentation_incomplete")) {
-      return this.customText(
-        "booklet_msgNavigationDeniedText_presentationIncomplete",
-        "View all required unit content before moving forward or completing the test."
+      messages.push(
+        this.customText(
+          "booklet_msgNavigationDeniedText_presentationIncomplete",
+          "View all required unit content before moving forward or completing the test."
+        )
       );
     }
     if (reasons.includes("response_incomplete")) {
-      return this.customText(
-        "booklet_msgNavigationDeniedText_responsesIncomplete",
-        "Complete the required response before moving forward or completing the test."
+      messages.push(
+        this.customText(
+          "booklet_msgNavigationDeniedText_responsesIncomplete",
+          "Complete the required response before moving forward or completing the test."
+        )
       );
+    }
+    if (messages.length > 0) {
+      return messages.join(" ");
     }
     if (reasons.includes("testlet_code_required")) {
       return "Enter the block code before opening the next block.";
@@ -1083,6 +1104,41 @@ export class ParticipantViewFacade {
       );
     }
     return "";
+  }
+
+  private presentNavigationAdvisory(
+    direction: "forward" | "backward"
+  ): void {
+    this.clearNavigationAdvisory();
+    const currentState = this.readCurrentRunState();
+    if (!currentState || currentState.booklet.policy.display.silentMode) {
+      return;
+    }
+    const reasons =
+      direction === "backward"
+        ? currentState.navigation.backwardAdvisoryReasons ?? []
+        : currentState.navigation.forwardAdvisoryReasons ?? [];
+    const detail = this.describeNavigationReasons(reasons);
+    if (!detail) {
+      return;
+    }
+    this.navigationAdvisory.set({
+      title: "Test mode: navigation remains available",
+      message: `In an enforced test, this action would be blocked. ${detail}`
+    });
+    this.navigationAdvisoryTimeout =
+      globalThis.window?.setTimeout(() => {
+        this.navigationAdvisoryTimeout = null;
+        this.navigationAdvisory.set(null);
+      }, 8_000) ?? null;
+  }
+
+  private clearNavigationAdvisory(): void {
+    if (this.navigationAdvisoryTimeout != null) {
+      globalThis.window?.clearTimeout(this.navigationAdvisoryTimeout);
+      this.navigationAdvisoryTimeout = null;
+    }
+    this.navigationAdvisory.set(null);
   }
 
   private startTimerTicker(): void {
@@ -1643,6 +1699,7 @@ export class ParticipantViewFacade {
       return;
     }
 
+    this.presentNavigationAdvisory("backward");
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("previous"));
   }
 
@@ -1651,6 +1708,7 @@ export class ParticipantViewFacade {
       return;
     }
 
+    this.presentNavigationAdvisory("forward");
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal("next"));
   }
 
@@ -1659,6 +1717,16 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const currentState = this.readCurrentRunState();
+    const currentIndex =
+      currentState?.bookletUnits.findIndex(
+        unit => unit.unitKey === currentState.currentUnit.unitKey
+      ) ?? -1;
+    const targetIndex =
+      currentState?.bookletUnits.findIndex(unit => unit.unitKey === unitKey) ?? -1;
+    this.presentNavigationAdvisory(
+      targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward"
+    );
     this.viewState.onActionAsync(() => this.goToPlayerUnitInternal(unitKey));
   }
 
@@ -1716,6 +1784,7 @@ export class ParticipantViewFacade {
     ) {
       return;
     }
+    this.presentNavigationAdvisory("forward");
     this.viewState.onActionAsync(() =>
       this.completeRunInternal(
         confirmTestletTimeLeave,

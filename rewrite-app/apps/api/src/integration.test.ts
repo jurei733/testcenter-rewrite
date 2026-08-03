@@ -17955,6 +17955,9 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
             <Id>${bookletKey}</Id>
             <Label>Execution Modes</Label>
           </Metadata>
+          <BookletConfig>
+            <Config key="force_response_complete">ON</Config>
+          </BookletConfig>
           <States>
             <State id="route" label="Adaptive Route">
               <Option id="alternate" label="Alternate">
@@ -18081,6 +18084,12 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
           overrideOptionKey: string | null;
         }>;
         bookletUnits: Array<{ unitKey: string }>;
+        navigation: {
+          backwardDeniedReasons: string[];
+          forwardDeniedReasons: string[];
+          backwardAdvisoryReasons: string[];
+          forwardAdvisoryReasons: string[];
+        };
       };
     }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
     assert.equal(state.status, 200);
@@ -18118,6 +18127,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   });
   assert.deepEqual(demo.testRun.unlockedTestletKeys, [protectedTestletKey]);
   assert.deepEqual(demo.testRun.testletTimers, {});
+  assert.deepEqual(demo.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(demo.currentRunState.navigation.forwardAdvisoryReasons, [
+    "response_incomplete"
+  ]);
   assert.equal(
     demo.currentRunState.availableActions.includes("change_state_options"),
     true
@@ -18220,6 +18233,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(review.currentRunState.booklet.policy.timing.showTimeLeft, true);
   assert.deepEqual(review.testRun.unlockedTestletKeys, [protectedTestletKey]);
   assert.deepEqual(review.testRun.testletTimers, {});
+  assert.deepEqual(review.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(review.currentRunState.navigation.forwardAdvisoryReasons, [
+    "response_incomplete"
+  ]);
   assert.equal(review.currentRunState.availableActions.includes("review"), true);
   assert.equal(
     review.currentRunState.availableActions.includes("change_state_options"),
@@ -18451,6 +18468,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     true
   );
   assert.equal(trial.currentRunState.booklet.policy.timing.showTimeLeft, true);
+  assert.deepEqual(trial.currentRunState.navigation.forwardDeniedReasons, []);
+  assert.deepEqual(trial.currentRunState.navigation.forwardAdvisoryReasons, [
+    "response_incomplete"
+  ]);
   const trialSave = await requestJson<{
     testRun: {
       currentUnitKey: string | null;
@@ -18518,6 +18539,7 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     "booklet_navigation_denied"
   );
   assert.deepEqual(blockedSimulationNavigation.body.details?.deniedReasons, [
+    "response_incomplete",
     "testlet_code_required"
   ]);
 
