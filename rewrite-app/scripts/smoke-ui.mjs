@@ -4825,6 +4825,323 @@ try {
   );
   stopAfter("participant-verona-player");
 
+  logStep("participant-original-booklet-config");
+  const bookletConfigTenantKey = `${tenantKey}-booklet-config`;
+  const bookletConfigWorkspaceKey = `${workspaceKey}-booklet-config`;
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: bookletConfigTenantKey,
+      displayName: "UI Original Booklet Config Tenant"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: bookletConfigWorkspaceKey,
+        displayName: "UI Original Booklet Config Workspace"
+      }
+    }
+  );
+  const bookletConfigFixtures = [
+    {
+      fixture: "booklets/system-test/CY_Bklt_BkltConfig_1.xml",
+      bookletKey: "Cy-Bklt_BkltConfig-1"
+    },
+    {
+      fixture: "booklets/CY_Bklt_BkltConfig_2.xml",
+      bookletKey: "Cy-Bklt_BkltConfig-2"
+    },
+    {
+      fixture: "booklets/system-test/CY_Bklt_BkltConfig_3.xml",
+      bookletKey: "Cy-Bklt_BkltConfig-3"
+    },
+    {
+      fixture: "booklets/system-test/CY_Bklt_BkltConfig_4.xml",
+      bookletKey: "Cy-Bklt_BkltConfig-4"
+    }
+  ];
+  const bookletConfigUnitFixtures = [
+    {
+      fixture: "units/CY_Unit101.xml",
+      unitKey: "CY-Unit.Sample-101"
+    },
+    {
+      fixture: "units/CY_Unit102.xml",
+      unitKey: "CY-Unit.Sample-102"
+    },
+    {
+      fixture: "units/CY_Unit104.xml",
+      unitKey: "CY-Unit.Sample-104"
+    }
+  ];
+  const bookletConfigPlayerFixture = "players/verona-player-simple-6.0.html";
+  const bookletConfigPlayerKey = "verona-player-simple-6.0";
+  const originalCorpusRoot = resolve("test-fixtures/original-testcenter");
+  const [
+    bookletConfigDocuments,
+    bookletConfigUnitDocuments,
+    bookletConfigPlayerDocument,
+    bookletConfigRosterBase64
+  ] = await Promise.all([
+    Promise.all(
+      bookletConfigFixtures.map(async fixture => ({
+        ...fixture,
+        content: await readFile(
+          resolve(originalCorpusRoot, fixture.fixture),
+          "utf8"
+        )
+      }))
+    ),
+    Promise.all(
+      bookletConfigUnitFixtures.map(async fixture => ({
+        ...fixture,
+        content: await readFile(
+          resolve(originalCorpusRoot, fixture.fixture),
+          "utf8"
+        )
+      }))
+    ),
+    readFile(resolve(originalCorpusRoot, bookletConfigPlayerFixture), "utf8"),
+    readFile(
+      resolve(originalCorpusRoot, "rosters/CY_Logins_BkltConfig.xml.base64"),
+      "utf8"
+    )
+  ]);
+  const bookletConfigManifestResources = [
+    ...bookletConfigFixtures.map(
+      fixture =>
+        `<resource identifier="${fixture.bookletKey}" href="${fixture.fixture}" />`
+    ),
+    ...bookletConfigUnitFixtures.map(
+      fixture =>
+        `<resource identifier="${fixture.unitKey}" href="${fixture.fixture}" />`
+    ),
+    `<resource identifier="${bookletConfigPlayerKey}" href="${bookletConfigPlayerFixture}" />`
+  ].join("\n");
+  const bookletConfigZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>${bookletConfigManifestResources}</resources>
+        </manifest>
+      `
+    },
+    ...bookletConfigDocuments.map(document => ({
+      fileName: `export/${document.fixture}`,
+      content: document.content
+    })),
+    ...bookletConfigUnitDocuments.map(document => ({
+      fileName: `export/${document.fixture}`,
+      content: document.content
+    })),
+    {
+      fileName: `export/${bookletConfigPlayerFixture}`,
+      content: bookletConfigPlayerDocument
+    }
+  ]);
+  const bookletConfigSourcePackageResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "original-booklet-config-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${bookletConfigZip.toString("base64")}`
+      }
+    }
+  );
+  const bookletConfigSourcePackagePayload =
+    await bookletConfigSourcePackageResponse.json();
+  const bookletConfigImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          bookletConfigSourcePackagePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const bookletConfigImportPayload = await bookletConfigImportResponse.json();
+  const bookletConfigReleaseId =
+    bookletConfigImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    bookletConfigReleaseId,
+    `Original Booklet Config browser import should stage a release: ${JSON.stringify(
+      bookletConfigImportPayload.importJob?.diagnostics ?? []
+    )}`
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/content-releases/${bookletConfigReleaseId}/activate`,
+    { body: {} }
+  );
+  const bookletConfigRosterResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${bookletConfigTenantKey}/workspaces/${bookletConfigWorkspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: Buffer.from(
+          bookletConfigRosterBase64.trim(),
+          "base64"
+        ).toString("utf8")
+      }
+    }
+  );
+  const bookletConfigRosterPayload = await bookletConfigRosterResponse.json();
+  assert.deepEqual(
+    bookletConfigRosterPayload.items.map(item => [
+      item.loginKey,
+      item.bookletKey,
+      item.passwordRequired
+    ]),
+    [
+      ["Bklt_Config-1", "Cy-Bklt_BkltConfig-1", true],
+      ["Bklt_Config-2", "Cy-Bklt_BkltConfig-2", true],
+      ["Bklt_Config-3", "Cy-Bklt_BkltConfig-3", true],
+      ["Bklt_Config-4", "Cy-Bklt_BkltConfig-4", true]
+    ]
+  );
+  const openOriginalBookletConfig = async (loginKey, bookletKey) => {
+    const signInResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/auth/sign-in`,
+      {
+        body: {
+          tenantKey: bookletConfigTenantKey,
+          workspaceKey: bookletConfigWorkspaceKey,
+          loginKey,
+          password: "123"
+        }
+      }
+    );
+    const signInPayload = await signInResponse.json();
+    const participantSessionId =
+      signInPayload.participantSession?.participantSessionId;
+    assert.ok(participantSessionId, `${loginKey} should create a session.`);
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
+      { body: { bookletKey } }
+    );
+    await page.goto(
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+        participantSessionId
+      )}`,
+      { waitUntil: "networkidle" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: "API 6.0" })
+      .waitFor({ timeout: 30_000 });
+    const playerFrame = page.frameLocator("#participantVeronaPlayerFrame");
+    await playerFrame.locator("#end-unit").waitFor({ timeout: 15_000 });
+    return { participantSessionId, playerFrame };
+  };
+
+  const configTwoBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-2",
+    "Cy-Bklt_BkltConfig-2"
+  );
+  await page.locator("#participantRouteFullscreenPrompt").waitFor();
+  await page.locator("#participantRouteDismissFullscreenButton").click();
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteUnit").count(), 0);
+  await page.locator("#participantRouteFullscreenButton").waitFor();
+  await page.locator("#participantRouteUnitRail").waitFor();
+  assert.equal(
+    await page.locator("#participantRoutePreviousUnitButton").count(),
+    0
+  );
+  assert.equal(
+    await page.locator("#participantRouteNextUnitButton").count(),
+    0
+  );
+  await page.locator("#participantRouteTestletTimerValue").waitFor();
+  assert.equal(
+    await configTwoBrowser.playerFrame.locator("#end-unit").isDisabled(),
+    true
+  );
+
+  const configThreeBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-3",
+    "Cy-Bklt_BkltConfig-3"
+  );
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Bklt-config-3" })
+    .waitFor();
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  assert.equal(
+    await configThreeBrowser.playerFrame.locator("#end-unit").isDisabled(),
+    true
+  );
+  assert.equal(
+    await page.locator("#participantRouteTestletTimerValue").count(),
+    0
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "cpy" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe2" })
+    .waitFor();
+  assert.equal(
+    await configThreeBrowser.playerFrame.locator("#end-unit").isEnabled(),
+    true
+  );
+
+  const configFourBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-4",
+    "Cy-Bklt_BkltConfig-4"
+  );
+  await page
+    .locator("#participantRouteScreenHeader")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+  await page
+    .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  await page.locator("#participantRouteNextUnitButton").waitFor();
+  assert.equal(
+    await configFourBrowser.playerFrame.locator("#end-unit").isEnabled(),
+    true
+  );
+
+  const configOneBrowser = await openOriginalBookletConfig(
+    "Bklt_Config-1",
+    "Cy-Bklt_BkltConfig-1"
+  );
+  await page.locator("#participantRouteUnit").waitFor();
+  assert.equal(await page.locator("#participantRouteScreenHeader").count(), 0);
+  assert.equal(
+    await page.locator("#participantRouteFullscreenPrompt").count(),
+    0
+  );
+  assert.equal(
+    await page.locator("#participantRouteFullscreenButton").count(),
+    0
+  );
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  assert.equal(
+    await page.locator("#participantRouteTestletTimerValue").count(),
+    0
+  );
+  await page.locator("#participantRouteNextUnitButton").waitFor();
+  assert.equal(
+    await configOneBrowser.playerFrame.locator("#end-unit").isEnabled(),
+    true
+  );
+  stopAfter("participant-original-booklet-config");
+
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
