@@ -63,15 +63,15 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       <article class="card">
         <h2>Workspace Setup</h2>
         <div class="actions">
-          <button id="createTenantButton" class="primary" type="button" [disabled]="!view.canUseTenantScope" (click)="view.createTenant()">Create Tenant</button>
-          <button id="createWorkspaceButton" class="secondary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.createWorkspace()">Create Workspace</button>
+          <button id="createTenantButton" class="primary" type="button" [disabled]="!view.canCreateTenant" (click)="view.createTenant()">Create Tenant</button>
+          <button id="createWorkspaceButton" class="secondary" type="button" [disabled]="!view.canCreateWorkspace" (click)="view.createWorkspace()">Create Workspace</button>
           <button id="refreshWorkspaceOverviewButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshWorkspaceOverview()">Refresh Workspace Overview</button>
           <button id="exportWorkspaceOverviewCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportWorkspaceOverviewCsv()">Export Workspace Overview CSV</button>
           <button id="refreshStudyMonitorButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshStudyMonitor()">Refresh Study Monitor</button>
-          <button id="refreshTenantDirectoryButton" class="ghost" type="button" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
-          <button id="exportTenantDirectoryCsvButton" class="ghost" type="button" (click)="view.exportTenantDirectoryCsv()">Export Tenant Directory CSV</button>
-          <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
-          <button id="exportWorkspaceDirectoryCsvButton" class="ghost" type="button" [disabled]="!view.canUseTenantScope" (click)="view.exportWorkspaceDirectoryCsv()">Export Workspace Directory CSV</button>
+          <button id="refreshTenantDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseDirectoryScope" (click)="view.refreshTenantDirectory()">Refresh Tenant Directory</button>
+          <button id="exportTenantDirectoryCsvButton" class="ghost" type="button" [disabled]="!view.canUseDirectoryScope" (click)="view.exportTenantDirectoryCsv()">Export Tenant Directory CSV</button>
+          <button id="refreshWorkspaceDirectoryButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceDirectoryScope" (click)="view.refreshWorkspaceDirectory()">Refresh Workspace Directory</button>
+          <button id="exportWorkspaceDirectoryCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceDirectoryScope" (click)="view.exportWorkspaceDirectoryCsv()">Export Workspace Directory CSV</button>
           <button id="exportStudyMonitorCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorCsv()">Export Study Monitor CSV</button>
           <button id="exportParticipantMatrixCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportStudyMonitorParticipantMatrixCsv()">Export Participant Matrix CSV</button>
           <button id="exportStudyMonitorRunCsvButton" class="ghost" type="button" [disabled]="!view.canExportStudyMonitorRunCsv" (click)="view.exportStudyMonitorRunCsv()">Export Run Detail CSV</button>

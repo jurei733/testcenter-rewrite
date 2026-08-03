@@ -102,15 +102,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
-          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Pause</button>
-          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Resume</button>
+          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">Pause</button>
+          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">Resume</button>
           <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Unit</button>
-          <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
-          <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
-          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockTest()">Unlock Test</button>
-          <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
+          <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
+          <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
+          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">Unlock Test</button>
+          <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
-          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Complete</button>
+          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">Complete</button>
         </div>
       </article>
 
@@ -186,7 +186,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <div class="actions">
               <button id="runtimeParticipantSignInButton" class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantSignIn()">Sign In</button>
               <button id="runtimeParticipantLaunchButton" class="primary" type="button" [disabled]="!view.canUseParticipantLoginActions" (click)="view.participantLaunch()">Start Participant</button>
-              <button id="runtimeResumeSessionButton" class="secondary" type="button" [disabled]="!view.canUseParticipantSessionActions" (click)="view.resumeSession()">Resume Session</button>
+              <button id="runtimeResumeSessionButton" class="secondary" type="button" [disabled]="!view.canResumeParticipantSession" (click)="view.resumeSession()">Resume Session</button>
               <button id="runtimeRefreshRuntimeReadsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshRuntimeReads()">Refresh Runtime Reads</button>
             </div>
           </section>
@@ -202,15 +202,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <section class="action-group">
             <span>Monitor Control</span>
             <div class="actions">
-              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
-              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
-              <button id="runtimeMonitorLockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockTest()">Monitor Lock Test</button>
-              <button id="runtimeMonitorUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockTest()">Monitor Unlock Test</button>
-              <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
-              <button id="runtimeMonitorLockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Monitor Lock Navigation</button>
+              <button id="runtimeMonitorLockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockTest()">Monitor Lock Test</button>
+              <button id="runtimeMonitorUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">Monitor Unlock Test</button>
+              <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
+              <button id="runtimeMonitorLockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockNavigation()">Monitor Lock Navigation</button>
               <button id="runtimeMonitorSetTestletTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Monitor Set Testlet Time</button>
-              <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
+              <button class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">Monitor Complete</button>
               <button id="runtimeOpenRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.openRuns()">Monitor Open Runs</button>
               <button id="runtimeExportOpenRunsCsvButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs CSV</button>
             </div>

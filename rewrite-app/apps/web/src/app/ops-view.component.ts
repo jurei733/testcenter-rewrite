@@ -60,13 +60,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminBootstrapOrSignInButton" *ngIf="!view.isMonitorOnlySession" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-          <button id="adminBootstrapButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
+          <button id="adminBootstrapOrSignInButton" *ngIf="view.canUseAdminManagement" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
+          <button id="adminBootstrapButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
           <button id="adminSignInButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.signInAdmin()">Sign In</button>
           <button id="adminCurrentSessionButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSession()">Current Session</button>
-          <button id="adminSessionsButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
-          <button id="adminUsersButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminUsers()">Admin Users</button>
-          <button id="adminAuditEventsButton" *ngIf="!view.isMonitorOnlySession" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
+          <button id="adminSessionsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
+          <button id="adminUsersButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminUsers()">Admin Users</button>
+          <button id="adminAuditEventsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
           <button id="adminSignOutButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.signOutAdmin()">Sign Out</button>
         </div>
       </article>
@@ -78,7 +78,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Bootstrap or sign in to inspect the admin session."
       ></app-record-collection>
 
-      <ng-container *ngIf="!view.isMonitorOnlySession">
+      <ng-container *ngIf="view.canUseAdminManagement">
 
       <article class="card">
         <h2>Admin Session Filters</h2>

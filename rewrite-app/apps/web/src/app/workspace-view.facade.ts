@@ -38,6 +38,7 @@ import {
 } from "./participant-session-links";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
@@ -46,6 +47,7 @@ import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 export class WorkspaceViewFacade {
   private readonly contentService = inject(RewriteAppContentService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly router = inject(Router);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
@@ -2311,6 +2313,22 @@ export class WorkspaceViewFacade {
     return this.canUseTenantScope && this.workspace.workspaceKey.trim() !== "";
   }
 
+  get canCreateTenant(): boolean {
+    return !this.operatorAccess.isReadOnlyAdmin && this.canUseTenantScope;
+  }
+
+  get canCreateWorkspace(): boolean {
+    return !this.operatorAccess.isReadOnlyAdmin && this.canUseWorkspaceScope;
+  }
+
+  get canUseDirectoryScope(): boolean {
+    return !this.operatorAccess.isReadOnlyAdmin;
+  }
+
+  get canUseWorkspaceDirectoryScope(): boolean {
+    return this.canUseDirectoryScope && this.canUseTenantScope;
+  }
+
   persistState(): void {
     this.viewState.persistShellState();
   }
@@ -2320,14 +2338,14 @@ export class WorkspaceViewFacade {
   }
 
   createTenant(): void {
-    if (!this.canUseTenantScope) {
+    if (!this.canCreateTenant) {
       return;
     }
     this.viewState.onActionAsync(() => this.workspaceService.createTenant());
   }
 
   createWorkspace(): void {
-    if (!this.canUseWorkspaceScope) {
+    if (!this.canCreateWorkspace) {
       return;
     }
     this.viewState.onActionAsync(() => this.workspaceService.createWorkspace());
@@ -2637,11 +2655,14 @@ export class WorkspaceViewFacade {
   }
 
   refreshTenantDirectory(): void {
+    if (!this.canUseDirectoryScope) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.refreshTenantDirectory());
   }
 
   refreshWorkspaceDirectory(): void {
-    if (!this.canUseTenantScope) {
+    if (!this.canUseWorkspaceDirectoryScope) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2650,13 +2671,16 @@ export class WorkspaceViewFacade {
   }
 
   exportTenantDirectoryCsv(): void {
+    if (!this.canUseDirectoryScope) {
+      return;
+    }
     this.viewState.onActionAsync(() =>
       this.workspaceService.exportTenantDirectoryCsv()
     );
   }
 
   exportWorkspaceDirectoryCsv(): void {
-    if (!this.canUseTenantScope) {
+    if (!this.canUseWorkspaceDirectoryScope) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2736,7 +2760,7 @@ export class WorkspaceViewFacade {
   runWorkspaceSuggestion(item: RecordCollectionItem): void {
     switch (item.actionPayload?.workspaceCommand) {
       case "bootstrapWorkspace":
-        if (!this.canUseWorkspaceScope) {
+        if (!this.canCreateWorkspace) {
           return;
         }
         this.viewState.onActionAsync(() => this.workspaceService.bootstrapWorkspaceFlow());

@@ -142,6 +142,12 @@ export class OpsViewFacade {
     return this.operatorAccess.isMonitorOnly;
   }
 
+  get canUseAdminManagement(): boolean {
+    return (
+      this.operatorAccess.mode === "signed_out" || this.operatorAccess.mode === "admin"
+    );
+  }
+
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
   }
@@ -159,6 +165,7 @@ export class OpsViewFacade {
 
   get canCreateAdminUser(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.ops.adminCreatePassword !== "" &&
@@ -224,6 +231,7 @@ export class OpsViewFacade {
 
   get canRevokeAdminSession(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminSessionRevokeTargetId.trim() !== ""
     );
@@ -231,6 +239,7 @@ export class OpsViewFacade {
 
   get canAssignAdminRole(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminRoleTargetUserId.trim() !== "" &&
       this.isScopedAdminRoleInputComplete(
@@ -244,6 +253,7 @@ export class OpsViewFacade {
 
   get canRevokeAdminRole(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminRevokeTargetUserId.trim() !== "" &&
       this.ops.adminRevokeRoleAssignmentId.trim() !== ""
@@ -252,6 +262,7 @@ export class OpsViewFacade {
 
   get canResetAdminUserPassword(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminResetTargetUserId.trim() !== "" &&
       this.ops.adminResetPassword !== ""
@@ -260,6 +271,7 @@ export class OpsViewFacade {
 
   get canUpdateAdminUserStatus(): boolean {
     return (
+      this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminStatusTargetUserId.trim() !== "" &&
       this.adminStatusOptions.includes(this.ops.adminStatusValue)

@@ -2022,7 +2022,11 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatch(): boolean {
-    return this.canUseWorkspaceScope && this.monitorBatchCount > 0;
+    return (
+      this.canIssueMonitorCommands &&
+      this.canUseWorkspaceScope &&
+      this.monitorBatchCount > 0
+    );
   }
 
   get canIssueMonitorBatchGoto(): boolean {
@@ -2523,7 +2527,11 @@ export class RuntimeViewFacade {
   }
 
   get canUseParticipantLoginActions(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.loginKey.trim().length > 0;
+    return (
+      this.canWriteWorkspace &&
+      this.canUseWorkspaceScope &&
+      this.runtime.loginKey.trim().length > 0
+    );
   }
 
   get canUseWorkspaceScope(): boolean {
@@ -2540,8 +2548,32 @@ export class RuntimeViewFacade {
     );
   }
 
+  get canResumeParticipantSession(): boolean {
+    return this.canWriteWorkspace && this.canUseParticipantSessionActions;
+  }
+
+  get canWriteWorkspace(): boolean {
+    return !this.operatorAccess.isReadOnlyAdmin;
+  }
+
+  get canIssueMonitorCommands(): boolean {
+    return this.canWriteWorkspace || this.operatorAccess.hasMonitorRole;
+  }
+
   get canUseRunActions(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.testRunId.trim().length > 0;
+    return (
+      this.canWriteWorkspace &&
+      this.canUseWorkspaceScope &&
+      this.runtime.testRunId.trim().length > 0
+    );
+  }
+
+  get canUseMonitorRunActions(): boolean {
+    return (
+      this.canIssueMonitorCommands &&
+      this.canUseWorkspaceScope &&
+      this.runtime.testRunId.trim().length > 0
+    );
   }
 
   get canSaveProgressActions(): boolean {
@@ -2550,7 +2582,7 @@ export class RuntimeViewFacade {
 
   get canIssueMonitorGoto(): boolean {
     return (
-      this.canUseRunActions &&
+      this.canUseMonitorRunActions &&
       this.runtime.monitorTargetUnitKey.trim().length > 0
     );
   }
@@ -2574,15 +2606,27 @@ export class RuntimeViewFacade {
   }
 
   get canUseSelectedReviewActions(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.reviewId.trim().length > 0;
+    return (
+      this.canWriteWorkspace &&
+      this.canUseWorkspaceScope &&
+      this.runtime.reviewId.trim().length > 0
+    );
   }
 
   get canDeleteGroupResultsAction(): boolean {
-    return this.canUseWorkspaceScope && this.runtime.groupKey.trim().length > 0;
+    return (
+      this.canWriteWorkspace &&
+      this.canUseWorkspaceScope &&
+      this.runtime.groupKey.trim().length > 0
+    );
   }
 
   get canImportParticipantRoster(): boolean {
-    return this.canUseWorkspaceScope && this.parseEntryRosterRowsPreview().length > 0;
+    return (
+      this.canWriteWorkspace &&
+      this.canUseWorkspaceScope &&
+      this.parseEntryRosterRowsPreview().length > 0
+    );
   }
 
   get canGenerateEntryLinks(): boolean {
@@ -2616,7 +2660,7 @@ export class RuntimeViewFacade {
   }
 
   resumeSession(): void {
-    if (!this.canUseParticipantSessionActions) {
+    if (!this.canResumeParticipantSession) {
       return;
     }
     this.viewState.onActionAsync(() => this.runtimeService.resumeParticipantSession());
@@ -2903,7 +2947,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorPause(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2912,7 +2956,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorResume(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2921,7 +2965,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorComplete(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2939,7 +2983,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorLockTest(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2948,7 +2992,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorUnlockTest(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2957,7 +3001,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorUnlockNavigation(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -2966,7 +3010,7 @@ export class RuntimeViewFacade {
   }
 
   issueMonitorLockNavigation(): void {
-    if (!this.canUseRunActions) {
+    if (!this.canUseMonitorRunActions) {
       return;
     }
     this.viewState.onActionAsync(() =>
@@ -3014,7 +3058,13 @@ export class RuntimeViewFacade {
       | "set_testlet_time"
   ): void {
     const testRunIds = this.monitorBatchRunIds;
-    if (testRunIds.length === 0) {
+    const canIssueCommand =
+      commandType === "goto"
+        ? this.canIssueMonitorBatchGoto
+        : commandType === "set_testlet_time"
+          ? this.canIssueMonitorBatchTime
+          : this.canIssueMonitorBatch;
+    if (!canIssueCommand || testRunIds.length === 0) {
       return;
     }
     const targetDescription =

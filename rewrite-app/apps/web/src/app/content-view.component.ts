@@ -62,7 +62,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="createSourcePackageButton" class="primary" type="button" [disabled]="!view.canCreateSourcePackage" (click)="view.createSourcePackage()">Create Source Package</button>
           <button id="createImportJobButton" class="secondary" type="button" [disabled]="!view.canCreateImportJob" (click)="view.createImportJob()">Create Import Job</button>
-          <button id="activateContentReleaseButton" class="ghost" type="button" [disabled]="!view.canUseSelectedContentRelease" (click)="view.confirmActivateContentRelease()">Activate Release</button>
+          <button id="activateContentReleaseButton" class="ghost" type="button" [disabled]="!view.canActivateContentRelease" (click)="view.confirmActivateContentRelease()">Activate Release</button>
           <button id="refreshContentReadsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.refreshContentReads()">Refresh Content Reads</button>
           <button class="ghost" type="button" (click)="view.restoreDemoSource()">Restore Demo Source</button>
         </div>
@@ -428,9 +428,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <h2>Guided Flows</h2>
         <p>Run the narrow happy path quickly, or deliberately exercise the activation guard once a participant still has an open run.</p>
         <div class="actions">
-          <button class="primary" type="button" (click)="view.bootstrapWorkspaceFlow()">Bootstrap Workspace</button>
-          <button class="secondary" type="button" (click)="view.importActivateFlow()">Import And Activate</button>
-          <button class="ghost" type="button" (click)="view.blockedActivationFlow()">Attempt Blocked Activation</button>
+          <button id="bootstrapWorkspaceFlowButton" class="primary" type="button" [disabled]="!view.canUseGuidedWriteFlows" (click)="view.bootstrapWorkspaceFlow()">Bootstrap Workspace</button>
+          <button id="importActivateFlowButton" class="secondary" type="button" [disabled]="!view.canUseGuidedWriteFlows" (click)="view.importActivateFlow()">Import And Activate</button>
+          <button id="blockedActivationFlowButton" class="ghost" type="button" [disabled]="!view.canUseGuidedWriteFlows" (click)="view.blockedActivationFlow()">Attempt Blocked Activation</button>
         </div>
       </article>
 

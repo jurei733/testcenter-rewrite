@@ -1814,32 +1814,72 @@ try {
     .filter({ hasText: "Inspect The Workspace Without Changing It." })
     .filter({ hasText: "Changes require an RW role assignment." })
     .waitFor();
+  const readOnlyAdminSessionToken = await page
+    .locator("#adminSessionToken")
+    .inputValue();
+  assert.equal(
+    await page.getByRole("heading", { name: "Admin User Management" }).count(),
+    0
+  );
+  assert.equal(await page.locator("#adminSessionsButton").count(), 0);
+  assert.equal(await page.locator("#adminUsersButton").count(), 0);
+  assert.equal(await page.locator("#adminAuditEventsButton").count(), 0);
+
+  await page.locator('[data-view-nav="content"]').click();
+  await page.waitForURL(/\/app\/content$/);
+  await page.locator("#createSourcePackageButton").waitFor();
+  await fillAndCommit("#sourceFileName", "read-only-denied.xml");
+  await fillAndCommit("#sourceMediaType", "application/xml");
+  await fillAndCommit("#sourceDocument", "<assessment />");
+  await expectButtonSelectorDisabled("#createSourcePackageButton");
+  await expectButtonSelectorDisabled("#createImportJobButton");
+  await expectButtonSelectorDisabled("#activateContentReleaseButton");
+  await expectButtonSelectorDisabled("#assembleSourcePackagesButton");
+  await expectButtonSelectorDisabled("#bootstrapWorkspaceFlowButton");
+  await expectButtonSelectorDisabled("#importActivateFlowButton");
+  await expectButtonSelectorDisabled("#blockedActivationFlowButton");
+  await expectButtonSelectorEnabled("#refreshContentReadsButton");
+
   if (operatorAuthRequired) {
-    await page.locator('[data-view-nav="content"]').click();
-    await page.waitForURL(/\/app\/content$/);
-    await page.locator("#createSourcePackageButton").waitFor();
-    await fillAndCommit("#sourceFileName", "read-only-denied.xml");
-    await fillAndCommit("#sourceMediaType", "application/xml");
-    await fillAndCommit("#sourceDocument", "<assessment />");
-    const deniedReadOnlyWriteResponsePromise = page.waitForResponse(
-      response =>
-        response.request().method() === "POST" &&
-        response.url().endsWith(
-          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`
-        )
+    const deniedReadOnlyWriteResponse = await fetch(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${readOnlyAdminSessionToken}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          fileName: "read-only-denied.xml",
+          mediaType: "application/xml",
+          sourceDocument: "<assessment />"
+        })
+      }
     );
-    await clickAction("Create Source Package");
-    const deniedReadOnlyWriteResponse = await deniedReadOnlyWriteResponsePromise;
-    assert.equal(deniedReadOnlyWriteResponse.status(), 403);
+    assert.equal(deniedReadOnlyWriteResponse.status, 403);
     assert.equal(
       (await deniedReadOnlyWriteResponse.json()).error,
       "admin_write_role_required"
     );
-    await page
-      .locator(".status-banner.is-error")
-      .filter({ hasText: "read-only access" })
-      .waitFor();
   }
+
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await expectButtonSelectorDisabled("#createTenantButton");
+  await expectButtonSelectorDisabled("#createWorkspaceButton");
+  await expectButtonSelectorDisabled("#refreshTenantDirectoryButton");
+  await expectButtonSelectorDisabled("#exportTenantDirectoryCsvButton");
+  await expectButtonSelectorDisabled("#refreshWorkspaceDirectoryButton");
+  await expectButtonSelectorDisabled("#exportWorkspaceDirectoryCsvButton");
+  await expectButtonSelectorEnabled("#refreshWorkspaceOverviewButton");
+  await expectButtonSelectorEnabled("#exportWorkspaceOverviewCsvButton");
+
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  await expectButtonSelectorDisabled("#runtimeResumeSessionButton");
+  await expectButtonSelectorDisabled("#runtimeMonitorLockTestButton");
+  await expectButtonSelectorDisabled("#importParticipantRosterButton");
+
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
   await clickAction("Sign Out");

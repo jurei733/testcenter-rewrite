@@ -40,6 +40,16 @@ export class RewriteAppOperatorAccessService {
     return this.mode === "admin_read_only";
   }
 
+  get hasMonitorRole(): boolean {
+    const session = parseJsonDocument<OperatorSessionView>(
+      this.uiState.ops.adminSessionView
+    );
+    return (session?.roleAssignments ?? []).some(
+      assignment =>
+        assignment.role === "study_monitor" || assignment.role === "group_monitor"
+    );
+  }
+
   get monitorProfiles(): MonitorViewProfile[] {
     const session = parseJsonDocument<OperatorSessionView>(
       this.uiState.ops.adminSessionView

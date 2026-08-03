@@ -34,6 +34,7 @@ import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 
@@ -44,6 +45,7 @@ export class ContentViewFacade {
   private readonly contentService = inject(RewriteAppContentService);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly runtimeService = inject(RewriteAppRuntimeService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
   private readonly router = inject(Router);
@@ -74,8 +76,13 @@ export class ContentViewFacade {
     return this.isWorkspaceScopeComplete();
   }
 
+  get canWriteWorkspace(): boolean {
+    return !this.operatorAccess.isReadOnlyAdmin;
+  }
+
   get canCreateSourcePackage(): boolean {
     return (
+      this.canWriteWorkspace &&
       this.isWorkspaceScopeComplete() &&
       this.content.sourceFileName.trim() !== "" &&
       this.content.sourceMediaType.trim() !== "" &&
@@ -84,11 +91,16 @@ export class ContentViewFacade {
   }
 
   get canCreateImportJob(): boolean {
-    return this.isWorkspaceScopeComplete() && this.content.sourcePackageId.trim() !== "";
+    return (
+      this.canWriteWorkspace &&
+      this.isWorkspaceScopeComplete() &&
+      this.content.sourcePackageId.trim() !== ""
+    );
   }
 
   get canAssembleSourcePackages(): boolean {
     return (
+      this.canWriteWorkspace &&
       this.isWorkspaceScopeComplete() &&
       this.assemblyFileName.trim() !== "" &&
       this.assemblySourcePackageIds.size >= 2
@@ -122,7 +134,7 @@ export class ContentViewFacade {
   }
 
   get canDeleteSelectedSourcePackage(): boolean {
-    if (!this.canUseSelectedSourcePackage) {
+    if (!this.canWriteWorkspace || !this.canUseSelectedSourcePackage) {
       return false;
     }
     const selectedSourcePackageId = this.content.sourcePackageId.trim();
@@ -142,6 +154,14 @@ export class ContentViewFacade {
     return this.isWorkspaceScopeComplete() && this.content.contentReleaseId.trim() !== "";
   }
 
+  get canActivateContentRelease(): boolean {
+    return this.canWriteWorkspace && this.canUseSelectedContentRelease;
+  }
+
+  get canUseGuidedWriteFlows(): boolean {
+    return this.canWriteWorkspace && this.canUseWorkspaceScope;
+  }
+
   get canUseSelectedParticipantSession(): boolean {
     return (
       this.isWorkspaceScopeComplete() &&
@@ -151,6 +171,7 @@ export class ContentViewFacade {
 
   get canRetrySourcePackageImport(): boolean {
     return (
+      this.canWriteWorkspace &&
       this.canUseSelectedSourcePackage &&
       this.hasSelectedFailedSourcePackageContext() &&
       this.content.sourceFileName.trim() !== "" &&
@@ -2207,7 +2228,7 @@ export class ContentViewFacade {
 
   confirmActivateContentRelease(): void {
     const releaseId = this.content.contentReleaseId.trim();
-    if (!this.canUseSelectedContentRelease) {
+    if (!this.canActivateContentRelease) {
       return;
     }
     if (!this.content.forceActivation) {
@@ -2363,14 +2384,23 @@ export class ContentViewFacade {
   }
 
   bootstrapWorkspaceFlow(): void {
+    if (!this.canUseGuidedWriteFlows) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.workspaceService.bootstrapWorkspaceFlow());
   }
 
   importActivateFlow(): void {
+    if (!this.canUseGuidedWriteFlows) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.importActivateFlow());
   }
 
   blockedActivationFlow(): void {
+    if (!this.canUseGuidedWriteFlows) {
+      return;
+    }
     this.viewState.onActionAsync(() => this.contentService.blockedActivationFlow());
   }
 
