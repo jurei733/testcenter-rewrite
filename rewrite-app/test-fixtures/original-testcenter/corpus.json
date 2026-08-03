@@ -307,6 +307,38 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "bookletConfigPackages": [
+    {
+      "bookletKeys": [
+        "Cy-Bklt_BkltConfig-1",
+        "Cy-Bklt_BkltConfig-2",
+        "Cy-Bklt_BkltConfig-3",
+        "Cy-Bklt_BkltConfig-4"
+      ],
+      "units": [
+        ["units/CY_Unit101.xml", "CY-Unit.Sample-101"],
+        ["units/CY_Unit102.xml", "CY-Unit.Sample-102"],
+        ["units/CY_Unit104.xml", "CY-Unit.Sample-104"]
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_BkltConfig.xml.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/system-test/booklet-config/CY_Logins_BkltConfig.xml",
+        "sha256": "79f9069466c0623f7c62e644acbf6fd45a2c040ad44b585e6b8f51c24ac70bab",
+        "groupKey": "bklt-config",
+        "participants": [
+          ["Bklt_Config-1", "run-hot-restart", "Cy-Bklt_BkltConfig-1"],
+          ["Bklt_Config-2", "run-hot-restart", "Cy-Bklt_BkltConfig-2"],
+          ["Bklt_Config-3", "run-hot-restart", "Cy-Bklt_BkltConfig-3"],
+          ["Bklt_Config-4", "run-hot-restart", "Cy-Bklt_BkltConfig-4"]
+        ]
+      }
+    }
+  ],
   "testControllerPackages": [
     {
       "bookletKeys": [

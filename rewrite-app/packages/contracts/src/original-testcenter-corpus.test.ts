@@ -33,6 +33,23 @@ type OriginalTestcenterCorpus = {
     skipNetwork: boolean;
     canSave: boolean;
   }>;
+  bookletConfigPackages: Array<{
+    bookletKeys: string[];
+    units: Array<[fixture: string, unitKey: string]>;
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      encoding: "base64";
+      sourcePath: string;
+      sha256: string;
+      groupKey: string;
+      participants: Array<[
+        loginKey: string,
+        executionMode: string,
+        bookletKey: string
+      ]>;
+    };
+  }>;
   testControllerPackages: Array<{
     bookletKeys: string[];
     units: Array<[fixture: string, unitKey: string]>;
@@ -411,6 +428,49 @@ test("original Testcenter compatibility corpus pins the complete official Test C
     Array.from(new Set(participants.map(participant => participant.executionMode))).sort(),
     ["run-demo", "run-hot-restart", "run-hot-return", "run-review"]
   );
+});
+
+test("original Testcenter compatibility corpus pins the complete official Booklet Config roster", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const bookletConfig = corpus.bookletConfigPackages[0];
+  assert.ok(bookletConfig);
+  assert.deepEqual(
+    bookletConfig.bookletKeys,
+    Array.from(
+      { length: 4 },
+      (_, index) => `Cy-Bklt_BkltConfig-${index + 1}`
+    )
+  );
+  assert.deepEqual(
+    bookletConfig.units.map(([, unitKey]) => unitKey),
+    ["CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-104"]
+  );
+  assert.equal(bookletConfig.player.playerKey, "verona-player-simple-6.0");
+
+  const rosterBuffer = Buffer.from(
+    readFileSync(resolve(corpusRoot, bookletConfig.roster.fixture), "utf8").trim(),
+    bookletConfig.roster.encoding
+  );
+  assert.equal(
+    createHash("sha256").update(rosterBuffer).digest("hex"),
+    bookletConfig.roster.sha256,
+    bookletConfig.roster.sourcePath
+  );
+  const participants = parseParticipantRosterText(rosterBuffer.toString("utf8"));
+  assert.equal(participants.length, 4);
+  for (const [loginKey, executionMode, bookletKey] of
+    bookletConfig.roster.participants) {
+    const participant = participants.find(
+      candidate => candidate.loginKey === loginKey
+    );
+    assert.ok(participant, loginKey);
+    assert.equal(participant.groupKey, bookletConfig.roster.groupKey);
+    assert.equal(participant.executionMode, executionMode);
+    assert.equal(participant.bookletKey, bookletKey);
+    assert.equal(participant.password, "123");
+  }
 });
 
 test("original Testcenter compatibility corpus pins official session management semantics", () => {

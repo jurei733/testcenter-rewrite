@@ -8736,6 +8736,627 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus executes the complete official Booklet Config package", async () => {
+  type BookletExpectation = {
+    fixture: string;
+    bookletKey: string;
+    displayLabel: string;
+    unitKeys: string[];
+  };
+  type BookletConfigPackage = {
+    bookletKeys: string[];
+    units: Array<[fixture: string, unitKey: string]>;
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      encoding: "base64";
+      groupKey: string;
+      participants: Array<
+        [loginKey: string, executionMode: string, bookletKey: string]
+      >;
+    };
+  };
+  type RuntimePolicy = {
+    navigation: {
+      requirePresentationComplete: string;
+      requireResponseComplete: string;
+      unitMenuEnabled: boolean;
+      unitControls: string;
+      playerEnd: string;
+    };
+    player: {
+      logPolicy: string;
+      pagingMode: string;
+      restoreCurrentPageOnReturn: boolean;
+    };
+    completion: { lockOnTermination: boolean };
+    display: {
+      headerContent: string;
+      unitTitle: boolean;
+      fullscreenPrompt: boolean;
+      fullscreenButton: boolean;
+      reloadButton: boolean;
+      silentMode: boolean;
+    };
+    timing: { showTimeLeft: boolean; warningMinutes: number[] };
+  };
+  type TimerState = {
+    testletKey: string;
+    status: string;
+    durationSeconds: number;
+    remainingSeconds: number;
+    startedAt: string;
+    expiresAt: string | null;
+    updatedAt: string;
+    endedAt: string | null;
+  };
+
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    booklets: BookletExpectation[];
+    systemBooklets: BookletExpectation[];
+    bookletConfigPackages: BookletConfigPackage[];
+  };
+  const expectation = corpus.bookletConfigPackages[0];
+  assert.ok(expectation);
+  const bookletCorpus = [...corpus.booklets, ...corpus.systemBooklets];
+  const booklets = expectation.bookletKeys.map(bookletKey => {
+    const booklet = bookletCorpus.find(
+      candidate => candidate.bookletKey === bookletKey
+    );
+    assert.ok(booklet, `Missing official Booklet Config fixture ${bookletKey}`);
+    return booklet;
+  });
+  assert.equal(booklets.length, 4);
+
+  const expectedPolicies: Record<string, RuntimePolicy> = {
+    "Cy-Bklt_BkltConfig-1": {
+      navigation: {
+        requirePresentationComplete: "off",
+        requireResponseComplete: "off",
+        unitMenuEnabled: false,
+        unitControls: "both",
+        playerEnd: "always"
+      },
+      player: {
+        logPolicy: "rich",
+        pagingMode: "separate",
+        restoreCurrentPageOnReturn: false
+      },
+      completion: { lockOnTermination: false },
+      display: {
+        headerContent: "none",
+        unitTitle: true,
+        fullscreenPrompt: false,
+        fullscreenButton: false,
+        reloadButton: false,
+        silentMode: false
+      },
+      timing: { showTimeLeft: false, warningMinutes: [0.01] }
+    },
+    "Cy-Bklt_BkltConfig-2": {
+      navigation: {
+        requirePresentationComplete: "off",
+        requireResponseComplete: "off",
+        unitMenuEnabled: true,
+        unitControls: "hidden",
+        playerEnd: "never"
+      },
+      player: {
+        logPolicy: "rich",
+        pagingMode: "separate",
+        restoreCurrentPageOnReturn: true
+      },
+      completion: { lockOnTermination: true },
+      display: {
+        headerContent: "unit",
+        unitTitle: false,
+        fullscreenPrompt: true,
+        fullscreenButton: true,
+        reloadButton: false,
+        silentMode: false
+      },
+      timing: { showTimeLeft: true, warningMinutes: [1] }
+    },
+    "Cy-Bklt_BkltConfig-3": {
+      navigation: {
+        requirePresentationComplete: "off",
+        requireResponseComplete: "off",
+        unitMenuEnabled: false,
+        unitControls: "both",
+        playerEnd: "last_unit"
+      },
+      player: {
+        logPolicy: "rich",
+        pagingMode: "separate",
+        restoreCurrentPageOnReturn: false
+      },
+      completion: { lockOnTermination: false },
+      display: {
+        headerContent: "booklet",
+        unitTitle: true,
+        fullscreenPrompt: false,
+        fullscreenButton: false,
+        reloadButton: false,
+        silentMode: false
+      },
+      timing: { showTimeLeft: false, warningMinutes: [5, 1] }
+    },
+    "Cy-Bklt_BkltConfig-4": {
+      navigation: {
+        requirePresentationComplete: "off",
+        requireResponseComplete: "off",
+        unitMenuEnabled: false,
+        unitControls: "both",
+        playerEnd: "always"
+      },
+      player: {
+        logPolicy: "rich",
+        pagingMode: "separate",
+        restoreCurrentPageOnReturn: false
+      },
+      completion: { lockOnTermination: false },
+      display: {
+        headerContent: "block",
+        unitTitle: true,
+        fullscreenPrompt: false,
+        fullscreenButton: false,
+        reloadButton: false,
+        silentMode: false
+      },
+      timing: { showTimeLeft: false, warningMinutes: [5, 1] }
+    }
+  };
+  const projectPolicy = (policy: RuntimePolicy): RuntimePolicy => ({
+    navigation: policy.navigation,
+    player: policy.player,
+    completion: policy.completion,
+    display: policy.display,
+    timing: policy.timing
+  });
+
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.original-booklet-config`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.original-booklet-config.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+
+  try {
+    const tenantKey = "integration-tenant-original-booklet-config";
+    const workspaceKey = "integration-workspace-original-booklet-config";
+    assert.equal(
+      (
+        await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", {
+          method: "POST",
+          body: { tenantKey, displayName: tenantKey }
+        })
+      ).status,
+      201
+    );
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces`,
+          {
+            method: "POST",
+            body: { workspaceKey, displayName: workspaceKey }
+          }
+        )
+      ).status,
+      201
+    );
+
+    const bookletDocuments = booklets.map(booklet => ({
+      ...booklet,
+      content: readFileSync(
+        resolve(originalTestcenterCorpusRoot, booklet.fixture),
+        "utf8"
+      )
+    }));
+    const unitDocuments = expectation.units.map(([fixture, unitKey]) => ({
+      fixture,
+      unitKey,
+      content: readFileSync(resolve(originalTestcenterCorpusRoot, fixture), "utf8")
+    }));
+    const playerDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
+      "utf8"
+    );
+    const manifestResources = [
+      ...booklets.map(
+        booklet =>
+          `<resource identifier="${booklet.bookletKey}" href="${booklet.fixture}" />`
+      ),
+      ...unitDocuments.map(
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+      ),
+      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+    ].join("\n");
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>${manifestResources}</resources>
+          </manifest>
+        `
+      },
+      ...bookletDocuments.map(booklet => ({
+        fileName: `export/${booklet.fixture}`,
+        content: booklet.content
+      })),
+      ...unitDocuments.map(unit => ({
+        fileName: `export/${unit.fixture}`,
+        content: unit.content
+      })),
+      {
+        fileName: `export/${expectation.player.fixture}`,
+        content: playerDocument
+      }
+    ]);
+    const sourcePackage = await requestJsonAt<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: "original-booklet-config.zip",
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${zipPayload}`
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201);
+    const imported = await requestJsonAt<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        body: {
+          sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    assert.equal(
+      imported.body.importJob.status,
+      "completed",
+      JSON.stringify(imported.body.importJob.diagnostics)
+    );
+    assert.deepEqual(imported.body.importJob.diagnostics, []);
+    const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+    assert.ok(contentReleaseId);
+
+    const release = await requestJsonAt<{
+      contentReleaseDetail: {
+        contentRelease: {
+          runtimeSnapshot: {
+            bookletEntries: Array<{
+              bookletKey: string;
+              displayLabel: string;
+              policy: RuntimePolicy;
+              unitEntries: Array<{
+                unitKey: string;
+                originalUnitId?: string;
+                playerKey?: string;
+              }>;
+            }>;
+            playerEntries?: Array<{ playerKey: string; html: string }>;
+          };
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+    );
+    const runtimeSnapshot =
+      release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+    assert.equal(runtimeSnapshot.bookletEntries.length, 4);
+    for (const expectedBooklet of booklets) {
+      const importedBooklet = runtimeSnapshot.bookletEntries.find(
+        candidate => candidate.bookletKey === expectedBooklet.bookletKey
+      );
+      assert.ok(importedBooklet);
+      assert.equal(importedBooklet.displayLabel, expectedBooklet.displayLabel);
+      assert.deepEqual(
+        importedBooklet.unitEntries.map(unit => unit.unitKey),
+        expectedBooklet.unitKeys
+      );
+      assert.ok(
+        importedBooklet.unitEntries.every(
+          unit => unit.playerKey === expectation.player.playerKey
+        )
+      );
+      if (expectedBooklet.bookletKey === "Cy-Bklt_BkltConfig-3") {
+        assert.deepEqual(
+          importedBooklet.unitEntries.map(unit => [
+            unit.unitKey,
+            unit.originalUnitId ?? unit.unitKey
+          ]),
+          [
+            ["CY-Unit.Sample-101", "CY-Unit.Sample-101"],
+            ["cpy", "CY-Unit.Sample-101"]
+          ]
+        );
+      }
+      assert.deepEqual(
+        projectPolicy(importedBooklet.policy),
+        expectedPolicies[expectedBooklet.bookletKey]
+      );
+    }
+    assert.deepEqual(runtimeSnapshot.playerEntries, [
+      { playerKey: expectation.player.playerKey, html: playerDocument }
+    ]);
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+          { method: "POST", body: { activatedByActorId: "original-booklet-config-gate" } }
+        )
+      ).status,
+      200
+    );
+
+    const rosterXml = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+        "utf8"
+      ).trim(),
+      expectation.roster.encoding
+    ).toString("utf8");
+    const rosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        executionMode?: string;
+        bookletKey: string | null;
+        passwordRequired: boolean;
+        validationWarnings: Array<{ code: string }>;
+      }>;
+      operationalLoginCandidates: unknown[];
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      { method: "POST", body: { rosterText: rosterXml } }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.equal(rosterImport.body.items.length, 4);
+    assert.deepEqual(rosterImport.body.operationalLoginCandidates, []);
+    const rosterByLoginKey = new Map(
+      rosterImport.body.items.map(item => [item.loginKey, item])
+    );
+    for (const [loginKey, executionMode, bookletKey] of
+      expectation.roster.participants) {
+      const participant = rosterByLoginKey.get(loginKey);
+      assert.ok(participant);
+      assert.equal(participant.groupKey, expectation.roster.groupKey);
+      assert.equal(participant.executionMode, executionMode);
+      assert.equal(participant.bookletKey, bookletKey);
+      assert.equal(participant.passwordRequired, true);
+      assert.deepEqual(participant.validationWarnings, []);
+    }
+
+    const start = async (loginKey: string, bookletKey: string) => {
+      const signIn = await requestJsonAt<{
+        participantSession: {
+          participantSessionId: string;
+          executionMode?: string;
+        };
+      }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: { tenantKey, workspaceKey, loginKey, password: "123" }
+      });
+      assert.equal(signIn.status, 200);
+      assert.equal(signIn.body.participantSession.executionMode, "run-hot-restart");
+      const participantSessionId =
+        signIn.body.participantSession.participantSessionId;
+      const resumed = await requestJsonAt<{
+        testRun: {
+          testRunId: string;
+          currentUnitKey: string | null;
+          testletTimers?: Record<string, TimerState>;
+        };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${participantSessionId}/resume`,
+        { method: "POST", body: { bookletKey } }
+      );
+      assert.equal(resumed.status, 200);
+      const state = await requestJsonAt<{
+        currentRunState: {
+          booklet: { policy: RuntimePolicy };
+          navigation: { canPlayerEnd: boolean; canComplete: boolean };
+          activeTestletTimer: (TimerState & {
+            displayLabel: string;
+            leave: string;
+            showTimeLeft: boolean;
+            warningMinutes: number[];
+          }) | null;
+        };
+      }>(
+        isolated.baseUrl,
+        `/api/v1/participant/sessions/${participantSessionId}/current-state`
+      );
+      assert.equal(state.status, 200);
+      assert.deepEqual(
+        projectPolicy(state.body.currentRunState.booklet.policy),
+        expectedPolicies[bookletKey]
+      );
+      return {
+        participantSessionId,
+        testRun: resumed.body.testRun,
+        currentRunState: state.body.currentRunState
+      };
+    };
+
+    const configOne = await start(
+      "Bklt_Config-1",
+      "Cy-Bklt_BkltConfig-1"
+    );
+    assert.equal(configOne.testRun.currentUnitKey, "CY-Unit.Sample-101");
+    assert.equal(configOne.currentRunState.navigation.canPlayerEnd, true);
+    assert.equal(configOne.currentRunState.navigation.canComplete, true);
+    assert.equal(configOne.currentRunState.activeTestletTimer?.durationSeconds, 3);
+    assert.equal(configOne.currentRunState.activeTestletTimer?.showTimeLeft, false);
+    assert.deepEqual(
+      configOne.currentRunState.activeTestletTimer?.warningMinutes,
+      [0.01]
+    );
+    const completedConfigOne = await requestJsonAt<{
+      testRun: {
+        status: string;
+        locked: boolean;
+        currentUnitKey: string | null;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${configOne.testRun.testRunId}/complete`,
+      { method: "POST", body: { confirmTestletTimeLeave: true } }
+    );
+    assert.equal(completedConfigOne.status, 200);
+    assert.deepEqual(
+      {
+        status: completedConfigOne.body.testRun.status,
+        locked: completedConfigOne.body.testRun.locked,
+        currentUnitKey: completedConfigOne.body.testRun.currentUnitKey
+      },
+      { status: "completed", locked: false, currentUnitKey: null }
+    );
+
+    const configTwo = await start(
+      "Bklt_Config-2",
+      "Cy-Bklt_BkltConfig-2"
+    );
+    assert.equal(configTwo.testRun.currentUnitKey, "CY-Unit.Sample-101");
+    assert.equal(configTwo.currentRunState.navigation.canPlayerEnd, false);
+    assert.equal(configTwo.currentRunState.navigation.canComplete, true);
+    assert.equal(configTwo.currentRunState.activeTestletTimer?.durationSeconds, 120);
+    assert.equal(configTwo.currentRunState.activeTestletTimer?.showTimeLeft, true);
+    assert.deepEqual(
+      configTwo.currentRunState.activeTestletTimer?.warningMinutes,
+      [1]
+    );
+    const lockedConfigTwo = await requestJsonAt<{
+      testRun: {
+        status: string;
+        locked: boolean;
+        currentUnitKey: string | null;
+        testletTimers?: Record<string, TimerState>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${configTwo.testRun.testRunId}/complete`,
+      { method: "POST", body: { confirmTestletTimeLeave: true } }
+    );
+    assert.equal(lockedConfigTwo.status, 200);
+    assert.deepEqual(
+      {
+        status: lockedConfigTwo.body.testRun.status,
+        locked: lockedConfigTwo.body.testRun.locked,
+        currentUnitKey: lockedConfigTwo.body.testRun.currentUnitKey,
+        timerStatus: lockedConfigTwo.body.testRun.testletTimers?.Tslt1?.status
+      },
+      {
+        status: "paused",
+        locked: true,
+        currentUnitKey: "CY-Unit.Sample-101",
+        timerStatus: "cancelled"
+      }
+    );
+
+    const configThree = await start(
+      "Bklt_Config-3",
+      "Cy-Bklt_BkltConfig-3"
+    );
+    assert.equal(configThree.currentRunState.navigation.canPlayerEnd, false);
+    const movedConfigThree = await requestJsonAt<{
+      testRun: { currentUnitKey: string | null };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${configThree.testRun.testRunId}/save-progress`,
+      { method: "POST", body: { currentUnitKey: "cpy", status: "running" } }
+    );
+    assert.equal(movedConfigThree.status, 200);
+    assert.equal(movedConfigThree.body.testRun.currentUnitKey, "cpy");
+    const configThreeLastState = await requestJsonAt<{
+      currentRunState: {
+        currentUnit: {
+          unitKey: string | null;
+          displayLabel: string;
+          testletPath: string[];
+        };
+        navigation: { canPlayerEnd: boolean };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${configThree.participantSessionId}/current-state`
+    );
+    const configThreeLastUnit =
+      configThreeLastState.body.currentRunState.currentUnit;
+    assert.equal(configThreeLastUnit.unitKey, "cpy");
+    assert.equal(configThreeLastUnit.displayLabel, "Aufgabe2");
+    assert.deepEqual(configThreeLastUnit.testletPath, ["Tslt1"]);
+    assert.equal(
+      configThreeLastState.body.currentRunState.navigation.canPlayerEnd,
+      true
+    );
+
+    const configFour = await start(
+      "Bklt_Config-4",
+      "Cy-Bklt_BkltConfig-4"
+    );
+    assert.equal(configFour.currentRunState.navigation.canPlayerEnd, true);
+    assert.equal(
+      configFour.currentRunState.booklet.policy.display.headerContent,
+      "block"
+    );
+
+    const completedOpenRuns = await requestJsonAt<{ items: unknown[] }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${configOne.testRun.testRunId}`
+    );
+    assert.deepEqual(completedOpenRuns.body.items, []);
+    const lockedOpenRuns = await requestJsonAt<{
+      items: Array<{ status: string; locked: boolean; executionMode: string }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${configTwo.testRun.testRunId}`
+    );
+    assert.deepEqual(
+      lockedOpenRuns.body.items.map(item => [
+        item.status,
+        item.locked,
+        item.executionMode
+      ]),
+      [["paused", true, "run-hot-restart"]]
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("original Testcenter compatibility corpus executes the complete official Test Controller package", async () => {
   type SystemBooklet = {
     fixture: string;
