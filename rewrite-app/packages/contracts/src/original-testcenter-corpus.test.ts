@@ -27,6 +27,34 @@ type OriginalTestcenterCorpus = {
     skipNetwork: boolean;
     canSave: boolean;
   }>;
+  groupMonitoringPackages: Array<{
+    booklet: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    units: Array<{
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      unitKey: string;
+    }>;
+    player: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      playerKey: string;
+    };
+    roster: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    };
+  }>;
   sessionManagementPackages: Array<{
     booklets: Array<{
       fixture: string;
@@ -178,6 +206,98 @@ test("original Testcenter compatibility corpus separates participant and operati
       "BOOKLET.SAMPLE-2#bonus:no"
     ]
   );
+});
+
+test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const groupMonitoring = corpus.groupMonitoringPackages[0];
+  assert.ok(groupMonitoring);
+
+  for (const pinnedFile of [
+    groupMonitoring.booklet,
+    ...groupMonitoring.units,
+    groupMonitoring.player,
+    groupMonitoring.roster
+  ]) {
+    assert.equal(
+      createHash("sha256")
+        .update(readFileSync(resolve(corpusRoot, pinnedFile.fixture)))
+        .digest("hex"),
+      pinnedFile.sha256,
+      pinnedFile.sourcePath
+    );
+  }
+
+  const rosterXml = readFileSync(
+    resolve(corpusRoot, groupMonitoring.roster.fixture),
+    "utf8"
+  );
+  const participants = parseParticipantRosterText(rosterXml);
+  assert.deepEqual(
+    participants.map(participant => participant.loginKey),
+    groupMonitoring.roster.participantLoginKeys
+  );
+  assert.equal(participants[0]?.groupKey, "filter-profiles");
+  assert.equal(participants[0]?.password, "123");
+  assert.equal(participants[0]?.executionMode, "run-hot-return");
+  assert.equal(participants[0]?.bookletKey, "Cy-Bklt_GM-1");
+
+  const operationalLogins = parseOriginalTestcenterOperationalLogins(rosterXml);
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    groupMonitoring.roster.operationalLoginKeys
+  );
+  assert.deepEqual(operationalLogins[0], {
+    loginKey: "GM-1",
+    loginMode: "monitor-group",
+    groupKey: "filter-profiles",
+    passwordRequired: true,
+    profileIds: ["all", "small"],
+    monitorProfiles: [
+      {
+        profileId: "all",
+        label: "Alles zeigen",
+        settings: {
+          blockColumn: "show",
+          unitColumn: "show",
+          view: "full",
+          groupColumn: "show",
+          bookletColumn: "show",
+          bookletStatesColumns: "level bonus",
+          autoselectNextBlock: "no"
+        },
+        filters: [],
+        filtersEnabled: { pending: "no", locked: "no" }
+      },
+      {
+        profileId: "small",
+        label: "Superklein",
+        settings: {
+          blockColumn: "hide",
+          unitColumn: "hide",
+          view: "small",
+          groupColumn: "hide",
+          bookletColumn: "hide",
+          bookletStatesColumns: "",
+          autoselectNextBlock: "yes"
+        },
+        filters: [
+          {
+            target: "bookletLabel",
+            value: "Reduced Booklet",
+            subValue: null,
+            label: "Reduced Booklet",
+            type: "equal",
+            not: false
+          }
+        ],
+        filtersEnabled: { pending: "yes", locked: "yes" }
+      }
+    ],
+    unresolvedProfileIds: []
+  });
 });
 
 test("original Testcenter compatibility corpus pins official session management semantics", () => {

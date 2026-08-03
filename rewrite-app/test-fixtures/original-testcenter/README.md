@@ -13,7 +13,10 @@ Session-Management package with two booklets, five units, the legacy
 `verona-player-simple-6.0` reference, and all 12 original participant logins.
 That package gates password-free and password-protected entry, ordered
 multi-booklet assignment, second codes, access windows, and hot-return versus
-hot-restart re-entry. The corpus also contains the original XSD-backed rejection
+hot-restart re-entry. The official Group-Monitoring booklet and roster add the
+original participant plus scoped monitor login, both imported view profiles,
+group isolation, and the pause/resume/go-to/lock/unlock command path. The corpus
+also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, and Testtakers structures plus duplicate
 runtime identities. It also contains the byte-exact original sample
 `.itcr.zip` resource package as base64 so the binary fixture remains reviewable

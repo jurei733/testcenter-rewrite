@@ -307,6 +307,68 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "groupMonitoringPackages": [
+    {
+      "booklet": {
+        "fixture": "booklets/group-monitoring/CY_Bklt_GM-1.xml",
+        "sourcePath": "sampledata/system-test/groupmon/CY_Bklt_GM-1.xml",
+        "sha256": "5d44bb9faf33a989c91ed8b950730f227b85b13e6c1b8e6fa6d8be294de241bd",
+        "bookletKey": "Cy-Bklt_GM-1",
+        "unitKeys": [
+          "CY-Unit.Sample-100",
+          "CY-Unit.Sample-101",
+          "CY-Unit.Sample-102",
+          "CY-Unit.Sample-103",
+          "CY-Unit.Sample-104"
+        ]
+      },
+      "units": [
+        {
+          "fixture": "units/CY_Unit100.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit100.xml",
+          "sha256": "d7fb72c8349ac60e8773774f494203bebdaec3416876cf49bced18202081e063",
+          "unitKey": "CY-Unit.Sample-100"
+        },
+        {
+          "fixture": "units/CY_Unit101.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit101.xml",
+          "sha256": "070268e4a13fe4527dcb76d03499d386769dc60513660b91e5df070f2cf34a97",
+          "unitKey": "CY-Unit.Sample-101"
+        },
+        {
+          "fixture": "units/CY_Unit102.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit102.xml",
+          "sha256": "d9030c53649b357914ba203efc2e788b7197e797f3a1bb1e2dc21f16e4be2fb4",
+          "unitKey": "CY-Unit.Sample-102"
+        },
+        {
+          "fixture": "units/CY_Unit103.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit103.xml",
+          "sha256": "abb8464d00d7fbf60c793a05ea4cf2b9f61a5dcf8123d158ba067389e5a6d1b0",
+          "unitKey": "CY-Unit.Sample-103"
+        },
+        {
+          "fixture": "units/CY_Unit104.xml",
+          "sourcePath": "sampledata/system-test/units/CY_Unit104.xml",
+          "sha256": "9cd532605bbbe8cc332e969c56bd7331e155d96d6114fa80e250a4f19be72d8f",
+          "unitKey": "CY-Unit.Sample-104"
+        }
+      ],
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "sourcePath": "sampledata/verona-player-simple-6.0.html",
+        "sha256": "e260cdc4bee370f5990390fbcbca17104d8069b43a41c4f0967e13b33fa6a38a",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "roster": {
+        "fixture": "rosters/CY_Logins_GM.xml",
+        "sourcePath": "sampledata/system-test/groupmon/CY_Logins_GM.xml",
+        "sha256": "ef4c8f621f682cee2efd56c2acf78bf63033e355e3579b5bc50dd900420d6722",
+        "participantLoginKeys": ["testtaker-a"],
+        "operationalLoginKeys": ["GM-1"]
+      }
+    }
+  ],
   "sessionManagementPackages": [
     {
       "booklets": [

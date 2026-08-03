@@ -8736,6 +8736,588 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus executes the official group monitoring package", async () => {
+  type GroupMonitoringPackage = {
+    booklet: {
+      fixture: string;
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    units: Array<{ fixture: string; unitKey: string }>;
+    player: { fixture: string; playerKey: string };
+    roster: {
+      fixture: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    };
+  };
+  type MonitorProfile = {
+    profileId: string;
+    label: string;
+    settings: Record<string, string>;
+    filters: Array<{
+      target: string;
+      value: string;
+      subValue: string | null;
+      label: string;
+      type: string;
+      not: boolean;
+    }>;
+    filtersEnabled: Record<string, string>;
+  };
+  type OperationalCandidate = {
+    loginKey: string;
+    loginMode: string;
+    groupKey: string | null;
+    passwordRequired: boolean;
+    profileIds: string[];
+    monitorProfiles: MonitorProfile[];
+    unresolvedProfileIds: string[];
+  };
+
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { groupMonitoringPackages: GroupMonitoringPackage[] };
+  const expectation = corpus.groupMonitoringPackages[0];
+  assert.ok(expectation);
+
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
+    FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "false"
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.original-group-monitor`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.original-group-monitor.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
+
+  try {
+    const bootstrap = await requestJsonAt<{
+      adminUser: { username: string };
+    }>(isolated.baseUrl, "/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "Original.Group.Admin",
+        displayName: "Original Group Admin",
+        password: "original-group-admin-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    const adminSignIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "original.group.admin",
+          password: "original-group-admin-secret"
+        }
+      }
+    );
+    assert.equal(adminSignIn.status, 200);
+    const adminHeaders = {
+      authorization: `Bearer ${adminSignIn.body.sessionToken}`
+    };
+
+    const tenantKey = "integration-tenant-original-group-monitoring";
+    const workspaceKey = "integration-workspace-original-group-monitoring";
+    assert.equal(
+      (
+        await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", {
+          method: "POST",
+          headers: adminHeaders,
+          body: { tenantKey, displayName: tenantKey }
+        })
+      ).status,
+      201
+    );
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces`,
+          {
+            method: "POST",
+            headers: adminHeaders,
+            body: { workspaceKey, displayName: workspaceKey }
+          }
+        )
+      ).status,
+      201
+    );
+
+    const bookletDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.booklet.fixture),
+      "utf8"
+    );
+    const unitDocuments = expectation.units.map(unit => ({
+      ...unit,
+      content: readFileSync(
+        resolve(originalTestcenterCorpusRoot, unit.fixture),
+        "utf8"
+      )
+    }));
+    const playerDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
+      "utf8"
+    );
+    const manifestResources = [
+      `<resource identifier="${expectation.booklet.bookletKey}" href="${expectation.booklet.fixture}" />`,
+      ...expectation.units.map(
+        unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+      ),
+      `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+    ].join("\n");
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>${manifestResources}</resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: `export/${expectation.booklet.fixture}`,
+        content: bookletDocument
+      },
+      ...unitDocuments.map(unit => ({
+        fileName: `export/${unit.fixture}`,
+        content: unit.content
+      })),
+      {
+        fileName: `export/${expectation.player.fixture}`,
+        content: playerDocument
+      }
+    ]);
+    const sourcePackage = await requestJsonAt<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          fileName: "original-group-monitoring.zip",
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${zipPayload}`
+        }
+      }
+    );
+    assert.equal(sourcePackage.status, 201);
+    const imported = await requestJsonAt<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ code: string; severity: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    assert.equal(
+      imported.body.importJob.status,
+      "completed",
+      JSON.stringify(imported.body.importJob.diagnostics)
+    );
+    assert.deepEqual(imported.body.importJob.diagnostics, []);
+    const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+    assert.ok(contentReleaseId);
+
+    const release = await requestJsonAt<{
+      contentReleaseDetail: {
+        contentRelease: {
+          runtimeSnapshot: {
+            bookletEntries: Array<{
+              bookletKey: string;
+              displayLabel: string;
+              unitEntries: Array<{
+                unitKey: string;
+                displayLabel: string;
+                testletPath?: string[];
+                playerKey?: string;
+              }>;
+            }>;
+          };
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`,
+      { headers: adminHeaders }
+    );
+    const importedBooklet =
+      release.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+        .bookletEntries[0];
+    assert.equal(importedBooklet?.bookletKey, expectation.booklet.bookletKey);
+    assert.equal(importedBooklet?.displayLabel, "GM-1");
+    assert.deepEqual(
+      importedBooklet?.unitEntries.map(unit => unit.unitKey),
+      expectation.booklet.unitKeys
+    );
+    assert.deepEqual(
+      importedBooklet?.unitEntries.map(unit => unit.testletPath ?? []),
+      [[], ["Tslt1"], ["Tslt1"], ["Tslt1"], []]
+    );
+    assert.ok(
+      importedBooklet?.unitEntries.every(
+        unit => unit.playerKey === expectation.player.playerKey
+      )
+    );
+    assert.equal(
+      (
+        await requestJsonAt(
+          isolated.baseUrl,
+          `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+          { method: "POST", headers: adminHeaders, body: {} }
+        )
+      ).status,
+      200
+    );
+
+    const rosterXml = readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+      "utf8"
+    );
+    const rosterImport = await requestJsonAt<{
+      items: Array<{
+        loginKey: string;
+        groupKey: string;
+        bookletKey: string | null;
+        passwordRequired: boolean;
+        validationWarnings: Array<{ code: string }>;
+      }>;
+      operationalLoginCandidates: OperationalCandidate[];
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: { rosterText: rosterXml }
+      }
+    );
+    assert.equal(rosterImport.status, 201);
+    assert.deepEqual(
+      rosterImport.body.items.map(item => item.loginKey),
+      expectation.roster.participantLoginKeys
+    );
+    assert.equal(rosterImport.body.items[0]?.groupKey, "filter-profiles");
+    assert.equal(rosterImport.body.items[0]?.bookletKey, "Cy-Bklt_GM-1");
+    assert.equal(rosterImport.body.items[0]?.passwordRequired, true);
+    assert.deepEqual(rosterImport.body.items[0]?.validationWarnings, []);
+    assert.deepEqual(
+      rosterImport.body.operationalLoginCandidates.map(candidate => candidate.loginKey),
+      expectation.roster.operationalLoginKeys
+    );
+    const monitorCandidate = rosterImport.body.operationalLoginCandidates[0];
+    assert.ok(monitorCandidate);
+    assert.equal(monitorCandidate.loginMode, "monitor-group");
+    assert.equal(monitorCandidate.groupKey, "filter-profiles");
+    assert.equal(monitorCandidate.passwordRequired, true);
+    assert.deepEqual(monitorCandidate.profileIds, ["all", "small"]);
+    assert.deepEqual(
+      monitorCandidate.monitorProfiles.map(profile => profile.label),
+      ["Alles zeigen", "Superklein"]
+    );
+    assert.deepEqual(monitorCandidate.unresolvedProfileIds, []);
+
+    const monitorAccount = await requestJsonAt<{
+      adminUser: { username: string; passwordHash?: string };
+      roleAssignments: Array<{
+        role: string;
+        groupKey: string | null;
+        monitorProfiles: MonitorProfile[];
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: monitorCandidate.loginKey,
+        displayName: monitorCandidate.loginKey,
+        password: "replacement-group-monitor-secret",
+        roleAssignments: [
+          {
+            role: "group_monitor",
+            tenantKey,
+            workspaceKey,
+            groupKey: monitorCandidate.groupKey,
+            monitorProfiles: monitorCandidate.monitorProfiles
+          }
+        ]
+      }
+    });
+    assert.equal(monitorAccount.status, 201);
+    assert.equal(monitorAccount.body.adminUser.username, "gm-1");
+    assert.equal(monitorAccount.body.adminUser.passwordHash, undefined);
+    assert.equal(monitorAccount.body.roleAssignments[0]?.role, "group_monitor");
+    assert.equal(
+      monitorAccount.body.roleAssignments[0]?.groupKey,
+      "filter-profiles"
+    );
+
+    const monitorSignIn = await requestJsonAt<{
+      sessionToken: string;
+      roleAssignments: Array<{
+        role: string;
+        groupKey: string | null;
+        monitorProfiles: MonitorProfile[];
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "GM-1",
+        password: "replacement-group-monitor-secret"
+      }
+    });
+    assert.equal(monitorSignIn.status, 200);
+    assert.deepEqual(
+      monitorSignIn.body.roleAssignments[0]?.monitorProfiles,
+      monitorCandidate.monitorProfiles
+    );
+    const monitorHeaders = {
+      authorization: `Bearer ${monitorSignIn.body.sessionToken}`
+    };
+
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "testtaker-a", password: "123" }
+    });
+    assert.equal(participantSignIn.status, 200);
+    const participantSessionId =
+      participantSignIn.body.participantSession.participantSessionId;
+    const participantRun = await requestJsonAt<{
+      testRun: {
+        testRunId: string;
+        status: string;
+        currentUnitKey: string | null;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSessionId}/resume`,
+      { method: "POST", body: { bookletKey: expectation.booklet.bookletKey } }
+    );
+    assert.equal(participantRun.status, 200);
+    assert.equal(participantRun.body.testRun.status, "running");
+    assert.equal(
+      participantRun.body.testRun.currentUnitKey,
+      "CY-Unit.Sample-100"
+    );
+    const testRunId = participantRun.body.testRun.testRunId;
+
+    const outsiderRoster = await requestJsonAt<{
+      items: Array<{ loginKey: string }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          rosterText: [
+            {
+              loginKey: "outside-group",
+              groupKey: "outside-group",
+              bookletKey: expectation.booklet.bookletKey
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(outsiderRoster.status, 201);
+    const outsiderSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "outside-group" }
+    });
+    const outsiderRun = await requestJsonAt<{
+      testRun: { testRunId: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${outsiderSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST", body: { bookletKey: expectation.booklet.bookletKey } }
+    );
+
+    const openRuns = await requestJsonAt<{
+      items: Array<{
+        testRunId: string;
+        loginKey: string;
+        groupKey: string;
+        bookletKey: string;
+        bookletLabel: string | null;
+        bookletSpecies: string | null;
+        currentUnitKey: string | null;
+        currentUnitLabel: string | null;
+        currentBlockKey: string | null;
+        currentBlockLabel: string | null;
+        status: string;
+        locked?: boolean;
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs`,
+      { headers: monitorHeaders }
+    );
+    assert.equal(openRuns.status, 200);
+    assert.deepEqual(openRuns.body.items.map(item => item.loginKey), [
+      "testtaker-a"
+    ]);
+    assert.equal(openRuns.body.items[0]?.testRunId, testRunId);
+    assert.equal(openRuns.body.items[0]?.groupKey, "filter-profiles");
+    assert.equal(openRuns.body.items[0]?.bookletKey, "Cy-Bklt_GM-1");
+    assert.equal(openRuns.body.items[0]?.bookletLabel, "GM-1");
+    assert.equal(openRuns.body.items[0]?.bookletSpecies, "species: 1");
+    assert.equal(openRuns.body.items[0]?.currentUnitLabel, "Startseite");
+
+    const rejectedOtherGroupQuery = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?groupKey=outside-group`,
+      { headers: monitorHeaders }
+    );
+    assert.equal(rejectedOtherGroupQuery.status, 403);
+    assert.equal(
+      rejectedOtherGroupQuery.body.error,
+      "monitor_group_access_required"
+    );
+    const rejectedOutsiderCommand = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${outsiderRun.body.testRun.testRunId}/commands`,
+      {
+        method: "POST",
+        headers: monitorHeaders,
+        body: { commandType: "pause", actorId: "GM-1" }
+      }
+    );
+    assert.equal(rejectedOutsiderCommand.status, 403);
+    assert.equal(
+      rejectedOutsiderCommand.body.error,
+      "monitor_group_access_required"
+    );
+
+    const commandPath = `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`;
+    const pause = await requestJsonAt<{
+      command: { testRun: { status: string } };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: monitorHeaders,
+      body: { commandType: "pause", actorId: "GM-1" }
+    });
+    assert.equal(pause.status, 200);
+    assert.equal(pause.body.command.testRun.status, "paused");
+    const resume = await requestJsonAt<{
+      command: { testRun: { status: string } };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: monitorHeaders,
+      body: { commandType: "resume", actorId: "GM-1" }
+    });
+    assert.equal(resume.body.command.testRun.status, "running");
+    const goTo = await requestJsonAt<{
+      command: { testRun: { status: string; currentUnitKey: string | null } };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: monitorHeaders,
+      body: {
+        commandType: "goto",
+        actorId: "GM-1",
+        targetUnitKey: "CY-Unit.Sample-102"
+      }
+    });
+    assert.equal(goTo.status, 200);
+    assert.equal(goTo.body.command.testRun.status, "running");
+    assert.equal(
+      goTo.body.command.testRun.currentUnitKey,
+      "CY-Unit.Sample-102"
+    );
+    const movedRuns = await requestJsonAt<typeof openRuns.body>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs`,
+      { headers: monitorHeaders }
+    );
+    assert.equal(movedRuns.body.items[0]?.currentUnitLabel, "Aufgabe2");
+    assert.equal(movedRuns.body.items[0]?.currentBlockKey, "Tslt1");
+    assert.equal(
+      movedRuns.body.items[0]?.currentBlockLabel,
+      "Aufgabenblock 1"
+    );
+
+    const lock = await requestJsonAt<{
+      command: { testRun: { status: string; locked?: boolean } };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: monitorHeaders,
+      body: { commandType: "lock_test", actorId: "GM-1" }
+    });
+    assert.equal(lock.status, 200);
+    assert.equal(lock.body.command.testRun.status, "running");
+    assert.equal(lock.body.command.testRun.locked, true);
+    const lockedRuntime = await requestJsonAt<{
+      runtimeState: { runtimeStatus: string; availableAction: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSessionId}/runtime-state`
+    );
+    assert.equal(lockedRuntime.body.runtimeState.runtimeStatus, "locked");
+    assert.equal(lockedRuntime.body.runtimeState.availableAction, "none");
+    const unlock = await requestJsonAt<{
+      command: { testRun: { status: string; locked?: boolean } };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: monitorHeaders,
+      body: { commandType: "unlock_test", actorId: "GM-1" }
+    });
+    assert.equal(unlock.status, 200);
+    assert.equal(unlock.body.command.testRun.locked, false);
+    const resumedAfterUnlock = await requestJsonAt<{
+      testRun: { status: string; currentUnitKey: string | null };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${testRunId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(resumedAfterUnlock.status, 200);
+    assert.equal(resumedAfterUnlock.body.testRun.status, "running");
+    assert.equal(
+      resumedAfterUnlock.body.testRun.currentUnitKey,
+      "CY-Unit.Sample-102"
+    );
+    const hotReturnSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: "testtaker-a", password: "123" }
+    });
+    assert.equal(
+      hotReturnSignIn.body.participantSession.participantSessionId,
+      participantSessionId
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("original Testcenter compatibility corpus executes the official session management package", async () => {
   type SessionManagementPackage = {
     booklets: Array<{
