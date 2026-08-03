@@ -906,6 +906,17 @@ export class ParticipantViewFacade {
     );
   }
 
+  get veronaLoadingPendingStatus(): string {
+    return this.customText(
+      "booklet_unitLoadingPending",
+      "Waiting in the loading queue"
+    );
+  }
+
+  get veronaLoadingCompleteStatus(): string {
+    return this.customText("booklet_unitLoading", "Loaded");
+  }
+
   get veronaErrorText(): string {
     return this.customText(
       "booklet_errormessage",

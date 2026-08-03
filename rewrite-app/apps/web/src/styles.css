@@ -1801,6 +1801,50 @@ pre {
   color: var(--muted);
 }
 
+.verona-player-loading-progress {
+  position: relative;
+  overflow: hidden;
+  height: 10px;
+  margin: 5px 0 2px;
+  border-radius: 999px;
+  background: rgba(31, 92, 84, 0.13);
+}
+
+.verona-player-loading-progress span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--secondary), #c99a3b);
+  transition: width 140ms ease;
+}
+
+.verona-player-loading-progress.is-indeterminate span {
+  position: absolute;
+  width: 36%;
+  animation: verona-loading-indeterminate 900ms ease-in-out infinite alternate;
+}
+
+.verona-player-loading-progress.is-complete span {
+  background: var(--secondary);
+}
+
+@keyframes verona-loading-indeterminate {
+  from {
+    transform: translateX(-35%);
+  }
+  to {
+    transform: translateX(210%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verona-player-loading-progress.is-indeterminate span {
+    left: 32%;
+    animation: none;
+  }
+}
+
 .verona-player-error {
   display: grid;
   gap: 8px;

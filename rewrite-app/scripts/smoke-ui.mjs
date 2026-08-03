@@ -3594,7 +3594,9 @@ try {
             customTexts: {
               booklet_loading: "Please wait for the project player.",
               booklet_loadingBlock: "Project block is loading",
+              booklet_unitLoadingPending: "Project player is queued.",
               booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
+              booklet_unitLoading: "Project player loaded",
               booklet_errormessage: "The project player could not be loaded.",
               booklet_msgTimerStarted: "Project timer started: ",
               booklet_msgTimeOver: "Project time is over.",
@@ -3675,20 +3677,81 @@ try {
     .filter({ hasText: "Project block access" })
     .waitFor();
   assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
+  await page.evaluate(() => {
+    window.__participantVeronaLoadingPhases = [];
+    const recordLoadingPhase = () => {
+      const loadingElement = document.querySelector(
+        "#participantVeronaPlayerLoading"
+      );
+      const phase = loadingElement?.getAttribute("data-loading-phase");
+      const label = document
+        .querySelector("#participantVeronaPlayerLoadingLabel")
+        ?.textContent?.trim();
+      const title = document
+        .querySelector("#participantVeronaPlayerLoadingTitle")
+        ?.textContent?.trim();
+      const message = document
+        .querySelector("#participantVeronaPlayerLoadingStatus")
+        ?.textContent?.trim();
+      if (!phase || !label || !title || !message) {
+        return;
+      }
+      const records = window.__participantVeronaLoadingPhases;
+      if (!records.some(record => record.phase === phase)) {
+        records.push({ phase, label, title, message });
+      }
+    };
+    window.__participantVeronaLoadingObserver = new MutationObserver(
+      recordLoadingPhase
+    );
+    window.__participantVeronaLoadingObserver.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ["data-loading-phase"]
+    });
+    const recordLoadingFrame = () => {
+      recordLoadingPhase();
+      window.__participantVeronaLoadingFrameRequest =
+        window.requestAnimationFrame(recordLoadingFrame);
+    };
+    window.__participantVeronaLoadingFrameRequest =
+      window.requestAnimationFrame(recordLoadingFrame);
+    recordLoadingPhase();
+  });
   await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
   await page.locator("#participantRouteTestletUnlockButton").click();
   await page
-    .locator("#participantVeronaPlayerLoadingLabel")
-    .filter({ hasText: "Please wait for the project player." })
+    .locator("#participantVeronaPlayerStatus")
+    .filter({ hasText: "running" })
     .waitFor({ timeout: 15_000 });
-  await page
-    .locator("#participantVeronaPlayerLoadingTitle")
-    .filter({ hasText: "Project block is loading" })
-    .waitFor();
-  await page
-    .locator("#participantVeronaPlayerLoadingStatus")
-    .filter({ hasText: "Project loading progress is pending." })
-    .waitFor();
+  const veronaLoadingPhases = await page.evaluate(() => {
+    window.__participantVeronaLoadingObserver?.disconnect();
+    window.cancelAnimationFrame(
+      window.__participantVeronaLoadingFrameRequest ?? 0
+    );
+    return window.__participantVeronaLoadingPhases;
+  });
+  assert.deepEqual(veronaLoadingPhases, [
+    {
+      phase: "pending",
+      label: "Please wait for the project player.",
+      title: "Project block is loading",
+      message: "Project player is queued."
+    },
+    {
+      phase: "unknown",
+      label: "Please wait for the project player.",
+      title: "Project block is loading",
+      message: "Project loading progress is pending."
+    },
+    {
+      phase: "complete",
+      label: "Please wait for the project player.",
+      title: "Project block is loading",
+      message: "100% Project player loaded"
+    }
+  ]);
   await page
     .locator("#participantRouteTestletTimerLabel")
     .filter({ hasText: "Protected Verona Block" })

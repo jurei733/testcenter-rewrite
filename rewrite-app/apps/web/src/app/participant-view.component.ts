@@ -350,6 +350,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [loadingLabel]="view.veronaLoadingLabel"
             [loadingTitle]="view.veronaLoadingTitle"
             [loadingStatus]="view.veronaLoadingStatus"
+            [loadingPendingStatus]="view.veronaLoadingPendingStatus"
+            [loadingCompleteStatus]="view.veronaLoadingCompleteStatus"
             [errorText]="view.veronaErrorText"
             (logEntries)="view.queueVeronaLogs($event)"
             (focusLogEntries)="view.saveVeronaFocusLogs($event)"

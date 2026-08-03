@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import {
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -49,12 +50,27 @@ import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domai
         *ngIf="status === 'loading'"
         class="verona-player-loading"
         id="participantVeronaPlayerLoading"
+        [attr.data-loading-phase]="loadingPhase"
         role="status"
         aria-live="polite"
       >
         <span id="participantVeronaPlayerLoadingLabel">{{ loadingLabel }}</span>
         <strong id="participantVeronaPlayerLoadingTitle">{{ loadingTitle }}</strong>
-        <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatus }}</p>
+        <div
+          id="participantVeronaPlayerLoadingProgress"
+          class="verona-player-loading-progress"
+          [class.is-pending]="loadingPhase === 'pending'"
+          [class.is-indeterminate]="loadingPhase === 'unknown'"
+          [class.is-complete]="loadingPhase === 'complete'"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="loadingProgressPercent"
+          [attr.aria-valuetext]="loadingStatusLabel"
+        >
+          <span [style.width.%]="loadingProgressPercent ?? 36"></span>
+        </div>
+        <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatusLabel }}</p>
       </section>
       <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
       <section
@@ -113,6 +129,8 @@ export class VeronaPlayerHostComponent
   @Input() loadingLabel = "Please wait";
   @Input() loadingTitle = "Unit is loading";
   @Input() loadingStatus = "Loading progress is not available";
+  @Input() loadingPendingStatus = "In queue";
+  @Input() loadingCompleteStatus = "Loaded";
   @Input() errorTitle = "Player could not start";
   @Input() errorText =
     "The unit could not be loaded. Reload the player or ask the test supervisor for help.";
@@ -126,16 +144,21 @@ export class VeronaPlayerHostComponent
   @Output() readonly retrySave = new EventEmitter<void>();
 
   status: "loading" | "ready" | "running" | "error" = "loading";
+  loadingPhase: "pending" | "unknown" | "complete" = "pending";
   apiVersionLabel = "Waiting for player";
   errorMessage = "";
 
   private frame: HTMLIFrameElement | null = null;
   private readyTimeout: ReturnType<typeof setTimeout> | null = null;
+  private mountFrameRequest: number | null = null;
+  private startPlayerRequest: number | null = null;
   private focusLogTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingPlayerHasFocus: boolean | undefined;
   private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
   private latestResponse = "";
   private viewReady = false;
+
+  constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
   private get sessionId(): string {
     return `${this.testRunId}:${this.unitKey}`;
@@ -151,6 +174,25 @@ export class VeronaPlayerHostComponent
         return "not saved";
       default:
         return this.saveStatus;
+    }
+  }
+
+  get loadingProgressPercent(): number | null {
+    return this.loadingPhase === "complete"
+      ? 100
+      : this.loadingPhase === "pending"
+        ? 0
+        : null;
+  }
+
+  get loadingStatusLabel(): string {
+    switch (this.loadingPhase) {
+      case "pending":
+        return this.loadingPendingStatus;
+      case "complete":
+        return `100% ${this.loadingCompleteStatus}`;
+      default:
+        return this.loadingStatus;
     }
   }
 
@@ -182,6 +224,7 @@ export class VeronaPlayerHostComponent
 
   ngOnDestroy(): void {
     this.clearReadyTimeout();
+    this.clearScheduledFrames();
     this.clearFocusLogTimeout();
     this.frame?.remove();
     this.frame = null;
@@ -281,10 +324,12 @@ export class VeronaPlayerHostComponent
 
   private mountPlayer(): void {
     this.clearReadyTimeout();
+    this.clearScheduledFrames();
     this.clearFocusLogTimeout();
     this.frame?.remove();
     this.frame = null;
     this.status = "loading";
+    this.loadingPhase = "pending";
     this.apiVersionLabel = "Waiting for player";
     this.errorMessage = "";
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
@@ -296,6 +341,28 @@ export class VeronaPlayerHostComponent
       return;
     }
 
+    this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
+      this.mountFrameRequest = null;
+      this.beginPlayerFrameLoad();
+    }) ?? null;
+  }
+
+  private beginPlayerFrameLoad(): void {
+    if (this.status !== "loading") {
+      return;
+    }
+    this.loadingPhase = "unknown";
+    this.changeDetector.detectChanges();
+    this.mountFrameRequest = globalThis.window?.requestAnimationFrame(() => {
+      this.mountFrameRequest = null;
+      this.attachPlayerFrame();
+    }) ?? null;
+  }
+
+  private attachPlayerFrame(): void {
+    if (this.status !== "loading") {
+      return;
+    }
     const frame = document.createElement("iframe");
     frame.className = "verona-player-frame";
     frame.id = "participantVeronaPlayerFrame";
@@ -303,6 +370,15 @@ export class VeronaPlayerHostComponent
     frame.setAttribute("sandbox", "allow-scripts allow-forms allow-modals");
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("srcdoc", this.playerHtml);
+    frame.addEventListener(
+      "load",
+      () => {
+        if (this.frame === frame && this.status === "loading") {
+          this.loadingPhase = "complete";
+        }
+      },
+      { once: true }
+    );
     this.frameHost.nativeElement.replaceChildren(frame);
     this.frame = frame;
     this.readyTimeout = setTimeout(() => {
@@ -313,6 +389,9 @@ export class VeronaPlayerHostComponent
   }
 
   private handleReady(notification: unknown): void {
+    if (this.status !== "loading" || this.startPlayerRequest != null) {
+      return;
+    }
     const apiVersion = readVeronaPlayerApiVersion(notification);
     if (!apiVersion) {
       this.fail("The player ready notification does not declare a Verona API version.");
@@ -326,8 +405,19 @@ export class VeronaPlayerHostComponent
     }
 
     this.clearReadyTimeout();
-    this.status = "ready";
+    this.loadingPhase = "complete";
     this.apiVersionLabel = `API ${apiVersion}`;
+    this.startPlayerRequest = globalThis.window?.requestAnimationFrame(() => {
+      this.startPlayerRequest = null;
+      this.startPlayer();
+    }) ?? null;
+  }
+
+  private startPlayer(): void {
+    if (this.status !== "loading" || !this.frame?.contentWindow) {
+      return;
+    }
+    this.status = "ready";
     const persistedResponse = parseVeronaUnitResponse(this.savedResponse);
     const startPage = this.restoreCurrentPageOnReturn
       ? persistedResponse?.playerState?.currentPage
@@ -418,6 +508,7 @@ export class VeronaPlayerHostComponent
 
   private fail(message: string): void {
     this.clearReadyTimeout();
+    this.clearScheduledFrames();
     this.status = "error";
     this.errorMessage = message;
   }
@@ -426,6 +517,17 @@ export class VeronaPlayerHostComponent
     if (this.readyTimeout) {
       clearTimeout(this.readyTimeout);
       this.readyTimeout = null;
+    }
+  }
+
+  private clearScheduledFrames(): void {
+    if (this.mountFrameRequest != null) {
+      globalThis.window?.cancelAnimationFrame(this.mountFrameRequest);
+      this.mountFrameRequest = null;
+    }
+    if (this.startPlayerRequest != null) {
+      globalThis.window?.cancelAnimationFrame(this.startPlayerRequest);
+      this.startPlayerRequest = null;
     }
   }
 
