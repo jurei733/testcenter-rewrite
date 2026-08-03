@@ -45,6 +45,7 @@ import type {
   ContentReleaseActivationReadiness,
   ContentRelease,
   ContentReleaseBookletEntry,
+  ContentReleasePlayerEntry,
   ContentReleaseStatus,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -73,6 +74,7 @@ import type {
   SourcePackageBookletStateEntry,
   SourcePackageSystemCheckEntry,
   SourcePackageTestletEntry,
+  SourcePackageUnitEntry,
   SystemCheckReport,
   SystemCheckReportDeletion,
   SystemCheckReportEntry,
@@ -2077,12 +2079,17 @@ const buildWorkspaceSourcePackageDependencyGraph = (input: {
         relationshipType: "contains_system_check"
       });
       if (systemCheck.unitKey) {
+        const resolvedUnit =
+          systemCheck.unitEntry?.unitKey.toLowerCase() ===
+          systemCheck.unitKey.toLowerCase()
+            ? systemCheck.unitEntry
+            : {
+                unitKey: systemCheck.unitKey,
+                displayLabel: systemCheck.unitKey
+              };
         const unitNodeId =
           unitNodeIds.get(systemCheck.unitKey.toLowerCase()) ??
-          ensureUnitNode({
-            unitKey: systemCheck.unitKey,
-            displayLabel: systemCheck.unitKey
-          });
+          ensureUnitNode(resolvedUnit);
         addEdge({
           fromNodeId: systemCheckNodeId,
           toNodeId: unitNodeId,
@@ -5167,6 +5174,48 @@ const normalizeUnitCodingScheme = (value: unknown): UnitCodingScheme | null => {
   };
 };
 
+const normalizeSourcePackageUnitEntry = (
+  unitEntry: SourcePackageUnitEntry
+): SourcePackageUnitEntry | null => {
+  const unitKey = normalizeManifestToken(unitEntry.unitKey);
+  if (!unitKey) {
+    return null;
+  }
+  const description = normalizeUnitContent(unitEntry.description);
+  const originalUnitId = normalizeManifestToken(unitEntry.originalUnitId);
+  const content = normalizeUnitContent(unitEntry.content);
+  const playerKey = normalizeManifestToken(unitEntry.playerKey);
+  const unitDefinition = normalizeRuntimeDocument(unitEntry.unitDefinition);
+  const unitDefinitionType = normalizeManifestToken(
+    unitEntry.unitDefinitionType
+  );
+  const codingScheme = normalizeUnitCodingScheme(unitEntry.codingScheme);
+  return {
+    unitKey,
+    ...(originalUnitId && originalUnitId !== unitKey
+      ? { originalUnitId }
+      : {}),
+    displayLabel: normalizeManifestLabel(
+      unitEntry.displayLabel,
+      "Unit",
+      unitKey
+    ),
+    ...(Array.isArray(unitEntry.testletPath) && unitEntry.testletPath.length > 0
+      ? {
+          testletPath: unitEntry.testletPath
+            .map(normalizeManifestToken)
+            .filter(Boolean)
+        }
+      : {}),
+    ...(description ? { description } : {}),
+    ...(content ? { content } : {}),
+    ...(playerKey ? { playerKey } : {}),
+    ...(unitDefinition ? { unitDefinition } : {}),
+    ...(unitDefinitionType ? { unitDefinitionType } : {}),
+    ...(codingScheme ? { codingScheme } : {})
+  };
+};
+
 const normalizeContentStructure = (
   contentStructure: SourcePackageContentStructure
 ): ContentReleaseRuntimeSnapshot | null => {
@@ -5224,6 +5273,9 @@ const normalizeContentStructure = (
           .filter(Boolean)
       }];
     });
+    const unitEntry = entry.unitEntry
+      ? normalizeSourcePackageUnitEntry(entry.unitEntry)
+      : null;
     systemCheckEntriesById.set(checkId.toUpperCase(), {
       checkId,
       displayLabel: normalizeManifestLabel(
@@ -5237,6 +5289,7 @@ const normalizeContentStructure = (
       ...(normalizeManifestToken(entry.unitKey)
         ? { unitKey: normalizeManifestToken(entry.unitKey) }
         : {}),
+      ...(unitEntry ? { unitEntry } : {}),
       ...(normalizeManifestToken(entry.saveKey)
         ? { saveKey: normalizeManifestToken(entry.saveKey) }
         : {}),
@@ -5516,45 +5569,12 @@ const normalizeContentStructure = (
       ? bookletEntry.unitEntries
       : [];
     for (const unitEntry of rawUnitEntries) {
-      const unitKey = normalizeManifestToken(unitEntry.unitKey);
-      if (!unitKey || unitKeys.has(unitKey)) {
+      const normalizedUnitEntry = normalizeSourcePackageUnitEntry(unitEntry);
+      if (!normalizedUnitEntry || unitKeys.has(normalizedUnitEntry.unitKey)) {
         continue;
       }
-
-      const description = normalizeUnitContent(unitEntry.description);
-      const originalUnitId = normalizeManifestToken(unitEntry.originalUnitId);
-      const content = normalizeUnitContent(unitEntry.content);
-      const playerKey = normalizeManifestToken(unitEntry.playerKey);
-      const unitDefinition = normalizeRuntimeDocument(unitEntry.unitDefinition);
-      const unitDefinitionType = normalizeManifestToken(
-        unitEntry.unitDefinitionType
-      );
-      const codingScheme = normalizeUnitCodingScheme(unitEntry.codingScheme);
-      normalizedBooklet.unitEntries.push({
-        unitKey,
-        ...(originalUnitId && originalUnitId !== unitKey
-          ? { originalUnitId }
-          : {}),
-        displayLabel: normalizeManifestLabel(
-          unitEntry.displayLabel,
-          "Unit",
-          unitKey
-        ),
-        ...(Array.isArray(unitEntry.testletPath) && unitEntry.testletPath.length > 0
-          ? {
-              testletPath: unitEntry.testletPath
-                .map(normalizeManifestToken)
-                .filter(Boolean)
-            }
-          : {}),
-        ...(description ? { description } : {}),
-        ...(content ? { content } : {}),
-        ...(playerKey ? { playerKey } : {}),
-        ...(unitDefinition ? { unitDefinition } : {}),
-        ...(unitDefinitionType ? { unitDefinitionType } : {}),
-        ...(codingScheme ? { codingScheme } : {})
-      });
-      unitKeys.add(unitKey);
+      normalizedBooklet.unitEntries.push(normalizedUnitEntry);
+      unitKeys.add(normalizedUnitEntry.unitKey);
     }
 
     if (normalizedBooklet.unitEntries.length > 0) {
@@ -10351,6 +10371,135 @@ const extractZipUnitDescription = (sourceDocument: string): string | null => {
   return description || null;
 };
 
+const parseStandaloneZipUnitEntry = (
+  sourceDocument: string
+): SourcePackageUnitEntry | null => {
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(_level, message) {
+        parserErrors.push(message);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return null;
+  }
+  const root = document?.documentElement;
+  if (
+    parserErrors.length > 0 ||
+    !root ||
+    xmlElementLocalName(root).toLowerCase() !== "unit"
+  ) {
+    return null;
+  }
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  const unitKey = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+  if (!unitKey) {
+    return null;
+  }
+  const unitDefinition = extractZipUnitDefinition(sourceDocument);
+  const description = extractZipUnitDescription(sourceDocument);
+  const content = extractZipUnitContent(sourceDocument);
+  return normalizeSourcePackageUnitEntry({
+    unitKey,
+    displayLabel:
+      xmlElementText(xmlChildrenNamed(metadata ?? root, "Label")[0]) || unitKey,
+    ...(description ? { description } : {}),
+    ...(content ? { content } : {}),
+    ...(unitDefinition.playerKey
+      ? { playerKey: unitDefinition.playerKey }
+      : {}),
+    ...(unitDefinition.unitDefinition
+      ? { unitDefinition: unitDefinition.unitDefinition }
+      : {}),
+    ...(unitDefinition.unitDefinitionType
+      ? { unitDefinitionType: unitDefinition.unitDefinitionType }
+      : {})
+  });
+};
+
+const hydrateZipUnitEntry = (input: {
+  unitEntry: SourcePackageUnitEntry;
+  sourceDocument: string;
+  referencedEntry: ZipEntry;
+  manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>;
+  manifestResources: Map<string, XmlManifestResource>;
+  playerEntriesByKey: Map<string, ContentReleasePlayerEntry>;
+}): SourcePackageUnitEntry => {
+  const unitDefinition = extractZipUnitDefinition(input.sourceDocument);
+  const codingSchemeReference =
+    extractZipUnitCodingSchemeReference(input.sourceDocument);
+  const codingSchemeEntry = codingSchemeReference?.reference
+    ? findZipUnitCodingSchemeEntry(
+        input.manifestExtraction,
+        input.referencedEntry,
+        codingSchemeReference.reference,
+        input.manifestResources
+      )
+    : null;
+  const codingSchemeDocument = codingSchemeEntry
+    ? readZipEntryText(input.manifestExtraction.zipBuffer, codingSchemeEntry)
+    : null;
+  const codingSchemeResult = codingSchemeDocument
+    ? parseUnitCodingSchemeDocument(codingSchemeDocument)
+    : null;
+  const definitionEntry = unitDefinition.reference
+    ? findZipUnitReferencedEntry(
+        input.manifestExtraction,
+        input.referencedEntry,
+        unitDefinition.reference,
+        input.manifestResources
+      )
+    : null;
+  const definitionDocument = definitionEntry
+    ? readZipEntryText(input.manifestExtraction.zipBuffer, definitionEntry)
+    : null;
+  const runtimeUnitDefinition = normalizeRuntimeDocument(
+    definitionDocument ?? unitDefinition.unitDefinition
+  );
+  const definitionContent = definitionDocument
+    ? normalizeUnitContent(decodeXmlTextContent(definitionDocument))
+    : null;
+  const content =
+    input.unitEntry.content ??
+    definitionContent ??
+    extractZipUnitContent(input.sourceDocument);
+  const description = input.unitEntry.description
+    ? null
+    : extractZipUnitDescription(input.sourceDocument);
+  const playerEntry = unitDefinition.playerKey
+    ? findZipUnitPlayerEntry(
+        input.manifestExtraction,
+        input.referencedEntry,
+        unitDefinition.playerKey,
+        input.manifestResources
+      )
+    : null;
+  const playerHtml = playerEntry
+    ? readZipEntryText(input.manifestExtraction.zipBuffer, playerEntry)
+    : null;
+  if (unitDefinition.playerKey && playerHtml) {
+    input.playerEntriesByKey.set(unitDefinition.playerKey, {
+      playerKey: unitDefinition.playerKey,
+      html: playerHtml
+    });
+  }
+  return {
+    ...input.unitEntry,
+    ...(description ? { description } : {}),
+    ...(content ? { content } : {}),
+    ...(unitDefinition.playerKey ? { playerKey: unitDefinition.playerKey } : {}),
+    ...(runtimeUnitDefinition ? { unitDefinition: runtimeUnitDefinition } : {}),
+    ...(unitDefinition.unitDefinitionType
+      ? { unitDefinitionType: unitDefinition.unitDefinitionType }
+      : {}),
+    ...(codingSchemeResult?.status === "valid"
+      ? { codingScheme: codingSchemeResult.codingScheme }
+      : {})
+  };
+};
+
 const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null => {
   const trimmedSourceDocument = sourceDocument.trim();
   const dataUrlMatch = trimmedSourceDocument.match(
@@ -10450,7 +10599,8 @@ const normalizeParsedZipXmlContentStructure = (
   let runtimeSnapshot = normalizeParsedXmlContentStructure(
     manifestExtraction.manifestText
   );
-  const referencedBookletEntries = [...manifestResources.values()].flatMap(resource => {
+  const visitedReferencedEntryPaths = new Set<string>();
+  const referencedRuntimeSnapshots = [...manifestResources.values()].flatMap(resource => {
     const referencedEntry = findZipEntryByPath(
       manifestExtraction.entries,
       resolveZipResourcePathCandidates(
@@ -10461,6 +10611,13 @@ const normalizeParsedZipXmlContentStructure = (
     if (!referencedEntry) {
       return [];
     }
+    const normalizedReferencedEntryPath = normalizeZipEntryPath(
+      referencedEntry.fileName
+    ).toLowerCase();
+    if (visitedReferencedEntryPaths.has(normalizedReferencedEntryPath)) {
+      return [];
+    }
+    visitedReferencedEntryPaths.add(normalizedReferencedEntryPath);
 
     const sourceDocument = readZipEntryText(
       manifestExtraction.zipBuffer,
@@ -10475,19 +10632,41 @@ const normalizeParsedZipXmlContentStructure = (
       collectXmlBookletUnitContentPathCandidates(sourceDocument)
     );
 
-    return (
-      normalizeParsedXmlContentStructure(sourceDocument)?.bookletEntries ?? []
-    );
+    const referencedSnapshot = normalizeParsedXmlContentStructure(sourceDocument);
+    return referencedSnapshot ? [referencedSnapshot] : [];
   });
-  // These entries already are normalized runtime booklets. Normalizing them as
-  // source entries again would discard compiled policies from referenced XML.
+  const referencedBookletEntries = referencedRuntimeSnapshots.flatMap(
+    snapshot => snapshot.bookletEntries
+  );
+  const referencedSystemCheckEntries = referencedRuntimeSnapshots.flatMap(
+    snapshot => snapshot.systemCheckEntries ?? []
+  );
+  // These entries already are normalized runtime structures. Normalizing them
+  // as source entries again would discard compiled booklet policies.
   const referencedRuntimeSnapshot: ContentReleaseRuntimeSnapshot | null =
-    referencedBookletEntries.length > 0
-      ? { bookletEntries: referencedBookletEntries }
+    referencedBookletEntries.length > 0 || referencedSystemCheckEntries.length > 0
+      ? {
+          bookletEntries: referencedBookletEntries,
+          ...(referencedSystemCheckEntries.length > 0
+            ? { systemCheckEntries: referencedSystemCheckEntries }
+            : {})
+        }
       : null;
 
   if (referencedRuntimeSnapshot) {
-    runtimeSnapshot = referencedRuntimeSnapshot;
+    runtimeSnapshot = {
+      bookletEntries:
+        referencedRuntimeSnapshot.bookletEntries.length > 0
+          ? referencedRuntimeSnapshot.bookletEntries
+          : runtimeSnapshot?.bookletEntries ?? [],
+      ...(referencedRuntimeSnapshot.systemCheckEntries?.length
+        ? {
+            systemCheckEntries: referencedRuntimeSnapshot.systemCheckEntries
+          }
+        : runtimeSnapshot?.systemCheckEntries?.length
+          ? { systemCheckEntries: runtimeSnapshot.systemCheckEntries }
+          : {})
+    };
   }
 
   if (!runtimeSnapshot) {
@@ -10555,85 +10734,64 @@ const normalizeParsedZipXmlContentStructure = (
           return unitEntry;
         }
 
-        const unitDefinition = extractZipUnitDefinition(sourceDocument);
-        const codingSchemeReference =
-          extractZipUnitCodingSchemeReference(sourceDocument);
-        const codingSchemeEntry = codingSchemeReference?.reference
-          ? findZipUnitCodingSchemeEntry(
-              manifestExtraction,
-              referencedEntry,
-              codingSchemeReference.reference,
-              manifestResources
-            )
-          : null;
-        const codingSchemeDocument = codingSchemeEntry
-          ? readZipEntryText(manifestExtraction.zipBuffer, codingSchemeEntry)
-          : null;
-        const codingSchemeResult = codingSchemeDocument
-          ? parseUnitCodingSchemeDocument(codingSchemeDocument)
-          : null;
-        const definitionReference = unitDefinition.reference;
-        const definitionEntry = definitionReference
-          ? findZipEntryByPath(
-              manifestExtraction.entries,
-              resolveZipResourcePathCandidates(
-                referencedEntry.fileName,
-                definitionReference
-              )
-            )
-          : null;
-        const definitionDocument = definitionEntry
-          ? readZipEntryText(manifestExtraction.zipBuffer, definitionEntry)
-          : null;
-        const runtimeUnitDefinition = normalizeRuntimeDocument(
-          definitionDocument ?? unitDefinition.unitDefinition
-        );
-        const definitionContent = definitionDocument
-          ? normalizeUnitContent(decodeXmlTextContent(definitionDocument))
-          : null;
-        const content =
-          unitEntry.content ??
-          definitionContent ??
-          extractZipUnitContent(sourceDocument);
-
-        const description = unitEntry.description
-          ? null
-          : extractZipUnitDescription(sourceDocument);
-        const playerEntry = unitDefinition.playerKey
-          ? findZipUnitPlayerEntry(
-              manifestExtraction,
-              referencedEntry,
-              unitDefinition.playerKey,
-              manifestResources
-            )
-          : null;
-        const playerHtml = playerEntry
-          ? readZipEntryText(manifestExtraction.zipBuffer, playerEntry)
-          : null;
-        if (unitDefinition.playerKey && playerHtml) {
-          playerEntriesByKey.set(unitDefinition.playerKey, {
-            playerKey: unitDefinition.playerKey,
-            html: playerHtml
-          });
-        }
-
-        return {
-          ...unitEntry,
-          ...(description ? { description } : {}),
-          ...(content ? { content } : {}),
-          ...(unitDefinition.playerKey
-            ? { playerKey: unitDefinition.playerKey }
-            : {}),
-          ...(runtimeUnitDefinition ? { unitDefinition: runtimeUnitDefinition } : {}),
-          ...(unitDefinition.unitDefinitionType
-            ? { unitDefinitionType: unitDefinition.unitDefinitionType }
-            : {}),
-          ...(codingSchemeResult?.status === "valid"
-            ? { codingScheme: codingSchemeResult.codingScheme }
-            : {})
-        };
+        return hydrateZipUnitEntry({
+          unitEntry,
+          sourceDocument,
+          referencedEntry,
+          manifestExtraction,
+          manifestResources,
+          playerEntriesByKey
+        });
       })
     })),
+    ...(runtimeSnapshot.systemCheckEntries?.length
+      ? {
+          systemCheckEntries: runtimeSnapshot.systemCheckEntries.map(
+            systemCheck => {
+              if (!systemCheck.unitKey) {
+                return systemCheck;
+              }
+              const unitResource = findXmlManifestResource(
+                manifestResources,
+                systemCheck.unitKey
+              );
+              const referencedEntry = unitResource
+                ? findZipEntryByPath(
+                    manifestExtraction.entries,
+                    resolveZipResourcePathCandidates(
+                      manifestExtraction.manifestFileName,
+                      unitResource.key
+                    )
+                  )
+                : null;
+              if (!referencedEntry) {
+                return systemCheck;
+              }
+              const sourceDocument = readZipEntryText(
+                manifestExtraction.zipBuffer,
+                referencedEntry
+              );
+              const unitEntry = sourceDocument
+                ? parseStandaloneZipUnitEntry(sourceDocument)
+                : null;
+              if (!sourceDocument || !unitEntry) {
+                return systemCheck;
+              }
+              return {
+                ...systemCheck,
+                unitEntry: hydrateZipUnitEntry({
+                  unitEntry,
+                  sourceDocument,
+                  referencedEntry,
+                  manifestExtraction,
+                  manifestResources,
+                  playerEntriesByKey
+                })
+              };
+            }
+          )
+        }
+      : {}),
     ...(playerEntriesByKey.size > 0
       ? { playerEntries: [...playerEntriesByKey.values()] }
       : {})
@@ -10672,6 +10830,32 @@ const validateZipXmlEntries = (
     diagnostics.push(
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
+    for (const systemCheck of parseSystemCheckSourceDocument(sourceDocument)) {
+      if (!systemCheck.unitKey) {
+        continue;
+      }
+      const unitResource = findXmlManifestResource(
+        manifestResources,
+        systemCheck.unitKey
+      );
+      const unitEntry = unitResource
+        ? findZipEntryByPath(
+            manifestExtraction.entries,
+            resolveZipResourcePathCandidates(
+              manifestExtraction.manifestFileName,
+              unitResource.key
+            )
+          )
+        : null;
+      if (!unitEntry) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_system_check_unit_missing",
+            `System-check ZIP entry '${entry.fileName}' references missing unit '${systemCheck.unitKey}'.`
+          )
+        );
+      }
+    }
     const unitDefinition = extractZipUnitDefinition(sourceDocument);
     const declaredUnitReferences =
       extractDeclaredTestcenterUnitCrossReferences(sourceDocument);
@@ -14935,6 +15119,11 @@ export const createFirstSliceServices = (
         ...sourcePackage,
         contentStructure: {
           bookletEntries: [],
+          ...(importResolution.runtimeSnapshot.playerEntries?.length
+            ? {
+                playerEntries: importResolution.runtimeSnapshot.playerEntries
+              }
+            : {}),
           systemCheckEntries:
             importResolution.runtimeSnapshot.systemCheckEntries ?? []
         },
@@ -15026,6 +15215,32 @@ export const createFirstSliceServices = (
       if (!systemCheck.unitKey) {
         return null;
       }
+      if (
+        systemCheck.unitEntry &&
+        systemCheck.unitEntry.unitKey.toUpperCase() ===
+          systemCheck.unitKey.toUpperCase()
+      ) {
+        const player = sourcePackage.contentStructure?.playerEntries?.find(
+          entry => entry.playerKey === systemCheck.unitEntry?.playerKey
+        );
+        return {
+          unitKey: systemCheck.unitEntry.unitKey,
+          displayLabel: systemCheck.unitEntry.displayLabel,
+          ...(systemCheck.unitEntry.playerKey
+            ? { playerKey: systemCheck.unitEntry.playerKey }
+            : {}),
+          ...(player?.html ? { playerHtml: player.html } : {}),
+          ...(systemCheck.unitEntry.unitDefinition
+            ? { unitDefinition: systemCheck.unitEntry.unitDefinition }
+            : {}),
+          ...(systemCheck.unitEntry.unitDefinitionType
+            ? {
+                unitDefinitionType:
+                  systemCheck.unitEntry.unitDefinitionType
+              }
+            : {})
+        };
+      }
       for (const release of releases) {
         for (const booklet of release.runtimeSnapshot.bookletEntries) {
           const unit = booklet.unitEntries.find(
@@ -15092,7 +15307,11 @@ export const createFirstSliceServices = (
         if (byCheckId.has(normalizedId)) {
           continue;
         }
-        const { saveKey: _saveKey, ...publicDefinition } = systemCheck;
+        const {
+          saveKey: _saveKey,
+          unitEntry: _unitEntry,
+          ...publicDefinition
+        } = systemCheck;
         byCheckId.set(normalizedId, {
           ...publicDefinition,
           sourcePackageId: sourcePackage.sourcePackageId,

@@ -19396,6 +19396,42 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     '    <Q id="1"',
     '    <CustomText key="syscheck_intro">Project-specific readiness introduction</CustomText>\n\n    <Q id="1"'
   );
+  const systemCheckUnitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "units/Unit2.xml"),
+    "utf8"
+  ).replace("<Id>UNIT.SAMPLE-2</Id>", "<Id>UNIT.SAMPLE</Id>");
+  for (const dependency of [
+    {
+      fileName: "SystemCheckUnit.xml",
+      mediaType: "application/xml",
+      sourceDocument: systemCheckUnitDocument
+    },
+    {
+      fileName: "coding-scheme.vocs.json",
+      mediaType: "application/json",
+      sourceDocument: readFileSync(
+        resolve(originalTestcenterCorpusRoot, "schemes/coding-scheme.vocs.json"),
+        "utf8"
+      )
+    },
+    {
+      fileName: "verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: readFileSync(
+        resolve(
+          originalTestcenterCorpusRoot,
+          "players/verona-player-simple-6.0.html"
+        ),
+        "utf8"
+      )
+    }
+  ]) {
+    const dependencyUpload = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      { method: "POST", body: dependency }
+    );
+    assert.equal(dependencyUpload.status, 201, dependency.fileName);
+  }
   const sourcePackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(
@@ -19412,7 +19448,11 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(sourcePackage.status, 201);
 
   const imported = await requestJson<{
-    importJob: { status: string; diagnostics: unknown[] };
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: unknown[];
+    };
     stagedContentRelease: unknown;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
     method: "POST",
@@ -19422,6 +19462,10 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(imported.body.importJob.status, "completed");
   assert.deepEqual(imported.body.importJob.diagnostics, []);
   assert.equal(imported.body.stagedContentRelease, null);
+  assert.notEqual(
+    imported.body.importJob.sourcePackageId,
+    sourcePackage.body.sourcePackage.sourcePackageId
+  );
 
   const configurations = await requestJson<{
     items: Array<{
@@ -19439,7 +19483,14 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
       }>;
       uploadSpeed: { min: number; sequenceSizes: number[] };
       customTexts: Record<string, string>;
-      unit: { unitKey: string; playerHtml?: string } | null;
+      unit: {
+        unitKey: string;
+        displayLabel: string;
+        playerKey?: string;
+        playerHtml?: string;
+        unitDefinition?: string;
+        unitDefinitionType?: string;
+      } | null;
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks`);
   assert.equal(configurations.status, 200);
@@ -19464,7 +19515,89 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     "Project-specific readiness introduction"
   );
   assert.equal(configuration?.unit?.unitKey, "UNIT.SAMPLE");
-  assert.equal(configuration?.unit?.playerHtml, undefined);
+  assert.equal(configuration?.unit?.displayLabel, "A sample unit");
+  assert.equal(configuration?.unit?.playerKey, "verona-player-simple@6.0");
+  assert.match(configuration?.unit?.playerHtml ?? "", /Simple Verona Player 6\.0/);
+  assert.match(configuration?.unit?.unitDefinition ?? "", /name="var1"/);
+  assert.equal(
+    configuration?.unit?.unitDefinitionType,
+    "verona-player-simple@6.0"
+  );
+  assert.equal(
+    configuration?.sourcePackageId,
+    imported.body.importJob.sourcePackageId
+  );
+  const systemCheckSnapshotDetail = await requestJson<{
+    sourcePackageDetail: {
+      dependencyGraph: {
+        edges: Array<{ relationshipType: string }>;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${imported.body.importJob.sourcePackageId}`
+  );
+  const systemCheckRelationshipTypes = new Set(
+    systemCheckSnapshotDetail.body.sourcePackageDetail.dependencyGraph.edges.map(
+      edge => edge.relationshipType
+    )
+  );
+  for (const relationshipType of [
+    "assembled_from",
+    "contains_system_check",
+    "uses_unit",
+    "uses_player",
+    "uses_definition",
+    "uses_coding_scheme"
+  ]) {
+    assert.ok(
+      systemCheckRelationshipTypes.has(relationshipType),
+      relationshipType
+    );
+  }
+
+  const incompleteSystemCheckZip = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content: [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<manifest identifier="incomplete-system-check">',
+        "  <resources>",
+        '    <resource identifier="SYSCHECK.SAMPLE" href="SysCheck.xml" />',
+        "  </resources>",
+        "</manifest>"
+      ].join("\n")
+    },
+    { fileName: "SysCheck.xml", content: sourceDocument }
+  ]);
+  const incompleteSystemCheckSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "incomplete-system-check.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${incompleteSystemCheckZip}`
+    }
+  });
+  const incompleteSystemCheckImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        incompleteSystemCheckSource.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(incompleteSystemCheckImport.body.importJob.status, "failed");
+  assert.ok(
+    incompleteSystemCheckImport.body.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_system_check_unit_missing"
+    )
+  );
+  assert.equal(incompleteSystemCheckImport.body.stagedContentRelease, null);
 
   const reportBody = {
     title: "SAMPLE SYS-CHECK REPORT",

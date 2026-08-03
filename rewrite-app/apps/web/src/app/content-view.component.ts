@@ -189,7 +189,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Loose File Assembly</h2>
-        <p>Upload related booklet, unit, coding-scheme, player, resource, and manifest files together. Importing a booklet captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
+        <p>Upload related booklet or system-check, unit, coding-scheme, player, resource, and manifest files together. Importing the booklet or system check captures uniquely matching workspace dependencies in an immutable ZIP automatically; use the reviewed selection below when names are ambiguous or you need an explicit bundle.</p>
         <div class="form-grid full">
           <label>
             Upload Loose Files

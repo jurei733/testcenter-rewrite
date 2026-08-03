@@ -1051,6 +1051,42 @@ try {
       '    <Q id="1"',
       '    <CustomText key="syscheck_intro">UI smoke readiness introduction</CustomText>\n\n    <Q id="1"'
     );
+    const systemCheckUnitDocument = (await readFile(
+      resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+      "utf8"
+    )).replace("<Id>UNIT.SAMPLE-2</Id>", "<Id>UNIT.SAMPLE</Id>");
+    for (const dependency of [
+      {
+        fileName: "SystemCheckUnit.xml",
+        mediaType: "application/xml",
+        sourceDocument: systemCheckUnitDocument
+      },
+      {
+        fileName: "coding-scheme.vocs.json",
+        mediaType: "application/json",
+        sourceDocument: await readFile(
+          resolve(
+            "test-fixtures/original-testcenter/schemes/coding-scheme.vocs.json"
+          ),
+          "utf8"
+        )
+      },
+      {
+        fileName: "verona-player-simple-6.0.html",
+        mediaType: "text/html",
+        sourceDocument: await readFile(
+          resolve(
+            "test-fixtures/original-testcenter/players/verona-player-simple-6.0.html"
+          ),
+          "utf8"
+        )
+      }
+    ]) {
+      await sendSmokeJson(
+        `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
+        { body: dependency }
+      );
+    }
     const systemCheckSourceResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
       {
@@ -1068,9 +1104,15 @@ try {
       systemCheckSourcePackageId,
       "UI smoke expected a source package id for the system check."
     );
-    await sendSmokeJson(
+    const systemCheckImportResponse = await sendSmokeJson(
       `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/import-jobs`,
       { body: { sourcePackageId: systemCheckSourcePackageId } }
+    );
+    const systemCheckImport = await systemCheckImportResponse.json();
+    assert.equal(systemCheckImport.importJob?.status, "completed");
+    assert.notEqual(
+      systemCheckImport.importJob?.sourcePackageId,
+      systemCheckSourcePackageId
     );
     await page.goto(
       `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
@@ -1114,7 +1156,18 @@ try {
     await page.getByRole("radio", { name: "Option A", exact: true }).check();
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Player and unit" }).waitFor();
-    await page.getByText("Player check unavailable", { exact: true }).waitFor();
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: "API 6.0" })
+      .waitFor({ timeout: 15_000 });
+    const systemCheckPlayerFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
+    await systemCheckPlayerFrame.locator("#var1").fill("System check answer");
+    await page
+      .locator("#participantVeronaPlayerStatus")
+      .filter({ hasText: "running" })
+      .waitFor({ timeout: 15_000 });
     await page.locator("#systemCheckNextButton").click();
     await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
     await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check");
@@ -1127,6 +1180,7 @@ try {
     await page
       .locator(".system-check-operator")
       .filter({ hasText: "UI Smoke System Check" })
+      .filter({ hasText: "System check answer" })
       .waitFor({ timeout: 15_000 });
     await expectButtonSelectorEnabled("#exportSystemCheckReportsButton");
     const systemCheckReportDownloadPromise = page.waitForEvent("download");

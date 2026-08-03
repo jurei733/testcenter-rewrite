@@ -489,6 +489,7 @@ export type SourcePackageSystemCheckEntry = {
   displayLabel: string;
   description?: string;
   unitKey?: string;
+  unitEntry?: SourcePackageUnitEntry;
   saveKey?: string;
   skipNetwork: boolean;
   uploadSpeed: SystemCheckSpeedParameters;
@@ -641,7 +642,7 @@ export type ContentReleaseRuntimeSnapshot = {
 
 export type WorkspaceSystemCheck = Omit<
   SourcePackageSystemCheckEntry,
-  "saveKey"
+  "saveKey" | "unitEntry"
 > & {
   sourcePackageId: string;
   canSave: boolean;
