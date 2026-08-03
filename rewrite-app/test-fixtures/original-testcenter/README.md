@@ -16,7 +16,11 @@ multi-booklet assignment, second codes, access windows, and hot-return versus
 hot-restart re-entry. The official Group-Monitoring booklet and roster add the
 original participant plus scoped monitor login, both imported view profiles,
 group isolation, and the pause/resume/go-to/lock/unlock command path. The corpus
-also contains the original XSD-backed rejection
+also pins the byte-exact official `CY_SysCheck_2.xml` beside the sample system
+check. Together they gate same-workspace check selection, measured versus
+skipped networking, the complete original question-type set, required-field
+feedback, a resolved Verona item, save-key reports, and isolated report cleanup.
+The corpus also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, and Testtakers structures plus duplicate
 runtime identities. It also contains the byte-exact original sample
 `.itcr.zip` resource package as base64 so the binary fixture remains reviewable

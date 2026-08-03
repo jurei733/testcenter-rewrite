@@ -586,8 +586,25 @@
       "fixture": "system-checks/SysCheck.xml",
       "sourcePath": "sampledata/SysCheck.xml",
       "checkId": "SYSCHECK.SAMPLE",
+      "displayLabel": "System-Check Beispiel",
+      "unitKey": "UNIT.SAMPLE",
       "questionCount": 6,
+      "questionTypes": ["header", "string", "select", "text", "check", "radio"],
+      "requiredQuestionIds": ["2"],
       "skipNetwork": false,
+      "canSave": true
+    },
+    {
+      "fixture": "system-checks/CY_SysCheck_2.xml",
+      "sourcePath": "sampledata/system-test/CY_SysCheck_2.xml",
+      "sha256": "ccc8fa83ec7680bb466ebd02a58fb3062b130673b956feb7d33f3cbdfaca9d7c",
+      "checkId": "syscheck-2",
+      "displayLabel": "System-Check-2",
+      "unitKey": "UNIT.SAMPLE",
+      "questionCount": 6,
+      "questionTypes": ["header", "string", "select", "text", "check", "radio"],
+      "requiredQuestionIds": ["2"],
+      "skipNetwork": true,
       "canSave": true
     }
   ]

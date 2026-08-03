@@ -20836,7 +20836,7 @@ test("monitor bulk commands report per-run successes and failures", async () => 
   }
 });
 
-test("original SysCheck XML imports and produces compatible saved reports", async () => {
+test("original Testcenter compatibility corpus executes both official SysCheck configurations and compatible reports", async () => {
   const tenantKey = "system-check-tenant";
   const workspaceKey = "system-check-workspace";
   await requestJson("/api/v1/platform/tenants", {
@@ -20925,6 +20925,50 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     sourcePackage.body.sourcePackage.sourcePackageId
   );
 
+  const secondSystemCheckDocument = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "system-checks/CY_SysCheck_2.xml"
+    ),
+    "utf8"
+  );
+  const secondSystemCheckSource = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "CY_SysCheck_2.xml",
+        mediaType: "application/xml",
+        sourceDocument: secondSystemCheckDocument
+      }
+    }
+  );
+  assert.equal(secondSystemCheckSource.status, 201);
+  const secondSystemCheckImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: unknown[];
+    };
+    stagedContentRelease: unknown;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        secondSystemCheckSource.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(secondSystemCheckImport.status, 201);
+  assert.equal(secondSystemCheckImport.body.importJob.status, "completed");
+  assert.deepEqual(secondSystemCheckImport.body.importJob.diagnostics, []);
+  assert.equal(secondSystemCheckImport.body.stagedContentRelease, null);
+  assert.notEqual(
+    secondSystemCheckImport.body.importJob.sourcePackageId,
+    secondSystemCheckSource.body.sourcePackage.sourcePackageId
+  );
+
   const configurations = await requestJson<{
     items: Array<{
       checkId: string;
@@ -20936,6 +20980,7 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
       questions: Array<{
         id: string;
         type: string;
+        prompt: string;
         required: boolean;
         options: string[];
       }>;
@@ -20952,8 +20997,15 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     }>;
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks`);
   assert.equal(configurations.status, 200);
-  assert.equal(configurations.body.items.length, 1);
-  const configuration = configurations.body.items[0];
+  assert.equal(configurations.body.items.length, 2);
+  const configuration = configurations.body.items.find(
+    item => item.checkId === "SYSCHECK.SAMPLE"
+  );
+  const secondConfiguration = configurations.body.items.find(
+    item => item.checkId.toUpperCase() === "SYSCHECK-2"
+  );
+  assert.ok(configuration);
+  assert.ok(secondConfiguration);
   assert.equal(configuration?.checkId, "SYSCHECK.SAMPLE");
   assert.equal(configuration?.displayLabel, "System-Check Beispiel");
   assert.equal(configuration?.canSave, true);
@@ -20984,6 +21036,70 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(
     configuration?.sourcePackageId,
     imported.body.importJob.sourcePackageId
+  );
+  assert.equal(secondConfiguration.checkId, "syscheck-2");
+  assert.equal(secondConfiguration.displayLabel, "System-Check-2");
+  assert.equal(secondConfiguration.canSave, true);
+  assert.equal(secondConfiguration.skipNetwork, true);
+  assert.deepEqual(
+    secondConfiguration.questions.map(question => ({
+      id: question.id,
+      type: question.type,
+      prompt: question.prompt,
+      required: question.required,
+      options: question.options
+    })),
+    [
+      {
+        id: "1",
+        type: "header",
+        prompt: "Beispielüberschrift",
+        required: false,
+        options: []
+      },
+      {
+        id: "2",
+        type: "string",
+        prompt: "Eingabefeld",
+        required: true,
+        options: []
+      },
+      {
+        id: "3",
+        type: "select",
+        prompt: "Auswahl",
+        required: false,
+        options: ["Option A", "Option B"]
+      },
+      {
+        id: "4",
+        type: "text",
+        prompt: "Eingabebereich",
+        required: false,
+        options: []
+      },
+      {
+        id: "5",
+        type: "check",
+        prompt: "Kontrollkästchen",
+        required: false,
+        options: []
+      },
+      {
+        id: "6",
+        type: "radio",
+        prompt: "Optionsfelder",
+        required: false,
+        options: ["Option A", "Option B"]
+      }
+    ]
+  );
+  assert.equal(secondConfiguration.unit?.unitKey, "UNIT.SAMPLE");
+  assert.equal(secondConfiguration.unit?.displayLabel, "A sample unit");
+  assert.equal(secondConfiguration.unit?.playerKey, "verona-player-simple@6.0");
+  assert.equal(
+    secondConfiguration.sourcePackageId,
+    secondSystemCheckImport.body.importJob.sourcePackageId
   );
   const systemCheckSnapshotDetail = await requestJson<{
     sourcePackageDetail: {
@@ -21125,6 +21241,81 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(saved.body.report.checkLabel, "System-Check Beispiel");
   assert.equal(saved.body.report.title, "SAMPLE SYS-CHECK REPORT");
   assert.equal(saved.body.report.environment.length, 1);
+
+  const secondReportBody = {
+    title: "SECOND ORIGINAL SYS-CHECK REPORT",
+    keyPhrase: "saveme",
+    responses: "",
+    environment: reportBody.environment,
+    network: [],
+    questionnaire: [
+      {
+        id: "2",
+        type: "string",
+        label: "Eingabefeld",
+        value: "Test-Input1",
+        warning: false
+      },
+      {
+        id: "3",
+        type: "select",
+        label: "Auswahl",
+        value: "Option A",
+        warning: false
+      },
+      {
+        id: "4",
+        type: "text",
+        label: "Eingabebereich",
+        value: "Test-Input2",
+        warning: false
+      },
+      {
+        id: "5",
+        type: "check",
+        label: "Kontrollkästchen",
+        value: true,
+        warning: false
+      },
+      {
+        id: "6",
+        type: "radio",
+        label: "Optionsfelder",
+        value: "Option B",
+        warning: false
+      }
+    ],
+    unit: reportBody.unit
+  };
+  const secondSaved = await requestJson<{
+    report: {
+      systemCheckReportId: string;
+      checkId: string;
+      checkLabel: string;
+      network: unknown[];
+      questionnaire: Array<{ id: string; value: string | boolean }>;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/syscheck-2/reports`,
+    { method: "POST", body: secondReportBody }
+  );
+  assert.equal(secondSaved.status, 201);
+  assert.equal(secondSaved.body.report.checkId, "syscheck-2");
+  assert.equal(secondSaved.body.report.checkLabel, "System-Check-2");
+  assert.deepEqual(secondSaved.body.report.network, []);
+  assert.deepEqual(
+    secondSaved.body.report.questionnaire.map(entry => ({
+      id: entry.id,
+      value: entry.value
+    })),
+    [
+      { id: "2", value: "Test-Input1" },
+      { id: "3", value: "Option A" },
+      { id: "4", value: "Test-Input2" },
+      { id: "5", value: true },
+      { id: "6", value: "Option B" }
+    ]
+  );
 
   const anonymousSystemCheckAccess = await requestJson<{
     accessMode: string;
@@ -21309,7 +21500,7 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     "system_check_login_required"
   );
 
-  const secondSaved = await requestJson<{
+  const secondProtectedSaved = await requestJson<{
     report: { systemCheckReportId: string };
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-checks/SYSCHECK.SAMPLE/reports`,
@@ -21350,7 +21541,7 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
       }
     }
   );
-  assert.equal(secondSaved.status, 201);
+  assert.equal(secondProtectedSaved.status, 201);
 
   const reports = await requestJson<{
     items: Array<{ systemCheckReportId: string; checkId: string }>;
@@ -21361,7 +21552,7 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   assert.equal(reports.body.items.length, 1);
   assert.equal(
     reports.body.items[0]?.systemCheckReportId,
-    secondSaved.body.report.systemCheckReportId
+    secondProtectedSaved.body.report.systemCheckReportId
   );
 
   const statistics = await requestJson<{
@@ -21376,20 +21567,31 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports/statistics`
   );
   assert.equal(statistics.status, 200);
-  assert.equal(statistics.body.items.length, 1);
-  assert.equal(statistics.body.items[0]?.checkId, "SYSCHECK.SAMPLE");
-  assert.equal(statistics.body.items[0]?.reportCount, 3);
-  assert.deepEqual(statistics.body.items[0]?.browsers, [
+  assert.equal(statistics.body.items.length, 2);
+  const primaryStatistics = statistics.body.items.find(
+    item => item.checkId === "SYSCHECK.SAMPLE"
+  );
+  const secondStatistics = statistics.body.items.find(
+    item => item.checkId.toUpperCase() === "SYSCHECK-2"
+  );
+  assert.ok(primaryStatistics);
+  assert.ok(secondStatistics);
+  assert.equal(primaryStatistics.reportCount, 3);
+  assert.deepEqual(primaryStatistics.browsers, [
     { value: "Chrome", count: 2 },
     { value: "Firefox", count: 1 }
   ]);
-  assert.deepEqual(statistics.body.items[0]?.operatingSystems, [
+  assert.deepEqual(primaryStatistics.operatingSystems, [
     { value: "unknown", count: 2 },
     { value: "Linux", count: 1 }
   ]);
-  assert.deepEqual(statistics.body.items[0]?.overallRatings, [
+  assert.deepEqual(primaryStatistics.overallRatings, [
     { value: "good", count: 2 },
     { value: "insufficient", count: 1 }
+  ]);
+  assert.equal(secondStatistics.reportCount, 1);
+  assert.deepEqual(secondStatistics.overallRatings, [
+    { value: "unknown", count: 1 }
   ]);
 
   const csv = await requestText(
@@ -21435,15 +21637,28 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
     [
       protectedSaved.body.report.systemCheckReportId,
       saved.body.report.systemCheckReportId,
-      secondSaved.body.report.systemCheckReportId
+      secondProtectedSaved.body.report.systemCheckReportId
     ].sort()
   );
 
-  const reportsAfterDeletion = await requestJson<{ items: unknown[] }>(
+  const reportsAfterDeletion = await requestJson<{
+    items: Array<{ systemCheckReportId: string; checkId: string }>;
+  }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`
   );
   assert.equal(reportsAfterDeletion.status, 200);
-  assert.deepEqual(reportsAfterDeletion.body.items, []);
+  assert.deepEqual(
+    reportsAfterDeletion.body.items.map(item => ({
+      systemCheckReportId: item.systemCheckReportId,
+      checkId: item.checkId
+    })),
+    [
+      {
+        systemCheckReportId: secondSaved.body.report.systemCheckReportId,
+        checkId: "syscheck-2"
+      }
+    ]
+  );
 
   const deletionAudit = await requestJson<{
     items: Array<{ activityEvent: { details: { deletedCount: number } } }>;
@@ -21452,4 +21667,23 @@ test("original SysCheck XML imports and produces compatible saved reports", asyn
   );
   assert.equal(deletionAudit.status, 200);
   assert.equal(deletionAudit.body.items[0]?.activityEvent.details.deletedCount, 3);
+
+  const secondDeleted = await requestJson<{
+    deletion: { deletedCount: number; deletedReportIds: string[] };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,
+    {
+      method: "DELETE",
+      body: { checkIds: ["syscheck-2"], confirmation: workspaceKey }
+    }
+  );
+  assert.equal(secondDeleted.status, 200);
+  assert.equal(secondDeleted.body.deletion.deletedCount, 1);
+  assert.deepEqual(secondDeleted.body.deletion.deletedReportIds, [
+    secondSaved.body.report.systemCheckReportId
+  ]);
+  const reportsAfterAllDeletions = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`
+  );
+  assert.deepEqual(reportsAfterAllDeletions.body.items, []);
 });

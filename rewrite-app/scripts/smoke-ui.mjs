@@ -1233,14 +1233,51 @@ try {
       systemCheckImport.importJob?.sourcePackageId,
       systemCheckSourcePackageId
     );
+    const secondSystemCheckSourceResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/source-packages`,
+      {
+        body: {
+          fileName: "CY_SysCheck_2.xml",
+          mediaType: "application/xml",
+          sourceDocument: await readFile(
+            resolve(
+              "test-fixtures/original-testcenter/system-checks/CY_SysCheck_2.xml"
+            ),
+            "utf8"
+          )
+        }
+      }
+    );
+    const secondSystemCheckSource = await secondSystemCheckSourceResponse.json();
+    const secondSystemCheckSourcePackageId =
+      secondSystemCheckSource.sourcePackage?.sourcePackageId;
+    assert.ok(
+      secondSystemCheckSourcePackageId,
+      "UI smoke expected a source package id for the second system check."
+    );
+    const secondSystemCheckImportResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${systemCheckTenantKey}/workspaces/${systemCheckWorkspaceKey}/import-jobs`,
+      { body: { sourcePackageId: secondSystemCheckSourcePackageId } }
+    );
+    const secondSystemCheckImport = await secondSystemCheckImportResponse.json();
+    assert.equal(secondSystemCheckImport.importJob?.status, "completed");
+    assert.notEqual(
+      secondSystemCheckImport.importJob?.sourcePackageId,
+      secondSystemCheckSourcePackageId
+    );
     await page.goto(
       `${baseUrl}/app/system-check?tenantKey=${encodeURIComponent(
         systemCheckTenantKey
       )}&workspaceKey=${encodeURIComponent(
         systemCheckWorkspaceKey
-      )}&checkId=SYSCHECK.SAMPLE`,
+      )}`,
       { waitUntil: "networkidle" }
     );
+    await page.getByRole("heading", { name: "Choose a system check" }).waitFor();
+    await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").waitFor();
+    await page.locator("[data-system-check-id='syscheck-2']").waitFor();
+    assert.equal(await page.locator(".system-check-option").count(), 2);
+    await page.locator("[data-system-check-id='SYSCHECK.SAMPLE']").click();
     await page.getByRole("heading", { name: "System-Check Beispiel" }).waitFor();
     await page
       .locator("#systemCheckIntroText")
@@ -1320,6 +1357,95 @@ try {
     page.once("dialog", async dialog => {
       assert.equal(dialog.type(), "prompt");
       assert.match(dialog.message(), /Delete all reports for SYSCHECK\.SAMPLE/);
+      await dialog.accept(systemCheckWorkspaceKey);
+    });
+    await expectButtonSelectorEnabled("#deleteSystemCheckReportsButton");
+    await page.locator("#deleteSystemCheckReportsButton").click();
+    await page
+      .locator("#systemCheckReportOperatorStatus")
+      .filter({ hasText: "1 report(s) deleted." })
+      .waitFor({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: "Choose Another Check" }).click();
+    await page.getByRole("heading", { name: "Choose a system check" }).waitFor();
+    await page.locator("[data-system-check-id='syscheck-2']").click();
+    await page.getByRole("heading", { name: "System-Check-2" }).waitFor();
+    await page
+      .locator(".system-check-facts")
+      .filter({ hasText: "Skipped by configuration" })
+      .filter({ hasText: "5" })
+      .waitFor();
+    await page
+      .locator("#systemCheckStepStatus")
+      .filter({ hasText: "1 / 5" })
+      .waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "Network", exact: true }).count(),
+      0
+    );
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Environment" }).waitFor();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await expectButtonSelectorEnabled("#systemCheckNextButton");
+    await page.locator("#systemCheckNextButton").click();
+    await page
+      .locator(".validation-message")
+      .filter({ hasText: "Please complete all required questions." })
+      .waitFor();
+    await page.getByRole("heading", { name: "Questionnaire" }).waitFor();
+    await fillAndCommit("#systemCheckQuestion-2", "Test-Input1");
+    await selectAndCommit("#systemCheckQuestion-3", "Option A");
+    await fillAndCommit("#systemCheckQuestion-4", "Test-Input2");
+    await page.locator("#systemCheckQuestion-5").check();
+    await page.getByRole("radio", { name: "Option B", exact: true }).check();
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Player and unit" }).waitFor();
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: "API 6.0" })
+      .waitFor({ timeout: 15_000 });
+    const secondSystemCheckPlayerFrame = page.frameLocator(
+      "#participantVeronaPlayerFrame"
+    );
+    await secondSystemCheckPlayerFrame
+      .locator("#var1")
+      .fill("Second system check answer");
+    await page
+      .locator("#participantVeronaPlayerStatus")
+      .filter({ hasText: "running" })
+      .waitFor({ timeout: 15_000 });
+    await page.locator("#systemCheckNextButton").click();
+    await page.getByRole("heading", { name: "Report", exact: true }).waitFor();
+    await fillAndCommit("#systemCheckReportTitle", "UI Smoke System Check 2");
+    await fillAndCommit("#systemCheckReportKey", "saveme");
+    await expectButtonSelectorEnabled("#saveSystemCheckReportButton");
+    await page.locator("#saveSystemCheckReportButton").click();
+    await page.locator("#systemCheckSavedReportStatus").waitFor({ timeout: 15_000 });
+    await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
+    await page.locator("#loadSystemCheckReportsButton").click();
+    await page
+      .locator(".system-check-report-detail")
+      .filter({ hasText: "UI Smoke System Check 2" })
+      .filter({ hasText: "Test-Input1" })
+      .filter({ hasText: "Option A" })
+      .filter({ hasText: "Test-Input2" })
+      .filter({ hasText: "true" })
+      .filter({ hasText: "Option B" })
+      .filter({ hasText: "Second system check answer" })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator(".system-check-statistics")
+      .filter({ hasText: "System-Check-2" })
+      .filter({ hasText: "Chrome" })
+      .filter({ hasText: "unknown" })
+      .waitFor();
+    await page
+      .getByLabel("Select reports for syscheck-2", { exact: true })
+      .check();
+    page.once("dialog", async dialog => {
+      assert.equal(dialog.type(), "prompt");
+      assert.match(dialog.message(), /Delete all reports for syscheck-2/);
       await dialog.accept(systemCheckWorkspaceKey);
     });
     await expectButtonSelectorEnabled("#deleteSystemCheckReportsButton");

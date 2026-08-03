@@ -297,7 +297,7 @@ type ThroughputResult = {
 
         <div class="actions system-check-navigation">
           <button id="systemCheckBackButton" class="ghost" type="button" [disabled]="stepIndex === 0" (click)="previousStep()">Back</button>
-          <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report'" [disabled]="!canContinue" (click)="nextStep()">Next</button>
+          <button id="systemCheckNextButton" class="primary" type="button" *ngIf="step !== 'report'" [disabled]="nextButtonDisabled" (click)="nextStep()">Next</button>
           <button class="ghost" type="button" (click)="chooseAnother()">Choose Another Check</button>
         </div>
       </ng-container>
@@ -456,6 +456,12 @@ export class SystemCheckViewComponent implements OnInit {
       return this.requiredQuestionsAnswered;
     }
     return !this.busy;
+  }
+
+  get nextButtonDisabled(): boolean {
+    if (this.busy) return true;
+    return this.step === "network" &&
+      (this.networkEntries.length === 0 || this.networkBusy);
   }
 
   get requiredQuestionsAnswered(): boolean {
@@ -661,6 +667,7 @@ export class SystemCheckViewComponent implements OnInit {
       this.unitLoadingTimeMs = null;
       this.savedReport = null;
       this.operatorReports = [];
+      this.questionnaireIssue = "";
       this.step = "welcome";
       this.captureEnvironment();
     });
@@ -669,6 +676,7 @@ export class SystemCheckViewComponent implements OnInit {
   chooseAnother(): void {
     this.systemCheck = null;
     this.step = "welcome";
+    this.questionnaireIssue = "";
     this.errorMessage = "";
   }
 

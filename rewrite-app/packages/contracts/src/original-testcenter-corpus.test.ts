@@ -22,8 +22,14 @@ type OriginalTestcenterCorpus = {
   }>;
   systemChecks: Array<{
     fixture: string;
+    sourcePath: string;
+    sha256?: string;
     checkId: string;
+    displayLabel: string;
+    unitKey: string;
     questionCount: number;
+    questionTypes: string[];
+    requiredQuestionIds: string[];
     skipNetwork: boolean;
     canSave: boolean;
   }>;
@@ -177,18 +183,51 @@ test("original Testcenter compatibility corpus separates participant and operati
     );
   }
 
-  const systemCheck = corpus.systemChecks[0];
-  const systemCheckXml = readFileSync(
-    resolve(corpusRoot, systemCheck.fixture),
-    "utf8"
+  assert.deepEqual(
+    corpus.systemChecks.map(systemCheck => systemCheck.checkId),
+    ["SYSCHECK.SAMPLE", "syscheck-2"]
   );
-  assert.match(systemCheckXml, new RegExp(`<Id>${systemCheck.checkId}</Id>`));
-  assert.equal(
-    Array.from(systemCheckXml.matchAll(/<Q\b/g)).length,
-    systemCheck.questionCount
-  );
-  assert.equal(/skipnetwork="true"/i.test(systemCheckXml), systemCheck.skipNetwork);
-  assert.equal(/\bsavekey="[^"]+"/i.test(systemCheckXml), systemCheck.canSave);
+  for (const systemCheck of corpus.systemChecks) {
+    const systemCheckBuffer = readFileSync(
+      resolve(corpusRoot, systemCheck.fixture)
+    );
+    const systemCheckXml = systemCheckBuffer.toString("utf8");
+    if (systemCheck.sha256) {
+      assert.equal(
+        createHash("sha256").update(systemCheckBuffer).digest("hex"),
+        systemCheck.sha256,
+        systemCheck.sourcePath
+      );
+    }
+    assert.match(systemCheckXml, new RegExp(`<Id>${systemCheck.checkId}</Id>`));
+    assert.match(
+      systemCheckXml,
+      new RegExp(`<Label>${systemCheck.displayLabel}</Label>`)
+    );
+    assert.match(
+      systemCheckXml,
+      new RegExp(`<Config\\b[^>]*\\bunit="${systemCheck.unitKey}"`)
+    );
+    const questionTags = Array.from(systemCheckXml.matchAll(/<Q\b([^>]*)>/g));
+    assert.equal(questionTags.length, systemCheck.questionCount);
+    assert.deepEqual(
+      questionTags.map(match => match[1]?.match(/\btype="([^"]+)"/)?.[1]),
+      systemCheck.questionTypes
+    );
+    assert.deepEqual(
+      questionTags.flatMap(match =>
+        /\brequired="true"/i.test(match[1] ?? "")
+          ? [match[1]?.match(/\bid="([^"]+)"/)?.[1]]
+          : []
+      ),
+      systemCheck.requiredQuestionIds
+    );
+    assert.equal(
+      /skipnetwork="true"/i.test(systemCheckXml),
+      systemCheck.skipNetwork
+    );
+    assert.equal(/\bsavekey="[^"]+"/i.test(systemCheckXml), systemCheck.canSave);
+  }
 
   const reviewParticipant = entries.find(entry => entry.loginKey === "test-review");
   assert.deepEqual(reviewParticipant?.bookletKeys, [
