@@ -55,6 +55,7 @@ import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers"
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
+import type { VeronaResponseChange } from "./verona-player-host.component";
 
 type ParticipantPlayerState = {
   headline: string;
@@ -289,6 +290,8 @@ export class ParticipantViewFacade {
   }> = [];
   private veronaSaveDrainPromise: Promise<void> | null = null;
   private veronaForegroundSaveSettlement = false;
+  private veronaSaveBufferTimeout: number | null = null;
+  private veronaSaveBufferDueAtMs: number | null = null;
   private readonly fullscreenChangeListener = (): void => {
     this.fullscreenActive.set(Boolean(globalThis.document?.fullscreenElement));
   };
@@ -317,6 +320,7 @@ export class ParticipantViewFacade {
       this.fullscreenChangeListener
     );
     globalThis.window?.removeEventListener("online", this.onlineListener);
+    this.clearVeronaSaveBuffer();
   }
 
   persistState(): void {
@@ -1507,7 +1511,7 @@ export class ParticipantViewFacade {
     );
   }
 
-  saveVeronaResponse(response: string): void {
+  saveVeronaResponse(change: VeronaResponseChange): void {
     const currentState = this.readCurrentRunState();
     const unitKey = currentState?.currentUnit.unitKey?.trim();
     if (
@@ -1518,7 +1522,7 @@ export class ParticipantViewFacade {
       return;
     }
 
-    this.runtime.currentUnitResponse = response;
+    this.runtime.currentUnitResponse = change.response;
     this.persistState();
     const queuedEntries = this.queuedVeronaLogs
       .filter(
@@ -1544,7 +1548,7 @@ export class ParticipantViewFacade {
     const save = createParticipantSaveOutboxEntry({
       testRunId: currentState.testRun.testRunId,
       unitKey,
-      response,
+      response: change.response,
       status: currentState.testRun.status === "paused" ? "paused" : "running",
       logs
     });
@@ -1555,7 +1559,7 @@ export class ParticipantViewFacade {
     };
     this.pendingVeronaSave = save;
     persistParticipantSaveOutboxEntry(save);
-    this.scheduleVeronaSaveDrain();
+    this.scheduleVeronaSaveDrain(this.veronaBufferDelayMs(change));
   }
 
   queueVeronaLogs(entries: ParticipantTestLogEntryInput[]): void {
@@ -1587,7 +1591,12 @@ export class ParticipantViewFacade {
       originalUnitId: null,
       entries
     });
-    this.saveVeronaResponse(this.runtime.currentUnitResponse);
+    this.saveVeronaResponse({
+      response: this.runtime.currentUnitResponse,
+      unitDataChanged: false,
+      unitStateChanged: false,
+      playerStateChanged: false
+    });
   }
 
   retryVeronaSave(): void {
@@ -1595,7 +1604,7 @@ export class ParticipantViewFacade {
       this.restorePersistentVeronaSave(this.readCurrentRunState());
     }
     if (this.pendingVeronaSave) {
-      this.scheduleVeronaSaveDrain();
+      this.scheduleVeronaSaveDrain(0);
     }
   }
 
@@ -2073,11 +2082,55 @@ export class ParticipantViewFacade {
     }
   }
 
-  private scheduleVeronaSaveDrain(): void {
-    if (this.veronaSaveDrainPromise || this.veronaForegroundSaveSettlement) {
+  private veronaBufferDelayMs(change: VeronaResponseChange): number {
+    const persistence = this.readCurrentRunState()?.booklet.policy.persistence;
+    const candidateDelays: number[] = [];
+    if (change.unitDataChanged) {
+      candidateDelays.push(persistence?.unitResponsesBufferMs ?? 5_000);
+    }
+    if (change.unitStateChanged || change.playerStateChanged) {
+      candidateDelays.push(persistence?.unitStateBufferMs ?? 6_000);
+    }
+    if (candidateDelays.length === 0) {
+      candidateDelays.push(persistence?.testStateBufferMs ?? 1_000);
+    }
+    return Math.min(...candidateDelays);
+  }
+
+  private scheduleVeronaSaveDrain(delayMs?: number): void {
+    if (this.veronaForegroundSaveSettlement || !this.pendingVeronaSave) {
       return;
     }
+    if (delayMs != null) {
+      const dueAtMs = Date.now() + Math.max(0, delayMs);
+      if (
+        this.veronaSaveBufferDueAtMs == null ||
+        dueAtMs < this.veronaSaveBufferDueAtMs
+      ) {
+        this.veronaSaveBufferDueAtMs = dueAtMs;
+      }
+    }
     this.veronaSaveStatus = "saving";
+    if (this.veronaSaveDrainPromise) {
+      return;
+    }
+
+    const remainingDelayMs = Math.max(
+      0,
+      (this.veronaSaveBufferDueAtMs ?? Date.now()) - Date.now()
+    );
+    if (remainingDelayMs > 0) {
+      if (this.veronaSaveBufferTimeout != null) {
+        globalThis.window?.clearTimeout(this.veronaSaveBufferTimeout);
+      }
+      this.veronaSaveBufferTimeout = globalThis.window?.setTimeout(() => {
+        this.veronaSaveBufferTimeout = null;
+        this.scheduleVeronaSaveDrain();
+      }, remainingDelayMs) ?? null;
+      return;
+    }
+
+    this.clearVeronaSaveBuffer();
     const drainPromise = this.drainVeronaSaveQueue().finally(() => {
       if (this.veronaSaveDrainPromise === drainPromise) {
         this.veronaSaveDrainPromise = null;
@@ -2093,6 +2146,14 @@ export class ParticipantViewFacade {
     });
     this.veronaSaveDrainPromise = drainPromise;
     this.viewState.onActionAsync(() => drainPromise);
+  }
+
+  private clearVeronaSaveBuffer(): void {
+    if (this.veronaSaveBufferTimeout != null) {
+      globalThis.window?.clearTimeout(this.veronaSaveBufferTimeout);
+      this.veronaSaveBufferTimeout = null;
+    }
+    this.veronaSaveBufferDueAtMs = null;
   }
 
   private async drainVeronaSaveQueue(): Promise<void> {
@@ -2343,6 +2404,7 @@ export class ParticipantViewFacade {
   private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<void> {
     this.veronaForegroundSaveSettlement = true;
     try {
+      this.clearVeronaSaveBuffer();
       const activeSave = this.veronaSaveDrainPromise;
       if (activeSave) {
         await activeSave;

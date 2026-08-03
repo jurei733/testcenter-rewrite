@@ -16,6 +16,11 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.display.reloadButton, false);
   assert.equal(defaults.display.silentMode, false);
   assert.deepEqual(defaults.timing.warningMinutes, [5, 1]);
+  assert.deepEqual(defaults.persistence, {
+    unitResponsesBufferMs: 5_000,
+    unitStateBufferMs: 6_000,
+    testStateBufferMs: 1_000
+  });
   assert.equal(
     compileBookletRuntimePolicy({ show_end_button_in_player: "OFF" }).navigation
       .playerEnd,
@@ -35,7 +40,10 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     toolbar_show_reload_button: "TRUE",
     silent_mode: "TRUE",
     unit_show_time_left: "ON",
-    unit_time_left_warnings: "10, 5; 1"
+    unit_time_left_warnings: "10, 5; 1",
+    unit_responses_buffer_time: "2500",
+    unit_state_buffer_time: "3000.9",
+    test_state_buffer_time: "0"
   });
   assert.equal(policy.navigation.requirePresentationComplete, "forward");
   assert.equal(policy.navigation.requireResponseComplete, "always");
@@ -54,10 +62,23 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.display.silentMode, true);
   assert.equal(policy.timing.showTimeLeft, true);
   assert.deepEqual(policy.timing.warningMinutes, [10, 5, 1]);
+  assert.deepEqual(policy.persistence, {
+    unitResponsesBufferMs: 2_500,
+    unitStateBufferMs: 3_000,
+    testStateBufferMs: 0
+  });
   assert.deepEqual(
     compileBookletRuntimePolicy({ unit_time_left_warnings: "" }).timing
       .warningMinutes,
     []
+  );
+  assert.deepEqual(
+    compileBookletRuntimePolicy({
+      unit_responses_buffer_time: "invalid",
+      unit_state_buffer_time: "-1",
+      test_state_buffer_time: ""
+    }).persistence,
+    defaults.persistence
   );
 });
 

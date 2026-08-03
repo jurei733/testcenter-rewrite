@@ -355,7 +355,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [errorText]="view.veronaErrorText"
             (logEntries)="view.queueVeronaLogs($event)"
             (focusLogEntries)="view.saveVeronaFocusLogs($event)"
-            (responseChange)="view.saveVeronaResponse($event)"
+            (responseUpdate)="view.saveVeronaResponse($event)"
             (navigationRequest)="view.navigateFromVerona($event)"
             (retrySave)="view.retryVeronaSave()"
           ></app-verona-player-host>

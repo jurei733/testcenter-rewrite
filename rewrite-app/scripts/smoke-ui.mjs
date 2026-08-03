@@ -5317,13 +5317,17 @@ try {
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: "API 6.0" })
       .waitFor({ timeout: 30_000 });
-    return page.frameLocator("#participantVeronaPlayerFrame");
+    return {
+      frame: page.frameLocator("#participantVeronaPlayerFrame"),
+      participantSessionId
+    };
   };
 
-  const protectedControllerFrame = await openOriginalTestController(
+  const protectedController = await openOriginalTestController(
     "Test_Ctrl-3",
     "Cy-Bklt_TC-3"
   );
+  const protectedControllerFrame = protectedController.frame;
   await protectedControllerFrame
     .getByText("Testung Controller: Startseite", { exact: true })
     .waitFor({ timeout: 15_000 });
@@ -5353,11 +5357,56 @@ try {
   await protectedControllerFrame
     .getByText(/Testung Controller: Aufgabe1:/)
     .waitFor({ timeout: 15_000 });
+  await protectedControllerFrame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .check();
+  await page
+    .locator("#participantVeronaSaveStatus")
+    .filter({ hasText: "saving" })
+    .waitFor();
+  const bufferedControllerStateResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${protectedController.participantSessionId}/current-state`,
+    { method: "GET" }
+  );
+  const bufferedControllerState = await bufferedControllerStateResponse.json();
+  assert.deepEqual(
+    bufferedControllerState.currentRunState.booklet.policy.persistence,
+    {
+      unitResponsesBufferMs: 20_000_000,
+      unitStateBufferMs: 20_000_000,
+      testStateBufferMs: 20_000_000
+    }
+  );
+  assert.equal(
+    bufferedControllerState.currentRunState.testRun.unitResponses[
+      "CY-Unit.Sample-101"
+    ],
+    undefined
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  const flushedControllerStateResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/participant/sessions/${protectedController.participantSessionId}/current-state`,
+    { method: "GET" }
+  );
+  const flushedControllerState = await flushedControllerStateResponse.json();
+  const flushedControllerResponse = JSON.parse(
+    flushedControllerState.currentRunState.testRun.unitResponses[
+      "CY-Unit.Sample-101"
+    ]
+  );
+  assert.ok(
+    Object.keys(flushedControllerResponse.unitState?.dataParts ?? {}).length > 0
+  );
 
-  const completionControllerFrame = await openOriginalTestController(
+  const completionController = await openOriginalTestController(
     "Test_Ctrl-23",
     "Cy-Bklt_TC-14"
   );
+  const completionControllerFrame = completionController.frame;
   await completionControllerFrame
     .getByText("Testung Controller: Aufgabe1: Check response complete and presentation complete", {
       exact: true

@@ -152,7 +152,14 @@
       "displayLabel": "Test-Controller-3",
       "unitKeys": ["CY-Unit.Sample-100", "CY-Unit.Sample-101", "CY-Unit.Sample-102", "CY-Unit.Sample-103", "CY-Unit.Sample-104"],
       "testletRestrictions": [{ "testletKey": "Tslt1", "codeToEnter": "Hase", "timeMax": [1, "confirm"] }],
-      "policy": { "unitMenuEnabled": true, "lockOnTermination": true, "showTimeLeft": true }
+      "policy": {
+        "unitMenuEnabled": true,
+        "lockOnTermination": true,
+        "showTimeLeft": true,
+        "unitResponsesBufferMs": 20000000,
+        "unitStateBufferMs": 20000000,
+        "testStateBufferMs": 20000000
+      }
     },
     {
       "fixture": "booklets/system-test/CY_Bklt_TC-4.xml",

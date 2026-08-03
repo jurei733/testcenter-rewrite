@@ -11477,10 +11477,20 @@ const resolveRuntimeBooklet = (
     };
   }
 
+  const policyDefaults = compileBookletRuntimePolicy(
+    bookletEntry.policy?.sourceConfig ?? {}
+  );
+
   return {
     bookletKey: bookletEntry.bookletKey,
     displayLabel: bookletEntry.displayLabel,
-    policy: bookletEntry.policy ?? compileBookletRuntimePolicy({}),
+    policy: bookletEntry.policy
+      ? {
+          ...bookletEntry.policy,
+          persistence:
+            bookletEntry.policy.persistence ?? policyDefaults.persistence
+        }
+      : policyDefaults,
     testlets: (bookletEntry.testletEntries ?? []).map(testletEntry => ({
       testletKey: testletEntry.testletKey,
       displayLabel: testletEntry.displayLabel,

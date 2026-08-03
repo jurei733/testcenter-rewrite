@@ -7486,6 +7486,9 @@ test("original Testcenter compatibility corpus imports representative booklets",
       fullscreenButton?: boolean;
       showTimeLeft?: boolean;
       warningMinutes?: number[];
+      unitResponsesBufferMs?: number;
+      unitStateBufferMs?: number;
+      testStateBufferMs?: number;
     };
   };
   type InvalidXmlExpectation = {
@@ -7597,6 +7600,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
                 timing: {
                   showTimeLeft: boolean;
                   warningMinutes: number[];
+                };
+                persistence: {
+                  unitResponsesBufferMs: number;
+                  unitStateBufferMs: number;
+                  testStateBufferMs: number;
                 };
               };
               stateEntries?: Array<{ stateKey: string }>;
@@ -7810,6 +7818,24 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.deepEqual(
         booklet.policy.timing.warningMinutes,
         expectation.policy.warningMinutes
+      );
+    }
+    if (expectation.policy.unitResponsesBufferMs !== undefined) {
+      assert.equal(
+        booklet.policy.persistence.unitResponsesBufferMs,
+        expectation.policy.unitResponsesBufferMs
+      );
+    }
+    if (expectation.policy.unitStateBufferMs !== undefined) {
+      assert.equal(
+        booklet.policy.persistence.unitStateBufferMs,
+        expectation.policy.unitStateBufferMs
+      );
+    }
+    if (expectation.policy.testStateBufferMs !== undefined) {
+      assert.equal(
+        booklet.policy.persistence.testStateBufferMs,
+        expectation.policy.testStateBufferMs
       );
     }
   }
@@ -8779,6 +8805,11 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       silentMode: boolean;
     };
     timing: { showTimeLeft: boolean; warningMinutes: number[] };
+    persistence: {
+      unitResponsesBufferMs: number;
+      unitStateBufferMs: number;
+      testStateBufferMs: number;
+    };
   };
   type TimerState = {
     testletKey: string;
@@ -8810,6 +8841,11 @@ test("original Testcenter compatibility corpus executes the complete official Bo
   });
   assert.equal(booklets.length, 4);
 
+  const defaultPersistence = {
+    unitResponsesBufferMs: 5_000,
+    unitStateBufferMs: 6_000,
+    testStateBufferMs: 1_000
+  };
   const expectedPolicies: Record<string, RuntimePolicy> = {
     "Cy-Bklt_BkltConfig-1": {
       navigation: {
@@ -8833,7 +8869,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         reloadButton: false,
         silentMode: false
       },
-      timing: { showTimeLeft: false, warningMinutes: [0.01] }
+      timing: { showTimeLeft: false, warningMinutes: [0.01] },
+      persistence: defaultPersistence
     },
     "Cy-Bklt_BkltConfig-2": {
       navigation: {
@@ -8857,7 +8894,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         reloadButton: false,
         silentMode: false
       },
-      timing: { showTimeLeft: true, warningMinutes: [1] }
+      timing: { showTimeLeft: true, warningMinutes: [1] },
+      persistence: defaultPersistence
     },
     "Cy-Bklt_BkltConfig-3": {
       navigation: {
@@ -8881,7 +8919,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         reloadButton: false,
         silentMode: false
       },
-      timing: { showTimeLeft: false, warningMinutes: [5, 1] }
+      timing: { showTimeLeft: false, warningMinutes: [5, 1] },
+      persistence: defaultPersistence
     },
     "Cy-Bklt_BkltConfig-4": {
       navigation: {
@@ -8905,7 +8944,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         reloadButton: false,
         silentMode: false
       },
-      timing: { showTimeLeft: false, warningMinutes: [5, 1] }
+      timing: { showTimeLeft: false, warningMinutes: [5, 1] },
+      persistence: defaultPersistence
     }
   };
   const projectPolicy = (policy: RuntimePolicy): RuntimePolicy => ({
@@ -8913,7 +8953,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
     player: policy.player,
     completion: policy.completion,
     display: policy.display,
-    timing: policy.timing
+    timing: policy.timing,
+    persistence: policy.persistence
   });
 
   const requestedStore = process.env.FIRST_SLICE_STORE;

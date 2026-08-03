@@ -132,6 +132,16 @@ const warningMinutes = (value: string): number[] =>
       .filter(minutes => Number.isFinite(minutes) && minutes >= 0)
   )].sort((left, right) => right - left);
 
+const bufferMilliseconds = (value: string, fallback: number): number => {
+  if (!value.trim()) {
+    return fallback;
+  }
+  const milliseconds = Number(value);
+  return Number.isFinite(milliseconds) && milliseconds >= 0
+    ? Math.min(Math.floor(milliseconds), 2_147_483_647)
+    : fallback;
+};
+
 export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolicy => {
   const sourceConfig = readBookletConfigValues(value);
   const read = configReader(sourceConfig);
@@ -197,6 +207,20 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       showTimeLeft: on(read("toolbar_show_time_left", "unit_show_time_left"), false),
       warningMinutes: warningMinutes(
         findSourceValue("unit_time_left_warnings") ?? "5,1"
+      )
+    },
+    persistence: {
+      unitResponsesBufferMs: bufferMilliseconds(
+        read("unit_responses_buffer_time"),
+        5_000
+      ),
+      unitStateBufferMs: bufferMilliseconds(
+        read("unit_state_buffer_time"),
+        6_000
+      ),
+      testStateBufferMs: bufferMilliseconds(
+        read("test_state_buffer_time"),
+        1_000
       )
     }
   };

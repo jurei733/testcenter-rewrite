@@ -30,6 +30,13 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
 
+export type VeronaResponseChange = {
+  response: string;
+  unitDataChanged: boolean;
+  unitStateChanged: boolean;
+  playerStateChanged: boolean;
+};
+
 @Component({
   selector: "app-verona-player-host",
   standalone: true,
@@ -139,6 +146,7 @@ export class VeronaPlayerHostComponent
     "The unit could not be loaded. Reload the player or ask the test supervisor for help.";
 
   @Output() readonly responseChange = new EventEmitter<string>();
+  @Output() readonly responseUpdate = new EventEmitter<VeronaResponseChange>();
   @Output() readonly logEntries =
     new EventEmitter<ParticipantTestLogEntryInput[]>();
   @Output() readonly focusLogEntries =
@@ -293,6 +301,19 @@ export class VeronaPlayerHostComponent
           playerState: notification.playerState
         });
         this.responseChange.emit(this.latestResponse);
+        this.responseUpdate.emit({
+          response: this.latestResponse,
+          unitDataChanged:
+            notification.unitState != null &&
+            Object.prototype.hasOwnProperty.call(
+              notification.unitState,
+              "dataParts"
+            ),
+          unitStateChanged:
+            notification.unitState != null &&
+            Object.keys(notification.unitState).some(key => key !== "dataParts"),
+          playerStateChanged: notification.playerState !== undefined
+        });
         break;
       case "vopUnitNavigationRequestedNotification":
         this.handleNavigationRequest(notification);

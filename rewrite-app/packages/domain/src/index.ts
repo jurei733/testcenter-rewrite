@@ -774,6 +774,11 @@ export type BookletRuntimePolicy = {
     showTimeLeft: boolean;
     warningMinutes: number[];
   };
+  persistence: {
+    unitResponsesBufferMs: number;
+    unitStateBufferMs: number;
+    testStateBufferMs: number;
+  };
 };
 
 export type ContentReleaseUnitEntry = {
