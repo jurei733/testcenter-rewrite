@@ -158,19 +158,30 @@ export function applyResumeRunResult(
 
 export function applyCompleteRunResult(
   host: RuntimePresentationHost,
-  payload: { testRun: { testRunId: string; status: string; completedAt?: string | null } }
+  payload: {
+    testRun: {
+      testRunId: string;
+      status: string;
+      locked?: boolean;
+      completedAt?: string | null;
+    };
+  }
 ): void {
   host.syncRuntimeStateFromRun(payload.testRun);
   host.updateRuntimeSummary(
     payload.testRun.status,
-    `Run ${payload.testRun.testRunId} completed at ${payload.testRun.completedAt ?? "unknown"}.`
+    payload.testRun.locked
+      ? `Run ${payload.testRun.testRunId} is locked until a monitor unlocks it.`
+      : `Run ${payload.testRun.testRunId} completed at ${payload.testRun.completedAt ?? "unknown"}.`
   );
   host.setRuntimeMonitorView(
     prettyPrintJson(payload, host.getRuntimeMonitorView())
   );
   host.rememberActivity(
-    "Run Completed",
-    `Run ${payload.testRun.testRunId} is closed.`
+    payload.testRun.locked ? "Run Locked" : "Run Completed",
+    payload.testRun.locked
+      ? `Run ${payload.testRun.testRunId} is waiting for monitor unlock.`
+      : `Run ${payload.testRun.testRunId} is closed.`
   );
 }
 

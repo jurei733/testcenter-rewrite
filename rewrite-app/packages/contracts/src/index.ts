@@ -2204,6 +2204,12 @@ export const filterOpenMonitorRunsByProfile = (
     ) {
       return false;
     }
+    if (
+      isEnabledMonitorProfileFlag(profile.filtersEnabled.locked) &&
+      openRun.locked
+    ) {
+      return false;
+    }
     return !profile.filters.some(filter =>
       monitorProfileFilterExcludesRun(openRun, filter)
     );

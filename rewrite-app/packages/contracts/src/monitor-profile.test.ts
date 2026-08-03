@@ -113,6 +113,23 @@ test("monitor profiles hide pending runs and filter projected block labels", () 
   );
 });
 
+test("monitor profiles honor the original locked-run filter independently", () => {
+  const locked = createOpenRun("locked-ui", "paused");
+  locked.locked = true;
+  const running = createOpenRun("running-ui", "running");
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filtersEnabled: { pending: "no", locked: "yes" }
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([locked, running], profile).map(
+      run => run.loginKey
+    ),
+    ["running-ui"]
+  );
+});
+
 test("monitor profiles filter runs by original booklet species", () => {
   const matching = createOpenRun("matching-ui", "running");
   const other = createOpenRun("other-ui", "running");

@@ -118,6 +118,8 @@ export class RewriteAppRuntimeService {
       | "resume"
       | "complete"
       | "goto"
+      | "lock_test"
+      | "unlock_test"
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time"
@@ -128,20 +130,19 @@ export class RewriteAppRuntimeService {
       ),
       commandType
     );
+    const activityTitle = {
+      pause: "Monitor Pause Issued",
+      resume: "Monitor Resume Issued",
+      complete: "Monitor Complete Issued",
+      goto: "Monitor Go To Issued",
+      lock_test: "Monitor Test Locked",
+      unlock_test: "Monitor Test Unlocked",
+      unlock_navigation: "Monitor Navigation Unlocked",
+      lock_navigation: "Monitor Navigation Locked",
+      set_testlet_time: "Monitor Testlet Time Set"
+    }[commandType];
     this.feedback.rememberActivity(
-      commandType === "pause"
-        ? "Monitor Pause Issued"
-        : commandType === "resume"
-          ? "Monitor Resume Issued"
-          : commandType === "goto"
-            ? "Monitor Go To Issued"
-            : commandType === "unlock_navigation"
-              ? "Monitor Navigation Unlocked"
-              : commandType === "lock_navigation"
-                ? "Monitor Navigation Locked"
-              : commandType === "set_testlet_time"
-                ? "Monitor Testlet Time Set"
-            : "Monitor Complete Issued",
+      activityTitle,
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );
   }
@@ -153,6 +154,8 @@ export class RewriteAppRuntimeService {
       | "resume"
       | "complete"
       | "goto"
+      | "lock_test"
+      | "unlock_test"
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time"

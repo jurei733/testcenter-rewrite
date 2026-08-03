@@ -357,6 +357,8 @@ const mapTestRun = (row: Row | undefined): TestRun | null =>
             ? String(row.booklet_key)
             : String(row.booklet_assignment_key),
         status: row.status as TestRun["status"],
+        locked:
+          row.locked === true || String(row.locked ?? "false") === "true",
         currentUnitKey:
           row.current_unit_key === null || row.current_unit_key === undefined
             ? null
@@ -548,7 +550,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 29;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 30;
 
 const migrations: PostgresMigration[] = [
   {
@@ -993,6 +995,13 @@ const migrations: PostgresMigration[] = [
     name: "add_participant_custom_texts",
     sql: `
       ALTER TABLE participant_roster_entries ADD COLUMN IF NOT EXISTS custom_texts_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `
+  },
+  {
+    version: 30,
+    name: "add_test_run_lock",
+    sql: `
+      ALTER TABLE test_runs ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT FALSE;
     `
   }
 ];
@@ -1789,7 +1798,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getTestRunById(testRunId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE test_run_id = $1`,
         [testRunId],
@@ -1798,7 +1807,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByParticipantSessionId(participantSessionId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1`,
         [participantSessionId],
@@ -1807,7 +1816,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getOpenTestRunByParticipantSessionId(participantSessionId) {
       return one(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE participant_session_id = $1 AND status != 'completed'
          ORDER BY updated_at ASC
@@ -1818,7 +1827,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listTestRunsByWorkspace(tenantId, workspaceId) {
       return many(
-        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        `SELECT test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
          FROM test_runs
          WHERE tenant_id = $1 AND workspace_id = $2`,
         [tenantId, workspaceId],
@@ -1828,8 +1837,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveTestRun(testRun) {
       await pool.query(
         `INSERT INTO test_runs (
-          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+          test_run_id, participant_session_id, tenant_id, workspace_id, content_release_id, booklet_key, execution_mode, booklet_assignment_key, preset_booklet_states_json, booklet_states_json, booklet_state_overrides_json, status, locked, current_unit_key, unit_responses_json, unlocked_testlet_keys_json, monitor_navigation_unlocked, testlet_timers_json, locked_testlet_keys_json, locked_unit_keys_json, created_at, updated_at, completed_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         ON CONFLICT(test_run_id) DO UPDATE SET
           participant_session_id = EXCLUDED.participant_session_id,
           tenant_id = EXCLUDED.tenant_id,
@@ -1842,6 +1851,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           booklet_states_json = EXCLUDED.booklet_states_json,
           booklet_state_overrides_json = EXCLUDED.booklet_state_overrides_json,
           status = EXCLUDED.status,
+          locked = EXCLUDED.locked,
           current_unit_key = EXCLUDED.current_unit_key,
           unit_responses_json = EXCLUDED.unit_responses_json,
           unlocked_testlet_keys_json = EXCLUDED.unlocked_testlet_keys_json,
@@ -1865,6 +1875,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           JSON.stringify(testRun.bookletStates ?? {}),
           JSON.stringify(testRun.bookletStateOverrides ?? {}),
           testRun.status,
+          testRun.locked === true,
           testRun.currentUnitKey,
           JSON.stringify(testRun.unitResponses),
           JSON.stringify(testRun.unlockedTestletKeys ?? []),

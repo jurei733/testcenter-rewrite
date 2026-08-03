@@ -106,6 +106,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Resume</button>
           <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Unit</button>
           <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
+          <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
+          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockTest()">Unlock Test</button>
           <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
           <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorComplete()">Complete</button>
@@ -203,6 +205,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorPause()">Monitor Pause</button>
               <button class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorResume()">Monitor Resume</button>
               <button id="runtimeMonitorGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Monitor Go To Unit</button>
+              <button id="runtimeMonitorLockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockTest()">Monitor Lock Test</button>
+              <button id="runtimeMonitorUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockTest()">Monitor Unlock Test</button>
               <button id="runtimeMonitorUnlockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorUnlockNavigation()">Monitor Unlock Navigation</button>
               <button id="runtimeMonitorLockNavigationButton" class="ghost" type="button" [disabled]="!view.canUseRunActions" (click)="view.issueMonitorLockNavigation()">Monitor Lock Navigation</button>
               <button id="runtimeMonitorSetTestletTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Monitor Set Testlet Time</button>
@@ -769,8 +773,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
           <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>
           <button id="monitorBatchGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchGoto" (click)="view.issueMonitorBatchCommand('goto')">Go To Target Unit</button>
-          <button id="monitorBatchUnlockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_navigation')">Unlock Selected</button>
-          <button id="monitorBatchLockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_navigation')">Lock Selected</button>
+          <button id="monitorBatchUnlockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_navigation')">Unlock Navigation</button>
+          <button id="monitorBatchLockButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_navigation')">Lock Navigation</button>
+          <button id="monitorBatchLockTestButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_test')">Lock Tests</button>
+          <button id="monitorBatchUnlockTestButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_test')">Unlock Tests</button>
           <button id="monitorBatchSetTimeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchTime" (click)="view.issueMonitorBatchCommand('set_testlet_time')">Set Time On Selected</button>
           <button id="monitorBatchCompleteButton" class="danger" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('complete')">Complete Selected</button>
         </div>

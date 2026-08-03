@@ -3605,11 +3605,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","booklet:demo","\{\}","running","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","booklet:demo","\{\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -4930,6 +4930,86 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       false
     );
 
+    const lockTestCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousLocked: boolean;
+        testRun: { status: string; locked?: boolean };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "lock_test",
+        actorId: "operator-demo"
+      }
+    });
+    assert.equal(lockTestCommand.status, 200);
+    assert.equal(lockTestCommand.body.command.commandType, "lock_test");
+    assert.equal(lockTestCommand.body.command.previousLocked, false);
+    assert.equal(lockTestCommand.body.command.testRun.status, "paused");
+    assert.equal(lockTestCommand.body.command.testRun.locked, true);
+
+    const blockedParticipantResume = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(blockedParticipantResume.status, 423);
+    assert.equal(blockedParticipantResume.body.error, "test_run_locked");
+
+    const lockedRuntimeState = await requestJsonAt<{
+      runtimeState: {
+        runtimeStatus: string;
+        availableAction: string;
+        latestTestRun: { locked?: boolean };
+        booklets: Array<{ status: string }>;
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/runtime-state`
+    );
+    assert.equal(lockedRuntimeState.status, 200);
+    assert.equal(lockedRuntimeState.body.runtimeState.runtimeStatus, "locked");
+    assert.equal(lockedRuntimeState.body.runtimeState.availableAction, "none");
+    assert.equal(lockedRuntimeState.body.runtimeState.latestTestRun.locked, true);
+    assert.equal(lockedRuntimeState.body.runtimeState.booklets[0]?.status, "locked");
+
+    const lockedOpenRuns = await requestJsonAt<{
+      items: Array<{ testRunId: string; locked?: boolean }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs",
+      { headers: { authorization } }
+    );
+    assert.equal(lockedOpenRuns.status, 200);
+    assert.equal(
+      lockedOpenRuns.body.items.find(
+        item => item.testRunId === resumed.body.testRun.testRunId
+      )?.locked,
+      true
+    );
+
+    const unlockTestCommand = await requestJsonAt<{
+      command: {
+        commandType: string;
+        previousLocked: boolean;
+        testRun: { status: string; locked?: boolean };
+      };
+    }>(isolated.baseUrl, commandPath, {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        commandType: "unlock_test",
+        actorId: "operator-demo"
+      }
+    });
+    assert.equal(unlockTestCommand.status, 200);
+    assert.equal(unlockTestCommand.body.command.commandType, "unlock_test");
+    assert.equal(unlockTestCommand.body.command.previousLocked, true);
+    assert.equal(unlockTestCommand.body.command.testRun.status, "paused");
+    assert.equal(unlockTestCommand.body.command.testRun.locked, false);
+
     const resumeCommand = await requestJsonAt<{
       command: {
         commandType: string;
@@ -5143,18 +5223,20 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       }>;
     }>(
       isolated.baseUrl,
-      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=6",
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/activity-events?eventType=monitor_run_command_issued&limit=8",
       { headers: { authorization } }
     );
 
     assert.equal(commandActivity.status, 200);
-    assert.equal(commandActivity.body.items.length, 6);
+    assert.equal(commandActivity.body.items.length, 8);
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
       [
         "complete",
         "goto",
         "resume",
+        "unlock_test",
+        "lock_test",
         "lock_navigation",
         "unlock_navigation",
         "pause"
@@ -5193,17 +5275,19 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       "unit-finish"
     );
     assert.equal(
-      commandActivity.body.items[3]?.activityEvent.details
+      commandActivity.body.items[5]?.activityEvent.details
         .previousNavigationUnlocked,
       true
     );
     assert.equal(
-      commandActivity.body.items[3]?.activityEvent.details.navigationUnlocked,
+      commandActivity.body.items[5]?.activityEvent.details.navigationUnlocked,
       false
     );
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.bookletKey),
       [
+        "booklet:demo",
+        "booklet:demo",
         "booklet:demo",
         "booklet:demo",
         "booklet:demo",
@@ -11580,7 +11664,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
 
@@ -14278,6 +14362,122 @@ test("original BookletConfig compiles into enforced participant navigation polic
   );
   assert.equal(completed.status, 200);
   assert.equal(completed.body.testRun.status, "completed");
+});
+
+test("lock_test_on_termination keeps a completed participant flow monitor-unlockable", async () => {
+  const tenantKey = "integration-tenant-termination-lock";
+  const workspaceKey = "integration-workspace-termination-lock";
+  const bookletKey = "BOOKLET.TERMINATION.LOCK";
+  const unitKey = "UNIT.TERMINATION.LOCK";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "termination-lock.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Termination Lock</Label></Metadata>
+          <BookletConfig>
+            <Config key="lock_test_on_termination">ON</Config>
+          </BookletConfig>
+          <Units><Unit id="${unitKey}" label="Termination Unit" /></Units>
+        </Booklet>
+      `
+    }
+  });
+  const imported = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  assert.equal(
+    (
+      await requestJson(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+        { method: "POST", body: {} }
+      )
+    ).status,
+    200
+  );
+
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "termination-lock-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  const testRunId = resumed.body.testRun.testRunId;
+
+  const terminated = await requestJson<{
+    testRun: {
+      status: string;
+      locked?: boolean;
+      currentUnitKey: string | null;
+      completedAt: string | null;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/complete`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(terminated.status, 200);
+  assert.equal(terminated.body.testRun.status, "paused");
+  assert.equal(terminated.body.testRun.locked, true);
+  assert.equal(terminated.body.testRun.currentUnitKey, unitKey);
+  assert.equal(terminated.body.testRun.completedAt, null);
+
+  const lockedRuntime = await requestJson<{
+    runtimeState: { runtimeStatus: string; availableAction: string };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/runtime-state`);
+  assert.equal(lockedRuntime.body.runtimeState.runtimeStatus, "locked");
+  assert.equal(lockedRuntime.body.runtimeState.availableAction, "none");
+  assert.equal(
+    (
+      await requestJson<{ error: string }>(
+        `/api/v1/participant/test-runs/${testRunId}/resume`,
+        { method: "POST" }
+      )
+    ).body.error,
+    "test_run_locked"
+  );
+
+  const unlock = await requestJson<{
+    command: { testRun: { locked?: boolean; status: string } };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    { method: "POST", body: { commandType: "unlock_test" } }
+  );
+  assert.equal(unlock.status, 200);
+  assert.equal(unlock.body.command.testRun.locked, false);
+  assert.equal(unlock.body.command.testRun.status, "paused");
+
+  const resumedAfterUnlock = await requestJson<{
+    testRun: { status: string; locked?: boolean; currentUnitKey: string | null };
+  }>(`/api/v1/participant/test-runs/${testRunId}/resume`, { method: "POST" });
+  assert.equal(resumedAfterUnlock.status, 200);
+  assert.equal(resumedAfterUnlock.body.testRun.status, "running");
+  assert.equal(resumedAfterUnlock.body.testRun.locked, false);
+  assert.equal(resumedAfterUnlock.body.testRun.currentUnitKey, unitKey);
 });
 
 test("original Testlet completeness restrictions override BookletConfig by dimension", async () => {

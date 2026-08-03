@@ -1396,7 +1396,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'lock_test', 'unlock_test', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
     );
   }
 
@@ -3057,6 +3057,9 @@ const buildParticipantRuntimeBooklets = (input: {
         (testRun.bookletAssignmentKey ?? testRun.bookletKey) ===
         assignment.assignmentKey
     );
+    const hasLockedRun = bookletRuns.some(
+      testRun => testRun.status !== "completed" && testRun.locked === true
+    );
     const hasOpenRun = bookletRuns.some(testRun => testRun.status !== "completed");
     const hasCompletedRun = bookletRuns.some(
       testRun => testRun.status === "completed"
@@ -3067,7 +3070,9 @@ const buildParticipantRuntimeBooklets = (input: {
         sourceBookletKey: booklet.bookletKey,
         statePreset: assignment.statePreset,
         displayLabel: booklet.displayLabel,
-        status: hasOpenRun
+        status: hasLockedRun
+          ? ("locked" as const)
+          : hasOpenRun
           ? ("in_progress" as const)
           : hasCompletedRun
             ? ("completed" as const)
@@ -3532,6 +3537,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
           testRun.bookletAssignmentKey ?? testRun.bookletKey,
         bookletStates: normalizedTestRun.bookletStates ?? {},
         status: normalizedTestRun.status,
+        locked: normalizedTestRun.locked === true,
         currentUnitKey: normalizedTestRun.currentUnitKey,
         currentUnitLabel: location.currentUnitLabel,
         currentBlockKey: location.currentBlockKey,
@@ -3641,6 +3647,7 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
 
   return {
     ...testRun,
+    locked: testRun.locked === true,
     executionMode: normalizeParticipantExecutionMode(testRun.executionMode),
     bookletAssignmentKey:
       String(testRun.bookletAssignmentKey ?? "").trim() || testRun.bookletKey,
@@ -3690,6 +3697,17 @@ const normalizeTestRun = (testRun: TestRun): TestRun => {
       ? [...new Set(testRun.lockedUnitKeys.filter(Boolean))]
       : []
   };
+};
+
+const requireParticipantTestRunUnlocked = (testRun: TestRun): void => {
+  if (testRun.locked === true) {
+    throw new FirstSliceError(
+      423,
+      "test_run_locked",
+      `Test run '${testRun.testRunId}' is locked and must be unlocked by a monitor.`,
+      { testRunId: testRun.testRunId }
+    );
+  }
 };
 
 const normalizeParticipantExecutionMode = (
@@ -4889,6 +4907,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "bookletAssignmentKey",
     "bookletStates",
     "status",
+    "locked",
     "currentUnitKey",
     "currentUnitLabel",
     "currentBlockKey",
@@ -4916,6 +4935,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
         item.status,
+        item.locked ? "true" : "false",
         item.currentUnitKey ?? "",
         item.currentUnitLabel ?? "",
         item.currentBlockKey ?? "",
@@ -14793,6 +14813,7 @@ export const createFirstSliceServices = (
       );
     }
     const testRun = normalizeTestRun(storedTestRun);
+    requireParticipantTestRunUnlocked(testRun);
     const participantSession = await requireAccessibleParticipantSession(
       testRun.participantSessionId
     );
@@ -19386,6 +19407,19 @@ export const createFirstSliceServices = (
           };
         }
 
+        if (latestTestRun.locked) {
+          return {
+            participantSession,
+            participantRosterEntry: publicParticipantRosterEntry,
+            scope,
+            executionMode,
+            latestTestRun: normalizeTestRun(latestTestRun),
+            booklets,
+            runtimeStatus: "locked",
+            availableAction: "none"
+          };
+        }
+
         return {
           participantSession,
           participantRosterEntry: publicParticipantRosterEntry,
@@ -19455,28 +19489,41 @@ export const createFirstSliceServices = (
             participantSession.participantSessionId
           )
         ).map(normalizeTestRun);
-        const navigation = resolveBookletNavigationState(
+        const resolvedNavigation = resolveBookletNavigationState(
           contentRelease,
           currentTestRun
         );
+        const navigation = currentTestRun.locked
+          ? {
+              ...resolvedNavigation,
+              canGoPrevious: false,
+              canGoNext: false,
+              canComplete: false,
+              canPlayerEnd: false,
+              nextTestletGate: null
+            }
+          : resolvedNavigation;
         const availableActions: ParticipantCurrentRunState["availableActions"] = [];
         const executionMode = resolveParticipantExecutionMode(
           currentTestRun.executionMode ?? participantSession.executionMode
         );
-        if (currentTestRun.status === "paused") {
+        if (currentTestRun.locked) {
+          // A whole-test monitor lock is independent of the paused/running state.
+        } else if (currentTestRun.status === "paused") {
           availableActions.push("resume", "save_progress");
         } else if (currentTestRun.status === "running") {
           availableActions.push("save_progress");
         }
-        if (navigation.canComplete) {
+        if (!currentTestRun.locked && navigation.canComplete) {
           availableActions.push("complete");
         }
-        if (executionMode.canReview) {
+        if (!currentTestRun.locked && executionMode.canReview) {
           availableActions.push("review");
         }
         if (
           executionMode.canChangeStateOptions &&
           currentTestRun.status !== "completed" &&
+          !currentTestRun.locked &&
           (currentBooklet?.stateEntries?.length ?? 0) > 0
         ) {
           availableActions.push("change_state_options");
@@ -19553,6 +19600,7 @@ export const createFirstSliceServices = (
           );
         }
         const testRun = normalizeTestRun(storedTestRun);
+        requireParticipantTestRunUnlocked(testRun);
         const participantSession = await requireAccessibleParticipantSession(
           testRun.participantSessionId
         );
@@ -19920,7 +19968,9 @@ export const createFirstSliceServices = (
             );
           }
 
-          return normalizeTestRun(existingRun);
+          const normalizedExistingRun = normalizeTestRun(existingRun);
+          requireParticipantTestRunUnlocked(normalizedExistingRun);
+          return normalizedExistingRun;
         }
 
         const rosterEntry = await findParticipantRosterEntryByLoginKey(
@@ -20016,6 +20066,7 @@ export const createFirstSliceServices = (
             selectedRuntimeBooklet?.bookletKey ?? selectedBooklet.bookletKey,
           presetBookletStates: selectedRuntimeBooklet?.statePreset ?? {},
           status: "running",
+          locked: false,
           currentUnitKey: null,
           unitResponses: {},
           unlockedTestletKeys: executionMode.presetCode
@@ -20117,6 +20168,8 @@ export const createFirstSliceServices = (
         );
 
         if (existingRun) {
+          const normalizedExistingRun = normalizeTestRun(existingRun);
+          requireParticipantTestRunUnlocked(normalizedExistingRun);
           if (
             requestedBookletKey &&
             existingRun.bookletKey !== requestedBookletKey
@@ -20135,7 +20188,7 @@ export const createFirstSliceServices = (
               existingRun.contentReleaseId
             );
             const resumedRun = transitionTestletTimersForRunStatus(
-              normalizeTestRun(existingRun),
+              normalizedExistingRun,
               "running",
               timestamp
             );
@@ -20160,7 +20213,7 @@ export const createFirstSliceServices = (
             return effectiveRun;
           }
 
-          return normalizeTestRun(existingRun);
+          return normalizedExistingRun;
         }
 
         return this.launch({
@@ -20216,6 +20269,7 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        requireParticipantTestRunUnlocked(testRun);
         const executionMode = resolveParticipantExecutionMode(
           testRun.executionMode
         );
@@ -20449,6 +20503,7 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        requireParticipantTestRunUnlocked(testRun);
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -20574,6 +20629,7 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        requireParticipantTestRunUnlocked(testRun);
         if (testRun.status === "completed") {
           throw new FirstSliceError(
             409,
@@ -20650,6 +20706,7 @@ export const createFirstSliceServices = (
           testRun: normalizeTestRun(storedTestRun),
           timestamp
         });
+        requireParticipantTestRunUnlocked(testRun);
         if (testRun.status === "completed") {
           return testRun;
         }
@@ -20728,12 +20785,24 @@ export const createFirstSliceServices = (
           );
         }
 
+        const lockOnTermination =
+          executionMode.monitorable &&
+          booklet?.policy?.completion.lockOnTermination === true;
         const completedRun: TestRun = {
-          ...closeRunningTestletTimers(completionBaseRun, timestamp),
-          status: "completed",
-          currentUnitKey: null,
+          ...(lockOnTermination
+            ? transitionTestletTimersForRunStatus(
+                completionBaseRun,
+                "paused",
+                timestamp
+              )
+            : closeRunningTestletTimers(completionBaseRun, timestamp)),
+          status: lockOnTermination ? "paused" : "completed",
+          locked: lockOnTermination,
+          currentUnitKey: lockOnTermination
+            ? completionBaseRun.currentUnitKey
+            : null,
           updatedAt: timestamp,
-          completedAt: timestamp
+          completedAt: lockOnTermination ? null : timestamp
         };
         await repository.saveTestRun(completedRun);
         if (executionMode.saveResponses) {
@@ -20744,7 +20813,7 @@ export const createFirstSliceServices = (
               entries: [{
                 key: "CONTROLLER",
                 timeStamp: Date.parse(timestamp),
-                content: "TERMINATED"
+                content: lockOnTermination ? "LOCKED" : "TERMINATED"
               }]
             }]
             })
@@ -20754,7 +20823,7 @@ export const createFirstSliceServices = (
         const participantSession = await repository.getParticipantSessionById(
           testRun.participantSessionId
         );
-        if (participantSession) {
+        if (participantSession && !lockOnTermination) {
           const nextSessionStatus =
             await resolveParticipantSessionStatusAfterCompletion(
               repository,
@@ -20769,12 +20838,15 @@ export const createFirstSliceServices = (
         await recordWorkspaceActivity({
           tenantId: completedRun.tenantId,
           workspaceId: completedRun.workspaceId,
-          eventType: "test_run_completed",
+          eventType: lockOnTermination ? "test_run_locked" : "test_run_completed",
           subjectType: "test_run",
           subjectId: completedRun.testRunId,
-          summary: `Run '${completedRun.testRunId}' completed.`,
+          summary: lockOnTermination
+            ? `Run '${completedRun.testRunId}' locked after participant termination.`
+            : `Run '${completedRun.testRunId}' completed.`,
           details: {
-            completedAt: completedRun.completedAt
+            completedAt: completedRun.completedAt,
+            lockOnTermination
           }
         });
         if (leavingLock) {
@@ -20890,6 +20962,7 @@ export const createFirstSliceServices = (
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
               status: testRun.status,
+              locked: testRun.locked === true,
               currentUnitKey: testRun.currentUnitKey,
               currentUnitLabel: location.currentUnitLabel,
               currentBlockKey: location.currentBlockKey,
@@ -21000,18 +21073,14 @@ export const createFirstSliceServices = (
           workspace.workspaceId,
           participantSession.loginKey
         );
-        const nextStatus: TestRunStatus =
-          commandType === "pause"
-            ? "paused"
-            : commandType === "complete"
-              ? "completed"
-              : commandType === "unlock_navigation"
-                ? testRun.status
-                : commandType === "lock_navigation"
-                  ? testRun.status
-                : commandType === "set_testlet_time"
-                  ? testRun.status
-                : "running";
+        let nextStatus: TestRunStatus = testRun.status;
+        if (commandType === "pause") {
+          nextStatus = "paused";
+        } else if (commandType === "resume" || commandType === "goto") {
+          nextStatus = "running";
+        } else if (commandType === "complete") {
+          nextStatus = "completed";
+        }
         let adjustedTestletKey: string | null = null;
         let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
           null;
@@ -21020,48 +21089,64 @@ export const createFirstSliceServices = (
             ? {
                 ...closeRunningTestletTimers(testRun, issuedAt),
                 status: "completed",
+                locked: false,
                 currentUnitKey: null,
                 updatedAt: issuedAt,
                 completedAt: issuedAt
               }
-            : commandType === "goto" && targetUnitKey
-              ? applyMonitorGoto({
-                  contentRelease,
-                  testRun,
-                  targetUnitKey,
-                  timestamp: issuedAt
+            : commandType === "lock_test"
+              ? normalizeTestRun({
+                  ...testRun,
+                  locked: true,
+                  updatedAt: issuedAt
                 })
-              : commandType === "unlock_navigation"
-                ? applyMonitorNavigationUnlock({
-                    contentRelease,
-                    testRun,
-                    timestamp: issuedAt
+              : commandType === "unlock_test"
+                ? normalizeTestRun({
+                    ...testRun,
+                    locked: false,
+                    updatedAt: issuedAt
                   })
-                : commandType === "lock_navigation"
-                  ? applyMonitorNavigationLock({
+                : commandType === "goto" && targetUnitKey
+                  ? applyMonitorGoto({
+                      contentRelease,
                       testRun,
+                      targetUnitKey,
                       timestamp: issuedAt
                     })
-                : commandType === "set_testlet_time" &&
-                    targetUnitKey &&
-                    remainingSeconds
-                  ? (() => {
-                      const adjusted = applyMonitorSetTestletTime({
+                  : commandType === "unlock_navigation"
+                    ? applyMonitorNavigationUnlock({
                         contentRelease,
                         testRun,
-                        targetUnitKey,
-                        remainingSeconds,
                         timestamp: issuedAt
-                      });
-                      adjustedTestletKey = adjusted.testletKey;
-                      previousTimer = adjusted.previousTimer;
-                      return adjusted.testRun;
-                    })()
-                : transitionTestletTimersForRunStatus(
-                    testRun,
-                    nextStatus as Extract<TestRunStatus, "running" | "paused">,
-                    issuedAt
-                  );
+                      })
+                    : commandType === "lock_navigation"
+                      ? applyMonitorNavigationLock({
+                          testRun,
+                          timestamp: issuedAt
+                        })
+                      : commandType === "set_testlet_time" &&
+                          targetUnitKey &&
+                          remainingSeconds
+                        ? (() => {
+                            const adjusted = applyMonitorSetTestletTime({
+                              contentRelease,
+                              testRun,
+                              targetUnitKey,
+                              remainingSeconds,
+                              timestamp: issuedAt
+                            });
+                            adjustedTestletKey = adjusted.testletKey;
+                            previousTimer = adjusted.previousTimer;
+                            return adjusted.testRun;
+                          })()
+                        : transitionTestletTimersForRunStatus(
+                            testRun,
+                            nextStatus as Extract<
+                              TestRunStatus,
+                              "running" | "paused"
+                            >,
+                            issuedAt
+                          );
         if (nextTestRun !== testRun) {
           await repository.saveTestRun(nextTestRun);
         }
@@ -21074,6 +21159,15 @@ export const createFirstSliceServices = (
               nextTestRun.status === "completed"
                 ? "TERMINATED"
                 : nextTestRun.status.toUpperCase()
+          });
+        }
+        if (nextTestRun.locked !== testRun.locked) {
+          monitorTestLogEntries.push({
+            key: "CONTROLLER",
+            timeStamp: Date.parse(issuedAt),
+            content: nextTestRun.locked
+              ? "LOCKED"
+              : nextTestRun.status.toUpperCase()
           });
         }
         if (nextTestRun.currentUnitKey !== testRun.currentUnitKey) {
@@ -21127,6 +21221,8 @@ export const createFirstSliceServices = (
             commandType,
             previousStatus: testRun.status,
             nextStatus: effectiveNextTestRun.status,
+            previousLocked: testRun.locked === true,
+            locked: effectiveNextTestRun.locked === true,
             completedAt: effectiveNextTestRun.completedAt ?? null,
             previousUnitKey: testRun.currentUnitKey,
             targetUnitKey,
@@ -21154,6 +21250,7 @@ export const createFirstSliceServices = (
           actorId,
           issuedAt,
           previousStatus: testRun.status,
+          previousLocked: testRun.locked === true,
           testRun: effectiveNextTestRun,
           participantSession: nextParticipantSession
         };

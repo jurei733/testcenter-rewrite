@@ -203,6 +203,8 @@ export type MonitorRunCommandType =
   | "resume"
   | "complete"
   | "goto"
+  | "lock_test"
+  | "unlock_test"
   | "unlock_navigation"
   | "lock_navigation"
   | "set_testlet_time";
@@ -211,6 +213,8 @@ export const monitorRunCommandTypes = [
   "resume",
   "complete",
   "goto",
+  "lock_test",
+  "unlock_test",
   "unlock_navigation",
   "lock_navigation",
   "set_testlet_time"
@@ -247,6 +251,7 @@ export type WorkspaceActivityEventType =
   | "testlet_leave_lock_activated"
   | "test_run_progress_saved"
   | "test_run_resumed"
+  | "test_run_locked"
   | "test_run_completed"
   | "monitor_run_command_issued"
   | "group_results_deleted"
@@ -275,6 +280,7 @@ export const workspaceActivityEventTypes = [
   "testlet_leave_lock_activated",
   "test_run_progress_saved",
   "test_run_resumed",
+  "test_run_locked",
   "test_run_completed",
   "monitor_run_command_issued",
   "group_results_deleted",
@@ -813,6 +819,8 @@ export type TestRun = {
   /** Participant-selected state options that take precedence over automatic evaluation. */
   bookletStateOverrides?: Record<string, string>;
   status: TestRunStatus;
+  /** Whole-test lock from the original monitor protocol; independent of progress status. */
+  locked?: boolean;
   currentUnitKey: string | null;
   unitResponses: Record<string, string>;
   unlockedTestletKeys?: string[];
@@ -903,6 +911,7 @@ export type OpenMonitorRun = {
   bookletAssignmentKey: string;
   bookletStates: Record<string, string>;
   status: TestRunStatus;
+  locked?: boolean;
   currentUnitKey: string | null;
   currentUnitLabel?: string | null;
   currentBlockKey?: string | null;
@@ -917,6 +926,7 @@ export type MonitorRunCommandResult = {
   actorId: string | null;
   issuedAt: string;
   previousStatus: TestRunStatus;
+  previousLocked: boolean;
   testRun: TestRun;
   participantSession: ParticipantSession;
 };
@@ -924,6 +934,7 @@ export type MonitorRunCommandResult = {
 export type ParticipantRuntimeStateStatus =
   | "ready_to_launch"
   | "in_progress"
+  | "locked"
   | "completed";
 
 export type ParticipantSessionScope = {
@@ -948,7 +959,7 @@ export type ParticipantRuntimeBooklet = {
   sourceBookletKey: string;
   statePreset: Record<string, string>;
   displayLabel: string;
-  status: "available" | "in_progress" | "completed";
+  status: "available" | "in_progress" | "locked" | "completed";
 };
 
 export type ParticipantCurrentRunState = {

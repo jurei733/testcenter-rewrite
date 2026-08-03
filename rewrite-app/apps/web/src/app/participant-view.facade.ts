@@ -10,6 +10,7 @@ import type {
   ParticipantLaunchRequest,
   ParticipantLaunchResponse,
   ParticipantReviewResponse,
+  ParticipantRuntimeStateResponse,
   ParticipantSignInRequest,
   ParticipantSignInResponse,
   ResumeParticipantSessionRequest,
@@ -46,7 +47,7 @@ import {
 } from "./participant-save-outbox";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
-import { prettyPrintJson } from "./rewrite-app-shell.readers";
+import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
@@ -1034,7 +1035,13 @@ export class ParticipantViewFacade {
   }
 
   get canStartOrResume(): boolean {
-    return Boolean(this.runtime.participantSessionId.trim()) || this.canSignIn;
+    if (!this.runtime.participantSessionId.trim()) {
+      return this.canSignIn;
+    }
+    const runtimeState = parseJsonDocument<ParticipantRuntimeStateResponse>(
+      this.runtime.runtimeStateView
+    )?.runtimeState;
+    return runtimeState?.availableAction !== "none";
   }
 
   get canRefreshCurrentState(): boolean {
@@ -2340,6 +2347,7 @@ export class ParticipantViewFacade {
 
     const nextBooklet =
       booklets.find(booklet => booklet.status === "in_progress") ??
+      booklets.find(booklet => booklet.status === "locked") ??
       booklets.find(booklet => booklet.status === "available") ??
       selectedBooklet ??
       booklets[0];

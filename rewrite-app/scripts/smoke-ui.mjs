@@ -5875,6 +5875,54 @@ try {
     .getByRole("button", { name: "Add to Batch" })
     .click();
   page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /lock_test.*1 selected run/i);
+    await dialog.accept();
+  });
+  const bulkLockResponsePromise = page.waitForResponse(
+    response =>
+      response.url().endsWith("/monitor/open-runs/commands") &&
+      response.request().method() === "POST"
+  );
+  await page.locator("#monitorBatchLockTestButton").click();
+  const bulkLockResponse = await bulkLockResponsePromise;
+  assert.equal(bulkLockResponse.status(), 200);
+  assert.equal((await bulkLockResponse.json()).commands[0]?.testRun?.locked, true);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.locked === true
+  );
+  await openRunStudentCard.filter({ hasText: "test locked" }).waitFor();
+  await monitorBatchCard.filter({ hasText: "0 selected runs" }).waitFor();
+  await openRunStudentCard
+    .getByRole("button", { name: "Add to Batch" })
+    .click();
+  page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /unlock_test.*1 selected run/i);
+    await dialog.accept();
+  });
+  const bulkUnlockResponsePromise = page.waitForResponse(
+    response =>
+      response.url().endsWith("/monitor/open-runs/commands") &&
+      response.request().method() === "POST"
+  );
+  await page.locator("#monitorBatchUnlockTestButton").click();
+  const bulkUnlockResponse = await bulkUnlockResponsePromise;
+  assert.equal(bulkUnlockResponse.status(), 200);
+  assert.equal((await bulkUnlockResponse.json()).commands[0]?.testRun?.locked, false);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.locked === false
+  );
+  await openRunStudentCard.filter({ hasText: "test unlocked" }).waitFor();
+  await monitorBatchCard.filter({ hasText: "0 selected runs" }).waitFor();
+  await openRunStudentCard
+    .getByRole("button", { name: "Add to Batch" })
+    .click();
+  await monitorBatchCard
+    .filter({ hasText: "1 selected run" })
+    .filter({ hasText: pausedTestRunId })
+    .waitFor();
+  page.once("dialog", async dialog => {
     assert.match(dialog.message(), /resume.*1 selected run/i);
     await dialog.accept();
   });
@@ -5889,6 +5937,8 @@ try {
   const bulkResumePayload = await bulkResumeResponse.json();
   assert.equal(bulkResumePayload.succeededCount, 1);
   assert.equal(bulkResumePayload.failedCount, 0);
+  assert.equal(bulkResumePayload.commands[0]?.testRun?.testRunId, pausedTestRunId);
+  assert.equal(bulkResumePayload.commands[0]?.testRun?.status, "running");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "running"

@@ -1902,6 +1902,7 @@ export class RuntimeViewFacade {
           subline: displayName ? openRun.loginKey : openRun.testRunId,
           badges: [
             openRun.status,
+            openRun.locked ? "test locked" : "test unlocked",
             openRun.groupKey,
             openRun.executionMode,
             openRun.bookletAssignmentKey,
@@ -1915,6 +1916,7 @@ export class RuntimeViewFacade {
             batchSelected ? "batch selected" : "not in batch"
           ],
           rows: [
+            { label: "Whole-test lock", value: openRun.locked ? "locked" : "unlocked" },
             ...(profile?.settings.view === "small"
               ? []
               : [{ label: "Session", value: openRun.participantSessionId }]),
@@ -2936,6 +2938,24 @@ export class RuntimeViewFacade {
     );
   }
 
+  issueMonitorLockTest(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("lock_test")
+    );
+  }
+
+  issueMonitorUnlockTest(): void {
+    if (!this.canUseRunActions) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.issueMonitorRunCommand("unlock_test")
+    );
+  }
+
   issueMonitorUnlockNavigation(): void {
     if (!this.canUseRunActions) {
       return;
@@ -2987,6 +3007,8 @@ export class RuntimeViewFacade {
       | "resume"
       | "complete"
       | "goto"
+      | "lock_test"
+      | "unlock_test"
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time"

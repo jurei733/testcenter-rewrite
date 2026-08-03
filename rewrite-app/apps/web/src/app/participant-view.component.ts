@@ -121,7 +121,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               <option
                 *ngFor="let booklet of view.assignedBooklets"
                 [value]="booklet.bookletKey"
-                [disabled]="booklet.status === 'completed'"
+                [disabled]="booklet.status === 'completed' || booklet.status === 'locked'"
               >
                 {{ booklet.displayLabel }}{{ view.formatBookletVariant(booklet) }} · {{ booklet.status }}
               </option>

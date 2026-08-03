@@ -258,24 +258,25 @@ export async function issueMonitorRunCommandAction(
     | "resume"
     | "complete"
     | "goto"
+    | "lock_test"
+    | "unlock_test"
     | "unlock_navigation"
     | "lock_navigation"
     | "set_testlet_time"
 ): Promise<IssueMonitorRunCommandResponse> {
+  const requestLabel = {
+    pause: "Monitor Pause Run",
+    resume: "Monitor Resume Run",
+    complete: "Monitor Complete Run",
+    goto: "Monitor Go To Unit",
+    lock_test: "Monitor Lock Test",
+    unlock_test: "Monitor Unlock Test",
+    unlock_navigation: "Monitor Unlock Navigation",
+    lock_navigation: "Monitor Lock Navigation",
+    set_testlet_time: "Monitor Set Testlet Time"
+  }[commandType];
   const payload = await host.request<IssueMonitorRunCommandResponse>(
-    commandType === "pause"
-      ? "Monitor Pause Run"
-      : commandType === "resume"
-        ? "Monitor Resume Run"
-        : commandType === "goto"
-          ? "Monitor Go To Unit"
-          : commandType === "unlock_navigation"
-            ? "Monitor Unlock Navigation"
-            : commandType === "lock_navigation"
-              ? "Monitor Lock Navigation"
-            : commandType === "set_testlet_time"
-              ? "Monitor Set Testlet Time"
-          : "Monitor Complete Run",
+    requestLabel,
     "POST",
     host.getMonitorRunCommandPath(),
     {
@@ -301,6 +302,8 @@ export async function issueMonitorRunCommandAction(
   } else if (
     commandType === "resume" ||
     commandType === "goto" ||
+    commandType === "lock_test" ||
+    commandType === "unlock_test" ||
     (commandType === "unlock_navigation" &&
       payload.command.testRun.status === "running") ||
     (commandType === "lock_navigation" &&
@@ -335,6 +338,8 @@ export async function issueMonitorRunCommandsAction(
     | "resume"
     | "complete"
     | "goto"
+    | "lock_test"
+    | "unlock_test"
     | "unlock_navigation"
     | "lock_navigation"
     | "set_testlet_time"
