@@ -9235,6 +9235,7 @@ const collectAssemblyResourceIdentifiers = (
         identifiers.add(id);
         if (moduleVersion) {
           identifiers.add(`${id}@${moduleVersion}`);
+          identifiers.add(`${id}-${moduleVersion}`);
         }
       }
     } catch {
@@ -10039,6 +10040,27 @@ const normalizeVeronaMajorMinorVersion = (version: string): string | null => {
   return match
     ? `${Number.parseInt(match[1] ?? "", 10)}.${Number.parseInt(match[2] ?? "0", 10)}`
     : null;
+};
+
+const parseVeronaPlayerReferenceForMetadata = (
+  playerKey: string,
+  declaredPlayerId: string
+): { id: string; moduleVersion: string | null } => {
+  const reference = parseVeronaPlayerReference(playerKey);
+  if (
+    reference.moduleVersion ||
+    reference.id.toLowerCase() === declaredPlayerId.toLowerCase()
+  ) {
+    return reference;
+  }
+  const legacyPrefix = `${declaredPlayerId}-`;
+  if (!reference.id.toLowerCase().startsWith(legacyPrefix.toLowerCase())) {
+    return reference;
+  }
+  const legacyModuleVersion = reference.id.slice(legacyPrefix.length);
+  return normalizeVeronaMajorMinorVersion(legacyModuleVersion)
+    ? { id: declaredPlayerId, moduleVersion: legacyModuleVersion }
+    : reference;
 };
 
 const validateVeronaPlayerMetadata = (
@@ -11015,8 +11037,9 @@ const validateZipXmlEntries = (
               )
             );
           } else if (metadata.status === "valid") {
-            const playerReference = parseVeronaPlayerReference(
-              unitDefinition.playerKey
+            const playerReference = parseVeronaPlayerReferenceForMetadata(
+              unitDefinition.playerKey,
+              metadata.id
             );
             const referencedModuleVersion = playerReference.moduleVersion
               ? normalizeVeronaMajorMinorVersion(playerReference.moduleVersion)

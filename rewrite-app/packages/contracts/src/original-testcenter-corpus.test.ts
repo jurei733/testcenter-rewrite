@@ -27,6 +27,33 @@ type OriginalTestcenterCorpus = {
     skipNetwork: boolean;
     canSave: boolean;
   }>;
+  sessionManagementPackages: Array<{
+    booklets: Array<{
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      bookletKey: string;
+      unitKeys: string[];
+    }>;
+    units: Array<{
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      unitKey: string;
+    }>;
+    player: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      playerKey: string;
+    };
+    roster: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      participantLoginKeys: string[];
+    };
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -151,4 +178,59 @@ test("original Testcenter compatibility corpus separates participant and operati
       "BOOKLET.SAMPLE-2#bonus:no"
     ]
   );
+});
+
+test("original Testcenter compatibility corpus pins official session management semantics", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const sessionManagement = corpus.sessionManagementPackages[0];
+  assert.ok(sessionManagement);
+
+  for (const pinnedFile of [
+    ...sessionManagement.booklets,
+    ...sessionManagement.units,
+    sessionManagement.player,
+    sessionManagement.roster
+  ]) {
+    const content = readFileSync(resolve(corpusRoot, pinnedFile.fixture));
+    assert.equal(
+      createHash("sha256").update(content).digest("hex"),
+      pinnedFile.sha256,
+      pinnedFile.sourcePath
+    );
+  }
+
+  const rosterXml = readFileSync(
+    resolve(corpusRoot, sessionManagement.roster.fixture),
+    "utf8"
+  );
+  const entries = parseParticipantRosterText(rosterXml);
+  assert.deepEqual(
+    entries.map(entry => entry.loginKey),
+    sessionManagement.roster.participantLoginKeys
+  );
+  assert.deepEqual(parseOriginalTestcenterOperationalLogins(rosterXml), []);
+
+  const entriesByLoginKey = new Map(entries.map(entry => [entry.loginKey, entry]));
+  assert.equal(entriesByLoginKey.get("SM-1")?.password, undefined);
+  assert.equal(entriesByLoginKey.get("SM-2")?.password, "101");
+  assert.deepEqual(entriesByLoginKey.get("SM-3")?.bookletKeys, [
+    "Cy-Bklt_SM-1",
+    "Cy-Bklt_SM-2"
+  ]);
+  assert.deepEqual(
+    entriesByLoginKey.get("SM-5")?.bookletAssignments?.[0]?.accessCodes,
+    ["as_code01"]
+  );
+  assert.deepEqual(
+    entriesByLoginKey.get("SM-6")?.bookletAssignments?.[0]?.accessCodes,
+    ["as_code02"]
+  );
+  assert.equal(entriesByLoginKey.get("SM-7")?.executionMode, "run-hot-return");
+  assert.equal(entriesByLoginKey.get("SM-8")?.executionMode, "run-hot-return");
+  assert.equal(entriesByLoginKey.get("SM-9")?.executionMode, "run-hot-restart");
+  assert.equal(entriesByLoginKey.get("SM-10")?.validFrom, "1/6/2023 10:00");
+  assert.equal(entriesByLoginKey.get("SM-11")?.validTo, "1/6/2023 10:00");
+  assert.equal(entriesByLoginKey.get("SM-12")?.validForMinutes, 10);
 });

@@ -8,7 +8,12 @@ The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
 all 17 original Test-Controller system booklets, all four original
 BookletConfig variants, the adaptive `Booklet2.xml` + `Unit2.xml` + coding
-scheme + Verona 6 player dependency set, and the original XSD-backed rejection
+scheme + Verona 6 player dependency set, and the complete official
+Session-Management package with two booklets, five units, the legacy
+`verona-player-simple-6.0` reference, and all 12 original participant logins.
+That package gates password-free and password-protected entry, ordered
+multi-booklet assignment, second codes, access windows, and hot-return versus
+hot-restart re-entry. The corpus also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, and Testtakers structures plus duplicate
 runtime identities. It also contains the byte-exact original sample
 `.itcr.zip` resource package as base64 so the binary fixture remains reviewable

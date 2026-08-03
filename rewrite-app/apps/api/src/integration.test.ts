@@ -8736,6 +8736,377 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
   );
 });
 
+test("original Testcenter compatibility corpus executes the official session management package", async () => {
+  type SessionManagementPackage = {
+    booklets: Array<{
+      fixture: string;
+      bookletKey: string;
+      unitKeys: string[];
+    }>;
+    units: Array<{
+      fixture: string;
+      unitKey: string;
+    }>;
+    player: {
+      fixture: string;
+      playerKey: string;
+    };
+    roster: {
+      fixture: string;
+      participantLoginKeys: string[];
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { sessionManagementPackages: SessionManagementPackage[] };
+  const expectation = corpus.sessionManagementPackages[0];
+  assert.ok(expectation);
+
+  const packageDocuments = [
+    ...expectation.booklets.map(booklet => ({
+      ...booklet,
+      kind: "booklet" as const,
+      content: readFileSync(
+        resolve(originalTestcenterCorpusRoot, booklet.fixture),
+        "utf8"
+      )
+    })),
+    ...expectation.units.map(unit => ({
+      ...unit,
+      kind: "unit" as const,
+      content: readFileSync(
+        resolve(originalTestcenterCorpusRoot, unit.fixture),
+        "utf8"
+      )
+    }))
+  ];
+  const playerDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.player.fixture),
+    "utf8"
+  );
+  const manifestResources = [
+    ...expectation.booklets.map(
+      booklet =>
+        `<resource identifier="${booklet.bookletKey}" href="${booklet.fixture}" />`
+    ),
+    ...expectation.units.map(
+      unit => `<resource identifier="${unit.unitKey}" href="${unit.fixture}" />`
+    ),
+    `<resource identifier="${expectation.player.playerKey}" href="${expectation.player.fixture}" />`
+  ].join("\n");
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>${manifestResources}</resources>
+        </manifest>
+      `
+    },
+    ...packageDocuments.map(document => ({
+      fileName: `export/${document.fixture}`,
+      content: document.content
+    })),
+    {
+      fileName: `export/${expectation.player.fixture}`,
+      content: playerDocument
+    }
+  ]);
+
+  const tenantKey = "integration-tenant-original-session-management";
+  const workspaceKey = "integration-workspace-original-session-management";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-session-management.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const runtimeSnapshot =
+    release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  assert.deepEqual(
+    runtimeSnapshot.bookletEntries.map(booklet => ({
+      bookletKey: booklet.bookletKey,
+      unitKeys: booklet.unitEntries.map(unit => unit.unitKey)
+    })),
+    expectation.booklets.map(booklet => ({
+      bookletKey: booklet.bookletKey,
+      unitKeys: booklet.unitKeys
+    }))
+  );
+  assert.ok(
+    runtimeSnapshot.bookletEntries.every(booklet =>
+      booklet.unitEntries.every(
+        unit =>
+          unit.playerKey === expectation.player.playerKey &&
+          unit.unitDefinition?.includes("<fieldset>")
+      )
+    )
+  );
+  assert.deepEqual(runtimeSnapshot.playerEntries, [
+    { playerKey: expectation.player.playerKey, html: playerDocument }
+  ]);
+
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: { activatedByActorId: "original-session-gate" } }
+  );
+  assert.equal(activation.status, 200);
+
+  const rosterXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+    "utf8"
+  );
+  const rosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      executionMode?: string;
+      passwordRequired: boolean;
+      bookletKeys?: string[];
+      validFrom: string | null;
+      validTo: string | null;
+      validForMinutes: number | null;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+    operationalLoginCandidates: unknown[];
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: rosterXml }
+  });
+  assert.equal(rosterImport.status, 201);
+  assert.deepEqual(
+    rosterImport.body.items.map(item => item.loginKey).sort(),
+    [...expectation.roster.participantLoginKeys].sort()
+  );
+  assert.deepEqual(rosterImport.body.operationalLoginCandidates, []);
+  assert.ok(
+    rosterImport.body.items.every(item => item.validationWarnings.length === 0)
+  );
+  const rosterByLoginKey = new Map(
+    rosterImport.body.items.map(item => [item.loginKey, item])
+  );
+  assert.equal(rosterByLoginKey.get("SM-1")?.passwordRequired, false);
+  assert.equal(rosterByLoginKey.get("SM-2")?.passwordRequired, true);
+  assert.deepEqual(rosterByLoginKey.get("SM-3")?.bookletKeys, [
+    "Cy-Bklt_SM-1",
+    "Cy-Bklt_SM-2"
+  ]);
+  assert.equal(rosterByLoginKey.get("SM-7")?.executionMode, "run-hot-return");
+  assert.equal(rosterByLoginKey.get("SM-9")?.executionMode, "run-hot-restart");
+  assert.equal(
+    rosterByLoginKey.get("SM-10")?.validFrom,
+    "2023-06-01T08:00:00.000Z"
+  );
+  assert.equal(
+    rosterByLoginKey.get("SM-11")?.validTo,
+    "2023-06-01T08:00:00.000Z"
+  );
+  assert.equal(rosterByLoginKey.get("SM-12")?.validForMinutes, 10);
+
+  type SessionSignInResponse = {
+    participantSession: {
+      participantSessionId: string;
+      executionMode?: string;
+      participantCode?: string | null;
+    };
+    participantRosterEntry: {
+      bookletAssignments: Array<{ bookletKey: string; accessCodes?: string[] }>;
+    } | null;
+    booklets: Array<{ sourceBookletKey: string }>;
+  };
+  const signIn = (
+    loginKey: string,
+    password?: string,
+    participantCode?: string
+  ) =>
+    requestJson<SessionSignInResponse>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey,
+        workspaceKey,
+        loginKey,
+        ...(password === undefined ? {} : { password }),
+        ...(participantCode === undefined ? {} : { participantCode })
+      }
+    });
+
+  const missingPassword = await signIn("SM-2");
+  assert.equal(missingPassword.status, 401);
+  assert.equal(
+    (missingPassword.body as unknown as { error: string }).error,
+    "participant_password_invalid"
+  );
+  const wrongPassword = await signIn("SM-2", "123");
+  assert.equal(wrongPassword.status, 401);
+  assert.equal(
+    (wrongPassword.body as unknown as { error: string }).error,
+    "participant_password_invalid"
+  );
+  const passwordSignIn = await signIn("SM-2", "101");
+  assert.equal(passwordSignIn.status, 200);
+  assert.equal(passwordSignIn.body.participantSession.executionMode, "run-demo");
+  assert.deepEqual(
+    passwordSignIn.body.booklets.map(booklet => booklet.sourceBookletKey),
+    ["Cy-Bklt_SM-1"]
+  );
+
+  const passwordlessSignIn = await signIn("SM-1");
+  assert.equal(passwordlessSignIn.status, 200);
+  const multiBookletSignIn = await signIn("SM-3");
+  assert.deepEqual(
+    multiBookletSignIn.body.booklets.map(booklet => booklet.sourceBookletKey),
+    ["Cy-Bklt_SM-1", "Cy-Bklt_SM-2"]
+  );
+
+  const missingCode = await signIn("SM-5", "102");
+  assert.equal(missingCode.status, 409);
+  assert.equal(
+    (missingCode.body as unknown as { error: string }).error,
+    "participant_code_required"
+  );
+  const invalidCode = await signIn("SM-5", "102", "wrong");
+  assert.equal(invalidCode.status, 400);
+  assert.equal(
+    (invalidCode.body as unknown as { error: string }).error,
+    "participant_code_invalid"
+  );
+  const codedSignIn = await signIn("SM-5", "102", "as_code01");
+  assert.equal(codedSignIn.status, 200);
+  assert.equal(codedSignIn.body.participantSession.participantCode, "as_code01");
+  assert.equal(
+    codedSignIn.body.participantRosterEntry?.bookletAssignments.some(
+      assignment => "accessCodes" in assignment
+    ),
+    false
+  );
+  const passwordlessCodedSignIn = await signIn(
+    "SM-6",
+    undefined,
+    "as_code02"
+  );
+  assert.equal(passwordlessCodedSignIn.status, 200);
+
+  const resume = (participantSessionId: string) =>
+    requestJson<{
+      testRun: {
+        testRunId: string;
+        currentUnitKey: string | null;
+        executionMode?: string;
+        unitResponses: Record<string, string>;
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+      method: "POST",
+      body: { bookletKey: "Cy-Bklt_SM-2" }
+    });
+
+  const hotReturnFirst = await signIn("SM-7", "201");
+  const hotReturnRun = await resume(
+    hotReturnFirst.body.participantSession.participantSessionId
+  );
+  assert.equal(hotReturnRun.body.testRun.currentUnitKey, "CY-Unit.Sample-101");
+  assert.equal(hotReturnRun.body.testRun.executionMode, "run-hot-return");
+  const savedHotReturn = await requestJson<{
+    testRun: { unitResponses: Record<string, string> };
+  }>(
+    `/api/v1/participant/test-runs/${hotReturnRun.body.testRun.testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        currentUnitKey: "CY-Unit.Sample-101",
+        unitResponse: "official hot-return response",
+        status: "running"
+      }
+    }
+  );
+  assert.equal(
+    savedHotReturn.body.testRun.unitResponses["CY-Unit.Sample-101"],
+    "official hot-return response"
+  );
+  const hotReturnSecond = await signIn("SM-7", "201");
+  assert.equal(
+    hotReturnSecond.body.participantSession.participantSessionId,
+    hotReturnFirst.body.participantSession.participantSessionId
+  );
+  const resumedHotReturn = await resume(
+    hotReturnSecond.body.participantSession.participantSessionId
+  );
+  assert.equal(
+    resumedHotReturn.body.testRun.testRunId,
+    hotReturnRun.body.testRun.testRunId
+  );
+  assert.equal(
+    resumedHotReturn.body.testRun.unitResponses["CY-Unit.Sample-101"],
+    "official hot-return response"
+  );
+
+  const hotRestartFirst = await signIn("SM-9", "203");
+  const hotRestartFirstRun = await resume(
+    hotRestartFirst.body.participantSession.participantSessionId
+  );
+  const hotRestartSecond = await signIn("SM-9", "203");
+  assert.notEqual(
+    hotRestartSecond.body.participantSession.participantSessionId,
+    hotRestartFirst.body.participantSession.participantSessionId
+  );
+  const hotRestartSecondRun = await resume(
+    hotRestartSecond.body.participantSession.participantSessionId
+  );
+  assert.notEqual(
+    hotRestartSecondRun.body.testRun.testRunId,
+    hotRestartFirstRun.body.testRun.testRunId
+  );
+  assert.deepEqual(hotRestartSecondRun.body.testRun.unitResponses, {});
+});
+
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
   type PlayerUnitPackage = {
     unitKey: string;
@@ -13685,6 +14056,13 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
       expectedMessage: "declares module version '5.0.0'"
     },
     {
+      name: "legacy-module-version-mismatch",
+      playerKey: "verona-player-simple-5.0",
+      metadataDocument: createVeronaPlayerMetadataV2({}),
+      expectedCode: "source_document_player_version_mismatch",
+      expectedMessage: "references player module version '5.0'"
+    },
+    {
       name: "identity-mismatch",
       metadataDocument: createVeronaPlayerMetadataV2({
         id: "different-player"
@@ -13702,6 +14080,8 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
     }
   ];
   for (const testCase of cases) {
+    const referencedPlayerKey =
+      "playerKey" in testCase ? testCase.playerKey : playerKey;
     const zipPayload = createZipBase64([
       {
         fileName: "export/imsmanifest.xml",
@@ -13709,7 +14089,7 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
           <manifest>
             <resources>
               <resource identifier="UNIT.PLAYER.ERROR" href="units/Unit.xml" />
-              <resource identifier="${playerKey}" href="players/player.html" />
+              <resource identifier="${referencedPlayerKey}" href="players/player.html" />
             </resources>
           </manifest>
         `
@@ -13719,7 +14099,7 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
         content: `
           <Unit>
             <Metadata><Id>UNIT.PLAYER.ERROR</Id><Label>Player Error Unit</Label></Metadata>
-            <Definition player="${playerKey}"><![CDATA[<p>Player metadata validation</p>]]></Definition>
+            <Definition player="${referencedPlayerKey}"><![CDATA[<p>Player metadata validation</p>]]></Definition>
           </Unit>
         `
       },
