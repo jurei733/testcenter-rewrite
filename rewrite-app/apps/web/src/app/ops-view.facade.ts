@@ -136,6 +136,9 @@ export class OpsViewFacade {
 
   init(): void {
     this.viewState.setActiveView("ops");
+    if (this.ops.adminSessionToken.trim()) {
+      this.viewState.onActionAsync(() => this.opsService.refreshAdminSession());
+    }
   }
 
   get isMonitorOnlySession(): boolean {

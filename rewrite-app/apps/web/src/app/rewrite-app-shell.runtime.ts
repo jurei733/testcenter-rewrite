@@ -25,6 +25,7 @@ export interface RuntimePresentationHost {
   getWorkspaceKey(): string;
   getParticipantSessionId(): string;
   setParticipantSessionId(nextValue: string): void;
+  clearParticipantSessionSelection(): void;
   setGroupKey(nextValue: string): void;
   setParticipantDisplayName(nextValue: string): void;
   syncRuntimeStateFromRun(testRun: RuntimeTestRunLike): void;
@@ -223,6 +224,19 @@ export function applyRuntimeReadsWithoutSession(
         : "Current run state appears after a participant session is available."
     },
     host.getCurrentRunStateView()
+    )
+  );
+  host.setParticipantSessionDetailView(
+    prettyPrintJson(
+      {
+        status: options.monitorOnly
+          ? "monitor_scope_loaded"
+          : "participant_session_required",
+        message: options.monitorOnly
+          ? "Participant session detail is outside the scoped monitor view."
+          : "Select or sign in a participant session to load its workspace detail."
+      },
+      host.getParticipantSessionDetailView()
     )
   );
   host.setRuntimeLoaded(true);

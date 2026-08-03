@@ -41,6 +41,9 @@ export class RewriteAppShellRuntimeHostsService {
       isCurrentRunMissingError: (error: unknown) =>
         this.requestState.isApiError(error) &&
         error.error === "participant_session_has_no_current_run",
+      isParticipantSessionMissingError: (error: unknown) =>
+        this.requestState.isApiError(error) &&
+        error.error === "participant_session_not_found",
       workspaceState: this.workspaceState,
       runtimeState: this.runtimeState,
       createRuntimePresentationHost: () =>

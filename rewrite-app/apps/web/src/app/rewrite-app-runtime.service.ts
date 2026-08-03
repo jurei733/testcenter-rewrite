@@ -263,6 +263,7 @@ export class RewriteAppRuntimeService {
       "Participant Roster Imported",
       `${payload.importedCount} imported, ${payload.updatedCount} updated${operationalCandidateSummary}.`
     );
+    await this.refreshCrossViewStateAfterRuntimeChange();
   }
 
   async loadParticipantRoster(quiet = false): Promise<void> {

@@ -105,6 +105,7 @@ export function createRuntimeReadsStateHost(args: {
     options?: { quiet?: boolean }
   ): Promise<T>;
   isCurrentRunMissingError(error: unknown): boolean;
+  isParticipantSessionMissingError(error: unknown): boolean;
   workspaceState: ShellWorkspaceState;
   runtimeState: ShellRuntimeState;
   createRuntimePresentationHost(): RuntimePresentationHost;
@@ -240,6 +241,7 @@ export function createRuntimeReadsStateHost(args: {
   return {
     request: args.request,
     isCurrentRunMissingError: args.isCurrentRunMissingError,
+    isParticipantSessionMissingError: args.isParticipantSessionMissingError,
     getOpenRunsPath: () => buildOpenRunsPath(productionApiRoutes.monitor.openRuns),
     getOpenRunsCsvExportPath: () =>
       buildOpenRunsPath(productionApiRoutes.workspace.exportOpenRunsCsv),

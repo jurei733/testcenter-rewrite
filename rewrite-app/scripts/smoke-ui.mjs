@@ -5861,21 +5861,28 @@ try {
       })
     })
     .locator(".record-card")
-    .filter({ has: page.getByRole("heading", { name: groupMonitorUsername }) })
-    .filter({ hasText: "monitor-group" })
-    .filter({ hasText: participantGroupKey })
-    .filter({ hasText: "password protected" })
-    .filter({ hasText: "All sessions (all)" })
-    .filter({ hasText: "all: small view; block hide" })
-    .filter({ hasText: "all: Current participant not substring student-ui" });
+    .filter({ has: page.getByRole("heading", { name: groupMonitorUsername }) });
+  logStep("operational-login-migration-candidates");
   await operationalLoginCandidateCard.waitFor();
-  if (
-    (await operationalLoginCandidateCard.textContent())?.includes(
-      "operator-secret"
-    )
-  ) {
+  const operationalLoginCandidateText =
+    (await operationalLoginCandidateCard.textContent()) ?? "";
+  for (const expectedText of [
+    "monitor-group",
+    participantGroupKey,
+    "password protected",
+    "All sessions (all)",
+    "all: small view; block hide",
+    "all: Current participant not substring student-ui"
+  ]) {
+    assert.ok(
+      operationalLoginCandidateText.includes(expectedText),
+      `Operational login migration card is missing '${expectedText}': ${operationalLoginCandidateText}`
+    );
+  }
+  if (operationalLoginCandidateText.includes("operator-secret")) {
     throw new Error("Operational login migration card exposed a source password.");
   }
+  stopAfter("operational-login-migration-candidates");
   await operationalLoginCandidateCard
     .getByRole("button", { name: "Prepare Monitor Account" })
     .click();

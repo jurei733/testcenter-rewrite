@@ -27,6 +27,7 @@ export interface ShellRuntimeReadsHost {
     options?: { quiet?: boolean }
   ): Promise<T>;
   isCurrentRunMissingError(error: unknown): boolean;
+  isParticipantSessionMissingError(error: unknown): boolean;
   getOpenRunsPath(): string;
   getOpenRunsCsvExportPath(): string;
   setOpenRunsExportView(nextValue: string): void;
@@ -152,22 +153,35 @@ export async function refreshRuntimeReadsAction(
     return;
   }
 
-  const [runtimeStatePayload, sessionDetailPayload] = await Promise.all([
-    host.request<ParticipantRuntimeStateResponse>(
-      "Runtime State",
-      "GET",
-      host.getRuntimeStatePath(),
-      undefined,
-      { quiet }
-    ),
-    host.request<GetParticipantSessionResponse>(
-      "Participant Session Detail",
-      "GET",
-      host.getParticipantSessionDetailPath(),
-      undefined,
-      { quiet }
-    )
-  ]);
+  let runtimeStatePayload: ParticipantRuntimeStateResponse;
+  let sessionDetailPayload: GetParticipantSessionResponse;
+  try {
+    [runtimeStatePayload, sessionDetailPayload] = await Promise.all([
+      host.request<ParticipantRuntimeStateResponse>(
+        "Runtime State",
+        "GET",
+        host.getRuntimeStatePath(),
+        undefined,
+        { quiet }
+      ),
+      host.request<GetParticipantSessionResponse>(
+        "Participant Session Detail",
+        "GET",
+        host.getParticipantSessionDetailPath(),
+        undefined,
+        { quiet }
+      )
+    ]);
+  } catch (error) {
+    if (!host.isParticipantSessionMissingError(error)) {
+      throw error;
+    }
+
+    const presentationHost = host.createRuntimePresentationHost();
+    presentationHost.clearParticipantSessionSelection();
+    applyRuntimeReadsWithoutSession(presentationHost, openRuns, quiet);
+    return;
+  }
 
   let currentRunStatePayload: ParticipantCurrentRunStateResponse | null = null;
   try {

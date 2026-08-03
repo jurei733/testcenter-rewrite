@@ -30,6 +30,13 @@ export function createRuntimePresentationStateHost(args: {
       args.runtimeState.participantSessionId = nextValue;
       args.persistShellState();
     },
+    clearParticipantSessionSelection: () => {
+      args.runtimeState.participantSessionId = "";
+      args.runtimeState.testRunId = "";
+      args.runtimeState.currentUnitKey = "";
+      args.runtimeState.currentUnitResponse = "";
+      args.persistShellState();
+    },
     setGroupKey: nextValue => {
       args.runtimeState.groupKey = nextValue;
       args.persistShellState();

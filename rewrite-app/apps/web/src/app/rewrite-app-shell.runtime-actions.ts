@@ -85,7 +85,6 @@ export async function importParticipantRosterAction(
     } satisfies ImportParticipantRosterRequest
   );
   host.setParticipantRosterView(JSON.stringify(payload, null, 2));
-  await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;
 }
 
