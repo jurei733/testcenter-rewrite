@@ -26,7 +26,7 @@
     </Testlet>
 
     <Testlet id="another_testlet" label="Second Block">
-      <Unit id="UNIT.SAMPLE-2" label="Sample Unit again, with Alias" labelshort="Sample Unit Again"/>
+      <Unit id="UNIT.SAMPLE-2" label="Sample Unit again, with Alias" labelshort="Sample Unit Again" alias="cpy"/>
     </Testlet>
 
   </Units>

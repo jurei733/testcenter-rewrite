@@ -21,10 +21,12 @@ check. Together they gate same-workspace check selection, measured versus
 skipped networking, the complete original question-type set, required-field
 feedback, a resolved Verona item, save-key reports, and isolated report cleanup.
 The corpus also contains the original XSD-backed rejection
-fixtures for malformed booklet, unit, and Testtakers structures plus duplicate
-runtime identities. It also contains the byte-exact original sample
-`.itcr.zip` resource package as base64 so the binary fixture remains reviewable
-and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as
+fixtures for malformed booklet, unit, SysCheck, and Testtakers structures plus
+duplicate runtime identities. The matching original repeated-Unit-ID fixture
+proves that an explicit alias remains valid while duplicate Unit runtime keys
+and duplicate Testlet IDs are rejected. It also contains the byte-exact
+original sample `.itcr.zip` resource package as base64 so the binary fixture
+remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as
 Brotli-compressed base64 together with the complete original three-unit 17.4
 booklet. Its media-heavy 16.17 MB second Voud definition is compressed the same
 way; tests decode both artifacts with Node's built-in Brotli support and verify

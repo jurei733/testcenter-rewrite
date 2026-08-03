@@ -7497,6 +7497,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
     kind: "source-package" | "participant-roster";
     diagnosticCode: string;
   };
+  type ValidXmlExpectation = {
+    fixture: string;
+    sourcePath: string;
+    kind: "source-package";
+    bookletKey: string;
+    unitKeys: string[];
+  };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as {
@@ -7508,6 +7515,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       participantLoginKeys: string[];
       excludedOperationalLoginKeys: string[];
     };
+    validXml: ValidXmlExpectation[];
     invalidXml: InvalidXmlExpectation[];
   };
   assert.equal(
@@ -7965,6 +7973,67 @@ test("original Testcenter compatibility corpus imports representative booklets",
           diagnostic.code === expectation.diagnosticCode &&
           diagnostic.severity === "error"
       ),
+      expectation.sourcePath
+    );
+  }
+
+  for (const [expectationIndex, expectation] of corpus.validXml.entries()) {
+    const validWorkspaceKey = `${workspaceKey}-valid-${expectationIndex + 1}`;
+    const validWorkspace = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces`,
+      {
+        method: "POST",
+        body: {
+          workspaceKey: validWorkspaceKey,
+          displayName: validWorkspaceKey
+        }
+      }
+    );
+    assert.equal(validWorkspace.status, 201, expectation.sourcePath);
+    const validSourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validWorkspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: expectation.fixture.split("/").at(-1),
+        mediaType: "application/xml",
+        sourceDocument: readFileSync(
+          resolve(originalTestcenterCorpusRoot, expectation.fixture),
+          "utf8"
+        )
+      }
+    });
+    assert.equal(validSourcePackage.status, 201, expectation.sourcePath);
+    const validImport = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{ unitKey: string }>;
+          }>;
+        };
+      } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validWorkspaceKey}/import-jobs`, {
+      method: "POST",
+      body: {
+        sourcePackageId: validSourcePackage.body.sourcePackage.sourcePackageId
+      }
+    });
+    assert.equal(validImport.status, 201, expectation.sourcePath);
+    assert.equal(
+      validImport.body.importJob.status,
+      "completed",
+      `${expectation.sourcePath}: ${JSON.stringify(validImport.body.importJob.diagnostics)}`
+    );
+    assert.deepEqual(validImport.body.importJob.diagnostics, [], expectation.sourcePath);
+    const booklet = validImport.body.stagedContentRelease?.runtimeSnapshot.bookletEntries.find(
+      candidate => candidate.bookletKey === expectation.bookletKey
+    );
+    assert.ok(booklet, expectation.sourcePath);
+    assert.deepEqual(
+      booklet.unitEntries.map(unit => unit.unitKey),
+      expectation.unitKeys,
       expectation.sourcePath
     );
   }

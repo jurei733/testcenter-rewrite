@@ -681,6 +681,15 @@
       ]
     }
   ],
+  "validXml": [
+    {
+      "fixture": "booklets/Booklet_sameUnitIDs_Alias.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs_Alias.xml",
+      "kind": "source-package",
+      "bookletKey": "BOOKLET.SAMPLE-1",
+      "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "cpy"]
+    }
+  ],
   "invalidXml": [
     {
       "fixture": "invalid/Booklet_error.xml",
@@ -693,6 +702,12 @@
       "sourcePath": "e2e/src/fixtures/Booklet_sameUnitIDs.xml",
       "kind": "source-package",
       "diagnosticCode": "testcenter_xml_unit_key_duplicate"
+    },
+    {
+      "fixture": "invalid/Booklet_sameTestlets.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameTestlets.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_testlet_id_duplicate"
     },
     {
       "fixture": "invalid/Unit_error.xml",
@@ -717,6 +732,12 @@
       "sourcePath": "e2e/src/fixtures/Testtaker_DuplicatedLogin.xml",
       "kind": "participant-roster",
       "diagnosticCode": "testcenter_xml_login_name_duplicate"
+    },
+    {
+      "fixture": "invalid/invalid_SysCheck.xml",
+      "sourcePath": "e2e/src/fixtures/invalid_SysCheck.xml",
+      "kind": "source-package",
+      "diagnosticCode": "testcenter_xml_metadata_missing"
     }
   ],
   "systemChecks": [

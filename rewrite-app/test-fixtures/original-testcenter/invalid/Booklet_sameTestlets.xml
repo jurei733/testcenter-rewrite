@@ -25,8 +25,16 @@
       <Unit id="UNIT.SAMPLE-2" label="A very Simple Sample Unit" labelshort="2nd Sample Unit" />
     </Testlet>
 
+    <Testlet id="a_testlet_with_restrictions" label="First Block">
+      <Restrictions>
+        <CodeToEnter code="sample">Please insert the word `sample`.</CodeToEnter>
+        <TimeMax minutes="1" />
+      </Restrictions>
+      <Unit id="UNIT.SAMPLE-2" label="A very Simple Sample Unit" labelshort="2nd Sample Unit" alias ="copy"/>
+    </Testlet>
+
     <Testlet id="another_testlet" label="Second Block">
-      <Unit id="UNIT.SAMPLE-2" label="Sample Unit again, with Alias" labelshort="Sample Unit Again"/>
+      <Unit id="UNIT.SAMPLE" label="Sample Unit again, with Alias" labelshort="Sample Unit Again" alias="an_alias" />
     </Testlet>
 
   </Units>
