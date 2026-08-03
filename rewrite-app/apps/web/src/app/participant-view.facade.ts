@@ -872,6 +872,30 @@ export class ParticipantViewFacade {
     );
   }
 
+  get veronaLoadingLabel(): string {
+    return this.customText("booklet_loading", "Please wait");
+  }
+
+  get veronaLoadingTitle(): string {
+    return this.readCurrentRunState()?.activeTestletTimer
+      ? this.customText("booklet_loadingBlock", "Timed block is loading")
+      : this.customText("booklet_loadingUnit", "Unit is loading");
+  }
+
+  get veronaLoadingStatus(): string {
+    return this.customText(
+      "booklet_unitLoadingUnknownProgress",
+      "Loading progress is not available"
+    );
+  }
+
+  get veronaErrorText(): string {
+    return this.customText(
+      "booklet_errormessage",
+      "The unit could not be loaded. Reload the player or ask the test supervisor for help."
+    );
+  }
+
   reloadPage(): void {
     if (!this.showReloadButton) {
       return;

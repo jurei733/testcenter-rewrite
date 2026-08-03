@@ -3434,10 +3434,10 @@ try {
           sessionId,
           target: "end"
         }, "*"));
-        addEventListener("DOMContentLoaded", () => parent.postMessage({
+        addEventListener("DOMContentLoaded", () => setTimeout(() => parent.postMessage({
           type: "vopReadyNotification",
           metadata: { specVersion: "6.0" }
-        }, "*"));
+        }, "*"), 750));
       <\/script>
     </body></html>`;
   const veronaSourcePackageZip = createStoredZipBuffer([
@@ -3557,6 +3557,10 @@ try {
             bookletKey: veronaBookletKey,
             displayName: "Verona Smoke Participant",
             customTexts: {
+              booklet_loading: "Please wait for the project player.",
+              booklet_loadingBlock: "Project block is loading",
+              booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
+              booklet_errormessage: "The project player could not be loaded.",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
               booklet_codeToEnterWarning: "Letters are normalized automatically.",
@@ -3622,6 +3626,18 @@ try {
   assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
   await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
   await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantVeronaPlayerLoadingLabel")
+    .filter({ hasText: "Please wait for the project player." })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantVeronaPlayerLoadingTitle")
+    .filter({ hasText: "Project block is loading" })
+    .waitFor();
+  await page
+    .locator("#participantVeronaPlayerLoadingStatus")
+    .filter({ hasText: "Project loading progress is pending." })
+    .waitFor();
   await page
     .locator("#participantRouteTestletTimerLabel")
     .filter({ hasText: "Protected Verona Block" })
@@ -3803,6 +3819,13 @@ try {
     await page.locator("#participantRouteCompleteButton").isDisabled(),
     false
   );
+  await page
+    .locator("#participantVeronaPlayerLoading")
+    .waitFor({ state: "detached", timeout: 15_000 });
+  await page
+    .locator("#participantVeronaPlayerStatus")
+    .filter({ hasText: "running" })
+    .waitFor();
   logStep("participant-verona-offline-outbox");
   const veronaOfflineResponse = "Recovered after offline reload";
   const veronaTestRunId = (
@@ -3857,6 +3880,10 @@ try {
   );
   await offlineRecoveredVeronaFrame
     .locator("#playerAnswer")
+    .waitFor({ timeout: 15_000 });
+  await offlineRecoveredVeronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
     .waitFor({ timeout: 15_000 });
   assert.equal(
     await offlineRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
@@ -3917,6 +3944,10 @@ try {
   await resumedVeronaFrame
     .locator("#playerAnswer")
     .waitFor({ state: "visible" });
+  await resumedVeronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
   assert.equal(
     await resumedVeronaFrame.locator("#playerAnswer").inputValue(),
     veronaOfflineResponse

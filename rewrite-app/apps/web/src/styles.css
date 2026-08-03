@@ -1703,6 +1703,29 @@ pre {
   background: white;
 }
 
+.verona-player-loading {
+  display: grid;
+  gap: 5px;
+  margin: 0 14px;
+  padding: 14px;
+  border: 1px solid rgba(31, 92, 84, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(31, 92, 84, 0.06);
+}
+
+.verona-player-loading span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verona-player-loading p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .verona-player-error {
   display: grid;
   gap: 8px;
@@ -1717,6 +1740,16 @@ pre {
 .verona-player-error p {
   margin: 0;
   color: var(--ink);
+  white-space: pre-line;
+}
+
+.verona-player-error details {
+  color: var(--ink);
+}
+
+.verona-player-error summary {
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .participant-navigation-notice {

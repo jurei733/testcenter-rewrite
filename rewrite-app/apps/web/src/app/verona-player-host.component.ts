@@ -45,6 +45,17 @@ import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domai
           <small id="participantVeronaPlayerVersion">{{ apiVersionLabel }}</small>
         </div>
       </header>
+      <section
+        *ngIf="status === 'loading'"
+        class="verona-player-loading"
+        id="participantVeronaPlayerLoading"
+        role="status"
+        aria-live="polite"
+      >
+        <span id="participantVeronaPlayerLoadingLabel">{{ loadingLabel }}</span>
+        <strong id="participantVeronaPlayerLoadingTitle">{{ loadingTitle }}</strong>
+        <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatus }}</p>
+      </section>
       <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
       <section
         *ngIf="errorMessage"
@@ -52,8 +63,12 @@ import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domai
         id="participantVeronaPlayerError"
         role="alert"
       >
-        <strong>Player could not start</strong>
-        <p>{{ errorMessage }}</p>
+        <strong>{{ errorTitle }}</strong>
+        <p id="participantVeronaPlayerErrorText">{{ errorText }}</p>
+        <details>
+          <summary>Technical details</summary>
+          <p id="participantVeronaPlayerErrorDetail">{{ errorMessage }}</p>
+        </details>
         <button type="button" class="secondary" (click)="reload()">Reload Player</button>
       </section>
       <footer>
@@ -95,6 +110,12 @@ export class VeronaPlayerHostComponent
     "separate";
   @Input() restoreCurrentPageOnReturn = false;
   @Input() saveStatus = "not_saved";
+  @Input() loadingLabel = "Please wait";
+  @Input() loadingTitle = "Unit is loading";
+  @Input() loadingStatus = "Loading progress is not available";
+  @Input() errorTitle = "Player could not start";
+  @Input() errorText =
+    "The unit could not be loaded. Reload the player or ask the test supervisor for help.";
 
   @Output() readonly responseChange = new EventEmitter<string>();
   @Output() readonly logEntries =
