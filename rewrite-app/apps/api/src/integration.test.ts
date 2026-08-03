@@ -8821,7 +8821,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       player: {
         logPolicy: "rich",
-        pagingMode: "separate",
+        pagingMode: "buttons",
         restoreCurrentPageOnReturn: false
       },
       completion: { lockOnTermination: false },
@@ -8845,7 +8845,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       player: {
         logPolicy: "rich",
-        pagingMode: "separate",
+        pagingMode: "buttons",
         restoreCurrentPageOnReturn: true
       },
       completion: { lockOnTermination: true },
@@ -8869,7 +8869,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       player: {
         logPolicy: "rich",
-        pagingMode: "separate",
+        pagingMode: "buttons",
         restoreCurrentPageOnReturn: false
       },
       completion: { lockOnTermination: false },
@@ -8893,7 +8893,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       },
       player: {
         logPolicy: "rich",
-        pagingMode: "separate",
+        pagingMode: "buttons",
         restoreCurrentPageOnReturn: false
       },
       completion: { lockOnTermination: false },

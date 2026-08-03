@@ -5142,6 +5142,273 @@ try {
   );
   stopAfter("participant-original-booklet-config");
 
+  logStep("participant-original-test-controller");
+  const testControllerTenantKey = `${tenantKey}-test-controller`;
+  const testControllerWorkspaceKey = `${workspaceKey}-test-controller`;
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: testControllerTenantKey,
+      displayName: "UI Original Test Controller Tenant"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: testControllerWorkspaceKey,
+        displayName: "UI Original Test Controller Workspace"
+      }
+    }
+  );
+  const testControllerFixtures = Array.from({ length: 17 }, (_, index) => ({
+    fixture: `booklets/system-test/CY_Bklt_TC-${index + 1}.xml`,
+    bookletKey: `Cy-Bklt_TC-${index + 1}`
+  }));
+  const testControllerUnitFixtures = Array.from({ length: 5 }, (_, index) => ({
+    fixture: `units/CY_Unit10${index}.xml`,
+    unitKey: `CY-Unit.Sample-10${index}`
+  }));
+  const [testControllerDocuments, testControllerUnitDocuments] =
+    await Promise.all([
+      Promise.all(
+        testControllerFixtures.map(async fixture => ({
+          ...fixture,
+          content: await readFile(
+            resolve(originalCorpusRoot, fixture.fixture),
+            "utf8"
+          )
+        }))
+      ),
+      Promise.all(
+        testControllerUnitFixtures.map(async fixture => ({
+          ...fixture,
+          content: await readFile(
+            resolve(originalCorpusRoot, fixture.fixture),
+            "utf8"
+          )
+        }))
+      )
+    ]);
+  const testControllerManifestResources = [
+    ...testControllerFixtures.map(
+      fixture =>
+        `<resource identifier="${fixture.bookletKey}" href="${fixture.fixture}" />`
+    ),
+    ...testControllerUnitFixtures.map(
+      fixture =>
+        `<resource identifier="${fixture.unitKey}" href="${fixture.fixture}" />`
+    ),
+    `<resource identifier="${bookletConfigPlayerKey}" href="${bookletConfigPlayerFixture}" />`
+  ].join("\n");
+  const testControllerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>${testControllerManifestResources}</resources>
+        </manifest>
+      `
+    },
+    ...testControllerDocuments.map(document => ({
+      fileName: `export/${document.fixture}`,
+      content: document.content
+    })),
+    ...testControllerUnitDocuments.map(document => ({
+      fileName: `export/${document.fixture}`,
+      content: document.content
+    })),
+    {
+      fileName: `export/${bookletConfigPlayerFixture}`,
+      content: bookletConfigPlayerDocument
+    }
+  ]);
+  const testControllerSourcePackageResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "original-test-controller-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${testControllerZip.toString("base64")}`
+      }
+    }
+  );
+  const testControllerSourcePackagePayload =
+    await testControllerSourcePackageResponse.json();
+  const testControllerImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          testControllerSourcePackagePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const testControllerImportPayload = await testControllerImportResponse.json();
+  const testControllerReleaseId =
+    testControllerImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    testControllerReleaseId,
+    `Original Test Controller browser import should stage a release: ${JSON.stringify(
+      testControllerImportPayload.importJob?.diagnostics ?? []
+    )}`
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/content-releases/${testControllerReleaseId}/activate`,
+    { body: {} }
+  );
+  const testControllerRosterResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${testControllerTenantKey}/workspaces/${testControllerWorkspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: Buffer.from(
+          (
+            await readFile(
+              resolve(
+                originalCorpusRoot,
+                "rosters/CY_Logins_TestController.xml.base64"
+              ),
+              "utf8"
+            )
+          ).trim(),
+          "base64"
+        ).toString("utf8")
+      }
+    }
+  );
+  const testControllerRosterPayload = await testControllerRosterResponse.json();
+  assert.equal(testControllerRosterPayload.items.length, 26);
+  assert.deepEqual(
+    testControllerRosterPayload.items
+      .filter(item => ["Test_Ctrl-3", "Test_Ctrl-23"].includes(item.loginKey))
+      .map(item => [item.loginKey, item.bookletKey, item.passwordRequired])
+      .sort((left, right) => left[0].localeCompare(right[0])),
+    [
+      ["Test_Ctrl-23", "Cy-Bklt_TC-14", true],
+      ["Test_Ctrl-3", "Cy-Bklt_TC-3", true]
+    ]
+  );
+  const openOriginalTestController = async (loginKey, bookletKey) => {
+    const signInResponse = await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/auth/sign-in`,
+      {
+        body: {
+          tenantKey: testControllerTenantKey,
+          workspaceKey: testControllerWorkspaceKey,
+          loginKey,
+          password: "123"
+        }
+      }
+    );
+    const signInPayload = await signInResponse.json();
+    const participantSessionId =
+      signInPayload.participantSession?.participantSessionId;
+    assert.ok(participantSessionId, `${loginKey} should create a session.`);
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/resume`,
+      { body: { bookletKey } }
+    );
+    await page.goto(
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+        participantSessionId
+      )}`,
+      { waitUntil: "networkidle" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: "API 6.0" })
+      .waitFor({ timeout: 30_000 });
+    return page.frameLocator("#participantVeronaPlayerFrame");
+  };
+
+  const protectedControllerFrame = await openOriginalTestController(
+    "Test_Ctrl-3",
+    "Cy-Bklt_TC-3"
+  );
+  await protectedControllerFrame
+    .getByText("Testung Controller: Startseite", { exact: true })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletGateLabel")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+  await page
+    .locator("#participantRouteTestletGatePrompt")
+    .filter({ hasText: "Bitte gib das Freigabewort ein." })
+    .waitFor();
+  await page.locator("#participantRouteTestletUnlockCode").fill("hase");
+  assert.equal(
+    await page.locator("#participantRouteTestletUnlockCode").inputValue(),
+    "HASE"
+  );
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#participantRouteTestletTimerLabel")
+    .filter({ hasText: "Aufgabenblock" })
+    .waitFor();
+  await page.locator("#participantRouteTestletTimerValue").waitFor();
+  await protectedControllerFrame
+    .getByText(/Testung Controller: Aufgabe1:/)
+    .waitFor({ timeout: 15_000 });
+
+  const completionControllerFrame = await openOriginalTestController(
+    "Test_Ctrl-23",
+    "Cy-Bklt_TC-14"
+  );
+  await completionControllerFrame
+    .getByText("Testung Controller: Aufgabe1: Check response complete and presentation complete", {
+      exact: true
+    })
+    .waitFor({ timeout: 15_000 });
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await page.locator("#participantRouteNextUnitButton").isDisabled(),
+    true
+  );
+  assert.equal(
+    await completionControllerFrame.locator("#next-unit").isDisabled(),
+    true
+  );
+  await completionControllerFrame
+    .locator('[data-cy="TestController-radio1-Aufg1"]')
+    .check();
+  assert.equal(
+    await page.locator("#participantRouteNextUnitButton").isDisabled(),
+    true
+  );
+  await completionControllerFrame.locator("#next-page").click();
+  await completionControllerFrame
+    .getByText("Presentation complete", { exact: true })
+    .waitFor();
+  await page
+    .locator("#participantRouteNextUnitButton")
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector("#participantRouteNextUnitButton");
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    undefined,
+    { timeout: 15_000 }
+  );
+  assert.equal(
+    await completionControllerFrame.locator("#next-unit").isEnabled(),
+    true
+  );
+  await page.locator("#participantRouteNextUnitButton").click();
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: "CY-Unit.Sample-102" })
+    .waitFor({ timeout: 15_000 });
+  stopAfter("participant-original-test-controller");
+
   logStep("nav-runtime");
   await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);

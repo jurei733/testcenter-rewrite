@@ -170,7 +170,7 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       ),
       pagingMode: choice(
         read("pagingMode"),
-        ["separate", "concat-scroll", "concat-scroll-snap"] as const,
+        ["separate", "concat-scroll", "concat-scroll-snap", "buttons"] as const,
         "separate"
       ),
       restoreCurrentPageOnReturn: on(read("restore_current_page_on_return"), false)

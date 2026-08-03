@@ -122,8 +122,11 @@ export class VeronaPlayerHostComponent
   @Input() canGoNext = false;
   @Input() canComplete = false;
   @Input() logPolicy: "disabled" | "lean" | "rich" | "debug" = "rich";
-  @Input() pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" =
-    "separate";
+  @Input() pagingMode:
+    | "separate"
+    | "concat-scroll"
+    | "concat-scroll-snap"
+    | "buttons" = "separate";
   @Input() restoreCurrentPageOnReturn = false;
   @Input() saveStatus = "not_saved";
   @Input() loadingLabel = "Please wait";

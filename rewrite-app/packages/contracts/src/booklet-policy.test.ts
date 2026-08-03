@@ -43,6 +43,10 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.navigation.unitControls, "forward_only");
   assert.equal(policy.navigation.playerEnd, "last_unit");
   assert.equal(policy.player.pagingMode, "concat-scroll-snap");
+  assert.equal(
+    compileBookletRuntimePolicy({ pagingMode: "buttons" }).player.pagingMode,
+    "buttons"
+  );
   assert.equal(policy.player.logPolicy, "debug");
   assert.equal(policy.player.restoreCurrentPageOnReturn, true);
   assert.equal(policy.completion.lockOnTermination, true);

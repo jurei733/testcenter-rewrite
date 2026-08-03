@@ -756,7 +756,7 @@ export type BookletRuntimePolicy = {
   };
   player: {
     logPolicy: "disabled" | "lean" | "rich" | "debug";
-    pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap";
+    pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
     restoreCurrentPageOnReturn: boolean;
   };
   completion: {

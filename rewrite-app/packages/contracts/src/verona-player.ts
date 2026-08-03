@@ -25,7 +25,7 @@ export type VeronaPlayerConfig = {
   directDownloadUrl?: string;
   enabledNavigationTargets: Array<"next" | "previous" | "first" | "last" | "end">;
   logPolicy: "disabled" | "lean" | "rich" | "debug";
-  pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap";
+  pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
   stateReportPolicy: "eager";
   unitNumber: number;
   unitTitle: string;
