@@ -123,6 +123,10 @@ type ParticipantPlayerState = {
     showTimeLeft: boolean;
     warningMessage: string | null;
   } | null;
+  timerLifecycleEvent: {
+    kind: "started" | "expired" | "cancelled";
+    message: string;
+  } | null;
   leaveLock: {
     testletKey: string;
     displayLabel: string;
@@ -257,6 +261,14 @@ export class ParticipantViewFacade {
     minutes: number;
     visibleUntilMs: number;
   } | null = null;
+  private readonly activeTimerLifecycleEvent = signal<{
+    key: string;
+    kind: "started" | "expired" | "cancelled";
+    durationSeconds: number;
+    visibleUntilMs: number;
+  } | null>(null);
+  private readonly seenTimerLifecycleEvents = new Set<string>();
+  private readonly presentedActiveTimers = new Set<string>();
   private readonly seenTimerWarnings = new Set<string>();
   private readonly timerRemainingSeconds = new Map<string, number>();
   private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
@@ -522,6 +534,7 @@ export class ParticipantViewFacade {
         navigationNotice: "",
         nextTestletGate: null,
         testletTimer: null,
+        timerLifecycleEvent: null,
         leaveLock: null
       };
     }
@@ -680,6 +693,7 @@ export class ParticipantViewFacade {
         })()
       : null;
     const activeLeaveLock = currentState.activeLeaveLock;
+    const timerLifecycleEvent = this.getTimerLifecycleEvent();
     const leaveLock = activeLeaveLock
       ? {
           ...activeLeaveLock,
@@ -784,6 +798,7 @@ export class ParticipantViewFacade {
         : this.describeNavigationDenial(currentState),
       nextTestletGate: currentState.navigation.nextTestletGate,
       testletTimer,
+      timerLifecycleEvent,
       leaveLock
     };
   }
@@ -1064,6 +1079,20 @@ export class ParticipantViewFacade {
       const expiresAtMs = activeTimer?.expiresAt
         ? Date.parse(activeTimer.expiresAt)
         : Number.NaN;
+      if (activeTimer) {
+        const activeTimerPresentationKey = `${
+          this.readCurrentRunState()?.testRun.testRunId ?? ""
+        }:${activeTimer.testletKey}:${activeTimer.startedAt}`;
+        if (!this.presentedActiveTimers.has(activeTimerPresentationKey)) {
+          this.presentedActiveTimers.add(activeTimerPresentationKey);
+          this.showTimerLifecycleEvent(
+            this.readCurrentRunState()?.testRun.testRunId ?? "",
+            "started",
+            activeTimer,
+            true
+          );
+        }
+      }
       if (activeTimer?.status === "running" && Number.isFinite(expiresAtMs)) {
         const remainingSeconds = Math.max(
           0,
@@ -1102,6 +1131,13 @@ export class ParticipantViewFacade {
       ) {
         this.activeTimerWarning = null;
       }
+      const activeTimerLifecycleEvent = this.activeTimerLifecycleEvent();
+      if (
+        activeTimerLifecycleEvent &&
+        activeTimerLifecycleEvent.visibleUntilMs <= currentTick
+      ) {
+        this.activeTimerLifecycleEvent.set(null);
+      }
       if (
         activeTimer?.status === "running" &&
         Number.isFinite(expiresAtMs) &&
@@ -1114,6 +1150,113 @@ export class ParticipantViewFacade {
         });
       }
     }, 250);
+  }
+
+  private getTimerLifecycleEvent(): ParticipantPlayerState["timerLifecycleEvent"] {
+    const event = this.activeTimerLifecycleEvent();
+    if (!event || event.visibleUntilMs <= this.timerTick()) {
+      return null;
+    }
+    if (event.kind === "started") {
+      const minutes = Math.floor(event.durationSeconds / 60);
+      const seconds = event.durationSeconds % 60;
+      return {
+        kind: event.kind,
+        message: `${
+          this.customText(
+            "booklet_msgTimerStarted",
+            "The time for this block has started: "
+          ).trimEnd()
+        } ${minutes}:${String(seconds).padStart(2, "0")}`
+      };
+    }
+    return {
+      kind: event.kind,
+      message:
+        event.kind === "expired"
+          ? this.customText(
+              "booklet_msgTimeOver",
+              "The time for this block has ended."
+            )
+          : this.customText(
+              "booklet_msgTimerCancelled",
+              "The timed block was cancelled."
+            )
+    };
+  }
+
+  private captureTimerLifecycleTransitions(
+    nextTestRun: Pick<
+      ParticipantCurrentRunStateResponse["currentRunState"]["testRun"],
+      "testRunId"
+    > &
+      Partial<ParticipantCurrentRunStateResponse["currentRunState"]["testRun"]>
+  ): void {
+    const previousTestRun = this.currentRunState?.testRun;
+    if (
+      !previousTestRun ||
+      previousTestRun.testRunId !== nextTestRun.testRunId ||
+      !nextTestRun.testletTimers
+    ) {
+      return;
+    }
+    for (const [testletKey, nextTimer] of Object.entries(
+      nextTestRun.testletTimers
+    )) {
+      const previousTimer = previousTestRun.testletTimers?.[testletKey];
+      if (
+        !previousTimer &&
+        (nextTimer.status === "running" || nextTimer.status === "paused")
+      ) {
+        this.showTimerLifecycleEvent(
+          nextTestRun.testRunId,
+          "started",
+          nextTimer
+        );
+        continue;
+      }
+      if (
+        previousTimer &&
+        (previousTimer.status === "running" ||
+          previousTimer.status === "paused") &&
+        (nextTimer.status === "expired" || nextTimer.status === "cancelled")
+      ) {
+        this.showTimerLifecycleEvent(
+          nextTestRun.testRunId,
+          nextTimer.status,
+          nextTimer
+        );
+      }
+    }
+  }
+
+  private showTimerLifecycleEvent(
+    testRunId: string,
+    kind: "started" | "expired" | "cancelled",
+    timer: {
+      testletKey: string;
+      startedAt: string;
+      durationSeconds: number;
+    },
+    forceVisible = false
+  ): void {
+    const key = `${testRunId}:${timer.testletKey}:${timer.startedAt}:${kind}`;
+    if (this.seenTimerLifecycleEvents.has(key) && !forceVisible) {
+      return;
+    }
+    this.seenTimerLifecycleEvents.add(key);
+    this.activeTimerLifecycleEvent.set({
+      key,
+      kind,
+      durationSeconds: Math.max(0, Math.ceil(timer.durationSeconds)),
+      visibleUntilMs: Date.now() + 5_000
+    });
+  }
+
+  private resetTimerLifecyclePresentation(): void {
+    this.activeTimerLifecycleEvent.set(null);
+    this.seenTimerLifecycleEvents.clear();
+    this.presentedActiveTimers.clear();
   }
 
   get canSignIn(): boolean {
@@ -1680,6 +1823,7 @@ export class ParticipantViewFacade {
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
     this.currentRunState = null;
+    this.resetTimerLifecyclePresentation();
     this.adaptiveStateFeedback = "";
     this.adaptiveStateChangePending = "";
     this.participantCodeRequired = false;
@@ -1716,6 +1860,7 @@ export class ParticipantViewFacade {
     this.pendingVeronaSave = null;
     this.optimisticVeronaResponse = null;
     this.currentRunState = null;
+    this.resetTimerLifecyclePresentation();
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
@@ -2094,6 +2239,7 @@ export class ParticipantViewFacade {
     this.syncRun(payload.testRun);
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+    this.presentedActiveTimers.clear();
   }
 
   private async resumeRunInternal(): Promise<void> {
@@ -2119,6 +2265,12 @@ export class ParticipantViewFacade {
     confirmTestletLeaveLock = false
   ): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
+    const activeTimerBeforeComplete =
+      this.readCurrentRunState()?.activeTestletTimer ??
+      Object.values(
+        this.readCurrentRunState()?.testRun.testletTimers ?? {}
+      ).find(timer => timer.status === "running" || timer.status === "paused") ??
+      null;
     await this.saveCurrentDraftBeforeCompleteInternal();
 
     const payload = await this.requestState.request<CompleteTestRunResponse>(
@@ -2140,6 +2292,14 @@ export class ParticipantViewFacade {
     );
     this.persistState();
     await this.refreshCurrentStateInternal(true);
+    if (activeTimerBeforeComplete) {
+      this.showTimerLifecycleEvent(
+        payload.testRun.testRunId,
+        "cancelled",
+        activeTimerBeforeComplete,
+        true
+      );
+    }
   }
 
   private async saveCurrentDraftBeforeCompleteInternal(): Promise<void> {
@@ -2414,6 +2574,7 @@ export class ParticipantViewFacade {
     > &
       Partial<ParticipantCurrentRunStateResponse["currentRunState"]["testRun"]>
   ): void {
+    this.captureTimerLifecycleTransitions(testRun);
     if (this.currentRunState?.testRun.testRunId === testRun.testRunId) {
       this.currentRunState = {
         ...this.currentRunState,
@@ -2446,6 +2607,7 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
+    this.captureTimerLifecycleTransitions(currentState.testRun);
     this.currentRunState = currentState;
     this.workspace.tenantKey = currentState.scope.tenantKey;
     this.workspace.workspaceKey = currentState.scope.workspaceKey;

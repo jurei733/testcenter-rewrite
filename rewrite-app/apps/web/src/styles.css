@@ -1449,6 +1449,38 @@ pre {
   color: var(--muted);
 }
 
+.participant-timer-lifecycle-event {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid rgba(31, 92, 84, 0.3);
+  border-radius: var(--radius-lg);
+  background: rgba(31, 92, 84, 0.1);
+}
+
+.participant-timer-lifecycle-event.is-expired,
+.participant-timer-lifecycle-event.is-cancelled {
+  border-color: rgba(196, 82, 47, 0.4);
+  background: rgba(196, 82, 47, 0.1);
+}
+
+.participant-timer-lifecycle-event span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-timer-lifecycle-event strong {
+  color: var(--green-deep);
+}
+
+.participant-timer-lifecycle-event.is-expired strong,
+.participant-timer-lifecycle-event.is-cancelled strong {
+  color: var(--accent);
+}
+
 .participant-testlet-timer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

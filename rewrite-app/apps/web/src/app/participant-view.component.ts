@@ -503,6 +503,18 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             <p id="participantRouteCompletionReadinessDetail">{{ view.player.completionReadinessDetail }}</p>
           </section>
           <section
+            *ngIf="view.player.timerLifecycleEvent as timerEvent"
+            id="participantRouteTimerLifecycleEvent"
+            class="participant-timer-lifecycle-event"
+            [class.is-expired]="timerEvent.kind === 'expired'"
+            [class.is-cancelled]="timerEvent.kind === 'cancelled'"
+            role="status"
+            aria-live="assertive"
+          >
+            <span>Timed block</span>
+            <strong id="participantRouteTimerLifecycleMessage">{{ timerEvent.message }}</strong>
+          </section>
+          <section
             *ngIf="view.player.testletTimer as timer"
             id="participantRouteTestletTimer"
             class="participant-testlet-timer"

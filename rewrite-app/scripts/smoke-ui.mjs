@@ -3561,6 +3561,9 @@ try {
               booklet_loadingBlock: "Project block is loading",
               booklet_unitLoadingUnknownProgress: "Project loading progress is pending.",
               booklet_errormessage: "The project player could not be loaded.",
+              booklet_msgTimerStarted: "Project timer started: ",
+              booklet_msgTimeOver: "Project time is over.",
+              booklet_msgTimerCancelled: "Project timer was cancelled.",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
               booklet_codeToEnterWarning: "Letters are normalized automatically.",
@@ -3642,6 +3645,14 @@ try {
     .locator("#participantRouteTestletTimerLabel")
     .filter({ hasText: "Protected Verona Block" })
     .waitFor({ timeout: 15_000 });
+  const timerStartedMessage = page.locator(
+    "#participantRouteTimerLifecycleMessage"
+  );
+  await timerStartedMessage.waitFor();
+  assert.match(
+    (await timerStartedMessage.innerText()).trim(),
+    /^Project timer started: \d+:\d{2}$/
+  );
   await page
     .locator("#participantRouteTestletTimerLeave")
     .filter({ hasText: "closes it immediately" })
