@@ -14039,6 +14039,266 @@ test("loose assemblies resolve Verona players by module version instead of API v
   assert.equal(snapshot.playerEntries?.[0]?.playerKey, playerKey);
 });
 
+test("original Testcenter compatibility corpus retains separately uploaded Verona resources in workspace dependency snapshots", async () => {
+  const tenantKey = "integration-tenant-loose-player-resource";
+  const workspaceKey = "integration-workspace-loose-player-resource";
+  const bookletKey = "BOOKLET.LOOSE.PLAYER.RESOURCE";
+  const unitKey = "UNIT.LOOSE.PLAYER.RESOURCE";
+  const playerKey = "verona-player-simple@6.0";
+  const resourceFileName = "sample_resource_package.itcr.zip";
+  const expectedResourceContent =
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+  const expectedResourceBytes = Buffer.from(expectedResourceContent, "utf8");
+  const originalResourcePackageBase64 = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "resources/sample_resource_package.itcr.zip.base64"
+    ),
+    "utf8"
+  ).trim();
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const files = [
+    {
+      fileName: "booklets/LooseResourceBooklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata>
+            <Id>${bookletKey}</Id>
+            <Label>Loose Player Resource Booklet</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${unitKey}" label="Loose Player Resource Unit" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "units/LooseResourceUnit.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
+          <Metadata>
+            <Id>${unitKey}</Id>
+            <Label>Loose Player Resource Unit</Label>
+          </Metadata>
+          <DefinitionRef player="${playerKey}">../definitions/loose-resource-unit.html</DefinitionRef>
+          <Dependencies>
+            <File for="player">${resourceFileName}</File>
+          </Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "definitions/loose-resource-unit.html",
+      mediaType: "text/html",
+      sourceDocument:
+        '<form><label>Loose resource response <input name="response" /></label></form>'
+    },
+    {
+      fileName: "players/verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: readFileSync(
+        resolve(
+          originalTestcenterCorpusRoot,
+          "players/verona-player-simple-6.0.html"
+        ),
+        "utf8"
+      )
+    },
+    {
+      fileName: `resources/${resourceFileName}`,
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${originalResourcePackageBase64}`
+    }
+  ];
+  const sourcePackages: Array<{
+    sourcePackageId: string;
+    fileName: string;
+  }> = [];
+  for (const file of files) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: file
+    });
+    assert.equal(upload.status, 201);
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const automaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+  });
+  assert.equal(automaticImport.status, 201);
+  assert.equal(automaticImport.body.importJob.status, "completed");
+  assert.equal(
+    automaticImport.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(automaticImport.body.importJob.diagnostics)
+  );
+  assert.notEqual(
+    automaticImport.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  const contentReleaseId =
+    automaticImport.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const snapshotDetail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: { fileName: string; mediaType: string; status: string };
+      dependencyGraph: {
+        edges: Array<{ relationshipType: string; toNodeId: string }>;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${automaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.sourcePackage.fileName,
+    "LooseResourceBooklet.workspace-dependencies.zip"
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.sourcePackage.mediaType,
+    "application/zip"
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.sourcePackage.status,
+    "accepted"
+  );
+  const assembledFromSourcePackageIds =
+    snapshotDetail.body.sourcePackageDetail.dependencyGraph.edges
+      .filter(edge => edge.relationshipType === "assembled_from")
+      .map(edge => edge.toNodeId)
+      .sort();
+  assert.deepEqual(
+    assembledFromSourcePackageIds,
+    sourcePackages
+      .map(sourcePackage => `source-package:${sourcePackage.sourcePackageId}`)
+      .sort()
+  );
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string }>;
+          resourceEntries?: Array<{
+            resourcePath: string;
+            mediaType: string;
+            dataBase64: string;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}`
+  );
+  const runtimeSnapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const importedUnit = runtimeSnapshot.bookletEntries
+    .find(booklet => booklet.bookletKey === bookletKey)
+    ?.unitEntries.find(unit => unit.unitKey === unitKey);
+  assert.equal(importedUnit?.playerKey, playerKey);
+  assert.equal(
+    importedUnit?.unitDefinition,
+    '<form><label>Loose resource response <input name="response" /></label></form>'
+  );
+  assert.equal(runtimeSnapshot.playerEntries?.[0]?.playerKey, playerKey);
+  assert.deepEqual(runtimeSnapshot.resourceEntries, [
+    {
+      resourcePath: "sample_resource_package/file.text",
+      mediaType: "text/plain; charset=utf-8",
+      dataBase64: expectedResourceBytes.toString("base64")
+    }
+  ]);
+
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "loose-resource-participant" }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId =
+    signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson(
+    `/api/v1/participant/sessions/${participantSessionId}/resume`,
+    { method: "POST", body: { bookletKey } }
+  );
+  assert.equal(resume.status, 200);
+  const currentState = await requestJson<{
+    currentRunState: {
+      currentUnit?: {
+        unitKey: string;
+        player?: { playerKey: string } | null;
+      };
+      resourceBasePath?: string;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(currentState.body.currentRunState.currentUnit?.unitKey, unitKey);
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.player?.playerKey,
+    playerKey
+  );
+  const resourceBasePath =
+    currentState.body.currentRunState.resourceBasePath;
+  assert.equal(
+    resourceBasePath,
+    `/api/v1/participant/sessions/${participantSessionId}/resources`
+  );
+  const resourceUrl =
+    `${baseUrl}${resourceBasePath}/sample_resource_package/file.text`;
+  const resourceResponse = await fetch(resourceUrl);
+  assert.equal(resourceResponse.status, 200);
+  assert.equal(await resourceResponse.text(), expectedResourceContent);
+  const rangedResourceResponse = await fetch(resourceUrl, {
+    headers: { range: "bytes=5-19" }
+  });
+  assert.equal(rangedResourceResponse.status, 206);
+  assert.deepEqual(
+    Buffer.from(await rangedResourceResponse.arrayBuffer()),
+    expectedResourceBytes.subarray(5, 20)
+  );
+});
+
 test("metadata-free Verona players use an explicit legacy compatibility policy", async () => {
   const tenantKey = "integration-tenant-player-metadata-legacy";
   const workspaceKey = "integration-workspace-player-metadata-legacy";
