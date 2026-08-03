@@ -1,5 +1,11 @@
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
 
+import {
+  discardParticipantBackgroundSavesForRun,
+  queueParticipantSaveForBackgroundDelivery,
+  removeParticipantSaveFromBackgroundDelivery
+} from "./participant-save-background-sync";
+
 export const PARTICIPANT_SAVE_OUTBOX_STORAGE_KEY =
   "testcenter-rewrite:participant-save-outbox:v1";
 
@@ -78,6 +84,17 @@ export function persistParticipantSaveOutboxEntry(
   return writeParticipantSaveOutbox({ version: OUTBOX_VERSION, entries }, storage);
 }
 
+export function queueParticipantSaveOutboxEntryForBackgroundDelivery(
+  entry: ParticipantSaveOutboxEntry,
+  storage = getBrowserStorage()
+): boolean {
+  const persisted = persistParticipantSaveOutboxEntry(entry, storage);
+  if (persisted) {
+    queueParticipantSaveForBackgroundDelivery(entry);
+  }
+  return persisted;
+}
+
 export function removeParticipantSaveOutboxEntry(
   testRunId: string,
   deliveryId: string,
@@ -97,12 +114,20 @@ export function removeParticipantSaveOutboxEntry(
   if (entries.length === 0) {
     try {
       storage.removeItem(PARTICIPANT_SAVE_OUTBOX_STORAGE_KEY);
+      removeParticipantSaveFromBackgroundDelivery(testRunId, deliveryId);
       return true;
     } catch {
       return false;
     }
   }
-  return writeParticipantSaveOutbox({ version: OUTBOX_VERSION, entries }, storage);
+  const removed = writeParticipantSaveOutbox(
+    { version: OUTBOX_VERSION, entries },
+    storage
+  );
+  if (removed) {
+    removeParticipantSaveFromBackgroundDelivery(testRunId, deliveryId);
+  }
+  return removed;
 }
 
 export function discardParticipantSaveOutboxForRun(
@@ -120,12 +145,20 @@ export function discardParticipantSaveOutboxForRun(
   if (entries.length === 0) {
     try {
       storage.removeItem(PARTICIPANT_SAVE_OUTBOX_STORAGE_KEY);
+      discardParticipantBackgroundSavesForRun(testRunId);
       return true;
     } catch {
       return false;
     }
   }
-  return writeParticipantSaveOutbox({ version: OUTBOX_VERSION, entries }, storage);
+  const discarded = writeParticipantSaveOutbox(
+    { version: OUTBOX_VERSION, entries },
+    storage
+  );
+  if (discarded) {
+    discardParticipantBackgroundSavesForRun(testRunId);
+  }
+  return discarded;
 }
 
 function readParticipantSaveOutbox(

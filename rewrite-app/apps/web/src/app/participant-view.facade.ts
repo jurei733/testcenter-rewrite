@@ -45,6 +45,7 @@ import {
   discardParticipantSaveOutboxForRun,
   findParticipantSaveOutboxEntry,
   persistParticipantSaveOutboxEntry,
+  queueParticipantSaveOutboxEntryForBackgroundDelivery,
   removeParticipantSaveOutboxEntry,
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
@@ -303,6 +304,9 @@ export class ParticipantViewFacade {
   private readonly onlineListener = (): void => {
     this.retryVeronaSave();
   };
+  private readonly pageHideListener = (): void => {
+    this.queuePendingVeronaSaveForBackgroundDelivery();
+  };
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -311,6 +315,7 @@ export class ParticipantViewFacade {
       this.fullscreenChangeListener
     );
     globalThis.window?.addEventListener("online", this.onlineListener);
+    globalThis.window?.addEventListener("pagehide", this.pageHideListener);
     this.fullscreenChangeListener();
     this.startTimerTicker();
   }
@@ -325,6 +330,8 @@ export class ParticipantViewFacade {
       this.fullscreenChangeListener
     );
     globalThis.window?.removeEventListener("online", this.onlineListener);
+    globalThis.window?.removeEventListener("pagehide", this.pageHideListener);
+    this.queuePendingVeronaSaveForBackgroundDelivery();
     this.clearVeronaSaveBuffer();
     this.clearNavigationAdvisory();
   }
@@ -2257,7 +2264,8 @@ export class ParticipantViewFacade {
       } catch {
         const retrySave = this.pendingVeronaSave ?? save;
         this.pendingVeronaSave = retrySave;
-        this.veronaSaveStatus = persistParticipantSaveOutboxEntry(retrySave)
+        this.veronaSaveStatus =
+          queueParticipantSaveOutboxEntryForBackgroundDelivery(retrySave)
           ? "queued_offline"
           : "save_failed";
         this.persistState();
@@ -2829,13 +2837,13 @@ export class ParticipantViewFacade {
     if (!saved) {
       return;
     }
+    if (currentState.testRun.unitResponses[saved.unitKey] === saved.response) {
+      removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
+      this.veronaSaveStatus = "saved";
+      return;
+    }
     if (currentState.testRun.status === "completed") {
-      if (currentState.testRun.unitResponses[saved.unitKey] === saved.response) {
-        removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
-        this.veronaSaveStatus = "saved";
-      } else {
-        this.veronaSaveStatus = "save_failed";
-      }
+      this.veronaSaveStatus = "save_failed";
       return;
     }
     this.pendingVeronaSave = saved;
@@ -2884,6 +2892,14 @@ export class ParticipantViewFacade {
       saved.response === unitResponse
     ) {
       removeParticipantSaveOutboxEntry(saved.testRunId, saved.deliveryId);
+    }
+  }
+
+  private queuePendingVeronaSaveForBackgroundDelivery(): void {
+    if (this.pendingVeronaSave) {
+      queueParticipantSaveOutboxEntryForBackgroundDelivery(
+        this.pendingVeronaSave
+      );
     }
   }
 

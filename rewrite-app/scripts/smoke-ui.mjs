@@ -4413,6 +4413,102 @@ try {
     "page-1"
   );
 
+  logStep("participant-verona-background-sync");
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  const backgroundSyncedResponse = "Saved after participant closed";
+  await resumedVeronaFrame
+    .locator("#playerAnswer")
+    .fill(backgroundSyncedResponse);
+  await page.waitForFunction(
+    ({ storageKey, testRunId, expectedAnswer }) => {
+      const rawValue = localStorage.getItem(storageKey);
+      if (!rawValue) return false;
+      try {
+        const document = JSON.parse(rawValue);
+        return document.entries?.some(entry => {
+          if (entry.testRunId !== testRunId) return false;
+          return JSON.parse(entry.response).unitState?.dataParts?.answer ===
+            expectedAnswer;
+        });
+      } catch {
+        return false;
+      }
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: veronaTestRunId,
+      expectedAnswer: backgroundSyncedResponse
+    }
+  );
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        return JSON.parse(response).unitState?.dataParts?.answer ===
+          backgroundSyncedResponse;
+      } catch {
+        return false;
+      }
+    }
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      veronaParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  const backgroundSyncedVeronaFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await backgroundSyncedVeronaFrame
+    .locator("#playerAnswer")
+    .waitFor({ timeout: 15_000 });
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1"
+  );
+  const backgroundQueueEntryCount = await page.evaluate(
+    () => new Promise((resolvePromise, reject) => {
+      const request = indexedDB.open("testcenter-participant-save-outbox-v1", 1);
+      request.addEventListener("error", () => reject(request.error));
+      request.addEventListener("success", () => {
+        const database = request.result;
+        const transaction = database.transaction("pending-saves", "readonly");
+        const countRequest = transaction.objectStore("pending-saves").count();
+        countRequest.addEventListener("error", () => reject(countRequest.error));
+        countRequest.addEventListener("success", () => {
+          database.close();
+          resolvePromise(countRequest.result);
+        });
+      });
+    })
+  );
+  assert.equal(
+    backgroundQueueEntryCount,
+    0,
+    "A delivered background response should leave no Service Worker outbox entry."
+  );
+  await delay(2_500);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        return JSON.parse(response).unitState?.dataParts?.answer ===
+          backgroundSyncedResponse;
+      } catch {
+        return false;
+      }
+    }
+  );
+  stopAfter("participant-verona-background-sync");
+
   logStep("participant-test-mode-navigation-advisory");
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({

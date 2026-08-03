@@ -236,8 +236,10 @@ const serviceWorkerSource = await readFile(
 );
 for (const marker of [
   "testcenter-rewrite-app-shell-",
+  "testcenter-participant-save-outbox-v1",
   'self.addEventListener("install"',
-  'self.addEventListener("fetch"'
+  'self.addEventListener("fetch"',
+  'self.addEventListener("sync"'
 ]) {
   if (!serviceWorkerSource.includes(marker)) {
     throw new Error(`Frontend Service Worker is missing required marker ${marker}.`);
