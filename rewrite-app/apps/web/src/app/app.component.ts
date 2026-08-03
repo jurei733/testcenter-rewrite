@@ -37,7 +37,14 @@ const routeViews: AppView[] = [
 export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
+  isOffline = !navigator.onLine;
   private readonly router = inject(Router);
+  private readonly onlineListener = (): void => {
+    this.isOffline = false;
+  };
+  private readonly offlineListener = (): void => {
+    this.isOffline = true;
+  };
 
   get isParticipantView(): boolean {
     return (
@@ -47,6 +54,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
+    window.addEventListener("online", this.onlineListener);
+    window.addEventListener("offline", this.offlineListener);
     const initialView = this.getInitialViewFromLocation();
     this.app.init(initialView);
     if (!initialView && (this.router.url === "/" || this.router.url === "")) {
@@ -57,6 +66,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener("online", this.onlineListener);
+    window.removeEventListener("offline", this.offlineListener);
     this.app.destroy();
   }
 

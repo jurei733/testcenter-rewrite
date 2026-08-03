@@ -19128,6 +19128,7 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.match(appResponse.body, /<title>Testcenter Rewrite App<\/title>/);
   const appFetchResponse = await fetch(`${baseUrl}/app`);
   assertSecurityHeaders(appFetchResponse);
+  assert.match(appFetchResponse.headers.get("cache-control") ?? "", /no-cache/);
 
   const participantEntryResponse = await fetch(
     `${baseUrl}/participant?workspaceKey=demo-workspace`,
@@ -19180,11 +19181,46 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.equal(scriptResponse.status, 200);
   assertSecurityHeaders(scriptResponse);
   assert.match(scriptResponse.headers.get("content-type") ?? "", /javascript/);
+  assert.match(scriptResponse.headers.get("cache-control") ?? "", /immutable/);
 
   const stylesheetResponse = await fetch(`${baseUrl}/app/${stylesheetMatch[1]}`);
   assert.equal(stylesheetResponse.status, 200);
   assertSecurityHeaders(stylesheetResponse);
   assert.match(stylesheetResponse.headers.get("content-type") ?? "", /text\/css/);
+  assert.match(stylesheetResponse.headers.get("cache-control") ?? "", /immutable/);
+
+  const serviceWorkerResponse = await fetch(`${baseUrl}/app/service-worker.js`);
+  assert.equal(serviceWorkerResponse.status, 200);
+  assertSecurityHeaders(serviceWorkerResponse);
+  assert.match(
+    serviceWorkerResponse.headers.get("content-type") ?? "",
+    /javascript/
+  );
+  assert.match(
+    serviceWorkerResponse.headers.get("cache-control") ?? "",
+    /no-cache/
+  );
+  assert.equal(
+    serviceWorkerResponse.headers.get("service-worker-allowed"),
+    "/app/"
+  );
+  assert.match(await serviceWorkerResponse.text(), /APP_SHELL_URL/);
+
+  const webManifestResponse = await fetch(`${baseUrl}/app/manifest.webmanifest`);
+  assert.equal(webManifestResponse.status, 200);
+  assertSecurityHeaders(webManifestResponse);
+  assert.match(
+    webManifestResponse.headers.get("content-type") ?? "",
+    /application\/manifest\+json/
+  );
+  const webManifest = (await webManifestResponse.json()) as {
+    start_url: string;
+    scope: string;
+    display: string;
+  };
+  assert.equal(webManifest.start_url, "/app/participant");
+  assert.equal(webManifest.scope, "/app/");
+  assert.equal(webManifest.display, "standalone");
 });
 
 test("participant access windows enforce Original Testcenter timing semantics", async () => {

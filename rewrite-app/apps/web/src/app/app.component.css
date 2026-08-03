@@ -41,9 +41,30 @@
   gap: 18px;
 }
 
+.offline-shell-banner {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border: 1px solid rgba(139, 89, 17, 0.34);
+  border-radius: var(--radius-lg);
+  background: #fff1cf;
+  color: #5d3b0c;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.offline-shell-banner strong {
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .participant-topbar {
     display: grid;
     align-items: start;
+  }
+
+  .offline-shell-banner {
+    display: grid;
   }
 }

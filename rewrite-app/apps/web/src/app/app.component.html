@@ -23,6 +23,16 @@
       (click)="browserCompatibility.dismiss()"
     >Close</button>
   </section>
+  <section
+    id="appOfflineShellNotice"
+    class="offline-shell-banner"
+    *ngIf="isOffline"
+    role="status"
+    aria-live="polite"
+  >
+    <strong>Offline mode</strong>
+    <span>The application shell is available, but signing in, loading test content, and saving require a connection.</span>
+  </section>
   <ng-container *ngIf="isParticipantView; else operatorShell">
     <header class="participant-topbar">
       <div>

@@ -64,6 +64,11 @@ const requiredBuiltFiles = [
 
 const frontendBuildDirectory = resolve("dist/apps/web/browser");
 const frontendIndexPath = resolve(frontendBuildDirectory, "index.html");
+const requiredFrontendRuntimeFiles = [
+  "service-worker.js",
+  "manifest.webmanifest",
+  "app-icon.svg"
+];
 
 const parseBooleanFlag = (value, defaultValue = false) => {
   const normalizedValue = String(value ?? "")
@@ -221,6 +226,33 @@ if (frontendAssetReferences.length === 0) {
 for (const assetReference of frontendAssetReferences) {
   await ensureFile(resolve(frontendBuildDirectory, assetReference));
 }
+for (const runtimeFile of requiredFrontendRuntimeFiles) {
+  await ensureFile(resolve(frontendBuildDirectory, runtimeFile));
+}
+
+const serviceWorkerSource = await readFile(
+  resolve(frontendBuildDirectory, "service-worker.js"),
+  "utf8"
+);
+for (const marker of [
+  "testcenter-rewrite-app-shell-",
+  'self.addEventListener("install"',
+  'self.addEventListener("fetch"'
+]) {
+  if (!serviceWorkerSource.includes(marker)) {
+    throw new Error(`Frontend Service Worker is missing required marker ${marker}.`);
+  }
+}
+
+const webManifest = JSON.parse(
+  await readFile(resolve(frontendBuildDirectory, "manifest.webmanifest"), "utf8")
+);
+if (webManifest.start_url !== "/app/participant") {
+  throw new Error("Frontend web manifest must start at /app/participant.");
+}
+if (webManifest.scope !== "/app/") {
+  throw new Error("Frontend web manifest must stay scoped to /app/.");
+}
 
 const frontendFiles = await readdir(frontendBuildDirectory);
 const mainBundle = frontendFiles.find(fileName => /^main-.*\.js$/.test(fileName));
@@ -283,6 +315,8 @@ process.stdout.write(
         frontendIndex: "dist/apps/web/browser/index.html",
         frontendMainBundle: mainBundle,
         frontendStylesheetBundle: stylesheetBundle,
+        frontendServiceWorker: "service-worker.js",
+        frontendWebManifest: "manifest.webmanifest",
         referencedAssetCount: frontendAssetReferences.length
       }
     },

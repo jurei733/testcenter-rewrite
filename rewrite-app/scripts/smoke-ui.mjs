@@ -732,6 +732,90 @@ try {
     [port, process.env.FIRST_SLICE_OPERATOR_AUTH_REQUIRED === "true" ? "required" : "open"],
     { timeout: 15_000 }
   );
+  logStep("offline-app-shell");
+  const offlineShellContext = await browser.newContext({
+    serviceWorkers: "allow"
+  });
+  const offlineShellPage = await offlineShellContext.newPage();
+  try {
+    await offlineShellPage.goto(`${baseUrl}/app/participant`, {
+      waitUntil: "networkidle"
+    });
+    await offlineShellPage.locator("#participantLoginKey").waitFor();
+    const serviceWorkerRegistration = await offlineShellPage.evaluate(async () => {
+      const registration = await navigator.serviceWorker.ready;
+      return {
+        scope: registration.scope,
+        activeState: registration.active?.state ?? null
+      };
+    });
+    assert.equal(serviceWorkerRegistration.scope, `${baseUrl}/app/`);
+    assert.equal(serviceWorkerRegistration.activeState, "activated");
+
+    await offlineShellPage.reload({ waitUntil: "networkidle" });
+    await offlineShellPage.waitForFunction(
+      () => navigator.serviceWorker.controller !== null,
+      undefined,
+      { timeout: 15_000 }
+    );
+    await offlineShellPage.locator("#participantLoginKey").waitFor();
+
+    await offlineShellContext.setOffline(true);
+    const offlineNavigationResponse = await offlineShellPage.reload({
+      waitUntil: "domcontentloaded"
+    });
+    assert.equal(
+      offlineNavigationResponse?.fromServiceWorker(),
+      true,
+      "The offline participant navigation should come from the application-shell service worker."
+    );
+    await offlineShellPage.locator("#participantLoginKey").waitFor({
+      timeout: 15_000
+    });
+    await offlineShellPage
+      .locator("#participantCustomLoginSubtitle")
+      .filter({ hasText: "Start or Resume Test" })
+      .waitFor();
+    const offlineNotice = offlineShellPage.locator("#appOfflineShellNotice");
+    await offlineNotice.waitFor();
+    assert.match(
+      (await offlineNotice.innerText()).replace(/\s+/g, " "),
+      /Offline mode.*signing in, loading test content, and saving require a connection/
+    );
+    assert.equal(
+      await offlineShellPage.evaluate(() => navigator.onLine),
+      false
+    );
+    const offlineShellCache = await offlineShellPage.evaluate(async () => {
+      const cacheName = (await caches.keys()).find(candidate =>
+        candidate.startsWith("testcenter-rewrite-app-shell-")
+      );
+      if (!cacheName) {
+        return null;
+      }
+      const cache = await caches.open(cacheName);
+      return {
+        cacheName,
+        urls: (await cache.keys()).map(request => request.url)
+      };
+    });
+    assert.ok(
+      offlineShellCache?.cacheName,
+      "The browser should retain a versioned application-shell cache."
+    );
+    assert.ok(
+      offlineShellCache.urls.some(url => /\/app\/chunk-[^/]+\.js$/.test(url)),
+      "The cached shell should contain the lazy Participant route."
+    );
+    assert.ok(
+      offlineShellCache.urls.every(url => new URL(url).pathname.startsWith("/app/")),
+      "The Service Worker must not cache API or participant-state requests."
+    );
+  } finally {
+    await offlineShellContext.setOffline(false);
+    await offlineShellContext.close();
+  }
+  stopAfter("offline-app-shell");
   logStep("raw-debug-toggle");
   assert.equal(
     await page.locator(".raw-debug-panel").count(),

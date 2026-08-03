@@ -19,7 +19,23 @@
             "browser": "apps/web/src/main.ts",
             "index": "apps/web/src/index.html",
             "tsConfig": "apps/web/tsconfig.app.json",
-            "assets": [],
+            "assets": [
+              {
+                "glob": "service-worker.js",
+                "input": "apps/web/src",
+                "output": "/"
+              },
+              {
+                "glob": "manifest.webmanifest",
+                "input": "apps/web/src",
+                "output": "/"
+              },
+              {
+                "glob": "app-icon.svg",
+                "input": "apps/web/src",
+                "output": "/"
+              }
+            ],
             "styles": [
               "apps/web/src/styles.css"
             ],

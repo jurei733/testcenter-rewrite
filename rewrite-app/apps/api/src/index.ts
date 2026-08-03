@@ -868,7 +868,8 @@ const sendHtml = (
 ): void => {
   response.writeHead(statusCode, {
     ...securityHeaders,
-    ...htmlHeaders
+    ...htmlHeaders,
+    "cache-control": "no-cache"
   });
   endResponse(response, html);
 };
@@ -2187,6 +2188,8 @@ const resolveFrontendContentType = (pathname: string): string => {
       return "text/javascript; charset=utf-8";
     case ".json":
       return "application/json; charset=utf-8";
+    case ".webmanifest":
+      return "application/manifest+json; charset=utf-8";
     case ".map":
       return "application/json; charset=utf-8";
     case ".ico":
@@ -2250,7 +2253,18 @@ const serveFrontendRequest = async (
       throw new Error("Not a file");
     }
     const body = await readFile(candidatePath);
-    sendAsset(response, 200, resolveFrontendContentType(candidatePath), body);
+    const isServiceWorker = relativePath === "service-worker.js";
+    const isHashedAsset = /(?:^|\/)(?:chunk|main|styles)-[a-z0-9]+\.(?:css|js)$/i.test(
+      relativePath
+    );
+    sendAsset(response, 200, resolveFrontendContentType(candidatePath), body, {
+      "cache-control": isServiceWorker
+        ? "no-cache, no-store, must-revalidate"
+        : isHashedAsset
+          ? "public, max-age=31536000, immutable"
+          : "no-cache",
+      ...(isServiceWorker ? { "service-worker-allowed": "/app/" } : {})
+    });
   } catch {
     sendError(response, 404, "not_found", "Frontend asset not found.", {
       assetPath: relativePath
