@@ -2730,6 +2730,7 @@ try {
           "    <CustomText key=\"login_codeInputTitle\">Project Access Code</CustomText>",
           "    <CustomText key=\"login_codeInputPrompt\">Ask the project supervisor for your access code.</CustomText>",
           "    <CustomText key=\"login_testResumeButtonLabel\">Open Project Test</CustomText>",
+          "    <CustomText key=\"login_bookletSelectPromptOne\">Choose the available project test.</CustomText>",
           "  </CustomTexts>",
           `  <Group id="${codedParticipantGroupKey}">`,
           `    <Login mode="run-hot-return" name="${codedParticipantLoginKey}">`,
@@ -2795,6 +2796,10 @@ try {
   await page
     .locator("#participantRouteStartOrResumeButton")
     .filter({ hasText: "Open Project Test" })
+    .waitFor();
+  await page
+    .locator("#participantBookletSelectionPrompt")
+    .filter({ hasText: "Choose the available project test." })
     .waitFor();
   assert.equal(
     await page.locator("#participantCode").count(),
@@ -3550,7 +3555,18 @@ try {
             loginKey: veronaLoginKey,
             groupKey: "group:verona-smoke",
             bookletKey: veronaBookletKey,
-            displayName: "Verona Smoke Participant"
+            displayName: "Verona Smoke Participant",
+            customTexts: {
+              booklet_codeToEnterTitle: "Project block access",
+              booklet_codeToEnterPrompt: "Enter the project block code.",
+              booklet_codeToEnterWarning: "Letters are normalized automatically.",
+              booketlet_continueButtonLockedUnit: "Continue to project block",
+              booklet_msgSoonTimeOver: "Only %s project minute remains.",
+              booklet_lockedByAfterLeave: "This project task closes after leaving.",
+              booklet_msgNavigationDeniedTitle: "Project task incomplete",
+              booklet_msgNavigationDeniedText_responsesIncomplete:
+                "Answer the project task before continuing."
+            }
           }
         ]
       }
@@ -3589,7 +3605,19 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteTestletGatePrompt")
-    .filter({ hasText: "Enter the assigned Verona block code." })
+    .filter({ hasText: "Enter the project block code." })
+    .waitFor();
+  await page
+    .locator("#participantRouteTestletGateWarning")
+    .filter({ hasText: "Letters are normalized automatically." })
+    .waitFor();
+  await page
+    .locator("#participantRouteTestletUnlockButton")
+    .filter({ hasText: "Continue to project block" })
+    .waitFor();
+  await page
+    .locator(".participant-testlet-gate")
+    .filter({ hasText: "Project block access" })
     .waitFor();
   assert.equal(await page.locator("#participantVeronaPlayerFrame").count(), 0);
   await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
@@ -3616,7 +3644,7 @@ try {
   );
   await page
     .locator("#participantRouteTestletTimerWarning")
-    .filter({ hasText: "1 minute left" })
+    .filter({ hasText: "Only 1 project minute remains." })
     .waitFor({ timeout: 10_000 });
   await page
     .locator("#participantRouteLeaveLockLabel")
@@ -3624,7 +3652,7 @@ try {
     .waitFor();
   await page
     .locator("#participantRouteLeaveLockDetail")
-    .filter({ hasText: "cannot be opened again" })
+    .filter({ hasText: "This project task closes after leaving." })
     .waitFor();
   const veronaFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await veronaFrame.locator("#playerAnswer").waitFor({ timeout: 15_000 });
@@ -3689,7 +3717,11 @@ try {
   }
   await page
     .locator("#participantRouteNavigationNotice")
-    .filter({ hasText: "Complete the required response" })
+    .filter({ hasText: "Answer the project task before continuing." })
+    .waitFor();
+  await page
+    .locator("#participantRouteNavigationNoticeTitle")
+    .filter({ hasText: "Project task incomplete" })
     .waitFor();
   assert.equal(
     await page.locator("#participantRouteCompleteButton").isDisabled(),

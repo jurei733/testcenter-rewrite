@@ -25,8 +25,11 @@ import type {
   UpdateParticipantReviewRequest
 } from "@testcenter-rewrite-app/contracts";
 import {
+  type ParticipantCustomTextKey,
   parseVeronaUnitResponse,
   productionApiRoutes,
+  resolveAndFormatParticipantCustomText,
+  resolveParticipantCustomText,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
 import type {
@@ -101,6 +104,7 @@ type ParticipantPlayerState = {
   draftStateLabel: string;
   draftStateDetail: string;
   hasUnsavedResponse: boolean;
+  navigationNoticeTitle: string;
   navigationNotice: string;
   nextTestletGate: {
     testletKey: string;
@@ -514,6 +518,7 @@ export class ParticipantViewFacade {
         draftStateLabel: "No response loaded",
         draftStateDetail: "Start or resume a test before writing an answer.",
         hasUnsavedResponse: false,
+        navigationNoticeTitle: "",
         navigationNotice: "",
         nextTestletGate: null,
         testletTimer: null,
@@ -665,7 +670,11 @@ export class ParticipantViewFacade {
                   : "Leaving this block requires confirmation.",
             showTimeLeft: activeTestletTimer.showTimeLeft,
             warningMessage: activeWarning
-              ? `You have ${activeWarning.minutes} minute${activeWarning.minutes === 1 ? "" : "s"} left for this timed block.`
+              ? this.customTextFormat(
+                  "booklet_msgSoonTimeOver",
+                  `You have ${activeWarning.minutes} minute${activeWarning.minutes === 1 ? "" : "s"} left for this timed block.`,
+                  activeWarning.minutes
+                )
               : null
           };
         })()
@@ -676,8 +685,14 @@ export class ParticipantViewFacade {
           ...activeLeaveLock,
           detail:
             activeLeaveLock.scope === "unit"
-              ? `After leaving, "${activeLeaveLock.unitDisplayLabel}" cannot be opened again.`
-              : `After leaving, the block "${activeLeaveLock.displayLabel}" cannot be opened again.`
+              ? this.customText(
+                  "booklet_lockedByAfterLeave",
+                  `After leaving, "${activeLeaveLock.unitDisplayLabel}" cannot be opened again.`
+                )
+              : this.customText(
+                  "booklet_blockLockedByAfterLeave",
+                  `After leaving, the block "${activeLeaveLock.displayLabel}" cannot be opened again.`
+                )
         }
       : null;
 
@@ -756,6 +771,14 @@ export class ParticipantViewFacade {
       draftStateLabel,
       draftStateDetail,
       hasUnsavedResponse,
+      navigationNoticeTitle: policy.display.silentMode
+        ? ""
+        : this.describeNavigationDenial(currentState)
+          ? this.customText(
+              "booklet_msgNavigationDeniedTitle",
+              "This unit cannot be left yet"
+            )
+          : "",
       navigationNotice: policy.display.silentMode
         ? ""
         : this.describeNavigationDenial(currentState),
@@ -772,6 +795,31 @@ export class ParticipantViewFacade {
     }
 
     return this.describeParticipantEntryIssue(error);
+  }
+
+  get bookletSelectionPrompt(): string {
+    if (this.assignedBooklets.length === 0) {
+      return "";
+    }
+    const selectableCount = this.assignedBooklets.filter(
+      booklet => booklet.status !== "completed" && booklet.status !== "locked"
+    ).length;
+    if (selectableCount === 0) {
+      return this.customText(
+        "login_bookletSelectPromptNull",
+        "All assigned tests are completed or unavailable."
+      );
+    }
+    if (selectableCount === 1) {
+      return this.customText(
+        "login_bookletSelectPromptOne",
+        "Select the available test to start or resume it."
+      );
+    }
+    return this.customText(
+      "login_bookletSelectPromptMany",
+      "Select one of the available tests to start or resume it."
+    );
   }
 
   get showUnitTitle(): boolean {
@@ -935,12 +983,24 @@ export class ParticipantViewFacade {
   private describeNavigationDenial(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): string {
+    if (currentState.testRun.status === "paused") {
+      return this.customText(
+        "booklet_pausedmessage",
+        "This test is currently paused."
+      );
+    }
     const reasons = currentState.navigation.forwardDeniedReasons;
     if (reasons.includes("presentation_incomplete")) {
-      return "View all required unit content before moving forward or completing the test.";
+      return this.customText(
+        "booklet_msgNavigationDeniedText_presentationIncomplete",
+        "View all required unit content before moving forward or completing the test."
+      );
     }
     if (reasons.includes("response_incomplete")) {
-      return "Complete the required response before moving forward or completing the test.";
+      return this.customText(
+        "booklet_msgNavigationDeniedText_responsesIncomplete",
+        "Complete the required response before moving forward or completing the test."
+      );
     }
     if (reasons.includes("testlet_code_required")) {
       return "Enter the block code before opening the next block.";
@@ -952,13 +1012,19 @@ export class ParticipantViewFacade {
       return "Confirm leaving the timed block before continuing.";
     }
     if (reasons.includes("testlet_time_closed")) {
-      return "This timed block is closed and cannot be opened again.";
+      return this.customText(
+        "booklet_lockedBlock",
+        "This timed block is closed and cannot be opened again."
+      );
     }
     if (reasons.includes("testlet_leave_confirmation_required")) {
       return "Confirm leaving before the unit or block is locked.";
     }
     if (reasons.includes("testlet_leave_locked")) {
-      return "This unit or block was locked after it was left.";
+      return this.customText(
+        "booklet_lockedByAfterLeave",
+        "This unit or block was locked after it was left."
+      );
     }
     return "";
   }
@@ -1427,7 +1493,10 @@ export class ParticipantViewFacade {
     if (
       confirmTestletTimeLeave &&
       !globalThis.window?.confirm(
-        `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
+        this.customText(
+          "booklet_warningLeaveTimerBlockTextPrompt",
+          `Leave the timed block "${player.testletTimer?.displayLabel}" and close it permanently?`
+        )
       )
     ) {
       return;
@@ -1437,7 +1506,7 @@ export class ParticipantViewFacade {
     if (
       confirmTestletLeaveLock &&
       !globalThis.window?.confirm(
-        `${player.leaveLock?.detail} Continue?`
+        this.leaveLockConfirmationText(player.leaveLock)
       )
     ) {
       return;
@@ -1465,8 +1534,42 @@ export class ParticipantViewFacade {
     );
   }
 
-  customText(key: string, fallback: string): string {
-    return this.participantCustomTexts[key]?.trim() || fallback;
+  customText(key: ParticipantCustomTextKey, fallback: string): string {
+    return resolveParticipantCustomText(
+      this.participantCustomTexts,
+      key,
+      fallback
+    );
+  }
+
+  customTextFormat(
+    key: ParticipantCustomTextKey,
+    fallback: string,
+    ...replacements: readonly (string | number)[]
+  ): string {
+    return resolveAndFormatParticipantCustomText(
+      this.participantCustomTexts,
+      key,
+      replacements,
+      fallback
+    );
+  }
+
+  private leaveLockConfirmationText(
+    leaveLock: ParticipantPlayerState["leaveLock"]
+  ): string {
+    if (!leaveLock) {
+      return "Continue?";
+    }
+    return leaveLock.scope === "unit"
+      ? this.customText(
+          "booklet_warningLeaveTextPrompt-unit",
+          `${leaveLock.detail} Continue?`
+        )
+      : this.customText(
+          "booklet_warningLeaveTextPrompt-testlet",
+          `${leaveLock.detail} Continue?`
+        );
   }
 
   async copySessionEntryLink(sessionEntryLink: string): Promise<void> {
@@ -1895,7 +1998,10 @@ export class ParticipantViewFacade {
       if (
         confirmTestletTimeLeave &&
         !globalThis.window?.confirm(
-          `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
+          this.customText(
+            "booklet_warningLeaveTimerBlockTextPrompt",
+            `Leave the timed block "${activeTimer.displayLabel}" and close it permanently?`
+          )
         )
       ) {
         return;
@@ -1910,7 +2016,7 @@ export class ParticipantViewFacade {
       if (
         confirmTestletLeaveLock &&
         !globalThis.window?.confirm(
-          `${activeLeaveLock.detail} Continue?`
+          this.leaveLockConfirmationText(activeLeaveLock)
         )
       ) {
         return;

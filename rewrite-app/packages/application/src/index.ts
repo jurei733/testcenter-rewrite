@@ -20536,8 +20536,15 @@ export const createFirstSliceServices = (
             `Block '${testletKey}' is not the next reachable code gate for run '${testRunId}'.`
           );
         }
-        const expectedCodeBuffer = Buffer.from(expectedCode, "utf8");
-        const providedCodeBuffer = Buffer.from(input.code.trim(), "utf8");
+        // The original participant dialog normalizes letters to uppercase while
+        // imported booklet codes may use mixed case. Compare the normalized
+        // forms so the UI behavior does not invalidate otherwise compatible
+        // source packages.
+        const expectedCodeBuffer = Buffer.from(expectedCode.toUpperCase(), "utf8");
+        const providedCodeBuffer = Buffer.from(
+          input.code.trim().toUpperCase(),
+          "utf8"
+        );
         if (
           expectedCodeBuffer.length !== providedCodeBuffer.length ||
           !timingSafeEqual(expectedCodeBuffer, providedCodeBuffer)

@@ -11290,7 +11290,7 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     testRun: { currentUnitKey: string | null; unlockedTestletKeys?: string[] };
   }>(
     `/api/v1/participant/test-runs/${testRunId}/testlets/${entryTestletKey}/unlock`,
-    { method: "POST", body: { code: "Wolf" } }
+    { method: "POST", body: { code: "WOLF" } }
   );
   assert.equal(entryUnlock.status, 200);
   assert.equal(entryUnlock.body.testRun.currentUnitKey, "UNIT.INTRO");
@@ -11350,7 +11350,7 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     };
   }>(`/api/v1/participant/test-runs/${testRunId}/testlets/${testletKey}/unlock`, {
     method: "POST",
-    body: { code: "Hase" }
+    body: { code: "hase" }
   });
   assert.equal(unlocked.status, 200);
   assert.equal(unlocked.body.testRun.currentUnitKey, "UNIT.PROTECTED");

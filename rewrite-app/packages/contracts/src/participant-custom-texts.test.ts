@@ -1,0 +1,103 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  formatOriginalCustomText,
+  originalParticipantCustomTextDefaults,
+  originalParticipantCustomTextKeys,
+  resolveAndFormatParticipantCustomText,
+  resolveParticipantCustomText
+} from "./participant-custom-texts.js";
+
+test("participant custom-text catalog preserves the complete original key set", () => {
+  assert.equal(originalParticipantCustomTextKeys.length, 42);
+  assert.deepEqual(
+    [...originalParticipantCustomTextKeys].sort(),
+    [
+      "booketlet_continueButtonLockedUnit",
+      "booklet_blockLockedByAfterLeave",
+      "booklet_codeToEnterPrompt",
+      "booklet_codeToEnterTitle",
+      "booklet_codeToEnterWarning",
+      "booklet_console_warning",
+      "booklet_errormessage",
+      "booklet_loading",
+      "booklet_loadingBlock",
+      "booklet_loadingUnit",
+      "booklet_lockedBlock",
+      "booklet_lockedByAfterLeave",
+      "booklet_msgNavigationDeniedText_presentationIncomplete",
+      "booklet_msgNavigationDeniedText_responsesIncomplete",
+      "booklet_msgNavigationDeniedTitle",
+      "booklet_msgSoonTimeOver",
+      "booklet_msgTimeOver",
+      "booklet_msgTimerCancelled",
+      "booklet_msgTimerStarted",
+      "booklet_pausedmessage",
+      "booklet_requestFullscreen",
+      "booklet_tasklisttitle",
+      "booklet_unitLoading",
+      "booklet_unitLoadingPending",
+      "booklet_unitLoadingUnknownProgress",
+      "booklet_warningLeaveTextPrompt-testlet",
+      "booklet_warningLeaveTextPrompt-unit",
+      "booklet_warningLeaveTimerBlockTextPrompt",
+      "booklet_warningLeaveTimerBlockTitle",
+      "booklet_warningLeaveTitle-testlet",
+      "booklet_warningLeaveTitle-unit",
+      "login_bookletSelectPromptMany",
+      "login_bookletSelectPromptNull",
+      "login_bookletSelectPromptOne",
+      "login_codeInputPrompt",
+      "login_codeInputTitle",
+      "login_pagesNaviPrompt",
+      "login_subtitle",
+      "login_testEndButtonLabel",
+      "login_testResumeButtonLabel",
+      "login_unsupportedBrowser",
+      "login_unsupportedBrowserBanner"
+    ].sort()
+  );
+  assert.equal(
+    originalParticipantCustomTextDefaults.booketlet_continueButtonLockedUnit,
+    "Weiter"
+  );
+});
+
+test("participant custom-text resolution keeps authored copy and safe fallbacks", () => {
+  assert.equal(
+    resolveParticipantCustomText(
+      { login_subtitle: "  Project Test Selection  " },
+      "login_subtitle",
+      "Start or Resume Test"
+    ),
+    "Project Test Selection"
+  );
+  assert.equal(
+    resolveParticipantCustomText(
+      { login_subtitle: "   " },
+      "login_subtitle",
+      "Start or Resume Test"
+    ),
+    "Start or Resume Test"
+  );
+  assert.equal(
+    resolveParticipantCustomText(undefined, "login_subtitle"),
+    "Testauswahl"
+  );
+});
+
+test("original percent-s placeholders are substituted sequentially", () => {
+  assert.equal(
+    formatOriginalCustomText("Browser %s %s; %s remains", ["Firefox", 128]),
+    "Browser Firefox 128; %s remains"
+  );
+  assert.equal(
+    resolveAndFormatParticipantCustomText(
+      { booklet_msgSoonTimeOver: "%s minutes remain" },
+      "booklet_msgSoonTimeOver",
+      [5]
+    ),
+    "5 minutes remain"
+  );
+});

@@ -532,6 +532,10 @@ describe("parseParticipantRosterText", () => {
   it("parses native JSON roster objects and arrays", () => {
     assert.deepEqual(
       parseParticipantRosterText({
+        customTexts: {
+          login_subtitle: "Native project selection",
+          booklet_msgSoonTimeOver: { value: "%s native minutes remain" }
+        },
         groups: [
           {
             id: "group:native",
@@ -539,7 +543,16 @@ describe("parseParticipantRosterText", () => {
               {
                 id: "booklet:native",
                 participants: [
-                  { loginKey: "native-a", displayName: "Native A" },
+                  {
+                    loginKey: "native-a",
+                    displayName: "Native A",
+                    customTexts: [
+                      {
+                        key: "login_subtitle",
+                        text: "Participant project selection"
+                      }
+                    ]
+                  },
                   { username: "native-b", firstName: "Native", lastName: "B" }
                 ]
               }
@@ -552,13 +565,21 @@ describe("parseParticipantRosterText", () => {
           loginKey: "native-a",
           groupKey: "group:native",
           bookletKey: "booklet:native",
-          displayName: "Native A"
+          displayName: "Native A",
+          customTexts: {
+            login_subtitle: "Participant project selection",
+            booklet_msgSoonTimeOver: "%s native minutes remain"
+          }
         },
         {
           loginKey: "native-b",
           groupKey: "group:native",
           bookletKey: "booklet:native",
-          displayName: "Native B"
+          displayName: "Native B",
+          customTexts: {
+            login_subtitle: "Native project selection",
+            booklet_msgSoonTimeOver: "%s native minutes remain"
+          }
         }
       ]
     );

@@ -72,6 +72,7 @@ import type {
 export * from "./verona-player.js";
 export * from "./booklet-policy.js";
 export * from "./monitor-event-stream.js";
+export * from "./participant-custom-texts.js";
 
 export type ParsedParticipantRosterEntry = {
   loginKey: string;
@@ -642,7 +643,15 @@ const mergeParsedParticipantRosterEntries = (
         ? { validForMinutes: entry.validForMinutes }
         : existingEntry.validForMinutes
           ? { validForMinutes: existingEntry.validForMinutes }
-          : {})
+          : {}),
+      ...((existingEntry.customTexts || entry.customTexts)
+        ? {
+            customTexts: {
+              ...(existingEntry.customTexts ?? {}),
+              ...(entry.customTexts ?? {})
+            }
+          }
+        : {})
     });
   }
 
@@ -780,6 +789,78 @@ const readJsonRosterEntries = (...values: unknown[]): unknown[] => {
   return [];
 };
 
+const readJsonRosterCustomTexts = (
+  value: Record<string, unknown>
+): Record<string, string> => {
+  const customTextsValue = Object.entries(value).find(([key]) =>
+    ["customtexts", "custom-texts", "custom_texts"].includes(key.toLowerCase())
+  )?.[1];
+  if (customTextsValue === undefined) {
+    return {};
+  }
+
+  const readEntries = (candidate: unknown): Array<readonly [string, string]> => {
+    if (Array.isArray(candidate)) {
+      return candidate.flatMap(entry => {
+        const objectEntry = asRosterObject(entry);
+        if (!objectEntry) {
+          return [];
+        }
+        const key = readJsonRosterString(
+          objectEntry,
+          "key",
+          "id",
+          "name",
+          "identifier"
+        );
+        const text = readJsonRosterString(
+          objectEntry,
+          "value",
+          "text",
+          "defaultValue",
+          "defaultvalue",
+          "content"
+        );
+        return key && text ? [[key, text] as const] : [];
+      });
+    }
+
+    const objectCandidate = asRosterObject(candidate);
+    if (!objectCandidate) {
+      return [];
+    }
+    const nestedEntries = Object.entries(objectCandidate).find(([key]) =>
+      ["customtext", "custom-text", "items", "entries"].includes(
+        key.toLowerCase()
+      )
+    )?.[1];
+    if (nestedEntries !== undefined) {
+      return readEntries(nestedEntries);
+    }
+    return Object.entries(objectCandidate).flatMap(([key, entryValue]) => {
+      const normalizedKey = normalizeRosterTextValue(key);
+      const normalizedText =
+        typeof entryValue === "string" || typeof entryValue === "number"
+          ? normalizeRosterTextValue(String(entryValue))
+          : asRosterObject(entryValue)
+            ? readJsonRosterString(
+                entryValue as Record<string, unknown>,
+                "value",
+                "text",
+                "defaultValue",
+                "defaultvalue",
+                "content"
+              )
+            : null;
+      return normalizedKey && normalizedText
+        ? [[normalizedKey, normalizedText] as const]
+        : [];
+    });
+  };
+
+  return Object.fromEntries(readEntries(customTextsValue));
+};
+
 const readJsonRosterChildValues = (
   value: Record<string, unknown>
 ): unknown[] => [
@@ -824,6 +905,7 @@ const parseParticipantRosterJsonValue = (
       validFrom: string | null;
       validTo: string | null;
       validForMinutes: number | null;
+      customTexts: Record<string, string>;
     }
   ): void => {
     if (Array.isArray(candidate)) {
@@ -896,6 +978,10 @@ const parseParticipantRosterJsonValue = (
     );
     const parsedValidForMinutes = parseRosterValidForMinutes(validForValue);
     const validForMinutes = parsedValidForMinutes ?? context.validForMinutes;
+    const customTexts = {
+      ...context.customTexts,
+      ...readJsonRosterCustomTexts(objectValue)
+    };
 
     if (loginKey) {
       if (!isParticipantRosterMode(mode)) {
@@ -931,7 +1017,8 @@ const parseParticipantRosterJsonValue = (
         ...(password ? { password } : {}),
         ...(validFrom ? { validFrom } : {}),
         ...(validTo ? { validTo } : {}),
-        ...(validForMinutes ? { validForMinutes } : {})
+        ...(validForMinutes ? { validForMinutes } : {}),
+        ...(Object.keys(customTexts).length > 0 ? { customTexts } : {})
       });
       return;
     }
@@ -941,7 +1028,8 @@ const parseParticipantRosterJsonValue = (
       bookletKey,
       validFrom,
       validTo,
-      validForMinutes
+      validForMinutes,
+      customTexts
     };
     for (const childValue of readJsonRosterEntries(
       objectValue.participants,
@@ -993,7 +1081,8 @@ const parseParticipantRosterJsonValue = (
         bookletKey,
         validFrom,
         validTo,
-        validForMinutes
+        validForMinutes,
+        customTexts
       });
     }
 
@@ -1022,7 +1111,8 @@ const parseParticipantRosterJsonValue = (
           : bookletKey,
         validFrom,
         validTo,
-        validForMinutes
+        validForMinutes,
+        customTexts
       });
     }
   };
@@ -1032,7 +1122,8 @@ const parseParticipantRosterJsonValue = (
     bookletKey: null,
     validFrom: null,
     validTo: null,
-    validForMinutes: null
+    validForMinutes: null,
+    customTexts: {}
   });
   return entries;
 };

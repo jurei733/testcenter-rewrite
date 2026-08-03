@@ -158,6 +158,11 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </button>
           </div>
         </section>
+        <p
+          id="participantBookletSelectionPrompt"
+          class="hint"
+          *ngIf="view.bookletSelectionPrompt"
+        >{{ view.bookletSelectionPrompt }}</p>
         <p id="participantCodePrompt" class="hint" *ngIf="view.participantCodeRequired">
           {{ view.customText('login_codeInputPrompt', 'This login requires the second code assigned by the test supervisor.') }}
         </p>
@@ -182,7 +187,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
         >
           <div>
             <span>Display Check</span>
-            <strong id="participantRouteFullscreenPromptTitle">Use fullscreen for this test?</strong>
+            <strong id="participantRouteFullscreenPromptTitle">{{ view.customText('booklet_requestFullscreen', 'Use fullscreen for this test?') }}</strong>
             <p>The booklet requests a distraction-free fullscreen presentation.</p>
           </div>
           <div class="actions">
@@ -538,9 +543,10 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             aria-labelledby="participantRouteTestletGateLabel"
           >
             <div>
-              <span>Protected Block</span>
+              <span>{{ view.customText('booklet_codeToEnterTitle', 'Protected Block') }}</span>
               <strong id="participantRouteTestletGateLabel">{{ gate.displayLabel }}</strong>
-              <p id="participantRouteTestletGatePrompt">{{ gate.prompt }}</p>
+              <p id="participantRouteTestletGatePrompt">{{ view.customText('booklet_codeToEnterPrompt', gate.prompt || 'Enter the block code supplied by the test supervisor.') }}</p>
+              <small id="participantRouteTestletGateWarning">{{ view.customText('booklet_codeToEnterWarning', 'Letters are entered in uppercase automatically.') }}</small>
             </div>
             <label>
               Block Code
@@ -550,6 +556,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
                 type="password"
                 autocomplete="off"
                 [(ngModel)]="view.testletUnlockCode"
+                (ngModelChange)="view.testletUnlockCode = $event.toUpperCase()"
                 (keyup.enter)="view.unlockNextTestlet()"
               />
             </label>
@@ -560,19 +567,22 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [disabled]="!view.testletUnlockCode.trim()"
               (click)="view.unlockNextTestlet()"
             >
-              Open Block
+              {{ view.customText('booketlet_continueButtonLockedUnit', 'Open Block') }}
             </button>
           </section>
-          <p
+          <section
             *ngIf="view.player.navigationNotice"
             id="participantRouteNavigationNotice"
             class="participant-navigation-notice"
             role="status"
-          >{{ view.player.navigationNotice }}</p>
-          <section class="unit-rail" aria-label="Booklet units" *ngIf="view.player.showUnitMenu && view.player.unitItems.length > 0">
+          >
+            <strong id="participantRouteNavigationNoticeTitle">{{ view.player.navigationNoticeTitle }}</strong>
+            <p>{{ view.player.navigationNotice }}</p>
+          </section>
+          <section class="unit-rail" [attr.aria-label]="view.customText('booklet_tasklisttitle', 'Booklet units')" *ngIf="view.player.showUnitMenu && view.player.unitItems.length > 0">
             <header>
               <div>
-                <span>Booklet Units</span>
+                <span id="participantRouteTaskListTitle">{{ view.customText('booklet_tasklisttitle', 'Booklet Units') }}</span>
                 <small id="participantRouteUnitOverview">{{ view.player.unitOverviewLabel }}</small>
               </div>
               <strong>{{ view.player.unitPosition }}</strong>
