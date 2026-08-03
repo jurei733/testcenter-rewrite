@@ -5,6 +5,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/rou
 
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { AppShellFacade } from "./app-shell.facade";
+import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { LiveContextComponent } from "./live-context.component";
 import type { AppView } from "./rewrite-app-shell.types";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -35,6 +36,7 @@ const routeViews: AppView[] = [
 })
 export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
+  readonly browserCompatibility = inject(BrowserCompatibilityService);
   private readonly router = inject(Router);
 
   get isParticipantView(): boolean {

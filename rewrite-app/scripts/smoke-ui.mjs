@@ -305,6 +305,41 @@ try {
 
     totalApiRequestCount += 1;
   });
+  logStep("browser-compatibility-warning");
+  const outdatedBrowserContext = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36"
+  });
+  const outdatedBrowserPage = await outdatedBrowserContext.newPage();
+  await outdatedBrowserPage.goto(`${baseUrl}/participant`, {
+    waitUntil: "networkidle"
+  });
+  const browserCompatibilityWarning = outdatedBrowserPage.locator(
+    "#browserCompatibilityWarning"
+  );
+  await browserCompatibilityWarning.waitFor();
+  assert.equal(
+    await browserCompatibilityWarning.getAttribute("data-browser-family"),
+    "Chrome"
+  );
+  assert.equal(
+    await browserCompatibilityWarning.getAttribute("data-browser-version"),
+    "90.0.4430.93"
+  );
+  assert.match(
+    (
+      await outdatedBrowserPage
+        .locator("#browserCompatibilityWarningMessage")
+        .innerText()
+    ).trim(),
+    /Ihr Browser Chrome 90\.0\.4430\.93 ist veraltet/
+  );
+  await outdatedBrowserPage
+    .locator("#browserCompatibilityWarningDismissButton")
+    .click();
+  await browserCompatibilityWarning.waitFor({ state: "detached" });
+  await outdatedBrowserPage.reload({ waitUntil: "networkidle" });
+  await outdatedBrowserPage.locator("#browserCompatibilityWarning").waitFor();
   if (!Number.isFinite(busyStartTimeoutMs) || busyStartTimeoutMs < 0) {
     throw new Error("UI_SMOKE_BUSY_START_TIMEOUT_MS must be a non-negative integer.");
   }
@@ -3564,6 +3599,8 @@ try {
               booklet_msgTimerStarted: "Project timer started: ",
               booklet_msgTimeOver: "Project time is over.",
               booklet_msgTimerCancelled: "Project timer was cancelled.",
+              login_unsupportedBrowserBanner:
+                "Project browser %s %s needs an update.",
               booklet_codeToEnterTitle: "Project block access",
               booklet_codeToEnterPrompt: "Enter the project block code.",
               booklet_codeToEnterWarning: "Letters are normalized automatically.",
@@ -3579,6 +3616,17 @@ try {
       }
     }
   );
+  await outdatedBrowserPage.locator("#participantTenantKey").fill(tenantKey);
+  await outdatedBrowserPage
+    .locator("#participantWorkspaceKey")
+    .fill(workspaceKey);
+  await outdatedBrowserPage.locator("#participantLoginKey").fill(veronaLoginKey);
+  await outdatedBrowserPage.locator("#participantRouteSignInButton").click();
+  await outdatedBrowserPage
+    .locator("#browserCompatibilityWarningMessage")
+    .filter({ hasText: "Project browser Chrome 90.0.4430.93 needs an update." })
+    .waitFor();
+  await outdatedBrowserContext.close();
   const isVeronaResourceResponse = response => response
     .url()
     .endsWith("/resources/sample_resource_package/file.text");

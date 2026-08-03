@@ -177,6 +177,49 @@ h1 {
   background: rgba(241, 216, 195, 0.82);
 }
 
+.browser-compatibility-banner {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border: 1px solid rgba(196, 82, 47, 0.34);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 244, 220, 0.96);
+  box-shadow: 0 12px 32px rgba(56, 39, 21, 0.16);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  backdrop-filter: blur(12px);
+}
+
+.browser-compatibility-banner strong {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.browser-compatibility-banner span {
+  line-height: 1.4;
+}
+
+.browser-compatibility-banner button {
+  padding: 8px 12px;
+}
+
+@media (max-width: 720px) {
+  .browser-compatibility-banner {
+    grid-template-columns: 1fr auto;
+  }
+
+  .browser-compatibility-banner strong {
+    grid-column: 1 / -1;
+  }
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;

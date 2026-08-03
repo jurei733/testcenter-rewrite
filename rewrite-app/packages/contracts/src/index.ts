@@ -71,6 +71,7 @@ import type {
 
 export * from "./verona-player.js";
 export * from "./booklet-policy.js";
+export * from "./browser-compatibility.js";
 export * from "./monitor-event-stream.js";
 export * from "./participant-custom-texts.js";
 

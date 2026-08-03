@@ -49,6 +49,7 @@ import {
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
+import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
@@ -210,6 +211,7 @@ export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
+  private readonly browserCompatibility = inject(BrowserCompatibilityService);
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
@@ -1259,6 +1261,13 @@ export class ParticipantViewFacade {
     this.presentedActiveTimers.clear();
   }
 
+  private setParticipantCustomTexts(
+    customTexts: Readonly<Record<string, string>>
+  ): void {
+    this.participantCustomTexts = { ...customTexts };
+    this.browserCompatibility.setCustomTexts(this.participantCustomTexts);
+  }
+
   get canSignIn(): boolean {
     return Boolean(
       this.workspace.workspaceKey.trim() &&
@@ -1864,7 +1873,7 @@ export class ParticipantViewFacade {
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
-    this.participantCustomTexts = {};
+    this.setParticipantCustomTexts({});
     this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
@@ -1907,11 +1916,11 @@ export class ParticipantViewFacade {
     if (details && typeof details === "object" && "customTexts" in details) {
       const customTexts = (details as { customTexts?: unknown }).customTexts;
       if (customTexts && typeof customTexts === "object" && !Array.isArray(customTexts)) {
-        this.participantCustomTexts = Object.fromEntries(
+        this.setParticipantCustomTexts(Object.fromEntries(
           Object.entries(customTexts).filter(
             (entry): entry is [string, string] => typeof entry[1] === "string"
           )
-        );
+        ));
       }
     }
     if (error.error === "participant_code_invalid") {
@@ -2625,7 +2634,7 @@ export class ParticipantViewFacade {
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
-    this.participantCustomTexts = participantRosterEntry?.customTexts ?? {};
+    this.setParticipantCustomTexts(participantRosterEntry?.customTexts ?? {});
   }
 
   private syncRuntimeBooklets(booklets: ParticipantRuntimeBooklet[]): void {
