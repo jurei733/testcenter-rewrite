@@ -12,6 +12,8 @@
     "@testcenter-rewrite-app/file-store": "0.0.0",
     "@testcenter-rewrite-app/memory-store": "0.0.0",
     "@testcenter-rewrite-app/postgres-store": "0.0.0",
-    "@testcenter-rewrite-app/sqlite-store": "0.0.0"
+    "@testcenter-rewrite-app/sqlite-store": "0.0.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4"
   }
 }

@@ -48,6 +48,35 @@ export class AttachmentManagerService {
     return payload.attachment;
   }
 
+  downloadPages(
+    scope: AttachmentScope,
+    options: { labelTemplate?: string; groupKey?: string } = {}
+  ): Promise<ApiDownload> {
+    const route = resolveRoutePath(
+      productionApiRoutes.workspace.downloadAttachmentPagesPdf,
+      scope
+    );
+    return this.api.download(
+      this.withQuery(route, options),
+      this.authorization(scope.sessionToken)
+    );
+  }
+
+  downloadPage(
+    scope: AttachmentScope,
+    attachmentId: string,
+    labelTemplate?: string
+  ): Promise<ApiDownload> {
+    const route = resolveRoutePath(
+      productionApiRoutes.workspace.downloadAttachmentPagePdf,
+      { ...scope, attachmentId }
+    );
+    return this.api.download(
+      this.withQuery(route, { labelTemplate }),
+      this.authorization(scope.sessionToken)
+    );
+  }
+
   download(
     scope: AttachmentScope,
     attachmentId: string,
@@ -90,5 +119,17 @@ export class AttachmentManagerService {
 
   private authorization(sessionToken: string): Record<string, string> {
     return { Authorization: `Bearer ${sessionToken}` };
+  }
+
+  private withQuery(
+    route: string,
+    values: Record<string, string | undefined>
+  ): string {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(values)) {
+      if (value?.trim()) query.set(key, value.trim());
+    }
+    const serialized = query.toString();
+    return serialized ? `${route}?${serialized}` : route;
   }
 }

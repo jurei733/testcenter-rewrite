@@ -11799,6 +11799,33 @@ try {
     .locator("#selectedAttachmentCode")
     .filter({ hasText: /^att-/ })
     .waitFor();
+  await fillAndCommit(
+    "#attachmentLabelTemplate",
+    "%TESTTAKER% | %GROUP% | %VAR%"
+  );
+  const allAttachmentPagesDownloadPromise = page.waitForEvent("download");
+  await attachmentManager.locator("#downloadAttachmentPagesButton").click();
+  const allAttachmentPagesDownload = await allAttachmentPagesDownloadPromise;
+  assert.equal(
+    allAttachmentPagesDownload.suggestedFilename(),
+    `${attachmentWorkspaceKey}-attachment-pages.pdf`
+  );
+  const allAttachmentPagesPath = await allAttachmentPagesDownload.path();
+  assert.ok(allAttachmentPagesPath);
+  assert.equal(
+    (await readFile(allAttachmentPagesPath)).subarray(0, 5).toString("ascii"),
+    "%PDF-"
+  );
+  const selectedAttachmentPageDownloadPromise = page.waitForEvent("download");
+  await attachmentManager
+    .locator("#downloadSelectedAttachmentPageButton")
+    .click();
+  const selectedAttachmentPageDownload =
+    await selectedAttachmentPageDownloadPromise;
+  assert.equal(
+    selectedAttachmentPageDownload.suggestedFilename(),
+    "attachment-smoke-participant-participant-photo-attachment-page.pdf"
+  );
   await attachmentManager.locator("#attachmentFileInput").setInputFiles({
     name: "attachment-smoke.png",
     mimeType: "image/png",

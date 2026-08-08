@@ -1890,8 +1890,12 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
     listAttachments:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments",
+    downloadAttachmentPagesPdf:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/pages.pdf",
     getAttachment:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId",
+    downloadAttachmentPagePdf:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId/page.pdf",
     uploadAttachmentFile:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId/files",
     getAttachmentFile:

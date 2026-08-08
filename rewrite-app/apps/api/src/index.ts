@@ -200,6 +200,8 @@ import {
   SQLITE_FIRST_SLICE_SCHEMA_VERSION
 } from "@testcenter-rewrite-app/sqlite-store";
 
+import { createAttachmentPagesPdf } from "./attachment-pages-pdf.js";
+
 type RuntimeStoreKind = "memory" | "file" | "sqlite" | "postgres";
 
 type StudyMonitorParticipantMatrixQuery = {
@@ -1709,8 +1711,14 @@ const workspaceActivityEventListPattern = createRoutePattern(
 const attachmentListPattern = createRoutePattern(
   productionApiRoutes.workspace.listAttachments
 );
+const attachmentPagesPdfPattern = createRoutePattern(
+  productionApiRoutes.workspace.downloadAttachmentPagesPdf
+);
 const attachmentDetailPattern = createRoutePattern(
   productionApiRoutes.workspace.getAttachment
+);
+const attachmentPagePdfPattern = createRoutePattern(
+  productionApiRoutes.workspace.downloadAttachmentPagePdf
 );
 const attachmentFileUploadPattern = createRoutePattern(
   productionApiRoutes.workspace.uploadAttachmentFile
@@ -1924,7 +1932,9 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", studyMonitorRunPattern],
   ["GET", workspaceActivityEventListPattern],
   ["GET", attachmentListPattern],
+  ["GET", attachmentPagesPdfPattern],
   ["GET", attachmentDetailPattern],
+  ["GET", attachmentPagePdfPattern],
   ["POST", attachmentFileUploadPattern],
   ["GET", attachmentFileDetailPattern],
   ["DELETE", attachmentFileDetailPattern],
@@ -2179,7 +2189,9 @@ const monitorOperatorAccessByRequest = new WeakMap<
 
 const workspaceMonitorRouteChecks: Array<[string, RegExp]> = [
   ["GET", attachmentListPattern],
+  ["GET", attachmentPagesPdfPattern],
   ["GET", attachmentDetailPattern],
+  ["GET", attachmentPagePdfPattern],
   ["POST", attachmentFileUploadPattern],
   ["GET", attachmentFileDetailPattern],
   ["DELETE", attachmentFileDetailPattern],
@@ -2681,7 +2693,9 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.listWorkspaceActivityEvents
     ],
     ["GET", attachmentListPattern, productionApiRoutes.workspace.listAttachments],
+    ["GET", attachmentPagesPdfPattern, productionApiRoutes.workspace.downloadAttachmentPagesPdf],
     ["GET", attachmentDetailPattern, productionApiRoutes.workspace.getAttachment],
+    ["GET", attachmentPagePdfPattern, productionApiRoutes.workspace.downloadAttachmentPagePdf],
     ["POST", attachmentFileUploadPattern, productionApiRoutes.workspace.uploadAttachmentFile],
     ["GET", attachmentFileDetailPattern, productionApiRoutes.workspace.getAttachmentFile],
     ["DELETE", attachmentFileDetailPattern, productionApiRoutes.workspace.deleteAttachmentFile],
@@ -4821,11 +4835,129 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const attachmentListMatch = attachmentListPattern.exec(pathname);
+      const attachmentPagesPdfMatch = attachmentPagesPdfPattern.exec(pathname);
       const attachmentDetailMatch = attachmentDetailPattern.exec(pathname);
+      const attachmentPagePdfMatch = attachmentPagePdfPattern.exec(pathname);
       const attachmentFileUploadMatch =
         attachmentFileUploadPattern.exec(pathname);
       const attachmentFileDetailMatch =
         attachmentFileDetailPattern.exec(pathname);
+      if (request.method === "GET" && attachmentPagesPdfMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) return;
+        const tenantKey = decodeRouteGroup(
+          attachmentPagesPdfMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          attachmentPagesPdfMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const labelTemplate = url.searchParams.get("labelTemplate");
+        if (labelTemplate && labelTemplate.length > 500) {
+          sendError(
+            response,
+            400,
+            "attachment_label_template_too_long",
+            "Attachment page label templates may contain at most 500 characters."
+          );
+          return;
+        }
+        const attachments = await services.attachments.listAttachments({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          groupKey: url.searchParams.get("groupKey")?.trim() || undefined
+        });
+        if (attachments.length === 0) {
+          sendError(
+            response,
+            404,
+            "attachment_pages_empty",
+            "No requested attachments are available for this scope."
+          );
+          return;
+        }
+        if (attachments.length > 500) {
+          sendError(
+            response,
+            400,
+            "attachment_page_limit_exceeded",
+            "Narrow the attachment scope to at most 500 printable pages.",
+            { attachmentCount: attachments.length, maxAttachmentCount: 500 }
+          );
+          return;
+        }
+        const pdf = await createAttachmentPagesPdf({
+          attachments,
+          labelTemplate
+        });
+        sendAsset(response, 200, "application/pdf", pdf, {
+          "content-disposition": buildAttachmentContentDisposition(
+            `${workspaceKey}-attachment-pages.pdf`
+          ),
+          "cache-control": "private, no-store"
+        });
+        return;
+      }
+
+      if (request.method === "GET" && attachmentPagePdfMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) return;
+        const tenantKey = decodeRouteGroup(
+          attachmentPagePdfMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          attachmentPagePdfMatch.groups.workspaceKey
+        );
+        const attachmentId = decodeRouteGroup(
+          attachmentPagePdfMatch.groups.attachmentId
+        );
+        if (!tenantKey || !workspaceKey || !attachmentId) {
+          sendError(
+            response,
+            400,
+            "invalid_attachment_scope",
+            "tenantKey, workspaceKey, and attachmentId are required."
+          );
+          return;
+        }
+        const labelTemplate = url.searchParams.get("labelTemplate");
+        if (labelTemplate && labelTemplate.length > 500) {
+          sendError(
+            response,
+            400,
+            "attachment_label_template_too_long",
+            "Attachment page label templates may contain at most 500 characters."
+          );
+          return;
+        }
+        const attachment = await services.attachments.getAttachment({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          attachmentId
+        });
+        const pdf = await createAttachmentPagesPdf({
+          attachments: [attachment],
+          labelTemplate
+        });
+        sendAsset(response, 200, "application/pdf", pdf, {
+          "content-disposition": buildAttachmentContentDisposition(
+            `${attachment.loginKey}-${attachment.variableId}-attachment-page.pdf`
+          ),
+          "cache-control": "private, no-store"
+        });
+        return;
+      }
+
       if (request.method === "GET" && attachmentListMatch?.groups) {
         const sessionToken = requireBearerToken(request, response);
         if (!sessionToken) {

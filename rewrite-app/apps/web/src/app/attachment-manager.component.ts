@@ -5,6 +5,7 @@ import type { OnChanges, OnDestroy } from "@angular/core";
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 
 import { AttachmentManagerService } from "./attachment-manager.service";
+import { downloadBlobFile } from "./download-text-file";
 
 @Component({
   selector: "app-attachment-manager",
@@ -37,7 +38,13 @@ import { AttachmentManagerService } from "./attachment-manager.service";
       <p>Manage requested participant image captures by group, login, test, unit, and variable. The attachment code can be copied into a capture-device handoff.</p>
       <div class="actions">
         <button id="loadAttachmentsButton" class="primary" type="button" [disabled]="busy || !hasScope" (click)="load()">{{ busy ? 'Working…' : 'Load Attachments' }}</button>
+        <button id="downloadAttachmentPagesButton" class="secondary" type="button" [disabled]="busy || attachments.length === 0" (click)="downloadPages()">Download all QR pages</button>
       </div>
+      <label>
+        QR page label template
+        <input id="attachmentLabelTemplate" type="text" maxlength="500" [value]="labelTemplate" (input)="setLabelTemplate($event)" />
+      </label>
+      <p class="attachment-meta">Placeholders: %GROUP%, %TESTTAKER%, %BOOKLET%, %UNIT%, %VAR%, %LOGIN%, %CODE%</p>
       <p id="attachmentManagerStatus" class="attachment-status" role="status">{{ status }}</p>
 
       <div class="attachment-layout" *ngIf="attachments.length > 0; else attachmentEmpty">
@@ -67,6 +74,7 @@ import { AttachmentManagerService } from "./attachment-manager.service";
           <p class="attachment-code" id="selectedAttachmentCode">{{ selected.attachmentId }}</p>
           <div class="actions">
             <button class="ghost" type="button" (click)="copyCode(selected.attachmentId)">Copy attachment code</button>
+            <button id="downloadSelectedAttachmentPageButton" class="secondary" type="button" [disabled]="busy" (click)="downloadSelectedPage(selected)">Download QR page</button>
           </div>
           <label>
             Add PNG or JPEG (max. 10 MiB)
@@ -110,6 +118,7 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
   status = "Load the workspace attachment inventory to begin.";
   busy = false;
   previewUrl: string | null = null;
+  labelTemplate = "%TESTTAKER% | %BOOKLET% | %UNIT% | %VAR%";
 
   get hasScope(): boolean {
     return Boolean(
@@ -195,6 +204,44 @@ export class AttachmentManagerComponent implements OnChanges, OnDestroy {
       );
       this.replaceAttachment(updated);
       this.status = `Uploaded ${file.name}.`;
+    });
+  }
+
+  setLabelTemplate(event: Event): void {
+    this.labelTemplate = (event.target as HTMLInputElement).value;
+  }
+
+  async downloadPages(): Promise<void> {
+    if (!this.hasScope || this.attachments.length === 0) return;
+    await this.run(async () => {
+      const download = await this.manager.downloadPages(this.scope(), {
+        labelTemplate: this.labelTemplate
+      });
+      downloadBlobFile({
+        filename:
+          download.filename || `${this.workspaceKey}-attachment-pages.pdf`,
+        blob: download.blob
+      });
+      this.status = `${this.attachments.length} QR page(s) downloaded.`;
+    });
+  }
+
+  async downloadSelectedPage(
+    attachment: WorkspaceAttachment
+  ): Promise<void> {
+    await this.run(async () => {
+      const download = await this.manager.downloadPage(
+        this.scope(),
+        attachment.attachmentId,
+        this.labelTemplate
+      );
+      downloadBlobFile({
+        filename:
+          download.filename ||
+          `${attachment.loginKey}-${attachment.variableId}-attachment-page.pdf`,
+        blob: download.blob
+      });
+      this.status = "Attachment QR page downloaded.";
     });
   }
 

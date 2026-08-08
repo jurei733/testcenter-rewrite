@@ -7,6 +7,8 @@ import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
+import { PDFDocument } from "pdf-lib";
+
 import { createProductionApiServer } from "./index.js";
 
 let server: Awaited<ReturnType<typeof createProductionApiServer>>;
@@ -2141,6 +2143,41 @@ test("attachment manager imports capture requests and enforces monitor scope", a
     scopedInventory.body.items.map(item => item.groupKey),
     ["group-a"]
   );
+  const attachmentPagesPath =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+    "/attachments/pages.pdf";
+  const allPagesResponse = await fetch(`${baseUrl}${attachmentPagesPath}`, {
+    headers: { authorization }
+  });
+  assert.equal(allPagesResponse.status, 200);
+  assert.equal(allPagesResponse.headers.get("content-type"), "application/pdf");
+  assert.match(
+    allPagesResponse.headers.get("content-disposition") ?? "",
+    /attachment-pages\.pdf/
+  );
+  assert.equal(allPagesResponse.headers.get("cache-control"), "private, no-store");
+  const allPagesPdf = await PDFDocument.load(
+    await allPagesResponse.arrayBuffer()
+  );
+  assert.equal(allPagesPdf.getPageCount(), 2);
+
+  const scopedPagesResponse = await fetch(
+    `${baseUrl}${attachmentPagesPath}?labelTemplate=${encodeURIComponent("%GROUP% | %LOGIN% | %VAR%")}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(scopedPagesResponse.status, 200);
+  const scopedPagesPdf = await PDFDocument.load(
+    await scopedPagesResponse.arrayBuffer()
+  );
+  assert.equal(scopedPagesPdf.getPageCount(), 1);
+  assert.equal(scopedPagesPdf.getTitle(), "group-a | attachment-a | participant-photo");
+
+  const forbiddenPages = await requestJson<{ error: string }>(
+    `${attachmentPagesPath}?groupKey=group-b`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(forbiddenPages.status, 403);
+  assert.equal(forbiddenPages.body.error, "attachment_group_scope_forbidden");
   const groupBAttachment = inventory.body.items.find(
     item => item.groupKey === "group-b"
   );
@@ -2162,6 +2199,16 @@ test("attachment manager imports capture requests and enforces monitor scope", a
   const attachmentPath =
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments/` +
     encodeURIComponent(groupAAttachment.attachmentId);
+  const singlePageResponse = await fetch(
+    `${baseUrl}${attachmentPath}/page.pdf?labelTemplate=${encodeURIComponent("%TESTTAKER% | %CODE%")}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(singlePageResponse.status, 200);
+  const singlePagePdf = await PDFDocument.load(
+    await singlePageResponse.arrayBuffer()
+  );
+  assert.equal(singlePagePdf.getPageCount(), 1);
+  assert.match(singlePagePdf.getTitle() ?? "", /^Attachment Alpha \| att-/);
   const invalidImage = await requestJson<{ error: string }>(
     `${attachmentPath}/files`,
     {
