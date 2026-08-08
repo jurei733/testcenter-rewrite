@@ -1891,6 +1891,95 @@ try {
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
   stopAfter("read-only-workspace-admin");
 
+  logStep("delegated-workspace-operator-management");
+  const delegatedWorkspaceAdminUsername = `ui-delegated-admin-${Date.now()}`;
+  const delegatedWorkspaceAdminPassword = "ui-delegated-admin-secret";
+  await fillAndCommit("#adminCreateUsername", delegatedWorkspaceAdminUsername);
+  await fillAndCommit("#adminCreateDisplayName", "UI Delegated Workspace Admin");
+  await fillAndCommit("#adminCreatePassword", delegatedWorkspaceAdminPassword);
+  await selectAndCommit("#adminCreateRole", "workspace_admin");
+  await selectAndCommit("#adminCreateAccessMode", "read_write");
+  await fillAndCommit("#adminCreateTenantKey", tenantKey);
+  await fillAndCommit("#adminCreateWorkspaceKey", workspaceKey);
+  await expectButtonSelectorEnabled("#adminCreateUserButton");
+  await clickAction("Create Admin User");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedWorkspaceAdminUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedWorkspaceAdminUsername &&
+          item?.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "workspace_admin" &&
+              roleAssignment?.accessMode === "read_write"
+          )
+      )
+  );
+
+  await clickAction("Sign Out");
+  await fillAndCommitUntilValue(
+    "#adminUsername",
+    delegatedWorkspaceAdminUsername
+  );
+  await fillAndCommitUntilValue(
+    "#adminPassword",
+    delegatedWorkspaceAdminPassword
+  );
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+  await page.locator("#adminCreateUsername").waitFor();
+  const delegatedRoleOptions = await page
+    .locator("#adminCreateRole option")
+    .allTextContents();
+  assert.deepEqual(
+    delegatedRoleOptions.map(option => option.trim()),
+    ["system_check", "group_monitor", "study_monitor"]
+  );
+
+  const delegatedSystemCheckUsername = `ui-system-check-${Date.now()}`;
+  await fillAndCommit("#adminCreateUsername", delegatedSystemCheckUsername);
+  await fillAndCommit("#adminCreateDisplayName", "UI Delegated System Check");
+  await fillAndCommit("#adminCreatePassword", "ui-system-check-secret");
+  await selectAndCommit("#adminCreateRole", "system_check");
+  await fillAndCommit("#adminCreateTenantKey", tenantKey);
+  await fillAndCommit("#adminCreateWorkspaceKey", workspaceKey);
+  await expectButtonSelectorEnabled("#adminCreateUserButton");
+  await clickAction("Create System Check Account");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedSystemCheckUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedSystemCheckUsername &&
+          item?.roleAssignments?.some(
+            roleAssignment => roleAssignment?.role === "system_check"
+          )
+      )
+  );
+  assert.equal(
+    await page
+      .locator("#adminCreateRole option")
+      .filter({ hasText: "platform_admin" })
+      .count(),
+    0
+  );
+  stopAfter("delegated-workspace-operator-management");
+
+  await clickAction("Sign Out");
+  await fillAndCommitUntilValue("#adminUsername", adminUsername);
+  await fillAndCommitUntilValue("#adminPassword", adminPassword);
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
+
   await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
   await selectAndCommit("#adminStatusValue", "disabled");
   await expectButtonSelectorEnabled("#adminUpdateStatusButton");

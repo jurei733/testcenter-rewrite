@@ -1448,7 +1448,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(revokedSession.body.error, "admin_session_invalid");
 });
 
-test("operator API can require a platform-admin bearer session", async () => {
+test("operator API enforces authenticated and scoped admin bearer roles", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "true"
@@ -2469,6 +2469,308 @@ test("operator API can require a platform-admin bearer session", async () => {
         workspace => workspace.workspaceKey === "tenant-admin-created"
       ),
       true
+    );
+
+    const tenantAdminHeaders = {
+      authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+    };
+    const delegatedStudyMonitor = await requestJsonAt<{
+      adminUser: { adminUserId: string; username: string };
+      roleAssignments: Array<{ role: string; workspaceId: string | null }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: tenantAdminHeaders,
+      body: {
+        username: "Tenant.Delegated.Monitor",
+        displayName: "Tenant Delegated Monitor",
+        password: "tenant-delegated-monitor-secret",
+        roleAssignments: [
+          {
+            role: "study_monitor",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace"
+          }
+        ]
+      }
+    });
+
+    assert.equal(delegatedStudyMonitor.status, 201);
+    assert.equal(
+      delegatedStudyMonitor.body.adminUser.username,
+      "tenant.delegated.monitor"
+    );
+    assert.equal(
+      delegatedStudyMonitor.body.roleAssignments[0]?.role,
+      "study_monitor"
+    );
+
+    const rejectedPlatformAdminDelegation = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: tenantAdminHeaders,
+      body: {
+        username: "Tenant.Cannot.Create.Platform",
+        password: "tenant-cannot-create-platform-secret",
+        roleAssignments: [{ role: "platform_admin" }]
+      }
+    });
+    assert.equal(rejectedPlatformAdminDelegation.status, 403);
+    assert.equal(
+      rejectedPlatformAdminDelegation.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    const rejectedUnscopedUserDelegation = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: tenantAdminHeaders,
+      body: {
+        username: "Tenant.Cannot.Create.Unscoped",
+        password: "tenant-cannot-create-unscoped-secret",
+        roleAssignments: []
+      }
+    });
+    assert.equal(rejectedUnscopedUserDelegation.status, 403);
+    assert.equal(
+      rejectedUnscopedUserDelegation.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    await requestJsonAt(isolated.baseUrl, "/api/v1/platform/tenants", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        tenantKey: "other-admin-tenant",
+        displayName: "Other Admin Tenant"
+      }
+    });
+    await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          workspaceKey: "other-admin-workspace",
+          displayName: "Other Admin Workspace"
+        }
+      }
+    );
+    const rejectedCrossTenantDelegation = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: tenantAdminHeaders,
+      body: {
+        username: "Tenant.Cannot.Create.Cross.Scope",
+        password: "tenant-cannot-create-cross-scope-secret",
+        roleAssignments: [
+          {
+            role: "study_monitor",
+            tenantKey: "other-admin-tenant",
+            workspaceKey: "other-admin-workspace"
+          }
+        ]
+      }
+    });
+    assert.equal(rejectedCrossTenantDelegation.status, 403);
+    assert.equal(
+      rejectedCrossTenantDelegation.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    const rejectedDelegationDirectoryCheck = await requestJsonAt<{
+      items: Array<{ adminUser: { username: string } }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users?username=tenant.cannot",
+      { headers: adminHeaders }
+    );
+    assert.equal(rejectedDelegationDirectoryCheck.status, 200);
+    assert.deepEqual(rejectedDelegationDirectoryCheck.body.items, []);
+
+    const tenantAdminDirectory = await requestJsonAt<{
+      items: Array<{ adminUser: { username: string } }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      headers: tenantAdminHeaders
+    });
+    assert.equal(tenantAdminDirectory.status, 200);
+    assert.equal(
+      tenantAdminDirectory.body.items.some(
+        item => item.adminUser.username === "tenant.delegated.monitor"
+      ),
+      true
+    );
+    assert.equal(
+      tenantAdminDirectory.body.items.some(
+        item => item.adminUser.username === "required.admin"
+      ),
+      false
+    );
+
+    const workspaceDelegatedMonitor = await requestJsonAt<{
+      adminUser: { adminUserId: string; username: string };
+      roleAssignments: Array<{ role: string; groupKey: string | null }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: workspaceAdminHeaders,
+      body: {
+        username: "Workspace.Delegated.Monitor",
+        password: "workspace-delegated-monitor-secret",
+        roleAssignments: [
+          {
+            role: "group_monitor",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace",
+            groupKey: "group:delegated"
+          }
+        ]
+      }
+    });
+    assert.equal(workspaceDelegatedMonitor.status, 201);
+    assert.equal(
+      workspaceDelegatedMonitor.body.roleAssignments[0]?.role,
+      "group_monitor"
+    );
+    assert.equal(
+      workspaceDelegatedMonitor.body.roleAssignments[0]?.groupKey,
+      "group:delegated"
+    );
+
+    const rejectedWorkspaceAdminDelegation = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: workspaceAdminHeaders,
+      body: {
+        username: "Workspace.Cannot.Create.Admin",
+        password: "workspace-cannot-create-admin-secret",
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "auth-required-workspace"
+          }
+        ]
+      }
+    });
+    assert.equal(rejectedWorkspaceAdminDelegation.status, 403);
+    assert.equal(
+      rejectedWorkspaceAdminDelegation.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    const rejectedCrossWorkspaceDelegation = await requestJsonAt<{
+      error: string;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: workspaceAdminHeaders,
+      body: {
+        username: "Workspace.Cannot.Create.Cross.Scope",
+        password: "workspace-cannot-create-cross-scope-secret",
+        roleAssignments: [
+          {
+            role: "system_check",
+            tenantKey: "auth-required-tenant",
+            workspaceKey: "tenant-admin-created"
+          }
+        ]
+      }
+    });
+    assert.equal(rejectedCrossWorkspaceDelegation.status, 403);
+    assert.equal(
+      rejectedCrossWorkspaceDelegation.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    const workspaceAdminDirectory = await requestJsonAt<{
+      items: Array<{ adminUser: { username: string } }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      headers: workspaceAdminHeaders
+    });
+    assert.equal(workspaceAdminDirectory.status, 200);
+    assert.equal(
+      workspaceAdminDirectory.body.items.some(
+        item => item.adminUser.username === "workspace.delegated.monitor"
+      ),
+      true
+    );
+    assert.equal(
+      workspaceAdminDirectory.body.items.some(
+        item => item.adminUser.username === "tenant.required.admin"
+      ),
+      false
+    );
+
+    const delegatedMonitorPasswordReset = await requestJsonAt<{
+      adminUser: { username: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/admin/users/${workspaceDelegatedMonitor.body.adminUser.adminUserId}/password`,
+      {
+        method: "POST",
+        headers: workspaceAdminHeaders,
+        body: { password: "workspace-delegated-monitor-reset" }
+      }
+    );
+    assert.equal(delegatedMonitorPasswordReset.status, 200);
+    assert.equal(
+      delegatedMonitorPasswordReset.body.adminUser.username,
+      "workspace.delegated.monitor"
+    );
+
+    const readOnlyDirectory = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      { headers: readOnlyHeaders }
+    );
+    assert.equal(readOnlyDirectory.status, 403);
+    assert.equal(readOnlyDirectory.body.error, "admin_role_required");
+
+    const tenantAdminSessions = await requestJsonAt<{
+      items: Array<{ adminUser: { username: string } }>;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sessions", {
+      headers: tenantAdminHeaders
+    });
+    assert.equal(tenantAdminSessions.status, 200);
+    assert.equal(
+      tenantAdminSessions.body.items.some(
+        item => item.adminUser.username === "tenant.required.admin"
+      ),
+      true
+    );
+    assert.equal(
+      tenantAdminSessions.body.items.some(
+        item => item.adminUser.username === "required.admin"
+      ),
+      false
+    );
+
+    const tenantAdminAudit = await requestJsonAt<{
+      items: Array<{
+        eventType: string;
+        subjectAdminUserId: string | null;
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/audit-events", {
+      headers: tenantAdminHeaders
+    });
+    assert.equal(tenantAdminAudit.status, 200);
+    assert.equal(
+      tenantAdminAudit.body.items.some(
+        item =>
+          item.eventType === "admin_user_created" &&
+          item.subjectAdminUserId ===
+            delegatedStudyMonitor.body.adminUser.adminUserId
+      ),
+      true
+    );
+    assert.equal(
+      tenantAdminAudit.body.items.some(
+        item => item.eventType === "admin_user_bootstrapped"
+      ),
+      false
     );
   } finally {
     await closeServer(isolated.server);

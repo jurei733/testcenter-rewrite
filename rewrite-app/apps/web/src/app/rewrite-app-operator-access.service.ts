@@ -18,14 +18,18 @@ type OperatorSessionView = {
 export class RewriteAppOperatorAccessService {
   private readonly uiState = inject(RewriteAppUiStateService);
 
+  get roleAssignments(): PublicAdminRoleAssignment[] {
+    const session = parseJsonDocument<OperatorSessionView>(
+      this.uiState.ops.adminSessionView
+    );
+    return session?.roleAssignments ?? [];
+  }
+
   get mode(): OperatorAccessMode | "signed_out" {
     if (!this.uiState.ops.adminSessionToken.trim()) {
       return "signed_out";
     }
-    const session = parseJsonDocument<OperatorSessionView>(
-      this.uiState.ops.adminSessionView
-    );
-    return resolveOperatorAccessMode(session?.roleAssignments ?? []);
+    return resolveOperatorAccessMode(this.roleAssignments);
   }
 
   get isMonitorOnly(): boolean {
@@ -41,21 +45,15 @@ export class RewriteAppOperatorAccessService {
   }
 
   get hasMonitorRole(): boolean {
-    const session = parseJsonDocument<OperatorSessionView>(
-      this.uiState.ops.adminSessionView
-    );
-    return (session?.roleAssignments ?? []).some(
+    return this.roleAssignments.some(
       assignment =>
         assignment.role === "study_monitor" || assignment.role === "group_monitor"
     );
   }
 
   get monitorProfiles(): MonitorViewProfile[] {
-    const session = parseJsonDocument<OperatorSessionView>(
-      this.uiState.ops.adminSessionView
-    );
     const profiles = new Map<string, MonitorViewProfile>();
-    for (const assignment of session?.roleAssignments ?? []) {
+    for (const assignment of this.roleAssignments) {
       if (
         assignment.role !== "study_monitor" &&
         assignment.role !== "group_monitor"

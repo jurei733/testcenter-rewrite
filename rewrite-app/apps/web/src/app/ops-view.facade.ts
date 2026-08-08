@@ -111,7 +111,7 @@ export class OpsViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
 
   readonly ops = this.uiState.ops;
-  readonly adminRoleOptions: AdminRole[] = [
+  private readonly allAdminRoleOptions: AdminRole[] = [
     "system_check",
     "group_monitor",
     "study_monitor",
@@ -151,6 +151,38 @@ export class OpsViewFacade {
     );
   }
 
+  get canBootstrapAdmin(): boolean {
+    return this.operatorAccess.mode === "signed_out";
+  }
+
+  get adminRoleOptions(): AdminRole[] {
+    if (
+      this.operatorAccess.mode === "signed_out" ||
+      this.operatorAccess.roleAssignments.some(
+        roleAssignment => roleAssignment.role === "platform_admin"
+      )
+    ) {
+      return this.allAdminRoleOptions;
+    }
+    if (
+      this.operatorAccess.roleAssignments.some(
+        roleAssignment => roleAssignment.role === "tenant_admin"
+      )
+    ) {
+      return this.allAdminRoleOptions.filter(role => role !== "platform_admin");
+    }
+    if (
+      this.operatorAccess.roleAssignments.some(
+        roleAssignment =>
+          roleAssignment.role === "workspace_admin" &&
+          roleAssignment.accessMode === "read_write"
+      )
+    ) {
+      return ["system_check", "group_monitor", "study_monitor"];
+    }
+    return [];
+  }
+
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
   }
@@ -170,6 +202,7 @@ export class OpsViewFacade {
     return (
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
+      this.adminRoleOptions.includes(this.ops.adminCreateRole) &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.ops.adminCreatePassword !== "" &&
       this.isAdminCreateAccessWindowValid &&
@@ -244,6 +277,7 @@ export class OpsViewFacade {
     return (
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
+      this.adminRoleOptions.includes(this.ops.adminRoleRole) &&
       this.ops.adminRoleTargetUserId.trim() !== "" &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminRoleRole,

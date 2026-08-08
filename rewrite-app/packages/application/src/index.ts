@@ -2835,6 +2835,120 @@ const requireAdminRole = (
   }
 };
 
+const hasAdminManagementRole = (
+  roleAssignments: AdminRoleAssignment[]
+): boolean =>
+  roleAssignments.some(
+    roleAssignment =>
+      roleAssignment.role === "platform_admin" ||
+      roleAssignment.role === "tenant_admin" ||
+      (roleAssignment.role === "workspace_admin" &&
+        (roleAssignment.accessMode ?? "read_write") === "read_write")
+  );
+
+const requireAdminManagementRole = (
+  roleAssignments: AdminRoleAssignment[]
+): void => {
+  if (!hasAdminManagementRole(roleAssignments)) {
+    throw new FirstSliceError(
+      403,
+      "admin_role_required",
+      "The admin session does not have an administrative delegation role.",
+      {
+        requiredRoles: ["platform_admin", "tenant_admin", "workspace_admin"]
+      }
+    );
+  }
+};
+
+type AdminDelegationScope = Pick<
+  AdminRoleAssignment,
+  "role" | "tenantId" | "workspaceId"
+>;
+
+const canDelegateAdminRoleScope = (
+  actorRoleAssignments: AdminRoleAssignment[],
+  targetScope: AdminDelegationScope
+): boolean => {
+  if (
+    actorRoleAssignments.some(
+      roleAssignment => roleAssignment.role === "platform_admin"
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    targetScope.role !== "platform_admin" &&
+    targetScope.tenantId !== null &&
+    actorRoleAssignments.some(
+      roleAssignment =>
+        roleAssignment.role === "tenant_admin" &&
+        roleAssignment.tenantId === targetScope.tenantId
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    targetScope.tenantId !== null &&
+    targetScope.workspaceId !== null &&
+    ["study_monitor", "group_monitor", "system_check"].includes(
+      targetScope.role
+    ) &&
+    actorRoleAssignments.some(
+      roleAssignment =>
+        roleAssignment.role === "workspace_admin" &&
+        (roleAssignment.accessMode ?? "read_write") === "read_write" &&
+        roleAssignment.tenantId === targetScope.tenantId &&
+        roleAssignment.workspaceId === targetScope.workspaceId
+    )
+  );
+};
+
+const requireAdminDelegationScope = (
+  actorRoleAssignments: AdminRoleAssignment[],
+  targetScope: AdminDelegationScope
+): void => {
+  if (!canDelegateAdminRoleScope(actorRoleAssignments, targetScope)) {
+    throw new FirstSliceError(
+      403,
+      "admin_delegation_scope_required",
+      "The admin session cannot manage the requested admin scope.",
+      {
+        role: targetScope.role,
+        tenantId: targetScope.tenantId,
+        workspaceId: targetScope.workspaceId
+      }
+    );
+  }
+};
+
+const canManageAdminUser = (
+  actorRoleAssignments: AdminRoleAssignment[],
+  targetRoleAssignments: AdminRoleAssignment[]
+): boolean =>
+  actorRoleAssignments.some(
+    roleAssignment => roleAssignment.role === "platform_admin"
+  ) ||
+  (targetRoleAssignments.length > 0 &&
+    targetRoleAssignments.every(roleAssignment =>
+      canDelegateAdminRoleScope(actorRoleAssignments, roleAssignment)
+    ));
+
+const requireManageableAdminUser = (
+  actorRoleAssignments: AdminRoleAssignment[],
+  targetRoleAssignments: AdminRoleAssignment[]
+): void => {
+  if (!canManageAdminUser(actorRoleAssignments, targetRoleAssignments)) {
+    throw new FirstSliceError(
+      403,
+      "admin_delegation_scope_required",
+      "The admin session cannot manage the requested admin user."
+    );
+  }
+};
+
 const requireAdminUser = async (
   repository: FirstSliceRepository,
   adminUserId: string
@@ -15863,7 +15977,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const nowIso = now();
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
@@ -15894,6 +16008,22 @@ export const createFirstSliceServices = (
           if (!adminUser) {
             continue;
           }
+          const targetRoleAssignments =
+            adminUser.adminUserId === currentSession.adminUser.adminUserId
+              ? currentSession.roleAssignments
+              : await listAdminRoleAssignmentsForUser(
+                  repository,
+                  adminUser.adminUserId
+                );
+          if (
+            adminUser.adminUserId !== currentSession.adminUser.adminUserId &&
+            !canManageAdminUser(
+              currentSession.roleAssignments,
+              targetRoleAssignments
+            )
+          ) {
+            continue;
+          }
 
           items.push({ adminSession, adminUser, status });
           if (items.length >= limit) {
@@ -15909,7 +16039,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const adminSessionId = input.adminSessionId.trim();
         const targetSession = (await repository.listAdminSessions()).find(
@@ -15927,6 +16057,16 @@ export const createFirstSliceServices = (
             409,
             "admin_self_session_revoke_forbidden",
             "Use sign-out for the active admin session."
+          );
+        }
+        if (targetSession.adminUserId !== currentSession.adminUser.adminUserId) {
+          const targetRoleAssignments = await listAdminRoleAssignmentsForUser(
+            repository,
+            targetSession.adminUserId
+          );
+          requireManageableAdminUser(
+            currentSession.roleAssignments,
+            targetRoleAssignments
           );
         }
         if (targetSession.revokedAt !== null) {
@@ -15988,7 +16128,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
         const usernameFilter = input.username?.trim().toLowerCase() || undefined;
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
         const tenantFilterKey = input.tenantKey?.trim() || undefined;
@@ -16030,6 +16170,12 @@ export const createFirstSliceServices = (
         return directoryItems
           .filter(
             item =>
+              (item.adminUser.adminUserId ===
+                currentSession.adminUser.adminUserId ||
+                canManageAdminUser(
+                  currentSession.roleAssignments,
+                  item.roleAssignments
+                )) &&
               (!usernameFilter || item.adminUser.username.includes(usernameFilter)) &&
               (!input.status || item.adminUser.status === input.status) &&
               (!input.role ||
@@ -16054,7 +16200,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const username = normalizeAdminUsername(input.username);
         const existingAdminUser = await repository.getAdminUserByUsername(username);
@@ -16082,20 +16228,40 @@ export const createFirstSliceServices = (
         const requestedRoleAssignments = normalizeAdminRoleAssignmentInputs(
           input.roleAssignments
         );
+        if (
+          requestedRoleAssignments.length === 0 &&
+          !currentSession.roleAssignments.some(
+            roleAssignment => roleAssignment.role === "platform_admin"
+          )
+        ) {
+          throw new FirstSliceError(
+            403,
+            "admin_delegation_scope_required",
+            "Delegated admins must create users with at least one manageable role assignment."
+          );
+        }
 
-        await repository.saveAdminUser(adminUser);
-
-        const savedRoleAssignments: AdminRoleAssignment[] = [];
+        const resolvedRoleScopes: ResolvedAdminRoleScope[] = [];
         for (const requestedRoleAssignment of requestedRoleAssignments) {
           const scope = await resolveAdminRoleScope(repository, requestedRoleAssignment);
+          requireAdminDelegationScope(currentSession.roleAssignments, scope);
           if (
-            savedRoleAssignments.some(roleAssignment =>
-              isSameAdminRoleScope(roleAssignment, scope)
+            resolvedRoleScopes.some(existingScope =>
+              existingScope.role === scope.role &&
+              existingScope.tenantId === scope.tenantId &&
+              existingScope.workspaceId === scope.workspaceId &&
+              existingScope.groupKey === scope.groupKey
             )
           ) {
             continue;
           }
+          resolvedRoleScopes.push(scope);
+        }
 
+        await repository.saveAdminUser(adminUser);
+
+        const savedRoleAssignments: AdminRoleAssignment[] = [];
+        for (const scope of resolvedRoleScopes) {
           const roleAssignment: AdminRoleAssignment = {
             roleAssignmentId: idGenerator(),
             adminUserId: adminUser.adminUserId,
@@ -16136,9 +16302,19 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const targetRoleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        if (adminUser.adminUserId !== currentSession.adminUser.adminUserId) {
+          requireManageableAdminUser(
+            currentSession.roleAssignments,
+            targetRoleAssignments
+          );
+        }
         const nextStatus =
           input.status === undefined
             ? adminUser.status
@@ -16190,9 +16366,19 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const adminUser = await requireAdminUser(repository, input.adminUserId);
+        const targetRoleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        if (adminUser.adminUserId !== currentSession.adminUser.adminUserId) {
+          requireManageableAdminUser(
+            currentSession.roleAssignments,
+            targetRoleAssignments
+          );
+        }
         const password = requireAdminPassword(input.password);
         const updatedAdminUser: AdminUser = {
           ...adminUser,
@@ -16222,7 +16408,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const adminUser = await requireAdminUser(repository, input.adminUserId);
         const scope = await resolveAdminRoleScope(repository, input);
@@ -16230,6 +16416,11 @@ export const createFirstSliceServices = (
           repository,
           adminUser.adminUserId
         );
+        requireManageableAdminUser(
+          currentSession.roleAssignments,
+          existingRoleAssignments
+        );
+        requireAdminDelegationScope(currentSession.roleAssignments, scope);
         const existingRoleAssignment = existingRoleAssignments.find(roleAssignment =>
           isSameAdminRoleScope(roleAssignment, scope)
         );
@@ -16298,7 +16489,7 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
 
         const adminUser = await requireAdminUser(repository, input.adminUserId);
         const existingRoleAssignments = await listAdminRoleAssignmentsForUser(
@@ -16315,7 +16506,6 @@ export const createFirstSliceServices = (
             `Role assignment '${input.roleAssignmentId}' was not found for admin user '${adminUser.adminUserId}'.`
           );
         }
-
         if (
           adminUser.adminUserId === currentSession.adminUser.adminUserId &&
           roleAssignment.role === "platform_admin"
@@ -16326,6 +16516,21 @@ export const createFirstSliceServices = (
             "The active admin user cannot revoke their own platform admin role."
           );
         }
+        if (adminUser.adminUserId === currentSession.adminUser.adminUserId) {
+          throw new FirstSliceError(
+            409,
+            "admin_self_role_revoke_forbidden",
+            "The active admin user cannot revoke their own admin role."
+          );
+        }
+        requireManageableAdminUser(
+          currentSession.roleAssignments,
+          existingRoleAssignments
+        );
+        requireAdminDelegationScope(
+          currentSession.roleAssignments,
+          roleAssignment
+        );
 
         await repository.deleteAdminRoleAssignment(roleAssignment.roleAssignmentId);
 
@@ -16349,12 +16554,44 @@ export const createFirstSliceServices = (
           input.sessionToken,
           now()
         );
-        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        requireAdminManagementRole(currentSession.roleAssignments);
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+
+        const visibleAdminUserIds = new Set<string>([
+          currentSession.adminUser.adminUserId
+        ]);
+        if (
+          !currentSession.roleAssignments.some(
+            roleAssignment => roleAssignment.role === "platform_admin"
+          )
+        ) {
+          for (const adminUser of await repository.listAdminUsers()) {
+            const targetRoleAssignments = await listAdminRoleAssignmentsForUser(
+              repository,
+              adminUser.adminUserId
+            );
+            if (
+              canManageAdminUser(
+                currentSession.roleAssignments,
+                targetRoleAssignments
+              )
+            ) {
+              visibleAdminUserIds.add(adminUser.adminUserId);
+            }
+          }
+        }
+        const canViewAllAuditEvents = currentSession.roleAssignments.some(
+          roleAssignment => roleAssignment.role === "platform_admin"
+        );
 
         return (await repository.listAdminAuditEvents())
           .filter(
             auditEvent =>
+              (canViewAllAuditEvents ||
+                (auditEvent.actorAdminUserId !== null &&
+                  visibleAdminUserIds.has(auditEvent.actorAdminUserId)) ||
+                (auditEvent.subjectAdminUserId !== null &&
+                  visibleAdminUserIds.has(auditEvent.subjectAdminUserId))) &&
               (!input.eventType || auditEvent.eventType === input.eventType) &&
               (!input.actorAdminUserId ||
                 auditEvent.actorAdminUserId === input.actorAdminUserId) &&

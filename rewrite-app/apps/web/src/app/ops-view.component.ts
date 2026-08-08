@@ -60,8 +60,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <div class="actions">
-          <button id="adminBootstrapOrSignInButton" *ngIf="view.canUseAdminManagement" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
-          <button id="adminBootstrapButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
+          <button id="adminBootstrapOrSignInButton" *ngIf="view.canBootstrapAdmin" class="primary" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapOrSignInAdmin()">Bootstrap / Sign In</button>
+          <button id="adminBootstrapButton" *ngIf="view.canBootstrapAdmin" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.bootstrapAdmin()">Bootstrap Only</button>
           <button id="adminSignInButton" class="ghost" type="button" [disabled]="!view.canUseAdminCredentials" (click)="view.signInAdmin()">Sign In</button>
           <button id="adminCurrentSessionButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSession()">Current Session</button>
           <button id="adminSessionsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminSessions()">Admin Sessions</button>
@@ -115,10 +115,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Admin Sessions"
-        subtitle="Protected platform-admin read model for issued admin bearer sessions without exposing tokens."
+        subtitle="Scoped admin read model for issued bearer sessions without exposing tokens."
         [items]="view.adminSessionDirectoryItems"
         (itemAction)="view.selectAdminSession($event)"
-        emptyState="Sign in as platform admin, then refresh admin sessions."
+        emptyState="Sign in with an administrative delegation role, then refresh admin sessions."
       ></app-record-collection>
 
       <article class="card">
@@ -322,10 +322,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Admin Users"
-        subtitle="Protected platform-admin directory with public user fields and role scopes."
+        subtitle="Scoped admin directory with public user fields and delegable role scopes."
         [items]="view.adminUserItems"
         (itemAction)="view.selectAdminUser($event)"
-        emptyState="Sign in as platform admin, then refresh admin users."
+        emptyState="Sign in with an administrative delegation role, then refresh admin users."
       ></app-record-collection>
 
       <article class="card">
@@ -376,10 +376,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Admin Audit Events"
-        subtitle="Persistent platform-admin trail for admin sign-ins, user management, and role changes."
+        subtitle="Persistent scope-filtered trail for admin sign-ins, user management, and role changes."
         [items]="view.adminAuditItems"
         (itemAction)="view.selectAdminAuditEvent($event)"
-        emptyState="Sign in as platform admin, then refresh admin audit events."
+        emptyState="Sign in with an administrative delegation role, then refresh visible admin audit events."
       ></app-record-collection>
 
       <article class="card">
