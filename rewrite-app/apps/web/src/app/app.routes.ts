@@ -48,6 +48,14 @@ export const appRoutes: Routes = [
       )
   },
   {
+    path: "attachment-capture",
+    loadComponent: () =>
+      import("./attachment-capture.component").then(
+        module => module.AttachmentCaptureComponent
+      ),
+    canActivate: [rejectSystemCheckOperator]
+  },
+  {
     path: "ops",
     loadComponent: () =>
       import("./ops-view.component").then(module => module.OpsViewComponent),

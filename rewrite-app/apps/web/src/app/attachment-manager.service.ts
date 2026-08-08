@@ -4,6 +4,7 @@ import {
   productionApiRoutes,
   resolveRoutePath,
   type DeleteAttachmentFileResponse,
+  type GetAttachmentResponse,
   type ListAttachmentsResponse,
   type UploadAttachmentFileResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -29,6 +30,22 @@ export class AttachmentManagerService {
       this.authorization(scope.sessionToken)
     );
     return payload.items;
+  }
+
+  async get(
+    scope: AttachmentScope,
+    attachmentId: string
+  ): Promise<WorkspaceAttachment> {
+    const { payload } = await this.api.send<GetAttachmentResponse>(
+      "GET",
+      resolveRoutePath(productionApiRoutes.workspace.getAttachment, {
+        ...scope,
+        attachmentId
+      }),
+      undefined,
+      this.authorization(scope.sessionToken)
+    );
+    return payload.attachment;
   }
 
   async upload(

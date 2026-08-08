@@ -51,8 +51,13 @@ export class AppComponent implements OnInit, OnDestroy {
   get isParticipantView(): boolean {
     return (
       this.app.activeView === "participant" ||
-      this.app.activeView === "system-check"
+      this.app.activeView === "system-check" ||
+      this.isAttachmentCaptureView
     );
+  }
+
+  get isAttachmentCaptureView(): boolean {
+    return this.router.url.split("?", 1)[0] === "/attachment-capture";
   }
 
   async ngOnInit(): Promise<void> {

@@ -47,7 +47,7 @@
     <header class="participant-topbar">
       <div>
         <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
-        <h1>{{ app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+        <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
     </header>

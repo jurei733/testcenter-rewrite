@@ -284,7 +284,7 @@ const assertSecurityHeaders = (response: Response): void => {
   assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
   assert.equal(
     response.headers.get("permissions-policy"),
-    "camera=(), geolocation=(), microphone=()"
+    "camera=(self), geolocation=(), microphone=()"
   );
 };
 

@@ -613,7 +613,7 @@ const securityHeaders = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
   "x-frame-options": "SAMEORIGIN",
-  "permissions-policy": "camera=(), geolocation=(), microphone=()"
+  "permissions-policy": "camera=(self), geolocation=(), microphone=()"
 };
 
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;

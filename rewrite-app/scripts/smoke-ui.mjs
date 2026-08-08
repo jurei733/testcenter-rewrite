@@ -7,6 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync } from "node:zlib";
 
 import { chromium } from "playwright";
+import QRCode from "qrcode";
 
 const store = process.env.FIRST_SLICE_STORE ?? "sqlite";
 const operatorAuthRequired =
@@ -297,12 +298,19 @@ let browser;
 try {
   await pollJson(`http://127.0.0.1:${port}/readyz`);
 
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream"
+    ]
+  });
   const baseUrl = `http://127.0.0.1:${port}`;
   const context = await browser.newContext();
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: baseUrl
-  });
+  await context.grantPermissions(
+    ["clipboard-read", "clipboard-write", "camera"],
+    { origin: baseUrl }
+  );
   const page = await context.newPage();
   const tenantKey = `ui-tenant-${Date.now()}`;
   const workspaceKey = `ui-workspace-${Date.now()}`;
@@ -11799,6 +11807,10 @@ try {
     .locator("#selectedAttachmentCode")
     .filter({ hasText: /^att-/ })
     .waitFor();
+  const selectedAttachmentCode = (
+    await attachmentManager.locator("#selectedAttachmentCode").textContent()
+  )?.trim();
+  assert.match(selectedAttachmentCode ?? "", /^att-/);
   await fillAndCommit(
     "#attachmentLabelTemplate",
     "%TESTTAKER% | %GROUP% | %VAR%"
@@ -11826,26 +11838,88 @@ try {
     selectedAttachmentPageDownload.suggestedFilename(),
     "attachment-smoke-participant-participant-photo-attachment-page.pdf"
   );
-  await attachmentManager.locator("#attachmentFileInput").setInputFiles({
-    name: "attachment-smoke.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-      "base64"
-    )
+
+  await attachmentManager.locator("#openAttachmentCaptureButton").click();
+  await page.waitForURL(/\/app\/attachment-capture$/);
+  const attachmentCapture = page.locator("#attachmentCaptureCard");
+  await attachmentCapture.waitFor();
+  await attachmentCapture.locator("#startAttachmentCameraButton").click();
+  try {
+    await attachmentCapture
+      .locator("#attachmentCaptureStatus")
+      .filter({ hasText: "Camera active" })
+      .waitFor({ timeout: 15_000 });
+  } catch (error) {
+    const cameraState = await page.evaluate(() => {
+      const video = document.querySelector("#attachmentCaptureVideo");
+      return {
+        status: document.querySelector("#attachmentCaptureStatus")?.textContent,
+        placeholder: document.querySelector(".camera-placeholder")?.textContent,
+        video:
+          video instanceof HTMLVideoElement
+            ? {
+                paused: video.paused,
+                readyState: video.readyState,
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight,
+                hasStream: video.srcObject instanceof MediaStream
+              }
+            : null
+      };
+    });
+    throw new Error(
+      `Attachment camera did not become active: ${JSON.stringify(cameraState)}`,
+      { cause: error }
+    );
+  }
+  await page.waitForFunction(() => {
+    const video = document.querySelector("#attachmentCaptureVideo");
+    return (
+      video instanceof HTMLVideoElement &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
+    );
   });
-  await attachmentManager
-    .locator("#attachmentManagerStatus")
-    .filter({ hasText: "Uploaded attachment-smoke.png" })
+  await attachmentCapture.locator("#attachmentQrImageInput").setInputFiles({
+    name: "attachment-code.png",
+    mimeType: "image/png",
+    buffer: await QRCode.toBuffer(selectedAttachmentCode, {
+      type: "png",
+      margin: 4,
+      width: 512
+    })
+  });
+  await attachmentCapture
+    .locator("#attachmentCaptureTarget")
+    .filter({ hasText: "Attachment Smoke Participant" })
+    .filter({ hasText: "participant-photo" })
     .waitFor();
-  await attachmentManager.getByRole("button", { name: "Preview" }).click();
-  await attachmentManager.locator("#attachmentPreview").waitFor();
-  await attachmentManager.getByRole("button", { name: "Delete" }).click();
-  await attachmentManager
+  await attachmentCapture.locator("#captureAttachmentFrameButton").click();
+  await attachmentCapture.locator("#attachmentCapturePreview").waitFor();
+  await attachmentCapture.locator("#uploadCapturedAttachmentButton").click();
+  await attachmentCapture
+    .locator("#attachmentCaptureStatus")
+    .filter({ hasText: "Attachment uploaded for Attachment Smoke Participant" })
+    .waitFor();
+  await attachmentCapture
+    .getByRole("link", { name: "Back to Attachment Manager" })
+    .click();
+  await page.waitForURL(/\/app\/runtime$/);
+  const refreshedAttachmentManager = page.locator("#attachmentManagerCard");
+  await refreshedAttachmentManager.locator("#loadAttachmentsButton").click();
+  await refreshedAttachmentManager
+    .locator("#attachmentRows")
+    .filter({ hasText: "image" })
+    .waitFor();
+  await refreshedAttachmentManager.locator(".attachment-row").click();
+  await refreshedAttachmentManager.getByRole("button", { name: "Preview" }).click();
+  await refreshedAttachmentManager.locator("#attachmentPreview").waitFor();
+  await refreshedAttachmentManager.getByRole("button", { name: "Delete" }).click();
+  await refreshedAttachmentManager
     .locator("#attachmentManagerStatus")
     .filter({ hasText: "Attachment image deleted" })
     .waitFor();
-  await attachmentManager
+  await refreshedAttachmentManager
     .locator("#attachmentRows")
     .filter({ hasText: "missing" })
     .waitFor();

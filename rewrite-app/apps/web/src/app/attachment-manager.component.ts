@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input, inject } from "@angular/core";
 import type { OnChanges, OnDestroy } from "@angular/core";
+import { RouterLink } from "@angular/router";
 
 import type { WorkspaceAttachment } from "@testcenter-rewrite-app/domain";
 
@@ -10,7 +11,7 @@ import { downloadBlobFile } from "./download-text-file";
 @Component({
   selector: "app-attachment-manager",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   styles: [`
     .attachment-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.6fr) minmax(16rem, .8fr); }
     .attachment-list { display: grid; gap: .65rem; }
@@ -39,6 +40,7 @@ import { downloadBlobFile } from "./download-text-file";
       <div class="actions">
         <button id="loadAttachmentsButton" class="primary" type="button" [disabled]="busy || !hasScope" (click)="load()">{{ busy ? 'Working…' : 'Load Attachments' }}</button>
         <button id="downloadAttachmentPagesButton" class="secondary" type="button" [disabled]="busy || attachments.length === 0" (click)="downloadPages()">Download all QR pages</button>
+        <a id="openAttachmentCaptureButton" class="button-link secondary" routerLink="/attachment-capture">Open camera capture</a>
       </div>
       <label>
         QR page label template
@@ -75,6 +77,13 @@ import { downloadBlobFile } from "./download-text-file";
           <div class="actions">
             <button class="ghost" type="button" (click)="copyCode(selected.attachmentId)">Copy attachment code</button>
             <button id="downloadSelectedAttachmentPageButton" class="secondary" type="button" [disabled]="busy" (click)="downloadSelectedPage(selected)">Download QR page</button>
+            <a
+              id="captureSelectedAttachmentButton"
+              class="button-link secondary"
+              routerLink="/attachment-capture"
+              [queryParams]="{ code: selected.attachmentId }"
+              *ngIf="!readOnly"
+            >Capture on this device</a>
           </div>
           <label>
             Add PNG or JPEG (max. 10 MiB)
