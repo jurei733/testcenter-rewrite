@@ -27,7 +27,7 @@ const failedImportSourceDocument = '{"booklets":[]}';
 const repairedImportSourceDocument =
   '<assessment><booklet key="booklet:recovered" label="Recovered"><unit key="unit-recovered" label="Recovered Unit" /></booklet></assessment>';
 const uploadedSourceDocument =
-  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="toolbar_show_reload_button">TRUE</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
+  '<Booklet><Metadata><Id>booklet:starter</Id><Label>Starter</Label></Metadata><BookletConfig><Config key="toolbar_show_unit_list">TRUE</Config><Config key="ask_for_fullscreen">ON</Config><Config key="show_fullscreen_button">ON</Config><Config key="toolbar_show_reload_button">TRUE</Config><Config key="unit_screenheader">WITH_UNIT_TITLE</Config><Config key="unit_title">OFF</Config></BookletConfig><Units><Unit id="unit-1" label="Entry" /><Testlet id="testlet:participant-route" label="Participant Route Block"><Unit id="unit-participant-route" label="Participant Route"><description>Read the participant prompt.</description><prompt>Explain how the starter example works.</prompt></Unit></Testlet><Testlet id="testlet:timed-paused" label="Timed Paused Work"><Restrictions><TimeMax minutes="5" leave="allowed" /></Restrictions><Unit id="unit-paused" label="Paused Work"><Definition><![CDATA[<section>Answer the direct Testcenter definition prompt.</section>]]></Definition></Unit></Testlet></Units></Booklet>';
 let smokeAdminSessionToken = "";
 
 const readBrotliBase64Text = async fixturePath =>
@@ -1800,7 +1800,7 @@ try {
     .filter({ hasText: "tenant_admin" })
     .filter({ hasText: tenantRoleAssignmentId })
     .waitFor();
-  await clickCardAction("Admin Role Assignments", "Use For Revoke", "tenant_admin");
+  await clickCardAction("Admin Role Assignments", "Edit Role Scope", "tenant_admin");
   await expectInputValue("#adminRevokeTargetUserId", workspaceAdminUserId);
   await expectInputValue("#adminRevokeRoleAssignmentId", tenantRoleAssignmentId);
   await expectButtonSelectorEnabled("#adminRevokeRoleButton");
@@ -6094,7 +6094,7 @@ try {
     [
       "<Testtakers>",
       "  <Profiles><GroupMonitor>",
-      "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"no\">",
+      "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"yes\">",
       "      <Filter label=\"Current participant\" type=\"substring\" field=\"personLabel\" value=\"student-ui\" not=\"true\" />",
       "    </Profile>",
       "  </GroupMonitor></Profiles>",
@@ -6230,7 +6230,10 @@ try {
   );
   await page
     .locator("#monitorProfileDetail")
-    .filter({ hasText: "All sessions: small view, 1 imported filter(s)." })
+    .filter({
+      hasText:
+        "All sessions: small view, 1 imported filter(s), next-block selection automatic."
+    })
     .waitFor();
   await page.locator('[data-view-nav="ops"]').click();
   await page.waitForURL(/\/app\/ops$/);
@@ -7301,7 +7304,7 @@ try {
   await openRunStudentCard
     .filter({ hasText: "Timed Paused Work" })
     .filter({ hasText: "Booklet Species" })
-    .filter({ hasText: "species: 1" })
+    .filter({ hasText: "species: 2" })
     .filter({ hasText: "Active Timer" })
     .filter({ hasText: "Timer Remaining" })
     .filter({ hasText: "Timer Expires" })
@@ -7501,7 +7504,10 @@ try {
   );
   await page
     .locator("#monitorProfileDetail")
-    .filter({ hasText: "All sessions: small view, 1 imported filter(s)." })
+    .filter({
+      hasText:
+        "All sessions: small view, 1 imported filter(s), next-block selection automatic."
+    })
     .waitFor();
   assert.equal(
     await page.locator("#loginKey").count(),
@@ -7542,6 +7548,43 @@ try {
     .click();
   await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
   await expectButtonSelectorEnabled("#monitorConsoleResumeButton");
+  assert.equal(
+    await page.locator("#monitorTargetUnitKey option").count(),
+    3,
+    "The scoped monitor should offer a placeholder and both visible booklet blocks."
+  );
+  await selectAndCommit("#monitorTargetUnitKey", "unit-participant-route");
+  const firstBlockGotoResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/monitor/open-runs/${pausedTestRunId}/commands`
+      )
+  );
+  await page.locator("#monitorConsoleGotoButton").click();
+  assert.equal((await firstBlockGotoResponsePromise).status(), 200);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.currentUnitKey ===
+      "unit-participant-route"
+  );
+  await expectInputValue("#monitorTargetUnitKey", "unit-paused");
+  const nextBlockGotoResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/monitor/open-runs/${pausedTestRunId}/commands`
+      )
+  );
+  await page.locator("#monitorConsoleGotoButton").click();
+  assert.equal((await nextBlockGotoResponsePromise).status(), 200);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.currentUnitKey === "unit-paused"
+  );
+  await expectInputValue("#monitorTargetUnitKey", "");
+  stopAfter("group-monitor-auto-next-block");
   await page.waitForFunction(
     () => !document.querySelector(".status-banner.is-error"),
     undefined,
@@ -7564,7 +7607,7 @@ try {
   await fillAndCommit("#openRunLoginFilter", participantLoginKey);
   await fillAndCommit("#openRunGroupFilter", participantGroupKey);
   await fillAndCommit("#openRunBookletFilter", participantBookletKey);
-  await fillAndCommit("#openRunSpeciesFilter", "species: 1");
+  await fillAndCommit("#openRunSpeciesFilter", "species: 2");
   await fillAndCommit("#openRunSessionFilter", participantSessionId);
   await fillAndCommit("#openRunRunFilter", pausedTestRunId);
   await fillAndCommit("#openRunUnitFilter", "unit-paused");
@@ -7572,7 +7615,7 @@ try {
   await fillAndCommit("#openRunLimit", "1");
   await clickAction("Apply Open Run Filters");
   await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&bookletSpecies=${encodeURIComponent("species: 1")}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=running&limit=1`,
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?loginKey=${participantLoginKey}&groupKey=${encodeURIComponent(participantGroupKey)}&bookletKey=${encodeURIComponent(participantBookletKey)}&bookletSpecies=${encodeURIComponent("species: 2")}&participantSessionId=${participantSessionId}&testRunId=${pausedTestRunId}&unitKey=unit-paused&status=running&limit=1`,
     payload =>
       typeof payload === "object" &&
       payload != null &&

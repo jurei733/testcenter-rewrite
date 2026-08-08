@@ -84,6 +84,9 @@ export class RuntimeViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly monitorBatchSelection = new Set<string>();
+  private selectedMonitorBlockNavigationTargets: NonNullable<
+    OpenMonitorRun["blockNavigationTargets"]
+  > = [];
   private readonly resultGroupSelection = new Set<string>();
   private resultGroupSelectionScope = "";
 
@@ -125,7 +128,27 @@ export class RuntimeViewFacade {
     if (!profile) {
       return "No imported monitor profile is assigned; all loaded runs remain visible.";
     }
-    return `${profile.label || profile.profileId}: ${profile.settings.view} view, ${profile.filters.length} imported filter(s).`;
+    return `${profile.label || profile.profileId}: ${profile.settings.view} view, ${profile.filters.length} imported filter(s), next-block selection ${profile.settings.autoselectNextBlock === "yes" ? "automatic" : "manual"}.`;
+  }
+
+  get monitorBlockNavigationTargets(): NonNullable<
+    OpenMonitorRun["blockNavigationTargets"]
+  > {
+    return (
+      this.selectedOpenMonitorRun?.blockNavigationTargets ??
+      this.selectedMonitorBlockNavigationTargets
+    );
+  }
+
+  private get selectedOpenMonitorRun(): OpenMonitorRun | null {
+    const payload = parseJsonDocument<MonitorOpenRunsResponse>(
+      this.runtime.openRunsView
+    );
+    return (
+      payload?.items.find(
+        openRun => openRun.testRunId === this.runtime.testRunId.trim()
+      ) ?? null
+    );
   }
 
   selectMonitorProfile(profileId: string): void {
@@ -2977,9 +3000,15 @@ export class RuntimeViewFacade {
     if (!this.canIssueMonitorGoto) {
       return;
     }
-    this.viewState.onActionAsync(() =>
-      this.runtimeService.issueMonitorRunCommand("goto")
-    );
+    const navigationTargets = this.monitorBlockNavigationTargets;
+    this.viewState.onActionAsync(async () => {
+      const result = await this.runtimeService.issueMonitorRunCommand("goto");
+      this.selectNextMonitorBlockAfterGoto(
+        result.command.testRun.testRunId,
+        result.command.testRun.currentUnitKey,
+        navigationTargets
+      );
+    });
   }
 
   issueMonitorLockTest(): void {
@@ -3058,6 +3087,15 @@ export class RuntimeViewFacade {
       | "set_testlet_time"
   ): void {
     const testRunIds = this.monitorBatchRunIds;
+    const openRuns =
+      parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView)
+        ?.items ?? [];
+    const navigationTargetsByRun = new Map(
+      openRuns.map(openRun => [
+        openRun.testRunId,
+        openRun.blockNavigationTargets ?? []
+      ])
+    );
     const canIssueCommand =
       commandType === "goto"
         ? this.canIssueMonitorBatchGoto
@@ -3088,6 +3126,13 @@ export class RuntimeViewFacade {
       );
       for (const command of result.commands) {
         this.monitorBatchSelection.delete(command.testRun.testRunId);
+      }
+      if (commandType === "goto" && result.commands[0]) {
+        this.selectNextMonitorBlockAfterGoto(
+          result.commands[0].testRun.testRunId,
+          result.commands[0].testRun.currentUnitKey,
+          navigationTargetsByRun.get(result.commands[0].testRun.testRunId)
+        );
       }
       this.uiState.renderVersion.update(version => version + 1);
     });
@@ -3525,7 +3570,17 @@ export class RuntimeViewFacade {
     this.runtime.testRunId = testRunId;
     if (item.actionPayload?.currentUnitKey != null) {
       this.runtime.currentUnitKey = item.actionPayload.currentUnitKey;
-      this.runtime.monitorTargetUnitKey = item.actionPayload.currentUnitKey;
+      const currentUnitKey = item.actionPayload.currentUnitKey;
+      const selectedOpenRun = parseJsonDocument<MonitorOpenRunsResponse>(
+        this.runtime.openRunsView
+      )?.items.find(openRun => openRun.testRunId === testRunId);
+      this.selectedMonitorBlockNavigationTargets =
+        selectedOpenRun?.blockNavigationTargets ?? [];
+      const navigationTarget = this.selectedMonitorBlockNavigationTargets.find(
+        target => target.unitKeys.includes(currentUnitKey)
+      );
+      this.runtime.monitorTargetUnitKey =
+        navigationTarget?.targetUnitKey ?? currentUnitKey;
     }
     if (item.actionPayload?.loginKey) {
       this.runtime.loginKey = item.actionPayload.loginKey;
@@ -3560,6 +3615,36 @@ export class RuntimeViewFacade {
       }
       await this.runtimeService.refreshRuntimeReads(true);
     });
+  }
+
+  private selectNextMonitorBlockAfterGoto(
+    testRunId: string,
+    currentUnitKey: string | null,
+    knownNavigationTargets?: NonNullable<
+      OpenMonitorRun["blockNavigationTargets"]
+    >
+  ): void {
+    if (this.activeMonitorProfile?.settings.autoselectNextBlock !== "yes") {
+      return;
+    }
+    const payload = parseJsonDocument<MonitorOpenRunsResponse>(
+      this.runtime.openRunsView
+    );
+    const navigationTargets =
+      payload?.items.find(openRun => openRun.testRunId === testRunId)
+        ?.blockNavigationTargets ??
+      knownNavigationTargets ??
+      [];
+    this.selectedMonitorBlockNavigationTargets = navigationTargets;
+    const currentBlockIndex = navigationTargets.findIndex(target =>
+      currentUnitKey ? target.unitKeys.includes(currentUnitKey) : false
+    );
+    this.runtime.monitorTargetUnitKey =
+      currentBlockIndex >= 0
+        ? navigationTargets[currentBlockIndex + 1]?.targetUnitKey ?? ""
+        : "";
+    this.persistState();
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   selectReview(item: RecordCollectionItem): void {

@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import {
   type DeleteGroupResultsBulkResponse,
   type GetParticipantSessionResponse,
+  type IssueMonitorRunCommandResponse,
   type IssueMonitorRunCommandsResponse,
   productionApiRoutes,
   resolveRoutePath
@@ -123,8 +124,8 @@ export class RewriteAppRuntimeService {
       | "unlock_navigation"
       | "lock_navigation"
       | "set_testlet_time"
-  ): Promise<void> {
-    await issueMonitorRunCommandAction(
+  ): Promise<IssueMonitorRunCommandResponse> {
+    const result = await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       ),
@@ -145,6 +146,7 @@ export class RewriteAppRuntimeService {
       activityTitle,
       `Monitor command '${commandType}' sent for ${this.runtimeState.testRunId || "the selected run"}.`
     );
+    return result;
   }
 
   async issueMonitorRunCommands(

@@ -89,10 +89,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Selected Test Run
             <input id="monitorSelectedTestRunId" name="monitorSelectedTestRunId" readonly [value]="view.runtime.testRunId || 'Select an open run below'" />
           </label>
-          <label>
-            Target Unit
-            <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()" />
+          <label *ngIf="view.monitorBlockNavigationTargets.length > 0; else monitorTargetUnitInput">
+            Target Block
+            <select id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()">
+              <option value="">Choose a block</option>
+              <option *ngFor="let target of view.monitorBlockNavigationTargets" [value]="target.targetUnitKey">
+                {{ target.blockLabel }} ({{ target.blockKey }})
+              </option>
+            </select>
           </label>
+          <ng-template #monitorTargetUnitInput>
+            <label>
+              Target Unit
+              <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()" />
+            </label>
+          </ng-template>
           <label>
             Timer Seconds
             <input id="monitorConsoleTimeSeconds" name="monitorConsoleTimeSeconds" type="number" min="1" max="86400" step="1" [(ngModel)]="view.runtime.monitorTimeSeconds" (change)="view.persistState()" />
@@ -104,7 +115,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
           <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">Pause</button>
           <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">Resume</button>
-          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Unit</button>
+          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Block</button>
           <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
           <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
           <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">Unlock Test</button>

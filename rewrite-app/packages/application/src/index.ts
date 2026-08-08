@@ -3806,6 +3806,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         currentUnitLabel: location.currentUnitLabel,
         currentBlockKey: location.currentBlockKey,
         currentBlockLabel: location.currentBlockLabel,
+        blockNavigationTargets: location.blockNavigationTargets,
         activeTestletTimer:
           testletTimers.find(
             timer =>
@@ -3827,6 +3828,7 @@ const resolveOpenMonitorRunLocation = (
   | "currentUnitLabel"
   | "currentBlockKey"
   | "currentBlockLabel"
+  | "blockNavigationTargets"
 > => {
   const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
     entry => entry.bookletKey === testRun.bookletKey
@@ -3838,6 +3840,38 @@ const resolveOpenMonitorRunLocation = (
   const currentBlock = currentBlockKey
     ? booklet?.testletEntries?.find(entry => entry.testletKey === currentBlockKey)
     : null;
+  const visibleUnits = resolveVisibleBookletUnits(booklet, testRun);
+  const testletsByKey = new Map(
+    (booklet?.testletEntries ?? []).map(testlet => [
+      testlet.testletKey,
+      testlet
+    ])
+  );
+  const blockNavigationTargets: NonNullable<
+    OpenMonitorRun["blockNavigationTargets"]
+  > = [];
+  const navigationTargetsByBlock = new Map(
+    blockNavigationTargets.map(target => [target.blockKey, target])
+  );
+  for (const visibleUnit of visibleUnits) {
+    const blockKey = visibleUnit.testletPath?.[0];
+    if (!blockKey) {
+      continue;
+    }
+    const existingTarget = navigationTargetsByBlock.get(blockKey);
+    if (existingTarget) {
+      existingTarget.unitKeys.push(visibleUnit.unitKey);
+      continue;
+    }
+    const target = {
+      blockKey,
+      blockLabel: testletsByKey.get(blockKey)?.displayLabel ?? blockKey,
+      targetUnitKey: visibleUnit.unitKey,
+      unitKeys: [visibleUnit.unitKey]
+    };
+    blockNavigationTargets.push(target);
+    navigationTargetsByBlock.set(blockKey, target);
+  }
   return {
     bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
     bookletSpecies: booklet
@@ -3847,7 +3881,8 @@ const resolveOpenMonitorRunLocation = (
       : null,
     currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
     currentBlockKey,
-    currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey
+    currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey,
+    blockNavigationTargets
   };
 };
 
@@ -21563,6 +21598,7 @@ export const createFirstSliceServices = (
               currentUnitLabel: location.currentUnitLabel,
               currentBlockKey: location.currentBlockKey,
               currentBlockLabel: location.currentBlockLabel,
+              blockNavigationTargets: location.blockNavigationTargets,
               activeTestletTimer:
                 testletTimers.find(
                   timer =>

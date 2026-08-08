@@ -923,6 +923,12 @@ export type OpenMonitorRun = {
   currentUnitLabel?: string | null;
   currentBlockKey?: string | null;
   currentBlockLabel?: string | null;
+  blockNavigationTargets?: Array<{
+    blockKey: string;
+    blockLabel: string;
+    targetUnitKey: string;
+    unitKeys: string[];
+  }>;
   activeTestletTimer: MonitorTestletTimer | null;
   updatedAt: string;
 };

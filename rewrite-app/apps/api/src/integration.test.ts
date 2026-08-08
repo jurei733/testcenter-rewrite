@@ -11347,6 +11347,12 @@ test("original Testcenter compatibility corpus executes the official group monit
         currentUnitLabel: string | null;
         currentBlockKey: string | null;
         currentBlockLabel: string | null;
+        blockNavigationTargets: Array<{
+          blockKey: string;
+          blockLabel: string;
+          targetUnitKey: string;
+          unitKeys: string[];
+        }>;
         status: string;
         locked?: boolean;
       }>;
@@ -11365,6 +11371,18 @@ test("original Testcenter compatibility corpus executes the official group monit
     assert.equal(openRuns.body.items[0]?.bookletLabel, "GM-1");
     assert.equal(openRuns.body.items[0]?.bookletSpecies, "species: 1");
     assert.equal(openRuns.body.items[0]?.currentUnitLabel, "Startseite");
+    assert.deepEqual(openRuns.body.items[0]?.blockNavigationTargets, [
+      {
+        blockKey: "Tslt1",
+        blockLabel: "Aufgabenblock 1",
+        targetUnitKey: "CY-Unit.Sample-101",
+        unitKeys: [
+          "CY-Unit.Sample-101",
+          "CY-Unit.Sample-102",
+          "CY-Unit.Sample-103"
+        ]
+      }
+    ]);
 
     const rejectedOtherGroupQuery = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
