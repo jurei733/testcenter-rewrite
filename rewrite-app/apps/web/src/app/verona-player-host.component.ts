@@ -29,8 +29,10 @@ import {
   type VeronaNavigationDeniedNotification,
   type VeronaNavigationDeniedReason,
   type VeronaNavigationRequestedNotification,
+  type VeronaPageNavigationCommand,
   type VeronaPlayerConfig,
   type VeronaPlayerConfigChangedNotification,
+  type VeronaPlayerState,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
@@ -85,6 +87,54 @@ export type VeronaResponseChange = {
         <p id="participantVeronaPlayerLoadingStatus">{{ loadingStatusLabel }}</p>
       </section>
       <div #frameHost class="verona-player-frame-host" id="participantVeronaFrameHost"></div>
+      <nav
+        *ngIf="pageNavigationLabelMode !== 'hidden' && pages.length > 0"
+        class="verona-player-page-navigation"
+        id="participantVeronaPageNavigation"
+        aria-label="Page navigation"
+      >
+        <button
+          *ngIf="!pageNavigationControlsHidden"
+          id="participantVeronaPreviousPageButton"
+          type="button"
+          class="ghost"
+          aria-label="Previous page"
+          [disabled]="currentPageIndex <= 0"
+          (click)="goToRelativePage(-1)"
+        >
+          ←
+        </button>
+        <div
+          class="verona-player-page-label"
+          id="participantVeronaPageLabel"
+          aria-live="polite"
+        >
+          <span *ngIf="pageNavigationLabelMode !== 'list'">{{ pageNavigationLabel }}</span>
+          <span
+            *ngIf="pageNavigationLabelMode === 'list'"
+            class="verona-player-page-list"
+            aria-label="Available pages"
+          >
+            <span
+              *ngFor="let page of pages; let pageIndex = index"
+              [class.is-current]="pageIndex === currentPageIndex"
+              [attr.aria-current]="pageIndex === currentPageIndex ? 'page' : null"
+              [attr.title]="page.label"
+            >{{ pageIndex + 1 }}</span>
+          </span>
+        </div>
+        <button
+          *ngIf="!pageNavigationControlsHidden"
+          id="participantVeronaNextPageButton"
+          type="button"
+          class="ghost"
+          aria-label="Next page"
+          [disabled]="currentPageIndex < 0 || currentPageIndex >= pages.length - 1"
+          (click)="goToRelativePage(1)"
+        >
+          →
+        </button>
+      </nav>
       <section
         *ngIf="errorMessage"
         class="verona-player-error"
@@ -143,6 +193,9 @@ export class VeronaPlayerHostComponent
     | "concat-scroll-snap"
     | "buttons" = "separate";
   @Input() restoreCurrentPageOnReturn = false;
+  @Input() pageNavigationLabelMode: "hidden" | "index" | "label" | "list" =
+    "index";
+  @Input() pageNavigationControlsHidden = false;
   @Input() saveStatus = "not_saved";
   @Input() loadingLabel = "Please wait";
   @Input() loadingTitle = "Unit is loading";
@@ -166,6 +219,8 @@ export class VeronaPlayerHostComponent
   loadingPhase: "pending" | "unknown" | "complete" = "pending";
   apiVersionLabel = "Waiting for player";
   errorMessage = "";
+  pages: Array<{ id: string; label: string }> = [];
+  currentPageIndex = -1;
 
   private frame: HTMLIFrameElement | null = null;
   private readyTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -214,6 +269,16 @@ export class VeronaPlayerHostComponent
       default:
         return this.loadingStatus;
     }
+  }
+
+  get pageNavigationLabel(): string {
+    const currentPage = this.pages[this.currentPageIndex];
+    if (this.pageNavigationLabelMode === "label") {
+      return currentPage?.label || currentPage?.id || "Page";
+    }
+    return this.currentPageIndex >= 0
+      ? `Page ${this.currentPageIndex + 1}/${this.pages.length}`
+      : `Page –/${this.pages.length}`;
   }
 
   ngAfterViewInit(): void {
@@ -290,6 +355,9 @@ export class VeronaPlayerHostComponent
     switch (notification.type) {
       case "vopStateChangedNotification":
         this.status = "running";
+        if (notification.playerState !== undefined) {
+          this.updatePageNavigation(notification.playerState);
+        }
         if (Array.isArray(notification.log)) {
           const logEntries = notification.log.flatMap(entry => {
             const key = typeof entry?.key === "string" ? entry.key.trim() : "";
@@ -372,6 +440,8 @@ export class VeronaPlayerHostComponent
     this.apiVersionLabel = "Waiting for player";
     this.apiVersion = null;
     this.errorMessage = "";
+    this.pages = [];
+    this.currentPageIndex = -1;
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
       : serializeVeronaUnitResponse({});
@@ -562,6 +632,50 @@ export class VeronaPlayerHostComponent
       playerConfig: this.createPlayerConfig()
     };
     this.frame.contentWindow.postMessage(notification, "*");
+  }
+
+  goToRelativePage(offset: -1 | 1): void {
+    const targetIndex = this.currentPageIndex + offset;
+    const targetPage = this.pages[targetIndex];
+    if (!targetPage || !this.frame?.contentWindow || this.status !== "running") {
+      return;
+    }
+    this.currentPageIndex = targetIndex;
+    const command: VeronaPageNavigationCommand = {
+      type: "vopPageNavigationCommand",
+      sessionId: this.sessionId,
+      target: targetPage.id
+    };
+    this.frame.contentWindow.postMessage(command, "*");
+  }
+
+  private updatePageNavigation(playerState: VeronaPlayerState): void {
+    const validPages = playerState.validPages;
+    this.pages = Array.isArray(validPages)
+      ? validPages.flatMap(page => {
+          const id = typeof page?.id === "string" ? page.id : "";
+          return id
+            ? [{ id, label: page.label || id }]
+            : [];
+        })
+      : validPages && typeof validPages === "object"
+        ? Object.entries(validPages).map(([id, label]) => ({
+            id,
+            label: typeof label === "string" && label ? label : id
+          }))
+        : [];
+    const currentPage = playerState.currentPage;
+    const currentPageId = currentPage == null ? "" : String(currentPage);
+    const currentPageById = this.pages.findIndex(page => page.id === currentPageId);
+    this.currentPageIndex =
+      currentPageById >= 0
+        ? currentPageById
+        : typeof currentPage === "number" &&
+            Number.isSafeInteger(currentPage) &&
+            currentPage >= 0 &&
+            currentPage < this.pages.length
+          ? currentPage
+          : -1;
   }
 
   private sendNavigationDenied(reasons: readonly string[]): void {

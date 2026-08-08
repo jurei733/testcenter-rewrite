@@ -4424,6 +4424,7 @@ try {
       <output id="playerConfigChangeCount">0</output>
       <output id="playerNavigationDenied"></output>
       <output id="playerStartPage"></output>
+      <output id="playerCurrentPage"></output>
       <output id="playerResource"></output>
       <output id="playerResourceRange"></output>
       <output id="playerResourceMultiRange"></output>
@@ -4432,7 +4433,8 @@ try {
       <button id="playerRuntimeError" type="button">Report runtime error</button>
       <script>
         let sessionId = "";
-        const sendState = () => parent.postMessage({
+        let currentPage = "page-1";
+        const sendState = (includeLog = true) => parent.postMessage({
           type: "vopStateChangedNotification",
           sessionId,
           unitState: {
@@ -4441,14 +4443,26 @@ try {
             responseProgress: document.querySelector("#playerAnswer").value ? "complete" : "none",
             unitStateDataType: "verona-smoke@1"
           },
-          playerState: { currentPage: "page-1" },
-          log: [{
+          playerState: {
+            currentPage,
+            validPages: [
+              { id: "page-1", label: "Introduction" },
+              { id: "page-2", label: "Review" }
+            ]
+          },
+          ...(includeLog ? { log: [{
             key: "PLAYER_STATE_CHANGED",
             timeStamp: Date.now(),
             content: document.querySelector("#playerAnswer").value
-          }]
+          }] } : {})
         }, "*");
         addEventListener("message", event => {
+          if (event.data?.type === "vopPageNavigationCommand") {
+            currentPage = String(event.data.target || "");
+            document.querySelector("#playerCurrentPage").textContent = currentPage;
+            sendState(false);
+            return;
+          }
           if (event.data?.type === "vopPlayerConfigChangedNotification") {
             document.querySelector("#playerConfig").textContent = JSON.stringify(event.data.playerConfig);
             const count = Number(document.querySelector("#playerConfigChangeCount").textContent || "0");
@@ -4466,8 +4480,11 @@ try {
           document.querySelector("#playerDefinition").textContent = event.data.unitDefinition;
           document.querySelector("#playerConfig").textContent = JSON.stringify(event.data.playerConfig);
           document.querySelector("#playerStartPage").textContent = String(event.data.playerConfig?.startPage || "");
+          currentPage = String(event.data.playerState?.currentPage || event.data.playerConfig?.startPage || "page-1");
+          document.querySelector("#playerCurrentPage").textContent = currentPage;
           document.querySelector("#playerAnswer").value = event.data.unitState?.dataParts?.answer || "";
-          document.querySelector("#playerAnswer").addEventListener("input", sendState);
+          document.querySelector("#playerAnswer").addEventListener("input", () => sendState(true));
+          sendState(false);
           parent.postMessage({
             type: "vopWindowFocusChangedNotification",
             hasFocus: true
@@ -4558,6 +4575,8 @@ try {
             <Config key="unit_navibuttons">OFF</Config>
             <Config key="pagingMode">concat-scroll</Config>
             <Config key="logPolicy">debug</Config>
+            <Config key="navbar_page_label">LABEL</Config>
+            <Config key="navbar_page_controls_hidden">FALSE</Config>
             <Config key="restore_current_page_on_return">ON</Config>
             <Config key="toolbar_show_reload_button">TRUE</Config>
             <Config key="unit_show_time_left">ON</Config>
@@ -4866,6 +4885,32 @@ try {
     .locator("#playerConfig")
     .filter({ hasText: '"pagingMode":"concat-scroll"' })
     .filter({ hasText: '"logPolicy":"debug"' })
+    .waitFor();
+  await page
+    .locator("#participantVeronaPageLabel")
+    .filter({ hasText: "Introduction" })
+    .waitFor();
+  await expectButtonSelectorDisabled("#participantVeronaPreviousPageButton");
+  await expectButtonSelectorEnabled("#participantVeronaNextPageButton");
+  await page.locator("#participantVeronaNextPageButton").click();
+  await veronaFrame
+    .locator("#playerCurrentPage")
+    .filter({ hasText: "page-2" })
+    .waitFor();
+  await page
+    .locator("#participantVeronaPageLabel")
+    .filter({ hasText: "Review" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#participantVeronaPreviousPageButton");
+  await expectButtonSelectorDisabled("#participantVeronaNextPageButton");
+  await page.locator("#participantVeronaPreviousPageButton").click();
+  await veronaFrame
+    .locator("#playerCurrentPage")
+    .filter({ hasText: "page-1" })
+    .waitFor();
+  await page
+    .locator("#participantVeronaPageLabel")
+    .filter({ hasText: "Introduction" })
     .waitFor();
   await veronaFrame
     .locator("#playerResource")

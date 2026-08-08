@@ -11151,6 +11151,10 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       logPolicy: string;
       pagingMode: string;
       restoreCurrentPageOnReturn: boolean;
+      pageNavigation: {
+        labelMode: string;
+        controlsHidden: boolean;
+      };
     };
     completion: { lockOnTermination: boolean };
     display: {
@@ -11215,7 +11219,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       player: {
         logPolicy: "rich",
         pagingMode: "buttons",
-        restoreCurrentPageOnReturn: false
+        restoreCurrentPageOnReturn: false,
+        pageNavigation: { labelMode: "list", controlsHidden: false }
       },
       completion: { lockOnTermination: false },
       display: {
@@ -11240,7 +11245,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       player: {
         logPolicy: "rich",
         pagingMode: "buttons",
-        restoreCurrentPageOnReturn: true
+        restoreCurrentPageOnReturn: true,
+        pageNavigation: { labelMode: "hidden", controlsHidden: false }
       },
       completion: { lockOnTermination: true },
       display: {
@@ -11265,7 +11271,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       player: {
         logPolicy: "rich",
         pagingMode: "buttons",
-        restoreCurrentPageOnReturn: false
+        restoreCurrentPageOnReturn: false,
+        pageNavigation: { labelMode: "index", controlsHidden: false }
       },
       completion: { lockOnTermination: false },
       display: {
@@ -11290,7 +11297,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       player: {
         logPolicy: "rich",
         pagingMode: "buttons",
-        restoreCurrentPageOnReturn: false
+        restoreCurrentPageOnReturn: false,
+        pageNavigation: { labelMode: "index", controlsHidden: false }
       },
       completion: { lockOnTermination: false },
       display: {
@@ -16345,6 +16353,10 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
                 pagingMode: string;
                 logPolicy: string;
                 restoreCurrentPageOnReturn: boolean;
+                pageNavigation: {
+                  labelMode: string;
+                  controlsHidden: boolean;
+                };
               };
             };
             unitEntries: Array<{
@@ -16377,7 +16389,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
     logPolicy: "debug",
     pagingMode: "concat-scroll",
-    restoreCurrentPageOnReturn: true
+    restoreCurrentPageOnReturn: true,
+    pageNavigation: { labelMode: "index", controlsHidden: false }
   });
   assert.deepEqual(
     {
@@ -20265,6 +20278,10 @@ test("original BookletConfig compiles into enforced participant navigation polic
               pagingMode: string;
               logPolicy: string;
               restoreCurrentPageOnReturn: boolean;
+              pageNavigation: {
+                labelMode: string;
+                controlsHidden: boolean;
+              };
             };
           };
         };
@@ -20295,7 +20312,8 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {
     logPolicy: "debug",
     pagingMode: "concat-scroll",
-    restoreCurrentPageOnReturn: true
+    restoreCurrentPageOnReturn: true,
+    pageNavigation: { labelMode: "index", controlsHidden: false }
   });
   assert.deepEqual(blockedState.body.currentRunState.navigation.forwardDeniedReasons, [
     "presentation_incomplete",

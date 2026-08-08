@@ -745,6 +745,7 @@ export type ContentReleaseTestletEntry = SourcePackageTestletEntry;
 export type BookletLeaveRestriction = "off" | "forward" | "always";
 export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
 export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
+export type BookletPageNavigationLabel = "hidden" | "index" | "label" | "list";
 export type BookletNavigationDeniedReason =
   | "presentation_incomplete"
   | "response_incomplete"
@@ -770,6 +771,11 @@ export type BookletRuntimePolicy = {
     logPolicy: "disabled" | "lean" | "rich" | "debug";
     pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
     restoreCurrentPageOnReturn: boolean;
+    /** Optional so runtime snapshots created before host page navigation remain readable. */
+    pageNavigation?: {
+      labelMode: BookletPageNavigationLabel;
+      controlsHidden: boolean;
+    };
   };
   completion: {
     lockOnTermination: boolean;

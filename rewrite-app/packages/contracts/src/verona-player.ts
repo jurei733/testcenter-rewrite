@@ -54,6 +54,12 @@ export type VeronaPlayerConfigChangedNotification = {
   playerConfig: VeronaPlayerConfig;
 };
 
+export type VeronaPageNavigationCommand = {
+  type: "vopPageNavigationCommand";
+  sessionId: string;
+  target: string;
+};
+
 export type VeronaNavigationDeniedReason =
   | "presentationIncomplete"
   | "responsesIncomplete";

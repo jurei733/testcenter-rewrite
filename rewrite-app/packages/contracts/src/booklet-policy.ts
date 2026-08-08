@@ -1,6 +1,7 @@
 import type {
   BookletLeaveRestriction,
   BookletNavigationDeniedReason,
+  BookletPageNavigationLabel,
   BookletPlayerEndPolicy,
   BookletRuntimePolicy,
   BookletUnitNavigationControls
@@ -124,6 +125,33 @@ const compileUnitControls = (value: string): BookletUnitNavigationControls => {
   }
 };
 
+const compilePageNavigationLabel = (
+  modernValue: string,
+  legacyValue: string
+): BookletPageNavigationLabel => {
+  switch (modernValue.trim().toUpperCase()) {
+    case "HIDDEN":
+      return "hidden";
+    case "LABEL":
+      return "label";
+    case "LIST":
+      return "list";
+    case "INDEX":
+      return "index";
+    default:
+      break;
+  }
+
+  switch (legacyValue.trim().toUpperCase()) {
+    case "OFF":
+      return "hidden";
+    case "FULL":
+      return "list";
+    default:
+      return "index";
+  }
+};
+
 const warningMinutes = (value: string): number[] =>
   [...new Set(
     value
@@ -183,7 +211,14 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
         ["separate", "concat-scroll", "concat-scroll-snap", "buttons"] as const,
         "separate"
       ),
-      restoreCurrentPageOnReturn: on(read("restore_current_page_on_return"), false)
+      restoreCurrentPageOnReturn: on(read("restore_current_page_on_return"), false),
+      pageNavigation: {
+        labelMode: compilePageNavigationLabel(
+          read("navbar_page_label"),
+          read("page_navibuttons")
+        ),
+        controlsHidden: on(read("navbar_page_controls_hidden"), false)
+      }
     },
     completion: {
       lockOnTermination: on(read("lock_test_on_termination"), false)

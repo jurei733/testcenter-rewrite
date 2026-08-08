@@ -172,6 +172,8 @@ export type ParticipantVeronaPlayerState = {
   logPolicy: "disabled" | "lean" | "rich" | "debug";
   pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
   restoreCurrentPageOnReturn: boolean;
+  pageNavigationLabelMode: "hidden" | "index" | "label" | "list";
+  pageNavigationControlsHidden: boolean;
 };
 
 type ParticipantEntryIssue = {
@@ -1053,7 +1055,11 @@ export class ParticipantViewFacade {
       logPolicy: currentState.booklet.policy.player.logPolicy,
       pagingMode: currentState.booklet.policy.player.pagingMode,
       restoreCurrentPageOnReturn:
-        currentState.booklet.policy.player.restoreCurrentPageOnReturn
+        currentState.booklet.policy.player.restoreCurrentPageOnReturn,
+      pageNavigationLabelMode:
+        currentState.booklet.policy.player.pageNavigation?.labelMode ?? "index",
+      pageNavigationControlsHidden:
+        currentState.booklet.policy.player.pageNavigation?.controlsHidden ?? false
     };
   }
 

@@ -15,6 +15,10 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.timing.showTimeLeft, false);
   assert.equal(defaults.display.reloadButton, false);
   assert.equal(defaults.display.silentMode, false);
+  assert.deepEqual(defaults.player.pageNavigation, {
+    labelMode: "index",
+    controlsHidden: false
+  });
   assert.deepEqual(defaults.timing.warningMinutes, [5, 1]);
   assert.deepEqual(defaults.persistence, {
     unitResponsesBufferMs: 5_000,
@@ -36,6 +40,8 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     pagingMode: "concat-scroll-snap",
     logPolicy: "debug",
     restore_current_page_on_return: "ON",
+    navbar_page_label: "LABEL",
+    navbar_page_controls_hidden: "TRUE",
     lock_test_on_termination: "ON",
     toolbar_show_reload_button: "TRUE",
     silent_mode: "TRUE",
@@ -57,6 +63,10 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   );
   assert.equal(policy.player.logPolicy, "debug");
   assert.equal(policy.player.restoreCurrentPageOnReturn, true);
+  assert.deepEqual(policy.player.pageNavigation, {
+    labelMode: "label",
+    controlsHidden: true
+  });
   assert.equal(policy.completion.lockOnTermination, true);
   assert.equal(policy.display.reloadButton, true);
   assert.equal(policy.display.silentMode, true);
@@ -79,6 +89,21 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
       test_state_buffer_time: ""
     }).persistence,
     defaults.persistence
+  );
+  assert.deepEqual(
+    compileBookletRuntimePolicy({ page_navibuttons: "OFF" }).player
+      .pageNavigation,
+    { labelMode: "hidden", controlsHidden: false }
+  );
+  assert.deepEqual(
+    compileBookletRuntimePolicy({ page_navibuttons: "FULL" }).player
+      .pageNavigation,
+    { labelMode: "list", controlsHidden: false }
+  );
+  assert.deepEqual(
+    compileBookletRuntimePolicy({ page_navibuttons: "SEPARATE_BOTTOM" }).player
+      .pageNavigation,
+    { labelMode: "index", controlsHidden: false }
   );
 });
 

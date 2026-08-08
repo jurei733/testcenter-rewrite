@@ -349,6 +349,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [logPolicy]="verona.logPolicy"
             [pagingMode]="verona.pagingMode"
             [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
+            [pageNavigationLabelMode]="verona.pageNavigationLabelMode"
+            [pageNavigationControlsHidden]="verona.pageNavigationControlsHidden"
             [saveStatus]="view.veronaSaveStatus"
             [loadingLabel]="view.veronaLoadingLabel"
             [loadingTitle]="view.veronaLoadingTitle"
