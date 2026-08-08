@@ -11000,6 +11000,7 @@ const validateZipXmlEntries = (
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
   const validatedPlayerKeys = new Set<string>();
+  const bookletSourceFileById = new Map<string, string>();
   const manifestResources = collectXmlManifestResources(
     manifestExtraction.manifestText
   );
@@ -11027,6 +11028,25 @@ const validateZipXmlEntries = (
     diagnostics.push(
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
+    const bookletEntry = collectXmlBookletEntries(
+      sourceDocument,
+      "Booklet"
+    )[0];
+    if (bookletEntry?.bookletKey) {
+      const existingSourceFile = bookletSourceFileById.get(
+        bookletEntry.bookletKey
+      );
+      if (existingSourceFile) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_id_duplicate",
+            `Original Testcenter ZIP entries '${existingSourceFile}' and '${entry.fileName}' contain duplicate booklet id '${bookletEntry.bookletKey}'.`
+          )
+        );
+      } else {
+        bookletSourceFileById.set(bookletEntry.bookletKey, entry.fileName);
+      }
+    }
     for (const systemCheck of parseSystemCheckSourceDocument(sourceDocument)) {
       if (!systemCheck.unitKey) {
         continue;

@@ -9061,6 +9061,98 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
 });
 
+test("original Testcenter compatibility corpus rejects duplicate Booklet identities across files", async () => {
+  type BookletIdentityCollision = {
+    fixture: string;
+    sourcePath: string;
+    collidesWithSourcePath: string;
+    bookletKey: string;
+    sha256: string;
+    diagnosticCode: string;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as {
+    bookletIdentityCollisions: BookletIdentityCollision[];
+  };
+  const expectation = corpus.bookletIdentityCollisions[0];
+  assert.ok(expectation);
+  const sourceDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.fixture),
+    "utf8"
+  );
+  assert.equal(
+    createHash("sha256").update(sourceDocument).digest("hex"),
+    expectation.sha256,
+    expectation.sourcePath
+  );
+  assert.match(
+    sourceDocument,
+    new RegExp(`<Id>\\s*${expectation.bookletKey.replaceAll(".", "\\.")}\\s*</Id>`)
+  );
+
+  const tenantKey = "integration-tenant-original-booklet-identity";
+  const workspaceKey = "integration-workspace-original-booklet-identity";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackages: Array<{ sourcePackageId: string }> = [];
+  for (const fileName of ["Booklet.xml", "Booklet_sameBookletID.xml"]) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName,
+        mediaType: "application/xml",
+        sourceDocument
+      }
+    });
+    assert.equal(
+      upload.status,
+      201,
+      `${expectation.sourcePath} colliding with ${expectation.collidesWithSourcePath}`
+    );
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const assembly = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-package-assemblies`,
+    {
+      method: "POST",
+      body: {
+        fileName: "duplicate-booklet-identities.zip",
+        sourcePackageIds: sourcePackages.map(
+          sourcePackage => sourcePackage.sourcePackageId
+        )
+      }
+    }
+  );
+  assert.equal(assembly.status, 201);
+  assert.equal(assembly.body.importJob.status, "failed");
+  assert.deepEqual(
+    assembly.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    [expectation.diagnosticCode]
+  );
+  assert.match(
+    assembly.body.importJob.diagnostics[0]?.message ?? "",
+    /Booklet\.xml.*Booklet_sameBookletID\.xml.*BOOKLET\.SAMPLE-100/
+  );
+  assert.equal(assembly.body.stagedContentRelease, null);
+});
+
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
   type AdaptiveDependencyPackage = {
     bookletFixture: string;

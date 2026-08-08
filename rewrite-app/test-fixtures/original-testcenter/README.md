@@ -24,7 +24,10 @@ The corpus also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, SysCheck, and Testtakers structures plus
 duplicate runtime identities. The matching original repeated-Unit-ID fixture
 proves that an explicit alias remains valid while duplicate Unit runtime keys
-and duplicate Testlet IDs are rejected. It also contains the byte-exact
+and duplicate Testlet IDs are rejected. The byte-identical original
+`Booklet.xml`/`Booklet_sameBookletID.xml` collision pair additionally proves
+that different package filenames cannot hide a duplicate Booklet metadata ID.
+It also contains the byte-exact
 original sample `.itcr.zip` resource package as base64 so the binary fixture
 remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as
 Brotli-compressed base64 together with the complete original three-unit 17.4

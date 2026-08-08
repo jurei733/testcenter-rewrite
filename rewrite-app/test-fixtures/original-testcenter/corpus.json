@@ -690,6 +690,16 @@
       "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "cpy"]
     }
   ],
+  "bookletIdentityCollisions": [
+    {
+      "fixture": "booklets/Booklet_sameBookletID.xml",
+      "sourcePath": "e2e/src/fixtures/Booklet_sameBookletID.xml",
+      "collidesWithSourcePath": "e2e/src/fixtures/Booklet.xml",
+      "bookletKey": "BOOKLET.SAMPLE-100",
+      "sha256": "53f9ac2009f1cc04e2e59c3c4b5ff06d591cb9989f5cfea57e71c8890010adc6",
+      "diagnosticCode": "testcenter_xml_booklet_id_duplicate"
+    }
+  ],
   "invalidXml": [
     {
       "fixture": "invalid/Booklet_error.xml",
