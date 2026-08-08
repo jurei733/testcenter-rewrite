@@ -151,6 +151,7 @@ type ParticipantPlayerUnitItem = {
   statusLabel: string;
   accessibilityLabel: string;
   isCurrent: boolean;
+  isLocked: boolean;
   hasResponse: boolean;
   canOpen: boolean;
 };
@@ -612,6 +613,7 @@ export class ParticipantViewFacade {
           unit.isLocked ? "locked" : "available"
         ].join(", "),
         isCurrent,
+        isLocked: unit.isLocked,
         hasResponse,
         canOpen:
           canNavigateUnits &&
@@ -1707,16 +1709,20 @@ export class ParticipantViewFacade {
         this.goToNextUnit();
         break;
       case "first": {
-        const firstUnit = this.player.unitItems[0];
-        if (firstUnit) {
-          this.goToUnit(firstUnit.unitKey);
+        if (this.player.canGoPreviousUnit) {
+          this.presentNavigationAdvisory("backward");
+          this.viewState.onActionAsync(() =>
+            this.goToPlayerUnitInternal("first")
+          );
         }
         break;
       }
       case "last": {
-        const lastUnit = this.player.unitItems.at(-1);
-        if (lastUnit) {
-          this.goToUnit(lastUnit.unitKey);
+        if (this.player.canGoNextUnit) {
+          this.presentNavigationAdvisory("forward");
+          this.viewState.onActionAsync(() =>
+            this.goToPlayerUnitInternal("last")
+          );
         }
         break;
       }
@@ -2310,7 +2316,7 @@ export class ParticipantViewFacade {
   }
 
   private async goToPlayerUnitInternal(
-    target: "previous" | "next" | string
+    target: "previous" | "next" | "first" | "last" | string
   ): Promise<void> {
     await this.settleVeronaAutoSaveBeforeForegroundAction();
     this.veronaForegroundSaveSettlement = true;
@@ -2321,7 +2327,15 @@ export class ParticipantViewFacade {
           ? player.previousUnitKey
           : target === "next"
             ? player.nextUnitKey
-            : target.trim();
+            : target === "first"
+              ? player.unitItems.find(unit => !unit.isCurrent && !unit.isLocked)
+                  ?.unitKey ?? null
+              : target === "last"
+                ? [...player.unitItems]
+                    .reverse()
+                    .find(unit => !unit.isCurrent && !unit.isLocked)?.unitKey ??
+                  null
+                : target.trim();
       if (!targetUnitKey) {
         return;
       }
@@ -2329,7 +2343,9 @@ export class ParticipantViewFacade {
       const targetUnit = player.unitItems.find(
         unit => unit.unitKey === targetUnitKey
       );
-      const usesUnitMenu = target !== "previous" && target !== "next";
+      const usesUnitMenu = !["previous", "next", "first", "last"].includes(
+        target
+      );
       if (
         targetUnitKey === player.unitKey ||
         !targetUnit ||

@@ -5710,6 +5710,8 @@ try {
           </Metadata>
           <BookletConfig>
             <Config key="paging_mode">separate</Config>
+            <Config key="unit_menu">OFF</Config>
+            <Config key="unit_navibuttons">OFF</Config>
           </BookletConfig>
           <Units>
             <Unit id="${legacyPlayerFirstUnitKey}" label="Legacy first unit" />
@@ -5841,6 +5843,8 @@ try {
   await legacyPlayerFrame
     .getByText("Official Verona 3 first unit", { exact: true })
     .waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
   const legacyPlayerAnswer = legacyPlayerFrame.locator(
     "input[name='legacy-answer']"
   );
@@ -5871,6 +5875,22 @@ try {
     },
     30_000
   );
+  await legacyPlayerFrame.locator("#last-unit").dispatchEvent("click");
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: legacyPlayerSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame
+    .getByText("Official Verona 3 second unit", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame.locator("#first-unit").dispatchEvent("click");
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: legacyPlayerFirstUnitKey })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame
+    .getByText("Official Verona 3 first unit", { exact: true })
+    .waitFor({ timeout: 30_000 });
   await legacyPlayerFrame.locator("#next-unit").dispatchEvent("click");
   await page
     .locator("#participantRouteUnitKey")
