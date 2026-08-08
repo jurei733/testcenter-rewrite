@@ -2223,6 +2223,58 @@ test("attachment manager imports capture requests and enforces monitor scope", a
   assert.equal(deleted.body.attachment.dataType, "missing");
   assert.deepEqual(deleted.body.attachment.attachmentFileIds, []);
 
+  const missingMultipartFile = new FormData();
+  missingMultipartFile.set("type", "image");
+  const missingMultipartResponse = await fetch(
+    `${baseUrl}${attachmentPath}/files?type=image`,
+    {
+      method: "POST",
+      headers: { authorization: groupAuthorization },
+      body: missingMultipartFile
+    }
+  );
+  assert.equal(missingMultipartResponse.status, 400);
+  assert.equal(
+    (await missingMultipartResponse.json()).error,
+    "invalid_multipart_attachment"
+  );
+
+  const originalCaptureForm = new FormData();
+  originalCaptureForm.set("type", "image");
+  originalCaptureForm.set(
+    "attachment",
+    new Blob([Buffer.from(onePixelPng, "base64")], { type: "image/png" }),
+    "original capture.png"
+  );
+  const multipartUploadResponse = await fetch(
+    `${baseUrl}${attachmentPath}/files?type=image`,
+    {
+      method: "POST",
+      headers: { authorization: groupAuthorization },
+      body: originalCaptureForm
+    }
+  );
+  assert.equal(multipartUploadResponse.status, 201);
+  const multipartUpload = (await multipartUploadResponse.json()) as {
+    attachment: { dataType: string; attachmentFileIds: string[] };
+  };
+  assert.equal(multipartUpload.attachment.dataType, "image");
+  assert.equal(multipartUpload.attachment.attachmentFileIds.length, 1);
+  const multipartAttachmentFileId =
+    multipartUpload.attachment.attachmentFileIds[0];
+  assert.ok(multipartAttachmentFileId);
+  const multipartDeleted = await requestJson<{
+    attachment: { dataType: string; attachmentFileIds: string[] };
+  }>(
+    `${attachmentPath}/files/${encodeURIComponent(multipartAttachmentFileId)}`,
+    {
+      method: "DELETE",
+      headers: { authorization: groupAuthorization }
+    }
+  );
+  assert.equal(multipartDeleted.status, 200);
+  assert.equal(multipartDeleted.body.attachment.dataType, "missing");
+
   const allActivity = await requestJson<{
     items: Array<{
       activityEvent: {
@@ -2243,7 +2295,12 @@ test("attachment manager imports capture requests and enforces monitor scope", a
       )
       .map(item => item.activityEvent.eventType)
       .sort(),
-    ["attachment_file_deleted", "attachment_file_uploaded"]
+    [
+      "attachment_file_deleted",
+      "attachment_file_deleted",
+      "attachment_file_uploaded",
+      "attachment_file_uploaded"
+    ]
   );
 });
 

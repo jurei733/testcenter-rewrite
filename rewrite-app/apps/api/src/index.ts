@@ -1402,6 +1402,134 @@ class RequestBodyTooLargeError extends Error {
   }
 }
 
+class InvalidMultipartBodyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMultipartBodyError";
+  }
+}
+
+type AttachmentUploadBody = {
+  fileName: string;
+  mediaType: string;
+  dataBase64: string;
+};
+
+const readRequestBuffer = async (
+  request: IncomingMessage,
+  maxBytes: number
+): Promise<Buffer> => {
+  const contentLengthHeader = request.headers["content-length"];
+  const contentLength =
+    typeof contentLengthHeader === "string" && /^\d+$/.test(contentLengthHeader)
+      ? Number.parseInt(contentLengthHeader, 10)
+      : null;
+  if (contentLength !== null && contentLength > maxBytes) {
+    throw new RequestBodyTooLargeError(maxBytes);
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of request) {
+    const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxBytes) {
+      throw new RequestBodyTooLargeError(maxBytes);
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+};
+
+const parseMultipartBoundary = (contentType: string): string => {
+  const match = /(?:^|;)\s*boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
+  const boundary = match?.[1] ?? match?.[2] ?? "";
+  if (!boundary || boundary.length > 200 || /[\r\n]/.test(boundary)) {
+    throw new InvalidMultipartBodyError(
+      "Multipart attachment upload requires a valid boundary."
+    );
+  }
+  return boundary;
+};
+
+const parseContentDispositionParameter = (
+  disposition: string,
+  parameter: string
+): string | null => {
+  const quoted = new RegExp(`${parameter}="([^"]*)"`, "i").exec(disposition);
+  if (quoted) return quoted[1] ?? "";
+  const bare = new RegExp(`${parameter}=([^;\\s]+)`, "i").exec(disposition);
+  return bare?.[1] ?? null;
+};
+
+const readMultipartAttachmentUpload = async (
+  request: IncomingMessage,
+  contentType: string,
+  maxBytes: number
+): Promise<AttachmentUploadBody> => {
+  const boundary = parseMultipartBoundary(contentType);
+  const body = await readRequestBuffer(request, maxBytes);
+  const boundaryMarker = Buffer.from(`--${boundary}`, "utf8");
+  const nextBoundaryMarker = Buffer.from(`\r\n--${boundary}`, "utf8");
+  let cursor = body.indexOf(boundaryMarker);
+  let upload: AttachmentUploadBody | null = null;
+
+  while (cursor >= 0) {
+    cursor += boundaryMarker.byteLength;
+    if (body.subarray(cursor, cursor + 2).equals(Buffer.from("--"))) break;
+    if (!body.subarray(cursor, cursor + 2).equals(Buffer.from("\r\n"))) {
+      throw new InvalidMultipartBodyError("Malformed multipart boundary.");
+    }
+    cursor += 2;
+    const headerEnd = body.indexOf(Buffer.from("\r\n\r\n"), cursor);
+    if (headerEnd < 0) {
+      throw new InvalidMultipartBodyError("Malformed multipart part headers.");
+    }
+    const headers = body.subarray(cursor, headerEnd).toString("latin1");
+    const contentDisposition = /^content-disposition:\s*(.+)$/im.exec(headers)?.[1];
+    if (!contentDisposition) {
+      throw new InvalidMultipartBodyError(
+        "Multipart attachment part is missing Content-Disposition."
+      );
+    }
+    const fieldName = parseContentDispositionParameter(
+      contentDisposition,
+      "name"
+    );
+    const fileName = parseContentDispositionParameter(
+      contentDisposition,
+      "filename"
+    );
+    const dataStart = headerEnd + 4;
+    const nextBoundary = body.indexOf(nextBoundaryMarker, dataStart);
+    if (nextBoundary < 0) {
+      throw new InvalidMultipartBodyError("Multipart body is not terminated.");
+    }
+
+    if (fieldName === "attachment" && fileName !== null) {
+      if (upload) {
+        throw new InvalidMultipartBodyError(
+          "Upload exactly one attachment file per request."
+        );
+      }
+      const mediaType = /^content-type:\s*([^;\r\n]+)/im.exec(headers)?.[1];
+      upload = {
+        fileName,
+        mediaType: mediaType?.trim() ?? "application/octet-stream",
+        dataBase64: body.subarray(dataStart, nextBoundary).toString("base64")
+      };
+    }
+    cursor = nextBoundary + 2;
+  }
+
+  if (!upload) {
+    throw new InvalidMultipartBodyError(
+      "Multipart attachment upload requires an 'attachment' file field."
+    );
+  }
+  return upload;
+};
+
 const readJsonBody = async <T>(
   request: IncomingMessage,
   maxJsonBodyBytes: number
@@ -4830,8 +4958,17 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           );
           return;
         }
-        const body =
-          await readSourcePackageRequestJsonBody<UploadAttachmentFileRequest>();
+        const contentTypeHeader = request.headers["content-type"];
+        const contentType = Array.isArray(contentTypeHeader)
+          ? contentTypeHeader[0] ?? ""
+          : contentTypeHeader ?? "";
+        const body = /^multipart\/form-data(?:;|$)/i.test(contentType)
+          ? await readMultipartAttachmentUpload(
+              request,
+              contentType,
+              runtime.config.maxSourcePackageJsonBodyBytes
+            )
+          : await readSourcePackageRequestJsonBody<UploadAttachmentFileRequest>();
         const attachment = await services.attachments.uploadAttachmentFile({
           sessionToken,
           tenantKey,
@@ -7347,6 +7484,16 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           "request_body_too_large",
           "Request body exceeds the configured JSON payload limit.",
           { maxJsonBodyBytes: error.maxJsonBodyBytes }
+        );
+        return;
+      }
+
+      if (error instanceof InvalidMultipartBodyError) {
+        sendError(
+          response,
+          400,
+          "invalid_multipart_attachment",
+          error.message
         );
         return;
       }
