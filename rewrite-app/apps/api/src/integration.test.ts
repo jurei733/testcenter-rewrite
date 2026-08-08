@@ -10470,37 +10470,52 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
     resolve(originalTestcenterCorpusRoot, expectation.playerFixture),
     "utf8"
   );
-  const zipPayload = createZipBase64([
-    {
-      fileName: "export/imsmanifest.xml",
-      content: `
-        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
-          <resources>
-            <resource identifier="${expectation.bookletKey}" href="booklets/Booklet2.xml" />
-            <resource identifier="UNIT.SAMPLE-2" href="units/Unit2.xml" />
-            <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
-            <resource identifier="${expectation.playerKey}" href="players/verona-player-simple-6.0.html" />
-          </resources>
-        </manifest>
-      `
-    },
-    {
-      fileName: "export/booklets/Booklet2.xml",
-      content: bookletDocument
-    },
-    {
-      fileName: "export/units/Unit2.xml",
-      content: unitDocument
-    },
-    {
-      fileName: "export/schemes/coding-scheme.vocs.json",
-      content: codingSchemeDocument
-    },
-    {
-      fileName: "export/players/verona-player-simple-6.0.html",
-      content: playerDocument
-    }
-  ]);
+  const createAdaptiveZipPayload = (
+    bookletContent: string,
+    options: {
+      unitContent?: string;
+      variablesContent?: string;
+    } = {}
+  ): string =>
+    createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="${expectation.bookletKey}" href="booklets/Booklet2.xml" />
+              <resource identifier="UNIT.SAMPLE-2" href="units/Unit2.xml" />
+              <resource identifier="coding-scheme.vocs.json" href="schemes/coding-scheme.vocs.json" />
+              <resource identifier="${expectation.playerKey}" href="players/verona-player-simple-6.0.html" />
+              ${options.variablesContent ? '<resource identifier="variables.xml" href="units/variables.xml" />' : ""}
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet2.xml",
+        content: bookletContent
+      },
+      {
+        fileName: "export/units/Unit2.xml",
+        content: options.unitContent ?? unitDocument
+      },
+      ...(options.variablesContent
+        ? [{
+            fileName: "export/units/variables.xml",
+            content: options.variablesContent
+          }]
+        : []),
+      {
+        fileName: "export/schemes/coding-scheme.vocs.json",
+        content: codingSchemeDocument
+      },
+      {
+        fileName: "export/players/verona-player-simple-6.0.html",
+        content: playerDocument
+      }
+    ]);
+  const zipPayload = createAdaptiveZipPayload(bookletDocument);
 
   const tenantKey = "integration-tenant-original-adaptive-package";
   const workspaceKey = "integration-workspace-original-adaptive-package";
@@ -10512,6 +10527,90 @@ test("original Testcenter compatibility corpus executes adaptive ZIP dependencie
     method: "POST",
     body: { workspaceKey, displayName: workspaceKey }
   });
+  const invalidVariablePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-adaptive-missing-variable.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createAdaptiveZipPayload(
+        bookletDocument.replace('of="derived_var"', 'of="missing_var"')
+      )}`
+    }
+  });
+  const invalidVariableImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        invalidVariablePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(invalidVariableImport.status, 201);
+  assert.equal(invalidVariableImport.body.importJob.status, "failed");
+  assert.ok(
+    invalidVariableImport.body.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_adaptive_variable_missing"
+    )
+  );
+  assert.equal(invalidVariableImport.body.stagedContentRelease, null);
+
+  const externalVariablesDocument = `
+    <Variables>
+      <BaseVariables>
+        ${[1, 2, 3, 4, 5, 6]
+          .map(id => `<Variable id="var${id}" type="string" />`)
+          .join("\n")}
+      </BaseVariables>
+      <DerivedVariables>
+        <Variable id="derived_var" type="number" />
+      </DerivedVariables>
+    </Variables>
+  `;
+  const externalVariablesUnitDocument = unitDocument
+    .replace(/\s*<BaseVariables>[\s\S]*?<\/BaseVariables>/, "")
+    .replace(
+      /\s*<DerivedVariables>[\s\S]*?<\/DerivedVariables>/,
+      "\n\n  <VariablesRef>variables.xml</VariablesRef>"
+    );
+  const externalVariablesPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-adaptive-external-variables.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createAdaptiveZipPayload(
+        bookletDocument,
+        {
+          unitContent: externalVariablesUnitDocument,
+          variablesContent: externalVariablesDocument
+        }
+      )}`
+    }
+  });
+  const externalVariablesImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        externalVariablesPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(externalVariablesImport.status, 201);
+  assert.equal(
+    externalVariablesImport.body.importJob.status,
+    "completed",
+    JSON.stringify(externalVariablesImport.body.importJob.diagnostics)
+  );
+  assert.ok(externalVariablesImport.body.stagedContentRelease?.contentReleaseId);
+
   const sourcePackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {

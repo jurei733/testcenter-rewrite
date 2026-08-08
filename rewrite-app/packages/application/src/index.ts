@@ -12288,6 +12288,90 @@ const normalizeParsedZipXmlContentStructure = (
   };
 };
 
+const parseTestcenterXmlRoot = (sourceDocument: string): XmlElement | null => {
+  const parserErrors: string[] = [];
+  try {
+    const document = new DOMParser({
+      onError(_level, message) {
+        parserErrors.push(message);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+    return parserErrors.length === 0 ? document?.documentElement ?? null : null;
+  } catch {
+    return null;
+  }
+};
+
+const collectTestcenterVariableIds = (root: XmlElement): Set<string> => {
+  const variableIds = new Set<string>();
+  for (const containerName of ["BaseVariables", "DerivedVariables"]) {
+    const containers = [
+      ...(xmlElementLocalName(root) === containerName ? [root] : []),
+      ...xmlDescendantsNamed(root, containerName)
+    ];
+    for (const container of containers) {
+      for (const variable of xmlDescendantsNamed(container, "Variable")) {
+        const variableId = variable.getAttribute("id")?.trim() ?? "";
+        if (variableId) {
+          variableIds.add(variableId);
+        }
+      }
+    }
+  }
+  return variableIds;
+};
+
+type TestcenterAdaptiveVariableReference = {
+  bookletFileName: string;
+  bookletId: string;
+  unitRuntimeKey: string;
+  unitId: string;
+  variableId: string;
+  sourceType: string;
+};
+
+const collectTestcenterAdaptiveVariableReferences = (
+  sourceDocument: string,
+  bookletFileName: string
+): TestcenterAdaptiveVariableReference[] => {
+  const root = parseTestcenterXmlRoot(sourceDocument);
+  if (!root || xmlElementLocalName(root) !== "Booklet") {
+    return [];
+  }
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  const bookletId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+  const units = xmlChildrenNamed(root, "Units")[0];
+  const unitIdByRuntimeKey = new Map<string, string>();
+  for (const unit of units ? xmlDescendantsNamed(units, "Unit") : []) {
+    const unitId = unit.getAttribute("id")?.trim() ?? "";
+    const unitRuntimeKey = unit.getAttribute("alias")?.trim() || unitId;
+    if (unitId && unitRuntimeKey && !unitIdByRuntimeKey.has(unitRuntimeKey)) {
+      unitIdByRuntimeKey.set(unitRuntimeKey, unitId);
+    }
+  }
+  const states = xmlChildrenNamed(root, "States")[0];
+  if (!states) {
+    return [];
+  }
+  return testcenterBookletVariableSourceNames.flatMap(sourceType =>
+    xmlDescendantsNamed(states, sourceType).flatMap(source => {
+      const unitRuntimeKey = source.getAttribute("from")?.trim() ?? "";
+      const variableId = source.getAttribute("of")?.trim() ?? "";
+      const unitId = unitIdByRuntimeKey.get(unitRuntimeKey) ?? "";
+      return unitRuntimeKey && variableId && unitId
+        ? [{
+            bookletFileName,
+            bookletId,
+            unitRuntimeKey,
+            unitId,
+            variableId,
+            sourceType
+          }]
+        : [];
+    })
+  );
+};
+
 const validateZipXmlEntries = (
   manifestExtraction: Extract<ZipManifestExtractionResult, { status: "found" }>
 ): ImportJobDiagnostic[] => {
@@ -12340,6 +12424,85 @@ const validateZipXmlEntries = (
       );
     } else {
       manifestResourceIdentifierByKey.set(identityKey, resourceIdentifier);
+    }
+  }
+  const unitVariablesById = new Map<
+    string,
+    { sourceFileName: string; variableIds: Set<string> }
+  >();
+  const adaptiveVariableReferences: TestcenterAdaptiveVariableReference[] = [];
+  for (const entry of manifestExtraction.entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !entry.fileName.toLowerCase().endsWith(".xml")
+    ) {
+      continue;
+    }
+    const sourceDocument = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    if (sourceDocument === null) {
+      continue;
+    }
+    adaptiveVariableReferences.push(
+      ...collectTestcenterAdaptiveVariableReferences(
+        sourceDocument,
+        entry.fileName
+      )
+    );
+    const root = parseTestcenterXmlRoot(sourceDocument);
+    if (!root || xmlElementLocalName(root) !== "Unit") {
+      continue;
+    }
+    const metadata = xmlChildrenNamed(root, "Metadata")[0];
+    const unitId = xmlElementText(xmlChildrenNamed(metadata ?? root, "Id")[0]);
+    if (!unitId) {
+      continue;
+    }
+    const variableIds = collectTestcenterVariableIds(root);
+    const declaredUnitReferences =
+      extractDeclaredTestcenterUnitCrossReferences(sourceDocument);
+    if (declaredUnitReferences?.variablesReference) {
+      const variablesEntry = findZipUnitReferencedEntry(
+        manifestExtraction,
+        entry,
+        declaredUnitReferences.variablesReference,
+        manifestResources
+      );
+      const variablesDocument = variablesEntry
+        ? readZipEntryText(manifestExtraction.zipBuffer, variablesEntry)
+        : null;
+      const variablesRoot = variablesDocument
+        ? parseTestcenterXmlRoot(variablesDocument)
+        : null;
+      if (variablesRoot) {
+        for (const variableId of collectTestcenterVariableIds(variablesRoot)) {
+          variableIds.add(variableId);
+        }
+      }
+    }
+    if (!unitVariablesById.has(unitId.toLowerCase())) {
+      unitVariablesById.set(unitId.toLowerCase(), {
+        sourceFileName: entry.fileName,
+        variableIds
+      });
+    }
+  }
+  for (const reference of adaptiveVariableReferences) {
+    const unitVariables = unitVariablesById.get(reference.unitId.toLowerCase());
+    if (
+      unitVariables &&
+      !unitVariables.variableIds.has(reference.variableId)
+    ) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_adaptive_variable_missing",
+          `Adaptive ${reference.sourceType} source '${reference.variableId}' in booklet ZIP entry '${reference.bookletFileName}' (` +
+            `${reference.bookletId || "unknown"}) uses Unit runtime key '${reference.unitRuntimeKey}', but Unit '${reference.unitId}' ` +
+            `in '${unitVariables.sourceFileName}' does not declare that variable.`
+        )
+      );
     }
   }
   for (const entry of manifestExtraction.entries) {
