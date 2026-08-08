@@ -8618,6 +8618,51 @@ const validateTestcenterXmlSourceDocument = (
           )
         );
       }
+      const normalizedAccessBoundaries = new Map<string, string>();
+      for (const attributeName of ["validFrom", "validTo"]) {
+        const value = group.getAttribute(attributeName);
+        if (value === null) {
+          continue;
+        }
+        const normalized = normalizeParticipantAccessBoundary(value);
+        if (
+          !/^\d{1,2}\/\d{1,2}\/\d{2,4}\W\d{1,2}:\d{2}$/.test(value) ||
+          !normalized
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_group_access_boundary_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid Group/@${attributeName} '${value}' for '${group.getAttribute("id")?.trim() || "unknown"}'.`
+            )
+          );
+        } else {
+          normalizedAccessBoundaries.set(attributeName, normalized);
+        }
+      }
+      const validFrom = normalizedAccessBoundaries.get("validFrom");
+      const validTo = normalizedAccessBoundaries.get("validTo");
+      if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_group_access_window_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains Group/@validFrom after Group/@validTo for '${group.getAttribute("id")?.trim() || "unknown"}'.`
+          )
+        );
+      }
+      const validFor = group.getAttribute("validFor");
+      if (
+        validFor !== null &&
+        (!isTestcenterXmlInteger(validFor) ||
+          !Number.isSafeInteger(Number(validFor)) ||
+          Number(validFor) <= 0)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_group_valid_for_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains invalid Group/@validFor '${validFor}' for '${group.getAttribute("id")?.trim() || "unknown"}'.`
+          )
+        );
+      }
     }
     for (const login of logins) {
       if (!login.getAttribute("name")?.trim()) {

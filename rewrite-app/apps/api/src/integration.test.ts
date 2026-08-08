@@ -9951,6 +9951,27 @@ test("original Testcenter compatibility corpus imports representative booklets",
         '<CustomText key="somestr">string</CustomText><CustomText key="somestr">duplicate</CustomText>'
       ),
       diagnosticCode: "testcenter_xml_custom_text_key_duplicate"
+    },
+    {
+      label: "invalid group access boundary",
+      rosterText: validRosterXml.replace(
+        'validFrom="1/3/2020 10:00"',
+        'validFrom="31/2/2020 10:00"'
+      ),
+      diagnosticCode: "testcenter_xml_group_access_boundary_invalid"
+    },
+    {
+      label: "inverted group access window",
+      rosterText: validRosterXml.replace(
+        'validFrom="1/3/2020 10:00"',
+        'validFrom="2/3/2020 10:00" validTo="1/3/2020 10:00"'
+      ),
+      diagnosticCode: "testcenter_xml_group_access_window_invalid"
+    },
+    {
+      label: "non-positive group relative lifetime",
+      rosterText: validRosterXml.replace('validFor="45"', 'validFor="0"'),
+      diagnosticCode: "testcenter_xml_group_valid_for_invalid"
     }
   ];
   for (const rosterFacetCase of invalidRosterFacetCases) {
