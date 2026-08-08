@@ -645,6 +645,14 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
 
+  get preventBrowserNavigation(): boolean {
+    return this.view.preventBrowserNavigation;
+  }
+
+  notifyBrowserNavigationPrevented(): void {
+    this.view.notifyBrowserNavigationPrevented();
+  }
+
   ngOnInit(): void {
     this.view.init();
     const query = new URLSearchParams(window.location.search);

@@ -329,6 +329,33 @@ export class ParticipantViewFacade {
     this.startTimerTicker();
   }
 
+  get preventBrowserNavigation(): boolean {
+    const currentState = this.readCurrentRunState();
+    return Boolean(
+      currentState?.testRun.status === "running" &&
+        currentState.currentUnit.unitKey &&
+        currentState.booklet.policy.navigation.browserNavigation === "prevent"
+    );
+  }
+
+  notifyBrowserNavigationPrevented(): void {
+    const currentState = this.readCurrentRunState();
+    if (!currentState || currentState.booklet.policy.display.silentMode) {
+      return;
+    }
+    this.clearNavigationAdvisory();
+    this.navigationAdvisory.set({
+      title: "Browser navigation disabled",
+      message:
+        "Use the test controls to move between tasks or complete the test."
+    });
+    this.navigationAdvisoryTimeout =
+      globalThis.window?.setTimeout(() => {
+        this.navigationAdvisoryTimeout = null;
+        this.navigationAdvisory.set(null);
+      }, 8_000) ?? null;
+  }
+
   destroy(): void {
     if (this.timerTickerHandle != null) {
       globalThis.window?.clearInterval(this.timerTickerHandle);

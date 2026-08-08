@@ -11143,6 +11143,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
     navigation: {
       requirePresentationComplete: string;
       requireResponseComplete: string;
+      browserNavigation: string;
       unitMenuEnabled: boolean;
       unitControls: string;
       playerEnd: string;
@@ -11212,6 +11213,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       navigation: {
         requirePresentationComplete: "off",
         requireResponseComplete: "off",
+        browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
         playerEnd: "always"
@@ -11238,6 +11240,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       navigation: {
         requirePresentationComplete: "off",
         requireResponseComplete: "off",
+        browserNavigation: "standard",
         unitMenuEnabled: true,
         unitControls: "hidden",
         playerEnd: "never"
@@ -11264,6 +11267,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       navigation: {
         requirePresentationComplete: "off",
         requireResponseComplete: "off",
+        browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
         playerEnd: "last_unit"
@@ -11290,6 +11294,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       navigation: {
         requirePresentationComplete: "off",
         requireResponseComplete: "off",
+        browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
         playerEnd: "always"
@@ -16246,6 +16251,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
           </Metadata>
           <BookletConfig>
             <Config key="force_response_complete">ON</Config>
+            <Config key="browserBehaviour">preventNav</Config>
             <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
             <Config key="pagingMode">concat-scroll</Config>
             <Config key="logPolicy">debug</Config>
@@ -16382,6 +16388,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.navigation, {
     requirePresentationComplete: "off",
     requireResponseComplete: "forward",
+    browserNavigation: "prevent",
     unitMenuEnabled: false,
     unitControls: "both",
     playerEnd: "last_unit"
@@ -20190,6 +20197,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
           <BookletConfig>
             <Config key="force_presentation_complete">ALWAYS</Config>
             <Config key="force_response_complete">ON</Config>
+            <Config key="browserBehaviour">preventNav</Config>
             <Config key="unit_menu">FULL</Config>
             <Config key="unit_navibuttons">FORWARD_ONLY</Config>
             <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
@@ -20305,6 +20313,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.navigation, {
     requirePresentationComplete: "always",
     requireResponseComplete: "forward",
+    browserNavigation: "prevent",
     unitMenuEnabled: true,
     unitControls: "forward_only",
     playerEnd: "last_unit"

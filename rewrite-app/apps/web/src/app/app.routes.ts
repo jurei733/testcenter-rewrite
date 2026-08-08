@@ -4,6 +4,7 @@ import {
   rejectSystemCheckOperator,
   requireAdministrativeOperator
 } from "./rewrite-app-admin-route.guard";
+import { preventParticipantBrowserNavigation } from "./participant-navigation.guard";
 
 export const appRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "workspace" },
@@ -36,7 +37,8 @@ export const appRoutes: Routes = [
     loadComponent: () =>
       import("./participant-view.component").then(
         module => module.ParticipantViewComponent
-      )
+      ),
+    canDeactivate: [preventParticipantBrowserNavigation]
   },
   {
     path: "system-check",

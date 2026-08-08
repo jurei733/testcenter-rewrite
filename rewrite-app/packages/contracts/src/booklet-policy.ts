@@ -194,6 +194,10 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
         read("force_presentation_complete")
       ),
       requireResponseComplete: compileRestriction(read("force_response_complete")),
+      browserNavigation:
+        read("browserBehaviour").toLowerCase() === "preventnav"
+          ? "prevent"
+          : "standard",
       unitMenuEnabled: on(read("toolbar_show_unit_list", "unit_menu"), false),
       unitControls: modernUnitControlsHidden
         ? compileUnitControls(modernUnitControlsHidden)

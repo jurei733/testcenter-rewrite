@@ -5709,7 +5709,8 @@ try {
             <Label>Official Verona 3 Player</Label>
           </Metadata>
           <BookletConfig>
-            <Config key="paging_mode">separate</Config>
+            <Config key="pagingMode">separate</Config>
+            <Config key="browserBehaviour">preventNav</Config>
             <Config key="unit_menu">OFF</Config>
             <Config key="unit_navibuttons">OFF</Config>
           </BookletConfig>
@@ -5913,6 +5914,22 @@ try {
       .inputValue(),
     legacyPlayerResponse
   );
+  const legacyPlayerProtectedUrl = page.url();
+  const legacyPlayerProtectedPath = new URL(legacyPlayerProtectedUrl);
+  await page.evaluate(protectedPath => {
+    history.replaceState(history.state, "", "/app/runtime");
+    history.pushState(history.state, "", protectedPath);
+    history.back();
+  }, `${legacyPlayerProtectedPath.pathname}${legacyPlayerProtectedPath.search}`);
+  await page
+    .locator("#participantRouteNavigationNoticeTitle")
+    .filter({ hasText: "Browser navigation disabled" })
+    .waitFor({ timeout: 15_000 });
+  await page.waitForURL(legacyPlayerProtectedUrl);
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: legacyPlayerFirstUnitKey })
+    .waitFor();
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       legacyPlayerParticipantSessionId

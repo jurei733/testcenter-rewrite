@@ -763,6 +763,8 @@ export type BookletRuntimePolicy = {
   navigation: {
     requirePresentationComplete: BookletLeaveRestriction;
     requireResponseComplete: BookletLeaveRestriction;
+    /** Optional so runtime snapshots created before browser navigation policy remain readable. */
+    browserNavigation?: "standard" | "prevent";
     unitMenuEnabled: boolean;
     unitControls: BookletUnitNavigationControls;
     playerEnd: BookletPlayerEndPolicy;
