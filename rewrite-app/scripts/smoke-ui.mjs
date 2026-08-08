@@ -2297,6 +2297,116 @@ try {
     0,
     "The signed-in admin account must not be available for bulk status changes."
   );
+  const selectedAdminAccounts = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Selected Admin Accounts" })
+    });
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    workspaceAdminUsername
+  );
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    delegatedWorkspaceAdminUsername
+  );
+  await selectedAdminAccounts
+    .filter({ hasText: workspaceAdminUserId })
+    .filter({ hasText: delegatedWorkspaceAdminUserId })
+    .waitFor();
+  await expectButtonSelectorEnabled("#adminBatchResetPasswordsButton");
+  logStep("admin-user-bulk-password");
+  const resetAdminBatchPasswordDialog = acceptNextDialog(
+    /Generate and set a unique password for 2 selected admin user\(s\)\? Existing passwords will stop working immediately; active sessions are unchanged\./
+  );
+  await page.locator("#adminBatchResetPasswordsButton").click();
+  await resetAdminBatchPasswordDialog;
+  await waitForNotBusy("admin-user-bulk-password");
+  const generatedPasswordFor = async username => {
+    const credentialCard = selectedAdminAccounts
+      .locator(".record-card")
+      .filter({ has: page.getByRole("heading", { name: username, exact: true }) })
+      .filter({ hasText: "Generated password handoff" });
+    await credentialCard.waitFor();
+    return credentialCard
+      .locator('[aria-label^="Generated Password: "]')
+      .getAttribute("title");
+  };
+  const workspaceAdminGeneratedPassword = await generatedPasswordFor(
+    workspaceAdminUsername
+  );
+  const delegatedAdminGeneratedPassword = await generatedPasswordFor(
+    delegatedWorkspaceAdminUsername
+  );
+  assert.equal(workspaceAdminGeneratedPassword?.length, 24);
+  assert.equal(delegatedAdminGeneratedPassword?.length, 24);
+  assert.notEqual(
+    workspaceAdminGeneratedPassword,
+    delegatedAdminGeneratedPassword,
+    "Bulk password resets must issue a unique password for every account."
+  );
+  const persistedBrowserState = await page.evaluate(() =>
+    Object.values(globalThis.localStorage).join("\n")
+  );
+  assert.equal(persistedBrowserState.includes(workspaceAdminGeneratedPassword), false);
+  assert.equal(persistedBrowserState.includes(delegatedAdminGeneratedPassword), false);
+  await selectedAdminAccounts
+    .filter({ hasText: "Generated Passwords Awaiting Handoff" })
+    .filter({ hasText: "Last Password Failed" })
+    .waitFor();
+  const passwordCsvDownloadPromise = page.waitForEvent("download");
+  await page.locator("#downloadAdminBatchPasswordsButton").click();
+  const passwordCsvDownload = await passwordCsvDownloadPromise;
+  assert.match(
+    passwordCsvDownload.suggestedFilename(),
+    /^admin-generated-passwords-.*\.csv$/
+  );
+  const passwordCsvPath = await passwordCsvDownload.path();
+  assert.ok(passwordCsvPath);
+  const passwordCsv = await readFile(passwordCsvPath, "utf8");
+  assert.match(passwordCsv, /adminUserId,username,generatedPassword/);
+  assert.match(passwordCsv, new RegExp(workspaceAdminGeneratedPassword));
+  assert.match(passwordCsv, new RegExp(delegatedAdminGeneratedPassword));
+  await expectButtonSelectorDisabled("#downloadAdminBatchPasswordsButton");
+  assert.equal(
+    await selectedAdminAccounts
+      .locator(".record-card")
+      .filter({ hasText: "Generated password handoff" })
+      .count(),
+    0,
+    "Downloaded password credentials must be removed from the rendered batch state."
+  );
+  for (const [username, previousPassword, generatedPassword] of [
+    [workspaceAdminUsername, workspaceAdminResetPassword, workspaceAdminGeneratedPassword],
+    [
+      delegatedWorkspaceAdminUsername,
+      delegatedWorkspaceAdminPassword,
+      delegatedAdminGeneratedPassword
+    ]
+  ]) {
+    const previousPasswordResponse = await fetch(
+      `${baseUrl}/api/v1/admin/auth/sign-in`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password: previousPassword })
+      }
+    );
+    assert.equal(previousPasswordResponse.status, 401);
+    const generatedPasswordResponse = await fetch(
+      `${baseUrl}/api/v1/admin/auth/sign-in`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password: generatedPassword })
+      }
+    );
+    assert.equal(generatedPasswordResponse.status, 200);
+  }
+  stopAfter("admin-user-bulk-password");
+
   await clickCardAction(
     "Admin Users",
     "Add To Batch",
@@ -2311,11 +2421,6 @@ try {
   await fillAndCommit("#adminRoleTenantKey", tenantKey);
   await fillAndCommit("#adminRoleWorkspaceKey", workspaceKey);
   await expectButtonSelectorEnabled("#adminBatchAssignRoleButton");
-  const selectedAdminAccounts = page
-    .locator("app-record-collection")
-    .filter({
-      has: page.getByRole("heading", { name: "Selected Admin Accounts" })
-    });
   await selectedAdminAccounts
     .filter({ hasText: workspaceAdminUserId })
     .filter({ hasText: delegatedWorkspaceAdminUserId })

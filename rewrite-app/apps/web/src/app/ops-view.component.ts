@@ -518,7 +518,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <div class="actions">
           <button id="adminBatchStatusButton" class="danger" type="button" [disabled]="!view.canUpdateAdminUserBatchStatus" (click)="view.confirmUpdateAdminUserBatchStatus()">Update Selected Accounts</button>
-          <button id="clearAdminBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminUserBatchCount === 0 && !view.adminUserStatusBatchResult" (click)="view.clearAdminUserBatchSelection()">Clear Batch</button>
+          <button id="clearAdminBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminUserBatchCount === 0 && !view.adminUserStatusBatchResult && !view.adminUserRoleBatchResult && !view.adminUserPasswordBatchResult" (click)="view.clearAdminUserBatchSelection()">Clear Batch</button>
         </div>
       </article>
 
@@ -536,12 +536,27 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article id="adminUserBatchPasswordCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Bulk password handoff</span>
+            <h2>Selected Account Passwords</h2>
+          </div>
+          <span class="status-pill">{{ view.adminUserBatchCount }}/50 selected</span>
+        </div>
+        <p>Generate a different 24-character password for every selected account and apply each reset through the existing server delegation boundary. Successful credentials remain only in memory until they are downloaded or the batch is cleared; active sessions are not revoked.</p>
+        <div class="actions">
+          <button id="adminBatchResetPasswordsButton" class="danger" type="button" [disabled]="!view.canResetAdminUserBatchPasswords" (click)="view.confirmResetAdminUserBatchPasswords()">Generate Passwords For Selected Accounts</button>
+          <button id="downloadAdminBatchPasswordsButton" class="secondary" type="button" [disabled]="!view.canDownloadAdminUserBatchPasswords" (click)="view.downloadAndClearAdminUserBatchPasswords()">Download Credentials CSV &amp; Clear</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Selected Admin Accounts"
-        subtitle="Exact best-effort batch preview and the most recent per-account result."
+        subtitle="Exact best-effort batch preview, password handoff, and the most recent per-account result."
         [items]="view.adminUserBatchPreviewItems"
         (itemAction)="view.selectAdminUser($event)"
-        emptyState="No admin accounts are selected for a status change."
+        emptyState="No admin accounts are selected for a batch action."
       ></app-record-collection>
 
       <article class="card">

@@ -33,6 +33,8 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import {
   RewriteAppOpsService,
+  type AdminUserPasswordBatchCredential,
+  type AdminUserPasswordBatchResult,
   type AdminUserRoleBatchResult,
   type AdminUserStatusBatchResult
 } from "./rewrite-app-ops.service";
@@ -110,6 +112,18 @@ const localDemoAccess = {
   )
 } as const;
 
+const generatedPasswordAlphabet =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+const generateAdminPassword = (): string => {
+  const randomBytes = new Uint8Array(20);
+  globalThis.crypto.getRandomValues(randomBytes);
+  return `A7-a${Array.from(
+    randomBytes,
+    value => generatedPasswordAlphabet[value & 63]
+  ).join("")}`;
+};
+
 @Injectable({ providedIn: "root" })
 export class OpsViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -182,6 +196,7 @@ export class OpsViewFacade {
   private readonly adminUserBatchSelection = new Set<string>();
   adminUserStatusBatchResult: AdminUserStatusBatchResult | null = null;
   adminUserRoleBatchResult: AdminUserRoleBatchResult | null = null;
+  adminUserPasswordBatchResult: AdminUserPasswordBatchResult | null = null;
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
 
@@ -497,6 +512,18 @@ export class OpsViewFacade {
     );
   }
 
+  get canResetAdminUserBatchPasswords(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminUserBatchCount > 0
+    );
+  }
+
+  get canDownloadAdminUserBatchPasswords(): boolean {
+    return Boolean(this.adminUserPasswordBatchResult?.credentials.length);
+  }
+
   get adminSessionBatchCount(): number {
     return this.adminSessionBatchSelection.size;
   }
@@ -724,6 +751,7 @@ export class OpsViewFacade {
 
     const selectedAdminUserIds = [...this.adminUserBatchSelection];
     this.viewState.onActionAsync(async () => {
+      this.adminUserPasswordBatchResult = null;
       const result = await this.opsService.updateAdminUsersStatus(
         selectedAdminUserIds,
         status
@@ -750,6 +778,7 @@ export class OpsViewFacade {
 
     const selectedAdminUserIds = [...this.adminUserBatchSelection];
     this.viewState.onActionAsync(async () => {
+      this.adminUserPasswordBatchResult = null;
       const result = await this.opsService.assignAdminRoles(selectedAdminUserIds);
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = result;
@@ -763,6 +792,78 @@ export class OpsViewFacade {
     this.adminUserBatchSelection.clear();
     this.adminUserStatusBatchResult = null;
     this.adminUserRoleBatchResult = null;
+    this.adminUserPasswordBatchResult = null;
+  }
+
+  confirmResetAdminUserBatchPasswords(): void {
+    if (!this.canResetAdminUserBatchPasswords) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Generate and set a unique password for ${this.adminUserBatchCount} selected admin user(s)? Existing passwords will stop working immediately; active sessions are unchanged.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const payload = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    const selectedUsers = (payload?.items ?? []).filter(item =>
+      this.adminUserBatchSelection.has(item.adminUser.adminUserId)
+    );
+    this.viewState.onActionAsync(async () => {
+      const issuedPasswords = new Set(
+        this.adminUserPasswordBatchResult?.credentials.map(
+          credential => credential.password
+        ) ?? []
+      );
+      const credentials: AdminUserPasswordBatchCredential[] = selectedUsers.map(
+        item => {
+          let password = generateAdminPassword();
+          while (issuedPasswords.has(password)) {
+            password = generateAdminPassword();
+          }
+          issuedPasswords.add(password);
+          return {
+            adminUserId: item.adminUser.adminUserId,
+            username: item.adminUser.username,
+            password
+          };
+        }
+      );
+      const result = await this.opsService.resetAdminUserPasswords(credentials);
+      const previousCredentials =
+        this.adminUserPasswordBatchResult?.credentials ?? [];
+      this.adminUserStatusBatchResult = null;
+      this.adminUserRoleBatchResult = null;
+      this.adminUserPasswordBatchResult = {
+        requestedCount: result.requestedCount,
+        credentials: [
+          ...previousCredentials.filter(previous =>
+            result.credentials.every(
+              credential => credential.adminUserId !== previous.adminUserId
+            )
+          ),
+          ...result.credentials
+        ],
+        failures: result.failures
+      };
+      for (const credential of result.credentials) {
+        this.adminUserBatchSelection.delete(credential.adminUserId);
+      }
+    });
+  }
+
+  downloadAndClearAdminUserBatchPasswords(): void {
+    const result = this.adminUserPasswordBatchResult;
+    if (!result?.credentials.length) {
+      return;
+    }
+    this.opsService.downloadAdminPasswordBatchCsv(result.credentials);
+    this.adminUserPasswordBatchResult = result.failures.length
+      ? { ...result, credentials: [] }
+      : null;
   }
 
   confirmResetAdminUserPassword(): void {
@@ -1489,7 +1590,8 @@ export class OpsViewFacade {
     );
     const result = this.adminUserStatusBatchResult;
     const roleResult = this.adminUserRoleBatchResult;
-    if (selectedUsers.length === 0 && !result && !roleResult) {
+    const passwordResult = this.adminUserPasswordBatchResult;
+    if (selectedUsers.length === 0 && !result && !roleResult && !passwordResult) {
       return [];
     }
 
@@ -1543,9 +1645,36 @@ export class OpsViewFacade {
               roleResult?.failures
                 .map(failure => `${failure.adminUserId}: ${failure.error}`)
                 .join(" | ") || "none"
+          },
+          {
+            label: "Generated Passwords Awaiting Handoff",
+            value: String(passwordResult?.credentials.length ?? 0)
+          },
+          {
+            label: "Last Password Failed",
+            value: String(passwordResult?.failures.length ?? 0)
+          },
+          {
+            label: "Password Failure Details",
+            value:
+              passwordResult?.failures
+                .map(
+                  failure =>
+                    `${failure.username} (${failure.adminUserId}): ${failure.error}`
+                )
+                .join(" | ") || "none"
           }
         ]
       },
+      ...(passwordResult?.credentials.map(credential => ({
+        headline: credential.username,
+        subline: "Generated password handoff",
+        badges: ["password reset", "not persisted in browser storage"],
+        rows: [
+          { label: "Admin User ID", value: credential.adminUserId },
+          { label: "Generated Password", value: credential.password }
+        ]
+      })) ?? []),
       ...selectedUsers.map(item => ({
         headline: item.adminUser.username,
         subline: item.adminUser.displayName,

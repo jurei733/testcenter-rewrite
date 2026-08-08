@@ -62,6 +62,22 @@ export type AdminUserRoleBatchResult = {
   }>;
 };
 
+export type AdminUserPasswordBatchCredential = {
+  adminUserId: string;
+  username: string;
+  password: string;
+};
+
+export type AdminUserPasswordBatchResult = {
+  requestedCount: number;
+  credentials: AdminUserPasswordBatchCredential[];
+  failures: Array<{
+    adminUserId: string;
+    username: string;
+    error: string;
+  }>;
+};
+
 @Injectable({ providedIn: "root" })
 export class RewriteAppOpsService {
   private readonly hosts = inject(RewriteAppShellOpsHostsService);
@@ -649,6 +665,85 @@ export class RewriteAppOpsService {
     );
     this.persistence.persistShellState();
     await this.refreshAdminUsers();
+  }
+
+  async resetAdminUserPasswords(
+    credentials: AdminUserPasswordBatchCredential[]
+  ): Promise<AdminUserPasswordBatchResult> {
+    if (!this.hasAdminSession()) {
+      return {
+        requestedCount: 0,
+        credentials: [],
+        failures: []
+      };
+    }
+
+    const uniqueCredentials = [
+      ...new Map(
+        credentials
+          .map(credential => ({
+            ...credential,
+            adminUserId: credential.adminUserId.trim(),
+            username: credential.username.trim()
+          }))
+          .filter(credential => credential.adminUserId && credential.username)
+          .map(credential => [credential.adminUserId, credential] as const)
+      ).values()
+    ].slice(0, 50);
+    const succeededCredentials: AdminUserPasswordBatchCredential[] = [];
+    const failures: AdminUserPasswordBatchResult["failures"] = [];
+
+    for (const credential of uniqueCredentials) {
+      try {
+        await this.requestState.request<ResetAdminUserPasswordResponse>(
+          "Reset Selected Admin Password",
+          "POST",
+          resolveRoutePath(productionApiRoutes.admin.resetPassword, {
+            adminUserId: credential.adminUserId
+          }),
+          { password: credential.password } satisfies ResetAdminUserPasswordRequest,
+          { headers: this.createAdminHeaders(), quiet: true }
+        );
+        succeededCredentials.push(credential);
+      } catch (error) {
+        failures.push({
+          adminUserId: credential.adminUserId,
+          username: credential.username,
+          error: this.requestState.isApiError(error)
+            ? error.error
+            : "unexpected_error"
+        });
+      }
+    }
+
+    this.feedback.rememberActivity(
+      "Admin Password Batch Reset",
+      `${succeededCredentials.length}/${uniqueCredentials.length} selected account(s) received unique generated passwords; ${failures.length} failed.`
+    );
+    await this.refreshAdminUsers();
+    return {
+      requestedCount: uniqueCredentials.length,
+      credentials: succeededCredentials,
+      failures
+    };
+  }
+
+  downloadAdminPasswordBatchCsv(
+    credentials: AdminUserPasswordBatchCredential[]
+  ): void {
+    const escapeCsvValue = (value: string): string =>
+      `"${value.replaceAll('"', '""')}"`;
+    const rows = credentials.map(credential =>
+      [credential.adminUserId, credential.username, credential.password]
+        .map(escapeCsvValue)
+        .join(",")
+    );
+    const timestamp = new Date().toISOString().replaceAll(":", "-");
+    downloadTextFile({
+      filename: `admin-generated-passwords-${timestamp}.csv`,
+      mediaType: "text/csv;charset=utf-8",
+      text: `\ufeffadminUserId,username,generatedPassword\n${rows.join("\n")}\n`
+    });
   }
 
   private buildAdminUsersPath(): string {
