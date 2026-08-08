@@ -9930,6 +9930,38 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_login_sequence_invalid"
     },
     {
+      label: "unsupported Testtakers element attribute",
+      rosterText: validRosterXml.replace(
+        '<Group id="sample_group"',
+        '<Group ignored="sample_group" id="sample_group"'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_attribute_invalid"
+    },
+    {
+      label: "repeated Testtakers metadata description",
+      rosterText: validRosterXml.replace(
+        "</Description>",
+        "</Description><Description>duplicate</Description>"
+      ),
+      diagnosticCode: "testcenter_xml_metadata_description_cardinality_invalid"
+    },
+    {
+      label: "unsupported monitor profile child",
+      rosterText: validRosterXml.replace(
+        '<Filter label="Reduced Booklet"',
+        '<Unexpected /><Filter label="Reduced Booklet"'
+      ),
+      diagnosticCode: "testcenter_xml_monitor_profile_child_invalid"
+    },
+    {
+      label: "nested element in text-only booklet assignment",
+      rosterText: validRosterXml.replace(
+        ">BOOKLET.SAMPLE-1</Booklet>",
+        "><Unexpected />BOOKLET.SAMPLE-1</Booklet>"
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_simple_content_invalid"
+    },
+    {
       label: "missing monitor profile",
       rosterText: validRosterXml.replace(
         '<Profile id="small" />',

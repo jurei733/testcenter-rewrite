@@ -7170,6 +7170,27 @@ const xmlChildElements = (element: XmlElement): XmlElement[] => {
 const xmlChildrenNamed = (element: XmlElement, name: string): XmlElement[] =>
   xmlChildElements(element).filter(child => xmlElementLocalName(child) === name);
 
+const xmlUnsupportedAttributeNames = (
+  element: XmlElement,
+  allowedAttributeNames: ReadonlySet<string>
+): string[] => {
+  const unsupportedAttributeNames: string[] = [];
+  for (let index = 0; index < element.attributes.length; index += 1) {
+    const attribute = element.attributes.item(index);
+    if (
+      !attribute ||
+      attribute.name === "xmlns" ||
+      attribute.name.startsWith("xmlns:")
+    ) {
+      continue;
+    }
+    if (!allowedAttributeNames.has(attribute.name)) {
+      unsupportedAttributeNames.push(attribute.name);
+    }
+  }
+  return unsupportedAttributeNames;
+};
+
 const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] => {
   const matches: XmlElement[] = [];
   const descendants = element.getElementsByTagName("*");
@@ -8448,6 +8469,37 @@ const validateTestcenterXmlSourceDocument = (
       "monitor-study",
       "sys-check-login"
     ]);
+    const validateAttributes = (
+      element: XmlElement,
+      allowedAttributeNames: readonly string[],
+      context: string
+    ): void => {
+      for (const attributeName of xmlUnsupportedAttributeNames(
+        element,
+        new Set(allowedAttributeNames)
+      )) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testtakers_attribute_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains unsupported attribute '${attributeName}' on ${context}.`
+          )
+        );
+      }
+    };
+    const validateSimpleContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      const nestedChildren = xmlChildElements(element);
+      if (nestedChildren.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testtakers_simple_content_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains nested element '${xmlElementLocalName(nestedChildren[0])}' in text-only ${context}.`
+          )
+        );
+      }
+    };
     const directChildren = xmlChildElements(root);
     const directChildRanks = new Map([
       ["Metadata", 0],
@@ -8494,7 +8546,34 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
+    for (const metadataContainer of metadataContainers) {
+      validateAttributes(metadataContainer, [], "Metadata");
+      const metadataChildren = xmlChildElements(metadataContainer);
+      for (const child of metadataChildren) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "Description") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_metadata_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported Metadata child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        validateAttributes(child, [], "Metadata/Description");
+        validateSimpleContent(child, "Metadata/Description");
+      }
+      if (xmlChildrenNamed(metadataContainer, "Description").length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_metadata_description_cardinality_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains repeated Metadata/Description elements.`
+          )
+        );
+      }
+    }
     for (const customTextContainer of customTextContainers) {
+      validateAttributes(customTextContainer, [], "CustomTexts");
       const children = xmlChildElements(customTextContainer);
       if (children.length === 0) {
         diagnostics.push(
@@ -8513,10 +8592,14 @@ const validateTestcenterXmlSourceDocument = (
               `Original Testcenter roster '${sourceFileName}' contains unsupported CustomTexts child '${childName}'.`
             )
           );
+          continue;
         }
+        validateAttributes(child, ["key"], "CustomTexts/CustomText");
+        validateSimpleContent(child, "CustomTexts/CustomText");
       }
     }
     for (const profileContainer of profileContainers) {
+      validateAttributes(profileContainer, [], "Profiles");
       const children = xmlChildElements(profileContainer);
       for (const child of children) {
         const childName = xmlElementLocalName(child);
@@ -8567,6 +8650,7 @@ const validateTestcenterXmlSourceDocument = (
       xmlChildrenNamed(container, "GroupMonitor")
     );
     for (const groupMonitorContainer of groupMonitorContainers) {
+      validateAttributes(groupMonitorContainer, [], "Profiles/GroupMonitor");
       for (const child of xmlChildElements(groupMonitorContainer)) {
         const childName = xmlElementLocalName(child);
         if (childName !== "Profile") {
@@ -8610,6 +8694,23 @@ const validateTestcenterXmlSourceDocument = (
     ]);
     for (const profile of monitorProfiles) {
       const profileId = profile.getAttribute("id")?.trim() ?? "";
+      validateAttributes(
+        profile,
+        [
+          "id",
+          "label",
+          "blockColumn",
+          "unitColumn",
+          "groupColumn",
+          "bookletColumn",
+          "bookletStatesColumns",
+          "view",
+          "filterPending",
+          "filterLocked",
+          "autoselectNextBlock"
+        ],
+        `monitor Profile '${profileId || "unknown"}'`
+      );
       if (!profileId) {
         diagnostics.push(
           createImportDiagnostic(
@@ -8653,7 +8754,30 @@ const validateTestcenterXmlSourceDocument = (
           );
         }
       }
-      for (const filter of xmlChildrenNamed(profile, "Filter")) {
+      const profileChildren = xmlChildElements(profile);
+      for (const child of profileChildren) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "Filter") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_profile_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported monitor Profile child '${childName}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+      }
+      for (const filter of profileChildren.filter(
+        child => xmlElementLocalName(child) === "Filter"
+      )) {
+        validateAttributes(
+          filter,
+          ["label", "field", "type", "value", "subValue", "not"],
+          `monitor Filter in Profile '${profileId || "unknown"}'`
+        );
+        validateSimpleContent(
+          filter,
+          `monitor Filter in Profile '${profileId || "unknown"}'`
+        );
         const field = filter.getAttribute("field");
         if (field !== null && !monitorFilterFields.has(field)) {
           diagnostics.push(
@@ -8704,6 +8828,11 @@ const validateTestcenterXmlSourceDocument = (
     }
     const logins = groups.flatMap(group => xmlChildrenNamed(group, "Login"));
     for (const group of groups) {
+      validateAttributes(
+        group,
+        ["id", "label", "validFrom", "validTo", "validFor"],
+        `Group '${group.getAttribute("id")?.trim() || "unknown"}'`
+      );
       const groupChildren = xmlChildElements(group);
       for (const child of groupChildren) {
         const childName = xmlElementLocalName(child);
@@ -8787,6 +8916,12 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const login of logins) {
+      const loginName = login.getAttribute("name")?.trim() || "unknown";
+      validateAttributes(
+        login,
+        ["name", "pw", "mode", "monitorcode"],
+        `Login '${loginName}'`
+      );
       const loginChildren = xmlChildElements(login);
       let viewSettingsSeen = false;
       for (const child of loginChildren) {
@@ -8840,6 +8975,15 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const booklet of loginBooklets) {
+        validateAttributes(
+          booklet,
+          ["codes", "state"],
+          `Booklet assignment for login '${loginName}'`
+        );
+        validateSimpleContent(
+          booklet,
+          `Booklet assignment for login '${loginName}'`
+        );
         const state = booklet.getAttribute("state");
         if (
           state !== null &&
@@ -8856,6 +9000,15 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       for (const profileReference of loginProfiles) {
+        validateAttributes(
+          profileReference,
+          ["id"],
+          `Profile assignment for login '${loginName}'`
+        );
+        validateSimpleContent(
+          profileReference,
+          `Profile assignment for login '${loginName}'`
+        );
         const profileId = profileReference.getAttribute("id")?.trim() ?? "";
         if (!profileId) {
           diagnostics.push(
@@ -8883,6 +9036,19 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const viewSetting of viewSettings) {
+        validateAttributes(
+          viewSetting,
+          ["monitorBookletVisibility"],
+          `ViewSettings for login '${loginName}'`
+        );
+        if (xmlChildElements(viewSetting).length > 0) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_view_settings_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains nested elements in ViewSettings for login '${loginName}'.`
+            )
+          );
+        }
         const visibility = viewSetting.getAttribute("monitorBookletVisibility");
         if (
           visibility !== null &&
