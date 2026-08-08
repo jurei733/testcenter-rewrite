@@ -34,6 +34,7 @@
         "beginner-unit",
         "bonus-unit"
       ],
+      "unitShortLabels": ["D", "Ⓒ", "Ⓑ", "Ⓐ", "Ⓧ"],
       "stateKeys": ["level", "bonus"],
       "showRules": [
         ["stage1-professional", "level", "professional"],
@@ -43,7 +44,9 @@
       ],
       "policy": {
         "pagingMode": "separate",
-        "unitMenuEnabled": true
+        "unitMenuEnabled": true,
+        "unitLabel": "label",
+        "unitListEnabled": false
       }
     },
     {
@@ -56,9 +59,12 @@
         "testcenter-sample2",
         "testcenter-sample3"
       ],
+      "unitShortLabels": ["1", "2", "3"],
       "policy": {
         "pagingMode": "separate",
-        "headerContent": "unit"
+        "headerContent": "unit",
+        "unitLabel": "hidden",
+        "unitListEnabled": true
       }
     },
     {

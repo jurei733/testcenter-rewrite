@@ -113,16 +113,27 @@ const compilePlayerEnd = (value: string): BookletPlayerEndPolicy => {
   }
 };
 
-const compileUnitControls = (value: string): BookletUnitNavigationControls => {
+const compileLegacyUnitNavigation = (value: string): {
+  controls: BookletUnitNavigationControls;
+  label: BookletUnitNavigationLabel;
+  listEnabled: boolean;
+} => {
   switch (value.trim().toUpperCase()) {
     case "OFF":
     case "HIDDEN":
-    case "TRUE":
-      return "hidden";
+      return { controls: "hidden", label: "hidden", listEnabled: false };
+    case "ARROWS_ONLY":
+      return { controls: "both", label: "hidden", listEnabled: false };
     case "FORWARD_ONLY":
-      return "forward_only";
+      return { controls: "forward_only", label: "hidden", listEnabled: true };
+    case "FULL":
+      return { controls: "both", label: "hidden", listEnabled: true };
+    case "LABEL":
+      return { controls: "both", label: "label", listEnabled: false };
+    case "INDEX":
+      return { controls: "both", label: "index", listEnabled: false };
     default:
-      return "both";
+      return { controls: "both", label: "index", listEnabled: false };
   }
 };
 
@@ -184,7 +195,11 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
     return entry?.[1];
   };
   const legacyUnitControls = read("unit_navibuttons");
-  const modernUnitControlsHidden = read("navbar_unit_controls_hidden");
+  const legacyUnitNavigation = compileLegacyUnitNavigation(legacyUnitControls);
+  const modernUnitControlsHidden = findSourceValue(
+    "navbar_unit_controls_hidden"
+  );
+  const modernUnitLabel = findSourceValue("navbar_unit_label");
   const playerEnd = read("allow_player_to_terminate_test");
   const headerContent = read("header_content", "unit_screenheader")
     .replace(/^WITH_/, "")
@@ -203,10 +218,18 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
           ? "prevent"
           : "standard",
       unitMenuEnabled: on(read("toolbar_show_unit_list", "unit_menu"), false),
-      unitControls: modernUnitControlsHidden
-        ? compileUnitControls(modernUnitControlsHidden)
-        : compileUnitControls(legacyUnitControls),
-      unitLabel: compileUnitNavigationLabel(read("navbar_unit_label")),
+      unitControls:
+        modernUnitControlsHidden !== undefined
+          ? on(modernUnitControlsHidden, false)
+            ? "hidden"
+            : "both"
+          : legacyUnitNavigation.controls,
+      unitLabel:
+        modernUnitLabel !== undefined
+          ? compileUnitNavigationLabel(modernUnitLabel)
+          : legacyUnitNavigation.label,
+      unitListEnabled:
+        modernUnitLabel === undefined && legacyUnitNavigation.listEnabled,
       playerEnd: compilePlayerEnd(playerEnd)
     },
     player: {

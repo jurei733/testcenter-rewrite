@@ -658,6 +658,26 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               aria-live="polite"
             >{{ view.player.unitNavigationLabel }}</span>
             <button *ngIf="view.player.showPreviousUnitControl" id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
+            <nav
+              *ngIf="view.player.showUnitNavigationList"
+              id="participantRouteUnitNavigationList"
+              class="participant-unit-navigation-list"
+              aria-label="Direct unit navigation"
+            >
+              <button
+                *ngFor="let unit of view.player.unitItems"
+                type="button"
+                class="ghost participant-unit-navigation-item"
+                [class.is-current]="unit.isCurrent"
+                [class.has-response]="unit.hasResponse"
+                [disabled]="!unit.canOpen"
+                [attr.data-unit-key]="unit.unitKey"
+                [attr.aria-current]="unit.isCurrent ? 'step' : null"
+                [attr.aria-label]="unit.accessibilityLabel"
+                [attr.title]="unit.accessibilityLabel"
+                (click)="view.goToUnit(unit.unitKey)"
+              >{{ unit.navigationLabel }}</button>
+            </nav>
             <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>
             <button class="ghost" type="button" [disabled]="!view.player.canResumeRun" (click)="view.resumeRun()">Resume Run</button>

@@ -14,6 +14,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.navigation.browserNavigation, "standard");
   assert.equal(defaults.navigation.unitControls, "both");
   assert.equal(defaults.navigation.unitLabel, "index");
+  assert.equal(defaults.navigation.unitListEnabled, false);
   assert.equal(defaults.player.loadingMode, "lazy");
   assert.equal(defaults.timing.showTimeLeft, false);
   assert.equal(defaults.display.reloadButton, false);
@@ -63,6 +64,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.navigation.unitMenuEnabled, true);
   assert.equal(policy.navigation.unitControls, "forward_only");
   assert.equal(policy.navigation.unitLabel, "label");
+  assert.equal(policy.navigation.unitListEnabled, false);
   assert.equal(policy.navigation.playerEnd, "last_unit");
   assert.equal(policy.player.loadingMode, "eager");
   assert.equal(
@@ -119,6 +121,33 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
       .pageNavigation,
     { labelMode: "index", controlsHidden: false }
   );
+
+  const legacyUnitNavigation = {
+    OFF: ["hidden", "hidden", false],
+    ARROWS_ONLY: ["both", "hidden", false],
+    FORWARD_ONLY: ["forward_only", "hidden", true],
+    FULL: ["both", "hidden", true],
+    INDEX: ["both", "index", false],
+    LABEL: ["both", "label", false]
+  } as const;
+  for (const [value, [controls, label, listEnabled]] of Object.entries(
+    legacyUnitNavigation
+  )) {
+    const legacyPolicy = compileBookletRuntimePolicy({
+      unit_navibuttons: value
+    });
+    assert.equal(legacyPolicy.navigation.unitControls, controls);
+    assert.equal(legacyPolicy.navigation.unitLabel, label);
+    assert.equal(legacyPolicy.navigation.unitListEnabled, listEnabled);
+  }
+  const transitionalPolicy = compileBookletRuntimePolicy({
+    unit_navibuttons: "FULL",
+    navbar_unit_label: "LABEL",
+    navbar_unit_controls_hidden: "TRUE"
+  });
+  assert.equal(transitionalPolicy.navigation.unitControls, "hidden");
+  assert.equal(transitionalPolicy.navigation.unitLabel, "label");
+  assert.equal(transitionalPolicy.navigation.unitListEnabled, false);
 });
 
 test("booklet config arrays and completeness rules are normalized", () => {

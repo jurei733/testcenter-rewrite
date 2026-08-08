@@ -5722,6 +5722,7 @@ const normalizeSourcePackageUnitEntry = (
   }
   const description = normalizeUnitContent(unitEntry.description);
   const originalUnitId = normalizeManifestToken(unitEntry.originalUnitId);
+  const shortLabel = normalizeManifestToken(unitEntry.shortLabel);
   const content = normalizeUnitContent(unitEntry.content);
   const playerKey = normalizeManifestToken(unitEntry.playerKey);
   const unitDefinition = normalizeRuntimeDocument(unitEntry.unitDefinition);
@@ -5739,6 +5740,7 @@ const normalizeSourcePackageUnitEntry = (
       "Unit",
       unitKey
     ),
+    ...(shortLabel ? { shortLabel } : {}),
     ...(Array.isArray(unitEntry.testletPath) && unitEntry.testletPath.length > 0
       ? {
           testletPath: unitEntry.testletPath
@@ -10505,6 +10507,11 @@ const collectXmlBookletEntries = (
             "html"
           )
       );
+      const shortLabel = String(
+        readXmlAttribute(unitAttributes, "labelshort", "labelShort") ??
+          readXmlChildText(unitContent, "labelshort", "labelShort") ??
+          ""
+      ).trim();
       unitEntries.push({
         unitKey,
         ...(originalUnitId && originalUnitId !== unitKey
@@ -10515,8 +10522,6 @@ const collectXmlBookletEntries = (
             unitAttributes,
             "displayLabel",
             "label",
-            "labelshort",
-            "labelShort",
             "title",
             "name",
             "displayName"
@@ -10525,13 +10530,12 @@ const collectXmlBookletEntries = (
               unitContent,
               "title",
               "label",
-              "labelshort",
-              "labelShort",
               "name",
               "displayName"
             ) ??
-            ""
+            shortLabel
         ).trim(),
+        ...(shortLabel ? { shortLabel } : {}),
         ...(description ? { description } : {}),
         ...(content ? { content } : {})
       });
@@ -14315,7 +14319,10 @@ const resolveRuntimeBooklet = (
             ...bookletEntry.policy.navigation,
             unitLabel:
               bookletEntry.policy.navigation.unitLabel ??
-              policyDefaults.navigation.unitLabel
+              policyDefaults.navigation.unitLabel,
+            unitListEnabled:
+              bookletEntry.policy.navigation.unitListEnabled ??
+              policyDefaults.navigation.unitListEnabled
           },
           player: {
             ...bookletEntry.policy.player,
@@ -15943,6 +15950,7 @@ const resolveRuntimeBookletUnits = (
 ): Array<{
   unitKey: string;
   displayLabel: string;
+  shortLabel?: string;
   description?: string;
   content?: string;
   testletPath: string[];
@@ -15957,6 +15965,7 @@ const resolveRuntimeBookletUnits = (
     resolveVisibleBookletUnits(bookletEntry, testRun).map(unitEntry => ({
       unitKey: unitEntry.unitKey,
       displayLabel: unitEntry.displayLabel,
+      ...(unitEntry.shortLabel ? { shortLabel: unitEntry.shortLabel } : {}),
       testletPath: unitEntry.testletPath ?? [],
       isLocked: isUnitLeaveLocked(bookletEntry, testRun, unitEntry.unitKey),
       ...(unitEntry.description ? { description: unitEntry.description } : {}),

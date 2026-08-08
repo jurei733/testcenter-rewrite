@@ -599,6 +599,8 @@ export type SourcePackageUnitEntry = {
   /** Authored Unit/@id when `unitKey` is an Original Testcenter alias. */
   originalUnitId?: string;
   displayLabel: string;
+  /** Authored Booklet Unit/@labelshort used by the legacy FULL navigation bar. */
+  shortLabel?: string;
   testletPath?: string[];
   description?: string;
   content?: string;
@@ -770,6 +772,8 @@ export type BookletRuntimePolicy = {
     unitControls: BookletUnitNavigationControls;
     /** Optional so runtime snapshots created before unit navigation labels remain readable. */
     unitLabel?: BookletUnitNavigationLabel;
+    /** Optional so runtime snapshots created before the legacy FULL Unit bar remain readable. */
+    unitListEnabled?: boolean;
     playerEnd: BookletPlayerEndPolicy;
   };
   player: {
@@ -811,6 +815,8 @@ export type ContentReleaseUnitEntry = {
   /** Authored Unit/@id when `unitKey` is an Original Testcenter alias. */
   originalUnitId?: string;
   displayLabel: string;
+  /** Authored Booklet Unit/@labelshort used by the legacy FULL navigation bar. */
+  shortLabel?: string;
   testletPath?: string[];
   description?: string;
   content?: string;
@@ -1047,6 +1053,7 @@ export type ParticipantCurrentRunState = {
   bookletUnits: Array<{
     unitKey: string;
     displayLabel: string;
+    shortLabel?: string;
     description?: string;
     content?: string;
     testletPath: string[];

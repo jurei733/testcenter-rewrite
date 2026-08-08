@@ -98,6 +98,7 @@ type ParticipantPlayerState = {
   actions: string[];
   canSaveProgress: boolean;
   showUnitMenu: boolean;
+  showUnitNavigationList: boolean;
   showPreviousUnitControl: boolean;
   showNextUnitControl: boolean;
   canGoPreviousUnit: boolean;
@@ -148,6 +149,7 @@ type ParticipantPlayerState = {
 type ParticipantPlayerUnitItem = {
   unitKey: string;
   label: string;
+  navigationLabel: string;
   position: string;
   statusLabel: string;
   accessibilityLabel: string;
@@ -584,6 +586,7 @@ export class ParticipantViewFacade {
         actions: [],
         canSaveProgress: false,
         showUnitMenu: false,
+        showUnitNavigationList: false,
         showPreviousUnitControl: true,
         showNextUnitControl: true,
         canGoPreviousUnit: false,
@@ -643,6 +646,7 @@ export class ParticipantViewFacade {
       return {
         unitKey: unit.unitKey,
         label,
+        navigationLabel: unit.shortLabel?.trim() || `${index + 1}`,
         position: `${index + 1}`,
         statusLabel,
         accessibilityLabel: [
@@ -656,7 +660,8 @@ export class ParticipantViewFacade {
         hasResponse,
         canOpen:
           canNavigateUnits &&
-          policy.navigation.unitMenuEnabled &&
+          (policy.navigation.unitMenuEnabled ||
+            Boolean(policy.navigation.unitListEnabled)) &&
           !isCurrent &&
           !unit.isLocked &&
           (index < unitIndex
@@ -848,6 +853,7 @@ export class ParticipantViewFacade {
       actions: availableActions,
       canSaveProgress: availableActions.includes("save_progress"),
       showUnitMenu: policy.navigation.unitMenuEnabled,
+      showUnitNavigationList: Boolean(policy.navigation.unitListEnabled),
       showPreviousUnitControl: policy.navigation.unitControls === "both",
       showNextUnitControl: policy.navigation.unitControls !== "hidden",
       canGoPreviousUnit: canNavigateUnits && currentState.navigation.canGoPrevious,

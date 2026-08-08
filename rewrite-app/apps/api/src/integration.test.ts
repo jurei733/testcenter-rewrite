@@ -8529,6 +8529,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     bookletKey: string;
     displayLabel: string;
     unitKeys: string[];
+    unitShortLabels?: string[];
     topLevelTestletCount?: number;
     stateKeys?: string[];
     showRules?: Array<[string, string, string]>;
@@ -8546,6 +8547,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
       headerContent?: string;
       unitMenuEnabled?: boolean;
       unitControls?: string;
+      unitLabel?: string;
+      unitListEnabled?: boolean;
       playerEnd?: string;
       requirePresentationComplete?: string;
       requireResponseComplete?: string;
@@ -8682,6 +8685,8 @@ test("original Testcenter compatibility corpus imports representative booklets",
                   requireResponseComplete: string;
                   unitMenuEnabled: boolean;
                   unitControls: string;
+                  unitLabel: string;
+                  unitListEnabled: boolean;
                   playerEnd: string;
                 };
                 player: {
@@ -8721,7 +8726,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
                   lockAfterLeaving?: { confirm: boolean; scope: string };
                 };
               }>;
-              unitEntries: Array<{ unitKey: string }>;
+              unitEntries: Array<{ unitKey: string; shortLabel?: string }>;
             }>;
           };
         };
@@ -8746,6 +8751,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
       expectation.unitKeys,
       expectation.sourcePath
     );
+    if (expectation.unitShortLabels) {
+      assert.deepEqual(
+        booklet.unitEntries.map(unit => unit.shortLabel ?? ""),
+        expectation.unitShortLabels,
+        expectation.sourcePath
+      );
+    }
     if (expectation.topLevelTestletCount != null) {
       assert.equal(
         booklet.testletEntries?.filter(testlet => !testlet.parentTestletKey)
@@ -8858,6 +8870,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
       assert.equal(
         booklet.policy.navigation.unitControls,
         expectation.policy.unitControls
+      );
+    }
+    if (expectation.policy.unitLabel) {
+      assert.equal(
+        booklet.policy.navigation.unitLabel,
+        expectation.policy.unitLabel
+      );
+    }
+    if (expectation.policy.unitListEnabled !== undefined) {
+      assert.equal(
+        booklet.policy.navigation.unitListEnabled,
+        expectation.policy.unitListEnabled
       );
     }
     if (expectation.policy.playerEnd) {
@@ -11147,6 +11171,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       unitMenuEnabled: boolean;
       unitControls: string;
       unitLabel: string;
+      unitListEnabled: boolean;
       playerEnd: string;
     };
     player: {
@@ -11218,7 +11243,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
-        unitLabel: "index",
+        unitLabel: "label",
+        unitListEnabled: false,
         playerEnd: "always"
       },
       player: {
@@ -11247,7 +11273,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: true,
         unitControls: "hidden",
-        unitLabel: "index",
+        unitLabel: "hidden",
+        unitListEnabled: false,
         playerEnd: "never"
       },
       player: {
@@ -11276,7 +11303,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
-        unitLabel: "index",
+        unitLabel: "label",
+        unitListEnabled: false,
         playerEnd: "last_unit"
       },
       player: {
@@ -11305,7 +11333,8 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
-        unitLabel: "index",
+        unitLabel: "label",
+        unitListEnabled: false,
         playerEnd: "always"
       },
       player: {
@@ -15355,6 +15384,7 @@ test("source document import preserves testcenter unit aliases", async () => {
             unitEntries: Array<{
               unitKey: string;
               displayLabel: string;
+              shortLabel?: string;
               content?: string;
             }>;
           }>;
@@ -15388,17 +15418,20 @@ test("source document import preserves testcenter unit aliases", async () => {
           unitEntries: [
             {
               unitKey: "UNIT.SAMPLE",
-              displayLabel: "A Sample Unit to demonstrate the SamplePlayer2"
+              displayLabel: "A Sample Unit to demonstrate the SamplePlayer2",
+              shortLabel: "Sample Unit"
             },
             {
               unitKey: "UNIT.SAMPLE-2",
               displayLabel: "A very Simple Sample Unit",
+              shortLabel: "2nd Sample Unit",
               testletPath: ["a_testlet_with_restrictions"]
             },
             {
               unitKey: "an_alias",
               originalUnitId: "UNIT.SAMPLE",
               displayLabel: "Sample Unit again, with Alias",
+              shortLabel: "Sample Unit Again",
               testletPath: ["another_testlet"]
             },
             {
@@ -16427,6 +16460,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     unitMenuEnabled: false,
     unitControls: "both",
     unitLabel: "index",
+    unitListEnabled: false,
     playerEnd: "last_unit"
   });
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
@@ -20319,6 +20353,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
               unitMenuEnabled: boolean;
               unitControls: string;
               unitLabel: string;
+              unitListEnabled: boolean;
               playerEnd: string;
             };
             player: {
@@ -20356,6 +20391,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
     unitMenuEnabled: true,
     unitControls: "forward_only",
     unitLabel: "label",
+    unitListEnabled: false,
     playerEnd: "last_unit"
   });
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {

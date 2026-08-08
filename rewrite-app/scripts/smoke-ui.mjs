@@ -6944,6 +6944,21 @@ try {
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: "API 6.0" })
     .waitFor({ timeout: 30_000 });
+  const aspectUnitNavigation = page.locator(
+    "#participantRouteUnitNavigationList"
+  );
+  await aspectUnitNavigation.waitFor({ timeout: 30_000 });
+  assert.deepEqual(
+    await aspectUnitNavigation
+      .locator(".participant-unit-navigation-item")
+      .allTextContents(),
+    ["1", "2", "3"]
+  );
+  assert.equal(
+    await page.locator("#participantRouteUnitNavigationLabel").count(),
+    0,
+    "Legacy FULL navigation should render authored short labels instead of a second current-Unit label."
+  );
   const aspectFrame = page.frameLocator("#participantVeronaPlayerFrame");
   await aspectFrame.getByText("Unit 1", { exact: true }).waitFor({
     timeout: 30_000
@@ -6995,9 +7010,24 @@ try {
     true,
     "The original booklet should allow its separate next-unit control."
   );
+  assert.deepEqual(
+    savedAspectState.currentRunState.bookletUnits.map(unit => [
+      unit.unitKey,
+      unit.shortLabel
+    ]),
+    [
+      ["testcenter-sample1", "1"],
+      ["testcenter-sample2", "2"],
+      ["testcenter-sample3", "3"]
+    ]
+  );
   const aspectNextUnitButton = page.locator("#participantRouteNextUnitButton");
   assert.equal(await aspectNextUnitButton.isEnabled(), true);
-  await aspectNextUnitButton.click();
+  const aspectSecondUnitNavigationItem = aspectUnitNavigation.locator(
+    '[data-unit-key="testcenter-sample2"]'
+  );
+  assert.equal(await aspectSecondUnitNavigationItem.isEnabled(), true);
+  await aspectSecondUnitNavigationItem.click();
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
     payload =>
@@ -7519,6 +7549,10 @@ try {
   await page.locator("#participantRouteFullscreenButton").waitFor();
   await page.locator("#participantRouteUnitRail").waitFor();
   assert.equal(
+    await page.locator("#participantRouteUnitNavigationLabel").count(),
+    0
+  );
+  assert.equal(
     await page.locator("#participantRoutePreviousUnitButton").count(),
     0
   );
@@ -7544,7 +7578,15 @@ try {
     .locator("#participantRouteUnit")
     .filter({ hasText: "Aufgabe1" })
     .waitFor();
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
   assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
+  assert.equal(
+    await page.locator("#participantRouteUnitNavigationList").count(),
+    0
+  );
   assert.equal(
     await configThreeBrowser.playerFrame.locator("#end-unit").isDisabled(),
     true
@@ -7560,6 +7602,10 @@ try {
     .waitFor({ timeout: 15_000 });
   await page
     .locator("#participantRouteUnit")
+    .filter({ hasText: "Aufgabe2" })
+    .waitFor();
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
     .filter({ hasText: "Aufgabe2" })
     .waitFor();
   assert.equal(
@@ -7579,6 +7625,10 @@ try {
     .locator("#participantRouteUnit")
     .filter({ hasText: "Aufgabe1" })
     .waitFor();
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
   assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
   await page.locator("#participantRouteNextUnitButton").waitFor();
   assert.equal(
@@ -7591,6 +7641,10 @@ try {
     "Cy-Bklt_BkltConfig-1"
   );
   await page.locator("#participantRouteUnit").waitFor();
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Aufgabe1" })
+    .waitFor();
   assert.equal(await page.locator("#participantRouteScreenHeader").count(), 0);
   assert.equal(
     await page.locator("#participantRouteFullscreenPrompt").count(),
