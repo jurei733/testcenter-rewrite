@@ -7221,6 +7221,8 @@ const testcenterXmlIdPattern =
 const isTestcenterXmlId = (value: string): boolean =>
   testcenterXmlIdPattern.test(value);
 
+const testcenterBookletStateIdPattern = /^[a-z\d-]+$/;
+
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
   sourceFileName: string
@@ -7337,6 +7339,103 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
 
+    const statesContainers = xmlChildrenNamed(root, "States");
+    if (statesContainers.length > 1) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_states_cardinality_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains multiple States elements.`
+        )
+      );
+    }
+    const stateEntries = statesContainers[0]
+      ? xmlChildrenNamed(statesContainers[0], "State")
+      : [];
+    const stateOptions = new Map<string, Set<string>>();
+    for (const state of stateEntries) {
+      const rawStateKey = state.getAttribute("id") ?? "";
+      const stateKey = rawStateKey.trim();
+      if (!stateKey) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_id_missing",
+            `Original Testcenter booklet '${sourceFileName}' contains a State without an id.`
+          )
+        );
+      } else if (
+        rawStateKey !== stateKey ||
+        !testcenterBookletStateIdPattern.test(stateKey)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_id_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains invalid State id '${rawStateKey}'.`
+          )
+        );
+      }
+
+      const options = xmlChildElements(state).filter(option =>
+        ["Option", "DefaultOption"].includes(xmlElementLocalName(option))
+      );
+      if (options.length === 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_options_missing",
+            `Original Testcenter booklet '${sourceFileName}' requires State '${stateKey || "unknown"}' to contain at least one Option.`
+          )
+        );
+      }
+      const optionKeys = new Set<string>();
+      for (const option of options) {
+        const rawOptionKey = option.getAttribute("id") ?? "";
+        const optionKey = rawOptionKey.trim();
+        if (!optionKey) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_state_option_id_missing",
+              `Original Testcenter booklet '${sourceFileName}' contains an Option without an id in State '${stateKey || "unknown"}'.`
+            )
+          );
+          continue;
+        }
+        if (
+          rawOptionKey !== optionKey ||
+          !testcenterBookletStateIdPattern.test(optionKey)
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_state_option_id_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid Option id '${rawOptionKey}' in State '${stateKey || "unknown"}'.`
+            )
+          );
+        }
+        optionKeys.add(optionKey);
+      }
+      if (stateKey && !stateOptions.has(stateKey)) {
+        stateOptions.set(stateKey, optionKeys);
+      }
+      diagnostics.push(
+        ...validateUniqueTestcenterXmlValues(
+          options.map(option => ({
+            value: option.getAttribute("id")?.trim() ?? "",
+            label: `option id in State '${stateKey || "unknown"}'`
+          })),
+          "testcenter_xml_state_option_id_duplicate",
+          sourceFileName
+        )
+      );
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        stateEntries.map(state => ({
+          value: state.getAttribute("id")?.trim() ?? "",
+          label: "state id"
+        })),
+        "testcenter_xml_state_id_duplicate",
+        sourceFileName
+      )
+    );
+
     const units = xmlChildrenNamed(root, "Units")[0];
     const unitEntries = units ? xmlDescendantsNamed(units, "Unit") : [];
     if (!units || unitEntries.length === 0) {
@@ -7388,6 +7487,27 @@ const validateTestcenterXmlSourceDocument = (
       const restriction = restrictions[0];
       if (!restriction) {
         continue;
+      }
+      for (const show of xmlChildrenNamed(restriction, "Show")) {
+        const stateKey = show.getAttribute("if")?.trim() ?? "";
+        const optionKey = show.getAttribute("is")?.trim() ?? "";
+        if (!stateKey || !stateOptions.has(stateKey)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_show_state_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Show state reference '${stateKey || "missing"}' for Testlet '${testletKey || "unknown"}', but that State is not defined.`
+            )
+          );
+          continue;
+        }
+        if (!optionKey || !stateOptions.get(stateKey)?.has(optionKey)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_show_option_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Show option reference '${optionKey || "missing"}' for State '${stateKey}' and Testlet '${testletKey || "unknown"}', but that Option is not defined.`
+            )
+          );
+        }
       }
       const timeMaxEntries = xmlChildrenNamed(restriction, "TimeMax");
       if (timeMaxEntries.length > 1) {

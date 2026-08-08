@@ -9159,6 +9159,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
     "utf8"
   );
+  const validAdaptiveBookletXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "booklets/Booklet2.xml"),
+    "utf8"
+  );
   const schemaFacetCases: Array<{
     fileName: string;
     sourceDocument: string;
@@ -9187,6 +9191,86 @@ test("original Testcenter compatibility corpus imports representative booklets",
         "<Id>SYSCHECK SAMPLE</Id>"
       ),
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
+    },
+    {
+      fileName: "booklet-invalid-state-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<State id="level"',
+        '<State id="Level"'
+      ),
+      diagnosticCode: "testcenter_xml_state_id_invalid"
+    },
+    {
+      fileName: "booklet-missing-state-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<State id="level"',
+        "<State"
+      ),
+      diagnosticCode: "testcenter_xml_state_id_missing"
+    },
+    {
+      fileName: "booklet-duplicate-state-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<State id="bonus"',
+        '<State id="level"'
+      ),
+      diagnosticCode: "testcenter_xml_state_id_duplicate"
+    },
+    {
+      fileName: "booklet-duplicate-states-container.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "  <States>",
+        "  <States />\n  <States>"
+      ),
+      diagnosticCode: "testcenter_xml_states_cardinality_invalid"
+    },
+    {
+      fileName: "booklet-missing-state-options.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        /<State id="bonus"[\s\S]*?<\/State>/,
+        '<State id="bonus" label="Bonusmaterial" />'
+      ),
+      diagnosticCode: "testcenter_xml_state_options_missing"
+    },
+    {
+      fileName: "booklet-missing-state-option-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="professional"',
+        "<Option"
+      ),
+      diagnosticCode: "testcenter_xml_state_option_id_missing"
+    },
+    {
+      fileName: "booklet-invalid-state-option-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="professional"',
+        '<Option id="Professional"'
+      ),
+      diagnosticCode: "testcenter_xml_state_option_id_invalid"
+    },
+    {
+      fileName: "booklet-duplicate-state-option-id.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="advanced"',
+        '<Option id="professional"'
+      ),
+      diagnosticCode: "testcenter_xml_state_option_id_duplicate"
+    },
+    {
+      fileName: "booklet-invalid-show-state.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Show if="level" is="professional"',
+        '<Show if="unknown" is="professional"'
+      ),
+      diagnosticCode: "testcenter_xml_show_state_invalid"
+    },
+    {
+      fileName: "booklet-invalid-show-option.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Show if="level" is="professional"',
+        '<Show if="level" is="unknown"'
+      ),
+      diagnosticCode: "testcenter_xml_show_option_invalid"
     },
     {
       fileName: "unit-duplicate-variable.xml",
