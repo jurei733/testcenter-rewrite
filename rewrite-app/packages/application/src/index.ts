@@ -7360,6 +7360,24 @@ const validateTestcenterBookletCondition = (
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
   const context = `Option '${optionKey || "unknown"}' in State '${stateKey || "unknown"}'`;
+  const validateAttributes = (
+    element: XmlElement,
+    allowedAttributeNames: readonly string[],
+    elementContext: string
+  ): void => {
+    for (const attributeName of xmlUnsupportedAttributeNames(
+      element,
+      new Set(allowedAttributeNames)
+    )) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_booklet_attribute_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains unsupported attribute '${attributeName}' on ${elementContext} for ${context}.`
+        )
+      );
+    }
+  };
+  validateAttributes(condition, [], "If");
   const children = xmlChildElements(condition);
   const sourceNames = [
     ...testcenterBookletVariableSourceNames,
@@ -7392,6 +7410,20 @@ const validateTestcenterBookletCondition = (
   }
 
   const validateVariableSource = (variableSource: XmlElement): void => {
+    const sourceName = xmlElementLocalName(variableSource);
+    validateAttributes(
+      variableSource,
+      sourceName === "Score" ? ["of", "from", "or"] : ["of", "from"],
+      sourceName
+    );
+    if (xmlChildElements(variableSource).length > 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_state_condition_structure_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains nested elements in ${sourceName} for ${context}.`
+        )
+      );
+    }
     const variableKey = variableSource.getAttribute("of")?.trim() ?? "";
     const unitKey = variableSource.getAttribute("from")?.trim() ?? "";
     if (!variableKey || !unitKey) {
@@ -7418,6 +7450,7 @@ const validateTestcenterBookletCondition = (
     if ((testcenterBookletVariableSourceNames as readonly string[]).includes(sourceName)) {
       validateVariableSource(sourceElement);
     } else if (["Sum", "Median", "Mean"].includes(sourceName)) {
+      validateAttributes(sourceElement, [], sourceName);
       const aggregateSources = xmlChildElements(sourceElement);
       const aggregateSourceNames = new Set(
         aggregateSources.map(xmlElementLocalName)
@@ -7446,6 +7479,7 @@ const validateTestcenterBookletCondition = (
         )
         .forEach(validateVariableSource);
     } else if (sourceName === "Count") {
+      validateAttributes(sourceElement, [], sourceName);
       const nestedChildren = xmlChildElements(sourceElement);
       if (
         nestedChildren.length < 2 ||
@@ -7480,6 +7514,15 @@ const validateTestcenterBookletCondition = (
       "greaterThan",
       "lowerThan"
     ] as const;
+    validateAttributes(expressionElement, comparisonNames, "Is");
+    if (xmlChildElements(expressionElement).length > 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_state_condition_structure_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains nested elements in Is for ${context}.`
+        )
+      );
+    }
     const presentComparisons = comparisonNames.filter(
       comparisonName => expressionElement.getAttribute(comparisonName) !== null
     );
@@ -7807,10 +7850,25 @@ const validateTestcenterXmlSourceDocument = (
     const stateEntries = statesContainers[0]
       ? xmlChildrenNamed(statesContainers[0], "State")
       : [];
+    for (const statesContainer of statesContainers) {
+      validateAttributes(statesContainer, [], "States");
+      const unsupportedStateChild = xmlChildElements(statesContainer).find(
+        child => xmlElementLocalName(child) !== "State"
+      );
+      if (unsupportedStateChild) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_structure_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains unsupported States child '${xmlElementLocalName(unsupportedStateChild)}'.`
+          )
+        );
+      }
+    }
     const stateOptions = new Map<string, Set<string>>();
     for (const state of stateEntries) {
       const rawStateKey = state.getAttribute("id") ?? "";
       const stateKey = rawStateKey.trim();
+      validateAttributes(state, ["id", "label"], `State '${stateKey || "unknown"}'`);
       if (!stateKey) {
         diagnostics.push(
           createImportDiagnostic(
@@ -7830,9 +7888,21 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
 
-      const options = xmlChildElements(state).filter(option =>
+      const stateChildren = xmlChildElements(state);
+      const options = stateChildren.filter(option =>
         ["Option", "DefaultOption"].includes(xmlElementLocalName(option))
       );
+      const unsupportedOptionChild = stateChildren.find(
+        option => !["Option", "DefaultOption"].includes(xmlElementLocalName(option))
+      );
+      if (unsupportedOptionChild) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_structure_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains unsupported State child '${xmlElementLocalName(unsupportedOptionChild)}' in State '${stateKey || "unknown"}'.`
+          )
+        );
+      }
       if (options.length === 0) {
         diagnostics.push(
           createImportDiagnostic(
@@ -7846,6 +7916,11 @@ const validateTestcenterXmlSourceDocument = (
         const optionElementName = xmlElementLocalName(option);
         const rawOptionKey = option.getAttribute("id") ?? "";
         const optionKey = rawOptionKey.trim();
+        validateAttributes(
+          option,
+          ["id", "label"],
+          `${optionElementName} '${optionKey || "unknown"}' in State '${stateKey || "unknown"}'`
+        );
         if (!optionKey) {
           diagnostics.push(
             createImportDiagnostic(

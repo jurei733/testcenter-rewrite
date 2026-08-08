@@ -9387,6 +9387,86 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_fallback_option_missing"
     },
     {
+      fileName: "booklet-unknown-states-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "  <States>",
+        '  <States ignored="true">'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-state-child.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '    <State id="bonus"',
+        '    <Unexpected />\n    <State id="bonus"'
+      ),
+      diagnosticCode: "testcenter_xml_state_structure_invalid"
+    },
+    {
+      fileName: "booklet-unknown-state-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<State id="level"',
+        '<State id="level" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-state-option-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="professional"',
+        '<Option id="professional" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-condition-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "        <If>",
+        '        <If ignored="true">'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unsupported-value-fallback.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Value of="derived_var" from="decision-unit" />',
+        '<Value of="derived_var" from="decision-unit" or="0" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-aggregation-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "              <Sum>",
+        '              <Sum ignored="true">'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-expression-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Is greaterThan="150" />',
+        '<Is greaterThan="150" ignored="true" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-nested-variable-source.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Value of="derived_var" from="decision-unit" />',
+        '<Value of="derived_var" from="decision-unit"><Unexpected /></Value>'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_structure_invalid"
+    },
+    {
+      fileName: "booklet-nested-condition-expression.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Is greaterThan="150" />',
+        '<Is greaterThan="150"><Unexpected /></Is>'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_structure_invalid"
+    },
+    {
       fileName: "booklet-missing-state-option-id.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<Option id="professional"',
