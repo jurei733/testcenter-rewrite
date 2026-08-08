@@ -53,6 +53,15 @@ export type AdminUserStatusBatchResult = {
   }>;
 };
 
+export type AdminUserRoleBatchResult = {
+  requestedCount: number;
+  succeededAdminUserIds: string[];
+  failures: Array<{
+    adminUserId: string;
+    error: string;
+  }>;
+};
+
 @Injectable({ providedIn: "root" })
 export class RewriteAppOpsService {
   private readonly hosts = inject(RewriteAppShellOpsHostsService);
@@ -453,6 +462,62 @@ export class RewriteAppOpsService {
     );
     this.persistence.persistShellState();
     await this.refreshAdminUsers();
+  }
+
+  async assignAdminRoles(
+    adminUserIds: string[]
+  ): Promise<AdminUserRoleBatchResult> {
+    if (!this.hasAdminSession()) {
+      return {
+        requestedCount: 0,
+        succeededAdminUserIds: [],
+        failures: []
+      };
+    }
+    const uniqueAdminUserIds = [
+      ...new Set(adminUserIds.map(adminUserId => adminUserId.trim()).filter(Boolean))
+    ].slice(0, 50);
+    const roleAssignment = this.createRoleAssignmentRequest(
+      this.opsState.adminRoleRole,
+      this.opsState.adminRoleAccessMode,
+      this.opsState.adminRoleTenantKey,
+      this.opsState.adminRoleWorkspaceKey,
+      this.opsState.adminRoleGroupKey,
+      this.opsState.adminRoleMonitorProfilesJson
+    );
+    const succeededAdminUserIds: string[] = [];
+    const failures: AdminUserRoleBatchResult["failures"] = [];
+
+    for (const adminUserId of uniqueAdminUserIds) {
+      try {
+        await this.requestState.request<AssignAdminRoleResponse>(
+          "Assign Role To Selected Admin User",
+          "POST",
+          resolveRoutePath(productionApiRoutes.admin.assignRole, { adminUserId }),
+          roleAssignment satisfies AssignAdminRoleRequest,
+          { headers: this.createAdminHeaders(), quiet: true }
+        );
+        succeededAdminUserIds.push(adminUserId);
+      } catch (error) {
+        failures.push({
+          adminUserId,
+          error: this.requestState.isApiError(error)
+            ? error.error
+            : "unexpected_error"
+        });
+      }
+    }
+
+    this.feedback.rememberActivity(
+      "Admin Role Batch Assigned",
+      `${succeededAdminUserIds.length}/${uniqueAdminUserIds.length} selected account(s) received ${roleAssignment.role}; ${failures.length} failed.`
+    );
+    await this.refreshAdminUsers();
+    return {
+      requestedCount: uniqueAdminUserIds.length,
+      succeededAdminUserIds,
+      failures
+    };
   }
 
   async revokeAdminRole(): Promise<void> {

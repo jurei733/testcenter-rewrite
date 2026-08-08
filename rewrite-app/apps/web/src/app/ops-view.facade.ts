@@ -33,6 +33,7 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import {
   RewriteAppOpsService,
+  type AdminUserRoleBatchResult,
   type AdminUserStatusBatchResult
 } from "./rewrite-app-ops.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
@@ -180,6 +181,7 @@ export class OpsViewFacade {
   monitorFilterDraftNot = false;
   private readonly adminUserBatchSelection = new Set<string>();
   adminUserStatusBatchResult: AdminUserStatusBatchResult | null = null;
+  adminUserRoleBatchResult: AdminUserRoleBatchResult | null = null;
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
 
@@ -480,6 +482,21 @@ export class OpsViewFacade {
     );
   }
 
+  get canAssignAdminUserBatchRole(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminUserBatchCount > 0 &&
+      this.adminRoleOptions.includes(this.ops.adminRoleRole) &&
+      this.isScopedAdminRoleInputComplete(
+        this.ops.adminRoleRole,
+        this.ops.adminRoleTenantKey,
+        this.ops.adminRoleWorkspaceKey,
+        this.ops.adminRoleGroupKey
+      )
+    );
+  }
+
   get adminSessionBatchCount(): number {
     return this.adminSessionBatchSelection.size;
   }
@@ -711,7 +728,31 @@ export class OpsViewFacade {
         selectedAdminUserIds,
         status
       );
+      this.adminUserRoleBatchResult = null;
       this.adminUserStatusBatchResult = result;
+      for (const adminUserId of result.succeededAdminUserIds) {
+        this.adminUserBatchSelection.delete(adminUserId);
+      }
+    });
+  }
+
+  confirmAssignAdminUserBatchRole(): void {
+    if (!this.canAssignAdminUserBatchRole) {
+      return;
+    }
+    const role = this.ops.adminRoleRole;
+    const confirmed = globalThis.window?.confirm(
+      `Assign '${role}' to ${this.adminUserBatchCount} selected admin user(s)? Each account remains subject to the server delegation boundary.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const selectedAdminUserIds = [...this.adminUserBatchSelection];
+    this.viewState.onActionAsync(async () => {
+      const result = await this.opsService.assignAdminRoles(selectedAdminUserIds);
+      this.adminUserStatusBatchResult = null;
+      this.adminUserRoleBatchResult = result;
       for (const adminUserId of result.succeededAdminUserIds) {
         this.adminUserBatchSelection.delete(adminUserId);
       }
@@ -721,6 +762,7 @@ export class OpsViewFacade {
   clearAdminUserBatchSelection(): void {
     this.adminUserBatchSelection.clear();
     this.adminUserStatusBatchResult = null;
+    this.adminUserRoleBatchResult = null;
   }
 
   confirmResetAdminUserPassword(): void {
@@ -848,6 +890,7 @@ export class OpsViewFacade {
         this.adminUserBatchSelection.add(batchAdminUserId);
       }
       this.adminUserStatusBatchResult = null;
+      this.adminUserRoleBatchResult = null;
       return;
     }
 
@@ -1445,7 +1488,8 @@ export class OpsViewFacade {
       this.adminUserBatchSelection.has(item.adminUser.adminUserId)
     );
     const result = this.adminUserStatusBatchResult;
-    if (selectedUsers.length === 0 && !result) {
+    const roleResult = this.adminUserRoleBatchResult;
+    if (selectedUsers.length === 0 && !result && !roleResult) {
       return [];
     }
 
@@ -1478,6 +1522,25 @@ export class OpsViewFacade {
             label: "Failure Details",
             value:
               result?.failures
+                .map(failure => `${failure.adminUserId}: ${failure.error}`)
+                .join(" | ") || "none"
+          },
+          {
+            label: "Role Target",
+            value: this.describeAdminRoleTarget()
+          },
+          {
+            label: "Last Role Succeeded",
+            value: String(roleResult?.succeededAdminUserIds.length ?? 0)
+          },
+          {
+            label: "Last Role Failed",
+            value: String(roleResult?.failures.length ?? 0)
+          },
+          {
+            label: "Role Failure Details",
+            value:
+              roleResult?.failures
                 .map(failure => `${failure.adminUserId}: ${failure.error}`)
                 .join(" | ") || "none"
           }
@@ -2446,6 +2509,25 @@ export class OpsViewFacade {
     return Object.entries(value).flatMap(([key, child]) =>
       typeof child === "string" ? [key] : this.flattenRouteNames(child)
     );
+  }
+
+  private describeAdminRoleTarget(): string {
+    const role = this.ops.adminRoleRole;
+    if (role === "platform_admin") {
+      return role;
+    }
+    if (role === "tenant_admin") {
+      return `${role} / ${this.ops.adminRoleTenantKey.trim() || "missing tenant"}`;
+    }
+    return [
+      role,
+      this.ops.adminRoleAccessMode,
+      this.ops.adminRoleTenantKey.trim() || "missing tenant",
+      this.ops.adminRoleWorkspaceKey.trim() || "missing workspace",
+      ...(role === "group_monitor"
+        ? [this.ops.adminRoleGroupKey.trim() || "missing group"]
+        : [])
+    ].join(" / ");
   }
 
   private isScopedAdminRoleInputComplete(

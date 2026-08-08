@@ -2307,12 +2307,56 @@ try {
     "Add To Batch",
     delegatedWorkspaceAdminUsername
   );
-  await selectAndCommit("#adminBatchStatusValue", "disabled");
+  await selectAndCommit("#adminRoleRole", "system_check");
+  await fillAndCommit("#adminRoleTenantKey", tenantKey);
+  await fillAndCommit("#adminRoleWorkspaceKey", workspaceKey);
+  await expectButtonSelectorEnabled("#adminBatchAssignRoleButton");
   const selectedAdminAccounts = page
     .locator("app-record-collection")
     .filter({
       has: page.getByRole("heading", { name: "Selected Admin Accounts" })
     });
+  await selectedAdminAccounts
+    .filter({ hasText: workspaceAdminUserId })
+    .filter({ hasText: delegatedWorkspaceAdminUserId })
+    .filter({ hasText: "system_check" })
+    .waitFor();
+  logStep("admin-user-bulk-role");
+  const assignAdminBatchRoleDialog = acceptNextDialog(
+    /Assign 'system_check' to 2 selected admin user\(s\)\? Each account remains subject to the server delegation boundary\./
+  );
+  await page.locator("#adminBatchAssignRoleButton").click();
+  await assignAdminBatchRoleDialog;
+  await waitForNotBusy("admin-user-bulk-role");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      [workspaceAdminUserId, delegatedWorkspaceAdminUserId].every(adminUserId =>
+        payload.items.some(
+          item =>
+            item?.adminUser?.adminUserId === adminUserId &&
+            item?.roleAssignments?.some(
+              roleAssignment => roleAssignment?.role === "system_check"
+            )
+        )
+      )
+  );
+  await selectedAdminAccounts
+    .filter({ hasText: "Last Role Succeeded" })
+    .filter({ hasText: "Last Role Failed" })
+    .waitFor();
+  stopAfter("admin-user-bulk-role");
+
+  await clickCardAction("Admin Users", "Add To Batch", workspaceAdminUsername);
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    delegatedWorkspaceAdminUsername
+  );
+  await selectAndCommit("#adminBatchStatusValue", "disabled");
   await selectedAdminAccounts
     .filter({ hasText: "2 selected account(s) will be changed to disabled" })
     .filter({ hasText: workspaceAdminUserId })

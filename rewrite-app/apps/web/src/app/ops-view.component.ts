@@ -522,6 +522,20 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article id="adminUserBatchRoleCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Bulk role management</span>
+            <h2>Selected Account Role</h2>
+          </div>
+          <span class="status-pill">{{ view.adminUserBatchCount }}/50 selected</span>
+        </div>
+        <p>Apply the role and scope configured in Admin User Management to the exact selected accounts. Existing identical assignments remain unchanged; each target is independently re-authorized and failed accounts stay selected for retry.</p>
+        <div class="actions">
+          <button id="adminBatchAssignRoleButton" class="danger" type="button" [disabled]="!view.canAssignAdminUserBatchRole" (click)="view.confirmAssignAdminUserBatchRole()">Assign Role To Selected Accounts</button>
+        </div>
+      </article>
+
       <app-record-collection
         title="Selected Admin Accounts"
         subtitle="Exact best-effort batch preview and the most recent per-account result."
