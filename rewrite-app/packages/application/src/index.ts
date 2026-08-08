@@ -8448,8 +8448,98 @@ const validateTestcenterXmlSourceDocument = (
       "monitor-study",
       "sys-check-login"
     ]);
+    const directChildren = xmlChildElements(root);
+    const directChildRanks = new Map([
+      ["Metadata", 0],
+      ["CustomTexts", 1],
+      ["Profiles", 2],
+      ["Group", 3]
+    ]);
+    let previousDirectChildRank = -1;
+    for (const child of directChildren) {
+      const childName = xmlElementLocalName(child);
+      const rank = directChildRanks.get(childName);
+      if (rank === undefined) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testtakers_child_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains unsupported direct child '${childName}'.`
+          )
+        );
+        continue;
+      }
+      if (rank < previousDirectChildRank) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_testtakers_sequence_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains direct children outside schema order.`
+          )
+        );
+        break;
+      }
+      previousDirectChildRank = rank;
+    }
+    const metadataContainers = xmlChildrenNamed(root, "Metadata");
+    const customTextContainers = xmlChildrenNamed(root, "CustomTexts");
+    const profileContainers = xmlChildrenNamed(root, "Profiles");
+    if (
+      metadataContainers.length > 1 ||
+      customTextContainers.length > 1 ||
+      profileContainers.length > 1
+    ) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_testtakers_child_cardinality_invalid",
+          `Original Testcenter roster '${sourceFileName}' contains repeated Metadata, CustomTexts, or Profiles elements.`
+        )
+      );
+    }
+    for (const customTextContainer of customTextContainers) {
+      const children = xmlChildElements(customTextContainer);
+      if (children.length === 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_custom_texts_cardinality_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains CustomTexts without a CustomText.`
+          )
+        );
+      }
+      for (const child of children) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "CustomText") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_custom_texts_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported CustomTexts child '${childName}'.`
+            )
+          );
+        }
+      }
+    }
+    for (const profileContainer of profileContainers) {
+      const children = xmlChildElements(profileContainer);
+      for (const child of children) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "GroupMonitor") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_profiles_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported Profiles child '${childName}'.`
+            )
+          );
+        }
+      }
+      if (xmlChildrenNamed(profileContainer, "GroupMonitor").length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_profiles_child_cardinality_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains multiple Profiles/GroupMonitor elements.`
+          )
+        );
+      }
+    }
     const groups = xmlChildrenNamed(root, "Group");
-    const customTexts = xmlChildrenNamed(root, "CustomTexts").flatMap(container =>
+    const customTexts = customTextContainers.flatMap(container =>
       xmlChildrenNamed(container, "CustomText")
     );
     for (const customText of customTexts) {
@@ -8473,10 +8563,22 @@ const validateTestcenterXmlSourceDocument = (
       )
     );
 
-    const profileContainers = xmlChildrenNamed(root, "Profiles");
     const groupMonitorContainers = profileContainers.flatMap(container =>
       xmlChildrenNamed(container, "GroupMonitor")
     );
+    for (const groupMonitorContainer of groupMonitorContainers) {
+      for (const child of xmlChildElements(groupMonitorContainer)) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "Profile") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_group_monitor_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported GroupMonitor child '${childName}'.`
+            )
+          );
+        }
+      }
+    }
     const monitorProfiles = groupMonitorContainers.flatMap(container =>
       xmlChildrenNamed(container, "Profile")
     );
@@ -8602,6 +8704,26 @@ const validateTestcenterXmlSourceDocument = (
     }
     const logins = groups.flatMap(group => xmlChildrenNamed(group, "Login"));
     for (const group of groups) {
+      const groupChildren = xmlChildElements(group);
+      for (const child of groupChildren) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "Login") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_group_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported Group child '${childName}' for '${group.getAttribute("id")?.trim() || "unknown"}'.`
+            )
+          );
+        }
+      }
+      if (xmlChildrenNamed(group, "Login").length === 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_group_logins_missing",
+            `Original Testcenter roster '${sourceFileName}' requires Group '${group.getAttribute("id")?.trim() || "unknown"}' to contain at least one Login.`
+          )
+        );
+      }
       if (!group.getAttribute("id")?.trim()) {
         diagnostics.push(
           createImportDiagnostic(
@@ -8665,6 +8787,31 @@ const validateTestcenterXmlSourceDocument = (
       }
     }
     for (const login of logins) {
+      const loginChildren = xmlChildElements(login);
+      let viewSettingsSeen = false;
+      for (const child of loginChildren) {
+        const childName = xmlElementLocalName(child);
+        if (!["Booklet", "Profile", "ViewSettings"].includes(childName)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_child_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains unsupported Login child '${childName}' for '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+          continue;
+        }
+        if (childName === "ViewSettings") {
+          viewSettingsSeen = true;
+        } else if (viewSettingsSeen) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_sequence_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains an assignment after ViewSettings for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+          break;
+        }
+      }
       if (!login.getAttribute("name")?.trim()) {
         diagnostics.push(
           createImportDiagnostic(

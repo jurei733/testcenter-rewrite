@@ -27,7 +27,8 @@ invalid or duplicate adaptive state/option identities, empty state option sets,
 broken `Show if/is` references, malformed recursive conditions and aggregates,
 unresolved adaptive Unit aliases or inline/external Unit variables, dangling or
 invalid Testtakers monitor profiles, malformed multi-state presets, invalid or
-unsafe Testtakers access windows, and duplicate runtime identities. The matching
+unsafe Testtakers access windows, invalid container cardinality/order and empty
+group login lists, and duplicate runtime identities. The matching
 original repeated-Unit-ID fixture
 proves that an explicit alias remains valid while duplicate Unit runtime keys
 and duplicate Testlet IDs are rejected. The byte-identical original

@@ -9882,6 +9882,54 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
   const invalidRosterFacetCases = [
     {
+      label: "duplicate Testtakers metadata container",
+      rosterText: validRosterXml.replace(
+        "</Metadata>",
+        "</Metadata><Metadata><Description>duplicate</Description></Metadata>"
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_child_cardinality_invalid"
+    },
+    {
+      label: "Testtakers children outside schema order",
+      rosterText: validRosterXml.replace(
+        "</Profiles>",
+        '</Profiles><CustomTexts><CustomText key="late">late</CustomText></CustomTexts>'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_sequence_invalid"
+    },
+    {
+      label: "unsupported Testtakers direct child",
+      rosterText: validRosterXml.replace(
+        '<Group id="sample_group"',
+        '<Unexpected /><Group id="sample_group"'
+      ),
+      diagnosticCode: "testcenter_xml_testtakers_child_invalid"
+    },
+    {
+      label: "empty Testtakers custom text container",
+      rosterText: validRosterXml.replace(
+        '<CustomText key="somestr">string</CustomText>',
+        ""
+      ),
+      diagnosticCode: "testcenter_xml_custom_texts_cardinality_invalid"
+    },
+    {
+      label: "Testtakers group without login",
+      rosterText: validRosterXml.replace(
+        "</Testtakers>",
+        '<Group id="empty" label="Empty"></Group></Testtakers>'
+      ),
+      diagnosticCode: "testcenter_xml_group_logins_missing"
+    },
+    {
+      label: "login assignment after view settings",
+      rosterText: validRosterXml.replace(
+        '<Login mode="monitor-group" name="test-group-monitor" pw="user123"/>',
+        '<Login mode="monitor-group" name="test-group-monitor" pw="user123"><ViewSettings /><Profile id="all" /></Login>'
+      ),
+      diagnosticCode: "testcenter_xml_login_sequence_invalid"
+    },
+    {
       label: "missing monitor profile",
       rosterText: validRosterXml.replace(
         '<Profile id="small" />',
