@@ -543,7 +543,10 @@ export type WorkspaceResultsPort = {
     fileName: string;
     modifiedAt?: string;
     report: unknown;
-  }): Promise<SystemCheckReport>;
+  }): Promise<{
+    report: SystemCheckReport;
+    disposition: "imported" | "already_imported";
+  }>;
 };
 
 export type WorkspaceReviewPort = {
@@ -16067,6 +16070,25 @@ export const createFirstSliceServices = (
     fileData: legacySystemCheckFileData(report)
   });
 
+  const systemCheckReportMigrationDigest = (
+    report: SystemCheckReport
+  ): string =>
+    createHash("sha256")
+      .update(
+        JSON.stringify({
+          date: report.sourceDate ?? formatLegacySystemCheckDate(report.createdAt),
+          checkId: report.checkId.toUpperCase(),
+          checkLabel: report.checkLabel,
+          title: report.title,
+          responses: report.responses,
+          environment: report.environment,
+          network: report.network,
+          questionnaire: report.questionnaire,
+          unit: report.unit
+        })
+      )
+      .digest("hex");
+
   const readSystemCheckReportRecords = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -19053,6 +19075,28 @@ export const createFirstSliceServices = (
           ),
           createdAt
         };
+        report.sourceDigest = systemCheckReportMigrationDigest(report);
+        const existingReport = (
+          await readSystemCheckReportRecords({
+            tenantKey: input.tenantKey,
+            workspaceKey: input.workspaceKey
+          })
+        )
+          .map(record => record.report)
+          .find(
+            candidate =>
+              candidate.originalFileName?.toUpperCase() ===
+                originalFileName.toUpperCase() &&
+              (candidate.sourceDigest ??
+                systemCheckReportMigrationDigest(candidate)) ===
+                report.sourceDigest
+          );
+        if (existingReport) {
+          return {
+            report: existingReport,
+            disposition: "already_imported"
+          };
+        }
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
@@ -19066,7 +19110,7 @@ export const createFirstSliceServices = (
             importedAt
           }
         });
-        return report;
+        return { report, disposition: "imported" };
       },
       async deleteGroupResults(input) {
         const groupKey = normalizeGroupKey(input.groupKey);

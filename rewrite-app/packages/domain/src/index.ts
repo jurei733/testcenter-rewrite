@@ -683,6 +683,8 @@ export type SystemCheckReport = {
   fileModifiedAt?: string;
   /** The report's original, human-readable `date` field. */
   sourceDate?: string;
+  /** Stable semantic digest used to make legacy file migration resumable. */
+  sourceDigest?: string;
   checkId: string;
   checkLabel: string;
   title: string;

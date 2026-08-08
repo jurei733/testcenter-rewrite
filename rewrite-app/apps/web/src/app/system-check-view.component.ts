@@ -255,17 +255,32 @@ type ThroughputResult = {
               id="legacySystemCheckReportInput"
               type="file"
               accept=".json,application/json"
+              multiple
+              hidden
+              (change)="importOperatorReport($event)"
+            />
+            <input
+              #legacyReportDirectoryInput
+              id="legacySystemCheckReportDirectoryInput"
+              type="file"
+              accept=".json,application/json"
+              multiple
+              webkitdirectory
               hidden
               (change)="importOperatorReport($event)"
             />
             <div class="actions">
               <button id="loadSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="loadOperatorReports()">Load Reports</button>
-              <button id="importSystemCheckReportButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportInput.click()">Import original JSON</button>
+              <button id="importSystemCheckReportButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportInput.click()">Import report files</button>
+              <button id="importSystemCheckReportDirectoryButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportDirectoryInput.click()">Import report folder</button>
               <button id="exportSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReports()">Export CSV</button>
               <button id="exportSystemCheckReportsJsonButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReportsJson()">Export JSON</button>
               <button id="deleteSystemCheckReportsButton" class="danger" type="button" [disabled]="!hasAdminSession || busy || selectedOperatorCheckIds.length === 0" (click)="deleteOperatorReports()">Delete selected</button>
             </div>
             <p id="systemCheckReportOperatorStatus" *ngIf="operatorStatusMessage">{{ operatorStatusMessage }}</p>
+            <ul id="systemCheckReportImportFailures" *ngIf="operatorImportFailures.length > 0">
+              <li *ngFor="let failure of operatorImportFailures">{{ failure }}</li>
+            </ul>
             <div class="system-check-statistics" *ngIf="operatorStatistics.length > 0">
               <article *ngFor="let statistics of operatorStatistics">
                 <label class="choice-row">
@@ -394,6 +409,7 @@ export class SystemCheckViewComponent implements OnInit {
   selectedOperatorCheckIds: string[] = [];
   selectedOperatorReport: SystemCheckReport | null = null;
   operatorStatusMessage = "";
+  operatorImportFailures: string[] = [];
   busy = false;
   systemCheckAuthenticationBusy = false;
   errorMessage = "";
@@ -894,53 +910,71 @@ export class SystemCheckViewComponent implements OnInit {
 
   async importOperatorReport(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
     const check = this.systemCheck;
-    if (!file || !check || !this.hasAdminSession) {
+    if (files.length === 0 || !check || !this.hasAdminSession) {
       input.value = "";
       return;
     }
-    try {
-      const report = JSON.parse(await file.text()) as unknown;
-      const importedCheckId =
-        report && typeof report === "object" && !Array.isArray(report)
-          ? String((report as Record<string, unknown>).checkId ?? "").trim()
-          : "";
-      if (importedCheckId.toUpperCase() !== check.checkId.toUpperCase()) {
-        throw new Error(
-          `The report belongs to '${importedCheckId || "an unknown check"}', not '${check.checkId}'.`
-        );
-      }
-      await this.run(async () => {
-        const { payload } = await this.api.send<ImportSystemCheckReportResponse>(
-          "POST",
-          this.workspaceRoute(
-            productionApiRoutes.workspace.importSystemCheckReport
-          ),
-          {
-            fileName: file.name,
-            ...(file.lastModified > 0
-              ? { modifiedAt: new Date(file.lastModified).toISOString() }
-              : {}),
-            report
-          },
-          this.adminHeaders
-        );
-        await this.refreshOperatorReports(check);
-        this.selectedOperatorReport = payload.report;
-        this.operatorStatusMessage = `Imported ${payload.report.originalFileName ?? file.name}.`;
-      });
-    } catch (error) {
-      this.errorMessage =
-        error instanceof SyntaxError
-          ? "The selected file is not valid JSON."
-          : error instanceof Error
-            ? error.message
-            : String(error);
-      this.changeDetectorRef.detectChanges();
-    } finally {
+    if (files.length > 200) {
+      this.errorMessage = "Select at most 200 report files per migration batch.";
       input.value = "";
+      this.changeDetectorRef.detectChanges();
+      return;
     }
+    await this.run(async () => {
+      let importedCount = 0;
+      let alreadyImportedCount = 0;
+      let selectedReport: SystemCheckReport | null = null;
+      const failures: string[] = [];
+      for (const file of files) {
+        if (!/\.json$/i.test(file.name)) {
+          failures.push(`${file.name}: not a JSON report file.`);
+          continue;
+        }
+        try {
+          const report = JSON.parse(await file.text()) as unknown;
+          const { payload } = await this.api.send<ImportSystemCheckReportResponse>(
+            "POST",
+            this.workspaceRoute(
+              productionApiRoutes.workspace.importSystemCheckReport
+            ),
+            {
+              fileName: file.name,
+              ...(file.lastModified > 0
+                ? { modifiedAt: new Date(file.lastModified).toISOString() }
+                : {}),
+              report
+            },
+            this.adminHeaders
+          );
+          if (payload.disposition === "imported") {
+            importedCount += 1;
+          } else {
+            alreadyImportedCount += 1;
+          }
+          if (payload.report.checkId.toUpperCase() === check.checkId.toUpperCase()) {
+            selectedReport = payload.report;
+          }
+        } catch (error) {
+          const message = this.api.isApiError(error)
+            ? `${error.error}: ${error.message}`
+            : error instanceof SyntaxError
+              ? "invalid JSON."
+              : error instanceof Error
+                ? error.message
+                : String(error);
+          failures.push(`${file.name}: ${message}`);
+        }
+      }
+      await this.refreshOperatorReports(check);
+      if (selectedReport) {
+        this.selectedOperatorReport = selectedReport;
+      }
+      this.operatorImportFailures = failures.slice(0, 20);
+      this.operatorStatusMessage = `${importedCount} imported, ${alreadyImportedCount} already present, ${failures.length} failed.`;
+    });
+    input.value = "";
   }
 
   isOperatorCheckSelected(checkId: string): boolean {

@@ -1349,20 +1349,72 @@ try {
       `${systemCheckWorkspaceKey}-system-check-reports.csv`
     );
     await expectButtonSelectorEnabled("#importSystemCheckReportButton");
+    await expectButtonSelectorEnabled("#importSystemCheckReportDirectoryButton");
+    const originalSystemCheckReportPath = resolve(
+      "test-fixtures/original-testcenter/system-checks/SysCheck-Report.json"
+    );
     await page.locator("#legacySystemCheckReportInput").setInputFiles(
-      resolve(
-        "test-fixtures/original-testcenter/system-checks/SysCheck-Report.json"
-      )
+      originalSystemCheckReportPath
     );
     await page
       .locator("#systemCheckReportOperatorStatus")
-      .filter({ hasText: "Imported SysCheck-Report.json." })
+      .filter({ hasText: "1 imported, 0 already present, 0 failed." })
       .waitFor({ timeout: 15_000 });
     await page
       .locator(".system-check-report-detail")
       .filter({ hasText: "SAMPLE SYS-CHECK REPORT" })
       .filter({ hasText: "Original file: SysCheck-Report.json" })
       .filter({ hasText: "Linux" })
+      .waitFor({ timeout: 15_000 });
+    const originalSystemCheckReportText = await readFile(
+      originalSystemCheckReportPath,
+      "utf8"
+    );
+    const secondLegacySystemCheckReport = {
+      ...JSON.parse(originalSystemCheckReportText),
+      checkId: "syscheck-2",
+      checkLabel: "System-Check-2",
+      title: "MIGRATED SYSTEM-CHECK-2 REPORT"
+    };
+    await page.locator("#legacySystemCheckReportInput").setInputFiles([
+      {
+        name: "SysCheck-Report.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(originalSystemCheckReportText, "utf8")
+      },
+      {
+        name: "SysCheck-2-Report.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(
+          `${JSON.stringify(secondLegacySystemCheckReport, null, 2)}\n`,
+          "utf8"
+        )
+      },
+      {
+        name: "broken-report.json",
+        mimeType: "application/json",
+        buffer: Buffer.from("{", "utf8")
+      },
+      {
+        name: "missing-check-report.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(
+          JSON.stringify({
+            ...secondLegacySystemCheckReport,
+            checkId: "missing-check"
+          }),
+          "utf8"
+        )
+      }
+    ]);
+    await page
+      .locator("#systemCheckReportOperatorStatus")
+      .filter({ hasText: "1 imported, 1 already present, 2 failed." })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator("#systemCheckReportImportFailures")
+      .filter({ hasText: "broken-report.json: invalid JSON." })
+      .filter({ hasText: "missing-check-report.json: system_check_not_found" })
       .waitFor({ timeout: 15_000 });
     await expectButtonSelectorEnabled("#exportSystemCheckReportsJsonButton");
     const systemCheckReportJsonDownloadPromise = page.waitForEvent("download");
@@ -1500,7 +1552,7 @@ try {
     await page.locator("#deleteSystemCheckReportsButton").click();
     await page
       .locator("#systemCheckReportOperatorStatus")
-      .filter({ hasText: "1 report(s) deleted." })
+      .filter({ hasText: "2 report(s) deleted." })
       .waitFor({ timeout: 15_000 });
     stopAfter("system-check-report");
 

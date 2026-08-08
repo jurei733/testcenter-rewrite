@@ -2779,6 +2779,7 @@ export type DeleteSystemCheckReportsResponse = {
 
 export type ImportSystemCheckReportResponse = {
   report: SystemCheckReport;
+  disposition: "imported" | "already_imported";
 };
 
 export type ParticipantSignInResponse = {

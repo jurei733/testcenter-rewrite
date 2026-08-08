@@ -24602,6 +24602,7 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.equal(removedDeprecatedReport.body.deletion.deletedCount, 1);
 
   const importedLegacyReport = await requestJson<{
+    disposition: "imported" | "already_imported";
     report: {
       systemCheckReportId: string;
       originalFileName: string;
@@ -24623,6 +24624,7 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     }
   );
   assert.equal(importedLegacyReport.status, 201);
+  assert.equal(importedLegacyReport.body.disposition, "imported");
   assert.equal(
     importedLegacyReport.body.report.originalFileName,
     "SAMPLE_SYSCHECK-REPORT.JSON"
@@ -24643,6 +24645,44 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.deepEqual(
     importedLegacyReport.body.report.environment,
     legacyReport.environment
+  );
+
+  const repeatedLegacyReport = await requestJson<{
+    disposition: "imported" | "already_imported";
+    report: {
+      systemCheckReportId: string;
+      fileModifiedAt: string;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports/import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "SAMPLE_SYSCHECK-REPORT.JSON",
+        modifiedAt: "2026-08-08T08:00:00.000Z",
+        report: legacyReport
+      }
+    }
+  );
+  assert.equal(repeatedLegacyReport.status, 200);
+  assert.equal(repeatedLegacyReport.body.disposition, "already_imported");
+  assert.equal(
+    repeatedLegacyReport.body.report.systemCheckReportId,
+    importedLegacyReport.body.report.systemCheckReportId
+  );
+  assert.equal(
+    repeatedLegacyReport.body.report.fileModifiedAt,
+    "2021-07-29T08:00:00.000Z"
+  );
+
+  const reportsAfterRepeatedImport = await requestJson<{
+    items: Array<{ systemCheckReportId: string }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports?checkId=SYSCHECK.SAMPLE`
+  );
+  assert.deepEqual(
+    reportsAfterRepeatedImport.body.items.map(item => item.systemCheckReportId),
+    [importedLegacyReport.body.report.systemCheckReportId]
   );
 
   const legacyCsv = await requestText(

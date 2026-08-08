@@ -6035,14 +6035,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
         const body = await readRequestJsonBody<ImportSystemCheckReportRequest>();
-        const report = await services.workspaceResults.importSystemCheckReport({
+        const result = await services.workspaceResults.importSystemCheckReport({
           tenantKey,
           workspaceKey,
           fileName: body.fileName,
           modifiedAt: body.modifiedAt,
           report: body.report
         });
-        sendJson<ImportSystemCheckReportResponse>(response, 201, { report });
+        sendJson<ImportSystemCheckReportResponse>(
+          response,
+          result.disposition === "imported" ? 201 : 200,
+          result
+        );
         return;
       }
 
