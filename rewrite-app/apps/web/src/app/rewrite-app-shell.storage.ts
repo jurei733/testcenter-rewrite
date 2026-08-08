@@ -123,6 +123,7 @@ export type ShellPersistenceTarget = {
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
+  adminRoleMonitorProfilesJson: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -252,6 +253,7 @@ export const createPersistedShellState = (
   adminRoleTenantKey: target.adminRoleTenantKey,
   adminRoleWorkspaceKey: target.adminRoleWorkspaceKey,
   adminRoleGroupKey: target.adminRoleGroupKey,
+  adminRoleMonitorProfilesJson: target.adminRoleMonitorProfilesJson,
   adminRevokeTargetUserId: target.adminRevokeTargetUserId,
   adminRevokeRoleAssignmentId: target.adminRevokeRoleAssignmentId,
   adminStatusTargetUserId: target.adminStatusTargetUserId,
@@ -694,6 +696,10 @@ export const applyHydratedShellState = (
     );
   target.adminRoleGroupKey =
     hydrateString(snapshot.adminRoleGroupKey, target.adminRoleGroupKey);
+  target.adminRoleMonitorProfilesJson = hydrateString(
+    snapshot.adminRoleMonitorProfilesJson,
+    target.adminRoleMonitorProfilesJson
+  );
   target.adminRevokeTargetUserId =
     hydrateString(
       snapshot.adminRevokeTargetUserId,

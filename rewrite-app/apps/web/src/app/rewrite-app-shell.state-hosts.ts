@@ -792,6 +792,12 @@ export function createShellPersistenceStateHost(args: {
     set adminRoleGroupKey(nextValue) {
       args.opsState.adminRoleGroupKey = nextValue;
     },
+    get adminRoleMonitorProfilesJson() {
+      return args.opsState.adminRoleMonitorProfilesJson;
+    },
+    set adminRoleMonitorProfilesJson(nextValue) {
+      args.opsState.adminRoleMonitorProfilesJson = nextValue;
+    },
     get adminRevokeTargetUserId() {
       return args.opsState.adminRevokeTargetUserId;
     },

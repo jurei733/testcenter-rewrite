@@ -16,7 +16,9 @@ import {
   type AdminRole,
   type AdminRoleAccessMode,
   type AdminSessionStatus,
-  type AdminUserStatus
+  type AdminUserStatus,
+  type MonitorViewProfile,
+  type MonitorViewProfileFilter
 } from "@testcenter-rewrite-app/domain";
 
 import type { RecordCollectionItem } from "./record-collection.component";
@@ -133,6 +135,45 @@ export class OpsViewFacade {
     "revoked"
   ];
   readonly adminAuditEventTypeOptions = adminAuditEventTypes;
+  readonly monitorProfileViewOptions = ["small", "middle", "large"];
+  readonly monitorProfileColumnOptions = ["show", "hide"];
+  readonly monitorProfileFilterTargetOptions = [
+    "groupName",
+    "personLabel",
+    "mode",
+    "bookletId",
+    "bookletLabel",
+    "bookletSpecies",
+    "unitId",
+    "unitLabel",
+    "blockId",
+    "blockLabel",
+    "state",
+    "testState",
+    "bookletStates"
+  ];
+  readonly monitorProfileFilterTypeOptions = ["equal", "substring", "regex"];
+
+  monitorProfileEditorTarget: "create" | "role" = "create";
+  monitorProfileDraftSelectedId = "";
+  monitorProfileDraftId = "";
+  monitorProfileDraftLabel = "";
+  monitorProfileDraftView = "middle";
+  monitorProfileDraftBlockColumn = "show";
+  monitorProfileDraftUnitColumn = "show";
+  monitorProfileDraftGroupColumn = "hide";
+  monitorProfileDraftBookletColumn = "show";
+  monitorProfileDraftBookletStatesColumns = "";
+  monitorProfileDraftAutoselectNextBlock: "yes" | "no" = "yes";
+  monitorProfileDraftPending = "no";
+  monitorProfileDraftLocked = "no";
+  monitorProfileDraftFilters: MonitorViewProfileFilter[] = [];
+  monitorFilterDraftTarget = "groupName";
+  monitorFilterDraftType = "equal";
+  monitorFilterDraftValue = "";
+  monitorFilterDraftSubValue = "";
+  monitorFilterDraftLabel = "";
+  monitorFilterDraftNot = false;
 
   init(): void {
     this.viewState.setActiveView("ops");
@@ -255,6 +296,95 @@ export class OpsViewFacade {
       this.ops.adminCreateMonitorProfilesJson
     );
     return Array.isArray(profiles) ? profiles.length : 0;
+  }
+
+  get isAssigningMonitorRole(): boolean {
+    return (
+      this.ops.adminRoleRole === "study_monitor" ||
+      this.ops.adminRoleRole === "group_monitor"
+    );
+  }
+
+  get monitorProfileEditorProfiles(): MonitorViewProfile[] {
+    const profiles = parseJsonDocument<MonitorViewProfile[]>(
+      this.monitorProfileEditorTarget === "create"
+        ? this.ops.adminCreateMonitorProfilesJson
+        : this.ops.adminRoleMonitorProfilesJson
+    );
+    return Array.isArray(profiles) ? profiles : [];
+  }
+
+  get monitorProfileEditorItems(): RecordCollectionItem[] {
+    return this.monitorProfileEditorProfiles.map(profile => ({
+      headline: profile.label || profile.profileId,
+      subline: profile.profileId,
+      badges: [
+        `${profile.settings.view} view`,
+        `${profile.filters.length} filter(s)`,
+        profile.settings.autoselectNextBlock === "yes" ? "auto-next" : "manual-next"
+      ],
+      rows: [
+        {
+          label: "Columns",
+          value: `block ${profile.settings.blockColumn}; unit ${profile.settings.unitColumn}; group ${profile.settings.groupColumn}; booklet ${profile.settings.bookletColumn}`
+        },
+        {
+          label: "Booklet States",
+          value: profile.settings.bookletStatesColumns || "none"
+        },
+        {
+          label: "Built-in Filters",
+          value: `pending ${profile.filtersEnabled.pending}; locked ${profile.filtersEnabled.locked}`
+        }
+      ],
+      selected: profile.profileId === this.monitorProfileDraftSelectedId,
+      actionLabel: "Edit Profile",
+      actionPayload: {
+        monitorProfileAction: "edit",
+        profileId: profile.profileId
+      },
+      actions: [
+        {
+          label: "Delete Profile",
+          payload: {
+            monitorProfileAction: "delete",
+            profileId: profile.profileId
+          }
+        }
+      ]
+    }));
+  }
+
+  get monitorProfileDraftFilterItems(): RecordCollectionItem[] {
+    return this.monitorProfileDraftFilters.map((filter, index) => ({
+      headline: filter.label || filter.target,
+      subline: `${filter.not ? "not " : ""}${filter.type} ${filter.subValue || filter.value}`,
+      badges: [filter.target, filter.type],
+      rows: [
+        { label: "Value", value: filter.value || "empty" },
+        { label: "Sub-value", value: filter.subValue || "none" }
+      ],
+      actionLabel: "Remove Filter",
+      actionPayload: { filterIndex: String(index) }
+    }));
+  }
+
+  get canSaveMonitorProfile(): boolean {
+    const profileId = this.monitorProfileDraftId.trim();
+    return (
+      profileId.length > 0 &&
+      profileId.length <= 128 &&
+      (this.monitorProfileDraftSelectedId !== "" ||
+        this.monitorProfileEditorProfiles.length < 20)
+    );
+  }
+
+  get canAddMonitorProfileFilter(): boolean {
+    return (
+      this.monitorFilterDraftTarget.trim() !== "" &&
+      this.monitorFilterDraftValue.trim() !== "" &&
+      this.monitorProfileDraftFilters.length < 50
+    );
   }
 
   get isCreatingSystemCheckAccount(): boolean {
@@ -633,11 +763,199 @@ export class OpsViewFacade {
     this.ops.adminRevokeRoleAssignmentId = roleAssignmentId;
     this.ops.adminStatusTargetUserId = adminUserId;
     this.ops.adminResetTargetUserId = adminUserId;
+    const role = item.actionPayload?.adminRole;
+    if (role && this.allAdminRoleOptions.includes(role as AdminRole)) {
+      this.ops.adminRoleRole = role as AdminRole;
+    }
+    const accessMode = item.actionPayload?.adminRoleAccessMode;
+    if (accessMode === "read_write" || accessMode === "read_only") {
+      this.ops.adminRoleAccessMode = accessMode;
+    }
+    this.ops.adminRoleGroupKey = item.actionPayload?.groupKey ?? "";
+    this.ops.adminRoleMonitorProfilesJson =
+      item.actionPayload?.monitorProfilesJson ?? "[]";
+    this.monitorProfileEditorTarget = "role";
+    this.resetMonitorProfileDraft();
     const status = item.actionPayload?.adminUserStatus;
     if (status === "active" || status === "disabled") {
       this.ops.adminStatusValue = status;
     }
     this.persistState();
+  }
+
+  setMonitorProfileEditorTarget(target: "create" | "role"): void {
+    if (
+      (target === "create" && !this.isCreatingMonitorAccount) ||
+      (target === "role" && !this.isAssigningMonitorRole)
+    ) {
+      return;
+    }
+    this.monitorProfileEditorTarget = target;
+    this.resetMonitorProfileDraft();
+  }
+
+  adminCreateRoleChanged(): void {
+    if (this.isCreatingMonitorAccount) {
+      this.setMonitorProfileEditorTarget("create");
+    } else if (this.isAssigningMonitorRole) {
+      this.setMonitorProfileEditorTarget("role");
+    }
+    this.persistState();
+  }
+
+  adminRoleRoleChanged(): void {
+    if (this.isAssigningMonitorRole) {
+      this.setMonitorProfileEditorTarget("role");
+    } else if (this.isCreatingMonitorAccount) {
+      this.setMonitorProfileEditorTarget("create");
+    }
+    this.persistState();
+  }
+
+  startNewMonitorProfile(): void {
+    this.resetMonitorProfileDraft();
+  }
+
+  handleMonitorProfileAction(item: RecordCollectionItem): void {
+    const profileId = item.actionPayload?.profileId;
+    if (!profileId) {
+      return;
+    }
+    if (item.actionPayload?.monitorProfileAction === "delete") {
+      const confirmed = globalThis.window?.confirm(
+        `Delete monitor profile '${profileId}' from this draft? The role is only changed after you create the account or update the role scope.`
+      );
+      if (!confirmed) {
+        return;
+      }
+      this.writeMonitorProfileEditorProfiles(
+        this.monitorProfileEditorProfiles.filter(
+          profile => profile.profileId !== profileId
+        )
+      );
+      if (this.monitorProfileDraftSelectedId === profileId) {
+        this.resetMonitorProfileDraft();
+      }
+      return;
+    }
+
+    const profile = this.monitorProfileEditorProfiles.find(
+      candidate => candidate.profileId === profileId
+    );
+    if (!profile) {
+      return;
+    }
+    this.monitorProfileDraftSelectedId = profile.profileId;
+    this.monitorProfileDraftId = profile.profileId;
+    this.monitorProfileDraftLabel = profile.label;
+    this.monitorProfileDraftView = profile.settings.view;
+    this.monitorProfileDraftBlockColumn = profile.settings.blockColumn;
+    this.monitorProfileDraftUnitColumn = profile.settings.unitColumn;
+    this.monitorProfileDraftGroupColumn = profile.settings.groupColumn;
+    this.monitorProfileDraftBookletColumn = profile.settings.bookletColumn;
+    this.monitorProfileDraftBookletStatesColumns =
+      profile.settings.bookletStatesColumns;
+    this.monitorProfileDraftAutoselectNextBlock =
+      profile.settings.autoselectNextBlock;
+    this.monitorProfileDraftPending = profile.filtersEnabled.pending;
+    this.monitorProfileDraftLocked = profile.filtersEnabled.locked;
+    this.monitorProfileDraftFilters = profile.filters.map(filter => ({
+      ...filter
+    }));
+  }
+
+  addMonitorProfileDraftFilter(): void {
+    if (!this.canAddMonitorProfileFilter) {
+      return;
+    }
+    this.monitorProfileDraftFilters = [
+      ...this.monitorProfileDraftFilters,
+      {
+        target: this.monitorFilterDraftTarget.trim(),
+        value: this.monitorFilterDraftValue.trim(),
+        subValue: this.monitorFilterDraftSubValue.trim() || null,
+        label: this.monitorFilterDraftLabel.trim(),
+        type: this.monitorFilterDraftType.trim() || "equal",
+        not: this.monitorFilterDraftNot
+      }
+    ];
+    this.monitorFilterDraftValue = "";
+    this.monitorFilterDraftSubValue = "";
+    this.monitorFilterDraftLabel = "";
+    this.monitorFilterDraftNot = false;
+  }
+
+  removeMonitorProfileDraftFilter(item: RecordCollectionItem): void {
+    const index = Number(item.actionPayload?.filterIndex);
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= this.monitorProfileDraftFilters.length
+    ) {
+      return;
+    }
+    this.monitorProfileDraftFilters = this.monitorProfileDraftFilters.filter(
+      (_filter, filterIndex) => filterIndex !== index
+    );
+  }
+
+  saveMonitorProfile(): void {
+    if (!this.canSaveMonitorProfile) {
+      return;
+    }
+    const profileId = this.monitorProfileDraftId.trim();
+    const profile: MonitorViewProfile = {
+      profileId,
+      label: this.monitorProfileDraftLabel.trim(),
+      settings: {
+        blockColumn: this.monitorProfileDraftBlockColumn,
+        unitColumn: this.monitorProfileDraftUnitColumn,
+        view: this.monitorProfileDraftView,
+        groupColumn: this.monitorProfileDraftGroupColumn,
+        bookletColumn: this.monitorProfileDraftBookletColumn,
+        bookletStatesColumns: this.monitorProfileDraftBookletStatesColumns.trim(),
+        autoselectNextBlock: this.monitorProfileDraftAutoselectNextBlock
+      },
+      filters: this.monitorProfileDraftFilters.map(filter => ({ ...filter })),
+      filtersEnabled: {
+        pending: this.monitorProfileDraftPending,
+        locked: this.monitorProfileDraftLocked
+      }
+    };
+    const selectedId = this.monitorProfileDraftSelectedId;
+    const profiles = this.monitorProfileEditorProfiles.filter(
+      candidate =>
+        candidate.profileId !== profileId &&
+        (!selectedId || candidate.profileId !== selectedId)
+    );
+    this.writeMonitorProfileEditorProfiles([...profiles, profile]);
+    this.monitorProfileDraftSelectedId = profileId;
+  }
+
+  private writeMonitorProfileEditorProfiles(profiles: MonitorViewProfile[]): void {
+    const serialized = JSON.stringify(profiles);
+    if (this.monitorProfileEditorTarget === "create") {
+      this.ops.adminCreateMonitorProfilesJson = serialized;
+    } else {
+      this.ops.adminRoleMonitorProfilesJson = serialized;
+    }
+    this.persistState();
+  }
+
+  private resetMonitorProfileDraft(): void {
+    this.monitorProfileDraftSelectedId = "";
+    this.monitorProfileDraftId = "";
+    this.monitorProfileDraftLabel = "";
+    this.monitorProfileDraftView = "middle";
+    this.monitorProfileDraftBlockColumn = "show";
+    this.monitorProfileDraftUnitColumn = "show";
+    this.monitorProfileDraftGroupColumn = "hide";
+    this.monitorProfileDraftBookletColumn = "show";
+    this.monitorProfileDraftBookletStatesColumns = "";
+    this.monitorProfileDraftAutoselectNextBlock = "yes";
+    this.monitorProfileDraftPending = "no";
+    this.monitorProfileDraftLocked = "no";
+    this.monitorProfileDraftFilters = [];
   }
 
   selectAdminAuditEvent(item: RecordCollectionItem): void {
@@ -914,11 +1232,15 @@ export class OpsViewFacade {
         ],
         selected:
           roleAssignment.roleAssignmentId === this.ops.adminRevokeRoleAssignmentId,
-        actionLabel: "Use For Revoke",
+        actionLabel: "Edit Role Scope",
         actionPayload: {
           adminUserId: item.adminUser.adminUserId,
           roleAssignmentId: roleAssignment.roleAssignmentId,
-          adminUserStatus: item.adminUser.status
+          adminUserStatus: item.adminUser.status,
+          adminRole: roleAssignment.role,
+          adminRoleAccessMode: roleAssignment.accessMode,
+          groupKey: roleAssignment.groupKey ?? "",
+          monitorProfilesJson: JSON.stringify(roleAssignment.monitorProfiles)
         }
       }))
     );

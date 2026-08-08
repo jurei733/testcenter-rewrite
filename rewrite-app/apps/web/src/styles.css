@@ -282,6 +282,18 @@ label {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
+label.inline-check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  align-self: end;
+  min-height: 45px;
+}
+
+label.inline-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
 input,
 textarea,
 select,

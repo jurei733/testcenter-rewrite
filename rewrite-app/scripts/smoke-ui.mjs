@@ -1683,6 +1683,90 @@ try {
           )
       )
   );
+  assert.equal(
+    await page.locator("#monitorProfileEditorTarget").inputValue(),
+    "role"
+  );
+  const authoredMonitorProfileId = "room-overview";
+  await fillAndCommit("#monitorProfileDraftId", authoredMonitorProfileId);
+  await fillAndCommit("#monitorProfileDraftLabel", "Room overview");
+  await selectAndCommit("#monitorProfileDraftView", "small");
+  await selectAndCommit("#monitorProfileDraftGroupColumn", "show");
+  await selectAndCommit("#monitorProfileDraftLocked", "yes");
+  await selectAndCommit("#monitorFilterDraftTarget", "groupName");
+  await selectAndCommit("#monitorFilterDraftType", "substring");
+  await fillAndCommit("#monitorFilterDraftValue", "group:hidden");
+  await fillAndCommit("#monitorFilterDraftLabel", "Hide hidden groups");
+  await expectButtonSelectorEnabled("#addMonitorProfileFilterButton");
+  await page.locator("#addMonitorProfileFilterButton").click();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Profile Draft Filters" }) })
+    .filter({ hasText: "Hide hidden groups" })
+    .filter({ hasText: "substring group:hidden" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#saveMonitorProfileButton");
+  await page.locator("#saveMonitorProfileButton").click();
+  await page
+    .locator("article.card")
+    .filter({ has: page.getByRole("heading", { name: "Monitor Profile Library" }) })
+    .filter({ hasText: "Room overview" })
+    .filter({ hasText: "small view" })
+    .filter({ hasText: "1 filter(s)" })
+    .waitFor();
+  const persistedProfileDraft = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+  );
+  assert.equal(
+    JSON.parse(persistedProfileDraft.adminRoleMonitorProfilesJson)[0]?.profileId,
+    authoredMonitorProfileId
+  );
+  await clickAction("Assign Role");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item?.roleAssignments?.some(
+            roleAssignment =>
+              roleAssignment?.role === "group_monitor" &&
+              roleAssignment?.groupKey === groupMonitorKey &&
+              roleAssignment?.monitorProfiles?.some(
+                profile =>
+                  profile?.profileId === authoredMonitorProfileId &&
+                  profile?.settings?.view === "small" &&
+                  profile?.settings?.groupColumn === "show" &&
+                  profile?.filtersEnabled?.locked === "yes" &&
+                  profile?.filters?.some(
+                    filter =>
+                      filter?.target === "groupName" &&
+                      filter?.type === "substring" &&
+                      filter?.value === "group:hidden"
+                  )
+              )
+          )
+      )
+  );
+  await clickCardAction(
+    "Admin Role Assignments",
+    "Edit Role Scope",
+    "group_monitor"
+  );
+  await clickCardAction(
+    "Monitor Profile Library",
+    "Edit Profile",
+    "Room overview"
+  );
+  await expectInputValue("#monitorProfileDraftId", authoredMonitorProfileId);
+  await expectInputValue("#monitorProfileDraftLabel", "Room overview");
+  await expectInputValue("#monitorProfileDraftView", "small");
+  await expectInputValue("#monitorProfileDraftLocked", "yes");
+  logStep("monitor-profile-authoring");
+  stopAfter("monitor-profile-authoring");
   await page
     .locator("article.card")
     .filter({

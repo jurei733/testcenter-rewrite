@@ -141,6 +141,7 @@ export type PersistedShellState = {
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
+  adminRoleMonitorProfilesJson: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;

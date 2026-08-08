@@ -145,7 +145,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Initial Role
-            <select id="adminCreateRole" name="adminCreateRole" [(ngModel)]="view.ops.adminCreateRole" (change)="view.persistState()">
+            <select id="adminCreateRole" name="adminCreateRole" [(ngModel)]="view.ops.adminCreateRole" (change)="view.adminCreateRoleChanged()">
               <option *ngFor="let role of view.adminRoleOptions" [ngValue]="role">{{ role }}</option>
             </select>
           </label>
@@ -205,7 +205,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             Role To Assign
-            <select id="adminRoleRole" name="adminRoleRole" [(ngModel)]="view.ops.adminRoleRole" (change)="view.persistState()">
+            <select id="adminRoleRole" name="adminRoleRole" [(ngModel)]="view.ops.adminRoleRole" (change)="view.adminRoleRoleChanged()">
               <option *ngFor="let role of view.adminRoleOptions" [ngValue]="role">{{ role }}</option>
             </select>
           </label>
@@ -276,6 +276,154 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="adminUpdateStatusButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserStatus" (click)="view.confirmUpdateAdminUserStatus()">Update Status</button>
         </div>
       </article>
+
+      <ng-container *ngIf="view.isCreatingMonitorAccount || view.isAssigningMonitorRole">
+        <article class="card">
+          <h2>Monitor Profile Editor</h2>
+          <p>
+            Author the monitor layout, visibility rules, and reusable run filters
+            without editing raw profile JSON. Save the profile here, then create the
+            account or update the selected role scope above.
+          </p>
+          <div class="form-grid">
+            <label>
+              Profile Destination
+              <select
+                id="monitorProfileEditorTarget"
+                name="monitorProfileEditorTarget"
+                [ngModel]="view.monitorProfileEditorTarget"
+                (ngModelChange)="view.setMonitorProfileEditorTarget($event)"
+              >
+                <option value="create" [disabled]="!view.isCreatingMonitorAccount">New monitor account</option>
+                <option value="role" [disabled]="!view.isAssigningMonitorRole">Selected role scope</option>
+              </select>
+            </label>
+            <label>
+              Profile ID
+              <input id="monitorProfileDraftId" name="monitorProfileDraftId" maxlength="128" placeholder="room-overview" [(ngModel)]="view.monitorProfileDraftId" />
+            </label>
+            <label>
+              Profile Label
+              <input id="monitorProfileDraftLabel" name="monitorProfileDraftLabel" maxlength="256" placeholder="Room overview" [(ngModel)]="view.monitorProfileDraftLabel" />
+            </label>
+            <label>
+              View Density
+              <select id="monitorProfileDraftView" name="monitorProfileDraftView" [(ngModel)]="view.monitorProfileDraftView">
+                <option *ngFor="let option of view.monitorProfileViewOptions" [value]="option">{{ option }}</option>
+              </select>
+            </label>
+            <label>
+              Block Column
+              <select id="monitorProfileDraftBlockColumn" name="monitorProfileDraftBlockColumn" [(ngModel)]="view.monitorProfileDraftBlockColumn">
+                <option *ngFor="let option of view.monitorProfileColumnOptions" [value]="option">{{ option }}</option>
+              </select>
+            </label>
+            <label>
+              Unit Column
+              <select id="monitorProfileDraftUnitColumn" name="monitorProfileDraftUnitColumn" [(ngModel)]="view.monitorProfileDraftUnitColumn">
+                <option *ngFor="let option of view.monitorProfileColumnOptions" [value]="option">{{ option }}</option>
+              </select>
+            </label>
+            <label>
+              Group Column
+              <select id="monitorProfileDraftGroupColumn" name="monitorProfileDraftGroupColumn" [(ngModel)]="view.monitorProfileDraftGroupColumn">
+                <option *ngFor="let option of view.monitorProfileColumnOptions" [value]="option">{{ option }}</option>
+              </select>
+            </label>
+            <label>
+              Booklet Column
+              <select id="monitorProfileDraftBookletColumn" name="monitorProfileDraftBookletColumn" [(ngModel)]="view.monitorProfileDraftBookletColumn">
+                <option *ngFor="let option of view.monitorProfileColumnOptions" [value]="option">{{ option }}</option>
+              </select>
+            </label>
+            <label>
+              Booklet State Columns
+              <input id="monitorProfileDraftBookletStatesColumns" name="monitorProfileDraftBookletStatesColumns" placeholder="stateA,stateB" [(ngModel)]="view.monitorProfileDraftBookletStatesColumns" />
+            </label>
+            <label>
+              Auto-select Next Block
+              <select id="monitorProfileDraftAutoselectNextBlock" name="monitorProfileDraftAutoselectNextBlock" [(ngModel)]="view.monitorProfileDraftAutoselectNextBlock">
+                <option value="yes">yes</option>
+                <option value="no">no</option>
+              </select>
+            </label>
+            <label>
+              Hide Pending Runs
+              <select id="monitorProfileDraftPending" name="monitorProfileDraftPending" [(ngModel)]="view.monitorProfileDraftPending">
+                <option value="no">no</option>
+                <option value="yes">yes</option>
+              </select>
+            </label>
+            <label>
+              Hide Locked Runs
+              <select id="monitorProfileDraftLocked" name="monitorProfileDraftLocked" [(ngModel)]="view.monitorProfileDraftLocked">
+                <option value="no">no</option>
+                <option value="yes">yes</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="action-groups">
+            <section class="action-group">
+              <span>Add run exclusion filter</span>
+              <div class="form-grid">
+                <label>
+                  Target
+                  <select id="monitorFilterDraftTarget" name="monitorFilterDraftTarget" [(ngModel)]="view.monitorFilterDraftTarget">
+                    <option *ngFor="let option of view.monitorProfileFilterTargetOptions" [value]="option">{{ option }}</option>
+                  </select>
+                </label>
+                <label>
+                  Comparison
+                  <select id="monitorFilterDraftType" name="monitorFilterDraftType" [(ngModel)]="view.monitorFilterDraftType">
+                    <option *ngFor="let option of view.monitorProfileFilterTypeOptions" [value]="option">{{ option }}</option>
+                  </select>
+                </label>
+                <label>
+                  Value
+                  <input id="monitorFilterDraftValue" name="monitorFilterDraftValue" placeholder="group:room-a" [(ngModel)]="view.monitorFilterDraftValue" />
+                </label>
+                <label>
+                  Sub-value
+                  <input id="monitorFilterDraftSubValue" name="monitorFilterDraftSubValue" placeholder="Optional expected value" [(ngModel)]="view.monitorFilterDraftSubValue" />
+                </label>
+                <label>
+                  Filter Label
+                  <input id="monitorFilterDraftLabel" name="monitorFilterDraftLabel" placeholder="Hide another room" [(ngModel)]="view.monitorFilterDraftLabel" />
+                </label>
+                <label class="inline-check">
+                  <input id="monitorFilterDraftNot" name="monitorFilterDraftNot" type="checkbox" [(ngModel)]="view.monitorFilterDraftNot" />
+                  Invert match
+                </label>
+              </div>
+              <div class="actions">
+                <button id="addMonitorProfileFilterButton" class="secondary" type="button" [disabled]="!view.canAddMonitorProfileFilter" (click)="view.addMonitorProfileDraftFilter()">Add Filter</button>
+              </div>
+            </section>
+          </div>
+
+          <div class="actions">
+            <button id="saveMonitorProfileButton" class="primary" type="button" [disabled]="!view.canSaveMonitorProfile" (click)="view.saveMonitorProfile()">Save Profile</button>
+            <button id="newMonitorProfileButton" class="ghost" type="button" (click)="view.startNewMonitorProfile()">New Profile</button>
+          </div>
+        </article>
+
+        <app-record-collection
+          title="Profile Draft Filters"
+          subtitle="Exclusion filters currently attached to the profile draft."
+          [items]="view.monitorProfileDraftFilterItems"
+          (itemAction)="view.removeMonitorProfileDraftFilter($event)"
+          emptyState="No custom run filters are attached to this profile."
+        ></app-record-collection>
+
+        <app-record-collection
+          title="Monitor Profile Library"
+          [subtitle]="view.monitorProfileEditorTarget === 'create' ? 'Profiles for the new monitor account.' : 'Profiles persisted with the selected monitor role scope.'"
+          [items]="view.monitorProfileEditorItems"
+          (itemAction)="view.handleMonitorProfileAction($event)"
+          emptyState="No profiles have been authored for this destination."
+        ></app-record-collection>
+      </ng-container>
 
       <article class="card">
         <h2>Admin User Filters</h2>

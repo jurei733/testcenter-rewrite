@@ -388,7 +388,8 @@ export class RewriteAppOpsService {
         this.opsState.adminRoleAccessMode,
         this.opsState.adminRoleTenantKey,
         this.opsState.adminRoleWorkspaceKey,
-        this.opsState.adminRoleGroupKey
+        this.opsState.adminRoleGroupKey,
+        this.opsState.adminRoleMonitorProfilesJson
       ) satisfies AssignAdminRoleRequest,
       { headers: this.createAdminHeaders() }
     );

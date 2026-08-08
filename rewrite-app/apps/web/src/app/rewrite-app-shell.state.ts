@@ -63,6 +63,7 @@ export interface ShellOpsState {
   adminRoleTenantKey: string;
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
+  adminRoleMonitorProfilesJson: string;
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -292,6 +293,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminRoleTenantKey: "demo-tenant",
     adminRoleWorkspaceKey: "demo-workspace",
     adminRoleGroupKey: "group:student-demo",
+    adminRoleMonitorProfilesJson: "[]",
     adminRevokeTargetUserId: "",
     adminRevokeRoleAssignmentId: "",
     adminStatusTargetUserId: "",
