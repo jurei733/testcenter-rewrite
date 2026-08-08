@@ -10837,6 +10837,105 @@ const validateVeronaPlayerMetadataDocument = (
   };
 };
 
+const validateExperimentalVeronaPlayerMetadataDocument = (
+  metadata: Record<string, unknown>
+): VeronaPlayerMetadataValidation => {
+  if (metadata.type !== "player") {
+    return {
+      status: "invalid",
+      reason: "experimental player metadata field 'type' must be 'player'"
+    };
+  }
+  if (!isVeronaMetadataUri(metadata["$schema"])) {
+    return {
+      status: "invalid",
+      reason: "experimental player metadata field '$schema' must be an absolute URI"
+    };
+  }
+
+  const id = typeof metadata.id === "string" ? metadata.id : "";
+  if (!veronaMetadataIdentifierPattern.test(id)) {
+    return {
+      status: "invalid",
+      reason: "experimental player metadata field 'id' must start with a letter and contain only letters, digits, underscores, or hyphens"
+    };
+  }
+  const nameError = validateVeronaLanguageTaggedStrings(
+    metadata.name,
+    "name",
+    false
+  );
+  if (nameError) {
+    return { status: "invalid", reason: nameError };
+  }
+  if (metadata.description !== undefined) {
+    const descriptionError = validateVeronaLanguageTaggedStrings(
+      metadata.description,
+      "description",
+      false
+    );
+    if (descriptionError) {
+      return { status: "invalid", reason: descriptionError };
+    }
+  }
+
+  const version = typeof metadata.version === "string" ? metadata.version : "";
+  if (!veronaMetadataSemverPattern.test(version)) {
+    return {
+      status: "invalid",
+      reason: "experimental player metadata field 'version' must use SemVer MAJOR.MINOR.PATCH notation"
+    };
+  }
+  const specVersion =
+    typeof metadata.specVersion === "string" ? metadata.specVersion : "";
+  if (!veronaMetadataMajorMinorPattern.test(specVersion)) {
+    return {
+      status: "invalid",
+      reason: "experimental player metadata field 'specVersion' must use MAJOR.MINOR notation"
+    };
+  }
+
+  if (metadata.notSupportedFeatures !== undefined) {
+    const features = metadata.notSupportedFeatures;
+    if (
+      !Array.isArray(features) ||
+      new Set(features).size !== features.length ||
+      features.some(feature => typeof feature !== "string")
+    ) {
+      return {
+        status: "invalid",
+        reason: "experimental player metadata field 'notSupportedFeatures' must be a unique string list"
+      };
+    }
+  }
+  const dependenciesError = validateVeronaMetadataDependencies(
+    metadata.dependencies,
+    2
+  );
+  if (dependenciesError) {
+    return { status: "invalid", reason: dependenciesError };
+  }
+  const maintainerError = validateVeronaMetadataMaintainer(
+    metadata.maintainer,
+    false
+  );
+  if (maintainerError) {
+    return { status: "invalid", reason: maintainerError };
+  }
+  const codeError = validateVeronaMetadataCode(metadata.code, false);
+  if (codeError) {
+    return { status: "invalid", reason: codeError };
+  }
+
+  return {
+    status: "valid",
+    id,
+    version,
+    specVersion,
+    metadataVersion: "experimental-jsonld"
+  };
+};
+
 const validateLegacyVeronaPlayerMetadataDocument = (
   metadata: Record<string, unknown>
 ): VeronaPlayerMetadataValidation => {
@@ -11009,6 +11108,12 @@ const validateVeronaPlayerMetadata = (
       }
       if (metadata.type === undefined && metadata["@type"] !== undefined) {
         return validateLegacyVeronaPlayerMetadataDocument(metadata);
+      }
+      if (
+        metadata.metadataVersion === undefined &&
+        metadata["$schema"] !== undefined
+      ) {
+        return validateExperimentalVeronaPlayerMetadataDocument(metadata);
       }
       return validateVeronaPlayerMetadataDocument(metadata);
     } catch {

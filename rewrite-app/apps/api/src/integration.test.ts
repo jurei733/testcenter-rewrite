@@ -161,6 +161,19 @@ const createLegacyVeronaPlayerMetadata = (
   ...overrides
 });
 
+const createExperimentalVeronaPlayerMetadata = (
+  overrides: Record<string, unknown> = {}
+): string => JSON.stringify({
+  "$schema": "https://example.test/verona-module-metadata.json",
+  type: "player",
+  id: "verona-player-simple",
+  name: [{ lang: "en", value: "Simple Verona Player" }],
+  version: "4.0.0",
+  specVersion: "4.0",
+  notSupportedFeatures: [],
+  ...overrides
+});
+
 type JsonResponse<T> = {
   status: number;
   body: T;
@@ -12167,8 +12180,8 @@ test("original Testcenter compatibility corpus executes the official session man
   assert.deepEqual(hotRestartSecondRun.body.testRun.unitResponses, {});
 });
 
-test("original Testcenter compatibility corpus imports the official Verona 3 player", async () => {
-  type LegacyPlayerPackage = {
+test("original Testcenter compatibility corpus imports the official Verona 3 through 5 players", async () => {
+  type VeronaSimplePlayerPackage = {
     fixture: string;
     sourceUrl: string;
     sha256: string;
@@ -12178,102 +12191,112 @@ test("original Testcenter compatibility corpus imports the official Verona 3 pla
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
-  ) as { legacyPlayerPackages: LegacyPlayerPackage[] };
-  const expectation = corpus.legacyPlayerPackages[0];
-  assert.ok(expectation);
-  const playerDocument = readBrotliBase64Fixture(
-    resolve(originalTestcenterCorpusRoot, expectation.fixture)
-  );
-  assert.equal(
-    createHash("sha256").update(playerDocument).digest("hex"),
-    expectation.sha256,
-    expectation.sourceUrl
-  );
+  ) as { veronaSimplePlayerPackages: VeronaSimplePlayerPackage[] };
+  assert.equal(corpus.veronaSimplePlayerPackages.length, 3);
 
-  const bookletKey = "BOOKLET.LEGACY.VERONA-3";
-  const unitKey = "UNIT.LEGACY.VERONA-3";
-  const zipPayload = createZipBase64([
-    {
-      fileName: "export/imsmanifest.xml",
-      content: `
-        <manifest>
-          <resources>
-            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
-            <resource identifier="${unitKey}" href="units/Unit.xml" />
-            <resource identifier="${expectation.playerKey}" href="players/verona-simple-player-2.html" />
-          </resources>
-        </manifest>
-      `
-    },
-    {
-      fileName: "export/booklets/Booklet.xml",
-      content: `
-        <Booklet>
-          <Metadata><Id>${bookletKey}</Id><Label>Legacy Verona 3</Label></Metadata>
-          <Units><Unit id="${unitKey}" label="Legacy Unit" /></Units>
-        </Booklet>
-      `
-    },
-    {
-      fileName: "export/units/Unit.xml",
-      content: `
-        <Unit>
-          <Metadata><Id>${unitKey}</Id><Label>Legacy Unit</Label></Metadata>
-          <Definition player="${expectation.playerKey}"><![CDATA[
-            <fieldset><legend>Legacy Verona 3 item</legend><input name="answer" /></fieldset>
-          ]]></Definition>
-        </Unit>
-      `
-    },
-    {
-      fileName: "export/players/verona-simple-player-2.html",
-      content: playerDocument
-    }
-  ]);
-  const tenantKey = "integration-tenant-official-verona-3-player";
-  const workspaceKey = "integration-workspace-official-verona-3-player";
-  await requestJson("/api/v1/platform/tenants", {
-    method: "POST",
-    body: { tenantKey, displayName: tenantKey }
-  });
-  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
-    method: "POST",
-    body: { workspaceKey, displayName: workspaceKey }
-  });
-  const sourcePackage = await requestJson<{
-    sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
-    method: "POST",
-    body: {
-      fileName: "official-verona-3-player.zip",
-      mediaType: "application/zip",
-      sourceDocument: `data:application/zip;base64,${zipPayload}`
-    }
-  });
-  const importResult = await requestJson<{
-    importJob: {
-      status: string;
-      diagnostics: Array<{ severity: string; code: string }>;
-    };
-    stagedContentRelease: { contentReleaseId: string } | null;
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
-    method: "POST",
-    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
-  });
-  assert.equal(importResult.status, 201);
-  assert.equal(importResult.body.importJob.status, "completed");
-  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
-  assert.equal(
-    importResult.body.importJob.diagnostics.some(
-      diagnostic =>
-        diagnostic.severity === "error" ||
-        diagnostic.code === "source_document_player_metadata_missing"
-    ),
-    false,
-    JSON.stringify(importResult.body.importJob.diagnostics)
-  );
-  assert.match(playerDocument, new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`));
-  assert.match(playerDocument, new RegExp(`"apiVersion"\\s*:\\s*"${expectation.playerApiVersion}"`));
+  for (const expectation of corpus.veronaSimplePlayerPackages) {
+    const apiMajor = expectation.playerApiVersion.split(".")[0];
+    assert.ok(apiMajor);
+    const playerDocument = readBrotliBase64Fixture(
+      resolve(originalTestcenterCorpusRoot, expectation.fixture)
+    );
+    assert.equal(
+      createHash("sha256").update(playerDocument).digest("hex"),
+      expectation.sha256,
+      expectation.sourceUrl
+    );
+
+    const bookletKey = `BOOKLET.OFFICIAL.VERONA-${apiMajor}`;
+    const unitKey = `UNIT.OFFICIAL.VERONA-${apiMajor}`;
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest>
+            <resources>
+              <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${unitKey}" href="units/Unit.xml" />
+              <resource identifier="${expectation.playerKey}" href="players/Player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>${bookletKey}</Id><Label>Official Verona ${apiMajor}</Label></Metadata>
+            <Units><Unit id="${unitKey}" label="Official Unit" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>${unitKey}</Id><Label>Official Unit</Label></Metadata>
+            <Definition player="${expectation.playerKey}"><![CDATA[
+              <fieldset><legend>Official Verona ${apiMajor} item</legend><input name="answer" /></fieldset>
+            ]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/Player.html",
+        content: playerDocument
+      }
+    ]);
+    const tenantKey = `integration-tenant-official-verona-${apiMajor}-player`;
+    const workspaceKey = `integration-workspace-official-verona-${apiMajor}-player`;
+    await requestJson("/api/v1/platform/tenants", {
+      method: "POST",
+      body: { tenantKey, displayName: tenantKey }
+    });
+    await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+      method: "POST",
+      body: { workspaceKey, displayName: workspaceKey }
+    });
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `official-verona-${apiMajor}-player.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ severity: string; code: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201);
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+    assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.severity === "error" ||
+          diagnostic.code === "source_document_player_metadata_missing"
+      ),
+      false,
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+    assert.match(
+      playerDocument,
+      new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion.replaceAll(".", "\\.")}"`)
+    );
+  }
 });
 
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
@@ -17638,6 +17661,22 @@ test("bundled Verona player metadata blocks incompatible ZIP imports", async () 
       metadataDocument: createLegacyVeronaPlayerMetadata({ name: undefined }),
       expectedCode: "source_document_player_metadata_invalid",
       expectedMessage: "field 'name'"
+    },
+    {
+      name: "experimental-missing-name",
+      metadataDocument: createExperimentalVeronaPlayerMetadata({
+        name: undefined
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field 'name'"
+    },
+    {
+      name: "experimental-invalid-schema",
+      metadataDocument: createExperimentalVeronaPlayerMetadata({
+        "$schema": "not a URI"
+      }),
+      expectedCode: "source_document_player_metadata_invalid",
+      expectedMessage: "field '$schema'"
     },
     {
       name: "invalid-id",

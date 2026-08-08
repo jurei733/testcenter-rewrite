@@ -169,7 +169,7 @@ type OriginalTestcenterCorpus = {
       customTexts: Record<string, string>;
     };
   }>;
-  legacyPlayerPackages: Array<{
+  veronaSimplePlayerPackages: Array<{
     fixture: string;
     encoding: "brotli-base64";
     sourceRepository: string;
@@ -457,32 +457,46 @@ test("original Testcenter compatibility corpus pins the Aspect player roster", (
   assert.equal(operationalLogins[0]?.passwordRequired, true);
 });
 
-test("original Testcenter compatibility corpus pins the official Verona 3 player", () => {
+test("original Testcenter compatibility corpus pins the official Verona 3 through 5 players", () => {
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  const legacyPlayer = corpus.legacyPlayerPackages[0];
-  assert.ok(legacyPlayer);
+  assert.deepEqual(
+    corpus.veronaSimplePlayerPackages.map(player => player.sourceTag),
+    ["2.1.0", "4.0.0", "5.2.0"]
+  );
 
-  const playerDocument = brotliDecompressSync(
-    Buffer.from(
-      readFileSync(resolve(corpusRoot, legacyPlayer.fixture), "utf8").trim(),
-      "base64"
-    )
-  );
-  assert.equal(
-    createHash("sha256").update(playerDocument).digest("hex"),
-    legacyPlayer.sha256,
-    legacyPlayer.sourceUrl
-  );
-  const playerHtml = playerDocument.toString("utf8");
-  assert.match(playerHtml, /"@id"\s*:\s*"iqb-player-simple"/);
-  assert.match(playerHtml, /"version"\s*:\s*"2\.1\.0"/);
-  assert.match(playerHtml, /"apiVersion"\s*:\s*"3\.0\.0"/);
-  assert.match(playerHtml, /data-api-version="3\.0\.0"/);
-  assert.equal(legacyPlayer.sourceTag, "2.1.0");
-  assert.equal(legacyPlayer.license, "MIT");
-  assert.equal(legacyPlayer.metadataFormat, "legacy-jsonld");
+  for (const player of corpus.veronaSimplePlayerPackages) {
+    const playerDocument = brotliDecompressSync(
+      Buffer.from(
+        readFileSync(resolve(corpusRoot, player.fixture), "utf8").trim(),
+        "base64"
+      )
+    );
+    assert.equal(
+      createHash("sha256").update(playerDocument).digest("hex"),
+      player.sha256,
+      player.sourceUrl
+    );
+    const playerHtml = playerDocument.toString("utf8");
+    assert.match(
+      playerHtml,
+      new RegExp(`"version"\\s*:\\s*"${player.playerModuleVersion.replaceAll(".", "\\.")}"`)
+    );
+    assert.match(
+      playerHtml,
+      new RegExp(
+        `"(?:apiVersion|specVersion)"\\s*:\\s*"${player.playerApiVersion.replaceAll(".", "\\.")}"`
+      )
+    );
+    assert.match(player.sourceCommit, /^[a-f0-9]{40}$/);
+    assert.equal(player.license, "MIT");
+  }
+
+  const [verona3, verona4, verona5] = corpus.veronaSimplePlayerPackages;
+  assert.equal(verona3?.metadataFormat, "legacy-jsonld");
+  assert.equal(verona4?.metadataFormat, "experimental-jsonld");
+  assert.equal(verona5?.metadataFormat, "metadata-2.0");
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

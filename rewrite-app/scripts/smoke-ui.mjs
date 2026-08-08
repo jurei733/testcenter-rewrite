@@ -5388,6 +5388,271 @@ try {
   );
   stopAfter("participant-verona-3-player");
 
+  logStep("participant-official-verona-4-5-players");
+  const officialProtocolCorpus = JSON.parse(
+    await readFile(
+      resolve("test-fixtures/original-testcenter/corpus.json"),
+      "utf8"
+    )
+  );
+  const officialProtocolPlayers =
+    officialProtocolCorpus.veronaSimplePlayerPackages.filter(player =>
+      ["4.0", "5.2"].includes(player.playerApiVersion)
+    );
+  assert.equal(officialProtocolPlayers.length, 2);
+
+  for (const protocolPlayer of officialProtocolPlayers) {
+    const apiMajor = protocolPlayer.playerApiVersion.split(".")[0];
+    const protocolTenantKey = `${tenantKey}-verona-${apiMajor}`;
+    const protocolWorkspaceKey = `${workspaceKey}-verona-${apiMajor}`;
+    const protocolBookletKey = `BOOKLET.OFFICIAL.VERONA-${apiMajor}`;
+    const protocolFirstUnitKey = `UNIT.OFFICIAL.VERONA-${apiMajor}.1`;
+    const protocolSecondUnitKey = `UNIT.OFFICIAL.VERONA-${apiMajor}.2`;
+    const protocolLoginKey = `student-official-verona-${apiMajor}`;
+    const protocolInputName = `answer-${apiMajor}`;
+    const protocolResponse = `Restored by the Verona ${apiMajor} host`;
+    const protocolPlayerDocument = await readBrotliBase64Text(
+      resolve("test-fixtures/original-testcenter", protocolPlayer.fixture)
+    );
+    const protocolPlayerZip = createStoredZipBuffer([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="${protocolBookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${protocolFirstUnitKey}" href="units/Unit1.xml" />
+              <resource identifier="${protocolSecondUnitKey}" href="units/Unit2.xml" />
+              <resource identifier="${protocolPlayer.playerKey}" href="players/Player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata>
+              <Id>${protocolBookletKey}</Id>
+              <Label>Official Verona ${apiMajor} Player</Label>
+            </Metadata>
+            <BookletConfig>
+              <Config key="paging_mode">separate</Config>
+            </BookletConfig>
+            <Units>
+              <Unit id="${protocolFirstUnitKey}" label="Protocol first unit" />
+              <Unit id="${protocolSecondUnitKey}" label="Protocol second unit" />
+            </Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit1.xml",
+        content: `
+          <Unit>
+            <Metadata>
+              <Id>${protocolFirstUnitKey}</Id>
+              <Label>Protocol first unit</Label>
+            </Metadata>
+            <Definition player="${protocolPlayer.playerKey}" type="${protocolPlayer.unitDefinitionType}"><![CDATA[
+              <fieldset>
+                <legend>Official Verona ${apiMajor} first unit</legend>
+                <label>Protocol answer <input name="${protocolInputName}" /></label>
+              </fieldset>
+            ]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/units/Unit2.xml",
+        content: `
+          <Unit>
+            <Metadata>
+              <Id>${protocolSecondUnitKey}</Id>
+              <Label>Protocol second unit</Label>
+            </Metadata>
+            <Definition player="${protocolPlayer.playerKey}" type="${protocolPlayer.unitDefinitionType}"><![CDATA[
+              <fieldset>
+                <legend>Official Verona ${apiMajor} second unit</legend>
+                <label>Second answer <input name="second-${apiMajor}" /></label>
+              </fieldset>
+            ]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/Player.html",
+        content: protocolPlayerDocument
+      }
+    ]);
+    await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+      body: {
+        tenantKey: protocolTenantKey,
+        displayName: `Official Verona ${apiMajor} Player`
+      }
+    });
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${protocolTenantKey}/workspaces`,
+      {
+        body: {
+          workspaceKey: protocolWorkspaceKey,
+          displayName: `Official Verona ${apiMajor} Player`
+        }
+      }
+    );
+    const protocolWorkspaceApiUrl =
+      `${baseUrl}/api/v1/tenants/${protocolTenantKey}` +
+      `/workspaces/${protocolWorkspaceKey}`;
+    const protocolSourceResponse = await sendSmokeJson(
+      `${protocolWorkspaceApiUrl}/source-packages`,
+      {
+        body: {
+          fileName: `official-verona-${apiMajor}-browser-smoke.zip`,
+          mediaType: "application/zip",
+          sourceDocument: `data:application/zip;base64,${protocolPlayerZip.toString("base64")}`
+        }
+      }
+    );
+    const protocolSourcePayload = await protocolSourceResponse.json();
+    const protocolImportResponse = await sendSmokeJson(
+      `${protocolWorkspaceApiUrl}/import-jobs`,
+      {
+        body: {
+          sourcePackageId:
+            protocolSourcePayload.sourcePackage.sourcePackageId
+        }
+      }
+    );
+    const protocolImportPayload = await protocolImportResponse.json();
+    assert.equal(
+      protocolImportPayload.importJob.status,
+      "completed",
+      JSON.stringify(protocolImportPayload.importJob.diagnostics)
+    );
+    assert.equal(
+      protocolImportPayload.importJob.diagnostics.some(
+        diagnostic => diagnostic.severity === "error"
+      ),
+      false,
+      JSON.stringify(protocolImportPayload.importJob.diagnostics)
+    );
+    const protocolReleaseId =
+      protocolImportPayload.stagedContentRelease?.contentReleaseId;
+    assert.ok(protocolReleaseId);
+    await sendSmokeJson(
+      `${protocolWorkspaceApiUrl}/content-releases/${protocolReleaseId}/activate`,
+      { body: {} }
+    );
+    await sendSmokeJson(`${protocolWorkspaceApiUrl}/participant-roster`, {
+      body: {
+        rosterText: [
+          {
+            loginKey: protocolLoginKey,
+            groupKey: `group:official-verona-${apiMajor}`,
+            bookletKey: protocolBookletKey,
+            displayName: `Official Verona ${apiMajor} Participant`,
+            executionMode: "run-hot-return"
+          }
+        ]
+      }
+    });
+    await page.goto(
+      `${baseUrl}/participant?${new URLSearchParams({
+        tenantKey: protocolTenantKey,
+        workspaceKey: protocolWorkspaceKey,
+        loginKey: protocolLoginKey,
+        bookletKey: protocolBookletKey
+      }).toString()}`,
+      { waitUntil: "networkidle" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${protocolPlayer.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    const protocolFrame = page.frameLocator("#participantVeronaPlayerFrame");
+    await protocolFrame
+      .getByText(`Official Verona ${apiMajor} first unit`, { exact: true })
+      .waitFor({ timeout: 30_000 });
+    const protocolAnswer = protocolFrame.locator(
+      `input[name='${protocolInputName}']`
+    );
+    await protocolAnswer.fill(protocolResponse);
+    await protocolAnswer.dispatchEvent("keyup", {
+      key: "t",
+      code: "KeyT"
+    });
+    const protocolParticipantSessionId = await page
+      .locator("#participantRouteSessionId")
+      .inputValue();
+    assert.ok(protocolParticipantSessionId);
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/participant/sessions/${protocolParticipantSessionId}/current-state`,
+      payload => {
+        const response =
+          payload?.currentRunState?.testRun?.unitResponses?.[
+            protocolFirstUnitKey
+          ];
+        if (typeof response !== "string") return false;
+        try {
+          const parsed = JSON.parse(response);
+          const answers = JSON.parse(
+            parsed.unitState?.dataParts?.answers ?? "null"
+          );
+          return Array.isArray(answers)
+            ? answers.some(
+                answer =>
+                  answer?.id === protocolInputName &&
+                  answer?.value === protocolResponse
+              )
+            : answers?.[protocolInputName] === protocolResponse;
+        } catch {
+          return false;
+        }
+      },
+      30_000
+    );
+    await protocolFrame.locator("#next-unit").dispatchEvent("click");
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: protocolSecondUnitKey })
+      .waitFor({ timeout: 30_000 });
+    await protocolFrame
+      .getByText(`Official Verona ${apiMajor} second unit`, { exact: true })
+      .waitFor({ timeout: 30_000 });
+    await protocolFrame.locator("#prev-unit").dispatchEvent("click");
+    await page
+      .locator("#participantRouteUnitKey")
+      .filter({ hasText: protocolFirstUnitKey })
+      .waitFor({ timeout: 30_000 });
+    await protocolFrame
+      .getByText(`Official Verona ${apiMajor} first unit`, { exact: true })
+      .waitFor({ timeout: 30_000 });
+    assert.equal(
+      await protocolFrame
+        .locator(`input[name='${protocolInputName}']`)
+        .inputValue(),
+      protocolResponse
+    );
+    await page.goto(
+      `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+        protocolParticipantSessionId
+      )}`,
+      { waitUntil: "networkidle" }
+    );
+    await page
+      .locator("#participantVeronaPlayerVersion")
+      .filter({ hasText: `API ${protocolPlayer.playerApiVersion}` })
+      .waitFor({ timeout: 30_000 });
+    assert.equal(
+      await page
+        .frameLocator("#participantVeronaPlayerFrame")
+        .locator(`input[name='${protocolInputName}']`)
+        .inputValue(),
+      protocolResponse
+    );
+  }
+  stopAfter("participant-verona-4-5-players");
+
   logStep("participant-original-aspect-player");
   const aspectLoginKey = "testuser1";
   const aspectBookletKey = "booklet1";

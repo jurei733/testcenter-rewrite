@@ -36,14 +36,15 @@ different HTML filenames cannot hide the same case-insensitive player module ID
 and major/minor version, either as loose uploads or inside a prebuilt ZIP.
 For runtime compatibility beyond the Player versions bundled by that Testcenter
 commit, the corpus also pins the official MIT-licensed
-`verona-player-simple` tag `2.1.0` at commit
-`9c4c48c77ecc0cfe7fbc8976c63ae7dc73b24710`. Its byte-exact HTML declares
-module version `2.1.0`, Verona API `3.0.0`, and the early JSON-LD
-`@id`/`@type` metadata shape. It is kept as Brotli-compressed base64 and gates
-legacy metadata import, object-valued `dataParts`, state restoration, and the
-real Player navigation request in Chromium. This fixture comes from the
-official Player repository rather than the pinned Testcenter tree; its source
-URL, SHA-256, tag, commit, and license are recorded in `corpus.json`.
+`verona-player-simple` tags `2.1.0`, `4.0.0`, and `5.2.0`. Their byte-exact HTML
+documents declare Verona APIs 3, 4, and 5 through the early
+`@id`/`@type`/`apiVersion` shape, the short-lived `$schema`-based experimental
+shape without `metadataVersion`, and metadata 2.0 respectively. They are kept
+as Brotli-compressed base64 and gate metadata import, generation-specific
+`dataParts`, state restoration, and real Player navigation requests in
+Chromium. These fixtures come from the official Player repository rather than
+the pinned Testcenter tree; every source URL, SHA-256, tag, commit, and license
+is recorded in `corpus.json`.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact

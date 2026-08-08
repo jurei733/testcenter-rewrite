@@ -640,7 +640,7 @@
       }
     }
   ],
-  "legacyPlayerPackages": [
+  "veronaSimplePlayerPackages": [
     {
       "fixture": "players/verona-simple-player-2.1.0.html.br.base64",
       "encoding": "brotli-base64",
@@ -657,6 +657,40 @@
       "playerApiVersion": "3.0.0",
       "metadataFormat": "legacy-jsonld",
       "unitDefinitionType": "iqb-simple-html@1.0.0"
+    },
+    {
+      "fixture": "players/verona-simple-player-4.0.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "4.0.0",
+      "sourceCommit": "b17de1c6ec96e5da1343dfc9b14e0e56f3104ec2",
+      "sourcePath": "verona-player-simple-4.0.0.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/4.0.0/verona-player-simple-4.0.0.html",
+      "sha256": "3d7023bc70bbaf1996480ba24feecb0fe5394dcf58a325da6b9c3e07cac35f6b",
+      "license": "MIT",
+      "playerKey": "verona-player-simple@4.0",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "4.0.0",
+      "playerApiVersion": "4.0",
+      "metadataFormat": "experimental-jsonld",
+      "unitDefinitionType": "verona-player-simple-4.0.0"
+    },
+    {
+      "fixture": "players/verona-simple-player-5.2.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "5.2.0",
+      "sourceCommit": "35a14250e9b3fa650249489a74ca49328b30878b",
+      "sourcePath": "verona-player-simple-5.2.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/5.2.0/verona-player-simple-5.2.html",
+      "sha256": "23177baf0020355e04c52841b61e872c62aed7c536dfa93155783d3ae1bf0727",
+      "license": "MIT",
+      "playerKey": "verona-player-simple@5.2",
+      "playerModuleId": "verona-player-simple",
+      "playerModuleVersion": "5.2.0",
+      "playerApiVersion": "5.2",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "verona-player-simple-5.2"
     }
   ],
   "playerPackages": [
