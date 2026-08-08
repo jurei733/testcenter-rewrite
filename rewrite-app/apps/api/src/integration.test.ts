@@ -9471,6 +9471,46 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_syscheck_skip_network_invalid"
     },
     {
+      fileName: "syscheck-invalid-root-order.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        /(  <Metadata>[\s\S]*?<\/Metadata>)\n(  <Config[\s\S]*<\/Config>)/,
+        "$2\n$1"
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_sequence_invalid"
+    },
+    {
+      fileName: "syscheck-duplicate-metadata-label.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        "</Label>",
+        "</Label><Label>Duplicate</Label>"
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_metadata_cardinality_invalid"
+    },
+    {
+      fileName: "syscheck-unknown-config-attribute.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'savekey="saveme"',
+        'savekey="saveme" saveKeyTypo="ignored"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_attribute_invalid"
+    },
+    {
+      fileName: "syscheck-nested-question-content.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        'prompt="Auswahl">Option A#Option B</Q>',
+        'prompt="Auswahl"><Option />Option A#Option B</Q>'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_simple_content_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-custom-text-key.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        '    <Q id="1"',
+        '    <CustomText key="1 invalid">Invalid key</CustomText>\n    <Q id="1"'
+      ),
+      diagnosticCode: "testcenter_xml_syscheck_custom_text_key_invalid"
+    },
+    {
       fileName: "syscheck-invalid-speed.xml",
       sourceDocument: validSystemCheckXml.replace('min="1024"', 'min="1.5"'),
       diagnosticCode: "testcenter_xml_syscheck_speed_integer_invalid"

@@ -8270,6 +8270,37 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   if (canonicalRootName === "SysCheck") {
+    const validateAttributes = (
+      element: XmlElement,
+      allowedAttributeNames: readonly string[],
+      context: string
+    ): void => {
+      for (const attributeName of xmlUnsupportedAttributeNames(
+        element,
+        new Set(allowedAttributeNames)
+      )) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_attribute_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains unsupported attribute '${attributeName}' on ${context}.`
+          )
+        );
+      }
+    };
+    const validateSimpleContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      const nestedChildren = xmlChildElements(element);
+      if (nestedChildren.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_simple_content_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains nested element '${xmlElementLocalName(nestedChildren[0])}' in text-only ${context}.`
+          )
+        );
+      }
+    };
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -8287,6 +8318,7 @@ const validateTestcenterXmlSourceDocument = (
       );
     }
     const directChildren = xmlChildElements(root);
+    let previousDirectChildRank = -1;
     for (const child of directChildren) {
       const childName = xmlElementLocalName(child);
       if (!["Metadata", "Config"].includes(childName)) {
@@ -8296,10 +8328,23 @@ const validateTestcenterXmlSourceDocument = (
             `Original Testcenter system check '${sourceFileName}' contains unsupported direct child '${childName}'.`
           )
         );
+        continue;
       }
+      const rank = childName === "Metadata" ? 0 : 1;
+      if (rank < previousDirectChildRank) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_sequence_invalid",
+            `Original Testcenter system check '${sourceFileName}' contains direct children outside schema order.`
+          )
+        );
+        break;
+      }
+      previousDirectChildRank = rank;
     }
+    const metadataContainers = xmlChildrenNamed(root, "Metadata");
     const configs = xmlChildrenNamed(root, "Config");
-    if (xmlChildrenNamed(root, "Metadata").length > 1 || configs.length > 1) {
+    if (metadataContainers.length > 1 || configs.length > 1) {
       diagnostics.push(
         createImportDiagnostic(
           "testcenter_xml_syscheck_child_cardinality_invalid",
@@ -8307,8 +8352,56 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
+    for (const metadataContainer of metadataContainers) {
+      validateAttributes(metadataContainer, [], "Metadata");
+      const metadataChildren = xmlChildElements(metadataContainer);
+      const metadataChildRanks = new Map([
+        ["Id", 0],
+        ["Label", 1],
+        ["Description", 2]
+      ]);
+      let previousMetadataChildRank = -1;
+      for (const child of metadataChildren) {
+        const childName = xmlElementLocalName(child);
+        const rank = metadataChildRanks.get(childName);
+        if (rank === undefined) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_metadata_child_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains unsupported Metadata child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        validateAttributes(child, [], `Metadata/${childName}`);
+        validateSimpleContent(child, `Metadata/${childName}`);
+        if (rank < previousMetadataChildRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_metadata_sequence_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains Metadata children outside schema order.`
+            )
+          );
+          break;
+        }
+        previousMetadataChildRank = rank;
+      }
+      if (
+        xmlChildrenNamed(metadataContainer, "Id").length !== 1 ||
+        xmlChildrenNamed(metadataContainer, "Label").length !== 1 ||
+        xmlChildrenNamed(metadataContainer, "Description").length > 1
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_syscheck_metadata_cardinality_invalid",
+            `Original Testcenter system check '${sourceFileName}' requires one Metadata/Id, one Metadata/Label, and at most one Metadata/Description.`
+          )
+        );
+      }
+    }
     const config = configs[0];
     if (config) {
+      validateAttributes(config, ["unit", "savekey", "skipnetwork"], "Config");
       const skipNetwork = config.getAttribute("skipnetwork");
       if (
         skipNetwork !== null &&
@@ -8363,6 +8456,18 @@ const validateTestcenterXmlSourceDocument = (
           );
         }
         for (const speed of speeds) {
+          validateAttributes(
+            speed,
+            [
+              "min",
+              "good",
+              "maxDevianceBytesPerSecond",
+              "maxErrorsPerSequence",
+              "maxSequenceRepetitions"
+            ],
+            speedName
+          );
+          validateSimpleContent(speed, speedName);
           for (const attributeName of [
             "min",
             "good",
@@ -8373,7 +8478,9 @@ const validateTestcenterXmlSourceDocument = (
             const value = speed.getAttribute(attributeName);
             if (
               (attributeName === "min" && value === null) ||
-              (value !== null && !isTestcenterXmlInteger(value))
+              (value !== null &&
+                (!isTestcenterXmlInteger(value) ||
+                  !Number.isSafeInteger(Number(value))))
             ) {
               diagnostics.push(
                 createImportDiagnostic(
@@ -8396,6 +8503,12 @@ const validateTestcenterXmlSourceDocument = (
       ]);
       for (const question of questions) {
         const questionId = question.getAttribute("id")?.trim() ?? "";
+        validateAttributes(
+          question,
+          ["type", "prompt", "id", "required"],
+          `question '${questionId || "unknown"}'`
+        );
+        validateSimpleContent(question, `question '${questionId || "unknown"}'`);
         if (!questionId) {
           diagnostics.push(
             createImportDiagnostic(
@@ -8435,11 +8548,21 @@ const validateTestcenterXmlSourceDocument = (
       );
       const customTexts = xmlChildrenNamed(config, "CustomText");
       for (const customText of customTexts) {
-        if (!customText.getAttribute("key")?.trim()) {
+        const customTextKey = customText.getAttribute("key")?.trim() ?? "";
+        validateAttributes(customText, ["key"], "CustomText");
+        validateSimpleContent(customText, "CustomText");
+        if (!customTextKey) {
           diagnostics.push(
             createImportDiagnostic(
               "testcenter_xml_syscheck_custom_text_key_missing",
               `Original Testcenter system check '${sourceFileName}' contains CustomText without a key.`
+            )
+          );
+        } else if (!isTestcenterXmlId(customTextKey)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_syscheck_custom_text_key_invalid",
+              `Original Testcenter system check '${sourceFileName}' contains CustomText key '${customTextKey}', which is not a valid XML ID.`
             )
           );
         }
