@@ -642,6 +642,23 @@
   ],
   "veronaSimplePlayerPackages": [
     {
+      "fixture": "players/verona-simple-player-1.0.1.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "1.0.1",
+      "sourceCommit": "282d552be69cd9005d3829a5053737535f5e6b21",
+      "sourcePath": "verona-simple-player-1.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/1.0.1/verona-simple-player-1.html",
+      "sha256": "08b1c6baca5e2f6e03964fc31253d4ad61028b34e09cd50310b1f449dc748526",
+      "license": "MIT",
+      "playerKey": "verona-simple-player@1.0",
+      "playerModuleId": "verona-simple-player",
+      "playerModuleVersion": "1.0.1",
+      "playerApiVersion": "2.1.0",
+      "metadataFormat": "legacy-meta-element",
+      "unitDefinitionType": "verona-simple-player-1.0.0"
+    },
+    {
       "fixture": "players/verona-simple-player-2.1.0.html.br.base64",
       "encoding": "brotli-base64",
       "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",

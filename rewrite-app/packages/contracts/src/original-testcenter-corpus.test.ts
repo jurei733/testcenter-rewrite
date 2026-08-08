@@ -457,13 +457,13 @@ test("original Testcenter compatibility corpus pins the Aspect player roster", (
   assert.equal(operationalLogins[0]?.passwordRequired, true);
 });
 
-test("original Testcenter compatibility corpus pins the official Verona 3 through 5 players", () => {
+test("original Testcenter compatibility corpus pins the official Verona 2 through 5 players", () => {
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
   assert.deepEqual(
     corpus.veronaSimplePlayerPackages.map(player => player.sourceTag),
-    ["2.1.0", "4.0.0", "5.2.0"]
+    ["1.0.1", "2.1.0", "4.0.0", "5.2.0"]
   );
 
   for (const player of corpus.veronaSimplePlayerPackages) {
@@ -479,21 +479,33 @@ test("original Testcenter compatibility corpus pins the official Verona 3 throug
       player.sourceUrl
     );
     const playerHtml = playerDocument.toString("utf8");
-    assert.match(
-      playerHtml,
-      new RegExp(`"version"\\s*:\\s*"${player.playerModuleVersion.replaceAll(".", "\\.")}"`)
-    );
-    assert.match(
-      playerHtml,
-      new RegExp(
-        `"(?:apiVersion|specVersion)"\\s*:\\s*"${player.playerApiVersion.replaceAll(".", "\\.")}"`
-      )
-    );
+    if (player.metadataFormat === "legacy-meta-element") {
+      assert.match(
+        playerHtml,
+        new RegExp(`data-version="${player.playerModuleVersion.replaceAll(".", "\\.")}"`)
+      );
+      assert.match(
+        playerHtml,
+        new RegExp(`data-api-version="${player.playerApiVersion.replaceAll(".", "\\.")}"`)
+      );
+    } else {
+      assert.match(
+        playerHtml,
+        new RegExp(`"version"\\s*:\\s*"${player.playerModuleVersion.replaceAll(".", "\\.")}"`)
+      );
+      assert.match(
+        playerHtml,
+        new RegExp(
+          `"(?:apiVersion|specVersion)"\\s*:\\s*"${player.playerApiVersion.replaceAll(".", "\\.")}"`
+        )
+      );
+    }
     assert.match(player.sourceCommit, /^[a-f0-9]{40}$/);
     assert.equal(player.license, "MIT");
   }
 
-  const [verona3, verona4, verona5] = corpus.veronaSimplePlayerPackages;
+  const [verona2, verona3, verona4, verona5] = corpus.veronaSimplePlayerPackages;
+  assert.equal(verona2?.metadataFormat, "legacy-meta-element");
   assert.equal(verona3?.metadataFormat, "legacy-jsonld");
   assert.equal(verona4?.metadataFormat, "experimental-jsonld");
   assert.equal(verona5?.metadataFormat, "metadata-2.0");

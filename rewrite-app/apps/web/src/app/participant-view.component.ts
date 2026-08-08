@@ -340,6 +340,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [resourceBasePath]="verona.resourceBasePath"
             [savedResponse]="verona.savedResponse"
             [unitNumber]="verona.unitNumber"
+            [unitCount]="verona.unitCount"
             [canGoPrevious]="verona.canGoPrevious"
             [canGoNext]="verona.canGoNext"
             [canComplete]="verona.canComplete"

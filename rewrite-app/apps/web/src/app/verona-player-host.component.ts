@@ -126,6 +126,7 @@ export class VeronaPlayerHostComponent
   @Input() resourceBasePath = "";
   @Input() savedResponse = "";
   @Input() unitNumber = 1;
+  @Input() unitCount = 1;
   @Input() canGoPrevious = false;
   @Input() canGoNext = false;
   @Input() canComplete = false;
@@ -224,6 +225,7 @@ export class VeronaPlayerHostComponent
         changes["unitDefinition"] ||
         changes["unitDefinitionType"] ||
         changes["resourceBasePath"] ||
+        changes["unitCount"] ||
         changes["canGoPrevious"] ||
         changes["canGoNext"] ||
         changes["canComplete"] ||
@@ -471,6 +473,9 @@ export class VeronaPlayerHostComponent
         persistedResponse?.unitState ?? {},
         this.apiVersion ?? String(SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX)
       ),
+      ...(this.restoreCurrentPageOnReturn && persistedResponse?.playerState
+        ? { playerState: persistedResponse.playerState }
+        : {}),
       playerConfig: {
         ...(this.resourceBasePath
           ? {
@@ -485,6 +490,7 @@ export class VeronaPlayerHostComponent
         pagingMode: this.pagingMode,
         stateReportPolicy: "eager",
         unitNumber: this.unitNumber,
+        unitCount: this.unitCount,
         unitTitle: this.unitTitle,
         unitId: this.unitKey,
         ...(startPage != null ? { startPage } : {})

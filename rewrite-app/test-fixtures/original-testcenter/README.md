@@ -36,10 +36,12 @@ different HTML filenames cannot hide the same case-insensitive player module ID
 and major/minor version, either as loose uploads or inside a prebuilt ZIP.
 For runtime compatibility beyond the Player versions bundled by that Testcenter
 commit, the corpus also pins the official MIT-licensed
-`verona-player-simple` tags `2.1.0`, `4.0.0`, and `5.2.0`. Their byte-exact HTML
-documents declare Verona APIs 3, 4, and 5 through the early
+`verona-player-simple` tags `1.0.1`, `2.1.0`, `4.0.0`, and `5.2.0`. Their byte-exact HTML
+documents declare Verona APIs 2, 3, 4, and 5 through the legacy HTML meta element, the early
 `@id`/`@type`/`apiVersion` shape, the short-lived `$schema`-based experimental
-shape without `metadataVersion`, and metadata 2.0 respectively. They are kept
+shape without `metadataVersion`, and metadata 2.0 respectively. The API-2
+artifact intentionally has no JSON-LD module metadata, so import retains the
+stable legacy warning and the runtime ready handshake is authoritative. They are kept
 as Brotli-compressed base64 and gate metadata import, generation-specific
 `dataParts`, state restoration, and real Player navigation requests in
 Chromium. These fixtures come from the official Player repository rather than

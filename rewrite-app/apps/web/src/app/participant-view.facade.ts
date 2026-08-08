@@ -163,6 +163,7 @@ export type ParticipantVeronaPlayerState = {
   resourceBasePath: string;
   savedResponse: string;
   unitNumber: number;
+  unitCount: number;
   canGoPrevious: boolean;
   canGoNext: boolean;
   canComplete: boolean;
@@ -1041,6 +1042,7 @@ export class ParticipantViewFacade {
           ? this.optimisticVeronaResponse.response
           : currentState.testRun.unitResponses[unitKey] ?? "",
       unitNumber: Math.max(unitIndex + 1, 1),
+      unitCount: currentState.bookletUnits.length,
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
       canComplete: currentState.navigation.canPlayerEnd,

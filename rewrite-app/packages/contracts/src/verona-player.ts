@@ -28,6 +28,7 @@ export type VeronaPlayerConfig = {
   pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
   stateReportPolicy: "eager";
   unitNumber: number;
+  unitCount?: number;
   unitTitle: string;
   unitId: string;
   startPage?: string | number;
@@ -43,6 +44,7 @@ export type VeronaStartCommand = {
   unitDefinition: string;
   unitDefinitionType?: string;
   unitState: VeronaStartUnitState;
+  playerState?: VeronaPlayerState;
   playerConfig: VeronaPlayerConfig;
 };
 

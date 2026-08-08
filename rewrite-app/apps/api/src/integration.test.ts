@@ -12180,7 +12180,7 @@ test("original Testcenter compatibility corpus executes the official session man
   assert.deepEqual(hotRestartSecondRun.body.testRun.unitResponses, {});
 });
 
-test("original Testcenter compatibility corpus imports the official Verona 3 through 5 players", async () => {
+test("original Testcenter compatibility corpus imports the official Verona 2 through 5 players", async () => {
   type VeronaSimplePlayerPackage = {
     fixture: string;
     sourceUrl: string;
@@ -12188,11 +12188,13 @@ test("original Testcenter compatibility corpus imports the official Verona 3 thr
     playerKey: string;
     playerModuleVersion: string;
     playerApiVersion: string;
+    metadataFormat: string;
+    unitDefinitionType: string;
   };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaSimplePlayerPackages: VeronaSimplePlayerPackage[] };
-  assert.equal(corpus.veronaSimplePlayerPackages.length, 3);
+  assert.equal(corpus.veronaSimplePlayerPackages.length, 4);
 
   for (const expectation of corpus.veronaSimplePlayerPackages) {
     const apiMajor = expectation.playerApiVersion.split(".")[0];
@@ -12235,7 +12237,7 @@ test("original Testcenter compatibility corpus imports the official Verona 3 thr
         content: `
           <Unit>
             <Metadata><Id>${unitKey}</Id><Label>Official Unit</Label></Metadata>
-            <Definition player="${expectation.playerKey}"><![CDATA[
+            <Definition player="${expectation.playerKey}" type="${expectation.unitDefinitionType}"><![CDATA[
               <fieldset><legend>Official Verona ${apiMajor} item</legend><input name="answer" /></fieldset>
             ]]></Definition>
           </Unit>
@@ -12285,16 +12287,19 @@ test("original Testcenter compatibility corpus imports the official Verona 3 thr
     assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
     assert.equal(
       importResult.body.importJob.diagnostics.some(
-        diagnostic =>
-          diagnostic.severity === "error" ||
-          diagnostic.code === "source_document_player_metadata_missing"
+        diagnostic => diagnostic.severity === "error"
       ),
       false,
       JSON.stringify(importResult.body.importJob.diagnostics)
     );
-    assert.match(
-      playerDocument,
-      new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion.replaceAll(".", "\\.")}"`)
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === "source_document_player_metadata_missing" &&
+          diagnostic.severity === "warning"
+      ),
+      expectation.metadataFormat === "legacy-meta-element",
+      JSON.stringify(importResult.body.importJob.diagnostics)
     );
   }
 });

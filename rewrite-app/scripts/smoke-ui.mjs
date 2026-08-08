@@ -5388,7 +5388,7 @@ try {
   );
   stopAfter("participant-verona-3-player");
 
-  logStep("participant-official-verona-4-5-players");
+  logStep("participant-official-verona-2-4-5-players");
   const officialProtocolCorpus = JSON.parse(
     await readFile(
       resolve("test-fixtures/original-testcenter/corpus.json"),
@@ -5397,9 +5397,9 @@ try {
   );
   const officialProtocolPlayers =
     officialProtocolCorpus.veronaSimplePlayerPackages.filter(player =>
-      ["4.0", "5.2"].includes(player.playerApiVersion)
+      ["2.1.0", "4.0", "5.2"].includes(player.playerApiVersion)
     );
-  assert.equal(officialProtocolPlayers.length, 2);
+  assert.equal(officialProtocolPlayers.length, 3);
 
   for (const protocolPlayer of officialProtocolPlayers) {
     const apiMajor = protocolPlayer.playerApiVersion.split(".")[0];
@@ -5438,6 +5438,7 @@ try {
             </Metadata>
             <BookletConfig>
               <Config key="paging_mode">separate</Config>
+              <Config key="restore_current_page_on_return">ON</Config>
             </BookletConfig>
             <Units>
               <Unit id="${protocolFirstUnitKey}" label="Protocol first unit" />
@@ -5459,6 +5460,12 @@ try {
                 <legend>Official Verona ${apiMajor} first unit</legend>
                 <label>Protocol answer <input name="${protocolInputName}" /></label>
               </fieldset>
+              ${apiMajor === "2" ? `
+                <fieldset>
+                  <legend>Official Verona 2 restored page</legend>
+                  <p>Legacy player state is restored.</p>
+                </fieldset>
+              ` : ""}
             ]]></Definition>
           </Unit>
         `
@@ -5536,6 +5543,15 @@ try {
       false,
       JSON.stringify(protocolImportPayload.importJob.diagnostics)
     );
+    assert.equal(
+      protocolImportPayload.importJob.diagnostics.some(
+        diagnostic =>
+          diagnostic.code === "source_document_player_metadata_missing" &&
+          diagnostic.severity === "warning"
+      ),
+      protocolPlayer.metadataFormat === "legacy-meta-element",
+      JSON.stringify(protocolImportPayload.importJob.diagnostics)
+    );
     const protocolReleaseId =
       protocolImportPayload.stagedContentRelease?.contentReleaseId;
     assert.ok(protocolReleaseId);
@@ -5595,9 +5611,12 @@ try {
         if (typeof response !== "string") return false;
         try {
           const parsed = JSON.parse(response);
-          const answers = JSON.parse(
-            parsed.unitState?.dataParts?.answers ?? "null"
+          const decodedDataPart = JSON.parse(
+            parsed.unitState?.dataParts?.answers ??
+              parsed.unitState?.dataParts?.all ??
+              "null"
           );
+          const answers = decodedDataPart?.answers ?? decodedDataPart;
           return Array.isArray(answers)
             ? answers.some(
                 answer =>
@@ -5611,6 +5630,30 @@ try {
       },
       30_000
     );
+    if (apiMajor === "2") {
+      await protocolFrame.locator("#next-page").waitFor({ state: "visible" });
+      await protocolFrame.locator("#next-page").dispatchEvent("click");
+      await protocolFrame
+        .getByText("Official Verona 2 restored page", { exact: true })
+        .waitFor({ timeout: 30_000 });
+      await pollJsonWithPredicate(
+        `${baseUrl}/api/v1/participant/sessions/${protocolParticipantSessionId}/current-state`,
+        payload => {
+          const response =
+            payload?.currentRunState?.testRun?.unitResponses?.[
+              protocolFirstUnitKey
+            ];
+          if (typeof response !== "string") return false;
+          try {
+            return JSON.parse(response).playerState?.currentPage === "2";
+          } catch {
+            return false;
+          }
+        },
+        30_000
+      );
+    }
+    await protocolFrame.locator("#next-unit").waitFor({ state: "visible" });
     await protocolFrame.locator("#next-unit").dispatchEvent("click");
     await page
       .locator("#participantRouteUnitKey")
@@ -5619,14 +5662,21 @@ try {
     await protocolFrame
       .getByText(`Official Verona ${apiMajor} second unit`, { exact: true })
       .waitFor({ timeout: 30_000 });
+    await protocolFrame.locator("#prev-unit").waitFor({ state: "visible" });
     await protocolFrame.locator("#prev-unit").dispatchEvent("click");
     await page
       .locator("#participantRouteUnitKey")
       .filter({ hasText: protocolFirstUnitKey })
       .waitFor({ timeout: 30_000 });
-    await protocolFrame
-      .getByText(`Official Verona ${apiMajor} first unit`, { exact: true })
-      .waitFor({ timeout: 30_000 });
+    if (apiMajor === "2") {
+      await protocolFrame
+        .getByText("Official Verona 2 restored page", { exact: true })
+        .waitFor({ timeout: 30_000 });
+    } else {
+      await protocolFrame
+        .getByText(`Official Verona ${apiMajor} first unit`, { exact: true })
+        .waitFor({ timeout: 30_000 });
+    }
     assert.equal(
       await protocolFrame
         .locator(`input[name='${protocolInputName}']`)
@@ -5643,6 +5693,12 @@ try {
       .locator("#participantVeronaPlayerVersion")
       .filter({ hasText: `API ${protocolPlayer.playerApiVersion}` })
       .waitFor({ timeout: 30_000 });
+    if (apiMajor === "2") {
+      await page
+        .frameLocator("#participantVeronaPlayerFrame")
+        .getByText("Official Verona 2 restored page", { exact: true })
+        .waitFor({ timeout: 30_000 });
+    }
     assert.equal(
       await page
         .frameLocator("#participantVeronaPlayerFrame")
@@ -5651,7 +5707,7 @@ try {
       protocolResponse
     );
   }
-  stopAfter("participant-verona-4-5-players");
+  stopAfter("participant-verona-2-5-players");
 
   logStep("participant-original-aspect-player");
   const aspectLoginKey = "testuser1";
