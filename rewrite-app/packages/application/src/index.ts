@@ -7120,10 +7120,13 @@ const parseTestcenterXmlBoolean = (value: string | null): boolean | null => {
   }
 };
 
-const isPositiveTestcenterXmlNumber = (value: string): boolean =>
+const isTestcenterXmlNumber = (value: string): boolean =>
   /^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$/.test(
     value.trim()
-  ) && Number(value) > 0;
+  );
+
+const isPositiveTestcenterXmlNumber = (value: string): boolean =>
+  isTestcenterXmlNumber(value) && Number(value) > 0;
 
 const isTestcenterXmlInteger = (value: string): boolean =>
   /^[+-]?\d+$/.test(value.trim());
@@ -7222,6 +7225,170 @@ const isTestcenterXmlId = (value: string): boolean =>
   testcenterXmlIdPattern.test(value);
 
 const testcenterBookletStateIdPattern = /^[a-z\d-]+$/;
+
+const testcenterBookletVariableSourceNames = [
+  "Code",
+  "Value",
+  "Status",
+  "Score"
+] as const;
+
+const validateTestcenterBookletCondition = (
+  condition: XmlElement,
+  sourceFileName: string,
+  stateKey: string,
+  optionKey: string
+): ImportJobDiagnostic[] => {
+  const diagnostics: ImportJobDiagnostic[] = [];
+  const context = `Option '${optionKey || "unknown"}' in State '${stateKey || "unknown"}'`;
+  const children = xmlChildElements(condition);
+  const sourceNames = [
+    ...testcenterBookletVariableSourceNames,
+    "Sum",
+    "Median",
+    "Mean",
+    "Count"
+  ];
+  const sourceElements = children.filter(child =>
+    sourceNames.includes(xmlElementLocalName(child) as typeof sourceNames[number])
+  );
+  const expressionElements = children.filter(
+    child => xmlElementLocalName(child) === "Is"
+  );
+  const sourceElement = sourceElements[0];
+  const expressionElement = expressionElements[0];
+  if (
+    children.length !== 2 ||
+    sourceElements.length !== 1 ||
+    expressionElements.length !== 1 ||
+    children[0] !== sourceElement ||
+    children[1] !== expressionElement
+  ) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_state_condition_structure_invalid",
+        `Original Testcenter booklet '${sourceFileName}' contains an invalid If structure for ${context}; exactly one source followed by one Is expression is required.`
+      )
+    );
+  }
+
+  const validateVariableSource = (variableSource: XmlElement): void => {
+    const variableKey = variableSource.getAttribute("of")?.trim() ?? "";
+    const unitKey = variableSource.getAttribute("from")?.trim() ?? "";
+    if (!variableKey || !unitKey) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_state_condition_variable_reference_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains a ${xmlElementLocalName(variableSource)} source without both 'of' and 'from' for ${context}.`
+        )
+      );
+    }
+    const defaultValue = variableSource.getAttribute("or");
+    if (defaultValue !== null && !isTestcenterXmlNumber(defaultValue)) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_state_condition_number_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains invalid numeric fallback '${defaultValue}' for ${context}.`
+        )
+      );
+    }
+  };
+
+  if (sourceElement) {
+    const sourceName = xmlElementLocalName(sourceElement);
+    if ((testcenterBookletVariableSourceNames as readonly string[]).includes(sourceName)) {
+      validateVariableSource(sourceElement);
+    } else if (["Sum", "Median", "Mean"].includes(sourceName)) {
+      const aggregateSources = xmlChildElements(sourceElement);
+      const aggregateSourceNames = new Set(
+        aggregateSources.map(xmlElementLocalName)
+      );
+      if (
+        aggregateSources.length < 2 ||
+        aggregateSourceNames.size !== 1 ||
+        !aggregateSources.every(source =>
+          (testcenterBookletVariableSourceNames as readonly string[]).includes(
+            xmlElementLocalName(source)
+          )
+        )
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_condition_aggregation_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires ${sourceName} in ${context} to contain at least two variable sources of one type.`
+          )
+        );
+      }
+      aggregateSources
+        .filter(source =>
+          (testcenterBookletVariableSourceNames as readonly string[]).includes(
+            xmlElementLocalName(source)
+          )
+        )
+        .forEach(validateVariableSource);
+    } else if (sourceName === "Count") {
+      const nestedChildren = xmlChildElements(sourceElement);
+      if (
+        nestedChildren.length < 2 ||
+        nestedChildren.some(child => xmlElementLocalName(child) !== "If")
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_condition_aggregation_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires Count in ${context} to contain at least two If conditions.`
+          )
+        );
+      }
+      for (const nestedCondition of nestedChildren.filter(
+        child => xmlElementLocalName(child) === "If"
+      )) {
+        diagnostics.push(
+          ...validateTestcenterBookletCondition(
+            nestedCondition,
+            sourceFileName,
+            stateKey,
+            optionKey
+          )
+        );
+      }
+    }
+  }
+
+  if (expressionElement) {
+    const comparisonNames = [
+      "equal",
+      "notEqual",
+      "greaterThan",
+      "lowerThan"
+    ] as const;
+    const presentComparisons = comparisonNames.filter(
+      comparisonName => expressionElement.getAttribute(comparisonName) !== null
+    );
+    if (presentComparisons.length === 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_state_condition_expression_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains an Is expression without a comparison for ${context}.`
+        )
+      );
+    }
+    for (const comparisonName of ["greaterThan", "lowerThan"] as const) {
+      const comparisonValue = expressionElement.getAttribute(comparisonName);
+      if (
+        comparisonValue !== null &&
+        !isTestcenterXmlNumber(comparisonValue)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_condition_number_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains invalid numeric comparison '${comparisonValue}' for ${context}.`
+          )
+        );
+      }
+    }
+  }
+  return diagnostics;
+};
 
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
@@ -7387,6 +7554,7 @@ const validateTestcenterXmlSourceDocument = (
       }
       const optionKeys = new Set<string>();
       for (const option of options) {
+        const optionElementName = xmlElementLocalName(option);
         const rawOptionKey = option.getAttribute("id") ?? "";
         const optionKey = rawOptionKey.trim();
         if (!optionKey) {
@@ -7410,6 +7578,30 @@ const validateTestcenterXmlSourceDocument = (
           );
         }
         optionKeys.add(optionKey);
+        const optionChildren = xmlChildElements(option);
+        if (
+          optionChildren.some(child => xmlElementLocalName(child) !== "If") ||
+          (optionElementName === "DefaultOption" && optionChildren.length > 0)
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_state_condition_structure_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains an unsupported child in ${optionElementName} '${optionKey || "unknown"}' of State '${stateKey || "unknown"}'.`
+            )
+          );
+        }
+        for (const condition of optionChildren.filter(
+          child => xmlElementLocalName(child) === "If"
+        )) {
+          diagnostics.push(
+            ...validateTestcenterBookletCondition(
+              condition,
+              sourceFileName,
+              stateKey,
+              optionKey
+            )
+          );
+        }
       }
       if (stateKey && !stateOptions.has(stateKey)) {
         stateOptions.set(stateKey, optionKeys);

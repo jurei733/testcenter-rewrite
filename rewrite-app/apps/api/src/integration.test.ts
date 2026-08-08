@@ -9273,6 +9273,53 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_show_option_invalid"
     },
     {
+      fileName: "booklet-invalid-condition-structure.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<If><Value of="derived_var" from="decision-unit" /><Is greaterThan="99" /></If>',
+        '<If><Value of="derived_var" from="decision-unit" /></If>'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_structure_invalid"
+    },
+    {
+      fileName: "booklet-invalid-condition-variable-reference.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Value of="derived_var" from="decision-unit" />',
+        '<Value from="decision-unit" />'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_variable_reference_invalid"
+    },
+    {
+      fileName: "booklet-invalid-condition-expression.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Is greaterThan="99" />',
+        "<Is />"
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_expression_invalid"
+    },
+    {
+      fileName: "booklet-invalid-condition-number.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Is greaterThan="99" />',
+        '<Is greaterThan="later" />'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_number_invalid"
+    },
+    {
+      fileName: "booklet-invalid-condition-sum.xml",
+      sourceDocument: validAdaptiveBookletXml
+        .replace('<Value of="var4" from="decision-unit" />', "")
+        .replace('<Value of="var5" from="decision-unit" />', ""),
+      diagnosticCode: "testcenter_xml_state_condition_aggregation_invalid"
+    },
+    {
+      fileName: "booklet-invalid-condition-count.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        /<Count>[\s\S]*?<\/Count>/,
+        '<Count><If><Value of="derived_var" from="decision-unit" /><Is greaterThan="150" /></If></Count>'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_aggregation_invalid"
+    },
+    {
       fileName: "unit-duplicate-variable.xml",
       sourceDocument: validUnitXml.replace(
         'id="derived_var" type="number"',

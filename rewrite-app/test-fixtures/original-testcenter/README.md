@@ -24,7 +24,8 @@ The corpus also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, SysCheck, and Testtakers structures,
 invalid XML `xs:ID` metadata identities in Booklet, Unit, and SysCheck files,
 invalid or duplicate adaptive state/option identities, empty state option sets,
-broken `Show if/is` references, plus duplicate runtime identities. The matching original repeated-Unit-ID fixture
+broken `Show if/is` references, malformed recursive conditions and aggregates,
+plus duplicate runtime identities. The matching original repeated-Unit-ID fixture
 proves that an explicit alias remains valid while duplicate Unit runtime keys
 and duplicate Testlet IDs are rejected. The byte-identical original
 `Booklet.xml`/`Booklet_sameBookletID.xml` collision pair additionally proves
