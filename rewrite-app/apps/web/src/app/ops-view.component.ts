@@ -476,6 +476,37 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Sign in with an administrative delegation role, then refresh admin users."
       ></app-record-collection>
 
+      <article id="adminUserBatchStatusCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Bulk account management</span>
+            <h2>Selected Account Status</h2>
+          </div>
+          <span class="status-pill">{{ view.adminUserBatchCount }}/50 selected</span>
+        </div>
+        <p>Select accounts from the scoped directory, review the exact IDs below, then apply one status. The signed-in account cannot be selected and every update is independently re-authorized by the server.</p>
+        <div class="form-grid">
+          <label>
+            Batch Target Status
+            <select id="adminBatchStatusValue" name="adminBatchStatusValue" [(ngModel)]="view.ops.adminStatusValue" (change)="view.persistState()">
+              <option *ngFor="let status of view.adminStatusOptions" [ngValue]="status">{{ status }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="adminBatchStatusButton" class="danger" type="button" [disabled]="!view.canUpdateAdminUserBatchStatus" (click)="view.confirmUpdateAdminUserBatchStatus()">Update Selected Accounts</button>
+          <button id="clearAdminBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminUserBatchCount === 0 && !view.adminUserStatusBatchResult" (click)="view.clearAdminUserBatchSelection()">Clear Batch</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Selected Admin Accounts"
+        subtitle="Exact best-effort batch preview and the most recent per-account result."
+        [items]="view.adminUserBatchPreviewItems"
+        (itemAction)="view.selectAdminUser($event)"
+        emptyState="No admin accounts are selected for a status change."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Admin Users CSV Export</h2>
         <p>Preview the filtered admin directory as CSV for access reviews, account handoff, or operator archiving.</p>

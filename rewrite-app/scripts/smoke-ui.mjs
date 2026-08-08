@@ -2064,29 +2064,80 @@ try {
   await waitForInputMinLength("#adminSessionToken", 20);
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
 
-  await fillAndCommit("#adminStatusTargetUserId", workspaceAdminUserId);
-  await selectAndCommit("#adminStatusValue", "disabled");
-  await expectButtonSelectorEnabled("#adminUpdateStatusButton");
-  logStep("disable-workspace-admin");
-  const updateAdminStatusDialog = acceptNextDialog(
-    new RegExp(
-      `Change admin user '${workspaceAdminUserId}' status to 'disabled'\\?`
-    )
+  await clickAction("Admin Users");
+  const batchAdminDirectoryResponse = await fetch(
+    `${baseUrl}/api/v1/admin/users?limit=100`,
+    { headers: { authorization: `Bearer ${smokeAdminSessionToken}` } }
   );
-  await clickAction("Update Status");
-  await updateAdminStatusDialog;
+  assert.equal(batchAdminDirectoryResponse.status, 200);
+  const batchAdminDirectory = await batchAdminDirectoryResponse.json();
+  const delegatedWorkspaceAdminUserId = batchAdminDirectory.items.find(
+    item => item?.adminUser?.username === delegatedWorkspaceAdminUsername
+  )?.adminUser?.adminUserId;
+  assert.ok(delegatedWorkspaceAdminUserId);
+  const adminUsersCollection = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Admin Users" }) });
+  const currentPlatformAdminCard = adminUsersCollection
+    .locator(".record-card")
+    .filter({ has: page.getByRole("heading", { name: adminUsername }) });
+  await currentPlatformAdminCard.filter({ hasText: "current session" }).waitFor();
+  assert.equal(
+    await currentPlatformAdminCard
+      .getByRole("button", { name: "Add To Batch" })
+      .count(),
+    0,
+    "The signed-in admin account must not be available for bulk status changes."
+  );
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    workspaceAdminUsername
+  );
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    delegatedWorkspaceAdminUsername
+  );
+  await selectAndCommit("#adminBatchStatusValue", "disabled");
+  const selectedAdminAccounts = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Selected Admin Accounts" })
+    });
+  await selectedAdminAccounts
+    .filter({ hasText: "2 selected account(s) will be changed to disabled" })
+    .filter({ hasText: workspaceAdminUserId })
+    .filter({ hasText: delegatedWorkspaceAdminUserId })
+    .waitFor();
+  await expectButtonSelectorEnabled("#adminBatchStatusButton");
+  logStep("admin-user-bulk-status");
+  const updateAdminBatchStatusDialog = acceptNextDialog(
+    /Change 2 selected admin user\(s\) to 'disabled'\? Each account remains subject to the server delegation boundary\./
+  );
+  await page.locator("#adminBatchStatusButton").click();
+  await updateAdminBatchStatusDialog;
+  await waitForNotBusy("admin-user-bulk-status");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/admin/users`,
     payload =>
       typeof payload === "object" &&
       payload != null &&
       Array.isArray(payload.items) &&
-      payload.items.some(
-        item =>
-          item?.adminUser?.adminUserId === workspaceAdminUserId &&
-          item?.adminUser?.status === "disabled"
+      [workspaceAdminUserId, delegatedWorkspaceAdminUserId].every(adminUserId =>
+        payload.items.some(
+          item =>
+            item?.adminUser?.adminUserId === adminUserId &&
+            item?.adminUser?.status === "disabled"
+        )
       )
   );
+  await selectedAdminAccounts
+    .filter({ hasText: "0 selected account(s) will be changed to disabled" })
+    .filter({ hasText: "Last Succeeded" })
+    .filter({ hasText: "Last Failed" })
+    .waitFor();
+  stopAfter("admin-user-bulk-status");
   const disabledWorkspaceAdminSignIn = await fetch(
     `${baseUrl}/api/v1/admin/auth/sign-in`,
     {

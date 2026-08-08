@@ -25,7 +25,10 @@ import {
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
-import type { MonitorViewProfile } from "@testcenter-rewrite-app/domain";
+import type {
+  AdminUserStatus,
+  MonitorViewProfile
+} from "@testcenter-rewrite-app/domain";
 
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
@@ -38,6 +41,15 @@ import {
 import { prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellOpsHostsService } from "./rewrite-app-shell-ops-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
+
+export type AdminUserStatusBatchResult = {
+  requestedCount: number;
+  succeededAdminUserIds: string[];
+  failures: Array<{
+    adminUserId: string;
+    error: string;
+  }>;
+};
 
 @Injectable({ providedIn: "root" })
 export class RewriteAppOpsService {
@@ -462,6 +474,57 @@ export class RewriteAppOpsService {
     );
     this.persistence.persistShellState();
     await this.refreshAdminUsers();
+  }
+
+  async updateAdminUsersStatus(
+    adminUserIds: string[],
+    status: AdminUserStatus
+  ): Promise<AdminUserStatusBatchResult> {
+    if (!this.hasAdminSession()) {
+      return {
+        requestedCount: 0,
+        succeededAdminUserIds: [],
+        failures: []
+      };
+    }
+
+    const uniqueAdminUserIds = [
+      ...new Set(adminUserIds.map(adminUserId => adminUserId.trim()).filter(Boolean))
+    ].slice(0, 50);
+    const succeededAdminUserIds: string[] = [];
+    const failures: AdminUserStatusBatchResult["failures"] = [];
+
+    for (const adminUserId of uniqueAdminUserIds) {
+      try {
+        await this.requestState.request<UpdateAdminUserResponse>(
+          "Update Selected Admin User",
+          "PATCH",
+          resolveRoutePath(productionApiRoutes.admin.updateUser, { adminUserId }),
+          { status } satisfies UpdateAdminUserRequest,
+          { headers: this.createAdminHeaders(), quiet: true }
+        );
+        succeededAdminUserIds.push(adminUserId);
+      } catch (error) {
+        failures.push({
+          adminUserId,
+          error: this.requestState.isApiError(error)
+            ? error.error
+            : "unexpected_error"
+        });
+      }
+    }
+
+    this.feedback.rememberActivity(
+      "Admin User Batch Updated",
+      `${succeededAdminUserIds.length}/${uniqueAdminUserIds.length} selected account(s) changed to ${status}; ${failures.length} failed.`
+    );
+    await this.refreshAdminUsers();
+
+    return {
+      requestedCount: uniqueAdminUserIds.length,
+      succeededAdminUserIds,
+      failures
+    };
   }
 
   async resetAdminUserPassword(): Promise<void> {

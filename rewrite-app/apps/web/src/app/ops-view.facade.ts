@@ -30,7 +30,10 @@ import {
   readStringValue
 } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
-import { RewriteAppOpsService } from "./rewrite-app-ops.service";
+import {
+  RewriteAppOpsService,
+  type AdminUserStatusBatchResult
+} from "./rewrite-app-ops.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 
@@ -174,6 +177,8 @@ export class OpsViewFacade {
   monitorFilterDraftSubValue = "";
   monitorFilterDraftLabel = "";
   monitorFilterDraftNot = false;
+  private readonly adminUserBatchSelection = new Set<string>();
+  adminUserStatusBatchResult: AdminUserStatusBatchResult | null = null;
 
   init(): void {
     this.viewState.setActiveView("ops");
@@ -226,6 +231,13 @@ export class OpsViewFacade {
 
   get operatorAccessLabel(): string {
     return this.operatorAccess.label;
+  }
+
+  get currentAdminUserId(): string {
+    const payload = parseJsonDocument<AdminSessionViewPayload>(
+      this.ops.adminSessionView
+    );
+    return payload?.adminUser?.adminUserId ?? "";
   }
 
   get canUseAdminCredentials(): boolean {
@@ -445,6 +457,19 @@ export class OpsViewFacade {
     );
   }
 
+  get adminUserBatchCount(): number {
+    return this.adminUserBatchSelection.size;
+  }
+
+  get canUpdateAdminUserBatchStatus(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminUserBatchCount > 0 &&
+      this.adminStatusOptions.includes(this.ops.adminStatusValue)
+    );
+  }
+
   refreshDiagnostics(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshOperationalDiagnostics());
   }
@@ -471,6 +496,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminCredentials) {
       return;
     }
+    this.clearAdminUserBatchSelection();
     this.viewState.onActionAsync(() => this.opsService.signInAdmin());
   }
 
@@ -499,6 +525,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminSession) {
       return;
     }
+    this.clearAdminUserBatchSelection();
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -526,6 +553,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminSession) {
       return;
     }
+    this.clearAdminUserBatchSelection();
     this.viewState.onActionAsync(() => this.opsService.refreshAdminUsers());
   }
 
@@ -606,6 +634,36 @@ export class OpsViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.opsService.updateAdminUserStatus());
+  }
+
+  confirmUpdateAdminUserBatchStatus(): void {
+    if (!this.canUpdateAdminUserBatchStatus) {
+      return;
+    }
+    const status = this.ops.adminStatusValue;
+    const confirmed = globalThis.window?.confirm(
+      `Change ${this.adminUserBatchCount} selected admin user(s) to '${status}'? Each account remains subject to the server delegation boundary.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const selectedAdminUserIds = [...this.adminUserBatchSelection];
+    this.viewState.onActionAsync(async () => {
+      const result = await this.opsService.updateAdminUsersStatus(
+        selectedAdminUserIds,
+        status
+      );
+      this.adminUserStatusBatchResult = result;
+      for (const adminUserId of result.succeededAdminUserIds) {
+        this.adminUserBatchSelection.delete(adminUserId);
+      }
+    });
+  }
+
+  clearAdminUserBatchSelection(): void {
+    this.adminUserBatchSelection.clear();
+    this.adminUserStatusBatchResult = null;
   }
 
   confirmResetAdminUserPassword(): void {
@@ -720,6 +778,20 @@ export class OpsViewFacade {
   }
 
   selectAdminUser(item: RecordCollectionItem): void {
+    if (item.actionPayload?.adminUserBatchCommand === "toggle") {
+      const batchAdminUserId = item.actionPayload.adminUserId?.trim();
+      if (!batchAdminUserId || batchAdminUserId === this.currentAdminUserId) {
+        return;
+      }
+      if (this.adminUserBatchSelection.has(batchAdminUserId)) {
+        this.adminUserBatchSelection.delete(batchAdminUserId);
+      } else if (this.adminUserBatchSelection.size < 50) {
+        this.adminUserBatchSelection.add(batchAdminUserId);
+      }
+      this.adminUserStatusBatchResult = null;
+      return;
+    }
+
     const adminUserId = item.actionPayload?.adminUserId;
     if (!adminUserId) {
       return;
@@ -1104,7 +1176,13 @@ export class OpsViewFacade {
         subline: item.adminUser.displayName,
         badges: [
           item.adminUser.status,
-          ...item.roleAssignments.map(roleAssignment => roleAssignment.role)
+          ...item.roleAssignments.map(roleAssignment => roleAssignment.role),
+          ...(item.adminUser.adminUserId === this.currentAdminUserId
+            ? ["current session"]
+            : []),
+          ...(this.adminUserBatchSelection.has(item.adminUser.adminUserId)
+            ? ["batch selected"]
+            : [])
         ],
         rows: [
           {
@@ -1164,6 +1242,92 @@ export class OpsViewFacade {
           adminUserId: item.adminUser.adminUserId,
           roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
           adminUserStatus: item.adminUser.status
+        },
+        actions:
+          item.adminUser.adminUserId === this.currentAdminUserId
+            ? []
+            : [
+                {
+                  label: this.adminUserBatchSelection.has(
+                    item.adminUser.adminUserId
+                  )
+                    ? "Remove From Batch"
+                    : "Add To Batch",
+                  payload: {
+                    adminUserBatchCommand: "toggle",
+                    adminUserId: item.adminUser.adminUserId
+                  }
+                }
+              ]
+      }))
+    ];
+  }
+
+  get adminUserBatchPreviewItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    const selectedUsers = (payload?.items ?? []).filter(item =>
+      this.adminUserBatchSelection.has(item.adminUser.adminUserId)
+    );
+    const result = this.adminUserStatusBatchResult;
+    if (selectedUsers.length === 0 && !result) {
+      return [];
+    }
+
+    return [
+      {
+        headline: "Batch status preview",
+        subline: `${selectedUsers.length} selected account(s) will be changed to ${this.ops.adminStatusValue}`,
+        badges: [
+          `${selectedUsers.length}/50 selected`,
+          `target ${this.ops.adminStatusValue}`,
+          "server-scoped"
+        ],
+        rows: [
+          {
+            label: "Selected Admin User IDs",
+            value:
+              selectedUsers
+                .map(item => item.adminUser.adminUserId)
+                .join(" | ") || "none"
+          },
+          {
+            label: "Last Succeeded",
+            value: String(result?.succeededAdminUserIds.length ?? 0)
+          },
+          {
+            label: "Last Failed",
+            value: String(result?.failures.length ?? 0)
+          },
+          {
+            label: "Failure Details",
+            value:
+              result?.failures
+                .map(failure => `${failure.adminUserId}: ${failure.error}`)
+                .join(" | ") || "none"
+          }
+        ]
+      },
+      ...selectedUsers.map(item => ({
+        headline: item.adminUser.username,
+        subline: item.adminUser.displayName,
+        badges: [item.adminUser.status, "batch selected"],
+        rows: [
+          { label: "Admin User ID", value: item.adminUser.adminUserId },
+          {
+            label: "Current Status",
+            value: item.adminUser.status
+          },
+          {
+            label: "Target Status",
+            value: this.ops.adminStatusValue
+          }
+        ],
+        actionLabel: "Remove From Batch",
+        actionPayload: {
+          adminUserBatchCommand: "toggle",
+          adminUserId: item.adminUser.adminUserId
         }
       }))
     ];
