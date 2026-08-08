@@ -4541,6 +4541,12 @@ try {
         }, "*"));
         addEventListener("unload", () => {
           document.querySelector("#playerAnswer").value = "Saved during player unload";
+          parent.postMessage({
+            type: "vopRuntimeErrorNotification",
+            sessionId,
+            code: "unload-runtime-error",
+            message: "Synthetic unload failure"
+          }, "*");
           sendState(false);
         });
         addEventListener("DOMContentLoaded", () => setTimeout(() => parent.postMessage({
@@ -5359,6 +5365,19 @@ try {
         return false;
       }
     }
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=${encodeURIComponent("Runtime Error: unload-runtime-error")}&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.logKey === "Runtime Error: unload-runtime-error" &&
+          item.testLog?.logContent === "Synthetic unload failure" &&
+          item.testLog?.unitKey === veronaUnitKey
+      )
   );
   stopAfter("participant-verona-background-sync");
 

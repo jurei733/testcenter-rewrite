@@ -720,19 +720,11 @@ export class VeronaPlayerHostComponent
   }
 
   private handleRuntimeError(codeValue: unknown, messageValue: unknown): void {
-    const code =
-      typeof codeValue === "string" && codeValue.trim()
-        ? codeValue.trim().slice(0, 180)
-        : "runtime-error";
-    const message =
-      typeof messageValue === "string"
-        ? messageValue.trim().slice(0, 32_768)
-        : "";
-    this.persistHostLog({
-      key: `Runtime Error: ${code}`,
-      timeStamp: Date.now(),
-      content: message
-    });
+    const { code, message, entry } = this.normalizeRuntimeError(
+      codeValue,
+      messageValue
+    );
+    this.persistHostLog(entry);
     this.fail(
       [code, message].filter(Boolean).join(": ") ||
         "The player reported a runtime error."
@@ -781,6 +773,29 @@ export class VeronaPlayerHostComponent
     notification: ReturnType<typeof parseVeronaIncomingNotification>
   ): void {
     if (
+      notification?.type === "vopRuntimeErrorNotification" &&
+      (!notification.sessionId || notification.sessionId === frame.sessionId)
+    ) {
+      const { entry } = this.normalizeRuntimeError(
+        notification.code,
+        notification.message
+      );
+      this.logEntries.emit({
+        testRunId: frame.testRunId,
+        unitKey: frame.unitKey,
+        entries: [entry]
+      });
+      this.responseUpdate.emit({
+        testRunId: frame.testRunId,
+        unitKey: frame.unitKey,
+        response: frame.latestResponse,
+        unitDataChanged: false,
+        unitStateChanged: false,
+        playerStateChanged: false
+      });
+      return;
+    }
+    if (
       !notification ||
       notification.type !== "vopStateChangedNotification" ||
       notification.sessionId !== frame.sessionId
@@ -813,6 +828,33 @@ export class VeronaPlayerHostComponent
         Object.keys(notification.unitState).some(key => key !== "dataParts"),
       playerStateChanged: notification.playerState !== undefined
     });
+  }
+
+  private normalizeRuntimeError(
+    codeValue: unknown,
+    messageValue: unknown
+  ): {
+    code: string;
+    message: string;
+    entry: ParticipantTestLogEntryInput;
+  } {
+    const code =
+      typeof codeValue === "string" && codeValue.trim()
+        ? codeValue.trim().slice(0, 180)
+        : "runtime-error";
+    const message =
+      typeof messageValue === "string"
+        ? messageValue.trim().slice(0, 32_768)
+        : "";
+    return {
+      code,
+      message,
+      entry: {
+        key: `Runtime Error: ${code}`,
+        timeStamp: Date.now(),
+        content: message
+      }
+    };
   }
 
   private normalizeLogEntries(
