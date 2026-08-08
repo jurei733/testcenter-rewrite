@@ -819,6 +819,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         title="Open Monitor Runs"
         subtitle="Runs that currently keep the activation guard active."
         [items]="view.openRunItems"
+        [density]="view.monitorProfileDensity"
         (itemAction)="view.selectTestRun($event)"
         emptyState="No open runs are currently loaded."
       ></app-record-collection>

@@ -798,6 +798,52 @@ pre {
   gap: 12px;
 }
 
+.record-collection-grid[data-density="medium"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.record-collection-grid[data-density="small"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 10px;
+}
+
+.record-collection-grid[data-density="medium"] .record-card {
+  gap: 12px;
+  padding: 14px;
+}
+
+.record-collection-grid[data-density="small"] .record-card {
+  gap: 10px;
+  padding: 12px;
+}
+
+.record-collection-grid[data-density="small"] .record-card-header {
+  display: grid;
+  gap: 8px;
+}
+
+.record-collection-grid[data-density="small"] .record-card-header h4 {
+  font-size: 16px;
+}
+
+.record-collection-grid[data-density="small"] .record-card-badges {
+  justify-content: start;
+}
+
+.record-collection-grid[data-density="small"] .record-card-badges span {
+  padding: 4px 7px;
+  font-size: 10px;
+}
+
+.record-collection-grid[data-density="small"] .record-card-rows {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.record-collection-grid[data-density="small"] .record-card-actions {
+  margin-top: 6px;
+}
+
 .record-card {
   display: grid;
   gap: 14px;

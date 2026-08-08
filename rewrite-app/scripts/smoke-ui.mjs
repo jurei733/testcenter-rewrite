@@ -9268,6 +9268,11 @@ try {
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
     .waitFor();
+  assert.equal(
+    await scopedOpenRuns.locator(".record-collection-grid").getAttribute("data-density"),
+    "small",
+    "Imported small monitor profile must apply the compact card layout."
+  );
   const monitorOverview = page.locator("#monitorOverviewCard");
   await monitorOverview
     .locator(".summary-card")

@@ -30,6 +30,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import type {
+  RecordCollectionDensity,
   RecordCollectionItem,
   RecordCollectionRow
 } from "./record-collection.component";
@@ -129,6 +130,20 @@ export class RuntimeViewFacade {
       return "No imported monitor profile is assigned; all loaded runs remain visible.";
     }
     return `${profile.label || profile.profileId}: ${profile.settings.view} view, ${profile.filters.length} imported filter(s), next-block selection ${profile.settings.autoselectNextBlock === "yes" ? "automatic" : "manual"}.`;
+  }
+
+  get monitorProfileDensity(): RecordCollectionDensity {
+    switch (this.activeMonitorProfile?.settings.view) {
+      case "small":
+        return "small";
+      case "medium":
+      case "middle":
+        return "medium";
+      case "full":
+      case "large":
+      default:
+        return "full";
+    }
   }
 
   get monitorBlockNavigationTargets(): NonNullable<

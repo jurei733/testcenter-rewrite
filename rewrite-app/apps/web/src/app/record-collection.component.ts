@@ -15,6 +15,8 @@ export type RecordCollectionAction = {
   payload: Record<string, string>;
 };
 
+export type RecordCollectionDensity = "full" | "medium" | "small";
+
 export type RecordCollectionItem = {
   headline: string;
   subline: string;
@@ -43,7 +45,11 @@ export type RecordCollectionItem = {
         {{ emptyState }}
       </div>
 
-      <div class="record-collection-grid" *ngIf="items.length > 0">
+      <div
+        class="record-collection-grid"
+        [attr.data-density]="density"
+        *ngIf="items.length > 0"
+      >
         <article
           class="record-card"
           [class.is-selected]="item.selected"
@@ -143,6 +149,7 @@ export class RecordCollectionComponent implements OnDestroy {
   @Input({ required: true }) subtitle = "";
   @Input({ required: true }) items: RecordCollectionItem[] = [];
   @Input() emptyState = "No items yet.";
+  @Input() density: RecordCollectionDensity = "full";
   @Output() readonly itemAction = new EventEmitter<RecordCollectionItem>();
   private copiedRowKey = "";
   private copyResetHandle?: ReturnType<typeof globalThis.setTimeout>;
