@@ -341,11 +341,7 @@ export class VeronaPlayerHostComponent
         this.scheduleFocusLog(notification.hasFocus);
         break;
       case "vopRuntimeErrorNotification":
-        this.fail(
-          [notification.code, notification.message]
-            .filter(Boolean)
-            .join(": ") || "The player reported a runtime error."
-        );
+        this.handleRuntimeError(notification.code, notification.message);
         break;
     }
   }
@@ -575,6 +571,32 @@ export class VeronaPlayerHostComponent
       reason
     };
     this.frame.contentWindow.postMessage(notification, "*");
+  }
+
+  private handleRuntimeError(codeValue: unknown, messageValue: unknown): void {
+    const code =
+      typeof codeValue === "string" && codeValue.trim()
+        ? codeValue.trim().slice(0, 180)
+        : "runtime-error";
+    const message =
+      typeof messageValue === "string"
+        ? messageValue.trim().slice(0, 32_768)
+        : "";
+    this.logEntries.emit([{
+      key: `Runtime Error: ${code}`,
+      timeStamp: Date.now(),
+      content: message
+    }]);
+    this.responseUpdate.emit({
+      response: this.latestResponse,
+      unitDataChanged: false,
+      unitStateChanged: false,
+      playerStateChanged: false
+    });
+    this.fail(
+      [code, message].filter(Boolean).join(": ") ||
+        "The player reported a runtime error."
+    );
   }
 
   private scheduleFocusLog(playerHasFocus?: boolean): void {

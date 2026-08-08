@@ -4429,6 +4429,7 @@ try {
       <output id="playerResourceMultiRange"></output>
       <label>Player answer <input id="playerAnswer" /></label>
       <button id="playerEnd" type="button">End from player</button>
+      <button id="playerRuntimeError" type="button">Report runtime error</button>
       <script>
         let sessionId = "";
         const sendState = () => parent.postMessage({
@@ -4514,6 +4515,12 @@ try {
           type: "vopUnitNavigationRequestedNotification",
           sessionId,
           target: "end"
+        }, "*"));
+        document.querySelector("#playerRuntimeError").addEventListener("click", () => parent.postMessage({
+          type: "vopRuntimeErrorNotification",
+          sessionId,
+          code: "runtime-error",
+          message: "Synthetic player failure"
         }, "*"));
         addEventListener("DOMContentLoaded", () => setTimeout(() => parent.postMessage({
           type: "vopReadyNotification",
@@ -5241,6 +5248,24 @@ try {
         return false;
       }
     }
+  );
+  await backgroundSyncedVeronaFrame.locator("#playerRuntimeError").click();
+  await page
+    .locator("#participantVeronaPlayerError")
+    .filter({ hasText: "runtime-error: Synthetic player failure" })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=${encodeURIComponent("Runtime Error: runtime-error")}&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.logKey === "Runtime Error: runtime-error" &&
+          item.testLog?.logContent === "Synthetic player failure" &&
+          item.testLog?.unitKey === veronaUnitKey
+      )
   );
   stopAfter("participant-verona-background-sync");
 
