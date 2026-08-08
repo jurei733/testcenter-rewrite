@@ -7892,6 +7892,17 @@ const validateTestcenterXmlSourceDocument = (
           );
         }
       }
+      if (
+        options.length > 0 &&
+        !options.some(option => xmlChildrenNamed(option, "If").length === 0)
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_fallback_option_missing",
+            `Original Testcenter booklet '${sourceFileName}' requires State '${stateKey || "unknown"}' to contain at least one Option without conditions.`
+          )
+        );
+      }
       if (stateKey && !stateOptions.has(stateKey)) {
         stateOptions.set(stateKey, optionKeys);
       }

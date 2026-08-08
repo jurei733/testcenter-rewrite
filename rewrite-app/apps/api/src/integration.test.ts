@@ -9379,6 +9379,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_options_missing"
     },
     {
+      fileName: "booklet-missing-state-fallback-option.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Option id="beginner" label="leicht "/>',
+        '<Option id="beginner" label="leicht"><If><Value of="var3" from="decision-unit"/><Is equal="fallback"/></If></Option>'
+      ),
+      diagnosticCode: "testcenter_xml_state_fallback_option_missing"
+    },
+    {
       fileName: "booklet-missing-state-option-id.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<Option id="professional"',
@@ -19112,6 +19120,18 @@ test("original coding schemes derive adaptive variables server-side", async () =
               </Option>
               <Option id="basic" label="Basic"/>
             </State>
+            <State id="coding-status" label="Server coding status">
+              <Option id="complete" label="Coding complete">
+                <If><Status of="var1" from="decision-unit"/><Is equal="CODING_COMPLETE"/></If>
+              </Option>
+              <Option id="pending" label="Coding pending"/>
+            </State>
+            <State id="coding-rank" label="Server coding rank">
+              <Option id="complete" label="Past coding errors">
+                <If><Status of="var1" from="decision-unit"/><Is greaterThan="10"/></If>
+              </Option>
+              <Option id="pending" label="Before coding complete"/>
+            </State>
           </States>
           <Units>
             <Unit id="UNIT.DECISION" alias="decision-unit" label="Decision Unit"/>
@@ -19216,7 +19236,11 @@ test("original coding schemes derive adaptive variables server-side", async () =
     method: "POST",
     body: { bookletKey }
   });
-  assert.deepEqual(resume.body.testRun.bookletStates, { route: "basic" });
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    route: "basic",
+    "coding-status": "pending",
+    "coding-rank": "pending"
+  });
 
   const rawPlayerResponse = JSON.stringify({
     kind: "verona_unit_state",
@@ -19245,7 +19269,9 @@ test("original coding schemes derive adaptive variables server-side", async () =
   });
   assert.equal(saveResult.status, 200);
   assert.deepEqual(saveResult.body.testRun.bookletStates, {
-    route: "professional"
+    route: "professional",
+    "coding-status": "complete",
+    "coding-rank": "complete"
   });
 
   const currentState = await requestJson<{
@@ -19270,6 +19296,32 @@ test("original coding schemes derive adaptive variables server-side", async () =
       options: [
         { optionKey: "professional", displayLabel: "Professional" },
         { optionKey: "basic", displayLabel: "Basic" }
+      ]
+    },
+    {
+      stateKey: "coding-status",
+      displayLabel: "Server coding status",
+      optionKey: "complete",
+      optionLabel: "Coding complete",
+      automaticOptionKey: "complete",
+      automaticOptionLabel: "Coding complete",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "complete", displayLabel: "Coding complete" },
+        { optionKey: "pending", displayLabel: "Coding pending" }
+      ]
+    },
+    {
+      stateKey: "coding-rank",
+      displayLabel: "Server coding rank",
+      optionKey: "complete",
+      optionLabel: "Past coding errors",
+      automaticOptionKey: "complete",
+      automaticOptionLabel: "Past coding errors",
+      overrideOptionKey: null,
+      options: [
+        { optionKey: "complete", displayLabel: "Past coding errors" },
+        { optionKey: "pending", displayLabel: "Before coding complete" }
       ]
     }
   ]);
