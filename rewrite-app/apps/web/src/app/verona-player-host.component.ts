@@ -38,10 +38,25 @@ import {
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
 
 export type VeronaResponseChange = {
+  testRunId: string;
+  unitKey: string;
   response: string;
   unitDataChanged: boolean;
   unitStateChanged: boolean;
   playerStateChanged: boolean;
+};
+
+export type VeronaLogChange = {
+  testRunId: string;
+  unitKey: string;
+  entries: ParticipantTestLogEntryInput[];
+};
+
+type RetiredVeronaFrame = {
+  sessionId: string;
+  testRunId: string;
+  unitKey: string;
+  latestResponse: string;
 };
 
 @Component({
@@ -147,7 +162,12 @@ export type VeronaResponseChange = {
           <summary>Technical details</summary>
           <p id="participantVeronaPlayerErrorDetail">{{ errorMessage }}</p>
         </details>
-        <button type="button" class="secondary" (click)="reload()">Reload Player</button>
+        <button
+          id="participantVeronaReloadPlayerButton"
+          type="button"
+          class="secondary"
+          (click)="reload()"
+        >Reload Player</button>
       </section>
       <footer>
         <span id="participantVeronaSaveStatus" aria-live="polite">{{ saveStatusLabel }}</span>
@@ -208,8 +228,7 @@ export class VeronaPlayerHostComponent
 
   @Output() readonly responseChange = new EventEmitter<string>();
   @Output() readonly responseUpdate = new EventEmitter<VeronaResponseChange>();
-  @Output() readonly logEntries =
-    new EventEmitter<ParticipantTestLogEntryInput[]>();
+  @Output() readonly logEntries = new EventEmitter<VeronaLogChange>();
   @Output() readonly focusLogEntries =
     new EventEmitter<ParticipantTestLogEntryInput[]>();
   @Output() readonly navigationRequest = new EventEmitter<string>();
@@ -230,6 +249,10 @@ export class VeronaPlayerHostComponent
   private pendingPlayerHasFocus: boolean | undefined;
   private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
   private latestResponse = "";
+  private frameTestRunId = "";
+  private frameUnitKey = "";
+  private frameSessionId = "";
+  private readonly retiredFrames = new Map<MessageEventSource, RetiredVeronaFrame>();
   private apiVersion: string | null = null;
   private viewReady = false;
 
@@ -323,6 +346,7 @@ export class VeronaPlayerHostComponent
     this.clearFocusLogTimeout();
     this.frame?.remove();
     this.frame = null;
+    this.retiredFrames.clear();
   }
 
   reload(): void {
@@ -331,11 +355,20 @@ export class VeronaPlayerHostComponent
 
   @HostListener("window:message", ["$event"])
   onWindowMessage(event: MessageEvent): void {
-    if (!this.frame?.contentWindow || event.source !== this.frame.contentWindow) {
+    const activeFrame = this.frame?.contentWindow;
+    const retiredFrame = event.source
+      ? this.retiredFrames.get(event.source)
+      : undefined;
+    if ((!activeFrame || event.source !== activeFrame) && !retiredFrame) {
       return;
     }
     const notification = parseVeronaIncomingNotification(event.data);
     if (!notification) {
+      return;
+    }
+
+    if (retiredFrame) {
+      this.handleRetiredFrameNotification(retiredFrame, notification);
       return;
     }
 
@@ -345,7 +378,7 @@ export class VeronaPlayerHostComponent
     }
     const notificationSessionId =
       "sessionId" in notification ? notification.sessionId : undefined;
-    if (notificationSessionId && notificationSessionId !== this.sessionId) {
+    if (notificationSessionId && notificationSessionId !== this.frameSessionId) {
       this.fail(
         `Player sent a message for unexpected session '${notificationSessionId}'.`
       );
@@ -359,28 +392,13 @@ export class VeronaPlayerHostComponent
           this.updatePageNavigation(notification.playerState);
         }
         if (Array.isArray(notification.log)) {
-          const logEntries = notification.log.flatMap(entry => {
-            const key = typeof entry?.key === "string" ? entry.key.trim() : "";
-            const timeStamp = Number(entry?.timeStamp);
-            const content = entry.content == null ? "" : String(entry.content);
-            if (
-              !key ||
-              key.length > 200 ||
-              content.length > 32_768 ||
-              !Number.isSafeInteger(timeStamp) ||
-              timeStamp < 0 ||
-              timeStamp > 8_640_000_000_000_000
-            ) {
-              return [];
-            }
-            return [{
-              key,
-              timeStamp,
-              content
-            } satisfies ParticipantTestLogEntryInput];
-          }).slice(-200);
+          const logEntries = this.normalizeLogEntries(notification.log);
           if (logEntries.length > 0) {
-            this.logEntries.emit(logEntries);
+            this.logEntries.emit({
+              testRunId: this.frameTestRunId,
+              unitKey: this.frameUnitKey,
+              entries: logEntries
+            });
           }
         }
         this.latestResponse = mergeVeronaUnitResponse(this.latestResponse, {
@@ -389,6 +407,8 @@ export class VeronaPlayerHostComponent
         });
         this.responseChange.emit(this.latestResponse);
         this.responseUpdate.emit({
+          testRunId: this.frameTestRunId,
+          unitKey: this.frameUnitKey,
           response: this.latestResponse,
           unitDataChanged:
             notification.unitState != null &&
@@ -433,8 +453,10 @@ export class VeronaPlayerHostComponent
     this.clearReadyTimeout();
     this.clearScheduledFrames();
     this.clearFocusLogTimeout();
-    this.frame?.remove();
-    this.frame = null;
+    this.retireCurrentFrame();
+    this.frameTestRunId = this.testRunId;
+    this.frameUnitKey = this.unitKey;
+    this.frameSessionId = this.sessionId;
     this.status = "loading";
     this.loadingPhase = "pending";
     this.apiVersionLabel = "Waiting for player";
@@ -721,13 +743,97 @@ export class VeronaPlayerHostComponent
     entry: ParticipantTestLogEntryInput,
     response = this.latestResponse
   ): void {
-    this.logEntries.emit([entry]);
+    this.logEntries.emit({
+      testRunId: this.frameTestRunId,
+      unitKey: this.frameUnitKey,
+      entries: [entry]
+    });
     this.responseUpdate.emit({
+      testRunId: this.frameTestRunId,
+      unitKey: this.frameUnitKey,
       response,
       unitDataChanged: false,
       unitStateChanged: false,
       playerStateChanged: false
     });
+  }
+
+  private retireCurrentFrame(): void {
+    const frame = this.frame;
+    const source = frame?.contentWindow;
+    if (frame && source && this.frameSessionId) {
+      this.retiredFrames.set(source, {
+        sessionId: this.frameSessionId,
+        testRunId: this.frameTestRunId,
+        unitKey: this.frameUnitKey,
+        latestResponse: this.latestResponse
+      });
+      globalThis.window?.setTimeout(() => {
+        this.retiredFrames.delete(source);
+      }, 1_500);
+    }
+    frame?.remove();
+    this.frame = null;
+  }
+
+  private handleRetiredFrameNotification(
+    frame: RetiredVeronaFrame,
+    notification: ReturnType<typeof parseVeronaIncomingNotification>
+  ): void {
+    if (
+      !notification ||
+      notification.type !== "vopStateChangedNotification" ||
+      notification.sessionId !== frame.sessionId
+    ) {
+      return;
+    }
+    if (Array.isArray(notification.log)) {
+      const entries = this.normalizeLogEntries(notification.log);
+      if (entries.length > 0) {
+        this.logEntries.emit({
+          testRunId: frame.testRunId,
+          unitKey: frame.unitKey,
+          entries
+        });
+      }
+    }
+    frame.latestResponse = mergeVeronaUnitResponse(frame.latestResponse, {
+      unitState: notification.unitState,
+      playerState: notification.playerState
+    });
+    this.responseUpdate.emit({
+      testRunId: frame.testRunId,
+      unitKey: frame.unitKey,
+      response: frame.latestResponse,
+      unitDataChanged:
+        notification.unitState != null &&
+        Object.prototype.hasOwnProperty.call(notification.unitState, "dataParts"),
+      unitStateChanged:
+        notification.unitState != null &&
+        Object.keys(notification.unitState).some(key => key !== "dataParts"),
+      playerStateChanged: notification.playerState !== undefined
+    });
+  }
+
+  private normalizeLogEntries(
+    entries: Array<{ key: string; timeStamp: number; content: string }>
+  ): ParticipantTestLogEntryInput[] {
+    return entries.flatMap(entry => {
+      const key = typeof entry?.key === "string" ? entry.key.trim() : "";
+      const timeStamp = Number(entry?.timeStamp);
+      const content = entry.content == null ? "" : String(entry.content);
+      if (
+        !key ||
+        key.length > 200 ||
+        content.length > 32_768 ||
+        !Number.isSafeInteger(timeStamp) ||
+        timeStamp < 0 ||
+        timeStamp > 8_640_000_000_000_000
+      ) {
+        return [];
+      }
+      return [{ key, timeStamp, content }];
+    }).slice(-200);
   }
 
   private scheduleFocusLog(playerHasFocus?: boolean): void {

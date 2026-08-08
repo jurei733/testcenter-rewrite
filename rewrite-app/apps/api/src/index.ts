@@ -6564,6 +6564,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           testRunId,
           deliveryId: body.deliveryId,
           currentUnitKey: body.currentUnitKey,
+          responseUnitKey: body.responseUnitKey,
           status: body.status,
           unitResponse: body.unitResponse,
           confirmTestletTimeLeave: body.confirmTestletTimeLeave,

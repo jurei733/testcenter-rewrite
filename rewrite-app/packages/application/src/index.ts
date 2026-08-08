@@ -652,6 +652,7 @@ export type ParticipantRuntimePort = {
     testRunId: string;
     deliveryId?: string;
     currentUnitKey?: string | null;
+    responseUnitKey?: string | null;
     status: Extract<TestRun["status"], "running" | "paused">;
     unitResponse?: string | null;
     confirmTestletTimeLeave?: boolean;
@@ -1619,6 +1620,22 @@ const normalizeOptionalCurrentUnitKey = (value: unknown): string | null => {
       400,
       "current_unit_key_invalid",
       "currentUnitKey must be a string when provided."
+    );
+  }
+
+  return value.trim() || null;
+};
+
+const normalizeOptionalResponseUnitKey = (value: unknown): string | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "response_unit_key_invalid",
+      "responseUnitKey must be a string when provided."
     );
   }
 
@@ -23879,6 +23896,19 @@ export const createFirstSliceServices = (
           ? normalizeOptionalCurrentUnitKey(input.currentUnitKey)
           : testRun.currentUnitKey;
         const nextUnitResponse = normalizeOptionalUnitResponse(input.unitResponse);
+        const hasResponseUnitKeyInput = input.responseUnitKey !== undefined;
+        const responseUnitKey = hasResponseUnitKeyInput
+          ? normalizeOptionalResponseUnitKey(input.responseUnitKey)
+          : hasCurrentUnitKeyInput
+            ? nextCurrentUnitKey
+            : testRun.currentUnitKey;
+        if (responseUnitKey) {
+          requireRuntimeUnitForBooklet(
+            contentRelease,
+            testRun.bookletKey,
+            responseUnitKey
+          );
+        }
         let navigationTestRun = testRun;
         let activatedLeaveLock: ReturnType<
           typeof resolveCurrentLeaveLock
@@ -23932,9 +23962,6 @@ export const createFirstSliceServices = (
         }
 
         const nextUnitResponses = { ...navigationTestRun.unitResponses };
-        const responseUnitKey = hasCurrentUnitKeyInput
-          ? nextCurrentUnitKey
-          : navigationTestRun.currentUnitKey;
         if (
           executionMode.saveResponses &&
           responseUnitKey &&

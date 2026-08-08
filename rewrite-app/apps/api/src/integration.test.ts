@@ -20347,6 +20347,26 @@ test("original BookletConfig compiles into enforced participant navigation polic
   assert.equal(readyFirstState.body.currentRunState.navigation.canComplete, true);
   assert.equal(readyFirstState.body.currentRunState.navigation.canPlayerEnd, false);
   assert.equal((await save(secondUnitKey)).status, 200);
+  const lateFirstResponse = unitResponse("complete", "complete", "page-4");
+  const lateFirstSave = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      responseUnitKey: firstUnitKey,
+      status: "running",
+      unitResponse: lateFirstResponse
+    }
+  });
+  assert.equal(lateFirstSave.status, 200);
+  assert.equal(lateFirstSave.body.testRun.currentUnitKey, secondUnitKey);
+  assert.equal(
+    lateFirstSave.body.testRun.unitResponses[firstUnitKey],
+    lateFirstResponse
+  );
   assert.equal(
     (await save(secondUnitKey, unitResponse("some", "none", "page-1"))).status,
     200

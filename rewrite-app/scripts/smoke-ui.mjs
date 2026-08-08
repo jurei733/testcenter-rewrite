@@ -4539,6 +4539,10 @@ try {
           code: "runtime-error",
           message: "Synthetic player failure"
         }, "*"));
+        addEventListener("unload", () => {
+          document.querySelector("#playerAnswer").value = "Saved during player unload";
+          sendState(false);
+        });
         addEventListener("DOMContentLoaded", () => setTimeout(() => parent.postMessage({
           type: "vopReadyNotification",
           metadata: { specVersion: "6.0" }
@@ -5326,6 +5330,35 @@ try {
           item.testLog?.logContent === "Synthetic player failure" &&
           item.testLog?.unitKey === veronaUnitKey
       )
+  );
+  await page.locator("#participantVeronaReloadPlayerButton").click();
+  const unloadRecoveredVeronaFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await unloadRecoveredVeronaFrame
+    .locator("#playerAnswer")
+    .waitFor({ timeout: 15_000 });
+  await unloadRecoveredVeronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await unloadRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
+    "Saved during player unload"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[veronaUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        return JSON.parse(response).unitState?.dataParts?.answer ===
+          "Saved during player unload";
+      } catch {
+        return false;
+      }
+    }
   );
   stopAfter("participant-verona-background-sync");
 

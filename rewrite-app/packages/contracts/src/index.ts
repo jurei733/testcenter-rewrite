@@ -2417,6 +2417,8 @@ export type ResumeParticipantSessionRequest = {
 export type SaveTestRunProgressRequest = {
   deliveryId?: string;
   currentUnitKey?: string | null;
+  /** Unit receiving `unitResponse`; defaults to `currentUnitKey` for compatibility. */
+  responseUnitKey?: string | null;
   status: Extract<TestRun["status"], "running" | "paused">;
   unitResponse?: string | null;
   confirmTestletTimeLeave?: boolean;

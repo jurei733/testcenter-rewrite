@@ -56,7 +56,10 @@ import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers"
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
-import type { VeronaResponseChange } from "./verona-player-host.component";
+import type {
+  VeronaLogChange,
+  VeronaResponseChange
+} from "./verona-player-host.component";
 
 type ParticipantPlayerState = {
   headline: string;
@@ -1588,17 +1591,21 @@ export class ParticipantViewFacade {
 
   saveVeronaResponse(change: VeronaResponseChange): void {
     const currentState = this.readCurrentRunState();
-    const unitKey = currentState?.currentUnit.unitKey?.trim();
+    const unitKey = change.unitKey.trim();
     if (
       !currentState ||
+      change.testRunId !== currentState.testRun.testRunId ||
       !unitKey ||
+      !currentState.bookletUnits.some(unit => unit.unitKey === unitKey) ||
       !currentState.availableActions.includes("save_progress")
     ) {
       return;
     }
 
-    this.runtime.currentUnitResponse = change.response;
-    this.persistState();
+    if (currentState.currentUnit.unitKey === unitKey) {
+      this.runtime.currentUnitResponse = change.response;
+      this.persistState();
+    }
     const queuedEntries = this.queuedVeronaLogs
       .filter(
         batch =>
@@ -1637,17 +1644,23 @@ export class ParticipantViewFacade {
     this.scheduleVeronaSaveDrain(this.veronaBufferDelayMs(change));
   }
 
-  queueVeronaLogs(entries: ParticipantTestLogEntryInput[]): void {
+  queueVeronaLogs(change: VeronaLogChange): void {
     const currentState = this.readCurrentRunState();
-    const unitKey = currentState?.currentUnit.unitKey?.trim();
-    if (!currentState || !unitKey || entries.length === 0) {
+    const unitKey = change.unitKey.trim();
+    if (
+      !currentState ||
+      change.testRunId !== currentState.testRun.testRunId ||
+      !unitKey ||
+      !currentState.bookletUnits.some(unit => unit.unitKey === unitKey) ||
+      change.entries.length === 0
+    ) {
       return;
     }
     this.queuedVeronaLogs.push({
-      testRunId: currentState.testRun.testRunId,
+      testRunId: change.testRunId,
       unitKey,
       originalUnitId: unitKey,
-      entries
+      entries: change.entries
     });
   }
 
@@ -1667,6 +1680,8 @@ export class ParticipantViewFacade {
       entries
     });
     this.saveVeronaResponse({
+      testRunId: currentState.testRun.testRunId,
+      unitKey: currentState.currentUnit.unitKey ?? "",
       response: this.runtime.currentUnitResponse,
       unitDataChanged: false,
       unitStateChanged: false,
@@ -2257,7 +2272,7 @@ export class ParticipantViewFacade {
           }),
           {
             deliveryId: save.deliveryId,
-            currentUnitKey: save.unitKey,
+            responseUnitKey: save.unitKey,
             status: save.status,
             unitResponse: save.response,
             logs: save.logs
