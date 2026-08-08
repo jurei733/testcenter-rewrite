@@ -28,10 +28,10 @@ broken `Show if/is` references, malformed recursive conditions and aggregates,
 unresolved adaptive Unit aliases or inline/external Unit variables, dangling or
 invalid Testtakers monitor profiles, malformed multi-state presets, invalid or
 unsafe Testtakers access windows, invalid Booklet/Testtakers container
-cardinality/order, unknown roster and Booklet attributes, nested elements in
-text-only fields, empty group login lists, invalid SysCheck metadata/config
-ordering, attributes, simple content and custom-text IDs, and duplicate runtime
-identities. The matching
+cardinality/order, version-invalid Unit Metadata/Variable fields, unknown roster,
+Booklet, and Unit attributes, nested elements in text-only fields, empty group
+login lists, invalid SysCheck metadata/config ordering, attributes, simple
+content and custom-text IDs, and duplicate runtime identities. The matching
 original repeated-Unit-ID fixture
 proves that an explicit alias remains valid while duplicate Unit runtime keys
 and duplicate Testlet IDs are rejected. The byte-identical original

@@ -9260,6 +9260,53 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
     },
     {
+      fileName: "unit-duplicate-metadata-label.xml",
+      sourceDocument: validUnitXml.replace(
+        "</Label>",
+        "</Label><Label>Duplicate</Label>"
+      ),
+      diagnosticCode: "testcenter_xml_unit_metadata_cardinality_invalid"
+    },
+    {
+      fileName: "unit-invalid-deprecated-last-change.xml",
+      sourceDocument: validUnitXml.replace(
+        "</Description>",
+        "</Description><Lastchange>2024-13-99T25:61:00</Lastchange>"
+      ),
+      diagnosticCode: "testcenter_xml_unit_last_change_invalid"
+    },
+    {
+      fileName: "unit-unknown-definition-attribute.xml",
+      sourceDocument: validUnitXml.replace(
+        'player="verona-player-simple@6.0"',
+        'player="verona-player-simple@6.0" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_unit_attribute_invalid"
+    },
+    {
+      fileName: "unit-nested-coding-reference.xml",
+      sourceDocument: validUnitXml.replace(
+        ">coding-scheme.vocs.json</CodingSchemeRef>",
+        "><Unexpected />coding-scheme.vocs.json</CodingSchemeRef>"
+      ),
+      diagnosticCode: "testcenter_xml_unit_simple_content_invalid"
+    },
+    {
+      fileName: "unit-unknown-variable-attribute.xml",
+      sourceDocument: validUnitXml.replace(
+        'id="var1" type="string"',
+        'id="var1" type="string" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_unit_attribute_invalid"
+    },
+    {
+      fileName: "unit-14-metadata-transcript.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace("</Description>", "</Description><Transcript>legacy</Transcript>"),
+      diagnosticCode: "testcenter_xml_unit_metadata_child_version_invalid"
+    },
+    {
       fileName: "syscheck-invalid-metadata-id.xml",
       sourceDocument: validSystemCheckXml.replace(
         "<Id>SYSCHECK.SAMPLE</Id>",
@@ -9463,6 +9510,13 @@ test("original Testcenter compatibility corpus imports representative booklets",
       sourceDocument: validUnitXml
         .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
         .replace('id="var1" type="string"', 'id="variable_identifier_x" type="string"'),
+      diagnosticCode: "testcenter_xml_variable_id_invalid"
+    },
+    {
+      fileName: "unit-14-variable-id-not-xml-id.xml",
+      sourceDocument: validUnitXml
+        .replace("/17.6.0/definitions/", "/14.3.0/definitions/")
+        .replace('id="var1" type="string"', 'id="1var" type="string"'),
       diagnosticCode: "testcenter_xml_variable_id_invalid"
     },
     {

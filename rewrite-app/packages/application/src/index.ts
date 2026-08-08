@@ -8093,6 +8093,37 @@ const validateTestcenterXmlSourceDocument = (
       schemaVersion !== null && schemaVersion.major < 15;
     const usesPre16UnitSchema =
       schemaVersion !== null && schemaVersion.major < 16;
+    const validateAttributes = (
+      element: XmlElement,
+      allowedAttributeNames: readonly string[],
+      context: string
+    ): void => {
+      for (const attributeName of xmlUnsupportedAttributeNames(
+        element,
+        new Set(allowedAttributeNames)
+      )) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_attribute_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains unsupported attribute '${attributeName}' on ${context}.`
+          )
+        );
+      }
+    };
+    const validateSimpleContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      const nestedChildren = xmlChildElements(element);
+      if (nestedChildren.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_simple_content_invalid",
+            `Original Testcenter unit '${sourceFileName}' contains nested element '${xmlElementLocalName(nestedChildren[0])}' in text-only ${context}.`
+          )
+        );
+      }
+    };
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -8109,6 +8140,83 @@ const validateTestcenterXmlSourceDocument = (
         )
       );
     }
+    const metadataContainers = xmlChildrenNamed(root, "Metadata");
+    for (const metadataContainer of metadataContainers) {
+      validateAttributes(metadataContainer, ["lastChange"], "Metadata");
+      const metadataChildRanks = new Map([
+        ["Id", 0],
+        ["Label", 1],
+        ["Description", 2],
+        ...(!usesPre15UnitSchema
+          ? ([
+              ["Transcript", 3],
+              ["Reference", 4]
+            ] as Array<[string, number]>)
+          : []),
+        ["Lastchange", 5]
+      ]);
+      let previousMetadataChildRank = -1;
+      for (const child of xmlChildElements(metadataContainer)) {
+        const childName = xmlElementLocalName(child);
+        const rank = metadataChildRanks.get(childName);
+        if (rank === undefined) {
+          diagnostics.push(
+            createImportDiagnostic(
+              ["Transcript", "Reference"].includes(childName)
+                ? "testcenter_xml_unit_metadata_child_version_invalid"
+                : "testcenter_xml_unit_metadata_child_invalid",
+              ["Transcript", "Reference"].includes(childName)
+                ? `Original Testcenter unit '${sourceFileName}' contains Metadata/${childName}, which is not supported by schema ${schemaVersion?.major}.${schemaVersion?.minor}.`
+                : `Original Testcenter unit '${sourceFileName}' contains unsupported Metadata child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        validateAttributes(child, [], `Metadata/${childName}`);
+        validateSimpleContent(child, `Metadata/${childName}`);
+        if (rank < previousMetadataChildRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_unit_metadata_sequence_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains Metadata children outside schema order.`
+            )
+          );
+          break;
+        }
+        previousMetadataChildRank = rank;
+        if (
+          childName === "Lastchange" &&
+          !isTestcenterXmlDateTime(xmlElementText(child))
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_unit_last_change_invalid",
+              `Original Testcenter unit '${sourceFileName}' contains invalid Metadata/Lastchange '${xmlElementText(child)}'.`
+            )
+          );
+        }
+      }
+      const optionalMetadataChildNames = [
+        "Description",
+        "Transcript",
+        "Reference",
+        "Lastchange"
+      ];
+      if (
+        xmlChildrenNamed(metadataContainer, "Id").length !== 1 ||
+        xmlChildrenNamed(metadataContainer, "Label").length !== 1 ||
+        optionalMetadataChildNames.some(
+          childName => xmlChildrenNamed(metadataContainer, childName).length > 1
+        )
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_unit_metadata_cardinality_invalid",
+            `Original Testcenter unit '${sourceFileName}' requires one Metadata/Id, one Metadata/Label, and at most one optional Metadata field of each supported type.`
+          )
+        );
+      }
+    }
     const definitions = [
       ...xmlChildrenNamed(root, "Definition"),
       ...xmlChildrenNamed(root, "DefinitionRef")
@@ -8120,6 +8228,14 @@ const validateTestcenterXmlSourceDocument = (
           `Original Testcenter unit '${sourceFileName}' requires exactly one Definition or DefinitionRef with a player attribute.`
         )
       );
+    }
+    for (const definition of definitions) {
+      validateAttributes(
+        definition,
+        ["player", "editor", "type", "lastChange"],
+        xmlElementLocalName(definition)
+      );
+      validateSimpleContent(definition, xmlElementLocalName(definition));
     }
     const allowedUnitChildren = new Set([
       "Metadata",
@@ -8184,6 +8300,12 @@ const validateTestcenterXmlSourceDocument = (
 
     const codingSchemeReference = xmlChildrenNamed(root, "CodingSchemeRef")[0];
     if (codingSchemeReference) {
+      validateAttributes(
+        codingSchemeReference,
+        ["schemer", "schemeType", "lastChange"],
+        "CodingSchemeRef"
+      );
+      validateSimpleContent(codingSchemeReference, "CodingSchemeRef");
       if (!codingSchemeReference.getAttribute("schemer")?.trim()) {
         diagnostics.push(
           createImportDiagnostic(
@@ -8195,6 +8317,10 @@ const validateTestcenterXmlSourceDocument = (
       validateLastChange(codingSchemeReference, "CodingSchemeRef");
     }
     const variablesReference = xmlChildrenNamed(root, "VariablesRef")[0];
+    if (variablesReference) {
+      validateAttributes(variablesReference, ["lastChange"], "VariablesRef");
+      validateSimpleContent(variablesReference, "VariablesRef");
+    }
     validateLastChange(variablesReference, "VariablesRef");
     if (variablesReference && !xmlElementText(variablesReference)) {
       diagnostics.push(
@@ -8206,6 +8332,9 @@ const validateTestcenterXmlSourceDocument = (
     }
 
     const dependencies = xmlChildrenNamed(root, "Dependencies")[0];
+    if (dependencies) {
+      validateAttributes(dependencies, [], "Dependencies");
+    }
     for (const dependency of dependencies ? xmlChildElements(dependencies) : []) {
       const dependencyName = xmlElementLocalName(dependency);
       if (!["File", "file", "Service"].includes(dependencyName)) {
@@ -8215,7 +8344,10 @@ const validateTestcenterXmlSourceDocument = (
             `Original Testcenter unit '${sourceFileName}' contains unsupported dependency element '${dependencyName}'.`
           )
         );
+        continue;
       }
+      validateAttributes(dependency, ["for"], dependencyName);
+      validateSimpleContent(dependency, dependencyName);
       const target = dependency.getAttribute("for");
       if (
         target !== null &&
@@ -8235,6 +8367,7 @@ const validateTestcenterXmlSourceDocument = (
       ...xmlChildrenNamed(root, "DerivedVariables")
     ];
     for (const container of variableContainers) {
+      validateAttributes(container, [], xmlElementLocalName(container));
       for (const child of xmlChildElements(container)) {
         if (xmlElementLocalName(child) !== "Variable") {
           diagnostics.push(
@@ -8263,7 +8396,24 @@ const validateTestcenterXmlSourceDocument = (
     const maximumVariableIdLength = usesPre15UnitSchema ? 20 : 50;
     for (const variable of variables) {
       const variableId = variable.getAttribute("id") ?? "";
-      if (!variableId.trim() || variableId.length > maximumVariableIdLength) {
+      validateAttributes(
+        variable,
+        [
+          "id",
+          "type",
+          "format",
+          "multiple",
+          "nullable",
+          ...(!usesPre15UnitSchema ? ["page"] : []),
+          ...(!usesPre16UnitSchema ? ["alias"] : [])
+        ],
+        `Variable '${variableId || "unknown"}'`
+      );
+      if (
+        !variableId.trim() ||
+        variableId.length > maximumVariableIdLength ||
+        (usesPre15UnitSchema && !isTestcenterXmlId(variableId))
+      ) {
         diagnostics.push(
           createImportDiagnostic(
             "testcenter_xml_variable_id_invalid",
@@ -8380,6 +8530,7 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const values of valuesElements) {
+        validateAttributes(values, ["complete"], `Values for '${variableId || "unknown"}'`);
         const valueElements = xmlChildElements(values);
         if (
           valueElements.length === 0 ||
@@ -8395,7 +8546,9 @@ const validateTestcenterXmlSourceDocument = (
         for (const value of valueElements.filter(
           item => xmlElementLocalName(item) === "Value"
         )) {
-          const valueChildren = xmlChildElements(value).map(xmlElementLocalName);
+          validateAttributes(value, [], `Value for '${variableId || "unknown"}'`);
+          const valueChildElements = xmlChildElements(value);
+          const valueChildren = valueChildElements.map(xmlElementLocalName);
           if (
             valueChildren.length !== 2 ||
             valueChildren[0] !== "label" ||
@@ -8411,6 +8564,11 @@ const validateTestcenterXmlSourceDocument = (
         }
       }
       for (const positionLabels of positionLabelElements) {
+        validateAttributes(
+          positionLabels,
+          [],
+          `ValuePositionLabels for '${variableId || "unknown"}'`
+        );
         const labelChildren = xmlChildElements(positionLabels);
         if (
           labelChildren.length === 0 ||
