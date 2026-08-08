@@ -1807,6 +1807,52 @@ const readStandaloneTestcenterXmlFileIdentity = (
   return readTestcenterXmlFileIdentity(sourceDocument);
 };
 
+const inferVeronaPlayerResourceIdFromFileName = (
+  fileName: string
+): string | null => {
+  const baseName = fileName.split(/[\\/]/).at(-1) ?? fileName;
+  const stem = baseName.replace(/\.html?$/i, "");
+  const versionedName = stem.match(
+    /^(.+?)[@-](\d+)\.(\d+)(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/
+  );
+  if (!versionedName?.[1]) {
+    return null;
+  }
+  return `${versionedName[1]}-${Number.parseInt(versionedName[2] ?? "", 10)}.${Number.parseInt(versionedName[3] ?? "", 10)}`;
+};
+
+const readVeronaPlayerResourceId = (
+  playerHtml: string,
+  fileName: string
+): string | null => {
+  const metadata = validateVeronaPlayerMetadata(playerHtml);
+  if (metadata.status === "valid") {
+    const moduleVersion = normalizeVeronaMajorMinorVersion(metadata.version);
+    return moduleVersion ? `${metadata.id}-${moduleVersion}` : null;
+  }
+  return inferVeronaPlayerResourceIdFromFileName(fileName);
+};
+
+const readStandaloneVeronaPlayerResourceId = (
+  sourcePackage: SourcePackage
+): string | null => {
+  const normalizedFileName = sourcePackage.fileName.trim().toLowerCase();
+  if (
+    (!normalizedFileName.endsWith(".html") &&
+      !normalizedFileName.endsWith(".htm")) ||
+    normalizedFileName.endsWith(".zip") ||
+    !sourcePackage.sourceDocument
+  ) {
+    return null;
+  }
+  const persistedDocument = sourcePackage.sourceDocument;
+  const decodedDocument = decodePersistedSourceDocument(sourcePackage);
+  const playerHtml = decodedDocument
+    ? decodedDocument.bytes.toString("utf8")
+    : persistedDocument;
+  return readVeronaPlayerResourceId(playerHtml, sourcePackage.fileName);
+};
+
 const classifyWorkspaceSourcePackage = (
   sourcePackage: SourcePackage,
   decodedDocument: { mediaType: string; bytes: Buffer } | null
@@ -11368,6 +11414,41 @@ const validateZipXmlEntries = (
       );
     }
   }
+  const playerSourceFileByResourceId = new Map<string, string>();
+  for (const entry of manifestExtraction.entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !/\.html?$/i.test(entry.fileName)
+    ) {
+      continue;
+    }
+    const playerHtml = readZipEntryText(
+      manifestExtraction.zipBuffer,
+      entry
+    );
+    if (playerHtml === null) {
+      continue;
+    }
+    const playerResourceId = readVeronaPlayerResourceId(
+      playerHtml,
+      entry.fileName
+    );
+    if (!playerResourceId) {
+      continue;
+    }
+    const identityKey = playerResourceId.toUpperCase();
+    const existingSourceFile = playerSourceFileByResourceId.get(identityKey);
+    if (existingSourceFile) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_resource_id_duplicate",
+          `Original Testcenter ZIP entries '${existingSourceFile}' and '${entry.fileName}' contain duplicate Verona player resource id '${playerResourceId}'.`
+        )
+      );
+    } else {
+      playerSourceFileByResourceId.set(identityKey, entry.fileName);
+    }
+  }
   return diagnostics;
 };
 
@@ -19059,6 +19140,25 @@ export const createFirstSliceServices = (
             409,
             `source_package_${normalizedFileType}_id_duplicate`,
             `${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}' already exists in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
+          );
+        }
+        const veronaPlayerResourceId =
+          readStandaloneVeronaPlayerResourceId(sourcePackage);
+        const duplicateVeronaPlayer = veronaPlayerResourceId
+          ? existingSourcePackages.find(existingSourcePackage => {
+              const existingResourceId =
+                readStandaloneVeronaPlayerResourceId(existingSourcePackage);
+              return (
+                existingResourceId?.toUpperCase() ===
+                veronaPlayerResourceId.toUpperCase()
+              );
+            })
+          : null;
+        if (veronaPlayerResourceId && duplicateVeronaPlayer) {
+          throw new FirstSliceError(
+            409,
+            "source_package_resource_id_duplicate",
+            `Verona player resource id '${veronaPlayerResourceId}' already exists in source package '${duplicateVeronaPlayer.fileName}'. Create a replacement for source package '${duplicateVeronaPlayer.sourcePackageId}' to preserve its version history.`
           );
         }
         await repository.saveSourcePackage(sourcePackage);

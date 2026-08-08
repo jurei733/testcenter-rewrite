@@ -9100,7 +9100,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
 });
 
-test("original Testcenter compatibility corpus rejects duplicate XML identities across files", async () => {
+test("original Testcenter compatibility corpus rejects duplicate file identities across files", async () => {
   type BookletIdentityCollision = {
     fixture: string;
     sourcePath: string;
@@ -9118,6 +9118,13 @@ test("original Testcenter compatibility corpus rejects duplicate XML identities 
   assert.ok(expectation);
   const sourceDocument = readFileSync(
     resolve(originalTestcenterCorpusRoot, expectation.fixture),
+    "utf8"
+  );
+  const originalPlayerHtml = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      "players/verona-player-simple-6.0.html"
+    ),
     "utf8"
   );
   assert.equal(
@@ -9252,6 +9259,78 @@ test("original Testcenter compatibility corpus rejects duplicate XML identities 
     );
   }
 
+  const playerUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: originalPlayerHtml
+    }
+  });
+  assert.equal(playerUpload.status, 201);
+  const duplicatePlayerIdentity = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "same-player-with-another-name.html",
+        mediaType: "text/html",
+        sourceDocument: originalPlayerHtml.replace(
+          '"id": "verona-player-simple"',
+          '"id": "VERONA-PLAYER-SIMPLE"'
+        )
+      }
+    }
+  );
+  assert.equal(duplicatePlayerIdentity.status, 409);
+  assert.equal(
+    duplicatePlayerIdentity.body.error,
+    "source_package_resource_id_duplicate"
+  );
+  const nextMinorPlayer = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "verona-player-simple-6.1.html",
+      mediaType: "text/html",
+      sourceDocument: originalPlayerHtml.replace(
+        '"version": "6.0.4"',
+        '"version": "6.1.0"'
+      )
+    }
+  });
+  assert.equal(nextMinorPlayer.status, 201);
+  const metadataFreePlayer = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "legacy-player-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: "<!doctype html><html><title>Legacy player</title></html>"
+    }
+  });
+  assert.equal(metadataFreePlayer.status, 201);
+  const duplicateMetadataFreePlayer = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "legacy-player@6.0.html",
+        mediaType: "text/html",
+        sourceDocument: "<!doctype html><html><title>Legacy player copy</title></html>"
+      }
+    }
+  );
+  assert.equal(duplicateMetadataFreePlayer.status, 409);
+  assert.equal(
+    duplicateMetadataFreePlayer.body.error,
+    "source_package_resource_id_duplicate"
+  );
+
   const replacement = await requestJson<{
     replacementSourcePackage: { sourcePackageId: string; status: string };
     importJob: { status: string };
@@ -9278,6 +9357,8 @@ test("original Testcenter compatibility corpus rejects duplicate XML identities 
           <resources>
             <resource identifier="BOOKLET-ONE" href="Booklet.xml" />
             <resource identifier="BOOKLET-TWO" href="Booklet_sameBookletID.xml" />
+            <resource identifier="PLAYER-ONE" href="players/verona-player-simple-6.0.html" />
+            <resource identifier="PLAYER-TWO" href="players/same-player-with-another-name.html" />
           </resources>
         </manifest>
       `
@@ -9302,6 +9383,17 @@ test("original Testcenter compatibility corpus rejects duplicate XML identities 
     {
       fileName: "export/SysCheck-copy.xml",
       content: "<SysCheck><Metadata><Id>syscheck.case</Id></Metadata></SysCheck>"
+    },
+    {
+      fileName: "export/players/verona-player-simple-6.0.html",
+      content: originalPlayerHtml
+    },
+    {
+      fileName: "export/players/same-player-with-another-name.html",
+      content: originalPlayerHtml.replace(
+        '"id": "verona-player-simple"',
+        '"id": "VERONA-PLAYER-SIMPLE"'
+      )
     }
   ]);
   const packageUpload = await requestJson<{
@@ -9333,7 +9425,8 @@ test("original Testcenter compatibility corpus rejects duplicate XML identities 
     [
       expectation.diagnosticCode,
       "testcenter_xml_unit_id_duplicate",
-      "testcenter_xml_syscheck_id_duplicate"
+      "testcenter_xml_syscheck_id_duplicate",
+      "testcenter_resource_id_duplicate"
     ]
   );
   assert.match(
