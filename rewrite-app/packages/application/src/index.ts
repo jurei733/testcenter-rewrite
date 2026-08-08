@@ -10300,7 +10300,9 @@ const resolveWorkspaceDependencySourcePackages = (input: {
         fileName: sourcePackage.fileName.trim().replace(/\\/g, "/"),
         bytes: decodedDocument.bytes
       };
-      const normalizedFileName = assemblyEntry.fileName.toLowerCase();
+      const normalizedFileName = normalizeZipEntryPath(
+        assemblyEntry.fileName
+      ).toLowerCase();
       const normalizedMediaType = sourcePackage.mediaType.toLowerCase();
       const metadataReadable =
         normalizedMediaType.startsWith("text/") ||
@@ -10315,11 +10317,19 @@ const resolveWorkspaceDependencySourcePackages = (input: {
           : [assemblyEntry.fileName, fileBaseName]
         ).flatMap(workspaceDependencyReferenceKeys)
       );
-      return { sourcePackage, identifierKeys };
+      return {
+        sourcePackage,
+        identifierKeys,
+        normalizedFileName,
+        normalizedFileBaseName:
+          normalizedFileName.split("/").at(-1) ?? normalizedFileName
+      };
     })
     .filter(Boolean) as Array<{
       sourcePackage: SourcePackage;
       identifierKeys: Set<string>;
+      normalizedFileName: string;
+      normalizedFileBaseName: string;
     }>;
 
   const selected = new Map<string, SourcePackage>([
@@ -10337,16 +10347,31 @@ const resolveWorkspaceDependencySourcePackages = (input: {
     )) {
       const referenceKeys = workspaceDependencyReferenceKeys(reference);
       const exactReferenceKey = reference.trim().toLowerCase();
-      const exactMatches = candidates.filter(
+      const normalizedReferencePath = normalizeZipEntryPath(
+        reference.trim().replace(/\\/g, "/")
+      ).toLowerCase();
+      const normalizedReferenceBaseName =
+        normalizedReferencePath.split("/").at(-1) ?? normalizedReferencePath;
+      const exactFileMatches = candidates.filter(
+        candidate => candidate.normalizedFileName === normalizedReferencePath
+      );
+      const baseFileMatches = candidates.filter(
+        candidate =>
+          candidate.normalizedFileBaseName === normalizedReferenceBaseName
+      );
+      const exactIdentifierMatches = candidates.filter(
         candidate => candidate.identifierKeys.has(exactReferenceKey)
       );
       const matches =
-        exactMatches.length > 0
-          ? exactMatches
-          : candidates.filter(
-              candidate =>
-                referenceKeys.some(key => candidate.identifierKeys.has(key))
-            );
+        exactFileMatches.length > 0
+          ? exactFileMatches
+          : baseFileMatches.length > 0
+            ? baseFileMatches
+            : exactIdentifierMatches.length > 0
+              ? exactIdentifierMatches
+              : candidates.filter(candidate =>
+                  referenceKeys.some(key => candidate.identifierKeys.has(key))
+                );
       if (matches.length > 1) {
         return {
           status: "blocked",

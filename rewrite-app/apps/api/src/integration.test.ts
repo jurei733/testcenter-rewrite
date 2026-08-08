@@ -13356,6 +13356,60 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
   );
   assert.equal(ambiguousAutomaticImport.body.stagedContentRelease, null);
 
+  const explicitFileReferenceSeed = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "explicit-file-reference-seed.txt",
+      mediaType: "text/plain",
+      sourceDocument: "replacement seed"
+    }
+  });
+  assert.equal(explicitFileReferenceSeed.status, 201);
+  const explicitFileReferenceRoot = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${explicitFileReferenceSeed.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Booklet2-explicit-file-reference.xml",
+        mediaType: "application/xml",
+        sourceDocument: readFileSync(
+          resolve(originalTestcenterCorpusRoot, expectation.bookletFixture),
+          "utf8"
+        ).replaceAll('id="UNIT.SAMPLE-2"', 'id="Unit2.xml"')
+      }
+    }
+  );
+  assert.equal(explicitFileReferenceRoot.status, 201);
+  const explicitFileReferenceImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: {
+        sourcePackageId:
+          explicitFileReferenceRoot.body.replacementSourcePackage.sourcePackageId
+      }
+    }
+  );
+  assert.equal(explicitFileReferenceImport.status, 201);
+  assert.equal(explicitFileReferenceImport.body.importJob.status, "completed");
+  assert.deepEqual(explicitFileReferenceImport.body.importJob.diagnostics, []);
+  assert.notEqual(
+    explicitFileReferenceImport.body.importJob.sourcePackageId,
+    explicitFileReferenceRoot.body.replacementSourcePackage.sourcePackageId
+  );
+  assert.ok(explicitFileReferenceImport.body.stagedContentRelease?.contentReleaseId);
+
   const assemblyPath =
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
     "/source-package-assemblies";
