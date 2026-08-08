@@ -1,8 +1,5 @@
 import type { Routes } from "@angular/router";
 
-import { OpsViewComponent } from "./ops-view.component";
-import { RuntimeViewComponent } from "./runtime-view.component";
-import { WorkspaceViewComponent } from "./workspace-view.component";
 import {
   rejectSystemCheckOperator,
   requireAdministrativeOperator
@@ -12,7 +9,10 @@ export const appRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "workspace" },
   {
     path: "workspace",
-    component: WorkspaceViewComponent,
+    loadComponent: () =>
+      import("./workspace-view.component").then(
+        module => module.WorkspaceViewComponent
+      ),
     canActivate: [requireAdministrativeOperator]
   },
   {
@@ -25,7 +25,10 @@ export const appRoutes: Routes = [
   },
   {
     path: "runtime",
-    component: RuntimeViewComponent,
+    loadComponent: () =>
+      import("./runtime-view.component").then(
+        module => module.RuntimeViewComponent
+      ),
     canActivate: [rejectSystemCheckOperator]
   },
   {
@@ -44,7 +47,8 @@ export const appRoutes: Routes = [
   },
   {
     path: "ops",
-    component: OpsViewComponent,
+    loadComponent: () =>
+      import("./ops-view.component").then(module => module.OpsViewComponent),
     canActivate: [rejectSystemCheckOperator]
   },
   { path: "**", redirectTo: "workspace" }

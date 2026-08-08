@@ -98,7 +98,7 @@ Priority:
 | Branding/settings/custom texts | settings module | partial | P2 | imported per-login participant and system-check texts are durable and applied, but no tenant/workspace/booklet settings surface, precedence editor, maintenance banner, or theme/branding controls exist |
 | Attachments and QR capture | attachment manager | missing | P2 | no attachment domain |
 | Durable storage | deployment stack | done | P0 | file, SQLite, Postgres, migrations, doctor/preflight |
-| CI and deployability | deployment scripts | done | P0 | static, unit, storage, browser, startup/shutdown, Docker and Compose gates |
+| CI and deployability | deployment scripts | done | P0 | static, unit, storage, browser, startup/shutdown, Docker and Compose gates. All six Angular feature surfaces now compile into guarded lazy chunks, reducing the raw initial shell from 901.74 kB to 522.65 kB; production budgets were tightened to warn at 600 kB and fail at 750 kB, while direct-entry and cross-feature browser paths remain executable |
 
 ## Exit criteria for “presentable with high parity”
 
