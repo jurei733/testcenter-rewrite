@@ -10373,11 +10373,18 @@ const resolveWorkspaceDependencySourcePackages = (input: {
                   referenceKeys.some(key => candidate.identifierKeys.has(key))
                 );
       if (matches.length > 1) {
+        const matchingFiles = matches
+          .map(
+            candidate =>
+              `'${candidate.sourcePackage.fileName}' (${candidate.sourcePackage.sourcePackageId})`
+          )
+          .sort((left, right) => left.localeCompare(right))
+          .join(", ");
         return {
           status: "blocked",
           diagnostic: createImportDiagnostic(
             "source_document_workspace_dependency_ambiguous",
-            `Workspace dependency '${reference}' referenced by '${currentSourcePackage.fileName}' matches multiple uploaded files. Use explicit loose-file assembly to select the intended immutable dependency set.`
+            `Workspace dependency '${reference}' referenced by '${currentSourcePackage.fileName}' matches multiple uploaded files: ${matchingFiles}. Use explicit loose-file assembly to select the intended immutable dependency set.`
           )
         };
       }

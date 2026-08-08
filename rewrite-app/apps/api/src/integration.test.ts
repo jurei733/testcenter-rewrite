@@ -13332,7 +13332,7 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     importJob: {
       sourcePackageId: string;
       status: string;
-      diagnostics: Array<{ code: string }>;
+      diagnostics: Array<{ code: string; message: string }>;
     };
     stagedContentRelease: null;
   }>(
@@ -13355,6 +13355,10 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     ["source_document_workspace_dependency_ambiguous"]
   );
   assert.equal(ambiguousAutomaticImport.body.stagedContentRelease, null);
+  const ambiguousDependencyMessage =
+    ambiguousAutomaticImport.body.importJob.diagnostics[0]?.message ?? "";
+  assert.match(ambiguousDependencyMessage, /'Unit2\.xml' \([^)]+\)/);
+  assert.match(ambiguousDependencyMessage, /'Unit2-copy\.xml' \([^)]+\)/);
 
   const explicitFileReferenceSeed = await requestJson<{
     sourcePackage: { sourcePackageId: string };
