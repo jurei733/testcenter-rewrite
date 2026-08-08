@@ -4,7 +4,8 @@ import type {
   BookletPageNavigationLabel,
   BookletPlayerEndPolicy,
   BookletRuntimePolicy,
-  BookletUnitNavigationControls
+  BookletUnitNavigationControls,
+  BookletUnitNavigationLabel
 } from "@testcenter-rewrite-app/domain";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -125,6 +126,9 @@ const compileUnitControls = (value: string): BookletUnitNavigationControls => {
   }
 };
 
+const compileUnitNavigationLabel = (value: string): BookletUnitNavigationLabel =>
+  choice(value, ["hidden", "index", "label"] as const, "index");
+
 const compilePageNavigationLabel = (
   modernValue: string,
   legacyValue: string
@@ -202,6 +206,7 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       unitControls: modernUnitControlsHidden
         ? compileUnitControls(modernUnitControlsHidden)
         : compileUnitControls(legacyUnitControls),
+      unitLabel: compileUnitNavigationLabel(read("navbar_unit_label")),
       playerEnd: compilePlayerEnd(playerEnd)
     },
     player: {

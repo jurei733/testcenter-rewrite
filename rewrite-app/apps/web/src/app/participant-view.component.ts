@@ -651,6 +651,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </div>
           </section>
           <div class="actions">
+            <span
+              *ngIf="view.player.unitNavigationLabel"
+              id="participantRouteUnitNavigationLabel"
+              class="participant-unit-navigation-label"
+              aria-live="polite"
+            >{{ view.player.unitNavigationLabel }}</span>
             <button *ngIf="view.player.showPreviousUnitControl" id="participantRoutePreviousUnitButton" class="ghost" type="button" [disabled]="!view.player.canGoPreviousUnit" (click)="view.goToPreviousUnit()">Previous Unit</button>
             <button *ngIf="view.player.showNextUnitControl" id="participantRouteNextUnitButton" class="secondary" type="button" [disabled]="!view.player.canGoNextUnit" (click)="view.goToNextUnit()">Next Unit</button>
             <button class="secondary" type="button" [disabled]="!view.player.canSaveProgress" (click)="view.saveProgressFromPlayer()">{{ view.player.saveProgressLabel }}</button>

@@ -75,6 +75,7 @@ type ParticipantPlayerState = {
   unitContent: string;
   unitKey: string;
   unitPosition: string;
+  unitNavigationLabel: string;
   executionMode: string;
   executionModeLabel: string;
   responsePersistenceLabel: string;
@@ -551,6 +552,7 @@ export class ParticipantViewFacade {
         unitContent: "Start or resume a session to load the current unit prompt.",
         unitKey: "n/a",
         unitPosition: "n/a",
+        unitNavigationLabel: "",
         executionMode: "n/a",
         executionModeLabel: "No execution mode loaded",
         responsePersistenceLabel: "No run loaded",
@@ -771,6 +773,16 @@ export class ParticipantViewFacade {
       : null;
     const navigationDenial = this.describeNavigationDenial(currentState);
     const navigationAdvisory = this.navigationAdvisory();
+    const unitNavigationLabelMode =
+      policy.navigation.unitLabel ?? "index";
+    const unitNavigationLabel =
+      unitNavigationLabelMode === "hidden"
+        ? ""
+        : unitNavigationLabelMode === "label"
+          ? unitLabel
+          : unitIndex >= 0
+            ? `Unit ${unitIndex + 1} / ${bookletUnits.length}`
+            : "";
 
     return {
       headline: unitLabel,
@@ -787,6 +799,7 @@ export class ParticipantViewFacade {
       unitKey: unitKey || "n/a",
       unitPosition:
         unitIndex >= 0 ? `${unitIndex + 1} / ${bookletUnits.length}` : "n/a",
+      unitNavigationLabel,
       executionMode: executionMode.mode,
       executionModeLabel: executionMode.label,
       responsePersistenceLabel: executionMode.saveResponses

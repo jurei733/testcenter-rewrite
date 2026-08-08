@@ -14311,6 +14311,12 @@ const resolveRuntimeBooklet = (
     policy: bookletEntry.policy
       ? {
           ...bookletEntry.policy,
+          navigation: {
+            ...bookletEntry.policy.navigation,
+            unitLabel:
+              bookletEntry.policy.navigation.unitLabel ??
+              policyDefaults.navigation.unitLabel
+          },
           player: {
             ...bookletEntry.policy.player,
             loadingMode:

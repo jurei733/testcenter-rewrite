@@ -5714,6 +5714,7 @@ try {
             <Config key="browserBehaviour">preventNav</Config>
             <Config key="unit_menu">OFF</Config>
             <Config key="unit_navibuttons">OFF</Config>
+            <Config key="navbar_unit_label">LABEL</Config>
           </BookletConfig>
           <Units>
             <Unit id="${legacyPlayerFirstUnitKey}" label="Legacy first unit" />
@@ -5848,6 +5849,10 @@ try {
     legacyPlayerPreloadPayload.currentRunState.booklet.policy.player.loadingMode,
     "eager"
   );
+  assert.equal(
+    legacyPlayerPreloadPayload.currentRunState.booklet.policy.navigation.unitLabel,
+    "label"
+  );
   assert.deepEqual(
     legacyPlayerPreloadPayload.currentRunState.bookletAssets.units.map(
       unit => unit.unitKey
@@ -5872,6 +5877,10 @@ try {
   await legacyPlayerFrame
     .getByText("Official Verona 3 first unit", { exact: true })
     .waitFor({ timeout: 30_000 });
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Legacy first unit" })
+    .waitFor();
   assert.equal(await page.locator("#participantRouteUnitRail").count(), 0);
   assert.equal(await page.locator("#participantRouteNextUnitButton").count(), 0);
   const legacyPlayerAnswer = legacyPlayerFrame.locator(
@@ -5912,6 +5921,10 @@ try {
   await legacyPlayerFrame
     .getByText("Official Verona 3 second unit", { exact: true })
     .waitFor({ timeout: 30_000 });
+  await page
+    .locator("#participantRouteUnitNavigationLabel")
+    .filter({ hasText: "Legacy second unit" })
+    .waitFor();
   await legacyPlayerFrame.locator("#first-unit").dispatchEvent("click");
   await page
     .locator("#participantRouteUnitKey")

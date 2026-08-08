@@ -745,6 +745,7 @@ export type ContentReleaseTestletEntry = SourcePackageTestletEntry;
 export type BookletLeaveRestriction = "off" | "forward" | "always";
 export type BookletPlayerEndPolicy = "never" | "last_unit" | "always";
 export type BookletUnitNavigationControls = "hidden" | "forward_only" | "both";
+export type BookletUnitNavigationLabel = "hidden" | "index" | "label";
 export type BookletPageNavigationLabel = "hidden" | "index" | "label" | "list";
 export type BookletNavigationDeniedReason =
   | "presentation_incomplete"
@@ -767,6 +768,8 @@ export type BookletRuntimePolicy = {
     browserNavigation?: "standard" | "prevent";
     unitMenuEnabled: boolean;
     unitControls: BookletUnitNavigationControls;
+    /** Optional so runtime snapshots created before unit navigation labels remain readable. */
+    unitLabel?: BookletUnitNavigationLabel;
     playerEnd: BookletPlayerEndPolicy;
   };
   player: {

@@ -11146,6 +11146,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       browserNavigation: string;
       unitMenuEnabled: boolean;
       unitControls: string;
+      unitLabel: string;
       playerEnd: string;
     };
     player: {
@@ -11217,6 +11218,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
+        unitLabel: "index",
         playerEnd: "always"
       },
       player: {
@@ -11245,6 +11247,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: true,
         unitControls: "hidden",
+        unitLabel: "index",
         playerEnd: "never"
       },
       player: {
@@ -11273,6 +11276,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
+        unitLabel: "index",
         playerEnd: "last_unit"
       },
       player: {
@@ -11301,6 +11305,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         browserNavigation: "standard",
         unitMenuEnabled: false,
         unitControls: "both",
+        unitLabel: "index",
         playerEnd: "always"
       },
       player: {
@@ -16421,6 +16426,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     browserNavigation: "prevent",
     unitMenuEnabled: false,
     unitControls: "both",
+    unitLabel: "index",
     playerEnd: "last_unit"
   });
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
@@ -20231,6 +20237,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
             <Config key="browserBehaviour">preventNav</Config>
             <Config key="unit_menu">FULL</Config>
             <Config key="unit_navibuttons">FORWARD_ONLY</Config>
+            <Config key="navbar_unit_label">LABEL</Config>
             <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
             <Config key="pagingMode">concat-scroll</Config>
             <Config key="logPolicy">debug</Config>
@@ -20311,6 +20318,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
               requireResponseComplete: string;
               unitMenuEnabled: boolean;
               unitControls: string;
+              unitLabel: string;
               playerEnd: string;
             };
             player: {
@@ -20347,6 +20355,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
     browserNavigation: "prevent",
     unitMenuEnabled: true,
     unitControls: "forward_only",
+    unitLabel: "label",
     playerEnd: "last_unit"
   });
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {

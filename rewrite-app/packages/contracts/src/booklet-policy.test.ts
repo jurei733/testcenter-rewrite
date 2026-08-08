@@ -13,6 +13,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(defaults.navigation.playerEnd, "always");
   assert.equal(defaults.navigation.browserNavigation, "standard");
   assert.equal(defaults.navigation.unitControls, "both");
+  assert.equal(defaults.navigation.unitLabel, "index");
   assert.equal(defaults.player.loadingMode, "lazy");
   assert.equal(defaults.timing.showTimeLeft, false);
   assert.equal(defaults.display.reloadButton, false);
@@ -38,6 +39,7 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
     force_presentation_complete: "ON",
     force_response_complete: "ALWAYS",
     browserBehaviour: "preventNav",
+    navbar_unit_label: "LABEL",
     unit_menu: "FULL",
     unit_navibuttons: "FORWARD_ONLY",
     allow_player_to_terminate_test: "LAST_UNIT",
@@ -60,8 +62,14 @@ test("booklet policy compiler maps original Testcenter config and defaults", () 
   assert.equal(policy.navigation.browserNavigation, "prevent");
   assert.equal(policy.navigation.unitMenuEnabled, true);
   assert.equal(policy.navigation.unitControls, "forward_only");
+  assert.equal(policy.navigation.unitLabel, "label");
   assert.equal(policy.navigation.playerEnd, "last_unit");
   assert.equal(policy.player.loadingMode, "eager");
+  assert.equal(
+    compileBookletRuntimePolicy({ navbar_unit_label: "HIDDEN" }).navigation
+      .unitLabel,
+    "hidden"
+  );
   assert.equal(policy.player.pagingMode, "concat-scroll-snap");
   assert.equal(
     compileBookletRuntimePolicy({ pagingMode: "buttons" }).player.pagingMode,
