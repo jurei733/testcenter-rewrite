@@ -11110,6 +11110,25 @@ const validateZipXmlEntries = (
   const diagnostics: ImportJobDiagnostic[] = [];
   const validatedPlayerKeys = new Set<string>();
   const xmlIdentitySourceFileByKey = new Map<string, string>();
+  const zipEntrySourceFileByPath = new Map<string, string>();
+  for (const entry of manifestExtraction.entries) {
+    if (entry.fileName.endsWith("/")) {
+      continue;
+    }
+    const normalizedPath = normalizeZipEntryPath(entry.fileName);
+    const identityKey = normalizedPath.toLowerCase();
+    const existingSourceFile = zipEntrySourceFileByPath.get(identityKey);
+    if (existingSourceFile) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_zip_entry_name_duplicate",
+          `Source package ZIP entries '${existingSourceFile}' and '${entry.fileName}' use the same case-insensitive archive path.`
+        )
+      );
+    } else {
+      zipEntrySourceFileByPath.set(identityKey, entry.fileName);
+    }
+  }
   const manifestResources = collectXmlManifestResources(
     manifestExtraction.manifestText
   );

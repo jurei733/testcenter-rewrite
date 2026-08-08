@@ -34,6 +34,8 @@ remain guarded by the same typed identity rules during import.
 The byte-exact Verona 6 player additionally proves the original Resource rule:
 different HTML filenames cannot hide the same case-insensitive player module ID
 and major/minor version, either as loose uploads or inside a prebuilt ZIP.
+Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
+before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact
 original sample `.itcr.zip` resource package as base64 so the binary fixture
 remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as

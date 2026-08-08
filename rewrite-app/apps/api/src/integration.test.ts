@@ -9434,6 +9434,51 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     /Booklet\.xml.*Booklet_sameBookletID\.xml.*BOOKLET\.SAMPLE-100/
   );
   assert.equal(packageImport.body.stagedContentRelease, null);
+
+  const duplicatePathZip = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="ASSET-ONE" href="resources/Asset.bin" />
+            <resource identifier="ASSET-TWO" href="resources/asset.BIN" />
+          </resources>
+        </manifest>
+      `
+    },
+    { fileName: "export/resources/Asset.bin", content: "asset one" },
+    { fileName: "export/resources/asset.BIN", content: "asset two" }
+  ]);
+  const duplicatePathPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "duplicate-case-insensitive-paths.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${duplicatePathZip}`
+    }
+  });
+  assert.equal(duplicatePathPackage.status, 201);
+  const duplicatePathImport = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: duplicatePathPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(duplicatePathImport.status, 201);
+  assert.equal(duplicatePathImport.body.importJob.status, "failed");
+  assert.deepEqual(
+    duplicatePathImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_zip_entry_name_duplicate"]
+  );
+  assert.equal(duplicatePathImport.body.stagedContentRelease, null);
 });
 
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
