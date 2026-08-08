@@ -52,9 +52,13 @@ Player and its release example definition; both are encoded portably without
 changing the release bytes. This independent Player family uses
 Verona API 2.1 with `iqb-scripted@1.0` definitions and string-valued
 `allResponses` key/value state. Its production Chromium gate persists text and
-radio answers and restores both after reload. The host records each legacy data
-part's original value kind so API-2/3 object-valued and string-valued Players
-both receive the representation they emitted.
+radio answers and restores both after reload. A second independent family pins
+the official DAN 3.0.0 Player release plus the byte-exact `G231mm.voud`
+definition from the official Verona Player Testbed at a fixed commit. Its
+production Chromium gate persists and restores a positioned multiline-text and
+multiple-choice response through DAN's JSON-string `all` data part. The host
+records each legacy data part's original value kind so API-2/3 object-valued and
+string-valued Players both receive the representation they emitted.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact

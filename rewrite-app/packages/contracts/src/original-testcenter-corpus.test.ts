@@ -195,8 +195,12 @@ type OriginalTestcenterCorpus = {
     sourceRepository: string;
     sourceTag: string;
     sourceCommit: string;
+    playerSourcePath: string;
     playerSourceUrl: string;
     playerSha256: string;
+    definitionSourceRepository?: string;
+    definitionSourceCommit?: string;
+    definitionSourcePath: string;
     definitionSourceUrl: string;
     definitionSha256: string;
     license: string;
@@ -534,47 +538,85 @@ test("original Testcenter compatibility corpus pins the official Verona 2 throug
   assert.equal(verona5?.metadataFormat, "metadata-2.0");
 });
 
-test("original Testcenter compatibility corpus pins the official ABI player family", () => {
+test("original Testcenter compatibility corpus pins independent official player families", () => {
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 1);
-  const player = corpus.veronaPlayerFamilyPackages[0];
-  assert.ok(player);
-  assert.equal(player.family, "ABI scripted survey");
-  assert.equal(player.sourceTag, "v3.3.0");
-  assert.equal(player.sourceCommit, "1e872a261c6a20b7dfe1f86d8916cfe643acdfb8");
-  assert.equal(player.license, "MIT");
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 2);
+  const playersByFamily = new Map(
+    corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
+  );
 
-  const playerDocument = brotliDecompressSync(
+  for (const player of corpus.veronaPlayerFamilyPackages) {
+    const playerDocument = brotliDecompressSync(
+      Buffer.from(
+        readFileSync(resolve(corpusRoot, player.playerFixture), "utf8").trim(),
+        "base64"
+      )
+    );
+    const definitionDocument = Buffer.from(
+      readFileSync(resolve(corpusRoot, player.definitionFixture), "utf8").trim(),
+      "base64"
+    );
+    assert.equal(
+      createHash("sha256").update(playerDocument).digest("hex"),
+      player.playerSha256,
+      player.playerSourceUrl
+    );
+    assert.equal(
+      createHash("sha256").update(definitionDocument).digest("hex"),
+      player.definitionSha256,
+      player.definitionSourceUrl
+    );
+    assert.match(player.sourceCommit, /^[a-f0-9]{40}$/);
+    assert.equal(player.license, "MIT");
+  }
+
+  const abi = playersByFamily.get("ABI scripted survey");
+  assert.ok(abi);
+  assert.equal(abi.sourceTag, "v3.3.0");
+  assert.equal(abi.sourceCommit, "1e872a261c6a20b7dfe1f86d8916cfe643acdfb8");
+  const abiPlayerHtml = brotliDecompressSync(
     Buffer.from(
-      readFileSync(resolve(corpusRoot, player.playerFixture), "utf8").trim(),
+      readFileSync(resolve(corpusRoot, abi.playerFixture), "utf8").trim(),
       "base64"
     )
-  );
-  const definitionDocument = Buffer.from(
-    readFileSync(resolve(corpusRoot, player.definitionFixture), "utf8").trim(),
+  ).toString("utf8");
+  const abiDefinition = Buffer.from(
+    readFileSync(resolve(corpusRoot, abi.definitionFixture), "utf8").trim(),
     "base64"
-  );
-  assert.equal(
-    createHash("sha256").update(playerDocument).digest("hex"),
-    player.playerSha256,
-    player.playerSourceUrl
-  );
-  assert.equal(
-    createHash("sha256").update(definitionDocument).digest("hex"),
-    player.definitionSha256,
-    player.definitionSourceUrl
-  );
-  const playerHtml = playerDocument.toString("utf8");
-  assert.match(playerHtml, /"@id"\s*:\s*"iqb-player-abi"/);
-  assert.match(playerHtml, /"version"\s*:\s*"3\.3\.0"/);
-  assert.match(playerHtml, /"apiVersion"\s*:\s*"2\.0"/);
-  assert.match(playerHtml, /data-api-version="2\.1\.0"/);
-  assert.match(playerHtml, /data-supported-unit-definition-types="iqb-scripted@1\.0"/);
-  assert.match(playerHtml, /data-supported-unit-state-data-types="iqb-key-value@1\.0\.0"/);
-  assert.match(definitionDocument.toString("utf8"), /input-text::text_var1/);
-  assert.match(definitionDocument.toString("utf8"), /multiple-choice::mc_var1/);
+  ).toString("utf8");
+  assert.match(abiPlayerHtml, /"@id"\s*:\s*"iqb-player-abi"/);
+  assert.match(abiPlayerHtml, /"version"\s*:\s*"3\.3\.0"/);
+  assert.match(abiPlayerHtml, /"apiVersion"\s*:\s*"2\.0"/);
+  assert.match(abiPlayerHtml, /data-api-version="2\.1\.0"/);
+  assert.match(abiPlayerHtml, /data-supported-unit-definition-types="iqb-scripted@1\.0"/);
+  assert.match(abiPlayerHtml, /data-supported-unit-state-data-types="iqb-key-value@1\.0\.0"/);
+  assert.match(abiDefinition, /input-text::text_var1/);
+  assert.match(abiDefinition, /multiple-choice::mc_var1/);
+
+  const dan = playersByFamily.get("DAN visual assessment");
+  assert.ok(dan);
+  assert.equal(dan.sourceTag, "v3.0.0");
+  assert.equal(dan.sourceCommit, "89d21726c70a014c179b95cd846ff31a25821a21");
+  assert.equal(dan.definitionSourceCommit, "1343550c864701daf9ca4a1b064351b37a617d89");
+  const danPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, dan.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const danDefinition = Buffer.from(
+    readFileSync(resolve(corpusRoot, dan.definitionFixture), "utf8").trim(),
+    "base64"
+  ).toString("utf8");
+  assert.match(danPlayerHtml, /"@id"\s*:\s*"iqb-player-dan"/);
+  assert.match(danPlayerHtml, /"version"\s*:\s*"3\.0\.0"/);
+  assert.match(danPlayerHtml, /"apiVersion"\s*:\s*"2\.1"/);
+  assert.match(danPlayerHtml, /data-api-version="2\.1\.0"/);
+  assert.match(danDefinition, /"canvasElement4"/);
+  assert.match(danDefinition, /"type":"multilineTextbox"/);
+  assert.match(danDefinition, /"type":"multipleChoice"/);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

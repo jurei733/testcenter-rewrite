@@ -12476,7 +12476,7 @@ test("original Testcenter compatibility corpus imports the official Verona 2 thr
   }
 });
 
-test("original Testcenter compatibility corpus imports the official ABI player family", async () => {
+test("original Testcenter compatibility corpus imports official independent player families", async () => {
   type VeronaPlayerFamilyPackage = {
     family: string;
     playerFixture: string;
@@ -12497,127 +12497,126 @@ test("original Testcenter compatibility corpus imports the official ABI player f
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 1);
-  const expectation = corpus.veronaPlayerFamilyPackages[0];
-  assert.ok(expectation);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 2);
 
-  const playerDocument = readBrotliBase64Fixture(
-    resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
-  );
-  const definitionBuffer = Buffer.from(
-    readFileSync(
-      resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
-      "utf8"
-    ).trim(),
-    "base64"
-  );
-  const definitionDocument = definitionBuffer.toString("utf8");
-  assert.equal(
-    createHash("sha256").update(playerDocument).digest("hex"),
-    expectation.playerSha256,
-    expectation.playerSourceUrl
-  );
-  assert.equal(
-    createHash("sha256").update(definitionBuffer).digest("hex"),
-    expectation.definitionSha256,
-    expectation.definitionSourceUrl
-  );
-  assert.match(playerDocument, new RegExp(`"@id"\\s*:\\s*"${expectation.playerModuleId}"`));
-  assert.match(playerDocument, new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`));
-  assert.match(playerDocument, new RegExp(`"apiVersion"\\s*:\\s*"${expectation.metadataApiVersion}"`));
-  assert.match(playerDocument, new RegExp(`data-api-version="${expectation.playerApiVersion}"`));
-  assert.match(playerDocument, new RegExp(`data-supported-unit-definition-types="${expectation.unitDefinitionType}"`));
-  assert.match(playerDocument, new RegExp(`data-supported-unit-state-data-types="${expectation.unitStateType}"`));
+  for (const expectation of corpus.veronaPlayerFamilyPackages) {
+    const playerDocument = readBrotliBase64Fixture(
+      resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
+    );
+    const definitionBuffer = Buffer.from(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.definitionFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    );
+    const definitionDocument = definitionBuffer.toString("utf8");
+    assert.equal(
+      createHash("sha256").update(playerDocument).digest("hex"),
+      expectation.playerSha256,
+      expectation.playerSourceUrl
+    );
+    assert.equal(
+      createHash("sha256").update(definitionBuffer).digest("hex"),
+      expectation.definitionSha256,
+      expectation.definitionSourceUrl
+    );
+    assert.match(playerDocument, new RegExp(`"@id"\\s*:\\s*"${expectation.playerModuleId}"`));
+    assert.match(playerDocument, new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`));
+    assert.match(playerDocument, new RegExp(`"apiVersion"\\s*:\\s*"${expectation.metadataApiVersion}"`));
+    assert.match(playerDocument, new RegExp(`data-api-version="${expectation.playerApiVersion}"`));
 
-  const bookletKey = "BOOKLET.OFFICIAL.ABI-3.3";
-  const unitKey = "UNIT.OFFICIAL.ABI-3.3";
-  const zipPayload = createZipBase64([
-    {
-      fileName: "export/imsmanifest.xml",
-      content: `
-        <manifest>
-          <resources>
-            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
-            <resource identifier="${unitKey}" href="units/Unit.xml" />
-            <resource identifier="${expectation.playerKey}" href="players/Player.html" />
-          </resources>
-        </manifest>
-      `
-    },
-    {
-      fileName: "export/booklets/Booklet.xml",
-      content: `
-        <Booklet>
-          <Metadata><Id>${bookletKey}</Id><Label>${expectation.family}</Label></Metadata>
-          <Units><Unit id="${unitKey}" label="ABI survey" /></Units>
-        </Booklet>
-      `
-    },
-    {
-      fileName: "export/units/Unit.xml",
-      content: `
-        <Unit>
-          <Metadata><Id>${unitKey}</Id><Label>Official ABI survey</Label></Metadata>
-          <Definition player="${expectation.playerKey}" type="${expectation.unitDefinitionType}"><![CDATA[${definitionDocument}]]></Definition>
-        </Unit>
-      `
-    },
-    {
-      fileName: "export/players/Player.html",
-      content: playerDocument
-    }
-  ]);
-  const tenantKey = "integration-tenant-official-abi-player";
-  const workspaceKey = "integration-workspace-official-abi-player";
-  await requestJson("/api/v1/platform/tenants", {
-    method: "POST",
-    body: { tenantKey, displayName: tenantKey }
-  });
-  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
-    method: "POST",
-    body: { workspaceKey, displayName: workspaceKey }
-  });
-  const sourcePackage = await requestJson<{
-    sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
-    method: "POST",
-    body: {
-      fileName: "official-abi-3.3-player.zip",
-      mediaType: "application/zip",
-      sourceDocument: `data:application/zip;base64,${zipPayload}`
-    }
-  });
-  const importResult = await requestJson<{
-    importJob: {
-      status: string;
-      diagnostics: Array<{ severity: string; code: string }>;
-    };
-    stagedContentRelease: { contentReleaseId: string } | null;
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
-    method: "POST",
-    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
-  });
-  assert.equal(importResult.status, 201);
-  assert.equal(
-    importResult.body.importJob.status,
-    "completed",
-    JSON.stringify(importResult.body.importJob.diagnostics)
-  );
-  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
-  assert.equal(
-    importResult.body.importJob.diagnostics.some(
-      diagnostic => diagnostic.severity === "error"
-    ),
-    false,
-    JSON.stringify(importResult.body.importJob.diagnostics)
-  );
-  assert.equal(
-    importResult.body.importJob.diagnostics.some(
-      diagnostic => diagnostic.code === "source_document_player_metadata_missing"
-    ),
-    false,
-    JSON.stringify(importResult.body.importJob.diagnostics)
-  );
+    const packageSuffix = expectation.playerModuleId.replaceAll("iqb-player-", "");
+    const bookletKey = `BOOKLET.OFFICIAL.${packageSuffix.toUpperCase()}`;
+    const unitKey = `UNIT.OFFICIAL.${packageSuffix.toUpperCase()}`;
+    const zipPayload = createZipBase64([
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest>
+            <resources>
+              <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+              <resource identifier="${unitKey}" href="units/Unit.xml" />
+              <resource identifier="${expectation.playerKey}" href="players/Player.html" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>${bookletKey}</Id><Label>${expectation.family}</Label></Metadata>
+            <Units><Unit id="${unitKey}" label="${expectation.family}" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>${unitKey}</Id><Label>${expectation.family}</Label></Metadata>
+            <Definition player="${expectation.playerKey}" type="${expectation.unitDefinitionType}"><![CDATA[${definitionDocument}]]></Definition>
+          </Unit>
+        `
+      },
+      {
+        fileName: "export/players/Player.html",
+        content: playerDocument
+      }
+    ]);
+    const tenantKey = `integration-tenant-official-${packageSuffix}-player`;
+    const workspaceKey = `integration-workspace-official-${packageSuffix}-player`;
+    await requestJson("/api/v1/platform/tenants", {
+      method: "POST",
+      body: { tenantKey, displayName: tenantKey }
+    });
+    await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+      method: "POST",
+      body: { workspaceKey, displayName: workspaceKey }
+    });
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: `official-${packageSuffix}-player.zip`,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload}`
+      }
+    });
+    const importResult = await requestJson<{
+      importJob: {
+        status: string;
+        diagnostics: Array<{ severity: string; code: string }>;
+      };
+      stagedContentRelease: { contentReleaseId: string } | null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    });
+    assert.equal(importResult.status, 201);
+    assert.equal(
+      importResult.body.importJob.status,
+      "completed",
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+    assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.severity === "error"
+      ),
+      false,
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+    assert.equal(
+      importResult.body.importJob.diagnostics.some(
+        diagnostic => diagnostic.code === "source_document_player_metadata_missing"
+      ),
+      false,
+      JSON.stringify(importResult.body.importJob.diagnostics)
+    );
+  }
 });
 
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {

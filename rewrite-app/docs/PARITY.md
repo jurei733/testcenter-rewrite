@@ -30,13 +30,15 @@ Priority:
 | 8 | P2 | Branding, custom texts, maintenance banner, themes | Needed for broad tenant rollout after core test integrity is proven. |
 
 Latest P0 player-family closure: the compatibility corpus now also pins the
-official MIT-licensed IQB ABI 3.3.0 scripted-survey Player, its `v3.3.0` tag
-commit, release HTML, and release example definition byte-for-byte. Import and
-production SQLite/Chromium gates negotiate Verona API 2.1, persist text plus
-radio answers, and restore them after reload. The versioned response envelope
-now records each legacy data part's original string/object value kind, so ABI's
-JSON-string `allResponses` and the Simple Player's object-valued state both
-round-trip correctly. Further representative families remain P0 corpus work.
+official MIT-licensed IQB ABI 3.3.0 scripted-survey and DAN 3.0.0 visual-
+assessment Players. ABI retains its release example byte-for-byte; DAN uses the
+byte-exact `G231mm.voud` definition from a pinned official Testbed commit.
+Import and production SQLite/Chromium gates negotiate Verona API 2.1, persist
+text plus radio answers, and restore them after reload. The versioned response
+envelope records each legacy data part's original string/object value kind, so
+ABI's JSON-string `allResponses`, DAN's JSON-string `all`, and the Simple
+Player's object-valued state all round-trip correctly. Further representative
+families remain P0 corpus work.
 
 ## Capability matrix
 
@@ -58,6 +60,7 @@ round-trip correctly. Further representative families remain P0 corpus work.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
+| Independent Player-family gates | official ABI/DAN repositories and Verona Player Testbed | partial | P0 | provenance-pinned ABI 3.3.0 and DAN 3.0.0 releases import with official executable definitions and negotiate API 2.1. ABI persists text/radio answers in string-valued `allResponses`; DAN persists positioned multiline-text/multiple-choice answers in a string-valued `all` part. Production Chromium/SQLite reloads both without Player-specific state rewriting, proving legacy data-part value-kind preservation across distinct implementations. Further production families remain |
 | Verona player integration | `test-controller`, `unithost` | partial | P0 | sandboxed `srcdoc` host imports embedded JSON and Testcenter ZIP players/definitions, exposes accessible queued, indeterminate document-loading, and exact 100%-loaded milestones before start, exchanges ready/start/state/navigation/runtime-error/focus messages, and visibly fails or reloads; the pinned original Verona 6 sample is executed browser-side with its real unit definition, CORS-readable single- and multi-range resource delivery, raw response autosave, durable Player-log forwarding, 500 ms debounced test-wide `FOCUS` logging, adaptive route transition, and reload restoration. The same original resource package is now separately uploaded and transitively resolved with its loose Booklet/Unit/definition/Player chain through immutable import and Participant delivery. A second executable gate loads the byte-exact original IQB Aspect 2.12.3 player and all three original 17.4 Unit/Voud pairs, including the 16.17 MB image definition; it combines separately emitted player/unit state, persists text plus radio `elementCodes` and page state, renders four embedded images, crosses all host units forward and backward, and restores the response after reload. The original Test Controller `pagingMode=buttons` now survives policy compilation and is proven through the player's visible page control. Additional representative player families remain |
 | Player API compatibility validation | workspace file admin and unithost | partial | P0 | runtime ready handshake gates Verona major versions 2–6; ZIP import performs version-aware structural validation for the experimental `$schema`-only format, legacy metadata 1.x/2.x, and strict metadata 3.0/3.1, rejects unsupported metadata/API versions and malformed type, identity, language, SemVer, dependency, maintainer, code, or unknown-property fields with stable diagnostics, and correctly distinguishes `player-id@module-version` from `specVersion`. Official Simple Player fixtures now prove API 2.1, 3.0, 4.0, and 5.2 through import and browser execution, while the original Aspect fixture proves that module `2.12.3` can negotiate Verona API `6.0`. Metadata-free legacy players remain importable with a warning because their references cannot prove API compatibility; the official API-2 fixture proves that warning-to-runtime-handshake path, while additional player families remain |
 | Booklet/unit navigation | `test-controller` | partial | P0 | ordered units, current position, nested original `Testlet` hierarchy, and per-unit testlet paths persist; imported `BookletConfig` compiles menu/button/player-end rules and server-side forward/backward eligibility, with separate Prev/Next controls no longer incorrectly depending on the unit-menu setting. Original `Show` rules remove inactive routes from the menu/navigation/completion path, Demo/Review/Trial participants can select a durable state override while retaining the automatic recommendation, and unit/testlet leave locks prevent and visibly mark re-entry. All 17 original Test-Controller system booklets now import and activate together with their five Units, legacy Player, and exact 26-login roster; representative official accounts gate navigation, code/time enforcement, session reuse/restart, and monitoring across memory, file, and SQLite. A production-built Angular browser gate repeats the complete official import and proves block-code normalization, the running testlet timer, nested completion locks, and forward navigation with two original accounts. The complete original three-unit Aspect booklet independently gates real-player navigation behavior |

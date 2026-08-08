@@ -5977,7 +5977,9 @@ try {
 
   logStep("participant-official-abi-player-family");
   const abiPlayerPackage =
-    officialProtocolCorpus.veronaPlayerFamilyPackages[0];
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage => playerPackage.family === "ABI scripted survey"
+    );
   assert.ok(abiPlayerPackage, "The official ABI player fixture should be pinned.");
   const abiTenantKey = `${tenantKey}-verona-abi`;
   const abiWorkspaceKey = `${workspaceKey}-verona-abi`;
@@ -6167,6 +6169,212 @@ try {
   assert.equal(
     await restoredAbiFrame
       .getByRole("radio", { name: "Sekundar I", exact: true })
+      .isChecked(),
+    true
+  );
+
+  logStep("participant-official-dan-player-family");
+  const danPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage => playerPackage.family === "DAN visual assessment"
+    );
+  assert.ok(danPlayerPackage, "The official DAN player fixture should be pinned.");
+  const danTenantKey = `${tenantKey}-verona-dan`;
+  const danWorkspaceKey = `${workspaceKey}-verona-dan`;
+  const danBookletKey = "BOOKLET.OFFICIAL.DAN-3.0";
+  const danUnitKey = "UNIT.OFFICIAL.DAN-3.0";
+  const danLoginKey = "student-official-dan";
+  const danResponse = "Heute ging ich früher, um meinen Hunger zu stillen.";
+  const [danPlayerDocument, danDefinitionDocument] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        danPlayerPackage.playerFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        danPlayerPackage.definitionFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+  ]);
+  const danPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${danBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${danUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${danPlayerPackage.playerKey}" href="players/Player.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${danBookletKey}</Id>
+            <Label>Official DAN visual assessment</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${danUnitKey}" label="DAN visual assessment" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${danUnitKey}</Id>
+            <Label>Official DAN visual assessment</Label>
+          </Metadata>
+          <Definition player="${danPlayerPackage.playerKey}" type="${danPlayerPackage.unitDefinitionType}"><![CDATA[${danDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: danPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: danTenantKey,
+      displayName: "Official DAN Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${danTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: danWorkspaceKey,
+        displayName: "Official DAN Player"
+      }
+    }
+  );
+  const danWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${danTenantKey}` +
+    `/workspaces/${danWorkspaceKey}`;
+  const danSourceResponse = await sendSmokeJson(
+    `${danWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-dan-3.0-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${danPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const danSourcePayload = await danSourceResponse.json();
+  const danImportResponse = await sendSmokeJson(
+    `${danWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: danSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const danImportPayload = await danImportResponse.json();
+  assert.equal(
+    danImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(danImportPayload.importJob.diagnostics)
+  );
+  const danReleaseId = danImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(danReleaseId, "Official DAN import should stage a release.");
+  await sendSmokeJson(
+    `${danWorkspaceApiUrl}/content-releases/${danReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${danWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: danLoginKey,
+          groupKey: "group:official-dan",
+          bookletKey: danBookletKey,
+          displayName: "Official DAN Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: danTenantKey,
+      workspaceKey: danWorkspaceKey,
+      loginKey: danLoginKey,
+      bookletKey: danBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${danPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const danFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await danFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  const danTextInput = danFrame.locator("#canvasElement4_textbox");
+  await danTextInput.pressSequentially(danResponse);
+  await danFrame.locator("#canvasElement14_multipleChoice").click();
+  const danParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(danParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${danParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[danUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const all = JSON.parse(response).unitState?.dataParts?.all;
+        if (typeof all !== "string") return false;
+        const unitStatus = JSON.parse(all);
+        return (
+          unitStatus?.canvasElement4 === danResponse &&
+          unitStatus?.canvasElement14 === "true"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      danParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${danPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredDanFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await restoredDanFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredDanFrame.locator("#canvasElement4_textbox").inputValue(),
+    danResponse
+  );
+  assert.equal(
+    await restoredDanFrame
+      .locator("#canvasElement14_multipleChoice")
       .isChecked(),
     true
   );

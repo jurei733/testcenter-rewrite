@@ -735,6 +735,33 @@
       "metadataFormat": "legacy-jsonld",
       "unitDefinitionType": "iqb-scripted@1.0",
       "unitStateType": "iqb-key-value@1.0.0"
+    },
+    {
+      "family": "DAN visual assessment",
+      "playerFixture": "players/iqb-player-dan-3.0.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/dan-g231mm-3.0.0.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-dan",
+      "sourceTag": "v3.0.0",
+      "sourceCommit": "89d21726c70a014c179b95cd846ff31a25821a21",
+      "playerSourcePath": "iqb-player-dan@3.0.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-dan/releases/download/v3.0.0/iqb-player-dan%403.0.0.html",
+      "playerSha256": "14300f0130bd02494f10819fb6093073de693ad4bff388ab6931b296beed8f12",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-player-testbed",
+      "definitionSourceCommit": "1343550c864701daf9ca4a1b064351b37a617d89",
+      "definitionSourcePath": "example_units/G231mm.voud",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.voud",
+      "definitionSha256": "e6e1b9d7daf945332e9e1a224b1d9c2566c49ed0b368a642d3e795cca2285075",
+      "license": "MIT",
+      "playerKey": "iqb-player-dan@3.0",
+      "playerModuleId": "iqb-player-dan",
+      "playerModuleVersion": "3.0.0",
+      "playerApiVersion": "2.1.0",
+      "metadataApiVersion": "2.1",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "IQBVisualUnitPlayerV2.1.0",
+      "unitStateType": "IQBVisualUnitPlayerV2.1.0"
     }
   ],
   "playerPackages": [
