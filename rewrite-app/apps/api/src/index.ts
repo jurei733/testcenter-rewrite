@@ -121,6 +121,8 @@ import {
   type ResetAdminUserPasswordRequest,
   type ResetAdminUserPasswordResponse,
   type RevokeAdminRoleResponse,
+  type RevokeAdminSessionsRequest,
+  type RevokeAdminSessionsResponse,
   type RevokeAdminSessionResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
@@ -2382,6 +2384,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `GET ${productionApiRoutes.admin.exportSessionsCsv}`;
   }
 
+  if (
+    method === "POST" &&
+    pathname === productionApiRoutes.admin.revokeSessions
+  ) {
+    return `POST ${productionApiRoutes.admin.revokeSessions}`;
+  }
+
   if (method === "DELETE" && adminSessionRevokePattern.test(pathname)) {
     return `DELETE ${productionApiRoutes.admin.revokeSession}`;
   }
@@ -3718,6 +3727,47 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           "admin-sessions.csv",
           formatAdminSessionsCsv(items.map(toAdminSessionDirectoryItem))
         );
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        pathname === productionApiRoutes.admin.revokeSessions
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const body = await readRequestJsonBody<RevokeAdminSessionsRequest>();
+        if (
+          !Array.isArray(body.adminSessionIds) ||
+          body.adminSessionIds.length < 1 ||
+          body.adminSessionIds.length > 50 ||
+          body.adminSessionIds.some(
+            adminSessionId =>
+              typeof adminSessionId !== "string" ||
+              !adminSessionId.trim() ||
+              adminSessionId.trim().length > 200
+          )
+        ) {
+          sendError(
+            response,
+            400,
+            "admin_session_ids_invalid",
+            "adminSessionIds must contain between 1 and 50 non-empty session ids."
+          );
+          return;
+        }
+
+        const result = await services.adminAuth.revokeAdminSessions({
+          sessionToken,
+          adminSessionIds: body.adminSessionIds
+        });
+        sendJson<RevokeAdminSessionsResponse>(response, 200, {
+          requestedCount: result.requestedCount,
+          adminSessions: result.adminSessions.map(toPublicAdminSession),
+          failures: result.failures
+        });
         return;
       }
 

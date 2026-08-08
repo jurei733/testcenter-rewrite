@@ -17,6 +17,8 @@ import type {
   ResetAdminUserPasswordRequest,
   ResetAdminUserPasswordResponse,
   RevokeAdminRoleResponse,
+  RevokeAdminSessionsRequest,
+  RevokeAdminSessionsResponse,
   RevokeAdminSessionResponse,
   UpdateAdminUserRequest,
   UpdateAdminUserResponse
@@ -203,6 +205,39 @@ export class RewriteAppOpsService {
     );
     this.persistence.persistShellState();
     await this.refreshAdminSessions();
+  }
+
+  async revokeAdminSessions(
+    adminSessionIds: string[]
+  ): Promise<RevokeAdminSessionsResponse> {
+    if (!this.hasAdminSession()) {
+      return {
+        requestedCount: 0,
+        adminSessions: [],
+        failures: []
+      };
+    }
+    const uniqueAdminSessionIds = [
+      ...new Set(
+        adminSessionIds.map(adminSessionId => adminSessionId.trim()).filter(Boolean)
+      )
+    ].slice(0, 50);
+    const payload = await this.requestState.request<RevokeAdminSessionsResponse>(
+      "Revoke Selected Admin Sessions",
+      "POST",
+      productionApiRoutes.admin.revokeSessions,
+      {
+        adminSessionIds: uniqueAdminSessionIds
+      } satisfies RevokeAdminSessionsRequest,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.feedback.rememberActivity(
+      "Admin Session Batch Revoked",
+      `${payload.adminSessions.length}/${payload.requestedCount} selected session(s) revoked; ${payload.failures.length} failed.`
+    );
+    await this.refreshAdminSessions();
+    return payload;
   }
 
   async exportAdminSessionsCsv(): Promise<void> {

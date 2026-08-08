@@ -1842,6 +1842,7 @@ export const productionApiRoutes = {
     signOut: "/api/v1/admin/auth/sign-out",
     currentSession: "/api/v1/admin/auth/current-session",
     listSessions: "/api/v1/admin/auth/sessions",
+    revokeSessions: "/api/v1/admin/auth/sessions:revoke",
     revokeSession: "/api/v1/admin/auth/sessions/:adminSessionId",
     exportSessionsCsv: "/api/v1/admin/auth/sessions.csv",
     listUsers: "/api/v1/admin/users",
@@ -2521,6 +2522,22 @@ export type ListAdminSessionsResponse = {
 
 export type RevokeAdminSessionResponse = {
   adminSession: PublicAdminSession;
+};
+
+export type RevokeAdminSessionsRequest = {
+  adminSessionIds: string[];
+};
+
+export type RevokeAdminSessionsResponse = {
+  requestedCount: number;
+  adminSessions: PublicAdminSession[];
+  failures: Array<{
+    adminSessionId: string;
+    statusCode: number;
+    error: string;
+    message: string;
+    details: unknown;
+  }>;
 };
 
 export type AdminUserDirectoryItem = {

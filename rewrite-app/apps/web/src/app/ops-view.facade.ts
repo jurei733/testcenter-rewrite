@@ -8,6 +8,7 @@ import type {
   ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
   ListAdminUsersResponse,
+  RevokeAdminSessionsResponse,
   GetRuntimeConfigResponse,
   GetRuntimeDiagnosticsResponse
 } from "@testcenter-rewrite-app/contracts";
@@ -179,6 +180,8 @@ export class OpsViewFacade {
   monitorFilterDraftNot = false;
   private readonly adminUserBatchSelection = new Set<string>();
   adminUserStatusBatchResult: AdminUserStatusBatchResult | null = null;
+  private readonly adminSessionBatchSelection = new Set<string>();
+  adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
 
   init(): void {
     this.viewState.setActiveView("ops");
@@ -238,6 +241,13 @@ export class OpsViewFacade {
       this.ops.adminSessionView
     );
     return payload?.adminUser?.adminUserId ?? "";
+  }
+
+  get currentAdminSessionId(): string {
+    const payload = parseJsonDocument<AdminSessionViewPayload>(
+      this.ops.adminSessionView
+    );
+    return payload?.adminSession?.adminSessionId ?? "";
   }
 
   get canUseAdminCredentials(): boolean {
@@ -470,6 +480,18 @@ export class OpsViewFacade {
     );
   }
 
+  get adminSessionBatchCount(): number {
+    return this.adminSessionBatchSelection.size;
+  }
+
+  get canRevokeAdminSessionBatch(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminSessionBatchCount > 0
+    );
+  }
+
   refreshDiagnostics(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshOperationalDiagnostics());
   }
@@ -482,6 +504,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminCredentials) {
       return;
     }
+    this.clearAdminBatches();
     this.viewState.onActionAsync(() => this.opsService.bootstrapOrSignInAdmin());
   }
 
@@ -496,7 +519,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminCredentials) {
       return;
     }
-    this.clearAdminUserBatchSelection();
+    this.clearAdminBatches();
     this.viewState.onActionAsync(() => this.opsService.signInAdmin());
   }
 
@@ -511,6 +534,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminSession) {
       return;
     }
+    this.clearAdminSessionBatchSelection();
     this.viewState.onActionAsync(() => this.opsService.refreshAdminSessions());
   }
 
@@ -525,7 +549,7 @@ export class OpsViewFacade {
     if (!this.canUseAdminSession) {
       return;
     }
-    this.clearAdminUserBatchSelection();
+    this.clearAdminBatches();
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -547,6 +571,39 @@ export class OpsViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.opsService.revokeAdminSession());
+  }
+
+  confirmRevokeAdminSessionBatch(): void {
+    if (!this.canRevokeAdminSessionBatch) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Revoke ${this.adminSessionBatchCount} selected admin session(s)? The current session is excluded and every target remains subject to the server delegation boundary.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const selectedAdminSessionIds = [...this.adminSessionBatchSelection];
+    this.viewState.onActionAsync(async () => {
+      const result = await this.opsService.revokeAdminSessions(
+        selectedAdminSessionIds
+      );
+      this.adminSessionBatchResult = result;
+      for (const adminSession of result.adminSessions) {
+        this.adminSessionBatchSelection.delete(adminSession.adminSessionId);
+      }
+    });
+  }
+
+  clearAdminSessionBatchSelection(): void {
+    this.adminSessionBatchSelection.clear();
+    this.adminSessionBatchResult = null;
+  }
+
+  private clearAdminBatches(): void {
+    this.clearAdminSessionBatchSelection();
+    this.clearAdminUserBatchSelection();
   }
 
   refreshAdminUsers(): void {
@@ -711,6 +768,7 @@ export class OpsViewFacade {
     this.ops.adminSessionStatusFilter = "";
     this.ops.adminSessionLimit = "100";
     this.ops.adminSessionRevokeTargetId = "";
+    this.clearAdminSessionBatchSelection();
     this.persistState();
   }
 
@@ -768,6 +826,7 @@ export class OpsViewFacade {
   }
 
   signInLocalDemoAdmin(): void {
+    this.clearAdminBatches();
     this.viewState.onActionAsync(async () => {
       this.ops.adminUsername = localDemoAccess.adminUsername;
       this.ops.adminDisplayName = localDemoAccess.adminDisplayName;
@@ -813,7 +872,19 @@ export class OpsViewFacade {
 
   selectAdminSession(item: RecordCollectionItem): void {
     const adminUserId = item.actionPayload?.adminUserId;
-    const adminSessionId = item.actionPayload?.adminSessionId;
+    const adminSessionId = item.actionPayload?.adminSessionId?.trim();
+    if (item.actionPayload?.adminSessionBatchCommand === "toggle") {
+      if (!adminSessionId || adminSessionId === this.currentAdminSessionId) {
+        return;
+      }
+      if (this.adminSessionBatchSelection.has(adminSessionId)) {
+        this.adminSessionBatchSelection.delete(adminSessionId);
+      } else if (this.adminSessionBatchSelection.size < 50) {
+        this.adminSessionBatchSelection.add(adminSessionId);
+      }
+      this.adminSessionBatchResult = null;
+      return;
+    }
     if (!adminUserId || !adminSessionId) {
       return;
     }
@@ -1122,7 +1193,18 @@ export class OpsViewFacade {
       ...payload.items.map(item => ({
         headline: item.adminUser.username,
         subline: `${item.status} session ${item.adminSession.adminSessionId}`,
-        badges: [item.status, item.adminUser.status],
+        badges: [
+          item.status,
+          item.adminUser.status,
+          ...(item.adminSession.adminSessionId === this.currentAdminSessionId
+            ? ["current session"]
+            : []),
+          ...(this.adminSessionBatchSelection.has(
+            item.adminSession.adminSessionId
+          )
+            ? ["batch selected"]
+            : [])
+        ],
         rows: [
           { label: "Admin User ID", value: item.adminUser.adminUserId },
           {
@@ -1142,6 +1224,98 @@ export class OpsViewFacade {
         ],
         actionLabel: "Select Session",
         actionPayload: {
+          adminSessionId: item.adminSession.adminSessionId,
+          adminUserId: item.adminUser.adminUserId
+        },
+        actions:
+          item.status !== "active" ||
+          item.adminSession.adminSessionId === this.currentAdminSessionId
+            ? []
+            : [
+                {
+                  label: this.adminSessionBatchSelection.has(
+                    item.adminSession.adminSessionId
+                  )
+                    ? "Remove From Batch"
+                    : "Add To Batch",
+                  payload: {
+                    adminSessionBatchCommand: "toggle",
+                    adminSessionId: item.adminSession.adminSessionId,
+                    adminUserId: item.adminUser.adminUserId
+                  }
+                }
+              ]
+      }))
+    ];
+  }
+
+  get adminSessionBatchPreviewItems(): RecordCollectionItem[] {
+    const payload = parseJsonDocument<ListAdminSessionsResponse>(
+      this.ops.adminSessionsView
+    );
+    const selectedSessions = (payload?.items ?? []).filter(item =>
+      this.adminSessionBatchSelection.has(item.adminSession.adminSessionId)
+    );
+    const result = this.adminSessionBatchResult;
+    if (selectedSessions.length === 0 && !result) {
+      return [];
+    }
+
+    return [
+      {
+        headline: "Batch revoke preview",
+        subline: `${selectedSessions.length} selected admin session(s) will be revoked`,
+        badges: [
+          `${selectedSessions.length}/50 selected`,
+          "current excluded",
+          "server-scoped"
+        ],
+        rows: [
+          {
+            label: "Selected Admin Session IDs",
+            value:
+              selectedSessions
+                .map(item => item.adminSession.adminSessionId)
+                .join(" | ") || "none"
+          },
+          {
+            label: "Last Succeeded",
+            value: String(result?.adminSessions.length ?? 0)
+          },
+          {
+            label: "Last Failed",
+            value: String(result?.failures.length ?? 0)
+          },
+          {
+            label: "Failure Details",
+            value:
+              result?.failures
+                .map(
+                  failure =>
+                    `${failure.adminSessionId}: ${failure.error} (${failure.statusCode})`
+                )
+                .join(" | ") || "none"
+          }
+        ]
+      },
+      ...selectedSessions.map(item => ({
+        headline: item.adminUser.username,
+        subline: item.adminSession.adminSessionId,
+        badges: [item.status, "batch selected"],
+        rows: [
+          { label: "Admin User ID", value: item.adminUser.adminUserId },
+          {
+            label: "Created",
+            value: this.formatDateTime(item.adminSession.createdAt)
+          },
+          {
+            label: "Expires",
+            value: this.formatDateTime(item.adminSession.expiresAt)
+          }
+        ],
+        actionLabel: "Remove From Batch",
+        actionPayload: {
+          adminSessionBatchCommand: "toggle",
           adminSessionId: item.adminSession.adminSessionId,
           adminUserId: item.adminUser.adminUserId
         }

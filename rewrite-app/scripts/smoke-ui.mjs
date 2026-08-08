@@ -2188,6 +2188,90 @@ try {
   await waitForInputMinLength("#adminSessionToken", 20);
   smokeAdminSessionToken = await page.locator("#adminSessionToken").inputValue();
 
+  const createBatchAdminSession = async (username, password) => {
+    const response = await fetch(`${baseUrl}/api/v1/admin/auth/sign-in`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const workspaceAdminBatchSession = await createBatchAdminSession(
+    workspaceAdminUsername,
+    workspaceAdminResetPassword
+  );
+  const delegatedAdminBatchSession = await createBatchAdminSession(
+    delegatedWorkspaceAdminUsername,
+    delegatedWorkspaceAdminPassword
+  );
+
+  await page
+    .getByRole("button", { name: "Clear Session Filters", exact: true })
+    .click();
+  await clickAction("Admin Sessions");
+  const adminSessionsCollection = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Admin Sessions", exact: true }) });
+  const currentAdminSessionCard = adminSessionsCollection
+    .locator(".record-card")
+    .filter({ hasText: "current session" });
+  await currentAdminSessionCard.waitFor();
+  assert.equal(
+    await currentAdminSessionCard
+      .getByRole("button", { name: "Add To Batch" })
+      .count(),
+    0,
+    "The signed-in admin session must not be available for bulk revocation."
+  );
+  for (const adminSessionId of [
+    workspaceAdminBatchSession.adminSession.adminSessionId,
+    delegatedAdminBatchSession.adminSession.adminSessionId
+  ]) {
+    await adminSessionsCollection
+      .locator(".record-card")
+      .filter({ hasText: adminSessionId })
+      .getByRole("button", { name: "Add To Batch" })
+      .click();
+  }
+  const selectedAdminSessions = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Selected Admin Sessions",
+        exact: true
+      })
+    });
+  await selectedAdminSessions
+    .filter({ hasText: "2 selected admin session(s) will be revoked" })
+    .filter({ hasText: workspaceAdminBatchSession.adminSession.adminSessionId })
+    .filter({ hasText: delegatedAdminBatchSession.adminSession.adminSessionId })
+    .waitFor();
+  await expectButtonSelectorEnabled("#adminBatchRevokeSessionsButton");
+  logStep("admin-session-bulk-revoke");
+  const revokeAdminSessionBatchDialog = acceptNextDialog(
+    /Revoke 2 selected admin session\(s\)\? The current session is excluded and every target remains subject to the server delegation boundary\./
+  );
+  await page.locator("#adminBatchRevokeSessionsButton").click();
+  await revokeAdminSessionBatchDialog;
+  await waitForNotBusy("admin-session-bulk-revoke");
+  for (const sessionToken of [
+    workspaceAdminBatchSession.sessionToken,
+    delegatedAdminBatchSession.sessionToken
+  ]) {
+    const revokedSessionResponse = await fetch(
+      `${baseUrl}/api/v1/admin/auth/current-session`,
+      { headers: { authorization: `Bearer ${sessionToken}` } }
+    );
+    assert.equal(revokedSessionResponse.status, 401);
+  }
+  await selectedAdminSessions
+    .filter({ hasText: "0 selected admin session(s) will be revoked" })
+    .filter({ hasText: "Last Succeeded" })
+    .filter({ hasText: "Last Failed" })
+    .waitFor();
+  stopAfter("admin-session-bulk-revoke");
+
   await clickAction("Admin Users");
   const batchAdminDirectoryResponse = await fetch(
     `${baseUrl}/api/v1/admin/users?limit=100`,

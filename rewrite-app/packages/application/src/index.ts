@@ -807,6 +807,20 @@ export type AdminAuthPort = {
     sessionToken: string;
     adminSessionId: string;
   }): Promise<AdminSession>;
+  revokeAdminSessions(input: {
+    sessionToken: string;
+    adminSessionIds: string[];
+  }): Promise<{
+    requestedCount: number;
+    adminSessions: AdminSession[];
+    failures: Array<{
+      adminSessionId: string;
+      statusCode: number;
+      error: string;
+      message: string;
+      details: unknown;
+    }>;
+  }>;
   signOut(input: { sessionToken: string }): Promise<AdminSession>;
 };
 
@@ -915,6 +929,7 @@ export const firstSliceUseCases = {
   getAdminCurrentSession: "GetAdminCurrentSession",
   listAdminSessions: "ListAdminSessions",
   revokeAdminSession: "RevokeAdminSession",
+  revokeAdminSessions: "RevokeAdminSessions",
   adminSignOut: "AdminSignOut",
   listAdminUsers: "ListAdminUsers",
   createAdminUser: "CreateAdminUser",
@@ -17250,6 +17265,73 @@ export const createFirstSliceServices = (
           }
         });
         return revokedSession;
+      },
+      async revokeAdminSessions(input) {
+        if (
+          !Array.isArray(input.adminSessionIds) ||
+          input.adminSessionIds.length < 1 ||
+          input.adminSessionIds.length > 50 ||
+          input.adminSessionIds.some(
+            adminSessionId => typeof adminSessionId !== "string"
+          )
+        ) {
+          throw new FirstSliceError(
+            400,
+            "admin_session_ids_invalid",
+            "adminSessionIds must contain between 1 and 50 session ids."
+          );
+        }
+        const adminSessionIds = Array.from(
+          new Set(input.adminSessionIds.map(adminSessionId => adminSessionId.trim()))
+        );
+        if (
+          adminSessionIds.length === 0 ||
+          adminSessionIds.length > 50 ||
+          adminSessionIds.some(
+            adminSessionId => !adminSessionId || adminSessionId.length > 200
+          )
+        ) {
+          throw new FirstSliceError(
+            400,
+            "admin_session_ids_invalid",
+            "adminSessionIds must contain between 1 and 50 distinct non-empty session ids."
+          );
+        }
+
+        const adminSessions: AdminSession[] = [];
+        const failures: Array<{
+          adminSessionId: string;
+          statusCode: number;
+          error: string;
+          message: string;
+          details: unknown;
+        }> = [];
+        for (const adminSessionId of adminSessionIds) {
+          try {
+            adminSessions.push(
+              await this.revokeAdminSession({
+                sessionToken: input.sessionToken,
+                adminSessionId
+              })
+            );
+          } catch (error) {
+            if (!(error instanceof FirstSliceError)) {
+              throw error;
+            }
+            failures.push({
+              adminSessionId,
+              statusCode: error.statusCode,
+              error: error.errorCode,
+              message: error.message,
+              details: error.details
+            });
+          }
+        }
+        return {
+          requestedCount: adminSessionIds.length,
+          adminSessions,
+          failures
+        };
       },
       async signOut(input) {
         const { adminUser, adminSession } = await requireActiveAdminSession(

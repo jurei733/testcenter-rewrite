@@ -544,6 +544,122 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(secondSignIn.status, 200);
   assert.notEqual(secondSignIn.body.sessionToken, signIn.body.sessionToken);
 
+  const missingAdminSessionBatchSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions:revoke",
+    {
+      method: "POST",
+      body: {
+        adminSessionIds: [secondSignIn.body.adminSession.adminSessionId]
+      }
+    }
+  );
+  assert.equal(missingAdminSessionBatchSession.status, 401);
+  assert.equal(missingAdminSessionBatchSession.body.error, "admin_session_missing");
+
+  const invalidAdminSessionBatch = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sessions:revoke",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: { adminSessionIds: [] }
+    }
+  );
+  assert.equal(invalidAdminSessionBatch.status, 400);
+  assert.equal(invalidAdminSessionBatch.body.error, "admin_session_ids_invalid");
+
+  const thirdSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+  const fourthSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+  assert.equal(thirdSignIn.status, 200);
+  assert.equal(fourthSignIn.status, 200);
+
+  const revokedSessionBatch = await requestJson<{
+    requestedCount: number;
+    adminSessions: Array<{ adminSessionId: string; token?: string }>;
+    failures: Array<{
+      adminSessionId: string;
+      statusCode: number;
+      error: string;
+    }>;
+  }>("/api/v1/admin/auth/sessions:revoke", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      adminSessionIds: [
+        thirdSignIn.body.adminSession.adminSessionId,
+        "missing-admin-session",
+        signIn.body.adminSession.adminSessionId,
+        thirdSignIn.body.adminSession.adminSessionId,
+        fourthSignIn.body.adminSession.adminSessionId
+      ]
+    }
+  });
+  assert.equal(revokedSessionBatch.status, 200);
+  assert.equal(revokedSessionBatch.body.requestedCount, 4);
+  assert.deepEqual(
+    revokedSessionBatch.body.adminSessions.map(session => session.adminSessionId),
+    [
+      thirdSignIn.body.adminSession.adminSessionId,
+      fourthSignIn.body.adminSession.adminSessionId
+    ]
+  );
+  assert.equal(
+    revokedSessionBatch.body.adminSessions.every(session => session.token === undefined),
+    true
+  );
+  assert.deepEqual(
+    revokedSessionBatch.body.failures.map(failure => ({
+      adminSessionId: failure.adminSessionId,
+      statusCode: failure.statusCode,
+      error: failure.error
+    })),
+    [
+      {
+        adminSessionId: "missing-admin-session",
+        statusCode: 404,
+        error: "admin_session_not_found"
+      },
+      {
+        adminSessionId: signIn.body.adminSession.adminSessionId,
+        statusCode: 409,
+        error: "admin_self_session_revoke_forbidden"
+      }
+    ]
+  );
+
+  for (const revokedToken of [
+    thirdSignIn.body.sessionToken,
+    fourthSignIn.body.sessionToken
+  ]) {
+    const revokedBatchSessionCurrent = await requestJson<{ error: string }>(
+      "/api/v1/admin/auth/current-session",
+      { headers: { authorization: `Bearer ${revokedToken}` } }
+    );
+    assert.equal(revokedBatchSessionCurrent.status, 401);
+    assert.equal(revokedBatchSessionCurrent.body.error, "admin_session_invalid");
+  }
+
   const missingAdminSessionRevokeSession = await requestJson<{ error: string }>(
     `/api/v1/admin/auth/sessions/${secondSignIn.body.adminSession.adminSessionId}`,
     { method: "DELETE" }
@@ -1356,6 +1472,23 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(adminAuditEventTypes.has("admin_role_revoked"), true);
   assert.equal(adminAuditEventTypes.has("admin_password_reset"), true);
   assert.equal(adminAuditEventTypes.has("admin_user_updated"), true);
+  assert.deepEqual(
+    adminAuditEvents.body.items
+      .filter(
+        item =>
+          item.eventType === "admin_session_revoked" &&
+          [
+            thirdSignIn.body.adminSession.adminSessionId,
+            fourthSignIn.body.adminSession.adminSessionId
+          ].includes(String(item.details["targetAdminSessionId"]))
+      )
+      .map(item => String(item.details["targetAdminSessionId"]))
+      .sort(),
+    [
+      thirdSignIn.body.adminSession.adminSessionId,
+      fourthSignIn.body.adminSession.adminSessionId
+    ].sort()
+  );
   assert.equal(
     adminAuditEvents.body.items.some(
       item =>
@@ -23065,6 +23198,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       };
       admin: {
         listSessions: string;
+        revokeSessions: string;
         revokeSession: string;
         exportSessionsCsv: string;
         exportUsersCsv: string;
@@ -23215,6 +23349,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.admin.listSessions, /auth\/sessions/);
   assert.match(manifest.routes.admin.revokeSession, /auth\/sessions\/:adminSessionId/);
+  assert.match(manifest.routes.admin.revokeSessions, /auth\/sessions:revoke/);
   assert.match(manifest.routes.admin.exportSessionsCsv, /sessions\.csv/);
   assert.match(manifest.routes.admin.exportUsersCsv, /users\.csv/);
   assert.match(manifest.routes.admin.exportAuditEventsCsv, /audit-events\.csv/);

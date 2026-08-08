@@ -121,6 +121,29 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         emptyState="Sign in with an administrative delegation role, then refresh admin sessions."
       ></app-record-collection>
 
+      <article id="adminSessionBatchRevokeCard" class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Bulk session management</span>
+            <h2>Selected Admin Sessions</h2>
+          </div>
+          <span class="status-pill">{{ view.adminSessionBatchCount }}/50 selected</span>
+        </div>
+        <p>Select active sessions from the scoped directory and review their exact IDs below. The signed-in session cannot be selected; successful revocations are removed while failed targets remain available for retry.</p>
+        <div class="actions">
+          <button id="adminBatchRevokeSessionsButton" class="danger" type="button" [disabled]="!view.canRevokeAdminSessionBatch" (click)="view.confirmRevokeAdminSessionBatch()">Revoke Selected Sessions</button>
+          <button id="clearAdminSessionBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminSessionBatchCount === 0 && !view.adminSessionBatchResult" (click)="view.clearAdminSessionBatchSelection()">Clear Batch</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Selected Admin Sessions"
+        subtitle="Exact best-effort batch preview and the most recent per-session result."
+        [items]="view.adminSessionBatchPreviewItems"
+        (itemAction)="view.selectAdminSession($event)"
+        emptyState="No admin sessions are selected for revocation."
+      ></app-record-collection>
+
       <article class="card">
         <h2>Admin Sessions CSV Export</h2>
         <p>CSV preview for the current session filters, excluding bearer tokens.</p>
