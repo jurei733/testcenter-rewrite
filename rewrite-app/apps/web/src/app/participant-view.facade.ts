@@ -287,10 +287,16 @@ export class ParticipantViewFacade {
   private readonly timerRemainingSeconds = new Map<string, number>();
   private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
     null;
-  private eagerAssetsLoadedRunId = "";
-  private eagerBookletAssets:
-    | ParticipantCurrentRunStateResponse["currentRunState"]["bookletAssets"]
-    | null = null;
+  private readonly loadedBookletAssets = signal<{
+    testRunId: string;
+    assets:
+      | ParticipantCurrentRunStateResponse["currentRunState"]["bookletAssets"]
+      | null;
+  } | null>(null);
+  private readonly bookletAssetLoadPromises = new Map<
+    string,
+    Promise<ParticipantCurrentRunStateResponse>
+  >();
   private pendingVeronaSave: ParticipantSaveOutboxEntry | null = null;
   private optimisticVeronaResponse: {
     testRunId: string;
@@ -966,8 +972,8 @@ export class ParticipantViewFacade {
     return this.customText("booklet_loading", "Please wait");
   }
 
-  get eagerBookletLoadedUnitCount(): number {
-    return this.eagerBookletAssets?.units.length ?? 0;
+  get bookletLoadedUnitCount(): number {
+    return this.loadedBookletAssets()?.assets?.units.length ?? 0;
   }
 
   get veronaLoadingTitle(): string {
@@ -1075,7 +1081,7 @@ export class ParticipantViewFacade {
     const currentState = this.readCurrentRunState();
     return Boolean(
       currentState?.booklet.policy.player.loadingMode === "eager" &&
-        this.eagerAssetsLoadedRunId !== currentState.testRun.testRunId
+        this.loadedBookletAssets()?.testRunId !== currentState.testRun.testRunId
     );
   }
 
@@ -2807,23 +2813,10 @@ export class ParticipantViewFacade {
       const testRunId = payload.currentRunState.testRun.testRunId;
       if (
         payload.currentRunState.booklet.policy.player.loadingMode === "eager" &&
-        this.eagerAssetsLoadedRunId !== testRunId
+        this.loadedBookletAssets()?.testRunId !== testRunId
       ) {
-        payload =
-          await this.requestState.request<ParticipantCurrentRunStateResponse>(
-            "Preload Participant Booklet",
-            "GET",
-            `${resolveRoutePath(
-              productionApiRoutes.participant.getCurrentRunState,
-              {
-                participantSessionId: this.runtime.participantSessionId.trim()
-              }
-            )}?includeBookletAssets=true`,
-            undefined,
-            { quiet: true }
-          );
-        this.eagerAssetsLoadedRunId = payload.currentRunState.testRun.testRunId;
-        this.eagerBookletAssets = payload.currentRunState.bookletAssets ?? null;
+        payload = await this.loadBookletAssets(payload);
+        this.recordLoadedBookletAssets(payload, testRunId);
       }
       const currentStateViewPayload = payload.currentRunState.bookletAssets
         ? {
@@ -2842,6 +2835,9 @@ export class ParticipantViewFacade {
       this.syncCurrentUnitResponse(payload.currentRunState);
       this.reconcileOptimisticVeronaResponse(payload.currentRunState);
       this.restorePersistentVeronaSave(payload.currentRunState);
+      if (payload.currentRunState.booklet.policy.player.loadingMode !== "eager") {
+        this.loadBookletAssetsInBackground(payload);
+      }
       await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
       this.persistState();
     } catch (error) {
@@ -2859,6 +2855,66 @@ export class ParticipantViewFacade {
       }
       throw error;
     }
+  }
+
+  private loadBookletAssets(
+    payload: ParticipantCurrentRunStateResponse
+  ): Promise<ParticipantCurrentRunStateResponse> {
+    const testRunId = payload.currentRunState.testRun.testRunId;
+    const existingLoad = this.bookletAssetLoadPromises.get(testRunId);
+    if (existingLoad) {
+      return existingLoad;
+    }
+    const participantSessionId =
+      payload.currentRunState.participantSession.participantSessionId;
+    const request = this.requestState.request<ParticipantCurrentRunStateResponse>(
+      "Preload Participant Booklet",
+      "GET",
+      `${resolveRoutePath(
+        productionApiRoutes.participant.getCurrentRunState,
+        { participantSessionId }
+      )}?includeBookletAssets=true`,
+      undefined,
+      { quiet: true }
+    );
+    const trackedRequest = request.finally(() => {
+      if (this.bookletAssetLoadPromises.get(testRunId) === trackedRequest) {
+        this.bookletAssetLoadPromises.delete(testRunId);
+      }
+    });
+    this.bookletAssetLoadPromises.set(testRunId, trackedRequest);
+    return trackedRequest;
+  }
+
+  private loadBookletAssetsInBackground(
+    payload: ParticipantCurrentRunStateResponse
+  ): void {
+    const testRunId = payload.currentRunState.testRun.testRunId;
+    if (this.loadedBookletAssets()?.testRunId === testRunId) {
+      return;
+    }
+    void this.loadBookletAssets(payload)
+      .then(loadedPayload => {
+        if (this.currentRunState?.testRun.testRunId === testRunId) {
+          this.recordLoadedBookletAssets(loadedPayload, testRunId);
+        }
+      })
+      .catch(() => {
+        // LAZY background loading is retried by the next current-state refresh.
+      });
+  }
+
+  private recordLoadedBookletAssets(
+    payload: ParticipantCurrentRunStateResponse,
+    expectedTestRunId: string
+  ): void {
+    if (payload.currentRunState.testRun.testRunId !== expectedTestRunId) {
+      return;
+    }
+    this.loadedBookletAssets.set({
+      testRunId: expectedTestRunId,
+      assets: payload.currentRunState.bookletAssets ?? null
+    });
   }
 
   private syncRun(
@@ -2901,8 +2957,11 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
-    if (currentState.testRun.testRunId !== this.eagerAssetsLoadedRunId) {
-      this.eagerBookletAssets = null;
+    if (
+      currentState.testRun.testRunId !==
+      this.loadedBookletAssets()?.testRunId
+    ) {
+      this.loadedBookletAssets.set(null);
     }
     this.captureTimerLifecycleTransitions(currentState.testRun);
     this.currentRunState = currentState;

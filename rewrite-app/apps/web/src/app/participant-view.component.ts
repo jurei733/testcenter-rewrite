@@ -222,11 +222,11 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           role="status"
         >{{ view.fullscreenStatusText }}</p>
         <p
-          *ngIf="view.eagerBookletLoadedUnitCount"
+          *ngIf="view.bookletLoadedUnitCount"
           id="participantRouteBookletLoadingStatus"
           class="participant-fullscreen-status"
           role="status"
-        >Booklet ready · {{ view.eagerBookletLoadedUnitCount }} unit assets loaded</p>
+        >Booklet ready · {{ view.bookletLoadedUnitCount }} {{ view.bookletLoadedUnitCount === 1 ? "unit asset" : "unit assets" }} loaded</p>
         <div class="record-card" [class.is-selected]="view.player.runStatus !== 'idle'">
           <div class="participant-meta-grid">
             <div>

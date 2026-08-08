@@ -4579,6 +4579,7 @@ try {
             <Label>Verona Smoke Booklet</Label>
           </Metadata>
           <BookletConfig>
+            <Config key="loading_mode">LAZY</Config>
             <Config key="force_response_complete">OFF</Config>
             <Config key="allow_player_to_terminate_test">LAST_UNIT</Config>
             <Config key="unit_menu">OFF</Config>
@@ -4736,6 +4737,29 @@ try {
       isVeronaResourceResponse(response) &&
       response.request().headers()["range"] === "bytes=0-3,10-15"
   );
+  const lazyBookletPreloadPattern =
+    /\/current-state\?includeBookletAssets=true$/;
+  const lazyBookletPreloadStarted = page.waitForRequest(
+    request => lazyBookletPreloadPattern.test(request.url())
+  );
+  let releaseLazyBookletPreload;
+  const lazyBookletPreloadRelease = new Promise(resolve => {
+    releaseLazyBookletPreload = resolve;
+  });
+  const holdLazyBookletPreload = async route => {
+    await lazyBookletPreloadRelease;
+    await route.continue();
+  };
+  await page.route(lazyBookletPreloadPattern, holdLazyBookletPreload);
+  let lazyBookletPreloadCompleted = false;
+  const lazyBookletPreloadResponsePromise = page
+    .waitForResponse(
+      response => lazyBookletPreloadPattern.test(response.url())
+    )
+    .then(response => {
+      lazyBookletPreloadCompleted = true;
+      return response;
+    });
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey,
@@ -4743,12 +4767,13 @@ try {
       loginKey: veronaLoginKey,
       bookletKey: veronaBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantRouteTestletGateLabel")
     .filter({ hasText: "Protected Verona Block" })
     .waitFor({ timeout: 15_000 });
+  await lazyBookletPreloadStarted;
   await page
     .locator("#participantRouteTestletGatePrompt")
     .filter({ hasText: "Enter the project block code." })
@@ -4814,6 +4839,30 @@ try {
     .locator("#participantVeronaPlayerStatus")
     .filter({ hasText: "running" })
     .waitFor({ timeout: 15_000 });
+  assert.equal(
+    lazyBookletPreloadCompleted,
+    false,
+    "LAZY loading must mount the current Player before background Booklet loading completes."
+  );
+  releaseLazyBookletPreload();
+  const lazyBookletPreloadResponse = await lazyBookletPreloadResponsePromise;
+  assert.equal(lazyBookletPreloadResponse.status(), 200);
+  const lazyBookletPreloadPayload = await lazyBookletPreloadResponse.json();
+  assert.equal(
+    lazyBookletPreloadPayload.currentRunState.booklet.policy.player.loadingMode,
+    "lazy"
+  );
+  assert.deepEqual(
+    lazyBookletPreloadPayload.currentRunState.bookletAssets.units.map(
+      unit => unit.unitKey
+    ),
+    [veronaUnitKey]
+  );
+  await page
+    .locator("#participantRouteBookletLoadingStatus")
+    .filter({ hasText: "1 unit asset loaded" })
+    .waitFor();
+  await page.unroute(lazyBookletPreloadPattern, holdLazyBookletPreload);
   const veronaLoadingPhases = await page.evaluate(() => {
     window.__participantVeronaLoadingObserver?.disconnect();
     window.cancelAnimationFrame(
