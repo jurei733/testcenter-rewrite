@@ -4985,6 +4985,21 @@ try {
           item.testLog?.unitKey === veronaUnitKey
       )
   );
+  const veronaPlayerLifecycleLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PLAYER&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload => {
+      const contents = payload?.items?.map(item => item.testLog?.logContent) ?? [];
+      return contents.includes("LOADING") && contents.includes("RUNNING");
+    }
+  );
+  assert.deepEqual(
+    new Set(
+      veronaPlayerLifecycleLogs.items.map(item => item.testLog?.logContent)
+    ),
+    new Set(["LOADING", "RUNNING"])
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

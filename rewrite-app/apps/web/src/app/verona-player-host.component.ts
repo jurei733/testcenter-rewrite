@@ -375,6 +375,11 @@ export class VeronaPlayerHostComponent
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
       : serializeVeronaUnitResponse({});
+    this.persistHostLog({
+      key: "PLAYER",
+      timeStamp: Date.now(),
+      content: "LOADING"
+    }, this.savedResponse);
 
     if (!this.playerHtml.trim() || !this.unitDefinition.trim()) {
       this.fail("The release does not contain both player HTML and a unit definition.");
@@ -479,6 +484,11 @@ export class VeronaPlayerHostComponent
     };
     this.frame?.contentWindow?.postMessage(command, "*");
     this.status = "running";
+    this.persistHostLog({
+      key: "PLAYER",
+      timeStamp: Date.now(),
+      content: "RUNNING"
+    }, this.savedResponse);
   }
 
   private handleNavigationRequest(
@@ -582,21 +592,28 @@ export class VeronaPlayerHostComponent
       typeof messageValue === "string"
         ? messageValue.trim().slice(0, 32_768)
         : "";
-    this.logEntries.emit([{
+    this.persistHostLog({
       key: `Runtime Error: ${code}`,
       timeStamp: Date.now(),
       content: message
-    }]);
-    this.responseUpdate.emit({
-      response: this.latestResponse,
-      unitDataChanged: false,
-      unitStateChanged: false,
-      playerStateChanged: false
     });
     this.fail(
       [code, message].filter(Boolean).join(": ") ||
         "The player reported a runtime error."
     );
+  }
+
+  private persistHostLog(
+    entry: ParticipantTestLogEntryInput,
+    response = this.latestResponse
+  ): void {
+    this.logEntries.emit([entry]);
+    this.responseUpdate.emit({
+      response,
+      unitDataChanged: false,
+      unitStateChanged: false,
+      playerStateChanged: false
+    });
   }
 
   private scheduleFocusLog(playerHasFocus?: boolean): void {
