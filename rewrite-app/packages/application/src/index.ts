@@ -1744,9 +1744,44 @@ const decodePersistedSourceDocument = (
   }
 };
 
-const readStandaloneBookletId = (
+type TestcenterXmlFileIdentity = {
+  fileType: "Booklet" | "Unit" | "SysCheck" | "Testtakers";
+  id: string;
+};
+
+const readTestcenterXmlFileIdentity = (
+  sourceDocument: string
+): TestcenterXmlFileIdentity | null => {
+  const documentHead = sourceDocument.slice(0, 256 * 1024);
+  if (/<!DOCTYPE\b/i.test(documentHead)) {
+    return null;
+  }
+  const rootName = documentHead
+    .replace(/^\uFEFF/, "")
+    .match(
+      /^\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)\b/i
+    )?.[1];
+  const fileType = (["Booklet", "Unit", "SysCheck", "Testtakers"] as const).find(
+    candidate => candidate.toLowerCase() === rootName?.toLowerCase()
+  );
+  if (!fileType) {
+    return null;
+  }
+  const metadataContent = documentHead
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .match(
+      /<((?:[A-Za-z_][\w.-]*:)?Metadata)\b[^>]*>([\s\S]*?)<\/\1>/i
+    )?.[2];
+  const encodedId = metadataContent?.match(
+    /<((?:[A-Za-z_][\w.-]*:)?Id)\b[^>]*>([\s\S]*?)<\/\1>/i
+  )?.[2];
+  const id = encodedId ? decodeXmlTextContent(encodedId).trim() : "";
+  return id ? { fileType, id } : null;
+};
+
+const readStandaloneTestcenterXmlFileIdentity = (
   sourcePackage: SourcePackage
-): string | null => {
+): TestcenterXmlFileIdentity | null => {
   const normalizedFileName = sourcePackage.fileName.trim().toLowerCase();
   const normalizedMediaType = sourcePackage.mediaType.trim().toLowerCase();
   if (
@@ -1769,41 +1804,7 @@ const readStandaloneBookletId = (
   const sourceDocument = decodedDocument
     ? decodedDocument.bytes.toString("utf8")
     : persistedDocument;
-  const documentHead = sourceDocument.slice(0, 256 * 1024);
-  if (/<!DOCTYPE\b/i.test(documentHead)) {
-    return null;
-  }
-  const rootName = documentHead
-    .replace(/^\uFEFF/, "")
-    .match(
-      /^\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)\b/i
-    )?.[1];
-  if (rootName?.toLowerCase() !== "booklet") {
-    return null;
-  }
-  const parserErrors: string[] = [];
-  let document: XmlDocument | null = null;
-  try {
-    document = new DOMParser({
-      onError(level, message) {
-        parserErrors.push(`${level}: ${message}`);
-      }
-    }).parseFromString(sourceDocument, "application/xml");
-  } catch {
-    return null;
-  }
-  const root = document?.documentElement;
-  if (
-    parserErrors.length > 0 ||
-    !root ||
-    xmlElementLocalName(root).toLowerCase() !== "booklet"
-  ) {
-    return null;
-  }
-  const metadata = xmlChildrenNamed(root, "Metadata")[0];
-  return metadata
-    ? xmlElementText(xmlChildrenNamed(metadata, "Id")[0]) || null
-    : null;
+  return readTestcenterXmlFileIdentity(sourceDocument);
 };
 
 const classifyWorkspaceSourcePackage = (
@@ -11062,7 +11063,7 @@ const validateZipXmlEntries = (
 ): ImportJobDiagnostic[] => {
   const diagnostics: ImportJobDiagnostic[] = [];
   const validatedPlayerKeys = new Set<string>();
-  const bookletSourceFileById = new Map<string, string>();
+  const xmlIdentitySourceFileByKey = new Map<string, string>();
   const manifestResources = collectXmlManifestResources(
     manifestExtraction.manifestText
   );
@@ -11090,23 +11091,21 @@ const validateZipXmlEntries = (
     diagnostics.push(
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
-    const bookletEntry = collectXmlBookletEntries(
-      sourceDocument,
-      "Booklet"
-    )[0];
-    if (bookletEntry?.bookletKey) {
-      const existingSourceFile = bookletSourceFileById.get(
-        bookletEntry.bookletKey
-      );
-      if (existingSourceFile) {
+    const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
+    if (xmlFileIdentity) {
+      const identityKey =
+        `${xmlFileIdentity.fileType}:${xmlFileIdentity.id}`.toUpperCase();
+      const existingIdentitySourceFile =
+        xmlIdentitySourceFileByKey.get(identityKey);
+      if (existingIdentitySourceFile) {
         diagnostics.push(
           createImportDiagnostic(
-            "testcenter_xml_booklet_id_duplicate",
-            `Original Testcenter ZIP entries '${existingSourceFile}' and '${entry.fileName}' contain duplicate booklet id '${bookletEntry.bookletKey}'.`
+            `testcenter_xml_${xmlFileIdentity.fileType.toLowerCase()}_id_duplicate`,
+            `Original Testcenter ZIP entries '${existingIdentitySourceFile}' and '${entry.fileName}' contain duplicate ${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}'.`
           )
         );
       } else {
-        bookletSourceFileById.set(bookletEntry.bookletKey, entry.fileName);
+        xmlIdentitySourceFileByKey.set(identityKey, entry.fileName);
       }
     }
     for (const systemCheck of parseSystemCheckSourceDocument(sourceDocument)) {
@@ -19041,18 +19040,25 @@ export const createFirstSliceServices = (
             `Source package file name '${sourcePackage.fileName}' already exists. Create a replacement for source package '${duplicateFileName.sourcePackageId}' to preserve its version history.`
           );
         }
-        const bookletId = readStandaloneBookletId(sourcePackage);
-        const duplicateBooklet = bookletId
-          ? existingSourcePackages.find(
-              existingSourcePackage =>
-                readStandaloneBookletId(existingSourcePackage) === bookletId
-            )
+        const xmlFileIdentity =
+          readStandaloneTestcenterXmlFileIdentity(sourcePackage);
+        const duplicateIdentity = xmlFileIdentity
+          ? existingSourcePackages.find(existingSourcePackage => {
+              const existingIdentity =
+                readStandaloneTestcenterXmlFileIdentity(existingSourcePackage);
+              return (
+                existingIdentity?.fileType === xmlFileIdentity.fileType &&
+                existingIdentity.id.toUpperCase() ===
+                  xmlFileIdentity.id.toUpperCase()
+              );
+            })
           : null;
-        if (duplicateBooklet) {
+        if (xmlFileIdentity && duplicateIdentity) {
+          const normalizedFileType = xmlFileIdentity.fileType.toLowerCase();
           throw new FirstSliceError(
             409,
-            "source_package_booklet_id_duplicate",
-            `Booklet id '${bookletId}' already exists in source package '${duplicateBooklet.fileName}'. Create a replacement for source package '${duplicateBooklet.sourcePackageId}' to preserve its version history.`
+            `source_package_${normalizedFileType}_id_duplicate`,
+            `${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}' already exists in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
           );
         }
         await repository.saveSourcePackage(sourcePackage);

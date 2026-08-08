@@ -8728,9 +8728,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     }
   ];
   for (const facetCase of schemaFacetCases) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      facetCase.fileName
+    );
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
       method: "POST",
       body: {
         fileName: facetCase.fileName,
@@ -8741,7 +8744,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     const importResult = await requestJson<{
       importJob: { status: string; diagnostics: Array<{ code: string }> };
       stagedContentRelease: null;
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
       method: "POST",
       body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
     });
@@ -8755,9 +8758,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
+  const version16UnitWorkspaceKey = await createValidationWorkspace(
+    "unit-16-extended-variable.xml"
+  );
   const version16UnitPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${version16UnitWorkspaceKey}/source-packages`, {
     method: "POST",
     body: {
       fileName: "unit-16-extended-variable.xml",
@@ -8773,7 +8779,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const version16UnitValidation = await requestJson<{
     importJob: { status: string; diagnostics: Array<{ code: string }> };
     stagedContentRelease: { contentReleaseId: string } | null;
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${version16UnitWorkspaceKey}/import-jobs`, {
     method: "POST",
     body: {
       sourcePackageId: version16UnitPackage.body.sourcePackage.sourcePackageId
@@ -9094,7 +9100,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   );
 });
 
-test("original Testcenter compatibility corpus rejects duplicate Booklet identities across files", async () => {
+test("original Testcenter compatibility corpus rejects duplicate XML identities across files", async () => {
   type BookletIdentityCollision = {
     fixture: string;
     sourcePath: string;
@@ -9193,6 +9199,59 @@ test("original Testcenter compatibility corpus rejects duplicate Booklet identit
     [originalUpload.body.sourcePackage.sourcePackageId]
   );
 
+  for (const identityCase of [
+    {
+      fileName: "CY_Unit100.xml",
+      duplicateFileName: "CY_Unit100-copy.xml",
+      fixture: "units/CY_Unit100.xml",
+      id: "CY-Unit.Sample-100",
+      diagnosticCode: "source_package_unit_id_duplicate"
+    },
+    {
+      fileName: "SysCheck.xml",
+      duplicateFileName: "SysCheck-copy.xml",
+      fixture: "system-checks/SysCheck.xml",
+      id: "SYSCHECK.SAMPLE",
+      diagnosticCode: "source_package_syscheck_id_duplicate"
+    }
+  ]) {
+    const identityDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, identityCase.fixture),
+      "utf8"
+    );
+    const identityUpload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: identityCase.fileName,
+        mediaType: "application/xml",
+        sourceDocument: identityDocument
+      }
+    });
+    assert.equal(identityUpload.status, 201, identityCase.fileName);
+    const duplicateIdentity = await requestJson<{ error: string }>(
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+      {
+        method: "POST",
+        body: {
+          fileName: identityCase.duplicateFileName,
+          mediaType: "application/xml",
+          sourceDocument: identityDocument.replace(
+            identityCase.id,
+            identityCase.id.toLowerCase()
+          )
+        }
+      }
+    );
+    assert.equal(duplicateIdentity.status, 409, identityCase.duplicateFileName);
+    assert.equal(
+      duplicateIdentity.body.error,
+      identityCase.diagnosticCode,
+      identityCase.duplicateFileName
+    );
+  }
+
   const replacement = await requestJson<{
     replacementSourcePackage: { sourcePackageId: string; status: string };
     importJob: { status: string };
@@ -9227,6 +9286,22 @@ test("original Testcenter compatibility corpus rejects duplicate Booklet identit
     {
       fileName: "export/Booklet_sameBookletID.xml",
       content: sourceDocument
+    },
+    {
+      fileName: "export/Unit.xml",
+      content: "<Unit><Metadata><Id>UNIT.CASE</Id></Metadata></Unit>"
+    },
+    {
+      fileName: "export/Unit-copy.xml",
+      content: "<Unit><Metadata><Id>unit.case</Id></Metadata></Unit>"
+    },
+    {
+      fileName: "export/SysCheck.xml",
+      content: "<SysCheck><Metadata><Id>SYSCHECK.CASE</Id></Metadata></SysCheck>"
+    },
+    {
+      fileName: "export/SysCheck-copy.xml",
+      content: "<SysCheck><Metadata><Id>syscheck.case</Id></Metadata></SysCheck>"
     }
   ]);
   const packageUpload = await requestJson<{
@@ -9255,7 +9330,11 @@ test("original Testcenter compatibility corpus rejects duplicate Booklet identit
   assert.equal(packageImport.body.importJob.status, "failed");
   assert.deepEqual(
     packageImport.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
-    [expectation.diagnosticCode]
+    [
+      expectation.diagnosticCode,
+      "testcenter_xml_unit_id_duplicate",
+      "testcenter_xml_syscheck_id_duplicate"
+    ]
   );
   assert.match(
     packageImport.body.importJob.diagnostics[0]?.message ?? "",
@@ -11946,20 +12025,34 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     sourcePackages.map(sourcePackage => sourcePackage.sourcePackageId).sort()
   );
 
-  const duplicateUnitUpload = await requestJson<{
+  const duplicateUnitSeed = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
     method: "POST",
     body: {
-      fileName: "Unit2-copy.xml",
-      mediaType: "application/xml",
-      sourceDocument: readFileSync(
-        resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
-        "utf8"
-      )
+      fileName: "duplicate-unit-seed.txt",
+      mediaType: "text/plain",
+      sourceDocument: "replacement seed"
     }
   });
-  assert.equal(duplicateUnitUpload.status, 201);
+  assert.equal(duplicateUnitSeed.status, 201);
+  const duplicateUnitReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${duplicateUnitSeed.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Unit2-copy.xml",
+        mediaType: "application/xml",
+        sourceDocument: readFileSync(
+          resolve(originalTestcenterCorpusRoot, expectation.unitFixture),
+          "utf8"
+        )
+      }
+    }
+  );
+  assert.equal(duplicateUnitReplacement.status, 201);
   const ambiguousAutomaticImport = await requestJson<{
     importJob: {
       sourcePackageId: string;
