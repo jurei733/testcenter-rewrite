@@ -7656,6 +7656,30 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
     }
+    const unitRuntimeKeys = new Set(
+      unitEntries.flatMap(unit => {
+        const unitId = unit.getAttribute("id")?.trim() ?? "";
+        const unitAlias = unit.getAttribute("alias")?.trim() ?? "";
+        const runtimeKey = unitAlias || unitId;
+        return runtimeKey ? [runtimeKey] : [];
+      })
+    );
+    const adaptiveVariableSources = stateEntries.flatMap(state =>
+      testcenterBookletVariableSourceNames.flatMap(sourceName =>
+        xmlDescendantsNamed(state, sourceName)
+      )
+    );
+    for (const variableSource of adaptiveVariableSources) {
+      const unitKey = variableSource.getAttribute("from")?.trim() ?? "";
+      if (unitKey && !unitRuntimeKeys.has(unitKey)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_state_condition_unit_reference_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains adaptive ${xmlElementLocalName(variableSource)} source '${variableSource.getAttribute("of")?.trim() || "unknown"}' whose Unit runtime key '${unitKey}' is not declared in Units.`
+          )
+        );
+      }
+    }
     const testletEntries = units ? xmlDescendantsNamed(units, "Testlet") : [];
     for (const testlet of testletEntries) {
       const testletKey = testlet.getAttribute("id")?.trim() ?? "";

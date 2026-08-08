@@ -9289,6 +9289,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_state_condition_variable_reference_invalid"
     },
     {
+      fileName: "booklet-invalid-condition-unit-reference.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        'from="decision-unit"',
+        'from="missing-unit"'
+      ),
+      diagnosticCode: "testcenter_xml_state_condition_unit_reference_invalid"
+    },
+    {
       fileName: "booklet-invalid-condition-expression.xml",
       sourceDocument: validAdaptiveBookletXml.replace(
         '<Is greaterThan="99" />',
