@@ -29,6 +29,18 @@ Priority:
 | 7 | P2 | Attachments and QR capture | Original Unit `attachment` variables with `capture-image` format now survive ZIP import and produce a durable, role-scoped image inventory for every started run. API and Angular support missing/captured status, PNG/JPEG upload, inline preview, deletion, and a copyable handoff code. The upload route accepts both the rewrite JSON contract and the original capture client's binary-safe `multipart/form-data` field. Operators can download one or all scoped A4 QR pages with the original seven label placeholders. Remaining parity is the camera/QR scanning workflow. |
 | 8 | P2 | Branding, custom-text precedence, and themes | The original instance title and expiring global warning are now usable; tenant/workspace/booklet precedence and visual branding remain for broad rollout. |
 
+Latest P0 Testtakers-schema closure: the byte-exact original
+`Testtakers_withoutSyscheck.xml` E2E roster extends the pinned corpus with the
+15.2 generation, nine participant accounts, four monitor accounts, no profiles,
+and no system-check login. The importer now follows the declared roster XSD:
+monitor profile containers/references require 15.3, Booklet state presets and
+extended profile/filter fields require 15.4, and per-login `ViewSettings`
+require 17.6. A 15.4-compatible modern roster remains accepted, while four
+cross-generation mixtures fail with stable diagnostics. Corpus/API gates prove
+byte identity, participant/operational separation, custom-text retention,
+idempotent legacy updates, and the version boundaries across memory, file, and
+SQLite.
+
 Latest P2 application-settings closure: the original instance-level application
 title and time-bounded global warning now form a complete vertical slice. A
 public endpoint feeds the Angular document title, participant heading, and

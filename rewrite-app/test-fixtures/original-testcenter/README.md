@@ -20,6 +20,11 @@ also pins the byte-exact official `CY_SysCheck_2.xml` beside the sample system
 check. Together they gate same-workspace check selection, measured versus
 skipped networking, the complete original question-type set, required-field
 feedback, a resolved Verona item, save-key reports, and isolated report cleanup.
+The byte-exact original `Testtakers_withoutSyscheck.xml` E2E fixture adds the
+legacy 15.2 roster generation without monitor profiles or a system-check login.
+Together with the current roster it gates the XSD feature boundaries introduced
+in 15.3 (monitor profiles), 15.4 (Booklet state presets and extended monitor
+fields), and 17.6 (per-login `ViewSettings`) across memory, file, and SQLite.
 The corpus also contains the original XSD-backed rejection
 fixtures for malformed booklet, unit, SysCheck, and Testtakers structures,
 invalid XML `xs:ID` metadata identities in Booklet, Unit, and SysCheck files,

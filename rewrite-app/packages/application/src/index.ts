@@ -9367,6 +9367,19 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   if (canonicalRootName === "Testtakers") {
+    const rosterSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
+    const rosterSchemaSupports = (major: number, minor: number): boolean =>
+      rosterSchemaVersion === null ||
+      rosterSchemaVersion.major > major ||
+      (rosterSchemaVersion.major === major &&
+        rosterSchemaVersion.minor >= minor);
+    const supportsMonitorProfiles = rosterSchemaSupports(15, 3);
+    const supportsBookletStatePresets = rosterSchemaSupports(15, 4);
+    const supportsExtendedMonitorProfiles = rosterSchemaSupports(15, 4);
+    const supportsLoginViewSettings = rosterSchemaSupports(17, 6);
+    const rosterSchemaLabel = rosterSchemaVersion
+      ? `${rosterSchemaVersion.major}.${rosterSchemaVersion.minor}`
+      : "unknown";
     const supportedLoginModes = new Set([
       "run-hot-return",
       "run-hot-restart",
@@ -9443,6 +9456,14 @@ const validateTestcenterXmlSourceDocument = (
     const metadataContainers = xmlChildrenNamed(root, "Metadata");
     const customTextContainers = xmlChildrenNamed(root, "CustomTexts");
     const profileContainers = xmlChildrenNamed(root, "Profiles");
+    if (!supportsMonitorProfiles && profileContainers.length > 0) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_monitor_profiles_version_invalid",
+          `Original Testcenter roster '${sourceFileName}' contains Profiles, which are not supported by schema ${rosterSchemaLabel}.`
+        )
+      );
+    }
     if (
       metadataContainers.length > 1 ||
       customTextContainers.length > 1 ||
@@ -9620,6 +9641,19 @@ const validateTestcenterXmlSourceDocument = (
         ],
         `monitor Profile '${profileId || "unknown"}'`
       );
+      if (
+        !supportsExtendedMonitorProfiles &&
+        ["bookletStatesColumns", "autoselectNextBlock"].some(
+          attributeName => profile.getAttribute(attributeName) !== null
+        )
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_monitor_profile_version_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains extended monitor Profile settings for '${profileId || "unknown"}', which are not supported by schema ${rosterSchemaLabel}.`
+          )
+        );
+      }
       if (!profileId) {
         diagnostics.push(
           createImportDiagnostic(
@@ -9688,6 +9722,18 @@ const validateTestcenterXmlSourceDocument = (
           `monitor Filter in Profile '${profileId || "unknown"}'`
         );
         const field = filter.getAttribute("field");
+        if (
+          !supportsExtendedMonitorProfiles &&
+          (filter.getAttribute("subValue") !== null ||
+            field === "bookletStates")
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_filter_version_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains extended monitor Filter settings for '${profileId || "unknown"}', which are not supported by schema ${rosterSchemaLabel}.`
+            )
+          );
+        }
         if (field !== null && !monitorFilterFields.has(field)) {
           diagnostics.push(
             createImportDiagnostic(
@@ -9875,6 +9921,14 @@ const validateTestcenterXmlSourceDocument = (
       }
       const loginBooklets = xmlChildrenNamed(login, "Booklet");
       const loginProfiles = xmlChildrenNamed(login, "Profile");
+      if (!supportsMonitorProfiles && loginProfiles.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_monitor_profiles_version_invalid",
+            `Original Testcenter roster '${sourceFileName}' assigns monitor Profiles to login '${loginName}', which is not supported by schema ${rosterSchemaLabel}.`
+          )
+        );
+      }
       if (loginBooklets.length > 0 && loginProfiles.length > 0) {
         diagnostics.push(
           createImportDiagnostic(
@@ -9894,6 +9948,14 @@ const validateTestcenterXmlSourceDocument = (
           `Booklet assignment for login '${loginName}'`
         );
         const state = booklet.getAttribute("state");
+        if (state !== null && !supportsBookletStatePresets) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_state_version_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains Booklet/@state for login '${loginName}', which is not supported by schema ${rosterSchemaLabel}.`
+            )
+          );
+        }
         if (
           state !== null &&
           !/^[a-z\d-]+:[a-z\d-]+(?:\s*,\s*[a-z\d-]+:[a-z\d-]+)*$/.test(
@@ -9945,6 +10007,14 @@ const validateTestcenterXmlSourceDocument = (
         );
       }
       for (const viewSetting of viewSettings) {
+        if (!supportsLoginViewSettings) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_view_settings_version_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains ViewSettings for login '${loginName}', which are not supported by schema ${rosterSchemaLabel}.`
+            )
+          );
+        }
         validateAttributes(
           viewSetting,
           ["monitorBookletVisibility"],

@@ -24,6 +24,15 @@ type OriginalTestcenterCorpus = {
     participantLoginKeys: string[];
     excludedOperationalLoginKeys: string[];
   };
+  legacyRosters: Array<{
+    fixture: string;
+    sourcePath: string;
+    sha256: string;
+    schemaVersion: string;
+    participantLoginKeys: string[];
+    operationalLoginKeys: string[];
+    hasSystemCheckLogin: boolean;
+  }>;
   resourcePackages: Array<{
     fixture: string;
     sha256: string;
@@ -412,6 +421,46 @@ test("original Testcenter compatibility corpus separates participant and operati
       "BOOKLET.SAMPLE-2#bonus:no"
     ]
   );
+});
+
+test("original Testcenter compatibility corpus pins the legacy 15.2 roster without system-check login", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  assert.equal(corpus.legacyRosters.length, 1);
+  const legacyRoster = corpus.legacyRosters[0]!;
+  const rosterBuffer = readFileSync(resolve(corpusRoot, legacyRoster.fixture));
+  assert.equal(
+    createHash("sha256").update(rosterBuffer).digest("hex"),
+    legacyRoster.sha256,
+    legacyRoster.sourcePath
+  );
+  const rosterXml = rosterBuffer.toString("utf8");
+  assert.match(
+    rosterXml,
+    new RegExp(`/${legacyRoster.schemaVersion}/definitions/vo_Testtakers\\.xsd`)
+  );
+
+  const participants = parseParticipantRosterText(rosterXml);
+  assert.deepEqual(
+    participants.map(participant => participant.loginKey),
+    legacyRoster.participantLoginKeys
+  );
+  assert.ok(
+    participants.every(
+      participant => participant.customTexts?.somestr === "string"
+    )
+  );
+  const operationalLogins = parseOriginalTestcenterOperationalLogins(rosterXml);
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    legacyRoster.operationalLoginKeys
+  );
+  assert.equal(
+    operationalLogins.some(login => login.loginMode === "sys-check-login"),
+    legacyRoster.hasSystemCheckLogin
+  );
+  assert.ok(operationalLogins.every(login => login.profileIds.length === 0));
 });
 
 test("original Testcenter compatibility corpus pins the complete 17.6 sample package", () => {

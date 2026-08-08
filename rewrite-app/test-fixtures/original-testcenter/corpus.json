@@ -870,6 +870,32 @@
       "expired-study-monitor"
     ]
   },
+  "legacyRosters": [
+    {
+      "fixture": "rosters/Testtakers_withoutSyscheck.xml",
+      "sourcePath": "e2e/src/fixtures/Testtakers_withoutSyscheck.xml",
+      "sha256": "867495606ae1a0c6d07ee74e952f98a62e77f7dee0dcad8c1e881dc917127344",
+      "schemaVersion": "15.2.0",
+      "participantLoginKeys": [
+        "test",
+        "test-review",
+        "test-trial",
+        "test-demo",
+        "test-simulation",
+        "test-no-pw",
+        "test-no-pw-trial",
+        "test-expired",
+        "test-future"
+      ],
+      "operationalLoginKeys": [
+        "test-group-monitor",
+        "test-study-monitor",
+        "expired-group-monitor",
+        "expired-study-monitor"
+      ],
+      "hasSystemCheckLogin": false
+    }
+  ],
   "resourcePackages": [
     {
       "fixture": "resources/sample_resource_package.itcr.zip.base64",

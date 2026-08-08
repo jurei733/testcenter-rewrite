@@ -9271,6 +9271,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
       participantLoginKeys: string[];
       excludedOperationalLoginKeys: string[];
     };
+    legacyRosters: Array<{
+      fixture: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+    }>;
     validXml: ValidXmlExpectation[];
     invalidXml: InvalidXmlExpectation[];
   };
@@ -9674,6 +9679,60 @@ test("original Testcenter compatibility corpus imports representative booklets",
   assert.deepEqual(
     rosterImport.body.items.map(item => item.loginKey),
     [...corpus.roster.participantLoginKeys].sort()
+  );
+
+  const legacyRoster = corpus.legacyRosters[0]!;
+  const legacyRosterXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, legacyRoster.fixture),
+    "utf8"
+  );
+  const legacyRosterImport = await requestJson<{
+    importedCount: number;
+    updatedCount: number;
+    items: Array<{ loginKey: string }>;
+    operationalLoginCandidates: Array<{ loginKey: string }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText: legacyRosterXml }
+  });
+  assert.equal(legacyRosterImport.status, 201);
+  assert.equal(legacyRosterImport.body.importedCount, 0);
+  assert.equal(
+    legacyRosterImport.body.updatedCount,
+    legacyRoster.participantLoginKeys.length
+  );
+  assert.deepEqual(
+    legacyRosterImport.body.items.map(item => item.loginKey),
+    [...legacyRoster.participantLoginKeys].sort()
+  );
+  assert.deepEqual(
+    legacyRosterImport.body.operationalLoginCandidates.map(item => item.loginKey),
+    legacyRoster.operationalLoginKeys
+  );
+
+  const schema154RosterImport = await requestJson<{
+    importedCount: number;
+    updatedCount: number;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: {
+        rosterText: readFileSync(
+          resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
+          "utf8"
+        ).replace(
+          "/17.6.0/definitions/vo_Testtakers.xsd",
+          "/15.4.0/definitions/vo_Testtakers.xsd"
+        )
+      }
+    }
+  );
+  assert.equal(schema154RosterImport.status, 201);
+  assert.equal(schema154RosterImport.body.importedCount, 0);
+  assert.equal(
+    schema154RosterImport.body.updatedCount,
+    corpus.roster.participantLoginKeys.length
   );
 
   const operationalLogin = await requestJson<{ error: string }>(
@@ -10974,6 +11033,43 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "utf8"
   );
   const invalidRosterFacetCases = [
+    {
+      label: "monitor profiles before schema 15.3",
+      rosterText: validRosterXml.replace(
+        "/17.6.0/definitions/vo_Testtakers.xsd",
+        "/15.2.0/definitions/vo_Testtakers.xsd"
+      ),
+      diagnosticCode: "testcenter_xml_monitor_profiles_version_invalid"
+    },
+    {
+      label: "booklet state presets before schema 15.4",
+      rosterText: validRosterXml.replace(
+        "/17.6.0/definitions/vo_Testtakers.xsd",
+        "/15.3.0/definitions/vo_Testtakers.xsd"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_state_version_invalid"
+    },
+    {
+      label: "extended monitor profile settings before schema 15.4",
+      rosterText: validRosterXml.replace(
+        "/17.6.0/definitions/vo_Testtakers.xsd",
+        "/15.3.0/definitions/vo_Testtakers.xsd"
+      ),
+      diagnosticCode: "testcenter_xml_monitor_profile_version_invalid"
+    },
+    {
+      label: "login view settings before schema 17.6",
+      rosterText: validRosterXml
+        .replace(
+          "/17.6.0/definitions/vo_Testtakers.xsd",
+          "/17.5.3/definitions/vo_Testtakers.xsd"
+        )
+        .replace(
+          '<Login mode="monitor-group" name="test-group-monitor" pw="user123"/>',
+          '<Login mode="monitor-group" name="test-group-monitor" pw="user123"><ViewSettings monitorBookletVisibility="visible" /></Login>'
+        ),
+      diagnosticCode: "testcenter_xml_login_view_settings_version_invalid"
+    },
     {
       label: "duplicate Testtakers metadata container",
       rosterText: validRosterXml.replace(
