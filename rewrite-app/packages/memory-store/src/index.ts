@@ -4,6 +4,7 @@ import type {
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationSettings,
   ContentRelease,
   ImportJob,
   ParticipantLoginAttempt,
@@ -19,6 +20,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 type InMemoryFirstSliceState = {
+  applicationSettings: ApplicationSettings | null;
   adminUsers: Map<string, AdminUser>;
   adminUsersByUsername: Map<string, AdminUser>;
   adminRoleAssignments: Map<string, AdminRoleAssignment>;
@@ -41,6 +43,7 @@ type InMemoryFirstSliceState = {
 };
 
 const createInitialState = (): InMemoryFirstSliceState => ({
+  applicationSettings: null,
   adminUsers: new Map(),
   adminUsersByUsername: new Map(),
   adminRoleAssignments: new Map(),
@@ -77,6 +80,12 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
   const state = createInitialState();
 
   return {
+    async getApplicationSettings() {
+      return state.applicationSettings;
+    },
+    async saveApplicationSettings(settings) {
+      state.applicationSettings = { ...settings };
+    },
     async listAdminUsers() {
       return Array.from(state.adminUsers.values());
     },

@@ -62,6 +62,7 @@ import {
   type ListReviewsResponse,
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
+  type GetApplicationSettingsResponse,
   type GetSystemCheckAccessResponse,
   type GetSourcePackageResponse,
   type GetSourcePackageDeletionReadinessResponse,
@@ -135,6 +136,8 @@ import {
   type ParticipantSignInResponse,
   type UpdateAdminUserRequest,
   type UpdateAdminUserResponse,
+  type UpdateApplicationSettingsRequest,
+  type UpdateApplicationSettingsResponse,
   type UpdateParticipantReviewRequest,
   type AdminSessionListQuery,
   type AdminUserListQuery,
@@ -2342,6 +2345,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
 
   if (
     method === "GET" &&
+    pathname === productionApiRoutes.system.getApplicationSettings
+  ) {
+    return `GET ${productionApiRoutes.system.getApplicationSettings}`;
+  }
+
+  if (
+    method === "GET" &&
     pathname === productionApiRoutes.system.getSystemCheckAccess
   ) {
     return `GET ${productionApiRoutes.system.getSystemCheckAccess}`;
@@ -2409,6 +2419,13 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     pathname === productionApiRoutes.admin.exportAuditEventsCsv
   ) {
     return `GET ${productionApiRoutes.admin.exportAuditEventsCsv}`;
+  }
+
+  if (
+    method === "PATCH" &&
+    pathname === productionApiRoutes.admin.updateApplicationSettings
+  ) {
+    return `PATCH ${productionApiRoutes.admin.updateApplicationSettings}`;
   }
 
   if (method === "GET" && pathname === productionApiRoutes.platform.listTenants) {
@@ -3582,6 +3599,18 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
 
       if (
         request.method === "GET" &&
+        pathname === productionApiRoutes.system.getApplicationSettings
+      ) {
+        const applicationSettings =
+          await services.applicationSettings.getApplicationSettings();
+        sendJson<GetApplicationSettingsResponse>(response, 200, {
+          applicationSettings
+        });
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
         pathname === productionApiRoutes.system.getSystemCheckAccess
       ) {
         const allSystemCheckRoles = await listSystemCheckRoleAssignments(
@@ -3629,6 +3658,29 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         sendJson<BootstrapAdminUserResponse>(response, 201, {
           adminUser: toPublicAdminUser(adminUser),
           roleAssignments
+        });
+        return;
+      }
+
+      if (
+        request.method === "PATCH" &&
+        pathname === productionApiRoutes.admin.updateApplicationSettings
+      ) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const body =
+          await readRequestJsonBody<UpdateApplicationSettingsRequest>();
+        const applicationSettings =
+          await services.applicationSettings.updateApplicationSettings({
+            sessionToken,
+            appTitle: body.appTitle,
+            globalWarningText: body.globalWarningText,
+            globalWarningExpiresAt: body.globalWarningExpiresAt
+          });
+        sendJson<UpdateApplicationSettingsResponse>(response, 200, {
+          applicationSettings
         });
         return;
       }

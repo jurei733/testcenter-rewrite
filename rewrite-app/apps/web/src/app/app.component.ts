@@ -4,6 +4,7 @@ import type { OnDestroy, OnInit } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
 import { ActivityFeedComponent } from "./activity-feed.component";
+import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import { LiveContextComponent } from "./live-context.component";
@@ -36,6 +37,7 @@ const routeViews: AppView[] = [
 })
 export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
+  readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
   isOffline = !navigator.onLine;
   private readonly router = inject(Router);
@@ -56,6 +58,7 @@ export class AppComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     window.addEventListener("online", this.onlineListener);
     window.addEventListener("offline", this.offlineListener);
+    void this.applicationSettings.load().catch(() => undefined);
     const initialView = this.getInitialViewFromLocation();
     this.app.init(initialView);
     if (!initialView && (this.router.url === "/" || this.router.url === "")) {

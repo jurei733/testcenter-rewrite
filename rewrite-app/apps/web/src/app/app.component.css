@@ -41,6 +41,28 @@
   gap: 18px;
 }
 
+.application-warning-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border: 1px solid rgba(196, 82, 47, 0.42);
+  border-radius: var(--radius-lg);
+  background: #f8ddcb;
+  color: #682d1d;
+  box-shadow: var(--shadow);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.application-warning-banner strong {
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .offline-shell-banner {
   display: flex;
   gap: 12px;
@@ -66,5 +88,9 @@
 
   .offline-shell-banner {
     display: grid;
+  }
+
+  .application-warning-banner {
+    grid-template-columns: 1fr;
   }
 }

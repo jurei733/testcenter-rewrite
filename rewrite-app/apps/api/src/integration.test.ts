@@ -1670,6 +1670,225 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(revokedSession.body.error, "admin_session_invalid");
 });
 
+test("platform application settings are public, durable, validated, and audited", async () => {
+  const defaultSettings = await requestJson<{
+    applicationSettings: {
+      appTitle: string;
+      globalWarningText: string | null;
+      globalWarningExpiresAt: string | null;
+      updatedAt: string | null;
+      updatedByAdminUserId: string | null;
+    };
+  }>("/api/v1/system/application-settings");
+  assert.equal(defaultSettings.status, 200);
+  assert.deepEqual(defaultSettings.body.applicationSettings, {
+    appTitle: "IQB-Testcenter",
+    globalWarningText: null,
+    globalWarningExpiresAt: null,
+    updatedAt: null,
+    updatedByAdminUserId: null
+  });
+
+  const missingSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      body: { appTitle: "Configured Testcenter" }
+    }
+  );
+  assert.equal(missingSession.status, 401);
+  assert.equal(missingSession.body.error, "admin_session_missing");
+
+  let signIn = await requestJson<{
+    adminUser: { adminUserId: string };
+    sessionToken: string;
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+  if (signIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    signIn = await requestJson<{
+      adminUser: { adminUserId: string };
+      sessionToken: string;
+    }>("/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(signIn.status, 200);
+
+    const tenant = await requestJson("/api/v1/platform/tenants", {
+      method: "POST",
+      headers: { authorization: `Bearer ${signIn.body.sessionToken}` },
+      body: {
+        tenantKey: "admin-directory-tenant",
+        displayName: "Admin Directory Tenant"
+      }
+    });
+    assert.equal(tenant.status, 201);
+  }
+  assert.equal(signIn.status, 200);
+  const authorization = `Bearer ${signIn.body.sessionToken}`;
+
+  const tenantAdmin = await requestJson<{
+    adminUser: { adminUserId: string };
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: { authorization },
+    body: {
+      username: "settings.tenant.admin",
+      password: "settings-tenant-admin-secret",
+      roleAssignments: [
+        {
+          role: "tenant_admin",
+          tenantKey: "admin-directory-tenant"
+        }
+      ]
+    }
+  });
+  assert.equal(tenantAdmin.status, 201);
+  const tenantAdminSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "settings.tenant.admin",
+        password: "settings-tenant-admin-secret"
+      }
+    }
+  );
+  assert.equal(tenantAdminSignIn.status, 200);
+  const tenantAdminUpdate = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${tenantAdminSignIn.body.sessionToken}`
+      },
+      body: { appTitle: "Tenant title" }
+    }
+  );
+  assert.equal(tenantAdminUpdate.status, 403);
+  assert.equal(tenantAdminUpdate.body.error, "admin_role_required");
+
+  const invalidExpiration = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        globalWarningText: "Maintenance",
+        globalWarningExpiresAt: "not-a-date"
+      }
+    }
+  );
+  assert.equal(invalidExpiration.status, 400);
+  assert.equal(
+    invalidExpiration.body.error,
+    "application_warning_expiration_invalid"
+  );
+
+  const updatedSettings = await requestJson<{
+    applicationSettings: {
+      appTitle: string;
+      globalWarningText: string | null;
+      globalWarningExpiresAt: string | null;
+      updatedAt: string | null;
+      updatedByAdminUserId: string | null;
+    };
+  }>("/api/v1/admin/application-settings", {
+    method: "PATCH",
+    headers: { authorization },
+    body: {
+      appTitle: "  Configured Testcenter  ",
+      globalWarningText: "  Planned maintenance from 18:00.  ",
+      globalWarningExpiresAt: "2050-12-12T19:00:00+01:00"
+    }
+  });
+  assert.equal(updatedSettings.status, 200);
+  assert.equal(
+    updatedSettings.body.applicationSettings.appTitle,
+    "Configured Testcenter"
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.globalWarningText,
+    "Planned maintenance from 18:00."
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.globalWarningExpiresAt,
+    "2050-12-12T18:00:00.000Z"
+  );
+  assert.match(
+    updatedSettings.body.applicationSettings.updatedAt ?? "",
+    ISO_DATE_REGEX
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.updatedByAdminUserId,
+    signIn.body.adminUser.adminUserId
+  );
+
+  const publicSettings = await requestJson<typeof updatedSettings.body>(
+    "/api/v1/system/application-settings"
+  );
+  assert.equal(publicSettings.status, 200);
+  assert.deepEqual(
+    publicSettings.body.applicationSettings,
+    updatedSettings.body.applicationSettings
+  );
+
+  const settingsAudit = await requestJson<{
+    items: Array<{
+      eventType: string;
+      actorAdminUserId: string | null;
+      details: Record<string, unknown>;
+    }>;
+  }>("/api/v1/admin/audit-events?eventType=application_settings_updated", {
+    headers: { authorization }
+  });
+  assert.equal(settingsAudit.status, 200);
+  assert.equal(settingsAudit.body.items.length, 1);
+  assert.equal(
+    settingsAudit.body.items[0]?.actorAdminUserId,
+    signIn.body.adminUser.adminUserId
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextAppTitle"],
+    "Configured Testcenter"
+  );
+
+  const resetSettings = await requestJson<typeof updatedSettings.body>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "",
+        globalWarningText: "",
+        globalWarningExpiresAt: null
+      }
+    }
+  );
+  assert.equal(resetSettings.status, 200);
+  assert.equal(resetSettings.body.applicationSettings.appTitle, "IQB-Testcenter");
+  assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);
+  assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);
+});
+
 test("admin deletion removes roles and sessions while retaining audit evidence", async () => {
   let platformSignIn = await requestJson<{
     adminUser: { adminUserId: string };

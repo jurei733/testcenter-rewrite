@@ -8,6 +8,7 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
+  ApplicationSettings,
   ContentReleaseActivationReadiness,
   ContentRelease,
   ContentReleaseStatus,
@@ -1855,7 +1856,8 @@ export const productionApiRoutes = {
       "/api/v1/admin/users/:adminUserId/role-assignments/:roleAssignmentId",
     exportUsersCsv: "/api/v1/admin/users.csv",
     listAuditEvents: "/api/v1/admin/audit-events",
-    exportAuditEventsCsv: "/api/v1/admin/audit-events.csv"
+    exportAuditEventsCsv: "/api/v1/admin/audit-events.csv",
+    updateApplicationSettings: "/api/v1/admin/application-settings"
   },
   platform: {
     listTenants: "/api/v1/platform/tenants",
@@ -2019,6 +2021,7 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/monitor/open-runs/:testRunId/commands"
   },
   system: {
+    getApplicationSettings: "/api/v1/system/application-settings",
     getRuntimeDiagnostics: "/diagnostics/runtime",
     getRuntimeConfig: "/diagnostics/config",
     getSystemCheckAccess: "/api/v1/system-check/access",
@@ -2395,6 +2398,12 @@ export type ResetAdminUserPasswordRequest = {
 
 export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
 
+export type UpdateApplicationSettingsRequest = {
+  appTitle: string;
+  globalWarningText?: string | null;
+  globalWarningExpiresAt?: string | null;
+};
+
 export type ParticipantLaunchRequest = {
   participantSessionId?: string;
   tenantKey?: string | null;
@@ -2572,6 +2581,12 @@ export type RevokeAdminRoleResponse = AdminUserDirectoryItem;
 export type ListAdminAuditEventsResponse = {
   items: AdminAuditEvent[];
 };
+
+export type GetApplicationSettingsResponse = {
+  applicationSettings: ApplicationSettings;
+};
+
+export type UpdateApplicationSettingsResponse = GetApplicationSettingsResponse;
 
 export type GetWorkspaceOverviewResponse = {
   workspaceOverview: WorkspaceOverview;

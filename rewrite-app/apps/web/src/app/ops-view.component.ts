@@ -80,6 +80,57 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <ng-container *ngIf="view.canUseAdminManagement">
 
+      <article id="applicationSettingsCard" class="card" *ngIf="view.canManageApplicationSettings">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Instance configuration</span>
+            <h2>Application Settings</h2>
+          </div>
+          <span class="status-pill">Platform admin</span>
+        </div>
+        <p>Set the public application title and an optional time-bounded warning shown above every participant and operator view.</p>
+        <div class="form-grid">
+          <label>
+            Application Title
+            <input
+              id="applicationTitleInput"
+              name="applicationTitleInput"
+              maxlength="120"
+              [(ngModel)]="view.applicationTitleDraft"
+            />
+          </label>
+          <label>
+            Warning Expires
+            <input
+              id="applicationWarningExpiresAtInput"
+              name="applicationWarningExpiresAtInput"
+              type="datetime-local"
+              [(ngModel)]="view.applicationWarningExpiresAtDraft"
+            />
+          </label>
+          <label class="span-all">
+            Global Warning
+            <textarea
+              id="applicationWarningTextInput"
+              name="applicationWarningTextInput"
+              maxlength="4000"
+              rows="4"
+              [(ngModel)]="view.applicationWarningTextDraft"
+              placeholder="Leave empty to show no global warning."
+            ></textarea>
+          </label>
+        </div>
+        <p *ngIf="!view.isApplicationWarningExpirationValid">
+          Enter a valid local date and time, or leave the expiration empty.
+        </p>
+        <p id="applicationSettingsStatus">{{ view.applicationSettingsStatus }}</p>
+        <div class="actions">
+          <button id="saveApplicationSettingsButton" class="primary" type="button" [disabled]="!view.canSaveApplicationSettings" (click)="view.saveApplicationSettings()">Save Application Settings</button>
+          <button id="clearApplicationWarningButton" class="secondary" type="button" [disabled]="!view.applicationWarningTextDraft && !view.applicationWarningExpiresAtDraft" (click)="view.clearApplicationWarning()">Clear Warning Draft</button>
+          <button id="refreshApplicationSettingsButton" class="ghost" type="button" (click)="view.refreshApplicationSettings()">Refresh Settings</button>
+        </div>
+      </article>
+
       <article class="card">
         <h2>Admin Session Filters</h2>
         <p>Narrow persisted admin bearer sessions by user, lifecycle status, or a bounded result limit.</p>

@@ -6,6 +6,7 @@ import type {
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationSettings,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -148,6 +149,28 @@ const mapAdminAuditEvent = (row: Row | undefined): AdminAuditEvent | null =>
         occurredAt: String(row.occurred_at),
         summary: String(row.summary),
         details: JSON.parse(String(row.details_json ?? "{}")) as Record<string, unknown>
+      }
+    : null;
+
+const mapApplicationSettings = (
+  row: Row | undefined
+): ApplicationSettings | null =>
+  row
+    ? {
+        appTitle: String(row.app_title),
+        globalWarningText:
+          row.global_warning_text == null
+            ? null
+            : String(row.global_warning_text),
+        globalWarningExpiresAt:
+          row.global_warning_expires_at == null
+            ? null
+            : String(row.global_warning_expires_at),
+        updatedAt: row.updated_at == null ? null : String(row.updated_at),
+        updatedByAdminUserId:
+          row.updated_by_admin_user_id == null
+            ? null
+            : String(row.updated_by_admin_user_id)
       }
     : null;
 
@@ -552,7 +575,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 31;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 32;
 
 const migrations: PostgresMigration[] = [
   {
@@ -1012,6 +1035,20 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE admin_role_assignments ADD COLUMN IF NOT EXISTS access_mode TEXT NOT NULL DEFAULT 'read_write';
     `
+  },
+  {
+    version: 32,
+    name: "add_application_settings",
+    sql: `
+      CREATE TABLE IF NOT EXISTS application_settings (
+        settings_key TEXT PRIMARY KEY,
+        app_title TEXT NOT NULL,
+        global_warning_text TEXT,
+        global_warning_expires_at TEXT,
+        updated_at TEXT,
+        updated_by_admin_user_id TEXT
+      );
+    `
   }
 ];
 
@@ -1129,6 +1166,37 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   };
 
   return {
+    async getApplicationSettings() {
+      return one(
+        `SELECT app_title, global_warning_text, global_warning_expires_at,
+                updated_at, updated_by_admin_user_id
+         FROM application_settings
+         WHERE settings_key = 'global'`,
+        [],
+        mapApplicationSettings
+      );
+    },
+    async saveApplicationSettings(settings) {
+      await pool.query(
+        `INSERT INTO application_settings (
+          settings_key, app_title, global_warning_text,
+          global_warning_expires_at, updated_at, updated_by_admin_user_id
+        ) VALUES ('global', $1, $2, $3, $4, $5)
+        ON CONFLICT(settings_key) DO UPDATE SET
+          app_title = EXCLUDED.app_title,
+          global_warning_text = EXCLUDED.global_warning_text,
+          global_warning_expires_at = EXCLUDED.global_warning_expires_at,
+          updated_at = EXCLUDED.updated_at,
+          updated_by_admin_user_id = EXCLUDED.updated_by_admin_user_id`,
+        [
+          settings.appTitle,
+          settings.globalWarningText,
+          settings.globalWarningExpiresAt,
+          settings.updatedAt,
+          settings.updatedByAdminUserId
+        ]
+      );
+    },
     async listAdminUsers() {
       return many(
         `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at

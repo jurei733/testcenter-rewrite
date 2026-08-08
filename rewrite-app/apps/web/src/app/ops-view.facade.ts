@@ -18,6 +18,7 @@ import {
   type AdminRoleAccessMode,
   type AdminSessionStatus,
   type AdminUserStatus,
+  type ApplicationSettings,
   type MonitorViewProfile,
   type MonitorViewProfileFilter
 } from "@testcenter-rewrite-app/domain";
@@ -25,6 +26,7 @@ import {
 import type { RecordCollectionItem } from "./record-collection.component";
 import type { SummaryCard } from "./rewrite-app-shell.types";
 import { buildParticipantEntryUrl } from "./participant-session-links";
+import { ApplicationSettingsService } from "./application-settings.service";
 import {
   parseJsonDocument,
   readNumberValue,
@@ -131,6 +133,7 @@ export class OpsViewFacade {
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  readonly applicationSettings = inject(ApplicationSettingsService);
 
   readonly ops = this.uiState.ops;
   private readonly allAdminRoleOptions: AdminRole[] = [
@@ -201,9 +204,13 @@ export class OpsViewFacade {
   adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
+  applicationTitleDraft = "IQB-Testcenter";
+  applicationWarningTextDraft = "";
+  applicationWarningExpiresAtDraft = "";
 
   init(): void {
     this.viewState.setActiveView("ops");
+    this.viewState.onActionAsync(() => this.loadApplicationSettingsDraft());
     if (this.ops.adminSessionToken.trim()) {
       this.viewState.onActionAsync(() => this.opsService.refreshAdminSession());
     }
@@ -221,6 +228,39 @@ export class OpsViewFacade {
 
   get canBootstrapAdmin(): boolean {
     return this.operatorAccess.mode === "signed_out";
+  }
+
+  get canManageApplicationSettings(): boolean {
+    return (
+      this.canUseAdminSession &&
+      this.operatorAccess.roleAssignments.some(
+        roleAssignment => roleAssignment.role === "platform_admin"
+      )
+    );
+  }
+
+  get isApplicationWarningExpirationValid(): boolean {
+    const value = this.applicationWarningExpiresAtDraft.trim();
+    return value === "" || Number.isFinite(Date.parse(value));
+  }
+
+  get canSaveApplicationSettings(): boolean {
+    return (
+      this.canManageApplicationSettings &&
+      this.applicationTitleDraft.trim().length <= 120 &&
+      this.applicationWarningTextDraft.trim().length <= 4_000 &&
+      this.isApplicationWarningExpirationValid
+    );
+  }
+
+  get applicationSettingsStatus(): string {
+    const settings = this.applicationSettings.settings();
+    if (this.applicationSettings.lastError()) {
+      return this.applicationSettings.lastError()!;
+    }
+    return settings.updatedAt
+      ? `Last saved ${new Date(settings.updatedAt).toLocaleString()}.`
+      : "Original defaults are active; no persisted override exists.";
   }
 
   get adminRoleOptions(): AdminRole[] {
@@ -552,6 +592,35 @@ export class OpsViewFacade {
 
   refreshMetrics(): void {
     this.viewState.onActionAsync(() => this.opsService.refreshMetricsOnly());
+  }
+
+  refreshApplicationSettings(): void {
+    this.viewState.onActionAsync(() => this.loadApplicationSettingsDraft(true));
+  }
+
+  saveApplicationSettings(): void {
+    if (!this.canSaveApplicationSettings) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      const expirationInput = this.applicationWarningExpiresAtDraft.trim();
+      const settings = await this.applicationSettings.update(
+        this.ops.adminSessionToken.trim(),
+        {
+          appTitle: this.applicationTitleDraft,
+          globalWarningText: this.applicationWarningTextDraft,
+          globalWarningExpiresAt: expirationInput
+            ? new Date(expirationInput).toISOString()
+            : null
+        }
+      );
+      this.applyApplicationSettingsDraft(settings);
+    });
+  }
+
+  clearApplicationWarning(): void {
+    this.applicationWarningTextDraft = "";
+    this.applicationWarningExpiresAtDraft = "";
   }
 
   bootstrapOrSignInAdmin(): void {
@@ -2763,6 +2832,33 @@ export class OpsViewFacade {
     }
 
     return tenantKey.trim() !== "" && workspaceKey.trim() !== "";
+  }
+
+  private async loadApplicationSettingsDraft(force = false): Promise<void> {
+    const settings =
+      force || !this.applicationSettings.loaded()
+        ? await this.applicationSettings.load()
+        : this.applicationSettings.settings();
+    this.applyApplicationSettingsDraft(settings);
+  }
+
+  private applyApplicationSettingsDraft(settings: ApplicationSettings): void {
+    this.applicationTitleDraft = settings.appTitle;
+    this.applicationWarningTextDraft = settings.globalWarningText ?? "";
+    this.applicationWarningExpiresAtDraft = settings.globalWarningExpiresAt
+      ? this.toLocalDateTimeInput(settings.globalWarningExpiresAt)
+      : "";
+  }
+
+  private toLocalDateTimeInput(timestamp: string): string {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) {
+      return "";
+    }
+    const component = (value: number): string => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${component(date.getMonth() + 1)}-${component(
+      date.getDate()
+    )}T${component(date.getHours())}:${component(date.getMinutes())}`;
   }
 
   private stringifyValue(value: unknown): string {

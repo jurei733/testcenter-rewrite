@@ -945,6 +945,74 @@ try {
     })
     .filter({ hasText: "platform_admin" })
     .waitFor();
+  logStep("application-settings");
+  await page.locator("#applicationSettingsCard").waitFor();
+  await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
+  const warningExpiration = new Date(Date.now() + 60 * 60_000);
+  const formatLocalDateTime = value => {
+    const component = number => String(number).padStart(2, "0");
+    return `${value.getFullYear()}-${component(value.getMonth() + 1)}-${component(
+      value.getDate()
+    )}T${component(value.getHours())}:${component(value.getMinutes())}`;
+  };
+  await fillAndCommit("#applicationTitleInput", "UI Smoke Testcenter");
+  await fillAndCommit(
+    "#applicationWarningTextInput",
+    "UI smoke planned maintenance warning"
+  );
+  await fillAndCommit(
+    "#applicationWarningExpiresAtInput",
+    formatLocalDateTime(warningExpiration)
+  );
+  await clickAction("Save Application Settings");
+  await page.waitForFunction(() => document.title === "UI Smoke Testcenter");
+  await page
+    .locator("#globalApplicationWarning")
+    .filter({ hasText: "UI smoke planned maintenance warning" })
+    .waitFor();
+  const configuredSettingsResponse = await fetch(
+    `${baseUrl}/api/v1/system/application-settings`
+  );
+  assert.equal(configuredSettingsResponse.status, 200);
+  const configuredSettingsPayload = await configuredSettingsResponse.json();
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.appTitle,
+    "UI Smoke Testcenter"
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.globalWarningText,
+    "UI smoke planned maintenance warning"
+  );
+  assert.match(
+    configuredSettingsPayload.applicationSettings.globalWarningExpiresAt,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/
+  );
+
+  await fillAndCommit(
+    "#applicationWarningExpiresAtInput",
+    "2000-01-01T00:00"
+  );
+  await clickAction("Save Application Settings");
+  await page.locator("#globalApplicationWarning").waitFor({ state: "detached" });
+
+  await fillAndCommit("#applicationTitleInput", "IQB-Testcenter");
+  await fillAndCommit("#applicationWarningTextInput", "");
+  await fillAndCommit("#applicationWarningExpiresAtInput", "");
+  await clickAction("Save Application Settings");
+  await page.waitForFunction(() => document.title === "IQB-Testcenter");
+  const settingsAuditResponse = await fetch(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=application_settings_updated`,
+    {
+      headers: {
+        authorization: `Bearer ${smokeAdminSessionToken}`
+      }
+    }
+  );
+  assert.equal(settingsAuditResponse.status, 200);
+  const settingsAuditPayload = await settingsAuditResponse.json();
+  assert.equal(settingsAuditPayload.items.length, 3);
+  assert.equal(settingsAuditPayload.items[0].eventType, "application_settings_updated");
+  stopAfter("application-settings");
   logStep("admin-sessions");
   await clickAction("Admin Sessions");
   await page

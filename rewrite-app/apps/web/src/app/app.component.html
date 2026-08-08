@@ -5,6 +5,16 @@
 >
   <span hidden>{{ app.renderVersion() }}</span>
   <section
+    id="globalApplicationWarning"
+    class="application-warning-banner"
+    *ngIf="applicationSettings.activeWarningText() as warningText"
+    role="alert"
+    aria-live="assertive"
+  >
+    <strong>Service notice</strong>
+    <span>{{ warningText }}</span>
+  </section>
+  <section
     id="browserCompatibilityWarning"
     class="browser-compatibility-banner"
     *ngIf="browserCompatibility.warning as warning"
@@ -36,7 +46,7 @@
   <ng-container *ngIf="isParticipantView; else operatorShell">
     <header class="participant-topbar">
       <div>
-        <span class="eyebrow">Testcenter</span>
+        <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
         <h1>{{ app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>

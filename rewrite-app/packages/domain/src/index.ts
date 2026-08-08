@@ -20,7 +20,8 @@ export type AdminAuditEventType =
   | "admin_user_deleted"
   | "admin_password_reset"
   | "admin_role_assigned"
-  | "admin_role_revoked";
+  | "admin_role_revoked"
+  | "application_settings_updated";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export const sourcePackageStatuses = [
   "uploaded",
@@ -232,7 +233,8 @@ export const adminAuditEventTypes = [
   "admin_user_deleted",
   "admin_password_reset",
   "admin_role_assigned",
-  "admin_role_revoked"
+  "admin_role_revoked",
+  "application_settings_updated"
 ] as const satisfies readonly AdminAuditEventType[];
 export type WorkspaceActivityEventType =
   | "workspace_created"
@@ -388,6 +390,22 @@ export type AdminUser = {
   validForMinutes: number | null;
   firstSignedInAt: string | null;
   createdAt: string;
+};
+
+export type ApplicationSettings = {
+  appTitle: string;
+  globalWarningText: string | null;
+  globalWarningExpiresAt: string | null;
+  updatedAt: string | null;
+  updatedByAdminUserId: string | null;
+};
+
+export const defaultApplicationSettings: ApplicationSettings = {
+  appTitle: "IQB-Testcenter",
+  globalWarningText: null,
+  globalWarningExpiresAt: null,
+  updatedAt: null,
+  updatedByAdminUserId: null
 };
 
 export type AdminSession = {
@@ -1671,6 +1689,8 @@ export type FirstSliceCapability =
   | "admin_user_csv_export"
   | "admin_audit_read"
   | "admin_audit_csv_export"
+  | "application_settings_read"
+  | "application_settings_update"
   | "tenant_lifecycle"
   | "tenant_directory_csv_export"
   | "workspace_lifecycle"
@@ -1737,6 +1757,8 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_user_csv_export",
   "admin_audit_read",
   "admin_audit_csv_export",
+  "application_settings_read",
+  "application_settings_update",
   "tenant_lifecycle",
   "tenant_directory_csv_export",
   "workspace_lifecycle",

@@ -2,11 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import { defaultApplicationSettings } from "@testcenter-rewrite-app/domain";
 import type {
   AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationSettings,
   ContentRelease,
   ImportJob,
   ParticipantLoginAttempt,
@@ -22,6 +24,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 type PersistedFirstSliceState = {
+  applicationSettings: ApplicationSettings | null;
   adminUsers: Record<string, AdminUser>;
   adminRoleAssignments: Record<string, AdminRoleAssignment>;
   adminAuditEvents: Record<string, AdminAuditEvent>;
@@ -43,6 +46,7 @@ type PersistedFirstSliceState = {
 };
 
 const createInitialState = (): PersistedFirstSliceState => ({
+  applicationSettings: null,
   adminUsers: {},
   adminRoleAssignments: {},
   adminAuditEvents: {},
@@ -83,6 +87,18 @@ const readStateFromFile = async (
       ...createInitialState(),
       ...(JSON.parse(raw) as Partial<PersistedFirstSliceState>)
     };
+    if (state.applicationSettings) {
+      state.applicationSettings = {
+        ...defaultApplicationSettings,
+        ...state.applicationSettings,
+        globalWarningText: state.applicationSettings.globalWarningText ?? null,
+        globalWarningExpiresAt:
+          state.applicationSettings.globalWarningExpiresAt ?? null,
+        updatedAt: state.applicationSettings.updatedAt ?? null,
+        updatedByAdminUserId:
+          state.applicationSettings.updatedByAdminUserId ?? null
+      };
+    }
     state.adminUsers = Object.fromEntries(
       Object.entries(state.adminUsers).map(([adminUserId, adminUser]) => [
         adminUserId,
@@ -200,6 +216,15 @@ export const createFileFirstSliceRepository = (
   };
 
   return {
+    async getApplicationSettings() {
+      const state = await getState();
+      return state.applicationSettings;
+    },
+    async saveApplicationSettings(settings) {
+      await mutate(state => {
+        state.applicationSettings = { ...settings };
+      });
+    },
     async listAdminUsers() {
       const state = await getState();
       return Object.values(state.adminUsers);

@@ -80,6 +80,25 @@ test("SQLite preserves workspace-admin access modes", async () => {
   );
 });
 
+test("SQLite preserves global application settings", async () => {
+  const repository = createSqliteFirstSliceRepository(":memory:");
+  await repository.saveApplicationSettings({
+    appTitle: "Assessment Portal",
+    globalWarningText: "Maintenance tonight",
+    globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
+    updatedAt: "2026-08-08T20:00:00.000Z",
+    updatedByAdminUserId: "platform-admin"
+  });
+
+  assert.deepEqual(await repository.getApplicationSettings(), {
+    appTitle: "Assessment Portal",
+    globalWarningText: "Maintenance tonight",
+    globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
+    updatedAt: "2026-08-08T20:00:00.000Z",
+    updatedByAdminUserId: "platform-admin"
+  });
+});
+
 test("SQLite upgrades legacy admin roles to read-write access", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-admin-mode-"));
   const databasePath = join(tempDirectory, "legacy.sqlite");

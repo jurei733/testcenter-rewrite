@@ -7,6 +7,35 @@ import { describe, it } from "node:test";
 import { createFileFirstSliceRepository } from "./index.js";
 
 describe("createFileFirstSliceRepository", () => {
+  it("preserves global application settings across repository restarts", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-settings-"));
+    const filePath = join(tempDirectory, "state.json");
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveApplicationSettings({
+        appTitle: "Assessment Portal",
+        globalWarningText: "Maintenance tonight",
+        globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
+        updatedAt: "2026-08-08T20:00:00.000Z",
+        updatedByAdminUserId: "platform-admin"
+      });
+
+      assert.deepEqual(
+        await createFileFirstSliceRepository(filePath).getApplicationSettings(),
+        {
+          appTitle: "Assessment Portal",
+          globalWarningText: "Maintenance tonight",
+          globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
+          updatedAt: "2026-08-08T20:00:00.000Z",
+          updatedByAdminUserId: "platform-admin"
+        }
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("normalizes legacy admin users without access windows", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-admin-"));
     const filePath = join(tempDirectory, "state.json");

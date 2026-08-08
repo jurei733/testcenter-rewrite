@@ -8,6 +8,7 @@ import type {
   AdminRoleAssignment,
   AdminSession,
   AdminUser,
+  ApplicationSettings,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -158,6 +159,28 @@ const mapAdminAuditEvent = (
         occurredAt: String(row.occurred_at),
         summary: String(row.summary),
         details: JSON.parse(String(row.details_json ?? "{}")) as Record<string, unknown>
+      }
+    : null;
+
+const mapApplicationSettings = (
+  row: Record<string, unknown> | undefined
+): ApplicationSettings | null =>
+  row
+    ? {
+        appTitle: String(row.app_title),
+        globalWarningText:
+          row.global_warning_text == null
+            ? null
+            : String(row.global_warning_text),
+        globalWarningExpiresAt:
+          row.global_warning_expires_at == null
+            ? null
+            : String(row.global_warning_expires_at),
+        updatedAt: row.updated_at == null ? null : String(row.updated_at),
+        updatedByAdminUserId:
+          row.updated_by_admin_user_id == null
+            ? null
+            : String(row.updated_by_admin_user_id)
       }
     : null;
 
@@ -567,7 +590,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 37;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 38;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -1070,6 +1093,20 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE admin_role_assignments ADD COLUMN access_mode TEXT NOT NULL DEFAULT 'read_write';
     `
+  },
+  {
+    version: 38,
+    name: "add_application_settings",
+    sql: `
+      CREATE TABLE application_settings (
+        settings_key TEXT PRIMARY KEY,
+        app_title TEXT NOT NULL,
+        global_warning_text TEXT,
+        global_warning_expires_at TEXT,
+        updated_at TEXT,
+        updated_by_admin_user_id TEXT
+      );
+    `
   }
 ];
 
@@ -1179,6 +1216,39 @@ export const createSqliteFirstSliceRepository = (
   applyMigrations(database);
 
   return {
+    async getApplicationSettings() {
+      const row = database
+        .prepare(
+          `SELECT app_title, global_warning_text, global_warning_expires_at,
+                  updated_at, updated_by_admin_user_id
+           FROM application_settings
+           WHERE settings_key = 'global'`
+        )
+        .get() as Record<string, unknown> | undefined;
+      return mapApplicationSettings(row);
+    },
+    async saveApplicationSettings(settings) {
+      database
+        .prepare(
+          `INSERT INTO application_settings (
+            settings_key, app_title, global_warning_text,
+            global_warning_expires_at, updated_at, updated_by_admin_user_id
+          ) VALUES ('global', ?, ?, ?, ?, ?)
+          ON CONFLICT(settings_key) DO UPDATE SET
+            app_title = excluded.app_title,
+            global_warning_text = excluded.global_warning_text,
+            global_warning_expires_at = excluded.global_warning_expires_at,
+            updated_at = excluded.updated_at,
+            updated_by_admin_user_id = excluded.updated_by_admin_user_id`
+        )
+        .run(
+          settings.appTitle,
+          settings.globalWarningText,
+          settings.globalWarningExpiresAt,
+          settings.updatedAt,
+          settings.updatedByAdminUserId
+        );
+    },
     async listAdminUsers() {
       const rows = database
         .prepare(

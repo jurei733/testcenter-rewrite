@@ -30,6 +30,7 @@ import type {
   SourceDocumentSource
 } from "@testcenter-rewrite-app/contracts";
 import {
+  defaultApplicationSettings,
   defaultParticipantExecutionMode,
   monitorRunCommandTypes,
   participantExecutionModeDefinitions,
@@ -45,6 +46,7 @@ import type {
   AdminSessionStatus,
   AdminUser,
   AdminUserStatus,
+  ApplicationSettings,
   BookletStateCondition,
   BookletStateVariableSource,
   BookletLeaveRestriction,
@@ -903,7 +905,18 @@ export type AdminDirectoryPort = {
   }): Promise<AdminAuditEvent[]>;
 };
 
+export type ApplicationSettingsPort = {
+  getApplicationSettings(): Promise<ApplicationSettings>;
+  updateApplicationSettings(input: {
+    sessionToken: string;
+    appTitle: string;
+    globalWarningText?: string | null;
+    globalWarningExpiresAt?: string | null;
+  }): Promise<ApplicationSettings>;
+};
+
 export type FirstSlicePorts = {
+  applicationSettings: ApplicationSettingsPort;
   adminAuth: AdminAuthPort;
   adminDirectory: AdminDirectoryPort;
   platform: PlatformPort;
@@ -936,6 +949,8 @@ export class FirstSliceError extends Error {
 }
 
 export const firstSliceUseCases = {
+  getApplicationSettings: "GetApplicationSettings",
+  updateApplicationSettings: "UpdateApplicationSettings",
   bootstrapAdminUser: "BootstrapAdminUser",
   adminSignIn: "AdminSignIn",
   getAdminCurrentSession: "GetAdminCurrentSession",
@@ -1048,6 +1063,8 @@ export type FirstSliceServices = FirstSlicePorts & {
 };
 
 export type FirstSliceRepository = {
+  getApplicationSettings(): Promise<ApplicationSettings | null>;
+  saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
   listAdminUsers(): Promise<AdminUser[]>;
   getAdminUserById(adminUserId: string): Promise<AdminUser | null>;
   getAdminUserByUsername(username: string): Promise<AdminUser | null>;
@@ -3163,6 +3180,49 @@ const requireAdminRole = (
       { requiredRoles }
     );
   }
+};
+
+const normalizeApplicationTitle = (value: unknown): string => {
+  const title = String(value ?? "").trim() || defaultApplicationSettings.appTitle;
+  if (title.length > 120) {
+    throw new FirstSliceError(
+      400,
+      "application_title_invalid",
+      "Application title must not exceed 120 characters."
+    );
+  }
+  return title;
+};
+
+const normalizeGlobalWarningText = (value: unknown): string | null => {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  if (text.length > 4_000) {
+    throw new FirstSliceError(
+      400,
+      "application_warning_text_invalid",
+      "Global warning text must not exceed 4,000 characters."
+    );
+  }
+  return text;
+};
+
+const normalizeGlobalWarningExpiration = (value: unknown): string | null => {
+  const expiration = String(value ?? "").trim();
+  if (!expiration) {
+    return null;
+  }
+  const timestamp = Date.parse(expiration);
+  if (!Number.isFinite(timestamp)) {
+    throw new FirstSliceError(
+      400,
+      "application_warning_expiration_invalid",
+      "Global warning expiration must be a valid ISO timestamp."
+    );
+  }
+  return new Date(timestamp).toISOString();
 };
 
 const hasAdminManagementRole = (
@@ -19120,6 +19180,53 @@ export const createFirstSliceServices = (
   };
 
   return {
+    applicationSettings: {
+      async getApplicationSettings() {
+        return (
+          (await repository.getApplicationSettings()) ?? {
+            ...defaultApplicationSettings
+          }
+        );
+      },
+      async updateApplicationSettings(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminRole(currentSession.roleAssignments, ["platform_admin"]);
+        const previousSettings =
+          (await repository.getApplicationSettings()) ?? defaultApplicationSettings;
+        const updatedSettings: ApplicationSettings = {
+          appTitle: normalizeApplicationTitle(input.appTitle),
+          globalWarningText: normalizeGlobalWarningText(
+            input.globalWarningText
+          ),
+          globalWarningExpiresAt: normalizeGlobalWarningExpiration(
+            input.globalWarningExpiresAt
+          ),
+          updatedAt: now(),
+          updatedByAdminUserId: currentSession.adminUser.adminUserId
+        };
+        await repository.saveApplicationSettings(updatedSettings);
+        await recordAdminAuditEvent({
+          eventType: "application_settings_updated",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          summary: `Platform admin '${currentSession.adminUser.username}' updated application settings.`,
+          details: {
+            previousAppTitle: previousSettings.appTitle,
+            nextAppTitle: updatedSettings.appTitle,
+            previousGlobalWarningText: previousSettings.globalWarningText,
+            nextGlobalWarningText: updatedSettings.globalWarningText,
+            previousGlobalWarningExpiresAt:
+              previousSettings.globalWarningExpiresAt,
+            nextGlobalWarningExpiresAt:
+              updatedSettings.globalWarningExpiresAt
+          }
+        });
+        return updatedSettings;
+      }
+    },
     adminAuth: {
       async bootstrapAdminUser(input) {
         const existingAdminUsers = await repository.listAdminUsers();
