@@ -9222,6 +9222,10 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, "booklets/Booklet2.xml"),
     "utf8"
   );
+  const validLegacyBookletXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "booklets/Booklet_sameBookletID.xml"),
+    "utf8"
+  );
   const schemaFacetCases: Array<{
     fileName: string;
     sourceDocument: string;
@@ -9505,6 +9509,166 @@ test("original Testcenter compatibility corpus imports representative booklets",
         '<Show if="level" is="unknown"'
       ),
       diagnosticCode: "testcenter_xml_show_option_invalid"
+    },
+    {
+      fileName: "booklet-unknown-restrictions-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "        <Restrictions>",
+        '        <Restrictions ignored="true">'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-units-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        "  <Units>",
+        '  <Units ignored="true">'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-restriction-child.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <Show if="level" is="professional" />\n          <Unexpected />'
+      ),
+      diagnosticCode: "testcenter_xml_testlet_restrictions_structure_invalid"
+    },
+    {
+      fileName: "booklet-duplicate-restriction.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <TimeMax minutes="1" />\n          <TimeMax minutes="2" />\n          <Show if="level" is="professional" />'
+      ),
+      diagnosticCode: "testcenter_xml_testlet_restrictions_structure_invalid"
+    },
+    {
+      fileName: "booklet-restriction-order.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <DenyNavigationOnIncomplete presentation="OFF" />\n          <TimeMax minutes="1" />\n          <Show if="level" is="professional" />'
+      ),
+      diagnosticCode: "testcenter_xml_testlet_restrictions_structure_invalid"
+    },
+    {
+      fileName: "booklet-unknown-show-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Show if="level" is="professional"',
+        '<Show if="level" is="professional" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-time-max-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <TimeMax minutes="1" ignored="true" />\n          <Show if="level" is="professional" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-code-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <CodeToEnter code="sample" ignored="true" />\n          <Show if="level" is="professional" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-navigation-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <Show if="level" is="professional" />\n          <DenyNavigationOnIncomplete presentation="OFF" ignored="true" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-leave-lock-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '          <Show if="level" is="professional" />',
+        '          <Show if="level" is="professional" />\n          <LockAfterLeaving confirm="false" scope="unit" ignored="true" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-nested-show-content.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Show if="level" is="professional" />',
+        '<Show if="level" is="professional"><Unexpected /></Show>'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_simple_content_invalid"
+    },
+    {
+      fileName: "booklet-unknown-testlet-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Testlet id="stage1-professional" label="Stage ① Block Ⓒ"',
+        '<Testlet id="stage1-professional" label="Stage ① Block Ⓒ" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-unknown-unit-attribute.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit"',
+        '<Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-nested-unit-content.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '<Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit" />',
+        '<Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit"><Unexpected /></Unit>'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_units_structure_invalid"
+    },
+    {
+      fileName: "booklet-unknown-testlet-child.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        '        <Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit" />',
+        '        <Unexpected />\n        <Unit id="UNIT.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_units_structure_invalid"
+    },
+    {
+      fileName: "booklet-restrictions-after-unit.xml",
+      sourceDocument: validAdaptiveBookletXml.replace(
+        /(<Restrictions>\s*<Show if="level" is="professional" \/>\s*<\/Restrictions>)(\s*<Unit id="UNIT\.SAMPLE-2" label="Ⓒ Professional Unit" labelshort="Ⓒ" alias="professional-unit" \/>)/,
+        "$2\n$1"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_units_structure_invalid"
+    },
+    {
+      fileName: "booklet-legacy-fractional-time-max.xml",
+      sourceDocument: validLegacyBookletXml.replace(
+        '<TimeMax minutes="1" />',
+        '<TimeMax minutes="0.5" />'
+      ),
+      diagnosticCode: "testcenter_xml_time_max_invalid"
+    },
+    {
+      fileName: "booklet-legacy-time-max-leave.xml",
+      sourceDocument: validLegacyBookletXml.replace(
+        '<TimeMax minutes="1" />',
+        '<TimeMax minutes="1" leave="confirm" />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
+      fileName: "booklet-legacy-show-restriction.xml",
+      sourceDocument: validLegacyBookletXml.replace(
+        '<TimeMax minutes="1" />',
+        '<TimeMax minutes="1" />\n        <Show if="level" is="advanced" />'
+      ),
+      diagnosticCode: "testcenter_xml_testlet_restrictions_structure_invalid"
+    },
+    {
+      fileName: "booklet-legacy-states.xml",
+      sourceDocument: validLegacyBookletXml.replace(
+        "  <Units>",
+        '  <States />\n\n  <Units>'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_child_invalid"
     },
     {
       fileName: "booklet-invalid-condition-structure.xml",

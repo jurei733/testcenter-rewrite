@@ -7651,6 +7651,9 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   if (canonicalRootName === "Booklet") {
+    const bookletSchemaVersion = parseTestcenterSchemaVersion(schemaLocation);
+    const usesAdaptiveBookletSchema =
+      bookletSchemaVersion === null || bookletSchemaVersion.major >= 17;
     const validateAttributes = (
       element: XmlElement,
       allowedAttributeNames: readonly string[],
@@ -7703,7 +7706,7 @@ const validateTestcenterXmlSourceDocument = (
       "Metadata",
       "CustomTexts",
       "BookletConfig",
-      "States",
+      ...(usesAdaptiveBookletSchema ? ["States"] : []),
       "Units"
     ]);
     for (const child of xmlChildElements(root)) {
@@ -8004,6 +8007,250 @@ const validateTestcenterXmlSourceDocument = (
     );
 
     const units = unitsContainers[0];
+    const validateRestrictions = (
+      restriction: XmlElement,
+      context: string,
+      isRoot: boolean
+    ): void => {
+      validateAttributes(restriction, [], `Restrictions for ${context}`);
+      const allowedChildNames = isRoot
+        ? ["TimeMax", "DenyNavigationOnIncomplete"]
+        : [
+            "CodeToEnter",
+            "TimeMax",
+            ...(usesAdaptiveBookletSchema ? ["Show"] : []),
+            "DenyNavigationOnIncomplete",
+            ...(usesAdaptiveBookletSchema ? ["LockAfterLeaving"] : [])
+          ];
+      const childRanks = new Map(
+        allowedChildNames.map((childName, index) => [childName, index])
+      );
+      const children = xmlChildElements(restriction);
+      let previousRank = -1;
+      for (const child of children) {
+        const childName = xmlElementLocalName(child);
+        const rank = childRanks.get(childName);
+        if (rank === undefined) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_testlet_restrictions_structure_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains unsupported restriction '${childName}' for ${context}.`
+            )
+          );
+          continue;
+        }
+        if (!isRoot && rank < previousRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_testlet_restrictions_structure_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains restrictions outside schema order for ${context}.`
+            )
+          );
+        }
+        previousRank = Math.max(previousRank, rank);
+      }
+      for (const childName of allowedChildNames.filter(
+        childName => childName !== "Show"
+      )) {
+        if (xmlChildrenNamed(restriction, childName).length > 1) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_testlet_restrictions_structure_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains multiple ${childName} restrictions for ${context}.`
+            )
+          );
+        }
+      }
+
+      for (const codeToEnter of xmlChildrenNamed(restriction, "CodeToEnter")) {
+        validateAttributes(codeToEnter, ["code"], `CodeToEnter for ${context}`);
+        validateSimpleContent(codeToEnter, `CodeToEnter for ${context}`);
+      }
+      for (const show of xmlChildrenNamed(restriction, "Show")) {
+        validateAttributes(show, ["if", "is"], `Show for ${context}`);
+        validateSimpleContent(show, `Show for ${context}`);
+        const stateKey = show.getAttribute("if")?.trim() ?? "";
+        const optionKey = show.getAttribute("is")?.trim() ?? "";
+        if (!stateKey || !stateOptions.has(stateKey)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_show_state_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Show state reference '${stateKey || "missing"}' for ${context}, but that State is not defined.`
+            )
+          );
+          continue;
+        }
+        if (!optionKey || !stateOptions.get(stateKey)?.has(optionKey)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_show_option_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Show option reference '${optionKey || "missing"}' for State '${stateKey}' and ${context}, but that Option is not defined.`
+            )
+          );
+        }
+      }
+      for (const timeMax of xmlChildrenNamed(restriction, "TimeMax")) {
+        validateAttributes(
+          timeMax,
+          usesAdaptiveBookletSchema ? ["minutes", "leave"] : ["minutes"],
+          `TimeMax for ${context}`
+        );
+        validateSimpleContent(timeMax, `TimeMax for ${context}`);
+        const minutes = timeMax.getAttribute("minutes");
+        const leave = timeMax.getAttribute("leave");
+        const validMinutes =
+          minutes === null ||
+          (usesAdaptiveBookletSchema
+            ? isPositiveTestcenterXmlNumber(minutes)
+            : isTestcenterXmlInteger(minutes) && Number(minutes) > 0);
+        if (!validMinutes) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_time_max_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax minutes '${minutes}' for ${context}.`
+            )
+          );
+        }
+        if (
+          leave !== null &&
+          !["forbidden", "confirm", "allowed"].includes(leave.trim())
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_time_max_leave_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax leave policy '${leave}' for ${context}.`
+            )
+          );
+        }
+      }
+      for (const denyNavigation of xmlChildrenNamed(
+        restriction,
+        "DenyNavigationOnIncomplete"
+      )) {
+        validateAttributes(
+          denyNavigation,
+          ["presentation", "response"],
+          `DenyNavigationOnIncomplete for ${context}`
+        );
+        validateSimpleContent(
+          denyNavigation,
+          `DenyNavigationOnIncomplete for ${context}`
+        );
+        for (const attributeName of ["presentation", "response"] as const) {
+          const value = denyNavigation.getAttribute(attributeName);
+          if (value !== null && !["ON", "OFF", "ALWAYS"].includes(value.trim())) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_navigation_restriction_invalid",
+                `Original Testcenter booklet '${sourceFileName}' contains invalid ${attributeName} completion policy '${value}' for ${context}.`
+              )
+            );
+          }
+        }
+      }
+      for (const lockAfterLeaving of xmlChildrenNamed(
+        restriction,
+        "LockAfterLeaving"
+      )) {
+        validateAttributes(
+          lockAfterLeaving,
+          ["confirm", "scope"],
+          `LockAfterLeaving for ${context}`
+        );
+        validateSimpleContent(lockAfterLeaving, `LockAfterLeaving for ${context}`);
+        const confirm = lockAfterLeaving.getAttribute("confirm");
+        const scope = lockAfterLeaving.getAttribute("scope");
+        if (confirm !== null && parseTestcenterXmlBoolean(confirm) === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_lock_after_leaving_confirm_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving confirm value '${confirm}' for ${context}.`
+            )
+          );
+        }
+        if (scope !== null && !["unit", "testlet"].includes(scope.trim())) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_lock_after_leaving_scope_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving scope '${scope}' for ${context}.`
+            )
+          );
+        }
+      }
+    };
+    const validateUnitTree = (
+      container: XmlElement,
+      context: string,
+      isRoot: boolean
+    ): void => {
+      validateAttributes(
+        container,
+        isRoot ? [] : ["id", "label"],
+        context
+      );
+      const children = xmlChildElements(container);
+      const restrictions = children.filter(
+        child => xmlElementLocalName(child) === "Restrictions"
+      );
+      if (
+        restrictions.length > 1 ||
+        (restrictions.length === 1 && children[0] !== restrictions[0])
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_units_structure_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires the optional Restrictions block to appear once and before content in ${context}.`
+          )
+        );
+      }
+      const contentChildren = children.filter(child =>
+        ["Unit", "Testlet"].includes(xmlElementLocalName(child))
+      );
+      const unsupportedChild = children.find(
+        child =>
+          !["Restrictions", "Unit", "Testlet"].includes(
+            xmlElementLocalName(child)
+          )
+      );
+      if (unsupportedChild || contentChildren.length === 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_units_structure_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires ${context} to contain one or more Unit or Testlet elements${unsupportedChild ? ` and does not support child '${xmlElementLocalName(unsupportedChild)}'` : ""}.`
+          )
+        );
+      }
+      restrictions.forEach(restriction =>
+        validateRestrictions(restriction, context, isRoot)
+      );
+      for (const child of contentChildren) {
+        const childName = xmlElementLocalName(child);
+        if (childName === "Unit") {
+          const unitKey = child.getAttribute("alias")?.trim() ||
+            child.getAttribute("id")?.trim() ||
+            "unknown";
+          validateAttributes(
+            child,
+            ["id", "label", "labelshort", "alias"],
+            `Unit '${unitKey}'`
+          );
+          if (xmlChildElements(child).length > 0) {
+            diagnostics.push(
+              createImportDiagnostic(
+                "testcenter_xml_booklet_units_structure_invalid",
+                `Original Testcenter booklet '${sourceFileName}' contains nested elements in Unit '${unitKey}'.`
+              )
+            );
+          }
+          continue;
+        }
+        const testletKey = child.getAttribute("id")?.trim() || "unknown";
+        validateUnitTree(child, `Testlet '${testletKey}'`, false);
+      }
+    };
+    if (units) {
+      validateUnitTree(units, "Units", true);
+    }
     const unitEntries = units ? xmlDescendantsNamed(units, "Unit") : [];
     if (!units || unitEntries.length === 0) {
       diagnostics.push(
@@ -8078,98 +8325,6 @@ const validateTestcenterXmlSourceDocument = (
       const restriction = restrictions[0];
       if (!restriction) {
         continue;
-      }
-      for (const show of xmlChildrenNamed(restriction, "Show")) {
-        const stateKey = show.getAttribute("if")?.trim() ?? "";
-        const optionKey = show.getAttribute("is")?.trim() ?? "";
-        if (!stateKey || !stateOptions.has(stateKey)) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_show_state_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains Show state reference '${stateKey || "missing"}' for Testlet '${testletKey || "unknown"}', but that State is not defined.`
-            )
-          );
-          continue;
-        }
-        if (!optionKey || !stateOptions.get(stateKey)?.has(optionKey)) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_show_option_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains Show option reference '${optionKey || "missing"}' for State '${stateKey}' and Testlet '${testletKey || "unknown"}', but that Option is not defined.`
-            )
-          );
-        }
-      }
-      const timeMaxEntries = xmlChildrenNamed(restriction, "TimeMax");
-      if (timeMaxEntries.length > 1) {
-        diagnostics.push(
-          createImportDiagnostic(
-            "testcenter_xml_time_max_invalid",
-            `Original Testcenter booklet '${sourceFileName}' contains multiple TimeMax restrictions for Testlet '${testletKey || "unknown"}'.`
-          )
-        );
-      }
-      for (const timeMax of timeMaxEntries) {
-        const minutes = timeMax.getAttribute("minutes");
-        const leave = timeMax.getAttribute("leave");
-        if (minutes !== null && !isPositiveTestcenterXmlNumber(minutes)) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_time_max_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax minutes '${minutes}' for Testlet '${testletKey || "unknown"}'.`
-            )
-          );
-        }
-        if (
-          leave !== null &&
-          !["forbidden", "confirm", "allowed"].includes(leave.trim())
-        ) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_time_max_leave_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains invalid TimeMax leave policy '${leave}' for Testlet '${testletKey || "unknown"}'.`
-            )
-          );
-        }
-      }
-      for (const denyNavigation of xmlChildrenNamed(
-        restriction,
-        "DenyNavigationOnIncomplete"
-      )) {
-        for (const attributeName of ["presentation", "response"] as const) {
-          const value = denyNavigation.getAttribute(attributeName);
-          if (value !== null && !["ON", "OFF", "ALWAYS"].includes(value.trim())) {
-            diagnostics.push(
-              createImportDiagnostic(
-                "testcenter_xml_navigation_restriction_invalid",
-                `Original Testcenter booklet '${sourceFileName}' contains invalid ${attributeName} completion policy '${value}' for Testlet '${testletKey || "unknown"}'.`
-              )
-            );
-          }
-        }
-      }
-      for (const lockAfterLeaving of xmlChildrenNamed(
-        restriction,
-        "LockAfterLeaving"
-      )) {
-        const confirm = lockAfterLeaving.getAttribute("confirm");
-        const scope = lockAfterLeaving.getAttribute("scope");
-        if (confirm !== null && parseTestcenterXmlBoolean(confirm) === null) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_lock_after_leaving_confirm_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving confirm value '${confirm}' for Testlet '${testletKey || "unknown"}'.`
-            )
-          );
-        }
-        if (scope !== null && !["unit", "testlet"].includes(scope.trim())) {
-          diagnostics.push(
-            createImportDiagnostic(
-              "testcenter_xml_lock_after_leaving_scope_invalid",
-              `Original Testcenter booklet '${sourceFileName}' contains invalid LockAfterLeaving scope '${scope}' for Testlet '${testletKey || "unknown"}'.`
-            )
-          );
-        }
       }
     }
     diagnostics.push(

@@ -29,6 +29,16 @@ Priority:
 | 7 | P2 | Attachments and QR capture | Operationally valuable but separable from the first controlled digital-only rollout. |
 | 8 | P2 | Branding, custom texts, maintenance banner, themes | Needed for broad tenant rollout after core test integrity is proven. |
 
+Latest P0 Booklet-schema closure: the importer now validates the complete
+`Units`/nested-`Testlet` tree and the ordered `Restrictions` surface before
+normalization. Unknown container, Unit, Testlet, `CodeToEnter`, `TimeMax`,
+`Show`, completion, or leave-lock attributes/children fail with stable
+diagnostics; singleton restrictions cannot be repeated or placed after their
+schema position. Validation follows the declared generation: 14.x/15.x
+`TimeMax` remains a positive integer without `leave`, while 17.x accepts the
+positive fractional duration and adaptive restriction extensions introduced
+by that schema.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey and DAN 3.0.0 visual-
 assessment Players. ABI retains its release example byte-for-byte; DAN uses the
