@@ -7525,6 +7525,50 @@ try {
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
     .waitFor();
+  const monitorOverview = page.locator("#monitorOverviewCard");
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Visible Runs" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Participants" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Running" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Paused" })
+    .getByRole("heading", { name: "0", exact: true })
+    .waitFor();
+  await page
+    .locator("#monitorOverviewDetail")
+    .filter({
+      hasText:
+        "1 open run after server scope, request filters, and the active imported profile."
+    })
+    .waitFor();
+  const scopedGroups = page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Groups In Scope" }) });
+  await scopedGroups
+    .filter({ hasText: participantGroupKey })
+    .filter({ hasText: "1 participant · 1 visible run" })
+    .filter({ hasText: "1 running" })
+    .waitFor();
+  assert.equal(
+    await scopedGroups.filter({ hasText: "group:entry-smoke" }).count(),
+    0,
+    "Group monitor overview must not aggregate groups outside its server scope."
+  );
+  await scopedGroups.getByRole("button", { name: "Show Group Runs" }).click();
+  await waitForNotBusy("group-monitor-overview-filter");
+  await expectInputValue("#openRunGroupFilter", participantGroupKey);
   assert.equal(
     await scopedOpenRuns.getByText("Group", { exact: true }).count(),
     1,
@@ -7547,6 +7591,26 @@ try {
     .first()
     .click();
   await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
+  await page.locator("#monitorConsolePauseButton").click();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.status === "paused"
+  );
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Paused" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
+  await page.locator("#monitorConsoleResumeButton").click();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
+    payload => payload?.currentRunState?.testRun?.status === "running"
+  );
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Running" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
   await expectButtonSelectorEnabled("#monitorConsoleResumeButton");
   assert.equal(
     await page.locator("#monitorTargetUnitKey option").count(),
@@ -7584,6 +7648,16 @@ try {
     payload => payload?.currentRunState?.testRun?.currentUnitKey === "unit-paused"
   );
   await expectInputValue("#monitorTargetUnitKey", "");
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Running" })
+    .getByRole("heading", { name: "1", exact: true })
+    .waitFor();
+  await monitorOverview
+    .locator(".summary-card")
+    .filter({ hasText: "Paused" })
+    .getByRole("heading", { name: "0", exact: true })
+    .waitFor();
   stopAfter("group-monitor-auto-next-block");
   await page.waitForFunction(
     () => !document.querySelector(".status-banner.is-error"),

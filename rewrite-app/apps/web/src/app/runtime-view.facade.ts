@@ -151,6 +151,16 @@ export class RuntimeViewFacade {
     );
   }
 
+  private get visibleOpenMonitorRuns(): OpenMonitorRun[] {
+    const payload = parseJsonDocument<MonitorOpenRunsResponse>(
+      this.runtime.openRunsView
+    );
+    return filterOpenMonitorRunsByProfile(
+      payload?.items ?? [],
+      this.activeMonitorProfile
+    );
+  }
+
   selectMonitorProfile(profileId: string): void {
     if (!this.monitorProfiles.some(profile => profile.profileId === profileId)) {
       return;
@@ -1902,10 +1912,9 @@ export class RuntimeViewFacade {
   }
 
   get openRunItems(): RecordCollectionItem[] {
-    const payload = parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView);
     const profile = this.activeMonitorProfile;
     return (
-      filterOpenMonitorRunsByProfile(payload?.items ?? [], profile).map(openRun => {
+      this.visibleOpenMonitorRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
         const activeTimer = openRun.activeTestletTimer;
         const activeTimerRemaining = activeTimer
@@ -2034,6 +2043,134 @@ export class RuntimeViewFacade {
         };
       })
     );
+  }
+
+  get monitorOverviewCards(): SummaryCard[] {
+    const openRuns = this.visibleOpenMonitorRuns;
+    const participantCount = new Set(openRuns.map(openRun => openRun.loginKey))
+      .size;
+    const groupCount = new Set(openRuns.map(openRun => openRun.groupKey)).size;
+    const runningCount = openRuns.filter(
+      openRun => openRun.status === "running"
+    ).length;
+    const pausedCount = openRuns.filter(
+      openRun => openRun.status === "paused"
+    ).length;
+    const lockedCount = openRuns.filter(openRun => openRun.locked).length;
+    const profile = this.activeMonitorProfile;
+
+    return [
+      {
+        label: "Visible Runs",
+        headline: String(openRuns.length),
+        detail: profile
+          ? `${profile.label || profile.profileId} profile applied.`
+          : "No imported profile filter applied."
+      },
+      {
+        label: "Participants",
+        headline: String(participantCount),
+        detail: "Unique visible participant logins."
+      },
+      {
+        label: "Running",
+        headline: String(runningCount),
+        detail: "Runs actively in progress."
+      },
+      {
+        label: "Paused",
+        headline: String(pausedCount),
+        detail: "Runs waiting for continuation."
+      },
+      {
+        label: "Locked",
+        headline: String(lockedCount),
+        detail: "Whole-test locks in the visible scope."
+      },
+      {
+        label: "Groups",
+        headline: String(groupCount),
+        detail: "Server-authorized groups represented below."
+      }
+    ];
+  }
+
+  get monitorOverviewDetail(): string {
+    const openRuns = this.visibleOpenMonitorRuns;
+    return `${openRuns.length} open run${openRuns.length === 1 ? "" : "s"} after server scope, request filters, and ${this.activeMonitorProfile ? "the active imported profile" : "the default view"}.`;
+  }
+
+  get monitorGroupOverviewItems(): RecordCollectionItem[] {
+    const runsByGroup = new Map<string, OpenMonitorRun[]>();
+    for (const openRun of this.visibleOpenMonitorRuns) {
+      const groupRuns = runsByGroup.get(openRun.groupKey) ?? [];
+      groupRuns.push(openRun);
+      runsByGroup.set(openRun.groupKey, groupRuns);
+    }
+
+    return [...runsByGroup.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([groupKey, openRuns]) => {
+        const participantCount = new Set(
+          openRuns.map(openRun => openRun.loginKey)
+        ).size;
+        const runningCount = openRuns.filter(
+          openRun => openRun.status === "running"
+        ).length;
+        const pausedCount = openRuns.filter(
+          openRun => openRun.status === "paused"
+        ).length;
+        const lockedCount = openRuns.filter(openRun => openRun.locked).length;
+        const timedCount = openRuns.filter(
+          openRun => openRun.activeTestletTimer
+        ).length;
+        const booklets = [
+          ...new Set(
+            openRuns.map(
+              openRun => openRun.bookletLabel ?? openRun.bookletKey
+            )
+          )
+        ];
+        const blocks = [
+          ...new Set(
+            openRuns
+              .map(
+                openRun =>
+                  openRun.currentBlockLabel ?? openRun.currentBlockKey ?? ""
+              )
+              .filter(Boolean)
+          )
+        ];
+        const latestActivityAt = openRuns
+          .map(openRun => openRun.updatedAt)
+          .sort((left, right) => right.localeCompare(left))[0];
+
+        return {
+          headline: groupKey,
+          subline: `${participantCount} participant${participantCount === 1 ? "" : "s"} · ${openRuns.length} visible run${openRuns.length === 1 ? "" : "s"}`,
+          badges: [
+            `${runningCount} running`,
+            `${pausedCount} paused`,
+            `${lockedCount} locked`,
+            `${timedCount} timed`
+          ],
+          rows: [
+            { label: "Booklets", value: booklets.join(" | ") || "none" },
+            { label: "Current Blocks", value: blocks.join(" | ") || "none" },
+            {
+              label: "Latest Activity",
+              value: latestActivityAt
+                ? this.formatDateTime(latestActivityAt)
+                : "none"
+            }
+          ],
+          actionLabel: "Show Group Runs",
+          actionPayload: {
+            monitorOverviewAction: "filter-group",
+            groupKey
+          }
+        };
+      });
   }
 
   get monitorBatchRunIds(): string[] {
@@ -2777,6 +2914,25 @@ export class RuntimeViewFacade {
   applyOpenRunFilters(): void {
     this.persistState();
     this.refreshRuntimeReads();
+  }
+
+  filterMonitorOverviewGroup(item: RecordCollectionItem): void {
+    if (item.actionPayload?.monitorOverviewAction !== "filter-group") {
+      return;
+    }
+    const groupKey = item.actionPayload.groupKey?.trim();
+    if (!groupKey) {
+      return;
+    }
+    this.runtime.openRunLoginFilter = "";
+    this.runtime.openRunGroupFilter = groupKey;
+    this.runtime.openRunBookletFilter = "";
+    this.runtime.openRunSpeciesFilter = "";
+    this.runtime.openRunSessionFilter = "";
+    this.runtime.openRunRunFilter = "";
+    this.runtime.openRunUnitFilter = "";
+    this.runtime.openRunStatusFilter = "";
+    this.applyOpenRunFilters();
   }
 
   useSelectedRuntimeAsOpenRunFilters(): void {

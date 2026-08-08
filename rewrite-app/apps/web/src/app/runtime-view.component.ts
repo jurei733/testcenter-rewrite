@@ -125,6 +125,27 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <article id="monitorOverviewCard" class="card" *ngIf="view.isMonitorOnlySession">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Scoped live dashboard</span>
+            <h2>Test Overview</h2>
+          </div>
+          <span class="status-pill">Profile-aware</span>
+        </div>
+        <p id="monitorOverviewDetail">{{ view.monitorOverviewDetail }}</p>
+        <app-summary-cards [cards]="view.monitorOverviewCards"></app-summary-cards>
+      </article>
+
+      <app-record-collection
+        *ngIf="view.isMonitorOnlySession"
+        title="Groups In Scope"
+        subtitle="Visible live runs grouped after server authorization, request filters, and the active monitor profile."
+        [items]="view.monitorGroupOverviewItems"
+        (itemAction)="view.filterMonitorOverviewGroup($event)"
+        emptyState="No groups currently have a visible open run."
+      ></app-record-collection>
+
       <ng-container *ngIf="!view.isMonitorOnlySession">
 
       <article class="card">
