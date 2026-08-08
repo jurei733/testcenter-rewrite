@@ -2378,6 +2378,7 @@ try {
     0,
     "Downloaded password credentials must be removed from the rendered batch state."
   );
+  const generatedPasswordSessions = [];
   for (const [username, previousPassword, generatedPassword] of [
     [workspaceAdminUsername, workspaceAdminResetPassword, workspaceAdminGeneratedPassword],
     [
@@ -2404,6 +2405,7 @@ try {
       }
     );
     assert.equal(generatedPasswordResponse.status, 200);
+    generatedPasswordSessions.push(await generatedPasswordResponse.json());
   }
   stopAfter("admin-user-bulk-password");
 
@@ -2494,6 +2496,37 @@ try {
     .filter({ hasText: "Last Succeeded" })
     .filter({ hasText: "Last Failed" })
     .waitFor();
+  for (const generatedPasswordSession of generatedPasswordSessions) {
+    const revokedSessionResponse = await fetch(
+      `${baseUrl}/api/v1/admin/auth/current-session`,
+      {
+        headers: {
+          authorization: `Bearer ${generatedPasswordSession.sessionToken}`
+        }
+      }
+    );
+    assert.equal(revokedSessionResponse.status, 401);
+  }
+  const disabledAdminSessionsResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sessions?status=revoked&limit=100`,
+    {
+      headers: { authorization: `Bearer ${smokeAdminSessionToken}` }
+    }
+  );
+  assert.equal(disabledAdminSessionsResponse.status, 200);
+  const disabledAdminSessions = await disabledAdminSessionsResponse.json();
+  assert.ok(Array.isArray(disabledAdminSessions.items));
+  for (const generatedPasswordSession of generatedPasswordSessions) {
+    assert.equal(
+      disabledAdminSessions.items.some(
+        item =>
+          item?.adminSession?.adminSessionId ===
+            generatedPasswordSession.adminSession.adminSessionId &&
+          item?.status === "revoked"
+      ),
+      true
+    );
+  }
   stopAfter("admin-user-bulk-status");
   const disabledWorkspaceAdminSignIn = await fetch(
     `${baseUrl}/api/v1/admin/auth/sign-in`,

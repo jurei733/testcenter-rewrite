@@ -17577,6 +17577,24 @@ export const createFirstSliceServices = (
         };
         await repository.saveAdminUser(updatedAdminUser);
 
+        const revokedSessionIds: string[] = [];
+        if (nextStatus === "disabled") {
+          const revokedAt = now();
+          for (const adminSession of await repository.listAdminSessions()) {
+            if (
+              adminSession.adminUserId !== updatedAdminUser.adminUserId ||
+              resolveAdminSessionStatus(adminSession, revokedAt) !== "active"
+            ) {
+              continue;
+            }
+            await repository.saveAdminSession({
+              ...adminSession,
+              revokedAt
+            });
+            revokedSessionIds.push(adminSession.adminSessionId);
+          }
+        }
+
         const directoryItem = await createAdminUserDirectoryItem(
           repository,
           updatedAdminUser
@@ -17591,7 +17609,9 @@ export const createFirstSliceServices = (
             previousDisplayName: adminUser.displayName,
             nextDisplayName: updatedAdminUser.displayName,
             previousStatus: adminUser.status,
-            nextStatus: updatedAdminUser.status
+            nextStatus: updatedAdminUser.status,
+            revokedSessionCount: revokedSessionIds.length,
+            revokedSessionIds
           }
         });
 

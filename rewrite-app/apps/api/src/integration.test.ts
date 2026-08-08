@@ -1281,7 +1281,10 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(oldPasswordSignIn.status, 401);
   assert.equal(oldPasswordSignIn.body.error, "admin_credentials_invalid");
 
-  const resetPasswordSignIn = await requestJson<{ sessionToken: string }>(
+  const resetPasswordSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+  }>(
     "/api/v1/admin/auth/sign-in",
     {
       method: "POST",
@@ -1328,6 +1331,37 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "Disabled Workspace Admin"
   );
   assert.equal(disabledAdminUser.body.adminUser.status, "disabled");
+
+  const disabledAdminCurrentSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session",
+    {
+      headers: {
+        authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+      }
+    }
+  );
+
+  assert.equal(disabledAdminCurrentSession.status, 401);
+  assert.equal(disabledAdminCurrentSession.body.error, "admin_session_invalid");
+
+  const disabledAdminRevokedSessions = await requestJson<{
+    items: Array<{ adminSession: { adminSessionId: string }; status: string }>;
+  }>("/api/v1/admin/auth/sessions?status=revoked", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+
+  assert.equal(disabledAdminRevokedSessions.status, 200);
+  assert.equal(
+    disabledAdminRevokedSessions.body.items.some(
+      item =>
+        item.adminSession.adminSessionId ===
+          resetPasswordSignIn.body.adminSession.adminSessionId &&
+        item.status === "revoked"
+    ),
+    true
+  );
 
   const disabledSignIn = await requestJson<{ error: string }>(
     "/api/v1/admin/auth/sign-in",
@@ -1494,7 +1528,12 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       item =>
         item.eventType === "admin_user_updated" &&
         item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
-        item.summary.includes("workspace.admin")
+        item.summary.includes("workspace.admin") &&
+        item.details["revokedSessionCount"] === 1 &&
+        Array.isArray(item.details["revokedSessionIds"]) &&
+        item.details["revokedSessionIds"].includes(
+          resetPasswordSignIn.body.adminSession.adminSessionId
+        )
     ),
     true
   );
