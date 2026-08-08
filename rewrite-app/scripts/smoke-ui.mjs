@@ -5318,6 +5318,240 @@ try {
     await resumedAspectFrame.getByRole("radio").nth(1).isChecked(),
     true
   );
+
+  logStep("participant-original-sample-package");
+  const originalSampleTenantKey = `${tenantKey}-original-sample`;
+  const originalSampleWorkspaceKey = `${workspaceKey}-original-sample`;
+  const originalSampleWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${originalSampleTenantKey}` +
+    `/workspaces/${originalSampleWorkspaceKey}`;
+  const originalSampleBookletKey = "BOOKLET.SAMPLE-1";
+  const originalSampleUnitKey = "UNIT.SAMPLE";
+  const originalSampleLoginKey = "test-no-pw";
+  const originalSampleResponse = "Saved from the original external HTML unit";
+  const originalSampleResourceContent =
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: originalSampleTenantKey,
+      displayName: "UI Original Sample Package Tenant"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${originalSampleTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: originalSampleWorkspaceKey,
+        displayName: "UI Original Sample Package Workspace"
+      }
+    }
+  );
+  const originalSampleFiles = [
+    {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: await readFile(
+        resolve("test-fixtures/original-testcenter/booklets/Booklet.xml"),
+        "utf8"
+      )
+    },
+    {
+      fileName: "Unit.xml",
+      mediaType: "application/xml",
+      sourceDocument: await readFile(
+        resolve("test-fixtures/original-testcenter/units/Unit.xml"),
+        "utf8"
+      )
+    },
+    {
+      fileName: "Unit2.xml",
+      mediaType: "application/xml",
+      sourceDocument: await readFile(
+        resolve("test-fixtures/original-testcenter/units/Unit2.xml"),
+        "utf8"
+      )
+    },
+    {
+      fileName: "SAMPLE_UNITCONTENTS.HTM",
+      mediaType: "text/html",
+      sourceDocument: await readFile(
+        resolve(
+          "test-fixtures/original-testcenter/definitions/SAMPLE_UNITCONTENTS.HTM"
+        ),
+        "utf8"
+      )
+    },
+    {
+      fileName: "verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      sourceDocument: await readFile(
+        resolve(
+          "test-fixtures/original-testcenter/players/verona-player-simple-6.0.html"
+        ),
+        "utf8"
+      )
+    },
+    {
+      fileName: "coding-scheme.vocs.json",
+      mediaType: "application/json",
+      sourceDocument: `data:application/json;base64,${(
+        await readFile(
+          resolve(
+            "test-fixtures/original-testcenter/schemes/coding-scheme.vocs.json.base64"
+          ),
+          "utf8"
+        )
+      ).trim()}`
+    },
+    {
+      fileName: "sample_resource_package.itcr.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${(
+        await readFile(
+          resolve(
+            "test-fixtures/original-testcenter/resources/sample_resource_package.itcr.zip.base64"
+          ),
+          "utf8"
+        )
+      ).trim()}`
+    }
+  ];
+  let originalSampleRootSourcePackageId = "";
+  for (const file of originalSampleFiles) {
+    const uploadResponse = await sendSmokeJson(
+      `${originalSampleWorkspaceApiUrl}/source-packages`,
+      { body: file }
+    );
+    const uploadPayload = await uploadResponse.json();
+    if (file.fileName === "Booklet.xml") {
+      originalSampleRootSourcePackageId =
+        uploadPayload.sourcePackage?.sourcePackageId ?? "";
+    }
+  }
+  assert.ok(originalSampleRootSourcePackageId);
+  const originalSampleImportResponse = await sendSmokeJson(
+    `${originalSampleWorkspaceApiUrl}/import-jobs`,
+    { body: { sourcePackageId: originalSampleRootSourcePackageId } }
+  );
+  const originalSampleImportPayload = await originalSampleImportResponse.json();
+  assert.equal(originalSampleImportPayload.importJob?.status, "completed");
+  assert.notEqual(
+    originalSampleImportPayload.importJob?.sourcePackageId,
+    originalSampleRootSourcePackageId,
+    "The original loose sample should import through an immutable dependency snapshot."
+  );
+  const originalSampleReleaseId =
+    originalSampleImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(originalSampleReleaseId);
+  await sendSmokeJson(
+    `${originalSampleWorkspaceApiUrl}` +
+      `/content-releases/${originalSampleReleaseId}/activate`,
+    { body: { forceActivation: true } }
+  );
+  const originalSampleRosterDocument = await readFile(
+    resolve("test-fixtures/original-testcenter/rosters/Testtakers.xml"),
+    "utf8"
+  );
+  const originalSampleRosterResponse = await sendSmokeJson(
+    `${originalSampleWorkspaceApiUrl}/participant-roster`,
+    { body: { rosterText: originalSampleRosterDocument } }
+  );
+  const originalSampleRosterPayload = await originalSampleRosterResponse.json();
+  assert.deepEqual(
+    originalSampleRosterPayload.items.find(
+      item => item.loginKey === originalSampleLoginKey
+    )?.validationWarnings,
+    []
+  );
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: originalSampleTenantKey,
+      workspaceKey: originalSampleWorkspaceKey,
+      loginKey: originalSampleLoginKey,
+      bookletKey: originalSampleBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 6.0" })
+    .waitFor({ timeout: 30_000 });
+  const originalSampleFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await originalSampleFrame
+    .locator('[data-cy="legend-about"]')
+    .waitFor({ timeout: 30_000 });
+  await originalSampleFrame
+    .locator('[data-cy="legend-longContent"]')
+    .filter({ hasText: "Long Content and Form Elements" })
+    .waitFor();
+  const originalSampleParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(originalSampleParticipantSessionId);
+  const requiredTextField = originalSampleFrame.locator(
+    'input[name="required-text-field"]'
+  );
+  await requiredTextField.fill(originalSampleResponse);
+  await requiredTextField.dispatchEvent("keyup", {
+    key: "e",
+    code: "KeyE"
+  });
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalSampleParticipantSessionId}/current-state`,
+    payload => {
+      if (
+        payload?.currentRunState?.testRun?.currentUnitKey !==
+        originalSampleUnitKey
+      ) {
+        return false;
+      }
+      const response =
+        payload.currentRunState.testRun.unitResponses?.[originalSampleUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const parsed = JSON.parse(response);
+        const answers = JSON.parse(parsed.unitState?.dataParts?.answers ?? "[]");
+        return answers.some(
+          answer =>
+            answer.id === "required-text-field" &&
+            answer.value === originalSampleResponse
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  const originalSampleResourceResponse = await fetch(
+    `${baseUrl}/api/v1/participant/sessions/` +
+      `${originalSampleParticipantSessionId}/resources/` +
+      "sample_resource_package/file.text"
+  );
+  assert.equal(originalSampleResourceResponse.status, 200);
+  assert.equal(
+    await originalSampleResourceResponse.text(),
+    originalSampleResourceContent
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      originalSampleParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  const resumedOriginalSampleFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await resumedOriginalSampleFrame
+    .locator('input[name="required-text-field"]')
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await resumedOriginalSampleFrame
+      .locator('input[name="required-text-field"]')
+      .inputValue(),
+    originalSampleResponse
+  );
   stopAfter("participant-verona-player");
 
   logStep("participant-original-booklet-config");

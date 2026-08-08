@@ -12338,6 +12338,320 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
   assert.equal(reviewSignIn.body.participantSession.executionMode, "run-review");
 });
 
+test("original Testcenter compatibility corpus executes the complete 17.6 sample package", async () => {
+  type PinnedFixture = {
+    fixture: string;
+    sourcePath: string;
+    sha256: string;
+    encoding?: "base64";
+  };
+  type SamplePackage = {
+    booklet: PinnedFixture & {
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    units: Array<PinnedFixture & { unitKey: string; playerKey: string }>;
+    definition: PinnedFixture;
+    codingScheme: PinnedFixture & { encoding: "base64" };
+    player: PinnedFixture & { playerKey: string };
+    resourcePackage: PinnedFixture & { encoding: "base64" };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { samplePackages: SamplePackage[] };
+  const expectation = corpus.samplePackages[0];
+  assert.ok(expectation);
+  const readPinnedFixture = (fixture: PinnedFixture): Buffer => {
+    const stored = readFileSync(
+      resolve(originalTestcenterCorpusRoot, fixture.fixture)
+    );
+    const source =
+      fixture.encoding === "base64"
+        ? Buffer.from(stored.toString("utf8").trim(), "base64")
+        : stored;
+    assert.equal(
+      createHash("sha256").update(source).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+    return source;
+  };
+
+  const tenantKey = "integration-tenant-original-sample-package";
+  const workspaceKey = "integration-workspace-original-sample-package";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const files = [
+    {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      fixture: expectation.booklet
+    },
+    {
+      fileName: "Unit.xml",
+      mediaType: "application/xml",
+      fixture: expectation.units[0]!
+    },
+    {
+      fileName: "Unit2.xml",
+      mediaType: "application/xml",
+      fixture: expectation.units[1]!
+    },
+    {
+      fileName: "SAMPLE_UNITCONTENTS.HTM",
+      mediaType: "text/html",
+      fixture: expectation.definition
+    },
+    {
+      fileName: "verona-player-simple-6.0.html",
+      mediaType: "text/html",
+      fixture: expectation.player
+    },
+    {
+      fileName: "coding-scheme.vocs.json",
+      mediaType: "application/json",
+      fixture: expectation.codingScheme
+    },
+    {
+      fileName: "sample_resource_package.itcr.zip",
+      mediaType: "application/zip",
+      fixture: expectation.resourcePackage
+    }
+  ];
+  const sourcePackages: Array<{
+    sourcePackageId: string;
+    fileName: string;
+  }> = [];
+  for (const file of files) {
+    const source = readPinnedFixture(file.fixture);
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName: file.fileName,
+        mediaType: file.mediaType,
+        sourceDocument:
+          file.fixture.encoding === "base64"
+            ? `data:${file.mediaType};base64,${source.toString("base64")}`
+            : source.toString("utf8")
+      }
+    });
+    assert.equal(upload.status, 201, file.fileName);
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const imported = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string; severity: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+  });
+  assert.equal(imported.status, 201);
+  assert.equal(
+    imported.body.importJob.status,
+    "completed",
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.equal(
+    imported.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.notEqual(
+    imported.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  const contentReleaseId = imported.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const assembledDetail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: { fileName: string };
+      dependencyGraph: {
+        edges: Array<{ relationshipType: string }>;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${imported.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    assembledDetail.body.sourcePackageDetail.sourcePackage.fileName,
+    "Booklet.workspace-dependencies.zip"
+  );
+  assert.equal(
+    assembledDetail.body.sourcePackageDetail.dependencyGraph.edges.filter(
+      edge => edge.relationshipType === "assembled_from"
+    ).length,
+    files.length
+  );
+
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              originalUnitId?: string;
+              playerKey?: string;
+              unitDefinition?: string;
+              codingScheme?: { variableCodings: Array<Record<string, unknown>> };
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+          resourceEntries?: Array<{
+            resourcePath: string;
+            dataBase64: string;
+          }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}`
+  );
+  assert.equal(release.status, 200);
+  const snapshot =
+    release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const booklet = snapshot.bookletEntries.find(
+    candidate => candidate.bookletKey === expectation.booklet.bookletKey
+  );
+  assert.ok(booklet);
+  assert.deepEqual(
+    booklet.unitEntries.map(unit => unit.unitKey),
+    expectation.booklet.unitKeys
+  );
+  const firstUnit = booklet.unitEntries[0];
+  const secondUnit = booklet.unitEntries[1];
+  const repeatedUnit = booklet.unitEntries[2];
+  assert.equal(firstUnit?.playerKey, expectation.units[0]?.playerKey);
+  assert.equal(
+    firstUnit?.unitDefinition,
+    readPinnedFixture(expectation.definition).toString("utf8").trim()
+  );
+  assert.equal(secondUnit?.playerKey, expectation.units[1]?.playerKey);
+  assert.ok((secondUnit?.codingScheme?.variableCodings.length ?? 0) > 0);
+  assert.equal(repeatedUnit?.originalUnitId, expectation.units[0]?.unitKey);
+  assert.equal(repeatedUnit?.unitDefinition, firstUnit?.unitDefinition);
+  assert.deepEqual(
+    new Set(snapshot.playerEntries?.map(player => player.playerKey)),
+    new Set(expectation.units.map(unit => unit.playerKey))
+  );
+  assert.ok(
+    snapshot.playerEntries?.every(
+      player =>
+        player.html ===
+        readPinnedFixture(expectation.player).toString("utf8")
+    )
+  );
+  const resource = snapshot.resourceEntries?.find(
+    entry => entry.resourcePath === "sample_resource_package/file.text"
+  );
+  assert.ok(resource);
+  assert.equal(
+    Buffer.from(resource.dataBase64, "base64").toString("utf8"),
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
+  );
+
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+  const originalRoster = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "rosters/Testtakers.xml"),
+    "utf8"
+  );
+  const rosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: { rosterText: originalRoster }
+    }
+  );
+  assert.equal(rosterImport.status, 201);
+  assert.deepEqual(
+    rosterImport.body.items.find(item => item.loginKey === "test-no-pw")
+      ?.validationWarnings,
+    []
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string; executionMode?: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "test-no-pw" }
+  });
+  assert.equal(signIn.status, 200);
+  assert.equal(signIn.body.participantSession.executionMode, "run-hot-restart");
+  const participantSessionId =
+    signIn.body.participantSession.participantSessionId;
+  const resumed = await requestJson<{
+    testRun: { testRunId: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.booklet.bookletKey }
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal(
+    resumed.body.testRun.currentUnitKey,
+    expectation.units[0]?.unitKey
+  );
+  const currentState = await requestJson<{
+    currentRunState: {
+      currentUnit: {
+        unitKey: string | null;
+        player?: { playerKey: string; html: string } | null;
+        unitDefinition?: string | null;
+      };
+      resourceBasePath?: string;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    currentState.body.currentRunState.currentUnit.unitKey,
+    expectation.units[0]?.unitKey
+  );
+  assert.equal(
+    currentState.body.currentRunState.currentUnit.player?.playerKey,
+    expectation.units[0]?.playerKey
+  );
+  assert.equal(
+    currentState.body.currentRunState.currentUnit.unitDefinition,
+    firstUnit?.unitDefinition
+  );
+  const resourceResponse = await fetch(
+    `${baseUrl}${currentState.body.currentRunState.resourceBasePath}` +
+      "/sample_resource_package/file.text"
+  );
+  assert.equal(resourceResponse.status, 200);
+  assert.equal(
+    await resourceResponse.text(),
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n'
+  );
+});
+
 test("original Testcenter compatibility corpus assembles loose dependency files", async () => {
   type AdaptiveDependencyPackage = {
     bookletFixture: string;

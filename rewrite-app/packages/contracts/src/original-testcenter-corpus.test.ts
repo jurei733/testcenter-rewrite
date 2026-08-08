@@ -9,6 +9,13 @@ import {
   parseParticipantRosterText
 } from "./index.js";
 
+type PinnedOriginalFixture = {
+  fixture: string;
+  sourcePath: string;
+  sha256: string;
+  encoding?: "base64";
+};
+
 type OriginalTestcenterCorpus = {
   sourceCommit: string;
   roster: {
@@ -19,6 +26,19 @@ type OriginalTestcenterCorpus = {
   resourcePackages: Array<{
     fixture: string;
     sha256: string;
+  }>;
+  samplePackages: Array<{
+    booklet: PinnedOriginalFixture & {
+      bookletKey: string;
+      unitKeys: string[];
+    };
+    units: Array<
+      PinnedOriginalFixture & { unitKey: string; playerKey: string }
+    >;
+    definition: PinnedOriginalFixture;
+    codingScheme: PinnedOriginalFixture & { encoding: "base64" };
+    player: PinnedOriginalFixture & { playerKey: string };
+    resourcePackage: PinnedOriginalFixture & { encoding: "base64" };
   }>;
   systemChecks: Array<{
     fixture: string;
@@ -290,6 +310,48 @@ test("original Testcenter compatibility corpus separates participant and operati
       "BOOKLET.SAMPLE-1",
       "BOOKLET.SAMPLE-2#bonus:yes",
       "BOOKLET.SAMPLE-2#bonus:no"
+    ]
+  );
+});
+
+test("original Testcenter compatibility corpus pins the complete 17.6 sample package", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const samplePackage = corpus.samplePackages[0];
+  assert.ok(samplePackage);
+
+  for (const pinnedFile of [
+    samplePackage.booklet,
+    ...samplePackage.units,
+    samplePackage.definition,
+    samplePackage.codingScheme,
+    samplePackage.player,
+    samplePackage.resourcePackage
+  ]) {
+    const fixtureBuffer = readFileSync(resolve(corpusRoot, pinnedFile.fixture));
+    const sourceBuffer =
+      pinnedFile.encoding === "base64"
+        ? Buffer.from(fixtureBuffer.toString("utf8").trim(), "base64")
+        : fixtureBuffer;
+    assert.equal(
+      createHash("sha256").update(sourceBuffer).digest("hex"),
+      pinnedFile.sha256,
+      pinnedFile.sourcePath
+    );
+  }
+
+  assert.equal(samplePackage.booklet.bookletKey, "BOOKLET.SAMPLE-1");
+  assert.deepEqual(samplePackage.booklet.unitKeys, [
+    "UNIT.SAMPLE",
+    "UNIT.SAMPLE-2",
+    "an_alias"
+  ]);
+  assert.deepEqual(
+    samplePackage.units.map(unit => [unit.unitKey, unit.playerKey]),
+    [
+      ["UNIT.SAMPLE", "verona-player-simple-6.0"],
+      ["UNIT.SAMPLE-2", "verona-player-simple@6.0"]
     ]
   );
 });

@@ -288,6 +288,56 @@
       "policy": { "requirePresentationComplete": "always", "requireResponseComplete": "always", "unitMenuEnabled": true }
     }
   ],
+  "samplePackages": [
+    {
+      "booklet": {
+        "fixture": "booklets/Booklet.xml",
+        "sourcePath": "sampledata/Booklet.xml",
+        "sha256": "3bcc9ef45f5c789783afb70ef55b913b42c1a50f05d2b801e15ec2043c4ee300",
+        "bookletKey": "BOOKLET.SAMPLE-1",
+        "unitKeys": ["UNIT.SAMPLE", "UNIT.SAMPLE-2", "an_alias"]
+      },
+      "units": [
+        {
+          "fixture": "units/Unit.xml",
+          "sourcePath": "sampledata/Unit.xml",
+          "sha256": "cfd09a052969a4e9dc61c16a7cecfce078816d01015ab007b2fd406c1f454a38",
+          "unitKey": "UNIT.SAMPLE",
+          "playerKey": "verona-player-simple-6.0"
+        },
+        {
+          "fixture": "units/Unit2.xml",
+          "sourcePath": "sampledata/Unit2.xml",
+          "sha256": "de54b8bcd95eb4ae902d21664029e54a023ea02837257d88b847beb6b5a945f7",
+          "unitKey": "UNIT.SAMPLE-2",
+          "playerKey": "verona-player-simple@6.0"
+        }
+      ],
+      "definition": {
+        "fixture": "definitions/SAMPLE_UNITCONTENTS.HTM",
+        "sourcePath": "sampledata/SAMPLE_UNITCONTENTS.HTM",
+        "sha256": "532310b1f4bf1eab6eaaa1603962a39566919b5669974f7b1a7dc2de4316d202"
+      },
+      "codingScheme": {
+        "fixture": "schemes/coding-scheme.vocs.json.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/coding-scheme.vocs.json",
+        "sha256": "0a0685f337e0cdf136795a467ecba92f05c8a4a2c4e142cd56e407f8827d322f"
+      },
+      "player": {
+        "fixture": "players/verona-player-simple-6.0.html",
+        "sourcePath": "sampledata/verona-player-simple-6.0.html",
+        "sha256": "e260cdc4bee370f5990390fbcbca17104d8069b43a41c4f0967e13b33fa6a38a",
+        "playerKey": "verona-player-simple-6.0"
+      },
+      "resourcePackage": {
+        "fixture": "resources/sample_resource_package.itcr.zip.base64",
+        "encoding": "base64",
+        "sourcePath": "sampledata/sample_resource_package.itcr.zip",
+        "sha256": "da2ae859b77f8a6ba09b3f61cab38ea0c5d6de5f08b9fcefef9d263aef187f4e"
+      }
+    }
+  ],
   "adaptiveDependencyPackages": [
     {
       "bookletFixture": "booklets/Booklet2.xml",

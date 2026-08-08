@@ -669,6 +669,8 @@ For runtime probes:
 
 The original Aspect 17.4 execution gate now imports the byte-exact companion `testtaker1.xml` roster and runs its real passwordless `testuser1` account in the production browser. Contract and API coverage pin the source hash, group, Custom Text, password-free and password-protected Hot-Return accounts, Review account, and password-redacted monitor migration candidate before launching the original player package.
 
+The complete original 17.6 showcase package is also an executable compatibility gate. Its seven byte-exact source files are uploaded separately and resolved into one immutable workspace dependency snapshot: `Booklet.xml`, both Units, the external `SAMPLE_UNITCONTENTS.HTM`, the Verona 6 player, the coding scheme, and the nested `.itcr.zip` resource. The importer accepts the schema-valid schemer-only empty `CodingSchemeRef` without weakening validation of non-empty references, resolves the same resource dependency declared for player and editor once, preserves legacy and modern player aliases plus the repeated Unit alias, and executes the real passwordless `test-no-pw` account with external-definition response restoration and resource delivery in the production browser.
+
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed

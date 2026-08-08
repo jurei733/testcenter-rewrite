@@ -11544,12 +11544,8 @@ const validateZipXmlEntries = (
       continue;
     }
     if (!codingSchemeReference.reference) {
-      diagnostics.push(
-        createImportDiagnostic(
-          "source_document_coding_scheme_reference_invalid",
-          `Unit ZIP entry '${entry.fileName}' contains a CodingSchemeRef without a resource path.`
-        )
-      );
+      // Original Unit 17.6 permits a schemer-only CodingSchemeRef. It selects
+      // the external/default schemer without declaring a packaged scheme.
       continue;
     }
     const codingSchemeEntry = findZipUnitCodingSchemeEntry(
