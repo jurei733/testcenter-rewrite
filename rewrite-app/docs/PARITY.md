@@ -39,6 +39,15 @@ schema position. Validation follows the declared generation: 14.x/15.x
 positive fractional duration and adaptive restriction extensions introduced
 by that schema.
 
+Latest P0 root-restriction closure: the original `Units` element is now
+retained as the synthetic root Testlet `[0]` at runtime. Its global
+`DenyNavigationOnIncomplete` values form the inherited completion baseline,
+and its `TimeMax` starts with the first Unit, remains active across nested
+Testlets, takes precedence over their timers exactly like the original parent
+timer, blocks premature completion according to `leave`, persists through the
+existing timer model, and completes the whole Booklet on expiry. Participant,
+monitor, and timer-adjustment paths share the same root timer identity.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey and DAN 3.0.0 visual-
 assessment Players. ABI retains its release example byte-for-byte; DAN uses the

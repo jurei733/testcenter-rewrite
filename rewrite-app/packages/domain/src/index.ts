@@ -517,6 +517,7 @@ export type SourcePackageBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   config?: Record<string, string>;
+  rootRestrictions?: BookletRootRestrictions;
   stateEntries?: SourcePackageBookletStateEntry[];
   testletEntries?: SourcePackageTestletEntry[];
   unitEntries: SourcePackageUnitEntry[];
@@ -565,6 +566,11 @@ export type SourcePackageBookletStateEntry = {
 };
 
 export type TestletTimeMaxLeavePolicy = "forbidden" | "confirm" | "allowed";
+
+export type BookletRootRestrictions = Pick<
+  NonNullable<SourcePackageTestletEntry["restrictions"]>,
+  "timeMax" | "denyNavigationOnIncomplete"
+>;
 
 export type SourcePackageTestletEntry = {
   testletKey: string;
@@ -737,6 +743,7 @@ export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
   policy?: BookletRuntimePolicy;
+  rootRestrictions?: BookletRootRestrictions;
   stateEntries?: SourcePackageBookletStateEntry[];
   testletEntries?: ContentReleaseTestletEntry[];
   unitEntries: ContentReleaseUnitEntry[];

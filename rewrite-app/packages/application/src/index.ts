@@ -48,6 +48,7 @@ import type {
   BookletStateCondition,
   BookletStateVariableSource,
   BookletLeaveRestriction,
+  BookletRootRestrictions,
   BookletRuntimePolicy,
   ContentReleaseActivationReadiness,
   ContentRelease,
@@ -5882,6 +5883,58 @@ const normalizeContentStructure = (
     if (bookletEntry.config && Object.keys(bookletEntry.config).length > 0) {
       normalizedBooklet.policy = compileBookletRuntimePolicy(bookletEntry.config);
     }
+    const normalizeLeaveRestriction = (
+      value: unknown
+    ): BookletLeaveRestriction | undefined => {
+      switch (String(value ?? "").trim().toLowerCase()) {
+        case "always":
+          return "always";
+        case "on":
+        case "forward":
+          return "forward";
+        case "off":
+          return "off";
+        default:
+          return undefined;
+      }
+    };
+    const rootTimeMaxMinutes = Number(
+      bookletEntry.rootRestrictions?.timeMax?.minutes
+    );
+    const rootTimeMaxLeave = bookletEntry.rootRestrictions?.timeMax?.leave;
+    const rootDenyPresentation = normalizeLeaveRestriction(
+      bookletEntry.rootRestrictions?.denyNavigationOnIncomplete?.presentation
+    );
+    const rootDenyResponse = normalizeLeaveRestriction(
+      bookletEntry.rootRestrictions?.denyNavigationOnIncomplete?.response
+    );
+    const rootRestrictions: BookletRootRestrictions = {
+      ...(Number.isFinite(rootTimeMaxMinutes) && rootTimeMaxMinutes > 0
+        ? {
+            timeMax: {
+              minutes: rootTimeMaxMinutes,
+              leave:
+                rootTimeMaxLeave === "forbidden" ||
+                rootTimeMaxLeave === "allowed"
+                  ? rootTimeMaxLeave
+                  : "confirm"
+            }
+          }
+        : {}),
+      ...(rootDenyPresentation || rootDenyResponse
+        ? {
+            denyNavigationOnIncomplete: {
+              ...(rootDenyPresentation
+                ? { presentation: rootDenyPresentation }
+                : {}),
+              ...(rootDenyResponse ? { response: rootDenyResponse } : {})
+            }
+          }
+        : {})
+    };
+    if (Object.keys(rootRestrictions).length > 0) {
+      normalizedBooklet.rootRestrictions = rootRestrictions;
+    }
     const normalizeVariableSource = (
       source: BookletStateVariableSource
     ): BookletStateVariableSource | null => {
@@ -6030,21 +6083,6 @@ const normalizeContentStructure = (
         testletEntry.restrictions?.timeMax?.minutes
       );
       const timeMaxLeave = testletEntry.restrictions?.timeMax?.leave;
-      const normalizeLeaveRestriction = (
-        value: unknown
-      ): BookletLeaveRestriction | undefined => {
-        switch (String(value ?? "").trim().toLowerCase()) {
-          case "always":
-            return "always";
-          case "on":
-          case "forward":
-            return "forward";
-          case "off":
-            return "off";
-          default:
-            return undefined;
-        }
-      };
       const denyPresentation = normalizeLeaveRestriction(
         testletEntry.restrictions?.denyNavigationOnIncomplete?.presentation
       );
@@ -10364,6 +10402,7 @@ const readXmlUnitEntryIdentity = (
   ).trim();
 
 type XmlBookletHierarchy = {
+  rootRestrictions?: BookletRootRestrictions;
   stateEntries: SourcePackageBookletStateEntry[];
   testletEntries: SourcePackageTestletEntry[];
   unitTestletPaths: Map<string, string[]>;
@@ -10404,6 +10443,20 @@ const collectXmlBookletHierarchies = (
     }
     const testletEntries: SourcePackageTestletEntry[] = [];
     const unitTestletPaths = new Map<string, string[]>();
+    const normalizeLeaveRestriction = (
+      value: string | null
+    ): BookletLeaveRestriction | undefined => {
+      switch (value?.trim().toUpperCase()) {
+        case "ALWAYS":
+          return "always";
+        case "ON":
+          return "forward";
+        case "OFF":
+          return "off";
+        default:
+          return undefined;
+      }
+    };
 
     const parseVariableSource = (
       sourceElement: XmlElement
@@ -10506,6 +10559,50 @@ const collectXmlBookletHierarchies = (
             : [];
         })
       : [];
+    const rootRestrictionsElement = xmlChildrenNamed(units, "Restrictions")[0];
+    const rootTimeMaxElement = rootRestrictionsElement
+      ? xmlChildrenNamed(rootRestrictionsElement, "TimeMax")[0]
+      : undefined;
+    const rootDenyNavigationElement = rootRestrictionsElement
+      ? xmlChildrenNamed(
+          rootRestrictionsElement,
+          "DenyNavigationOnIncomplete"
+        )[0]
+      : undefined;
+    const rootTimeMaxMinutes = Number(
+      rootTimeMaxElement?.getAttribute("minutes")?.trim() ?? ""
+    );
+    const rootTimeMaxLeave = rootTimeMaxElement?.getAttribute("leave")?.trim();
+    const rootDenyPresentation = normalizeLeaveRestriction(
+      rootDenyNavigationElement?.getAttribute("presentation") ?? null
+    );
+    const rootDenyResponse = normalizeLeaveRestriction(
+      rootDenyNavigationElement?.getAttribute("response") ?? null
+    );
+    const rootRestrictions: BookletRootRestrictions = {
+      ...(Number.isFinite(rootTimeMaxMinutes) && rootTimeMaxMinutes > 0
+        ? {
+            timeMax: {
+              minutes: rootTimeMaxMinutes,
+              leave:
+                rootTimeMaxLeave === "forbidden" ||
+                rootTimeMaxLeave === "allowed"
+                  ? rootTimeMaxLeave
+                  : "confirm"
+            }
+          }
+        : {}),
+      ...(rootDenyPresentation || rootDenyResponse
+        ? {
+            denyNavigationOnIncomplete: {
+              ...(rootDenyPresentation
+                ? { presentation: rootDenyPresentation }
+                : {}),
+              ...(rootDenyResponse ? { response: rootDenyResponse } : {})
+            }
+          }
+        : {})
+    };
 
     const visitContainer = (
       container: XmlElement,
@@ -10557,20 +10654,6 @@ const collectXmlBookletHierarchies = (
           timeMaxElement?.getAttribute("minutes")?.trim() ?? ""
         );
         const timeMaxLeave = timeMaxElement?.getAttribute("leave")?.trim();
-        const normalizeLeaveRestriction = (
-          value: string | null
-        ): BookletLeaveRestriction | undefined => {
-          switch (value?.trim().toUpperCase()) {
-            case "ALWAYS":
-              return "always";
-            case "ON":
-              return "forward";
-            case "OFF":
-              return "off";
-            default:
-              return undefined;
-          }
-        };
         const denyPresentation = normalizeLeaveRestriction(
           denyNavigationElement?.getAttribute("presentation") ?? null
         );
@@ -10647,6 +10730,7 @@ const collectXmlBookletHierarchies = (
 
     visitContainer(units, []);
     hierarchies.set(bookletKey, {
+      ...(Object.keys(rootRestrictions).length > 0 ? { rootRestrictions } : {}),
       stateEntries,
       testletEntries,
       unitTestletPaths
@@ -10839,6 +10923,9 @@ const collectXmlBookletEntries = (
           ""
       ).trim(),
       config: readBookletConfig(bookletMatch[3] ?? ""),
+      ...(hierarchy?.rootRestrictions
+        ? { rootRestrictions: hierarchy.rootRestrictions }
+        : {}),
       ...(hierarchy?.stateEntries.length
         ? { stateEntries: hierarchy.stateEntries }
         : {}),
@@ -15135,12 +15222,49 @@ const findTestletCodeGate = (input: {
   return null;
 };
 
+const originalBookletRootTestletKey = "[0]";
+
+const resolveBookletRootTestlet = (
+  booklet: ContentReleaseBookletEntry | undefined
+): SourcePackageTestletEntry | null =>
+  booklet?.rootRestrictions
+    ? {
+        testletKey: originalBookletRootTestletKey,
+        displayLabel: booklet.displayLabel,
+        parentTestletKey: null,
+        restrictions: booklet.rootRestrictions
+      }
+    : null;
+
+const resolveBookletTestletEntry = (
+  booklet: ContentReleaseBookletEntry | undefined,
+  testletKey: string
+): SourcePackageTestletEntry | null =>
+  (testletKey === originalBookletRootTestletKey
+    ? resolveBookletRootTestlet(booklet)
+    : booklet?.testletEntries?.find(
+        candidate => candidate.testletKey === testletKey
+      )) ?? null;
+
+const unitBelongsToTestlet = (
+  booklet: ContentReleaseBookletEntry,
+  unit: ContentReleaseBookletEntry["unitEntries"][number] | undefined,
+  testletKey: string
+): boolean =>
+  testletKey === originalBookletRootTestletKey
+    ? Boolean(booklet.rootRestrictions?.timeMax)
+    : Boolean(unit?.testletPath?.includes(testletKey));
+
 const resolveTimedTestletForUnit = (
   booklet: ContentReleaseBookletEntry | undefined,
   unitKey: string | null
 ): SourcePackageTestletEntry | null => {
   if (!booklet || !unitKey) {
     return null;
+  }
+  const rootTestlet = resolveBookletRootTestlet(booklet);
+  if (rootTestlet?.restrictions?.timeMax?.minutes) {
+    return rootTestlet;
   }
   const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
   for (const testletKey of unit?.testletPath ?? []) {
@@ -15351,14 +15475,18 @@ const reconcileExpiredTestletTimers = (
   let status: TestRun["status"] = testRun.status;
   let completedAt = testRun.completedAt;
   const activeExpiredTestletKey = expiredTestletKeys.find(testletKey =>
-    booklet.unitEntries
-      .find(unit => unit.unitKey === testRun.currentUnitKey)
-      ?.testletPath?.includes(testletKey)
+    unitBelongsToTestlet(
+      booklet,
+      booklet.unitEntries.find(unit => unit.unitKey === testRun.currentUnitKey),
+      testletKey
+    )
   );
   if (activeExpiredTestletKey) {
     const lastTimedUnitIndex = booklet.unitEntries.reduce(
       (lastIndex, unit, index) =>
-        unit.testletPath?.includes(activeExpiredTestletKey) ? index : lastIndex,
+        unitBelongsToTestlet(booklet, unit, activeExpiredTestletKey)
+          ? index
+          : lastIndex,
       -1
     );
     const visibleUnitKeys = new Set(
@@ -15408,6 +15536,13 @@ const findClosedTimedTestlet = (
     return null;
   }
   const unit = booklet.unitEntries.find(candidate => candidate.unitKey === unitKey);
+  const rootTimer = testRun.testletTimers?.[originalBookletRootTestletKey];
+  if (
+    booklet.rootRestrictions?.timeMax &&
+    (rootTimer?.status === "expired" || rootTimer?.status === "cancelled")
+  ) {
+    return resolveBookletRootTestlet(booklet);
+  }
   for (const testletKey of unit?.testletPath ?? []) {
     const timer = testRun.testletTimers?.[testletKey];
     if (timer?.status === "expired" || timer?.status === "cancelled") {
@@ -15446,7 +15581,9 @@ const resolveLeavingTimedTestlet = (
   const targetUnit = booklet?.unitEntries.find(
     candidate => candidate.unitKey === targetUnitKey
   );
-  return (targetUnit?.testletPath ?? []).includes(timedTestlet.testletKey)
+  return targetUnit &&
+    booklet &&
+    unitBelongsToTestlet(booklet, targetUnit, timedTestlet.testletKey)
     ? null
     : timedTestlet;
 };
@@ -15647,7 +15784,8 @@ const applyMonitorSetTestletTime = (input: {
     candidate => candidate.unitKey === input.testRun.currentUnitKey
   );
   const targetIsCurrent = Boolean(
-    currentUnit?.testletPath?.includes(timedTestlet.testletKey)
+    booklet &&
+      unitBelongsToTestlet(booklet, currentUnit, timedTestlet.testletKey)
   );
   const status =
     input.testRun.status === "running" && targetIsCurrent ? "running" : "paused";
@@ -15738,9 +15876,7 @@ const buildMonitorTestletTimers = (
 
   return Object.values(normalizedTestRun.testletTimers ?? {})
     .map(timer => {
-      const testlet = booklet?.testletEntries?.find(
-        candidate => candidate.testletKey === timer.testletKey
-      );
+      const testlet = resolveBookletTestletEntry(booklet, timer.testletKey);
       return {
         ...timer,
         displayLabel: testlet?.displayLabel ?? timer.testletKey,
@@ -15780,7 +15916,9 @@ const resolveTestletCompletenessPolicy = (
         return restriction;
       }
     }
-    return fallback;
+    return (
+      booklet?.rootRestrictions?.denyNavigationOnIncomplete?.[field] ?? fallback
+    );
   };
 
   return {

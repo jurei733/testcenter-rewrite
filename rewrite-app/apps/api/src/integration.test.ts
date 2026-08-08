@@ -17473,6 +17473,199 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
   );
 });
 
+test("original Testcenter root restrictions govern the complete booklet", async () => {
+  const tenantKey = "integration-tenant-root-restrictions";
+  const workspaceKey = "integration-workspace-root-restrictions";
+  const bookletKey = "BOOKLET.ROOT-RESTRICTIONS";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet-root-restrictions.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Booklet.xsd">
+          <Metadata><Id>${bookletKey}</Id><Label>Root Restricted Booklet</Label></Metadata>
+          <Units>
+            <Restrictions>
+              <TimeMax minutes="1" leave="forbidden" />
+              <DenyNavigationOnIncomplete response="ALWAYS" />
+            </Restrictions>
+            <Unit id="UNIT.ROOT-1" label="Root Unit One" />
+            <Testlet id="inner-timed" label="Inner Timed Block">
+              <Restrictions><TimeMax minutes="0.01" leave="allowed" /></Restrictions>
+              <Unit id="UNIT.ROOT-2" label="Root Unit Two" />
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    }
+  });
+  const importResult = await requestJson<{
+    stagedContentRelease: {
+      contentReleaseId: string;
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          rootRestrictions?: {
+            timeMax?: { minutes: number; leave: string };
+            denyNavigationOnIncomplete?: { response?: string };
+          };
+        }>;
+      };
+    } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  assert.deepEqual(
+    importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]
+      ?.rootRestrictions,
+    {
+      timeMax: { minutes: 1, leave: "forbidden" },
+      denyNavigationOnIncomplete: { response: "always" }
+    }
+  );
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "root-restrictions-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      testletTimers?: Record<string, { status: string; durationSeconds: number }>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  const testRunId = resume.body.testRun.testRunId;
+  assert.equal(resume.body.testRun.currentUnitKey, "UNIT.ROOT-1");
+  assert.deepEqual(resume.body.testRun.testletTimers?.["[0]"], {
+    ...resume.body.testRun.testletTimers?.["[0]"],
+    testletKey: "[0]",
+    status: "running",
+    durationSeconds: 60,
+    remainingSeconds: 60,
+    endedAt: null
+  });
+  assert.equal(resume.body.testRun.testletTimers?.["inner-timed"], undefined);
+
+  const blockedForward = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.ROOT-2", status: "running" }
+  });
+  assert.equal(blockedForward.status, 409);
+  assert.deepEqual(blockedForward.body.details?.deniedReasons, [
+    "response_incomplete"
+  ]);
+  const completeResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      presentationProgress: "complete",
+      responseProgress: "complete"
+    }
+  });
+  await requestJson(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.ROOT-1",
+      status: "running",
+      unitResponse: completeResponse
+    }
+  });
+  const enteredSecondUnit = await requestJson<{
+    testRun: { currentUnitKey: string | null; testletTimers?: Record<string, unknown> };
+  }>(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.ROOT-2", status: "running" }
+  });
+  assert.equal(enteredSecondUnit.status, 200);
+  assert.equal(enteredSecondUnit.body.testRun.currentUnitKey, "UNIT.ROOT-2");
+  assert.equal(enteredSecondUnit.body.testRun.testletTimers?.["inner-timed"], undefined);
+  await requestJson(`/api/v1/participant/test-runs/${testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "UNIT.ROOT-2",
+      status: "running",
+      unitResponse: completeResponse
+    }
+  });
+  const blockedCompletion = await requestJson<{
+    error: string;
+    details?: { deniedReasons?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/complete`, {
+    method: "POST",
+    body: {}
+  });
+  assert.equal(blockedCompletion.status, 409);
+  assert.deepEqual(blockedCompletion.body.details?.deniedReasons, [
+    "testlet_time_leave_forbidden"
+  ]);
+
+  const shortenedTimer = await requestJson<{
+    command: { testRun: { testletTimers?: Record<string, { durationSeconds: number }> } };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/${testRunId}/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "set_testlet_time",
+        targetUnitKey: "UNIT.ROOT-2",
+        remainingSeconds: 1,
+        actorId: "root-timer-monitor"
+      }
+    }
+  );
+  assert.equal(shortenedTimer.status, 200);
+  assert.equal(
+    shortenedTimer.body.command.testRun.testletTimers?.["[0]"]?.durationSeconds,
+    1
+  );
+  await delay(1_100);
+  const stateAfterExpiry = await requestJson<{
+    currentRunState: {
+      testRun: {
+        status: string;
+        currentUnitKey: string | null;
+        testletTimers?: Record<string, { status: string }>;
+      };
+      activeTestletTimer: unknown;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(stateAfterExpiry.body.currentRunState.testRun.status, "completed");
+  assert.equal(stateAfterExpiry.body.currentRunState.testRun.currentUnitKey, null);
+  assert.equal(
+    stateAfterExpiry.body.currentRunState.testRun.testletTimers?.["[0]"]?.status,
+    "expired"
+  );
+  assert.equal(stateAfterExpiry.body.currentRunState.activeTestletTimer, null);
+});
+
 test("original Testcenter timed testlets pause durably and close after expiry", async () => {
   const tenantKey = "integration-tenant-testlet-timer";
   const workspaceKey = "integration-workspace-testlet-timer";
