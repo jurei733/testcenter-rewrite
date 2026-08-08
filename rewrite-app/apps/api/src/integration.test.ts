@@ -12798,6 +12798,205 @@ test("original Testcenter compatibility corpus imports the historical DAN Defini
   assert.equal(snapshot.playerEntries?.[0]?.playerKey, legacy.playerKey);
 });
 
+test("original Testcenter compatibility corpus assembles the loose historical DAN graph", async () => {
+  type HistoricalDanPackage = {
+    family: string;
+    definitionFixture: string;
+    legacyTestbedPackage?: {
+      playerFixture: string;
+      playerKey: string;
+      unitFixture: string;
+    };
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { veronaPlayerFamilyPackages: HistoricalDanPackage[] };
+  const dan = corpus.veronaPlayerFamilyPackages.find(
+    playerPackage => playerPackage.family === "DAN visual assessment"
+  );
+  assert.ok(dan?.legacyTestbedPackage);
+  const legacy = dan.legacyTestbedPackage;
+  const bookletKey = "BOOKLET.LOOSE.DAN-TESTBED";
+  const unitKey = "G231mm";
+  const tenantKey = "integration-tenant-loose-historical-dan";
+  const workspaceKey = "integration-workspace-loose-historical-dan";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const files = [
+    {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Loose historical DAN</Label></Metadata>
+          <Units><Unit id="${unitKey}" label="Sprachliche Mittel MM" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "G231mm.xml",
+      mediaType: "application/xml",
+      sourceDocument: readFileSync(
+        resolve(originalTestcenterCorpusRoot, legacy.unitFixture),
+        "utf8"
+      )
+    },
+    {
+      fileName: "G231mm.voud",
+      mediaType: "application/json",
+      sourceDocument: Buffer.from(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, dan.definitionFixture),
+          "utf8"
+        ).trim(),
+        "base64"
+      ).toString("utf8")
+    },
+    {
+      fileName: "IQBVisualUnitPlayerV2.99.2.html",
+      mediaType: "text/html",
+      sourceDocument: readBrotliBase64Fixture(
+        resolve(originalTestcenterCorpusRoot, legacy.playerFixture)
+      )
+    }
+  ];
+  const sourcePackages: Array<{ sourcePackageId: string }> = [];
+  for (const file of files) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: file
+    });
+    assert.equal(upload.status, 201);
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const automaticImport = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+  });
+  assert.equal(automaticImport.status, 201);
+  assert.equal(
+    automaticImport.body.importJob.status,
+    "completed",
+    JSON.stringify(automaticImport.body.importJob.diagnostics)
+  );
+  assert.equal(
+    automaticImport.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(automaticImport.body.importJob.diagnostics)
+  );
+  assert.notEqual(
+    automaticImport.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+  const contentReleaseId =
+    automaticImport.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const snapshotDetail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: { fileName: string; mediaType: string };
+      dependencyGraph: { edges: Array<{ relationshipType: string }> };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${automaticImport.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.sourcePackage.fileName,
+    "Booklet.workspace-dependencies.zip"
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.sourcePackage.mediaType,
+    "application/zip"
+  );
+  assert.equal(
+    snapshotDetail.body.sourcePackageDetail.dependencyGraph.edges.filter(
+      edge => edge.relationshipType === "assembled_from"
+    ).length,
+    files.length
+  );
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}`
+  );
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const importedUnit = snapshot.bookletEntries
+    .find(booklet => booklet.bookletKey === bookletKey)
+    ?.unitEntries.find(unit => unit.unitKey === unitKey);
+  assert.equal(importedUnit?.playerKey, legacy.playerKey);
+  assert.match(importedUnit?.unitDefinition ?? "", /"canvasElement4"/);
+  assert.equal(snapshot.playerEntries?.[0]?.playerKey, legacy.playerKey);
+
+  const competingPlayer = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      ...files[3],
+      fileName: "IQBVisualUnitPlayerV2.99.1.html"
+    }
+  });
+  assert.equal(competingPlayer.status, 201);
+  const ambiguousImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+  });
+  assert.equal(ambiguousImport.status, 201);
+  assert.equal(ambiguousImport.body.importJob.status, "failed");
+  assert.equal(ambiguousImport.body.stagedContentRelease, null);
+  assert.deepEqual(
+    ambiguousImport.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    ["source_document_workspace_dependency_ambiguous"]
+  );
+  const ambiguousMessage =
+    ambiguousImport.body.importJob.diagnostics[0]?.message ?? "";
+  assert.match(ambiguousMessage, /IQBVisualUnitPlayerV2\.99\.1\.html/);
+  assert.match(ambiguousMessage, /IQBVisualUnitPlayerV2\.99\.2\.html/);
+});
+
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
   type PlayerUnitPackage = {
     unitKey: string;

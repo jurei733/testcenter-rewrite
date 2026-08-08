@@ -10050,9 +10050,11 @@ const collectAssemblyResourceIdentifiers = (
       identifiers.add(metadataId);
     }
   }
+  let hasJsonLdMetadata = false;
   for (const metadataMatch of text.matchAll(
     /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
   )) {
+    hasJsonLdMetadata = true;
     try {
       const metadata = JSON.parse(metadataMatch[1] ?? "") as {
         id?: unknown;
@@ -10074,6 +10076,16 @@ const collectAssemblyResourceIdentifiers = (
       }
     } catch {
       // Player metadata validation reports malformed JSON during the normal import.
+    }
+  }
+  if (!hasJsonLdMetadata && /\.html?$/i.test(baseName)) {
+    // Historical Testcenter players use names such as
+    // IQBVisualUnitPlayerV2.99.2.html while Units reference the unversioned stem.
+    const legacyVersionedPlayerName = stem.match(
+      /^(.+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][0-9A-Za-z.-]+)?$/
+    );
+    if (legacyVersionedPlayerName?.[1]) {
+      identifiers.add(legacyVersionedPlayerName[1]);
     }
   }
   return [...identifiers];
