@@ -9259,6 +9259,40 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     );
   }
 
+  const rosterDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, "rosters/CY_Logins_SM.xml"),
+    "utf8"
+  );
+  const rosterUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "CY_Logins_SM.xml",
+      mediaType: "application/xml",
+      sourceDocument: rosterDocument
+    }
+  });
+  assert.equal(rosterUpload.status, 201);
+  const duplicateRosterIdentity = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "renamed-session-logins.xml",
+        mediaType: "application/xml",
+        sourceDocument: rosterDocument
+          .replace('id="login-variants"', 'id="LOGIN-VARIANTS"')
+          .replace('name="SM-1"', 'name="sm-1"')
+      }
+    }
+  );
+  assert.equal(duplicateRosterIdentity.status, 409);
+  assert.equal(
+    duplicateRosterIdentity.body.error,
+    "source_package_testtakers_id_duplicate"
+  );
+
   const playerUpload = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
@@ -9385,6 +9419,16 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
       content: "<SysCheck><Metadata><Id>syscheck.case</Id></Metadata></SysCheck>"
     },
     {
+      fileName: "export/CY_Logins_SM.xml",
+      content: rosterDocument
+    },
+    {
+      fileName: "export/renamed-session-logins.xml",
+      content: rosterDocument
+        .replace('id="login-variants"', 'id="LOGIN-VARIANTS"')
+        .replace('name="SM-1"', 'name="sm-1"')
+    },
+    {
       fileName: "export/players/verona-player-simple-6.0.html",
       content: originalPlayerHtml
     },
@@ -9426,12 +9470,20 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
       expectation.diagnosticCode,
       "testcenter_xml_unit_id_duplicate",
       "testcenter_xml_syscheck_id_duplicate",
+      "testcenter_xml_testtakers_id_duplicate",
       "testcenter_resource_id_duplicate"
     ]
   );
   assert.match(
     packageImport.body.importJob.diagnostics[0]?.message ?? "",
     /Booklet\.xml.*Booklet_sameBookletID\.xml.*BOOKLET\.SAMPLE-100/
+  );
+  assert.match(
+    packageImport.body.importJob.diagnostics.find(
+      diagnostic =>
+        diagnostic.code === "testcenter_xml_testtakers_id_duplicate"
+    )?.message ?? "",
+    /CY_Logins_SM\.xml.*renamed-session-logins\.xml.*group and login assignments/
   );
   assert.equal(packageImport.body.stagedContentRelease, null);
 

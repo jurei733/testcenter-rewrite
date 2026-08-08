@@ -1,4 +1,10 @@
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  scryptSync,
+  timingSafeEqual
+} from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 
 import { DOMParser } from "@xmldom/xmldom";
@@ -1747,6 +1753,63 @@ const decodePersistedSourceDocument = (
 type TestcenterXmlFileIdentity = {
   fileType: "Booklet" | "Unit" | "SysCheck" | "Testtakers";
   id: string;
+  source: "metadata" | "roster";
+};
+
+const readTesttakersRosterIdentity = (
+  sourceDocument: string
+): TestcenterXmlFileIdentity | null => {
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(level, message) {
+        if (level === "error" || level === "fatalError") {
+          parserErrors.push(message);
+        }
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return null;
+  }
+  const root = document?.documentElement;
+  if (
+    parserErrors.length > 0 ||
+    !root ||
+    xmlElementLocalName(root).toLowerCase() !== "testtakers"
+  ) {
+    return null;
+  }
+
+  const groupIdentities = xmlChildrenNamed(root, "Group").map(group => {
+    const groupId = group.getAttribute("id")?.trim().toLowerCase() ?? "";
+    const loginNames = xmlChildrenNamed(group, "Login")
+      .map(login => login.getAttribute("name")?.trim().toLowerCase() ?? "")
+      .sort();
+    return { groupId, loginNames };
+  });
+  if (
+    groupIdentities.length === 0 ||
+    groupIdentities.some(
+      groupIdentity =>
+        !groupIdentity.groupId ||
+        groupIdentity.loginNames.length === 0 ||
+        groupIdentity.loginNames.some(loginName => !loginName)
+    )
+  ) {
+    return null;
+  }
+  groupIdentities.sort((left, right) =>
+    left.groupId.localeCompare(right.groupId)
+  );
+  const rosterDigest = createHash("sha256")
+    .update(JSON.stringify(groupIdentities))
+    .digest("hex");
+  return {
+    fileType: "Testtakers",
+    id: `roster:${rosterDigest}`,
+    source: "roster"
+  };
 };
 
 const readTestcenterXmlFileIdentity = (
@@ -1776,7 +1839,12 @@ const readTestcenterXmlFileIdentity = (
     /<((?:[A-Za-z_][\w.-]*:)?Id)\b[^>]*>([\s\S]*?)<\/\1>/i
   )?.[2];
   const id = encodedId ? decodeXmlTextContent(encodedId).trim() : "";
-  return id ? { fileType, id } : null;
+  if (id) {
+    return { fileType, id, source: "metadata" };
+  }
+  return fileType === "Testtakers"
+    ? readTesttakersRosterIdentity(sourceDocument)
+    : null;
 };
 
 const readStandaloneTestcenterXmlFileIdentity = (
@@ -11217,10 +11285,14 @@ const validateZipXmlEntries = (
       const existingIdentitySourceFile =
         xmlIdentitySourceFileByKey.get(identityKey);
       if (existingIdentitySourceFile) {
+        const identityDescription =
+          xmlFileIdentity.source === "roster"
+            ? "the same case-insensitive group and login assignments"
+            : `duplicate ${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}'`;
         diagnostics.push(
           createImportDiagnostic(
             `testcenter_xml_${xmlFileIdentity.fileType.toLowerCase()}_id_duplicate`,
-            `Original Testcenter ZIP entries '${existingIdentitySourceFile}' and '${entry.fileName}' contain duplicate ${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}'.`
+            `Original Testcenter ZIP entries '${existingIdentitySourceFile}' and '${entry.fileName}' contain ${identityDescription}.`
           )
         );
       } else {
@@ -19209,10 +19281,14 @@ export const createFirstSliceServices = (
           : null;
         if (xmlFileIdentity && duplicateIdentity) {
           const normalizedFileType = xmlFileIdentity.fileType.toLowerCase();
+          const identityConflict =
+            xmlFileIdentity.source === "roster"
+              ? "A Testtakers roster with the same case-insensitive group and login assignments already exists"
+              : `${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}' already exists`;
           throw new FirstSliceError(
             409,
             `source_package_${normalizedFileType}_id_duplicate`,
-            `${xmlFileIdentity.fileType} id '${xmlFileIdentity.id}' already exists in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
+            `${identityConflict} in source package '${duplicateIdentity.fileName}'. Create a replacement for source package '${duplicateIdentity.sourcePackageId}' to preserve its version history.`
           );
         }
         const veronaPlayerResourceId =
