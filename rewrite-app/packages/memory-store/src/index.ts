@@ -90,6 +90,29 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       state.adminUsers.set(adminUser.adminUserId, adminUser);
       state.adminUsersByUsername.set(adminUser.username, adminUser);
     },
+    async deleteAdminUser(adminUserId) {
+      const adminUser = state.adminUsers.get(adminUserId);
+      if (adminUser) {
+        state.adminUsers.delete(adminUserId);
+        state.adminUsersByUsername.delete(adminUser.username);
+      }
+      let deletedRoleAssignmentCount = 0;
+      for (const [roleAssignmentId, roleAssignment] of
+        state.adminRoleAssignments.entries()) {
+        if (roleAssignment.adminUserId === adminUserId) {
+          state.adminRoleAssignments.delete(roleAssignmentId);
+          deletedRoleAssignmentCount += 1;
+        }
+      }
+      let deletedSessionCount = 0;
+      for (const [token, adminSession] of state.adminSessionsByToken.entries()) {
+        if (adminSession.adminUserId === adminUserId) {
+          state.adminSessionsByToken.delete(token);
+          deletedSessionCount += 1;
+        }
+      }
+      return { deletedRoleAssignmentCount, deletedSessionCount };
+    },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       return Array.from(state.adminRoleAssignments.values()).filter(
         roleAssignment => roleAssignment.adminUserId === adminUserId

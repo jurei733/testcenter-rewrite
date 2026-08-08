@@ -518,7 +518,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <div class="actions">
           <button id="adminBatchStatusButton" class="danger" type="button" [disabled]="!view.canUpdateAdminUserBatchStatus" (click)="view.confirmUpdateAdminUserBatchStatus()">Update Selected Accounts</button>
-          <button id="clearAdminBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminUserBatchCount === 0 && !view.adminUserStatusBatchResult && !view.adminUserRoleBatchResult && !view.adminUserPasswordBatchResult" (click)="view.clearAdminUserBatchSelection()">Clear Batch</button>
+          <button id="adminBatchDeleteButton" class="danger" type="button" [disabled]="!view.canDeleteAdminUserBatch" (click)="view.confirmDeleteAdminUserBatch()">Permanently Delete Selected Accounts</button>
+          <button id="clearAdminBatchSelectionButton" class="ghost" type="button" [disabled]="view.adminUserBatchCount === 0 && !view.adminUserStatusBatchResult && !view.adminUserRoleBatchResult && !view.adminUserPasswordBatchResult && !view.adminUserDeletionBatchResult" (click)="view.clearAdminUserBatchSelection()">Clear Batch</button>
         </div>
       </article>
 

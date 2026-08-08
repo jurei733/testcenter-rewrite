@@ -862,6 +862,15 @@ export type AdminDirectoryPort = {
     displayName?: string;
     status?: AdminUserStatus;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
+  deleteAdminUser(input: {
+    sessionToken: string;
+    adminUserId: string;
+  }): Promise<{
+    adminUserId: string;
+    username: string;
+    deletedRoleAssignmentCount: number;
+    deletedSessionCount: number;
+  }>;
   resetAdminUserPassword(input: {
     sessionToken: string;
     adminUserId: string;
@@ -1040,6 +1049,10 @@ export type FirstSliceRepository = {
   getAdminUserById(adminUserId: string): Promise<AdminUser | null>;
   getAdminUserByUsername(username: string): Promise<AdminUser | null>;
   saveAdminUser(adminUser: AdminUser): Promise<void>;
+  deleteAdminUser(adminUserId: string): Promise<{
+    deletedRoleAssignmentCount: number;
+    deletedSessionCount: number;
+  }>;
   listAdminRoleAssignmentsByUserId(
     adminUserId: string
   ): Promise<AdminRoleAssignment[]>;
@@ -17660,6 +17673,54 @@ export const createFirstSliceServices = (
         });
 
         return directoryItem;
+      },
+      async deleteAdminUser(input) {
+        const currentSession = await requireActiveAdminSession(
+          repository,
+          input.sessionToken,
+          now()
+        );
+        requireAdminManagementRole(currentSession.roleAssignments);
+
+        const adminUser = await requireAdminUser(repository, input.adminUserId);
+        if (adminUser.adminUserId === currentSession.adminUser.adminUserId) {
+          throw new FirstSliceError(
+            409,
+            "admin_self_delete_forbidden",
+            "The active admin user cannot delete their own account."
+          );
+        }
+        const targetRoleAssignments = await listAdminRoleAssignmentsForUser(
+          repository,
+          adminUser.adminUserId
+        );
+        requireManageableAdminUser(
+          currentSession.roleAssignments,
+          targetRoleAssignments
+        );
+
+        const deletion = await repository.deleteAdminUser(adminUser.adminUserId);
+        await recordAdminAuditEvent({
+          eventType: "admin_user_deleted",
+          actorAdminUserId: currentSession.adminUser.adminUserId,
+          subjectAdminUserId: adminUser.adminUserId,
+          summary: `Admin '${currentSession.adminUser.username}' deleted user '${adminUser.username}'.`,
+          details: {
+            username: adminUser.username,
+            displayName: adminUser.displayName,
+            status: adminUser.status,
+            roleAssignments: targetRoleAssignments.map(
+              summarizeAdminRoleAssignment
+            ),
+            ...deletion
+          }
+        });
+
+        return {
+          adminUserId: adminUser.adminUserId,
+          username: adminUser.username,
+          ...deletion
+        };
       },
       async resetAdminUserPassword(input) {
         const currentSession = await requireActiveAdminSession(

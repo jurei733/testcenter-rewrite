@@ -221,6 +221,30 @@ export const createFileFirstSliceRepository = (
         state.adminUsers[adminUser.adminUserId] = adminUser;
       });
     },
+    async deleteAdminUser(adminUserId) {
+      return mutate(state => {
+        delete state.adminUsers[adminUserId];
+        let deletedRoleAssignmentCount = 0;
+        for (const [roleAssignmentId, roleAssignment] of Object.entries(
+          state.adminRoleAssignments
+        )) {
+          if (roleAssignment.adminUserId === adminUserId) {
+            delete state.adminRoleAssignments[roleAssignmentId];
+            deletedRoleAssignmentCount += 1;
+          }
+        }
+        let deletedSessionCount = 0;
+        for (const [adminSessionId, adminSession] of Object.entries(
+          state.adminSessions
+        )) {
+          if (adminSession.adminUserId === adminUserId) {
+            delete state.adminSessions[adminSessionId];
+            deletedSessionCount += 1;
+          }
+        }
+        return { deletedRoleAssignmentCount, deletedSessionCount };
+      });
+    },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const state = await getState();
       return Object.values(state.adminRoleAssignments)

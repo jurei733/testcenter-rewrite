@@ -1239,6 +1239,31 @@ export const createSqliteFirstSliceRepository = (
           adminUser.createdAt
         );
     },
+    async deleteAdminUser(adminUserId) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const deletedRoleAssignmentCount = Number(
+          database
+            .prepare(
+              `DELETE FROM admin_role_assignments WHERE admin_user_id = ?`
+            )
+            .run(adminUserId).changes
+        );
+        const deletedSessionCount = Number(
+          database
+            .prepare(`DELETE FROM admin_sessions WHERE admin_user_id = ?`)
+            .run(adminUserId).changes
+        );
+        database
+          .prepare(`DELETE FROM admin_users WHERE admin_user_id = ?`)
+          .run(adminUserId);
+        database.exec("COMMIT");
+        return { deletedRoleAssignmentCount, deletedSessionCount };
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       const rows = database
         .prepare(

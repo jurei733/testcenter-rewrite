@@ -1848,6 +1848,7 @@ export const productionApiRoutes = {
     listUsers: "/api/v1/admin/users",
     createUser: "/api/v1/admin/users",
     updateUser: "/api/v1/admin/users/:adminUserId",
+    deleteUser: "/api/v1/admin/users/:adminUserId",
     resetPassword: "/api/v1/admin/users/:adminUserId/password",
     assignRole: "/api/v1/admin/users/:adminUserId/role-assignments",
     revokeRole:
@@ -2552,6 +2553,13 @@ export type ListAdminUsersResponse = {
 export type CreateAdminUserResponse = AdminUserDirectoryItem;
 
 export type UpdateAdminUserResponse = AdminUserDirectoryItem;
+
+export type DeleteAdminUserResponse = {
+  adminUserId: string;
+  username: string;
+  deletedRoleAssignmentCount: number;
+  deletedSessionCount: number;
+};
 
 export type ResetAdminUserPasswordResponse = AdminUserDirectoryItem;
 

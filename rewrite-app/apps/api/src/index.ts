@@ -31,6 +31,7 @@ import {
   type CompleteTestRunResponse,
   type CreateAdminUserRequest,
   type CreateAdminUserResponse,
+  type DeleteAdminUserResponse,
   type CreateImportJobRequest,
   type CreateImportJobResponse,
   type CreateParticipantReviewRequest,
@@ -2437,6 +2438,10 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     return `PATCH ${productionApiRoutes.admin.updateUser}`;
   }
 
+  if (method === "DELETE" && adminUserUpdatePattern.test(pathname)) {
+    return `DELETE ${productionApiRoutes.admin.deleteUser}`;
+  }
+
   if (method === "POST" && adminUserResetPasswordPattern.test(pathname)) {
     return `POST ${productionApiRoutes.admin.resetPassword}`;
   }
@@ -3930,6 +3935,27 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const adminUserUpdateMatch = adminUserUpdatePattern.exec(pathname);
+      if (request.method === "DELETE" && adminUserUpdateMatch?.groups) {
+        const adminUserId = decodeRouteGroup(
+          adminUserUpdateMatch.groups.adminUserId
+        );
+        if (!adminUserId) {
+          sendError(response, 400, "invalid_admin_user_id", "adminUserId is required.");
+          return;
+        }
+
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+
+        const deletion = await services.adminDirectory.deleteAdminUser({
+          sessionToken,
+          adminUserId
+        });
+        sendJson<DeleteAdminUserResponse>(response, 200, deletion);
+        return;
+      }
       if (request.method === "PATCH" && adminUserUpdateMatch?.groups) {
         const adminUserId = decodeRouteGroup(
           adminUserUpdateMatch.groups.adminUserId

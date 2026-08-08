@@ -1670,6 +1670,194 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(revokedSession.body.error, "admin_session_invalid");
 });
 
+test("admin deletion removes roles and sessions while retaining audit evidence", async () => {
+  let platformSignIn = await requestJson<{
+    adminUser: { adminUserId: string };
+    sessionToken: string;
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "integration.admin",
+      password: "integration-secret"
+    }
+  });
+  if (platformSignIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    platformSignIn = await requestJson<{
+      adminUser: { adminUserId: string };
+      sessionToken: string;
+    }>("/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "integration-secret"
+      }
+    });
+  }
+  assert.equal(platformSignIn.status, 200);
+
+  const tenantKey = "admin-deletion-tenant";
+  const workspaceKey = "admin-deletion-workspace";
+  const tenant = await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: "Admin Deletion Tenant" }
+  });
+  assert.equal(tenant.status, 201);
+  const workspace = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces`,
+    {
+      method: "POST",
+      body: { workspaceKey, displayName: "Admin Deletion Workspace" }
+    }
+  );
+  assert.equal(workspace.status, 201);
+
+  const selfDeletion = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${platformSignIn.body.adminUser.adminUserId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${platformSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(selfDeletion.status, 409);
+  assert.equal(selfDeletion.body.error, "admin_self_delete_forbidden");
+
+  const victim = await requestJson<{
+    adminUser: { adminUserId: string; username: string };
+    roleAssignments: Array<{ roleAssignmentId: string }>;
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${platformSignIn.body.sessionToken}`
+    },
+    body: {
+      username: "delete.me",
+      password: "delete-me-secret",
+      roleAssignments: [
+        {
+          role: "workspace_admin",
+          tenantKey,
+          workspaceKey
+        }
+      ]
+    }
+  });
+  assert.equal(victim.status, 201);
+  assert.equal(victim.body.roleAssignments.length, 1);
+
+  const victimSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: { username: "delete.me", password: "delete-me-secret" }
+  });
+  assert.equal(victimSignIn.status, 200);
+
+  const missingDeletionSession = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${victim.body.adminUser.adminUserId}`,
+    { method: "DELETE" }
+  );
+  assert.equal(missingDeletionSession.status, 401);
+  assert.equal(missingDeletionSession.body.error, "admin_session_missing");
+
+  const deletion = await requestJson<{
+    adminUserId: string;
+    username: string;
+    deletedRoleAssignmentCount: number;
+    deletedSessionCount: number;
+  }>(`/api/v1/admin/users/${victim.body.adminUser.adminUserId}`, {
+    method: "DELETE",
+    headers: {
+      authorization: `Bearer ${platformSignIn.body.sessionToken}`
+    }
+  });
+  assert.equal(deletion.status, 200);
+  assert.deepEqual(deletion.body, {
+    adminUserId: victim.body.adminUser.adminUserId,
+    username: "delete.me",
+    deletedRoleAssignmentCount: 1,
+    deletedSessionCount: 1
+  });
+
+  const deletedSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session",
+    {
+      headers: { authorization: `Bearer ${victimSignIn.body.sessionToken}` }
+    }
+  );
+  assert.equal(deletedSession.status, 401);
+  assert.equal(deletedSession.body.error, "admin_session_invalid");
+
+  const deletedSignIn = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: { username: "delete.me", password: "delete-me-secret" }
+    }
+  );
+  assert.equal(deletedSignIn.status, 401);
+  assert.equal(deletedSignIn.body.error, "admin_credentials_invalid");
+
+  const directory = await requestJson<{
+    items: Array<{ adminUser: { adminUserId: string } }>;
+  }>("/api/v1/admin/users?username=delete.me", {
+    headers: {
+      authorization: `Bearer ${platformSignIn.body.sessionToken}`
+    }
+  });
+  assert.equal(directory.status, 200);
+  assert.equal(directory.body.items.length, 0);
+
+  const deletionAudit = await requestJson<{
+    items: Array<{
+      eventType: string;
+      subjectAdminUserId: string | null;
+      details: Record<string, unknown>;
+    }>;
+  }>(
+    `/api/v1/admin/audit-events?eventType=admin_user_deleted&subjectAdminUserId=${victim.body.adminUser.adminUserId}`,
+    {
+      headers: {
+        authorization: `Bearer ${platformSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(deletionAudit.status, 200);
+  assert.equal(deletionAudit.body.items.length, 1);
+  assert.equal(
+    deletionAudit.body.items[0]?.subjectAdminUserId,
+    victim.body.adminUser.adminUserId
+  );
+  assert.equal(
+    deletionAudit.body.items[0]?.details["deletedRoleAssignmentCount"],
+    1
+  );
+  assert.equal(deletionAudit.body.items[0]?.details["deletedSessionCount"], 1);
+
+  const repeatedDeletion = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${victim.body.adminUser.adminUserId}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${platformSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(repeatedDeletion.status, 404);
+  assert.equal(repeatedDeletion.body.error, "admin_user_not_found");
+});
+
 test("operator API enforces authenticated and scoped admin bearer roles", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -3028,6 +3216,45 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       ),
       false
     );
+
+    const platformAdminDirectory = await requestJsonAt<{
+      items: Array<{
+        adminUser: { adminUserId: string; username: string };
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users?username=required.admin", {
+      headers: adminHeaders
+    });
+    assert.equal(platformAdminDirectory.status, 200);
+    const platformAdmin = platformAdminDirectory.body.items.find(
+      item => item.adminUser.username === "required.admin"
+    );
+    assert.ok(platformAdmin);
+
+    const rejectedHigherScopeDeletion = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      `/api/v1/admin/users/${platformAdmin.adminUser.adminUserId}`,
+      { method: "DELETE", headers: tenantAdminHeaders }
+    );
+    assert.equal(rejectedHigherScopeDeletion.status, 403);
+    assert.equal(
+      rejectedHigherScopeDeletion.body.error,
+      "admin_delegation_scope_required"
+    );
+
+    const delegatedDeletion = await requestJsonAt<{
+      adminUserId: string;
+      deletedRoleAssignmentCount: number;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/admin/users/${delegatedStudyMonitor.body.adminUser.adminUserId}`,
+      { method: "DELETE", headers: tenantAdminHeaders }
+    );
+    assert.equal(delegatedDeletion.status, 200);
+    assert.equal(
+      delegatedDeletion.body.adminUserId,
+      delegatedStudyMonitor.body.adminUser.adminUserId
+    );
+    assert.equal(delegatedDeletion.body.deletedRoleAssignmentCount, 1);
   } finally {
     await closeServer(isolated.server);
   }

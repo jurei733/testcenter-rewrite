@@ -2664,6 +2664,96 @@ try {
     .waitFor({ timeout: 15_000 });
   stopAfter("admin-audit-events");
 
+  await page
+    .getByRole("button", { name: "Clear User Filters", exact: true })
+    .click();
+  await clickAction("Admin Users");
+  await clickCardAction("Admin Users", "Add To Batch", workspaceAdminUsername);
+  await clickCardAction(
+    "Admin Users",
+    "Add To Batch",
+    delegatedWorkspaceAdminUsername
+  );
+  await selectedAdminAccounts
+    .filter({ hasText: workspaceAdminUserId })
+    .filter({ hasText: delegatedWorkspaceAdminUserId })
+    .waitFor();
+  await page
+    .locator("#adminUserBatchStatusCard")
+    .filter({ hasText: "2/50 selected" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#adminBatchDeleteButton");
+  logStep("admin-user-bulk-delete");
+  const deleteAdminBatchDialog = acceptNextDialog(
+    /Permanently delete 2 selected admin user\(s\)\? Their sessions and role assignments will be removed; audit evidence will be retained\. This cannot be undone\./
+  );
+  await page.locator("#adminBatchDeleteButton").click();
+  await deleteAdminBatchDialog;
+  await waitForBusy("admin-user-bulk-delete");
+  await waitForNotBusy("admin-user-bulk-delete");
+  await selectedAdminAccounts
+    .filter({ hasText: "Last Deleted" })
+    .filter({ hasText: "Deleted Sessions" })
+    .filter({ hasText: "Deleted Role Assignments" })
+    .filter({ hasText: "Deletion Failure Details" })
+    .waitFor();
+  const adminDeletionPreviewText = await selectedAdminAccounts.innerText();
+  assert.match(
+    adminDeletionPreviewText,
+    /LAST DELETED\s+2/,
+    adminDeletionPreviewText
+  );
+  const remainingAdminUsersResponse = await fetch(
+    `${baseUrl}/api/v1/admin/users?limit=100`,
+    { headers: { authorization: `Bearer ${smokeAdminSessionToken}` } }
+  );
+  assert.equal(remainingAdminUsersResponse.status, 200);
+  const remainingAdminUsers = await remainingAdminUsersResponse.json();
+  assert.equal(
+    remainingAdminUsers.items.some(item =>
+      [workspaceAdminUserId, delegatedWorkspaceAdminUserId].includes(
+        item?.adminUser?.adminUserId
+      )
+    ),
+    false
+  );
+  const deletionAuditResponse = await fetch(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=admin_user_deleted&limit=10`,
+    { headers: { authorization: `Bearer ${smokeAdminSessionToken}` } }
+  );
+  assert.equal(deletionAuditResponse.status, 200);
+  const deletionAudit = await deletionAuditResponse.json();
+  for (const deletedAdminUserId of [
+    workspaceAdminUserId,
+    delegatedWorkspaceAdminUserId
+  ]) {
+    assert.equal(
+      deletionAudit.items.some(
+        item =>
+          item?.eventType === "admin_user_deleted" &&
+          item?.subjectAdminUserId === deletedAdminUserId &&
+          Number(item?.details?.deletedRoleAssignmentCount) >= 1 &&
+          Number(item?.details?.deletedSessionCount) >= 1
+      ),
+      true
+    );
+  }
+  const deletedAdminSessionsResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sessions?limit=100`,
+    { headers: { authorization: `Bearer ${smokeAdminSessionToken}` } }
+  );
+  assert.equal(deletedAdminSessionsResponse.status, 200);
+  const deletedAdminSessions = await deletedAdminSessionsResponse.json();
+  assert.equal(
+    deletedAdminSessions.items.some(item =>
+      [workspaceAdminUserId, delegatedWorkspaceAdminUserId].includes(
+        item?.adminUser?.adminUserId
+      )
+    ),
+    false
+  );
+  stopAfter("admin-user-bulk-delete");
+
   logStep("nav-content");
   await page.locator('[data-view-nav="content"]').click();
   await page.waitForURL(/\/app\/content$/);

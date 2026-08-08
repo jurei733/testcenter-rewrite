@@ -17,6 +17,7 @@ export type AdminAuditEventType =
   | "admin_session_revoked"
   | "admin_user_created"
   | "admin_user_updated"
+  | "admin_user_deleted"
   | "admin_password_reset"
   | "admin_role_assigned"
   | "admin_role_revoked";
@@ -228,6 +229,7 @@ export const adminAuditEventTypes = [
   "admin_session_revoked",
   "admin_user_created",
   "admin_user_updated",
+  "admin_user_deleted",
   "admin_password_reset",
   "admin_role_assigned",
   "admin_role_revoked"

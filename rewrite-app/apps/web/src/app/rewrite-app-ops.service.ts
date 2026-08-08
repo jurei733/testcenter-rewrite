@@ -10,6 +10,7 @@ import type {
   BootstrapAdminUserResponse,
   CreateAdminUserRequest,
   CreateAdminUserResponse,
+  DeleteAdminUserResponse,
   GetAdminCurrentSessionResponse,
   ListAdminSessionsResponse,
   ListAdminAuditEventsResponse,
@@ -56,6 +57,15 @@ export type AdminUserStatusBatchResult = {
 export type AdminUserRoleBatchResult = {
   requestedCount: number;
   succeededAdminUserIds: string[];
+  failures: Array<{
+    adminUserId: string;
+    error: string;
+  }>;
+};
+
+export type AdminUserDeletionBatchResult = {
+  requestedCount: number;
+  deletions: DeleteAdminUserResponse[];
   failures: Array<{
     adminUserId: string;
     error: string;
@@ -639,6 +649,52 @@ export class RewriteAppOpsService {
     return {
       requestedCount: uniqueAdminUserIds.length,
       succeededAdminUserIds,
+      failures
+    };
+  }
+
+  async deleteAdminUsers(
+    adminUserIds: string[]
+  ): Promise<AdminUserDeletionBatchResult> {
+    if (!this.hasAdminSession()) {
+      return { requestedCount: 0, deletions: [], failures: [] };
+    }
+
+    const uniqueAdminUserIds = [
+      ...new Set(adminUserIds.map(adminUserId => adminUserId.trim()).filter(Boolean))
+    ].slice(0, 50);
+    const deletions: DeleteAdminUserResponse[] = [];
+    const failures: AdminUserDeletionBatchResult["failures"] = [];
+
+    for (const adminUserId of uniqueAdminUserIds) {
+      try {
+        deletions.push(
+          await this.requestState.request<DeleteAdminUserResponse>(
+            "Delete Selected Admin User",
+            "DELETE",
+            resolveRoutePath(productionApiRoutes.admin.deleteUser, { adminUserId }),
+            undefined,
+            { headers: this.createAdminHeaders(), quiet: true }
+          )
+        );
+      } catch (error) {
+        failures.push({
+          adminUserId,
+          error: this.requestState.isApiError(error)
+            ? error.error
+            : "unexpected_error"
+        });
+      }
+    }
+
+    this.feedback.rememberActivity(
+      "Admin User Batch Deleted",
+      `${deletions.length}/${uniqueAdminUserIds.length} selected account(s) were deleted with their sessions and role assignments; ${failures.length} failed.`
+    );
+    await this.refreshAdminUsers();
+    return {
+      requestedCount: uniqueAdminUserIds.length,
+      deletions,
       failures
     };
   }

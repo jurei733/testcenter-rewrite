@@ -33,6 +33,7 @@ import {
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import {
   RewriteAppOpsService,
+  type AdminUserDeletionBatchResult,
   type AdminUserPasswordBatchCredential,
   type AdminUserPasswordBatchResult,
   type AdminUserRoleBatchResult,
@@ -197,6 +198,7 @@ export class OpsViewFacade {
   adminUserStatusBatchResult: AdminUserStatusBatchResult | null = null;
   adminUserRoleBatchResult: AdminUserRoleBatchResult | null = null;
   adminUserPasswordBatchResult: AdminUserPasswordBatchResult | null = null;
+  adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
 
@@ -520,6 +522,14 @@ export class OpsViewFacade {
     );
   }
 
+  get canDeleteAdminUserBatch(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminUserBatchCount > 0
+    );
+  }
+
   get canDownloadAdminUserBatchPasswords(): boolean {
     return Boolean(this.adminUserPasswordBatchResult?.credentials.length);
   }
@@ -752,6 +762,7 @@ export class OpsViewFacade {
     const selectedAdminUserIds = [...this.adminUserBatchSelection];
     this.viewState.onActionAsync(async () => {
       this.adminUserPasswordBatchResult = null;
+      this.adminUserDeletionBatchResult = null;
       const result = await this.opsService.updateAdminUsersStatus(
         selectedAdminUserIds,
         status
@@ -779,6 +790,7 @@ export class OpsViewFacade {
     const selectedAdminUserIds = [...this.adminUserBatchSelection];
     this.viewState.onActionAsync(async () => {
       this.adminUserPasswordBatchResult = null;
+      this.adminUserDeletionBatchResult = null;
       const result = await this.opsService.assignAdminRoles(selectedAdminUserIds);
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = result;
@@ -788,11 +800,36 @@ export class OpsViewFacade {
     });
   }
 
+  confirmDeleteAdminUserBatch(): void {
+    if (!this.canDeleteAdminUserBatch) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Permanently delete ${this.adminUserBatchCount} selected admin user(s)? Their sessions and role assignments will be removed; audit evidence will be retained. This cannot be undone.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const selectedAdminUserIds = [...this.adminUserBatchSelection];
+    this.viewState.onActionAsync(async () => {
+      this.adminUserPasswordBatchResult = null;
+      const result = await this.opsService.deleteAdminUsers(selectedAdminUserIds);
+      this.adminUserStatusBatchResult = null;
+      this.adminUserRoleBatchResult = null;
+      this.adminUserDeletionBatchResult = result;
+      for (const deletion of result.deletions) {
+        this.adminUserBatchSelection.delete(deletion.adminUserId);
+      }
+    });
+  }
+
   clearAdminUserBatchSelection(): void {
     this.adminUserBatchSelection.clear();
     this.adminUserStatusBatchResult = null;
     this.adminUserRoleBatchResult = null;
     this.adminUserPasswordBatchResult = null;
+    this.adminUserDeletionBatchResult = null;
   }
 
   confirmResetAdminUserBatchPasswords(): void {
@@ -837,6 +874,7 @@ export class OpsViewFacade {
         this.adminUserPasswordBatchResult?.credentials ?? [];
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = null;
+      this.adminUserDeletionBatchResult = null;
       this.adminUserPasswordBatchResult = {
         requestedCount: result.requestedCount,
         credentials: [
@@ -992,6 +1030,7 @@ export class OpsViewFacade {
       }
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = null;
+      this.adminUserDeletionBatchResult = null;
       return;
     }
 
@@ -1591,7 +1630,14 @@ export class OpsViewFacade {
     const result = this.adminUserStatusBatchResult;
     const roleResult = this.adminUserRoleBatchResult;
     const passwordResult = this.adminUserPasswordBatchResult;
-    if (selectedUsers.length === 0 && !result && !roleResult && !passwordResult) {
+    const deletionResult = this.adminUserDeletionBatchResult;
+    if (
+      selectedUsers.length === 0 &&
+      !result &&
+      !roleResult &&
+      !passwordResult &&
+      !deletionResult
+    ) {
       return [];
     }
 
@@ -1662,6 +1708,36 @@ export class OpsViewFacade {
                   failure =>
                     `${failure.username} (${failure.adminUserId}): ${failure.error}`
                 )
+                .join(" | ") || "none"
+          },
+          {
+            label: "Last Deleted",
+            value: String(deletionResult?.deletions.length ?? 0)
+          },
+          {
+            label: "Deleted Sessions",
+            value: String(
+              deletionResult?.deletions.reduce(
+                (count, deletion) => count + deletion.deletedSessionCount,
+                0
+              ) ?? 0
+            )
+          },
+          {
+            label: "Deleted Role Assignments",
+            value: String(
+              deletionResult?.deletions.reduce(
+                (count, deletion) =>
+                  count + deletion.deletedRoleAssignmentCount,
+                0
+              ) ?? 0
+            )
+          },
+          {
+            label: "Deletion Failure Details",
+            value:
+              deletionResult?.failures
+                .map(failure => `${failure.adminUserId}: ${failure.error}`)
                 .join(" | ") || "none"
           }
         ]

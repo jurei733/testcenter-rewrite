@@ -1185,6 +1185,33 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         ]
       );
     },
+    async deleteAdminUser(adminUserId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const deletedRoleAssignments = await client.query(
+          `DELETE FROM admin_role_assignments WHERE admin_user_id = $1`,
+          [adminUserId]
+        );
+        const deletedSessions = await client.query(
+          `DELETE FROM admin_sessions WHERE admin_user_id = $1`,
+          [adminUserId]
+        );
+        await client.query(`DELETE FROM admin_users WHERE admin_user_id = $1`, [
+          adminUserId
+        ]);
+        await client.query("COMMIT");
+        return {
+          deletedRoleAssignmentCount: deletedRoleAssignments.rowCount ?? 0,
+          deletedSessionCount: deletedSessions.rowCount ?? 0
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async listAdminRoleAssignmentsByUserId(adminUserId) {
       return many(
         `SELECT role_assignment_id, admin_user_id, role, access_mode, tenant_id, workspace_id, group_key, monitor_profiles_json, created_at
