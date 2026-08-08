@@ -344,6 +344,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             [canGoPrevious]="verona.canGoPrevious"
             [canGoNext]="verona.canGoNext"
             [canComplete]="verona.canComplete"
+            [backwardDeniedReasons]="verona.backwardDeniedReasons"
+            [forwardDeniedReasons]="verona.forwardDeniedReasons"
             [logPolicy]="verona.logPolicy"
             [pagingMode]="verona.pagingMode"
             [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"

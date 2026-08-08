@@ -26,7 +26,11 @@ import {
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN,
+  type VeronaNavigationDeniedNotification,
+  type VeronaNavigationDeniedReason,
   type VeronaNavigationRequestedNotification,
+  type VeronaPlayerConfig,
+  type VeronaPlayerConfigChangedNotification,
   type VeronaStartCommand
 } from "@testcenter-rewrite-app/contracts";
 import type { ParticipantTestLogEntryInput } from "@testcenter-rewrite-app/domain";
@@ -130,6 +134,8 @@ export class VeronaPlayerHostComponent
   @Input() canGoPrevious = false;
   @Input() canGoNext = false;
   @Input() canComplete = false;
+  @Input() backwardDeniedReasons: readonly string[] = [];
+  @Input() forwardDeniedReasons: readonly string[] = [];
   @Input() logPolicy: "disabled" | "lean" | "rich" | "debug" = "rich";
   @Input() pagingMode:
     | "separate"
@@ -216,24 +222,33 @@ export class VeronaPlayerHostComponent
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (!this.viewReady) {
+      return;
+    }
     if (
-      this.viewReady &&
-      (changes["playerHtml"] ||
-        changes["playerKey"] ||
-        changes["testRunId"] ||
-        changes["unitKey"] ||
-        changes["unitDefinition"] ||
-        changes["unitDefinitionType"] ||
-        changes["resourceBasePath"] ||
-        changes["unitCount"] ||
-        changes["canGoPrevious"] ||
-        changes["canGoNext"] ||
-        changes["canComplete"] ||
-        changes["logPolicy"] ||
-        changes["pagingMode"] ||
-        changes["restoreCurrentPageOnReturn"])
+      changes["playerHtml"] ||
+      changes["playerKey"] ||
+      changes["testRunId"] ||
+      changes["unitKey"] ||
+      changes["unitDefinition"] ||
+      changes["unitDefinitionType"]
     ) {
       this.mountPlayer();
+      return;
+    }
+    if (
+      changes["resourceBasePath"] ||
+      changes["unitTitle"] ||
+      changes["unitNumber"] ||
+      changes["unitCount"] ||
+      changes["canGoPrevious"] ||
+      changes["canGoNext"] ||
+      changes["canComplete"] ||
+      changes["logPolicy"] ||
+      changes["pagingMode"] ||
+      changes["restoreCurrentPageOnReturn"]
+    ) {
+      this.updatePlayerConfig();
     }
   }
 
@@ -449,19 +464,6 @@ export class VeronaPlayerHostComponent
     }
     this.status = "ready";
     const persistedResponse = parseVeronaUnitResponse(this.savedResponse);
-    const startPage = this.restoreCurrentPageOnReturn
-      ? persistedResponse?.playerState?.currentPage
-      : undefined;
-    const enabledNavigationTargets: VeronaStartCommand["playerConfig"]["enabledNavigationTargets"] = [];
-    if (this.canGoPrevious) {
-      enabledNavigationTargets.push("previous");
-    }
-    if (this.canGoNext) {
-      enabledNavigationTargets.push("next");
-    }
-    if (this.canComplete) {
-      enabledNavigationTargets.push("end");
-    }
     const command: VeronaStartCommand = {
       type: "vopStartCommand",
       sessionId: this.sessionId,
@@ -477,25 +479,7 @@ export class VeronaPlayerHostComponent
       ...(this.restoreCurrentPageOnReturn && persistedResponse?.playerState
         ? { playerState: persistedResponse.playerState }
         : {}),
-      playerConfig: {
-        ...(this.resourceBasePath
-          ? {
-              directDownloadUrl: new URL(
-                this.resourceBasePath,
-                window.location.origin
-              ).toString()
-            }
-          : {}),
-        enabledNavigationTargets,
-        logPolicy: this.logPolicy,
-        pagingMode: this.pagingMode,
-        stateReportPolicy: "eager",
-        unitNumber: this.unitNumber,
-        unitCount: this.unitCount,
-        unitTitle: this.unitTitle,
-        unitId: this.unitKey,
-        ...(startPage != null ? { startPage } : {})
-      }
+      playerConfig: this.createPlayerConfig()
     };
     this.frame?.contentWindow?.postMessage(command, "*");
     this.status = "running";
@@ -516,7 +500,81 @@ export class VeronaPlayerHostComponent
       (target === "end" && this.canComplete);
     if (targetEnabled) {
       this.navigationRequest.emit(target);
+      return;
     }
+    this.sendNavigationDenied(
+      target === "previous" || target === "first"
+        ? this.backwardDeniedReasons
+        : this.forwardDeniedReasons
+    );
+  }
+
+  private createPlayerConfig(): VeronaPlayerConfig {
+    const persistedResponse = parseVeronaUnitResponse(this.savedResponse);
+    const startPage = this.restoreCurrentPageOnReturn
+      ? persistedResponse?.playerState?.currentPage
+      : undefined;
+    const enabledNavigationTargets: VeronaPlayerConfig["enabledNavigationTargets"] =
+      [];
+    if (this.canGoPrevious) {
+      enabledNavigationTargets.push("previous", "first");
+    }
+    if (this.canGoNext) {
+      enabledNavigationTargets.push("next", "last");
+    }
+    if (this.canComplete) {
+      enabledNavigationTargets.push("end");
+    }
+    return {
+      ...(this.resourceBasePath
+        ? {
+            directDownloadUrl: new URL(
+              this.resourceBasePath,
+              window.location.origin
+            ).toString()
+          }
+        : {}),
+      enabledNavigationTargets,
+      logPolicy: this.logPolicy,
+      pagingMode: this.pagingMode,
+      stateReportPolicy: "eager",
+      unitNumber: this.unitNumber,
+      unitCount: this.unitCount,
+      unitTitle: this.unitTitle,
+      unitId: this.unitKey,
+      ...(startPage != null ? { startPage } : {})
+    };
+  }
+
+  private updatePlayerConfig(): void {
+    if (this.status !== "running" || !this.frame?.contentWindow) {
+      return;
+    }
+    const notification: VeronaPlayerConfigChangedNotification = {
+      type: "vopPlayerConfigChangedNotification",
+      sessionId: this.sessionId,
+      playerConfig: this.createPlayerConfig()
+    };
+    this.frame.contentWindow.postMessage(notification, "*");
+  }
+
+  private sendNavigationDenied(reasons: readonly string[]): void {
+    if (!this.frame?.contentWindow) {
+      return;
+    }
+    const reason: VeronaNavigationDeniedReason[] = [];
+    if (reasons.includes("presentation_incomplete")) {
+      reason.push("presentationIncomplete");
+    }
+    if (reasons.includes("response_incomplete")) {
+      reason.push("responsesIncomplete");
+    }
+    const notification: VeronaNavigationDeniedNotification = {
+      type: "vopNavigationDeniedNotification",
+      sessionId: this.sessionId,
+      reason
+    };
+    this.frame.contentWindow.postMessage(notification, "*");
   }
 
   private scheduleFocusLog(playerHasFocus?: boolean): void {

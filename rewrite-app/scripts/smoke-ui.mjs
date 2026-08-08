@@ -4420,6 +4420,9 @@ try {
     <html><body>
       <strong id="playerDefinition"></strong>
       <output id="playerConfig"></output>
+      <output id="playerStartCount">0</output>
+      <output id="playerConfigChangeCount">0</output>
+      <output id="playerNavigationDenied"></output>
       <output id="playerStartPage"></output>
       <output id="playerResource"></output>
       <output id="playerResourceRange"></output>
@@ -4445,8 +4448,20 @@ try {
           }]
         }, "*");
         addEventListener("message", event => {
+          if (event.data?.type === "vopPlayerConfigChangedNotification") {
+            document.querySelector("#playerConfig").textContent = JSON.stringify(event.data.playerConfig);
+            const count = Number(document.querySelector("#playerConfigChangeCount").textContent || "0");
+            document.querySelector("#playerConfigChangeCount").textContent = String(count + 1);
+            return;
+          }
+          if (event.data?.type === "vopNavigationDeniedNotification") {
+            document.querySelector("#playerNavigationDenied").textContent = JSON.stringify(event.data.reason);
+            return;
+          }
           if (event.data?.type !== "vopStartCommand") return;
           sessionId = event.data.sessionId;
+          const startCount = Number(document.querySelector("#playerStartCount").textContent || "0");
+          document.querySelector("#playerStartCount").textContent = String(startCount + 1);
           document.querySelector("#playerDefinition").textContent = event.data.unitDefinition;
           document.querySelector("#playerConfig").textContent = JSON.stringify(event.data.playerConfig);
           document.querySelector("#playerStartPage").textContent = String(event.data.playerConfig?.startPage || "");
@@ -4916,7 +4931,10 @@ try {
     `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/resources`
   );
   await veronaFrame.locator("#playerEnd").click();
-  await page.waitForTimeout(250);
+  await veronaFrame
+    .locator("#playerNavigationDenied")
+    .filter({ hasText: '["responsesIncomplete"]' })
+    .waitFor();
   const guardedPlayerEndState = await (
     await fetch(
       `${baseUrl}/api/v1/participant/sessions/${veronaParticipantSessionId}/current-state`
@@ -4978,6 +4996,19 @@ try {
   assert.equal(
     await page.locator("#participantRouteCompleteButton").isDisabled(),
     false
+  );
+  await veronaFrame
+    .locator("#playerConfig")
+    .filter({ hasText: '"enabledNavigationTargets":["end"]' })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await veronaFrame.locator("#playerStartCount").textContent(),
+    "1",
+    "A navigation-policy update must not restart the running Verona Player."
+  );
+  assert.ok(
+    Number(await veronaFrame.locator("#playerConfigChangeCount").textContent()) >= 1,
+    "The running Verona Player should receive vopPlayerConfigChangedNotification."
   );
   await page
     .locator("#participantVeronaPlayerLoading")

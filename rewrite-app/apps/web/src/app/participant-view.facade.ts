@@ -167,6 +167,8 @@ export type ParticipantVeronaPlayerState = {
   canGoPrevious: boolean;
   canGoNext: boolean;
   canComplete: boolean;
+  backwardDeniedReasons: readonly string[];
+  forwardDeniedReasons: readonly string[];
   logPolicy: "disabled" | "lean" | "rich" | "debug";
   pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
   restoreCurrentPageOnReturn: boolean;
@@ -1046,6 +1048,8 @@ export class ParticipantViewFacade {
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
       canComplete: currentState.navigation.canPlayerEnd,
+      backwardDeniedReasons: currentState.navigation.backwardDeniedReasons,
+      forwardDeniedReasons: currentState.navigation.forwardDeniedReasons,
       logPolicy: currentState.booklet.policy.player.logPolicy,
       pagingMode: currentState.booklet.policy.player.pagingMode,
       restoreCurrentPageOnReturn:

@@ -48,6 +48,22 @@ export type VeronaStartCommand = {
   playerConfig: VeronaPlayerConfig;
 };
 
+export type VeronaPlayerConfigChangedNotification = {
+  type: "vopPlayerConfigChangedNotification";
+  sessionId: string;
+  playerConfig: VeronaPlayerConfig;
+};
+
+export type VeronaNavigationDeniedReason =
+  | "presentationIncomplete"
+  | "responsesIncomplete";
+
+export type VeronaNavigationDeniedNotification = {
+  type: "vopNavigationDeniedNotification";
+  sessionId: string;
+  reason: VeronaNavigationDeniedReason[];
+};
+
 export type VeronaReadyNotification = {
   type: "vopReadyNotification";
   apiVersion?: string;
