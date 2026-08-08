@@ -7215,6 +7215,12 @@ const validateUniqueTestcenterXmlValues = (
   return diagnostics;
 };
 
+const testcenterXmlIdPattern =
+  /^[_A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u{10000}-\u{EFFFF}][-._A-Za-z0-9\u00B7\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u037D\u037F-\u1FFF\u200C-\u200D\u203F-\u2040\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u0300-\u036F\u{10000}-\u{EFFFF}]*$/u;
+
+const isTestcenterXmlId = (value: string): boolean =>
+  testcenterXmlIdPattern.test(value);
+
 const validateTestcenterXmlSourceDocument = (
   sourceDocument: string,
   sourceFileName: string
@@ -7300,6 +7306,17 @@ const validateTestcenterXmlSourceDocument = (
         `Original Testcenter XML '${sourceFileName}' requires a direct Metadata element.`
       )
     );
+  }
+  if (metadata && canonicalRootName !== "Testtakers") {
+    const metadataId = xmlElementText(xmlChildrenNamed(metadata, "Id")[0]);
+    if (metadataId && !isTestcenterXmlId(metadataId)) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_metadata_id_invalid",
+          `Original Testcenter ${canonicalRootName} '${sourceFileName}' contains Metadata/Id '${metadataId}', which is not a valid XML ID.`
+        )
+      );
+    }
   }
 
   if (canonicalRootName === "Booklet") {

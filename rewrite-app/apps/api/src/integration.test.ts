@@ -9165,6 +9165,30 @@ test("original Testcenter compatibility corpus imports representative booklets",
     diagnosticCode: string;
   }> = [
     {
+      fileName: "booklet-invalid-metadata-id.xml",
+      sourceDocument: validBookletXml.replace(
+        "<Id>BOOKLET.SAMPLE-1</Id>",
+        "<Id>1BOOKLET.SAMPLE-1</Id>"
+      ),
+      diagnosticCode: "testcenter_xml_metadata_id_invalid"
+    },
+    {
+      fileName: "unit-invalid-metadata-id.xml",
+      sourceDocument: validUnitXml.replace(
+        "<Id>UNIT.SAMPLE-2</Id>",
+        "<Id>UNIT:SAMPLE-2</Id>"
+      ),
+      diagnosticCode: "testcenter_xml_metadata_id_invalid"
+    },
+    {
+      fileName: "syscheck-invalid-metadata-id.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        "<Id>SYSCHECK.SAMPLE</Id>",
+        "<Id>SYSCHECK SAMPLE</Id>"
+      ),
+      diagnosticCode: "testcenter_xml_metadata_id_invalid"
+    },
+    {
       fileName: "unit-duplicate-variable.xml",
       sourceDocument: validUnitXml.replace(
         'id="derived_var" type="number"',
@@ -9345,6 +9369,38 @@ test("original Testcenter compatibility corpus imports representative booklets",
     );
     assert.equal(importResult.body.stagedContentRelease, null);
   }
+
+  const unicodeMetadataIdWorkspaceKey = await createValidationWorkspace(
+    "unit-unicode-metadata-id.xml"
+  );
+  const unicodeMetadataIdPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${unicodeMetadataIdWorkspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unit-unicode-metadata-id.xml",
+      mediaType: "application/xml",
+      sourceDocument: validUnitXml.replace(
+        "<Id>UNIT.SAMPLE-2</Id>",
+        "<Id>ÜNIT.Änderung_2·3</Id>"
+      )
+    }
+  });
+  const unicodeMetadataIdValidation = await requestJson<{
+    importJob: { diagnostics: Array<{ code: string }> };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${unicodeMetadataIdWorkspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: unicodeMetadataIdPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(
+    unicodeMetadataIdValidation.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.code === "testcenter_xml_metadata_id_invalid"
+    ),
+    false,
+    JSON.stringify(unicodeMetadataIdValidation.body.importJob.diagnostics)
+  );
 
   const version16UnitWorkspaceKey = await createValidationWorkspace(
     "unit-16-extended-variable.xml"
