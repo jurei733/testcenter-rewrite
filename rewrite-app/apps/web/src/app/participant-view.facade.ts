@@ -286,6 +286,10 @@ export class ParticipantViewFacade {
   private readonly timerRemainingSeconds = new Map<string, number>();
   private currentRunState: ParticipantCurrentRunStateResponse["currentRunState"] | null =
     null;
+  private eagerAssetsLoadedRunId = "";
+  private eagerBookletAssets:
+    | ParticipantCurrentRunStateResponse["currentRunState"]["bookletAssets"]
+    | null = null;
   private pendingVeronaSave: ParticipantSaveOutboxEntry | null = null;
   private optimisticVeronaResponse: {
     testRunId: string;
@@ -949,6 +953,10 @@ export class ParticipantViewFacade {
     return this.customText("booklet_loading", "Please wait");
   }
 
+  get eagerBookletLoadedUnitCount(): number {
+    return this.eagerBookletAssets?.units.length ?? 0;
+  }
+
   get veronaLoadingTitle(): string {
     return this.readCurrentRunState()?.activeTestletTimer
       ? this.customText("booklet_loadingBlock", "Timed block is loading")
@@ -1050,12 +1058,26 @@ export class ParticipantViewFacade {
     this.fullscreenStatus.set(message);
   }
 
+  get eagerBookletLoading(): boolean {
+    const currentState = this.readCurrentRunState();
+    return Boolean(
+      currentState?.booklet.policy.player.loadingMode === "eager" &&
+        this.eagerAssetsLoadedRunId !== currentState.testRun.testRunId
+    );
+  }
+
   get veronaPlayer(): ParticipantVeronaPlayerState | null {
     const currentState = this.readCurrentRunState();
     const player = currentState?.currentUnit.player;
     const unitDefinition = currentState?.currentUnit.unitDefinition?.trim();
     const unitKey = currentState?.currentUnit.unitKey;
-    if (!currentState || !player?.html.trim() || !unitDefinition || !unitKey) {
+    if (
+      !currentState ||
+      this.eagerBookletLoading ||
+      !player?.html.trim() ||
+      !unitDefinition ||
+      !unitKey
+    ) {
       return null;
     }
     const unitIndex = currentState.bookletUnits.findIndex(
@@ -2759,7 +2781,7 @@ export class ParticipantViewFacade {
     }
 
     try {
-      const payload =
+      let payload =
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
           "Participant Current State",
           "GET",
@@ -2769,8 +2791,38 @@ export class ParticipantViewFacade {
           undefined,
           { quiet }
         );
+      const testRunId = payload.currentRunState.testRun.testRunId;
+      if (
+        payload.currentRunState.booklet.policy.player.loadingMode === "eager" &&
+        this.eagerAssetsLoadedRunId !== testRunId
+      ) {
+        payload =
+          await this.requestState.request<ParticipantCurrentRunStateResponse>(
+            "Preload Participant Booklet",
+            "GET",
+            `${resolveRoutePath(
+              productionApiRoutes.participant.getCurrentRunState,
+              {
+                participantSessionId: this.runtime.participantSessionId.trim()
+              }
+            )}?includeBookletAssets=true`,
+            undefined,
+            { quiet: true }
+          );
+        this.eagerAssetsLoadedRunId = payload.currentRunState.testRun.testRunId;
+        this.eagerBookletAssets = payload.currentRunState.bookletAssets ?? null;
+      }
+      const currentStateViewPayload = payload.currentRunState.bookletAssets
+        ? {
+            ...payload,
+            currentRunState: {
+              ...payload.currentRunState,
+              bookletAssets: undefined
+            }
+          }
+        : payload;
       this.runtime.currentRunStateView = prettyPrintJson(
-        payload,
+        currentStateViewPayload,
         this.runtime.currentRunStateView
       );
       this.syncCurrentRunState(payload.currentRunState);
@@ -2836,6 +2888,9 @@ export class ParticipantViewFacade {
   private syncCurrentRunState(
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
+    if (currentState.testRun.testRunId !== this.eagerAssetsLoadedRunId) {
+      this.eagerBookletAssets = null;
+    }
     this.captureTimerLifecycleTransitions(currentState.testRun);
     this.currentRunState = currentState;
     this.workspace.tenantKey = currentState.scope.tenantKey;

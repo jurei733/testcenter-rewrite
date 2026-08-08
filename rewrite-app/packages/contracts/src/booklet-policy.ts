@@ -205,6 +205,11 @@ export const compileBookletRuntimePolicy = (value: unknown): BookletRuntimePolic
       playerEnd: compilePlayerEnd(playerEnd)
     },
     player: {
+      loadingMode: choice(
+        read("loading_mode"),
+        ["lazy", "eager"] as const,
+        "lazy"
+      ),
       logPolicy: choice(
         read("logPolicy"),
         ["disabled", "lean", "rich", "debug"] as const,

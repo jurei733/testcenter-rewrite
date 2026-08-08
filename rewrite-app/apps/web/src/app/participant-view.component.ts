@@ -221,6 +221,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
           class="participant-fullscreen-status"
           role="status"
         >{{ view.fullscreenStatusText }}</p>
+        <p
+          *ngIf="view.eagerBookletLoadedUnitCount"
+          id="participantRouteBookletLoadingStatus"
+          class="participant-fullscreen-status"
+          role="status"
+        >Booklet ready · {{ view.eagerBookletLoadedUnitCount }} unit assets loaded</p>
         <div class="record-card" [class.is-selected]="view.player.runStatus !== 'idle'">
           <div class="participant-meta-grid">
             <div>
@@ -328,59 +334,73 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </label>
             <p *ngIf="view.adaptiveStateFeedback" id="participantRouteAdaptiveStateFeedback" class="participant-adaptive-state-feedback" role="status">{{ view.adaptiveStateFeedback }}</p>
           </section>
-          <app-verona-player-host
-            *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
-            [playerHtml]="verona.playerHtml"
-            [playerKey]="verona.playerKey"
-            [testRunId]="verona.testRunId"
-            [unitKey]="verona.unitKey"
-            [unitTitle]="verona.unitTitle"
-            [unitDefinition]="verona.unitDefinition"
-            [unitDefinitionType]="verona.unitDefinitionType"
-            [resourceBasePath]="verona.resourceBasePath"
-            [savedResponse]="verona.savedResponse"
-            [unitNumber]="verona.unitNumber"
-            [unitCount]="verona.unitCount"
-            [canGoPrevious]="verona.canGoPrevious"
-            [canGoNext]="verona.canGoNext"
-            [canComplete]="verona.canComplete"
-            [backwardDeniedReasons]="verona.backwardDeniedReasons"
-            [forwardDeniedReasons]="verona.forwardDeniedReasons"
-            [logPolicy]="verona.logPolicy"
-            [pagingMode]="verona.pagingMode"
-            [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
-            [pageNavigationLabelMode]="verona.pageNavigationLabelMode"
-            [pageNavigationControlsHidden]="verona.pageNavigationControlsHidden"
-            [saveStatus]="view.veronaSaveStatus"
-            [loadingLabel]="view.veronaLoadingLabel"
-            [loadingTitle]="view.veronaLoadingTitle"
-            [loadingStatus]="view.veronaLoadingStatus"
-            [loadingPendingStatus]="view.veronaLoadingPendingStatus"
-            [loadingCompleteStatus]="view.veronaLoadingCompleteStatus"
-            [errorText]="view.veronaErrorText"
-            (logEntries)="view.queueVeronaLogs($event)"
-            (focusLogEntries)="view.saveVeronaFocusLogs($event)"
-            (responseUpdate)="view.saveVeronaResponse($event)"
-            (navigationRequest)="view.navigateFromVerona($event)"
-            (retrySave)="view.retryVeronaSave()"
-          ></app-verona-player-host>
-          <ng-template #textResponsePlayer>
-            <section class="participant-unit-prompt" aria-label="Current unit prompt">
-              <span>Unit Prompt</span>
-              <p id="participantRouteUnitDescription">{{ view.player.unitDescription }}</p>
-              <strong id="participantRouteUnitContent">{{ view.player.unitContent }}</strong>
+          <ng-container *ngIf="!view.eagerBookletLoading; else eagerBookletLoading">
+            <app-verona-player-host
+              *ngIf="view.veronaPlayer as verona; else textResponsePlayer"
+              [playerHtml]="verona.playerHtml"
+              [playerKey]="verona.playerKey"
+              [testRunId]="verona.testRunId"
+              [unitKey]="verona.unitKey"
+              [unitTitle]="verona.unitTitle"
+              [unitDefinition]="verona.unitDefinition"
+              [unitDefinitionType]="verona.unitDefinitionType"
+              [resourceBasePath]="verona.resourceBasePath"
+              [savedResponse]="verona.savedResponse"
+              [unitNumber]="verona.unitNumber"
+              [unitCount]="verona.unitCount"
+              [canGoPrevious]="verona.canGoPrevious"
+              [canGoNext]="verona.canGoNext"
+              [canComplete]="verona.canComplete"
+              [backwardDeniedReasons]="verona.backwardDeniedReasons"
+              [forwardDeniedReasons]="verona.forwardDeniedReasons"
+              [logPolicy]="verona.logPolicy"
+              [pagingMode]="verona.pagingMode"
+              [restoreCurrentPageOnReturn]="verona.restoreCurrentPageOnReturn"
+              [pageNavigationLabelMode]="verona.pageNavigationLabelMode"
+              [pageNavigationControlsHidden]="verona.pageNavigationControlsHidden"
+              [saveStatus]="view.veronaSaveStatus"
+              [loadingLabel]="view.veronaLoadingLabel"
+              [loadingTitle]="view.veronaLoadingTitle"
+              [loadingStatus]="view.veronaLoadingStatus"
+              [loadingPendingStatus]="view.veronaLoadingPendingStatus"
+              [loadingCompleteStatus]="view.veronaLoadingCompleteStatus"
+              [errorText]="view.veronaErrorText"
+              (logEntries)="view.queueVeronaLogs($event)"
+              (focusLogEntries)="view.saveVeronaFocusLogs($event)"
+              (responseUpdate)="view.saveVeronaResponse($event)"
+              (navigationRequest)="view.navigateFromVerona($event)"
+              (retrySave)="view.retryVeronaSave()"
+            ></app-verona-player-host>
+            <ng-template #textResponsePlayer>
+              <section class="participant-unit-prompt" aria-label="Current unit prompt">
+                <span>Unit Prompt</span>
+                <p id="participantRouteUnitDescription">{{ view.player.unitDescription }}</p>
+                <strong id="participantRouteUnitContent">{{ view.player.unitContent }}</strong>
+              </section>
+              <label>
+                Unit Response
+                <textarea
+                  id="participantRouteUnitResponse"
+                  name="participantRouteUnitResponse"
+                  [disabled]="!view.player.canSaveProgress"
+                  [(ngModel)]="view.runtime.currentUnitResponse"
+                  (change)="view.persistState()"
+                  placeholder="Write the participant response for this unit."
+                ></textarea>
+              </label>
+            </ng-template>
+          </ng-container>
+          <ng-template #eagerBookletLoading>
+            <section
+              id="participantRouteBookletLoading"
+              class="participant-unit-prompt"
+              role="status"
+              aria-live="polite"
+            >
+              <span>{{ view.veronaLoadingLabel }}</span>
+              <strong>Booklet is loading</strong>
+              <p>{{ view.veronaLoadingPendingStatus }}</p>
             </section>
-            <label>
-              Unit Response
-              <textarea
-                id="participantRouteUnitResponse"
-                name="participantRouteUnitResponse"
-                [disabled]="!view.player.canSaveProgress"
-                [(ngModel)]="view.runtime.currentUnitResponse"
-                (change)="view.persistState()"
-                placeholder="Write the participant response for this unit."
-              ></textarea>
-            </label>
           </ng-template>
           <section
             *ngIf="view.player.canReview"

@@ -11149,6 +11149,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
       playerEnd: string;
     };
     player: {
+      loadingMode: string;
       logPolicy: string;
       pagingMode: string;
       restoreCurrentPageOnReturn: boolean;
@@ -11219,6 +11220,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         playerEnd: "always"
       },
       player: {
+        loadingMode: "lazy",
         logPolicy: "rich",
         pagingMode: "buttons",
         restoreCurrentPageOnReturn: false,
@@ -11246,6 +11248,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         playerEnd: "never"
       },
       player: {
+        loadingMode: "lazy",
         logPolicy: "rich",
         pagingMode: "buttons",
         restoreCurrentPageOnReturn: true,
@@ -11273,6 +11276,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         playerEnd: "last_unit"
       },
       player: {
+        loadingMode: "lazy",
         logPolicy: "rich",
         pagingMode: "buttons",
         restoreCurrentPageOnReturn: false,
@@ -11300,6 +11304,7 @@ test("original Testcenter compatibility corpus executes the complete official Bo
         playerEnd: "always"
       },
       player: {
+        loadingMode: "lazy",
         logPolicy: "rich",
         pagingMode: "buttons",
         restoreCurrentPageOnReturn: false,
@@ -11625,6 +11630,31 @@ test("original Testcenter compatibility corpus executes the complete official Bo
     const configOne = await start(
       "Bklt_Config-1",
       "Cy-Bklt_BkltConfig-1"
+    );
+    const preloadedConfigOne = await requestJsonAt<{
+      currentRunState: {
+        bookletAssets?: {
+          units: Array<{ unitKey: string; playerKey: string }>;
+          players: Array<{ playerKey: string }>;
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${configOne.participantSessionId}/current-state?includeBookletAssets=true`
+    );
+    assert.equal(preloadedConfigOne.status, 200);
+    assert.deepEqual(
+      preloadedConfigOne.body.currentRunState.bookletAssets?.units.map(
+        unit => unit.unitKey
+      ),
+      booklets.find(booklet => booklet.bookletKey === "Cy-Bklt_BkltConfig-1")
+        ?.unitKeys
+    );
+    assert.deepEqual(
+      preloadedConfigOne.body.currentRunState.bookletAssets?.players.map(
+        player => player.playerKey
+      ),
+      [expectation.player.playerKey]
     );
     assert.equal(configOne.testRun.currentUnitKey, "CY-Unit.Sample-101");
     assert.equal(configOne.currentRunState.navigation.canPlayerEnd, true);
@@ -16394,6 +16424,7 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
     playerEnd: "last_unit"
   });
   assert.deepEqual(runtimeSnapshot.bookletEntries[0]?.policy?.player, {
+    loadingMode: "lazy",
     logPolicy: "debug",
     pagingMode: "concat-scroll",
     restoreCurrentPageOnReturn: true,
@@ -20319,6 +20350,7 @@ test("original BookletConfig compiles into enforced participant navigation polic
     playerEnd: "last_unit"
   });
   assert.deepEqual(blockedState.body.currentRunState.booklet.policy.player, {
+    loadingMode: "lazy",
     logPolicy: "debug",
     pagingMode: "concat-scroll",
     restoreCurrentPageOnReturn: true,

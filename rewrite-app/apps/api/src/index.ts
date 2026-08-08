@@ -6369,7 +6369,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
 
         const currentRunState = await services.participantRuntime.getCurrentRunState({
-          participantSessionId
+          participantSessionId,
+          includeBookletAssets:
+            url.searchParams.get("includeBookletAssets") === "true"
         });
         sendJson<ParticipantCurrentRunStateResponse>(response, 200, {
           currentRunState

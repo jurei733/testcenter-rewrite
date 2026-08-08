@@ -5709,6 +5709,7 @@ try {
             <Label>Official Verona 3 Player</Label>
           </Metadata>
           <BookletConfig>
+            <Config key="loading_mode">EAGER</Config>
             <Config key="pagingMode">separate</Config>
             <Config key="browserBehaviour">preventNav</Config>
             <Config key="unit_menu">OFF</Config>
@@ -5827,6 +5828,11 @@ try {
       ]
     }
   });
+  const legacyPlayerPreloadResponse = page.waitForResponse(
+    response =>
+      response.request().method() === "GET" &&
+      response.url().includes("includeBookletAssets=true")
+  );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
       tenantKey: legacyPlayerTenantKey,
@@ -5836,6 +5842,28 @@ try {
     }).toString()}`,
     { waitUntil: "networkidle" }
   );
+  const legacyPlayerPreloadPayload =
+    await (await legacyPlayerPreloadResponse).json();
+  assert.equal(
+    legacyPlayerPreloadPayload.currentRunState.booklet.policy.player.loadingMode,
+    "eager"
+  );
+  assert.deepEqual(
+    legacyPlayerPreloadPayload.currentRunState.bookletAssets.units.map(
+      unit => unit.unitKey
+    ),
+    [legacyPlayerFirstUnitKey, legacyPlayerSecondUnitKey]
+  );
+  assert.deepEqual(
+    legacyPlayerPreloadPayload.currentRunState.bookletAssets.players.map(
+      player => player.playerKey
+    ),
+    [legacyPlayerKey]
+  );
+  await page
+    .locator("#participantRouteBookletLoadingStatus")
+    .filter({ hasText: "2 unit assets loaded" })
+    .waitFor();
   await page
     .locator("#participantVeronaPlayerVersion")
     .filter({ hasText: "API 3.0.0" })

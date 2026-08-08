@@ -638,6 +638,7 @@ export type ParticipantRuntimePort = {
   }): Promise<ParticipantRuntimeState>;
   getCurrentRunState(input: {
     participantSessionId: string;
+    includeBookletAssets?: boolean;
   }): Promise<ParticipantCurrentRunState>;
   getResource(input: {
     participantSessionId: string;
@@ -14310,6 +14311,12 @@ const resolveRuntimeBooklet = (
     policy: bookletEntry.policy
       ? {
           ...bookletEntry.policy,
+          player: {
+            ...bookletEntry.policy.player,
+            loadingMode:
+              bookletEntry.policy.player.loadingMode ??
+              policyDefaults.player.loadingMode
+          },
           persistence:
             bookletEntry.policy.persistence ?? policyDefaults.persistence
         }
@@ -15890,6 +15897,37 @@ const resolveRuntimeUnit = (
     unitDefinitionType: unitEntry?.unitDefinitionType ?? null,
     testletPath: unitEntry?.testletPath ?? []
   };
+};
+
+const resolveRuntimeBookletAssets = (
+  contentRelease: ContentRelease,
+  bookletKey: string
+): NonNullable<ParticipantCurrentRunState["bookletAssets"]> => {
+  const bookletEntry =
+    contentRelease.runtimeSnapshot.bookletEntries.find(
+      candidate => candidate.bookletKey === bookletKey
+    ) ?? contentRelease.runtimeSnapshot.bookletEntries[0];
+  const units = (bookletEntry?.unitEntries ?? []).flatMap(unitEntry => {
+    const unitDefinition = unitEntry.unitDefinition;
+    const playerKey = unitEntry.playerKey?.trim();
+    if (!unitDefinition?.trim() || !playerKey) {
+      return [];
+    }
+    return [
+      {
+        unitKey: unitEntry.unitKey,
+        playerKey,
+        unitDefinition,
+        unitDefinitionType:
+          unitEntry.unitDefinitionType?.trim() || playerKey
+      }
+    ];
+  });
+  const playerKeys = new Set(units.map(unit => unit.playerKey));
+  const players = (contentRelease.runtimeSnapshot.playerEntries ?? []).filter(
+    player => playerKeys.has(player.playerKey)
+  );
+  return { units, players };
 };
 
 const resolveRuntimeBookletUnits = (
@@ -23136,6 +23174,18 @@ export const createFirstSliceServices = (
           availableActions.push("change_state_options");
         }
 
+        const runtimeBooklet = resolveRuntimeBooklet(
+          contentRelease,
+          currentTestRun.bookletKey
+        );
+        const participantBooklet = {
+          ...runtimeBooklet,
+          policy: applyParticipantExecutionModeToBookletPolicy(
+            runtimeBooklet.policy,
+            executionMode
+          )
+        };
+
         return {
           participantSession,
           participantRosterEntry: sanitizeParticipantRosterEntryForSession(
@@ -23145,24 +23195,20 @@ export const createFirstSliceServices = (
           scope,
           executionMode,
           testRun: currentTestRun,
-          booklet: (() => {
-            const runtimeBooklet = resolveRuntimeBooklet(
-              contentRelease,
-              currentTestRun.bookletKey
-            );
-            return {
-              ...runtimeBooklet,
-              policy: applyParticipantExecutionModeToBookletPolicy(
-                runtimeBooklet.policy,
-                executionMode
-              )
-            };
-          })(),
+          booklet: participantBooklet,
           currentUnit: resolveRuntimeUnit(
             contentRelease,
             currentTestRun.bookletKey,
             currentTestRun.currentUnitKey
           ),
+          ...(input.includeBookletAssets
+            ? {
+                bookletAssets: resolveRuntimeBookletAssets(
+                  contentRelease,
+                  currentTestRun.bookletKey
+                )
+              }
+            : {}),
           ...(contentRelease.runtimeSnapshot.resourceEntries?.length
             ? {
                 resourceBasePath: `/api/v1/participant/sessions/${encodeURIComponent(participantSessionId)}/resources`

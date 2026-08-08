@@ -770,6 +770,8 @@ export type BookletRuntimePolicy = {
     playerEnd: BookletPlayerEndPolicy;
   };
   player: {
+    /** Optional so runtime snapshots created before booklet preloading remain readable. */
+    loadingMode?: "lazy" | "eager";
     logPolicy: "disabled" | "lean" | "rich" | "debug";
     pagingMode: "separate" | "concat-scroll" | "concat-scroll-snap" | "buttons";
     restoreCurrentPageOnReturn: boolean;
@@ -1028,6 +1030,15 @@ export type ParticipantCurrentRunState = {
     unitDefinition?: string | null;
     unitDefinitionType?: string | null;
     testletPath: string[];
+  };
+  bookletAssets?: {
+    units: Array<{
+      unitKey: string;
+      playerKey: string;
+      unitDefinition: string;
+      unitDefinitionType: string;
+    }>;
+    players: ContentReleasePlayerEntry[];
   };
   resourceBasePath?: string;
   bookletUnits: Array<{
