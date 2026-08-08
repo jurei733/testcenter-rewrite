@@ -606,13 +606,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card" id="resultGroupSelectionActions">
         <h2>Result Group Selection</h2>
-        <p>Select one or more result groups for Original-compatible response, log, and review exports or a confirmed bulk deletion.</p>
+        <p>Select one or more result groups for an Original-compatible response, log, and review archive, individual CSV exports, or a confirmed bulk deletion.</p>
         <div class="selection-summary" role="status" aria-live="polite">
           {{ view.selectedResultGroupCount }} selected group{{ view.selectedResultGroupCount === 1 ? "" : "s" }}
         </div>
         <div class="actions">
           <button id="selectAllVisibleResultGroupsButton" class="ghost" type="button" [disabled]="view.groupResultItems.length === 0" (click)="view.selectAllVisibleResultGroups()">Select All Visible</button>
           <button id="clearResultGroupSelectionButton" class="ghost" type="button" [disabled]="view.selectedResultGroupCount === 0" (click)="view.clearResultGroupSelection()">Clear Selection</button>
+          <button id="exportSelectedGroupResultArchiveButton" class="primary" type="button" [disabled]="!view.canUseSelectedResultGroups" (click)="view.exportSelectedGroupResultArchive()">Download Result Archive</button>
           <button id="exportSelectedGroupResponsesButton" class="ghost" type="button" [disabled]="!view.canUseSelectedResultGroups" (click)="view.exportSelectedGroupResponsesCsv()">Export Selected Responses</button>
           <button id="exportSelectedGroupLogsButton" class="ghost" type="button" [disabled]="!view.canUseSelectedResultGroups" (click)="view.exportSelectedGroupLogsCsv()">Export Selected Logs</button>
           <button id="exportSelectedGroupReviewsButton" class="ghost" type="button" [disabled]="!view.canUseSelectedResultGroups" (click)="view.exportSelectedGroupReviewsCsv()">Export Selected Reviews</button>

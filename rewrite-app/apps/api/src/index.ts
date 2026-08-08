@@ -1636,6 +1636,9 @@ const openRunsCsvExportPattern = createRoutePattern(
 const responseCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportResponseCsv
 );
+const originalResultArchiveExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportOriginalResultArchive
+);
 const logCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportLogCsv
 );
@@ -1803,6 +1806,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["DELETE", reviewDetailPattern],
   ["DELETE", deleteGroupResultsPattern],
   ["GET", responseCsvExportPattern],
+  ["GET", originalResultArchiveExportPattern],
   ["GET", logCsvExportPattern],
   ["GET", activityCsvExportPattern],
   ["GET", participantTestLogListPattern],
@@ -2630,6 +2634,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "GET",
       responseCsvExportPattern,
       productionApiRoutes.workspace.exportResponseCsv
+    ],
+    [
+      "GET",
+      originalResultArchiveExportPattern,
+      productionApiRoutes.workspace.exportOriginalResultArchive
     ],
     [
       "GET",
@@ -4867,6 +4876,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         studyMonitorRunCsvExportPattern.exec(pathname);
       const openRunsCsvExportMatch = openRunsCsvExportPattern.exec(pathname);
       const responseCsvExportMatch = responseCsvExportPattern.exec(pathname);
+      const originalResultArchiveExportMatch =
+        originalResultArchiveExportPattern.exec(pathname);
       const logCsvExportMatch = logCsvExportPattern.exec(pathname);
       const activityCsvExportMatch = activityCsvExportPattern.exec(pathname);
       const participantTestLogListMatch =
@@ -5622,6 +5633,45 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           ...query
         });
         sendCsv(response, 200, `${workspaceKey}-responses.csv`, csv);
+        return;
+      }
+
+      if (
+        request.method === "GET" &&
+        originalResultArchiveExportMatch?.groups
+      ) {
+        const tenantKey = decodeRouteGroup(
+          originalResultArchiveExportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          originalResultArchiveExportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const groupFilter = parseGroupKeyQuery(url, response);
+        if (!groupFilter.ok) {
+          return;
+        }
+        const archive =
+          await services.workspaceAdminRead.exportOriginalResultArchive({
+            tenantKey,
+            workspaceKey,
+            groupKeys:
+              groupFilter.groupKeys ??
+              (groupFilter.groupKey ? [groupFilter.groupKey] : [])
+          });
+        sendAsset(response, 200, archive.mediaType, archive.body, {
+          "content-disposition": buildAttachmentContentDisposition(
+            archive.fileName
+          )
+        });
         return;
       }
 

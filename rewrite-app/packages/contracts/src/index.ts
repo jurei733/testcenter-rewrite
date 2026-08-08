@@ -1929,6 +1929,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/open-runs.csv",
     exportResponseCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/responses.csv",
+    exportOriginalResultArchive:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/original-results.zip",
     exportLogCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/logs.csv",
     exportActivityCsv:

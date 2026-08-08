@@ -429,6 +429,11 @@ export type WorkspaceAdminReadPort = {
     status?: TestRun["status"];
     limit?: number;
   }): Promise<string>;
+  exportOriginalResultArchive(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    groupKeys: string[];
+  }): Promise<WorkspaceOriginalResultArchive>;
   getContentReleaseActivationReadiness(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -492,6 +497,12 @@ export type WorkspaceAdminReadPort = {
     workspaceKey: string;
     checkId?: string;
   }): Promise<SystemCheckReportStatistics[]>;
+};
+
+export type WorkspaceOriginalResultArchive = {
+  fileName: string;
+  mediaType: "application/zip";
+  body: Buffer;
 };
 
 export type SystemCheckPort = {
@@ -955,6 +966,7 @@ export const firstSliceUseCases = {
   exportReviewCsv: "ExportReviewCsv",
   deleteGroupResults: "DeleteGroupResults",
   exportResponseCsv: "ExportResponseCsv",
+  exportOriginalResultArchive: "ExportOriginalResultArchive",
   getContentReleaseActivationReadiness: "GetContentReleaseActivationReadiness",
   listImportJobs: "ListImportJobs",
   exportImportJobsCsv: "ExportImportJobsCsv",
@@ -9594,6 +9606,397 @@ const createStoredZipArchive = (
   endOfCentralDirectory.writeUInt32LE(localOffset, 16);
 
   return Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]);
+};
+
+type OriginalResponseReportRow = {
+  groupname: string;
+  loginname: string;
+  code: string;
+  bookletname: string;
+  unitname: string;
+  originalUnitId: string;
+  responses: Array<{
+    id: string;
+    content: string;
+    ts: number;
+    responseType: string;
+  }>;
+  laststate: string;
+};
+
+type OriginalLogReportRow = {
+  groupname: string;
+  loginname: string;
+  code: string;
+  bookletname: string;
+  unitname: string;
+  originalUnitId: string;
+  timestamp: string;
+  logentry: string;
+};
+
+type OriginalReviewReportRow = Record<string, string | number | boolean | null>;
+
+const escapeOriginalCsvCell = (value: unknown): string =>
+  `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+const formatOriginalReportCsv = (
+  columns: string[],
+  rows: Array<Record<string, unknown>>
+): string =>
+  `\uFEFF${[
+    columns.join(";"),
+    ...rows.map(row =>
+      columns.map(column => escapeOriginalCsvCell(row[column])).join(";")
+    )
+  ].join("\n")}`;
+
+const formatOriginalLogReportCsv = (
+  columns: string[],
+  rows: OriginalLogReportRow[]
+): string =>
+  `\uFEFF${[
+    columns.join(";"),
+    ...rows.map(row =>
+      columns
+        .map(column =>
+          column === "logentry"
+            ? row.logentry.replace(/\\"/g, '""')
+            : escapeOriginalCsvCell(row[column as keyof OriginalLogReportRow])
+        )
+        .join(";")
+    )
+  ].join("\n")}`;
+
+const formatOriginalReviewReportCsv = (
+  columns: string[],
+  rows: Array<Record<string, unknown>>
+): string =>
+  `\uFEFF${[
+    columns.join(";"),
+    ...rows.map(row =>
+      columns
+        .map(column =>
+          row[column] == null ? "" : escapeOriginalCsvCell(row[column])
+        )
+        .join(";")
+    )
+  ].join("\n")}`;
+
+const toOriginalReportDateTime = (value: string): string => {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+  return new Date(timestamp).toISOString().replace("T", " ").slice(0, 19);
+};
+
+const resolveOriginalReportUnit = (input: {
+  contentReleasesById: Map<string, ContentRelease>;
+  testRun: TestRun;
+  unitKey: string | null;
+}): { originalUnitId: string; unitLabel: string; bookletLabel: string } => {
+  const release = input.contentReleasesById.get(input.testRun.contentReleaseId);
+  const booklet = release?.runtimeSnapshot.bookletEntries.find(
+    entry => entry.bookletKey === input.testRun.bookletKey
+  );
+  const unit = input.unitKey
+    ? booklet?.unitEntries.find(entry => entry.unitKey === input.unitKey)
+    : undefined;
+  return {
+    originalUnitId: input.unitKey
+      ? unit?.originalUnitId ?? input.unitKey
+      : "",
+    unitLabel: unit?.displayLabel ?? "",
+    bookletLabel: booklet?.displayLabel ?? ""
+  };
+};
+
+const buildOriginalResponseReportRows = (input: {
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  contentReleases: ContentRelease[];
+  groupKeys: string[];
+}): OriginalResponseReportRow[] => {
+  const sessionsById = new Map(
+    input.participantSessions.map(session => [session.participantSessionId, session])
+  );
+  const contentReleasesById = new Map(
+    input.contentReleases.map(release => [release.contentReleaseId, release])
+  );
+  const groupKeys = new Set(input.groupKeys);
+
+  return input.testRuns
+    .flatMap(rawTestRun => {
+      const testRun = normalizeTestRun(rawTestRun);
+      const participantSession = sessionsById.get(testRun.participantSessionId);
+      if (!participantSession || !groupKeys.has(participantSession.groupKey)) {
+        return [];
+      }
+      const responseTimestamp = Date.parse(testRun.updatedAt);
+      const timestamp = Number.isFinite(responseTimestamp) ? responseTimestamp : 0;
+      return Object.entries(testRun.unitResponses).map(([unitKey, response]) => {
+        const unit = resolveOriginalReportUnit({
+          contentReleasesById,
+          testRun,
+          unitKey
+        });
+        const veronaResponse = parseVeronaUnitResponse(response);
+        const responseType = String(
+          veronaResponse?.unitState.unitStateDataType ?? ""
+        );
+        const responses = veronaResponse?.unitState.dataParts
+          ? Object.entries(veronaResponse.unitState.dataParts).map(
+              ([id, content]) => ({ id, content, ts: timestamp, responseType })
+            )
+          : [{ id: "all", content: response, ts: timestamp, responseType: "" }];
+        const lastState = veronaResponse
+          ? Object.fromEntries(
+              Object.entries(veronaResponse.unitState).filter(
+                ([key]) => key !== "dataParts"
+              )
+            )
+          : null;
+        return {
+          groupname: participantSession.groupKey,
+          loginname: participantSession.loginKey,
+          code: participantSession.participantCode ?? "",
+          bookletname: testRun.bookletAssignmentKey ?? testRun.bookletKey,
+          unitname: unitKey,
+          originalUnitId: unit.originalUnitId,
+          responses,
+          laststate:
+            lastState && Object.keys(lastState).length > 0
+              ? JSON.stringify(lastState)
+              : ""
+        };
+      });
+    })
+    .sort(
+      (left, right) =>
+        left.groupname.localeCompare(right.groupname) ||
+        left.loginname.localeCompare(right.loginname) ||
+        left.bookletname.localeCompare(right.bookletname) ||
+        left.unitname.localeCompare(right.unitname)
+    );
+};
+
+const buildOriginalLogReportRows = (input: {
+  participantSessions: ParticipantSession[];
+  testRuns: TestRun[];
+  testLogs: ParticipantTestLog[];
+  groupKeys: string[];
+}): OriginalLogReportRow[] =>
+  listParticipantTestLogsForWorkspace({
+    tenantKey: "",
+    workspaceKey: "",
+    participantSessions: input.participantSessions,
+    testRuns: input.testRuns,
+    testLogs: input.testLogs,
+    groupKeys: input.groupKeys,
+    limit: 50_001
+  })
+    .map(item => ({
+      groupname: item.groupKey,
+      loginname: item.loginKey,
+      code: item.participantCode,
+      bookletname: item.bookletAssignmentKey,
+      unitname: item.testLog.unitKey ?? "",
+      originalUnitId: item.testLog.originalUnitId ?? "",
+      timestamp: String(item.testLog.timestamp),
+      logentry: item.testLog.logContent
+        ? `${item.testLog.logKey}${item.testLog.unitKey ? " = " : " : "}${JSON.stringify(item.testLog.logContent)}`
+        : item.testLog.logKey
+    }))
+    .sort(
+      (left, right) =>
+        Number(left.timestamp) - Number(right.timestamp) ||
+        left.groupname.localeCompare(right.groupname) ||
+        left.loginname.localeCompare(right.loginname)
+    );
+
+const buildOriginalReviewReportRows = (input: {
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+  contentReleases: ContentRelease[];
+  groupKeys: string[];
+}): { rows: OriginalReviewReportRow[]; categoryColumns: string[] } => {
+  const contentReleasesById = new Map(
+    input.contentReleases.map(release => [release.contentReleaseId, release])
+  );
+  const items = buildWorkspaceReviewListItems({
+    participantSessions: input.participantSessions,
+    participantRosterEntries: input.participantRosterEntries,
+    testRuns: input.testRuns,
+    reviews: input.reviews,
+    groupKeys: input.groupKeys,
+    limit: 50_001,
+    limitMaximum: 50_001
+  });
+  const categories = Array.from(
+    new Set(items.flatMap(item => item.review.categories))
+  ).sort();
+  const categoryColumns = categories.map(category => `category_${category}`);
+  const rows = items.map(item => {
+    const testRun = item.testRun ? normalizeTestRun(item.testRun) : null;
+    const unit = testRun
+      ? resolveOriginalReportUnit({
+          contentReleasesById,
+          testRun,
+          unitKey: item.review.unitKey
+        })
+      : {
+          originalUnitId: item.review.originalUnitId ?? item.review.unitKey ?? "",
+          unitLabel: "",
+          bookletLabel: ""
+        };
+    return {
+      groupname: item.participantSession?.groupKey ?? "",
+      loginname: item.participantSession?.loginKey ?? "",
+      code: item.participantSession?.participantCode ?? "",
+      bookletname: testRun
+        ? testRun.bookletAssignmentKey ?? testRun.bookletKey
+        : "",
+      unitname: item.review.unitKey ?? "",
+      priority: String(item.review.priority),
+      ...Object.fromEntries(
+        categories.map(category => [
+          `category_${category}`,
+          item.review.categories.includes(category)
+        ])
+      ),
+      reviewtime: toOriginalReportDateTime(item.review.createdAt),
+      page: item.review.page,
+      pagelabel: item.review.pageLabel,
+      originalUnitId: item.review.originalUnitId ?? unit.originalUnitId,
+      userAgent: item.review.userAgent,
+      reviewer: item.review.reviewerId,
+      entry: item.review.comment,
+      unitlabel: unit.unitLabel,
+      bookletlabel: unit.bookletLabel
+    } satisfies OriginalReviewReportRow;
+  });
+  return { rows, categoryColumns };
+};
+
+const createOriginalResultArchive = (input: {
+  tenantKey: string;
+  workspaceKey: string;
+  groupKeys: string[];
+  generatedAt: string;
+  participantSessions: ParticipantSession[];
+  participantRosterEntries: ParticipantRosterEntry[];
+  testRuns: TestRun[];
+  reviews: WorkspaceReview[];
+  testLogs: ParticipantTestLog[];
+  contentReleases: ContentRelease[];
+}): WorkspaceOriginalResultArchive => {
+  const responseRows = buildOriginalResponseReportRows(input);
+  const logRows = buildOriginalLogReportRows(input);
+  const reviewReport = buildOriginalReviewReportRows(input);
+  const counts = {
+    responses: responseRows.length,
+    logs: logRows.length,
+    reviews: reviewReport.rows.length
+  };
+  if (Object.values(counts).some(count => count > 50_000)) {
+    throw new FirstSliceError(
+      413,
+      "result_archive_too_large",
+      "The selected result archive exceeds the 50,000-row per report limit. Select fewer groups."
+    );
+  }
+
+  const responseColumns = [
+    "groupname",
+    "loginname",
+    "code",
+    "bookletname",
+    "unitname",
+    "originalUnitId",
+    "responses",
+    "laststate"
+  ];
+  const logColumns = [
+    "groupname",
+    "loginname",
+    "code",
+    "bookletname",
+    "unitname",
+    "originalUnitId",
+    "timestamp",
+    "logentry"
+  ];
+  const reviewColumns = [
+    "groupname",
+    "loginname",
+    "code",
+    "bookletname",
+    "unitname",
+    "priority",
+    ...reviewReport.categoryColumns,
+    "reviewtime",
+    "page",
+    "pagelabel",
+    "originalUnitId",
+    "userAgent",
+    "reviewer",
+    "entry",
+    "unitlabel",
+    "bookletlabel"
+  ];
+  const responsesCsvRows = responseRows.map(row => ({
+    ...row,
+    responses: JSON.stringify(row.responses)
+  }));
+  const reviewCsvRows = reviewReport.rows.map(row =>
+    Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [
+        key,
+        key.startsWith("category_") ? (value ? "TRUE" : "FALSE") : value
+      ])
+    )
+  );
+  const manifest = {
+    format: "testcenter-original-result-archive",
+    version: 1,
+    tenantKey: input.tenantKey,
+    workspaceKey: input.workspaceKey,
+    generatedAt: input.generatedAt,
+    groupKeys: input.groupKeys,
+    counts,
+    reports: [
+      { type: "response", csv: "responses.csv", json: "responses.json" },
+      { type: "log", csv: "logs.csv", json: "logs.json" },
+      { type: "review", csv: "reviews.csv", json: "reviews.json", version: 2 }
+    ],
+    compatibility: {
+      source: "IQB Testcenter workspace reports",
+      responseProjection:
+        "Verona dataParts are emitted as response entries; remaining unit state is emitted as laststate."
+    }
+  };
+  const textEntries = [
+    ["manifest.json", `${JSON.stringify(manifest, null, 2)}\n`],
+    ["responses.json", JSON.stringify(responseRows)],
+    ["responses.csv", formatOriginalReportCsv(responseColumns, responsesCsvRows)],
+    ["logs.json", JSON.stringify(logRows)],
+    ["logs.csv", formatOriginalLogReportCsv(logColumns, logRows)],
+    ["reviews.json", JSON.stringify(reviewReport.rows)],
+    ["reviews.csv", formatOriginalReviewReportCsv(reviewColumns, reviewCsvRows)]
+  ] as const;
+  return {
+    fileName: `${input.workspaceKey}-original-results.zip`,
+    mediaType: "application/zip",
+    body: createStoredZipArchive(
+      textEntries.map(([fileName, content]) => ({
+        fileName,
+        bytes: Buffer.from(content, "utf8")
+      }))
+    )
+  };
 };
 
 const normalizeSourcePackageAssemblyPath = (fileName: string): string => {
@@ -18828,6 +19231,75 @@ export const createFirstSliceServices = (
           status: input.status,
           limit: input.limit ?? 50_000,
           limitMaximum: 50_000
+        });
+      },
+      async exportOriginalResultArchive(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const groupKeys = Array.from(
+          new Set(input.groupKeys.map(groupKey => groupKey.trim()).filter(Boolean))
+        ).sort();
+        if (groupKeys.length === 0) {
+          throw new FirstSliceError(
+            400,
+            "result_archive_group_required",
+            "At least one result group must be selected."
+          );
+        }
+        if (groupKeys.length > 100) {
+          throw new FirstSliceError(
+            400,
+            "result_archive_group_limit_exceeded",
+            "At most 100 result groups can be exported at once."
+          );
+        }
+        const [
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews,
+          testLogs,
+          contentReleases
+        ] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantRosterEntriesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listTestRunsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceReviewsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listParticipantTestLogsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listContentReleasesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
+        return createOriginalResultArchive({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          groupKeys,
+          generatedAt: now(),
+          participantSessions,
+          participantRosterEntries,
+          testRuns,
+          reviews,
+          testLogs,
+          contentReleases
         });
       },
       async getContentReleaseActivationReadiness(input) {

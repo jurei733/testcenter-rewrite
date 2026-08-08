@@ -45,7 +45,7 @@ import {
 } from "./rewrite-app-shell.runtime-reads";
 import { runParticipantHappyPathFlow } from "./rewrite-app-shell.workflows";
 import { RewriteAppContentService } from "./rewrite-app-content.service";
-import { downloadTextFile } from "./download-text-file";
+import { downloadBlobFile, downloadTextFile } from "./download-text-file";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 import { RewriteAppWorkspaceService } from "./rewrite-app-workspace.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
@@ -377,6 +377,25 @@ export class RewriteAppRuntimeService {
       filenameSuffix: "selected-logs",
       view: "logs"
     });
+  }
+
+  async exportSelectedGroupResultArchive(groupKeys: string[]): Promise<void> {
+    const normalizedGroupKeys = this.normalizeSelectedGroupKeys(groupKeys);
+    const download = await this.requestState.requestDownload(
+      "Selected Group Original Result Archive Export",
+      this.selectedGroupPath(
+        productionApiRoutes.workspace.exportOriginalResultArchive,
+        normalizedGroupKeys
+      )
+    );
+    const workspaceKey = this.uiState.workspace.workspaceKey.trim() || "workspace";
+    const filename =
+      download.filename ?? `${workspaceKey}-original-results.zip`;
+    downloadBlobFile({ filename, blob: download.blob });
+    this.feedback.rememberActivity(
+      "Original Result Archive Downloaded",
+      `${filename} contains response, log, and review reports in Original-compatible CSV and JSON formats for ${normalizedGroupKeys.length} selected group(s).`
+    );
   }
 
   async deleteSelectedGroupResults(

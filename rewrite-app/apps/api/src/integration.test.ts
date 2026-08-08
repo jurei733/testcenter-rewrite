@@ -100,6 +100,31 @@ const createZipBase64 = (
   ]).toString("base64");
 };
 
+const readStoredZipTextEntries = (archive: Buffer): Map<string, string> => {
+  const entries = new Map<string, string>();
+  let offset = 0;
+  while (
+    offset + 30 <= archive.length &&
+    archive.readUInt32LE(offset) === 0x04034b50
+  ) {
+    const compressionMethod = archive.readUInt16LE(offset + 8);
+    assert.equal(compressionMethod, 0, "Expected an uncompressed ZIP entry.");
+    const contentLength = archive.readUInt32LE(offset + 18);
+    const fileNameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const fileNameStart = offset + 30;
+    const contentStart = fileNameStart + fileNameLength + extraLength;
+    const contentEnd = contentStart + contentLength;
+    assert.ok(contentEnd <= archive.length, "ZIP entry exceeds archive bounds.");
+    const fileName = archive
+      .subarray(fileNameStart, fileNameStart + fileNameLength)
+      .toString("utf8");
+    entries.set(fileName, archive.subarray(contentStart, contentEnd).toString("utf8"));
+    offset = contentEnd;
+  }
+  return entries;
+};
+
 const createVeronaPlayerMetadataV2 = (
   overrides: Record<string, unknown> = {}
 ): string => JSON.stringify({
@@ -1796,6 +1821,16 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     assert.equal(rejectedParticipantTestLogsCsv.status, 401);
     assert.equal(
       rejectedParticipantTestLogsCsv.body.error,
+      "admin_session_missing"
+    );
+
+    const rejectedOriginalResultArchive = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/original-results.zip?groupKey=group%3Aauth"
+    );
+    assert.equal(rejectedOriginalResultArchive.status, 401);
+    assert.equal(
+      rejectedOriginalResultArchive.body.error,
       "admin_session_missing"
     );
 
@@ -4886,6 +4921,111 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       testLogCount: participantTestLogs.body.items.length,
       lastChangeAt: "checked-separately"
     });
+
+    const rejectedResultArchive = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip",
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(rejectedResultArchive.status, 400);
+    assert.equal(
+      rejectedResultArchive.body.error,
+      "result_archive_group_required"
+    );
+
+    const resultArchiveResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/tenants/demo-tenant/workspaces/demo-workspace/exports/original-results.zip?groupKey=group%3Amissing&groupKey=group%3Astudent-demo`,
+      {
+        headers: {
+          authorization: `Bearer ${signIn.body.sessionToken}`
+        }
+      }
+    );
+    assert.equal(resultArchiveResponse.status, 200);
+    assert.equal(
+      resultArchiveResponse.headers.get("content-type"),
+      "application/zip"
+    );
+    assert.match(
+      resultArchiveResponse.headers.get("content-disposition") ?? "",
+      /demo-workspace-original-results\.zip/
+    );
+    const resultArchiveEntries = readStoredZipTextEntries(
+      Buffer.from(await resultArchiveResponse.arrayBuffer())
+    );
+    assert.deepEqual([...resultArchiveEntries.keys()], [
+      "manifest.json",
+      "responses.json",
+      "responses.csv",
+      "logs.json",
+      "logs.csv",
+      "reviews.json",
+      "reviews.csv"
+    ]);
+    const resultArchiveManifest = JSON.parse(
+      resultArchiveEntries.get("manifest.json") ?? "{}"
+    ) as {
+      format: string;
+      version: number;
+      groupKeys: string[];
+      counts: { responses: number; logs: number; reviews: number };
+    };
+    assert.equal(resultArchiveManifest.format, "testcenter-original-result-archive");
+    assert.equal(resultArchiveManifest.version, 1);
+    assert.deepEqual(resultArchiveManifest.groupKeys, [
+      "group:missing",
+      "group:student-demo"
+    ]);
+    assert.equal(resultArchiveManifest.counts.responses, 2);
+    assert.equal(resultArchiveManifest.counts.reviews, 1);
+    assert.equal(
+      resultArchiveManifest.counts.logs,
+      participantTestLogs.body.items.length
+    );
+    const originalResponseRows = JSON.parse(
+      resultArchiveEntries.get("responses.json") ?? "[]"
+    ) as Array<{
+      groupname: string;
+      loginname: string;
+      bookletname: string;
+      unitname: string;
+      originalUnitId: string;
+      responses: Array<{ id: string; content: string; ts: number }>;
+      laststate: string;
+    }>;
+    assert.ok(
+      originalResponseRows.some(
+        row =>
+          row.groupname === "group:student-demo" &&
+          row.loginname === "student-demo" &&
+          row.bookletname === "booklet:demo" &&
+          row.unitname === "unit-intro" &&
+          row.originalUnitId === "unit-intro" &&
+          row.responses.length > 0 &&
+          Number.isFinite(row.responses[0]?.ts)
+      )
+    );
+    assert.match(
+      resultArchiveEntries.get("responses.csv") ?? "",
+      /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;responses;laststate\n/
+    );
+    assert.match(
+      resultArchiveEntries.get("logs.csv") ?? "",
+      /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;timestamp;logentry\n/
+    );
+    assert.match(
+      resultArchiveEntries.get("reviews.csv") ?? "",
+      /category_cleanup-check/
+    );
+    const originalReviewRows = JSON.parse(
+      resultArchiveEntries.get("reviews.json") ?? "[]"
+    ) as Array<Record<string, unknown>>;
+    assert.equal(originalReviewRows[0]?.["category_cleanup-check"], true);
+    assert.equal(originalReviewRows[0]?.entry, "Review removed by group deletion");
 
     const selectedResponseCsv = await requestTextAt(
       isolated.baseUrl,
@@ -22728,6 +22868,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         exportStudyMonitorRunCsv: string;
         exportOpenRunsCsv: string;
         exportResponseCsv: string;
+        exportOriginalResultArchive: string;
         exportLogCsv: string;
         exportReviewCsv: string;
         downloadSourcePackage: string;
@@ -22789,6 +22930,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     "participant_session_csv_export",
     "detailed_response_read",
     "response_csv_export",
+    "original_result_archive_export",
     "result_group_read",
     "review_workflow",
     "review_csv_export",
@@ -22876,6 +23018,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   );
   assert.match(manifest.routes.workspace.exportOpenRunsCsv, /open-runs\.csv/);
   assert.match(manifest.routes.workspace.exportResponseCsv, /responses\.csv/);
+  assert.match(
+    manifest.routes.workspace.exportOriginalResultArchive,
+    /original-results\.zip/
+  );
   assert.match(manifest.routes.workspace.exportLogCsv, /logs\.csv/);
   assert.match(manifest.routes.workspace.exportReviewCsv, /reviews\.csv/);
   assert.match(manifest.routes.workspace.listReviews, /reviews/);

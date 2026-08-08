@@ -3589,6 +3589,17 @@ export class RuntimeViewFacade {
     );
   }
 
+  exportSelectedGroupResultArchive(): void {
+    if (!this.canUseSelectedResultGroups) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.exportSelectedGroupResultArchive(
+        this.selectedResultGroupKeys
+      )
+    );
+  }
+
   confirmDeleteSelectedGroupResults(): void {
     if (!this.canUseSelectedResultGroups) {
       return;

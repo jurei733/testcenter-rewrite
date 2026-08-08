@@ -90,6 +90,32 @@ const createStoredZipBuffer = entries => {
   ]);
 };
 
+const readStoredZipTextEntries = archive => {
+  const entries = new Map();
+  let offset = 0;
+  while (
+    offset + 30 <= archive.length &&
+    archive.readUInt32LE(offset) === 0x04034b50
+  ) {
+    assert.equal(archive.readUInt16LE(offset + 8), 0);
+    const contentLength = archive.readUInt32LE(offset + 18);
+    const fileNameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const fileNameStart = offset + 30;
+    const contentStart = fileNameStart + fileNameLength + extraLength;
+    const contentEnd = contentStart + contentLength;
+    assert.ok(contentEnd <= archive.length);
+    entries.set(
+      archive
+        .subarray(fileNameStart, fileNameStart + fileNameLength)
+        .toString("utf8"),
+      archive.subarray(contentStart, contentEnd).toString("utf8")
+    );
+    offset = contentEnd;
+  }
+  return entries;
+};
+
 class UiSmokeEarlyExit extends Error {
   constructor(step) {
     super(`UI smoke stopped after requested step: ${step}`);
@@ -9971,6 +9997,44 @@ try {
     .locator("#resultGroupSelectionActions")
     .filter({ hasText: "1 selected group" })
     .waitFor();
+  const [resultArchiveDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#exportSelectedGroupResultArchiveButton").click()
+  ]);
+  assert.match(
+    resultArchiveDownload.suggestedFilename(),
+    /original-results\.zip$/
+  );
+  const resultArchivePath = resolve(
+    ".data",
+    `${workspaceKey}-browser-original-results.zip`
+  );
+  await resultArchiveDownload.saveAs(resultArchivePath);
+  const resultArchiveEntries = readStoredZipTextEntries(
+    await readFile(resultArchivePath)
+  );
+  assert.deepEqual([...resultArchiveEntries.keys()], [
+    "manifest.json",
+    "responses.json",
+    "responses.csv",
+    "logs.json",
+    "logs.csv",
+    "reviews.json",
+    "reviews.csv"
+  ]);
+  const resultArchiveManifest = JSON.parse(
+    resultArchiveEntries.get("manifest.json")
+  );
+  assert.deepEqual(resultArchiveManifest.groupKeys, [participantGroupKey]);
+  assert.ok(resultArchiveManifest.counts.responses > 0);
+  assert.ok(resultArchiveManifest.counts.logs > 0);
+  assert.ok(resultArchiveManifest.counts.reviews > 0);
+  assert.match(
+    resultArchiveEntries.get("responses.csv"),
+    /^\uFEFFgroupname;loginname;code;bookletname;unitname;originalUnitId;responses;laststate\n/
+  );
+  assert.match(resultArchiveEntries.get("reviews.csv"), /category_/);
+  await rm(resultArchivePath, { force: true });
   for (const [selector, filenamePattern] of [
     ["#exportSelectedGroupResponsesButton", /selected-responses\.csv$/],
     ["#exportSelectedGroupLogsButton", /selected-logs\.csv$/],
