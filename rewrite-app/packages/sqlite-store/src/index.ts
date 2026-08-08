@@ -9,6 +9,7 @@ import type {
   AdminSession,
   AdminUser,
   ApplicationSettings,
+  AttachmentFile,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -181,6 +182,22 @@ const mapApplicationSettings = (
           row.updated_by_admin_user_id == null
             ? null
             : String(row.updated_by_admin_user_id)
+      }
+    : null;
+
+const mapAttachmentFile = (
+  row: Record<string, unknown> | undefined
+): AttachmentFile | null =>
+  row
+    ? {
+        attachmentFileId: String(row.attachment_file_id),
+        attachmentId: String(row.attachment_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        fileName: String(row.file_name),
+        mediaType: row.media_type as AttachmentFile["mediaType"],
+        dataBase64: String(row.data_base64),
+        createdAt: String(row.created_at)
       }
     : null;
 
@@ -590,7 +607,7 @@ const mapParticipantTestLog = (
       }
     : null;
 
-export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 38;
+export const SQLITE_FIRST_SLICE_SCHEMA_VERSION = 39;
 
 const sqliteMigrations: SqliteMigration[] = [
   {
@@ -1107,6 +1124,24 @@ const sqliteMigrations: SqliteMigration[] = [
         updated_by_admin_user_id TEXT
       );
     `
+  },
+  {
+    version: 39,
+    name: "add_attachment_files",
+    sql: `
+      CREATE TABLE attachment_files (
+        attachment_file_id TEXT PRIMARY KEY,
+        attachment_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX attachment_files_workspace_attachment_idx
+        ON attachment_files (tenant_id, workspace_id, attachment_id, created_at);
+    `
   }
 ];
 
@@ -1248,6 +1283,65 @@ export const createSqliteFirstSliceRepository = (
           settings.updatedAt,
           settings.updatedByAdminUserId
         );
+    },
+    async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
+      const rows = database
+        .prepare(
+          `SELECT attachment_file_id, attachment_id, tenant_id, workspace_id,
+                  file_name, media_type, data_base64, created_at
+           FROM attachment_files
+           WHERE tenant_id = ? AND workspace_id = ?
+           ORDER BY created_at ASC, attachment_file_id ASC`
+        )
+        .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapAttachmentFile(row))
+        .filter(Boolean) as AttachmentFile[];
+    },
+    async getAttachmentFileById(attachmentFileId) {
+      const row = database
+        .prepare(
+          `SELECT attachment_file_id, attachment_id, tenant_id, workspace_id,
+                  file_name, media_type, data_base64, created_at
+           FROM attachment_files
+           WHERE attachment_file_id = ?`
+        )
+        .get(attachmentFileId) as Record<string, unknown> | undefined;
+      return mapAttachmentFile(row);
+    },
+    async saveAttachmentFile(attachmentFile) {
+      database
+        .prepare(
+          `INSERT INTO attachment_files (
+            attachment_file_id, attachment_id, tenant_id, workspace_id,
+            file_name, media_type, data_base64, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(attachment_file_id) DO UPDATE SET
+            attachment_id = excluded.attachment_id,
+            tenant_id = excluded.tenant_id,
+            workspace_id = excluded.workspace_id,
+            file_name = excluded.file_name,
+            media_type = excluded.media_type,
+            data_base64 = excluded.data_base64,
+            created_at = excluded.created_at`
+        )
+        .run(
+          attachmentFile.attachmentFileId,
+          attachmentFile.attachmentId,
+          attachmentFile.tenantId,
+          attachmentFile.workspaceId,
+          attachmentFile.fileName,
+          attachmentFile.mediaType,
+          attachmentFile.dataBase64,
+          attachmentFile.createdAt
+        );
+    },
+    async deleteAttachmentFile(attachmentFileId) {
+      return (
+        database
+          .prepare(`DELETE FROM attachment_files WHERE attachment_file_id = ?`)
+          .run(attachmentFileId).changes > 0
+      );
     },
     async listAdminUsers() {
       const rows = database

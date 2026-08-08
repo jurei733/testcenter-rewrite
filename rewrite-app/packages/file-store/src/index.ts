@@ -9,6 +9,7 @@ import type {
   AdminSession,
   AdminUser,
   ApplicationSettings,
+  AttachmentFile,
   ContentRelease,
   ImportJob,
   ParticipantLoginAttempt,
@@ -25,6 +26,7 @@ import type {
 
 type PersistedFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
+  attachmentFiles: Record<string, AttachmentFile>;
   adminUsers: Record<string, AdminUser>;
   adminRoleAssignments: Record<string, AdminRoleAssignment>;
   adminAuditEvents: Record<string, AdminAuditEvent>;
@@ -47,6 +49,7 @@ type PersistedFirstSliceState = {
 
 const createInitialState = (): PersistedFirstSliceState => ({
   applicationSettings: null,
+  attachmentFiles: {},
   adminUsers: {},
   adminRoleAssignments: {},
   adminAuditEvents: {},
@@ -223,6 +226,32 @@ export const createFileFirstSliceRepository = (
     async saveApplicationSettings(settings) {
       await mutate(state => {
         state.applicationSettings = { ...settings };
+      });
+    },
+    async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
+      const state = await getState();
+      return Object.values(state.attachmentFiles).filter(
+        attachmentFile =>
+          attachmentFile.tenantId === tenantId &&
+          attachmentFile.workspaceId === workspaceId
+      );
+    },
+    async getAttachmentFileById(attachmentFileId) {
+      const state = await getState();
+      return state.attachmentFiles[attachmentFileId] ?? null;
+    },
+    async saveAttachmentFile(attachmentFile) {
+      await mutate(state => {
+        state.attachmentFiles[attachmentFile.attachmentFileId] = attachmentFile;
+      });
+    },
+    async deleteAttachmentFile(attachmentFileId) {
+      return mutate(state => {
+        if (!state.attachmentFiles[attachmentFileId]) {
+          return false;
+        }
+        delete state.attachmentFiles[attachmentFileId];
+        return true;
       });
     },
     async listAdminUsers() {

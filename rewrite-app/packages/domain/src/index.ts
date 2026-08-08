@@ -263,6 +263,8 @@ export type WorkspaceActivityEventType =
   | "review_created"
   | "review_updated"
   | "review_deleted"
+  | "attachment_file_uploaded"
+  | "attachment_file_deleted"
   | "system_check_report_saved"
   | "system_check_reports_deleted";
 export const workspaceActivityEventTypes = [
@@ -292,6 +294,8 @@ export const workspaceActivityEventTypes = [
   "review_created",
   "review_updated",
   "review_deleted",
+  "attachment_file_uploaded",
+  "attachment_file_deleted",
   "system_check_report_saved",
   "system_check_reports_deleted"
 ] as const satisfies readonly WorkspaceActivityEventType[];
@@ -632,6 +636,7 @@ export type SourcePackageUnitEntry = {
   unitDefinition?: string;
   unitDefinitionType?: string;
   codingScheme?: UnitCodingScheme;
+  requestedAttachments?: UnitAttachmentRequest[];
 };
 
 /** Serializable IQB variable-coding definition retained with a content release. */
@@ -849,6 +854,43 @@ export type ContentReleaseUnitEntry = {
   unitDefinition?: string;
   unitDefinitionType?: string;
   codingScheme?: UnitCodingScheme;
+  requestedAttachments?: UnitAttachmentRequest[];
+};
+
+export type UnitAttachmentRequest = {
+  variableId: string;
+  attachmentType: "capture-image";
+};
+
+export type AttachmentFile = {
+  attachmentFileId: string;
+  attachmentId: string;
+  tenantId: string;
+  workspaceId: string;
+  fileName: string;
+  mediaType: "image/jpeg" | "image/png";
+  dataBase64: string;
+  createdAt: string;
+};
+
+export type WorkspaceAttachment = {
+  attachmentId: string;
+  tenantId: string;
+  workspaceId: string;
+  participantSessionId: string;
+  testRunId: string;
+  groupKey: string;
+  loginKey: string;
+  personLabel: string;
+  bookletKey: string;
+  testLabel: string;
+  unitKey: string;
+  unitLabel: string;
+  variableId: string;
+  attachmentType: UnitAttachmentRequest["attachmentType"];
+  dataType: "image" | "missing";
+  attachmentFileIds: string[];
+  lastModified: number | null;
 };
 
 export type ParticipantSession = {
@@ -1691,6 +1733,7 @@ export type FirstSliceCapability =
   | "admin_audit_csv_export"
   | "application_settings_read"
   | "application_settings_update"
+  | "attachment_management"
   | "tenant_lifecycle"
   | "tenant_directory_csv_export"
   | "workspace_lifecycle"
@@ -1759,6 +1802,7 @@ export const firstProductionSliceCapabilities: FirstSliceCapability[] = [
   "admin_audit_csv_export",
   "application_settings_read",
   "application_settings_update",
+  "attachment_management",
   "tenant_lifecycle",
   "tenant_directory_csv_export",
   "workspace_lifecycle",

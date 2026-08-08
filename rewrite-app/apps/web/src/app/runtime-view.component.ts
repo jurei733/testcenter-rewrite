@@ -4,6 +4,7 @@ import type { OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
 import { JsonPanelComponent } from "./json-panel.component";
+import { AttachmentManagerComponent } from "./attachment-manager.component";
 import { RecordCollectionComponent } from "./record-collection.component";
 import { RuntimeViewFacade } from "./runtime-view.facade";
 import { SummaryCardsComponent } from "./summary-cards.component";
@@ -15,6 +16,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
     CommonModule,
     FormsModule,
     JsonPanelComponent,
+    AttachmentManagerComponent,
     SummaryCardsComponent,
     RecordCollectionComponent
   ],
@@ -136,6 +138,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p id="monitorOverviewDetail">{{ view.monitorOverviewDetail }}</p>
         <app-summary-cards [cards]="view.monitorOverviewCards"></app-summary-cards>
       </article>
+
+      <app-attachment-manager
+        *ngIf="view.canUseAttachmentManager"
+        [sessionToken]="view.attachmentSessionToken"
+        [tenantKey]="view.workspace.tenantKey"
+        [workspaceKey]="view.workspace.workspaceKey"
+        [readOnly]="view.attachmentManagerReadOnly"
+      ></app-attachment-manager>
 
       <app-record-collection
         *ngIf="view.isMonitorOnlySession"

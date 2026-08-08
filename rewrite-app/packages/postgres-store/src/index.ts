@@ -7,6 +7,7 @@ import type {
   AdminSession,
   AdminUser,
   ApplicationSettings,
+  AttachmentFile,
   ContentRelease,
   ContentReleaseRuntimeSnapshot,
   ImportJob,
@@ -171,6 +172,20 @@ const mapApplicationSettings = (
           row.updated_by_admin_user_id == null
             ? null
             : String(row.updated_by_admin_user_id)
+      }
+    : null;
+
+const mapAttachmentFile = (row: Row | undefined): AttachmentFile | null =>
+  row
+    ? {
+        attachmentFileId: String(row.attachment_file_id),
+        attachmentId: String(row.attachment_id),
+        tenantId: String(row.tenant_id),
+        workspaceId: String(row.workspace_id),
+        fileName: String(row.file_name),
+        mediaType: row.media_type as AttachmentFile["mediaType"],
+        dataBase64: String(row.data_base64),
+        createdAt: String(row.created_at)
       }
     : null;
 
@@ -575,7 +590,7 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
       }
     : null;
 
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 32;
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 33;
 
 const migrations: PostgresMigration[] = [
   {
@@ -1049,6 +1064,24 @@ const migrations: PostgresMigration[] = [
         updated_by_admin_user_id TEXT
       );
     `
+  },
+  {
+    version: 33,
+    name: "add_attachment_files",
+    sql: `
+      CREATE TABLE IF NOT EXISTS attachment_files (
+        attachment_file_id TEXT PRIMARY KEY,
+        attachment_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS attachment_files_workspace_attachment_idx
+        ON attachment_files (tenant_id, workspace_id, attachment_id, created_at);
+    `
   }
 ];
 
@@ -1196,6 +1229,60 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.updatedByAdminUserId
         ]
       );
+    },
+    async listAttachmentFilesByWorkspace(tenantId, workspaceId) {
+      return many(
+        `SELECT attachment_file_id, attachment_id, tenant_id, workspace_id,
+                file_name, media_type, data_base64, created_at
+         FROM attachment_files
+         WHERE tenant_id = $1 AND workspace_id = $2
+         ORDER BY created_at ASC, attachment_file_id ASC`,
+        [tenantId, workspaceId],
+        mapAttachmentFile
+      );
+    },
+    async getAttachmentFileById(attachmentFileId) {
+      return one(
+        `SELECT attachment_file_id, attachment_id, tenant_id, workspace_id,
+                file_name, media_type, data_base64, created_at
+         FROM attachment_files
+         WHERE attachment_file_id = $1`,
+        [attachmentFileId],
+        mapAttachmentFile
+      );
+    },
+    async saveAttachmentFile(attachmentFile) {
+      await pool.query(
+        `INSERT INTO attachment_files (
+          attachment_file_id, attachment_id, tenant_id, workspace_id,
+          file_name, media_type, data_base64, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT(attachment_file_id) DO UPDATE SET
+          attachment_id = EXCLUDED.attachment_id,
+          tenant_id = EXCLUDED.tenant_id,
+          workspace_id = EXCLUDED.workspace_id,
+          file_name = EXCLUDED.file_name,
+          media_type = EXCLUDED.media_type,
+          data_base64 = EXCLUDED.data_base64,
+          created_at = EXCLUDED.created_at`,
+        [
+          attachmentFile.attachmentFileId,
+          attachmentFile.attachmentId,
+          attachmentFile.tenantId,
+          attachmentFile.workspaceId,
+          attachmentFile.fileName,
+          attachmentFile.mediaType,
+          attachmentFile.dataBase64,
+          attachmentFile.createdAt
+        ]
+      );
+    },
+    async deleteAttachmentFile(attachmentFileId) {
+      const result = await pool.query(
+        `DELETE FROM attachment_files WHERE attachment_file_id = $1`,
+        [attachmentFileId]
+      );
+      return (result.rowCount ?? 0) > 0;
     },
     async listAdminUsers() {
       return many(

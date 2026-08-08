@@ -99,6 +99,41 @@ test("SQLite preserves global application settings", async () => {
   });
 });
 
+test("SQLite preserves and deletes attachment images", async () => {
+  const repository = createSqliteFirstSliceRepository(":memory:");
+  const attachmentFile = {
+    attachmentFileId: "image:sqlite.png",
+    attachmentId: "att-sqlite",
+    tenantId: "tenant-sqlite",
+    workspaceId: "workspace-sqlite",
+    fileName: "capture.png",
+    mediaType: "image/png" as const,
+    dataBase64: "iVBORw0KGgo=",
+    createdAt: "2026-08-08T20:00:00.000Z"
+  };
+
+  await repository.saveAttachmentFile(attachmentFile);
+  assert.deepEqual(
+    await repository.listAttachmentFilesByWorkspace(
+      attachmentFile.tenantId,
+      attachmentFile.workspaceId
+    ),
+    [attachmentFile]
+  );
+  assert.deepEqual(
+    await repository.getAttachmentFileById(attachmentFile.attachmentFileId),
+    attachmentFile
+  );
+  assert.equal(
+    await repository.deleteAttachmentFile(attachmentFile.attachmentFileId),
+    true
+  );
+  assert.equal(
+    await repository.getAttachmentFileById(attachmentFile.attachmentFileId),
+    null
+  );
+});
+
 test("SQLite upgrades legacy admin roles to read-write access", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-admin-mode-"));
   const databasePath = join(tempDirectory, "legacy.sqlite");

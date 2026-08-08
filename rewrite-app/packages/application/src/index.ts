@@ -47,6 +47,7 @@ import type {
   AdminUser,
   AdminUserStatus,
   ApplicationSettings,
+  AttachmentFile,
   BookletStateCondition,
   BookletStateVariableSource,
   BookletLeaveRestriction,
@@ -93,7 +94,9 @@ import type {
   TestRun,
   TestRunStatus,
   UnitCodingScheme,
+  UnitAttachmentRequest,
   Workspace,
+  WorkspaceAttachment,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
   WorkspaceActivityEvent,
@@ -775,6 +778,44 @@ export type MonitorControlPort = {
   }>;
 };
 
+export type AttachmentPort = {
+  listAttachments(input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    groupKey?: string;
+  }): Promise<WorkspaceAttachment[]>;
+  getAttachment(input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    attachmentId: string;
+  }): Promise<WorkspaceAttachment>;
+  uploadAttachmentFile(input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    attachmentId: string;
+    fileName: string;
+    mediaType: string;
+    dataBase64: string;
+  }): Promise<WorkspaceAttachment>;
+  getAttachmentFile(input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    attachmentId: string;
+    attachmentFileId: string;
+  }): Promise<AttachmentFile>;
+  deleteAttachmentFile(input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    attachmentId: string;
+    attachmentFileId: string;
+  }): Promise<WorkspaceAttachment>;
+};
+
 export type AdminAuthPort = {
   bootstrapAdminUser(input: {
     username: string;
@@ -917,6 +958,7 @@ export type ApplicationSettingsPort = {
 
 export type FirstSlicePorts = {
   applicationSettings: ApplicationSettingsPort;
+  attachments: AttachmentPort;
   adminAuth: AdminAuthPort;
   adminDirectory: AdminDirectoryPort;
   platform: PlatformPort;
@@ -951,6 +993,11 @@ export class FirstSliceError extends Error {
 export const firstSliceUseCases = {
   getApplicationSettings: "GetApplicationSettings",
   updateApplicationSettings: "UpdateApplicationSettings",
+  listAttachments: "ListAttachments",
+  getAttachment: "GetAttachment",
+  uploadAttachmentFile: "UploadAttachmentFile",
+  getAttachmentFile: "GetAttachmentFile",
+  deleteAttachmentFile: "DeleteAttachmentFile",
   bootstrapAdminUser: "BootstrapAdminUser",
   adminSignIn: "AdminSignIn",
   getAdminCurrentSession: "GetAdminCurrentSession",
@@ -1065,6 +1112,13 @@ export type FirstSliceServices = FirstSlicePorts & {
 export type FirstSliceRepository = {
   getApplicationSettings(): Promise<ApplicationSettings | null>;
   saveApplicationSettings(settings: ApplicationSettings): Promise<void>;
+  listAttachmentFilesByWorkspace(
+    tenantId: string,
+    workspaceId: string
+  ): Promise<AttachmentFile[]>;
+  getAttachmentFileById(attachmentFileId: string): Promise<AttachmentFile | null>;
+  saveAttachmentFile(attachmentFile: AttachmentFile): Promise<void>;
+  deleteAttachmentFile(attachmentFileId: string): Promise<boolean>;
   listAdminUsers(): Promise<AdminUser[]>;
   getAdminUserById(adminUserId: string): Promise<AdminUser | null>;
   getAdminUserByUsername(username: string): Promise<AdminUser | null>;
@@ -5774,6 +5828,31 @@ const normalizeUnitCodingScheme = (value: unknown): UnitCodingScheme | null => {
   };
 };
 
+const normalizeUnitAttachmentRequests = (
+  value: unknown
+): UnitAttachmentRequest[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const requests = new Map<string, UnitAttachmentRequest>();
+  for (const candidate of value) {
+    if (typeof candidate !== "object" || candidate === null) {
+      continue;
+    }
+    const record = candidate as Record<string, unknown>;
+    const variableId = normalizeManifestToken(record.variableId);
+    const attachmentType = normalizeManifestToken(record.attachmentType);
+    if (!variableId || attachmentType !== "capture-image") {
+      continue;
+    }
+    requests.set(variableId.toLowerCase(), {
+      variableId,
+      attachmentType: "capture-image"
+    });
+  }
+  return [...requests.values()];
+};
+
 const normalizeSourcePackageUnitEntry = (
   unitEntry: SourcePackageUnitEntry
 ): SourcePackageUnitEntry | null => {
@@ -5791,6 +5870,9 @@ const normalizeSourcePackageUnitEntry = (
     unitEntry.unitDefinitionType
   );
   const codingScheme = normalizeUnitCodingScheme(unitEntry.codingScheme);
+  const requestedAttachments = normalizeUnitAttachmentRequests(
+    unitEntry.requestedAttachments
+  );
   return {
     unitKey,
     ...(originalUnitId && originalUnitId !== unitKey
@@ -5814,7 +5896,8 @@ const normalizeSourcePackageUnitEntry = (
     ...(playerKey ? { playerKey } : {}),
     ...(unitDefinition ? { unitDefinition } : {}),
     ...(unitDefinitionType ? { unitDefinitionType } : {}),
-    ...(codingScheme ? { codingScheme } : {})
+    ...(codingScheme ? { codingScheme } : {}),
+    ...(requestedAttachments.length > 0 ? { requestedAttachments } : {})
   };
 };
 
@@ -8741,6 +8824,11 @@ const validateTestcenterXmlSourceDocument = (
     const variables = variableContainers.flatMap(container =>
       xmlChildrenNamed(container, "Variable")
     );
+    const baseAttachmentVariables = new Set(
+      xmlChildrenNamed(root, "BaseVariables").flatMap(container =>
+        xmlChildrenNamed(container, "Variable")
+      )
+    );
     const variableTypes = new Set([
       "string",
       "integer",
@@ -8795,6 +8883,17 @@ const validateTestcenterXmlSourceDocument = (
           createImportDiagnostic(
             "testcenter_xml_variable_format_invalid",
             `Original Testcenter unit '${sourceFileName}' contains invalid Variable format '${format}' for '${variableId || "unknown"}'.`
+          )
+        );
+      }
+      if (
+        variableType === "attachment" &&
+        (format !== "capture-image" || !baseAttachmentVariables.has(variable))
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_attachment_variable_invalid",
+            `Original Testcenter unit '${sourceFileName}' attachment Variable '${variableId || "unknown"}' must be a BaseVariable with format 'capture-image'.`
           )
         );
       }
@@ -13368,6 +13467,40 @@ const extractZipUnitDescription = (sourceDocument: string): string | null => {
   return description || null;
 };
 
+const extractZipUnitAttachmentRequests = (
+  sourceDocument: string
+): UnitAttachmentRequest[] => {
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(_level, message) {
+        parserErrors.push(message);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return [];
+  }
+  const root = document?.documentElement;
+  if (
+    parserErrors.length > 0 ||
+    !root ||
+    xmlElementLocalName(root).toLowerCase() !== "unit"
+  ) {
+    return [];
+  }
+  const baseVariables = xmlChildrenNamed(root, "BaseVariables")[0];
+  if (!baseVariables) {
+    return [];
+  }
+  return normalizeUnitAttachmentRequests(
+    xmlChildrenNamed(baseVariables, "Variable").map(variable => ({
+      variableId: variable.getAttribute("id"),
+      attachmentType: variable.getAttribute("format")
+    }))
+  );
+};
+
 const parseStandaloneZipUnitEntry = (
   sourceDocument: string
 ): SourcePackageUnitEntry | null => {
@@ -13398,6 +13531,8 @@ const parseStandaloneZipUnitEntry = (
   const unitDefinition = extractZipUnitDefinition(sourceDocument);
   const description = extractZipUnitDescription(sourceDocument);
   const content = extractZipUnitContent(sourceDocument);
+  const requestedAttachments =
+    extractZipUnitAttachmentRequests(sourceDocument);
   return normalizeSourcePackageUnitEntry({
     unitKey,
     displayLabel:
@@ -13412,7 +13547,8 @@ const parseStandaloneZipUnitEntry = (
       : {}),
     ...(unitDefinition.unitDefinitionType
       ? { unitDefinitionType: unitDefinition.unitDefinitionType }
-      : {})
+      : {}),
+    ...(requestedAttachments.length > 0 ? { requestedAttachments } : {})
   });
 };
 
@@ -13465,6 +13601,9 @@ const hydrateZipUnitEntry = (input: {
   const description = input.unitEntry.description
     ? null
     : extractZipUnitDescription(input.sourceDocument);
+  const requestedAttachments = extractZipUnitAttachmentRequests(
+    input.sourceDocument
+  );
   const playerEntry = unitDefinition.playerKey
     ? findZipUnitPlayerEntry(
         input.manifestExtraction,
@@ -13493,7 +13632,8 @@ const hydrateZipUnitEntry = (input: {
       : {}),
     ...(codingSchemeResult?.status === "valid"
       ? { codingScheme: codingSchemeResult.codingScheme }
-      : {})
+      : {}),
+    ...(requestedAttachments.length > 0 ? { requestedAttachments } : {})
   };
 };
 
@@ -18043,6 +18183,292 @@ export const createFirstSliceServices = (
     });
   };
 
+  const requireAttachmentAccess = async (input: {
+    sessionToken: string;
+    tenantKey: string;
+    workspaceKey: string;
+    write: boolean;
+  }): Promise<{
+    workspace: Workspace;
+    actorAdminUserId: string;
+    groupKeys: string[] | null;
+  }> => {
+    const currentSession = await requireActiveAdminSession(
+      repository,
+      input.sessionToken,
+      now()
+    );
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const fullScopeAssignments = currentSession.roleAssignments.filter(
+      roleAssignment =>
+        roleAssignment.role === "platform_admin" ||
+        (roleAssignment.role === "tenant_admin" &&
+          roleAssignment.tenantId === workspace.tenantId) ||
+        ((roleAssignment.role === "workspace_admin" ||
+          roleAssignment.role === "study_monitor") &&
+          roleAssignment.workspaceId === workspace.workspaceId)
+    );
+    const groupScopeAssignments = currentSession.roleAssignments.filter(
+      roleAssignment =>
+        roleAssignment.role === "group_monitor" &&
+        roleAssignment.workspaceId === workspace.workspaceId &&
+        Boolean(roleAssignment.groupKey)
+    );
+    const applicableAssignments =
+      fullScopeAssignments.length > 0
+        ? fullScopeAssignments
+        : groupScopeAssignments;
+
+    if (applicableAssignments.length === 0) {
+      throw new FirstSliceError(
+        403,
+        "attachment_management_role_required",
+        "Attachment management requires administration or monitor access to the workspace."
+      );
+    }
+    if (
+      input.write &&
+      !applicableAssignments.some(
+        roleAssignment => roleAssignment.accessMode === "read_write"
+      )
+    ) {
+      throw new FirstSliceError(
+        403,
+        "attachment_management_write_role_required",
+        "Uploading or deleting attachment files requires read-write workspace access."
+      );
+    }
+
+    return {
+      workspace,
+      actorAdminUserId: currentSession.adminUser.adminUserId,
+      groupKeys:
+        fullScopeAssignments.length > 0
+          ? null
+          : [
+              ...new Set(
+                groupScopeAssignments.flatMap(roleAssignment =>
+                  roleAssignment.groupKey ? [roleAssignment.groupKey] : []
+                )
+              )
+            ].sort()
+    };
+  };
+
+  const buildWorkspaceAttachments = async (
+    workspace: Workspace
+  ): Promise<WorkspaceAttachment[]> => {
+    const [attachmentFiles, testRuns, participantSessions, rosterEntries, releases] =
+      await Promise.all([
+        repository.listAttachmentFilesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        ),
+        repository.listTestRunsByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        ),
+        repository.listParticipantSessionsByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        ),
+        repository.listParticipantRosterEntriesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        ),
+        repository.listContentReleasesByWorkspace(
+          workspace.tenantId,
+          workspace.workspaceId
+        )
+      ]);
+    const sessionsById = new Map(
+      participantSessions.map(session => [session.participantSessionId, session])
+    );
+    const releasesById = new Map(
+      releases.map(release => [release.contentReleaseId, release])
+    );
+    const filesByAttachmentId = new Map<string, AttachmentFile[]>();
+    for (const attachmentFile of attachmentFiles) {
+      const files = filesByAttachmentId.get(attachmentFile.attachmentId) ?? [];
+      files.push(attachmentFile);
+      filesByAttachmentId.set(attachmentFile.attachmentId, files);
+    }
+
+    return testRuns
+      .flatMap(testRun => {
+        const participantSession = sessionsById.get(testRun.participantSessionId);
+        const contentRelease = releasesById.get(testRun.contentReleaseId);
+        const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
+          candidate => candidate.bookletKey === testRun.bookletKey
+        );
+        if (!participantSession || !booklet) {
+          return [];
+        }
+        const rosterEntry = rosterEntries.find(
+          candidate =>
+            candidate.loginKey === participantSession.loginKey &&
+            candidate.groupKey === participantSession.groupKey
+        );
+
+        return booklet.unitEntries.flatMap(unitEntry =>
+          (unitEntry.requestedAttachments ?? []).map(request => {
+            const attachmentId = `att-${Buffer.from(
+              JSON.stringify([
+                testRun.testRunId,
+                unitEntry.unitKey,
+                request.variableId
+              ]),
+              "utf8"
+            ).toString("base64url")}`;
+            const files = (filesByAttachmentId.get(attachmentId) ?? []).sort(
+              (left, right) =>
+                left.createdAt.localeCompare(right.createdAt) ||
+                left.attachmentFileId.localeCompare(right.attachmentFileId)
+            );
+            const latestFile = files.at(-1);
+            const lastModified = latestFile
+              ? Date.parse(latestFile.createdAt)
+              : null;
+
+            return {
+              attachmentId,
+              tenantId: workspace.tenantId,
+              workspaceId: workspace.workspaceId,
+              participantSessionId: participantSession.participantSessionId,
+              testRunId: testRun.testRunId,
+              groupKey: participantSession.groupKey,
+              loginKey: participantSession.loginKey,
+              personLabel:
+                rosterEntry?.displayName?.trim() || participantSession.loginKey,
+              bookletKey: booklet.bookletKey,
+              testLabel: booklet.displayLabel,
+              unitKey: unitEntry.unitKey,
+              unitLabel: unitEntry.displayLabel,
+              variableId: request.variableId,
+              attachmentType: request.attachmentType,
+              dataType: files.length > 0 ? "image" : "missing",
+              attachmentFileIds: files.map(file => file.attachmentFileId),
+              lastModified:
+                lastModified !== null && Number.isFinite(lastModified)
+                  ? lastModified
+                  : null
+            } satisfies WorkspaceAttachment;
+          })
+        );
+      })
+      .sort(
+        (left, right) =>
+          left.groupKey.localeCompare(right.groupKey) ||
+          left.loginKey.localeCompare(right.loginKey) ||
+          left.bookletKey.localeCompare(right.bookletKey) ||
+          left.unitKey.localeCompare(right.unitKey) ||
+          left.variableId.localeCompare(right.variableId) ||
+          left.attachmentId.localeCompare(right.attachmentId)
+      );
+  };
+
+  const requireScopedAttachment = async (input: {
+    workspace: Workspace;
+    groupKeys: string[] | null;
+    attachmentId: string;
+  }): Promise<WorkspaceAttachment> => {
+    const attachment = (await buildWorkspaceAttachments(input.workspace)).find(
+      candidate => candidate.attachmentId === input.attachmentId.trim()
+    );
+    if (!attachment) {
+      throw new FirstSliceError(
+        404,
+        "attachment_not_found",
+        "The requested attachment was not found."
+      );
+    }
+    if (input.groupKeys && !input.groupKeys.includes(attachment.groupKey)) {
+      throw new FirstSliceError(
+        403,
+        "attachment_group_scope_forbidden",
+        "The attachment is outside the monitor's assigned groups."
+      );
+    }
+    return attachment;
+  };
+
+  const normalizeAttachmentFileInput = (input: {
+    fileName: string;
+    mediaType: string;
+    dataBase64: string;
+  }): {
+    fileName: string;
+    mediaType: AttachmentFile["mediaType"];
+    dataBase64: string;
+    extension: "jpg" | "png";
+  } => {
+    const mediaType = input.mediaType.trim().toLowerCase();
+    if (mediaType !== "image/jpeg" && mediaType !== "image/png") {
+      throw new FirstSliceError(
+        400,
+        "attachment_media_type_invalid",
+        "Attachment files must be PNG or JPEG images."
+      );
+    }
+    const dataBase64 = input.dataBase64.replace(/\s+/g, "");
+    if (
+      !dataBase64 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        dataBase64
+      )
+    ) {
+      throw new FirstSliceError(
+        400,
+        "attachment_data_invalid",
+        "Attachment image data must be valid base64."
+      );
+    }
+    const bytes = Buffer.from(dataBase64, "base64");
+    if (bytes.length > 10 * 1024 * 1024) {
+      throw new FirstSliceError(
+        413,
+        "attachment_file_too_large",
+        "Attachment images must not exceed 10 MiB."
+      );
+    }
+    const validSignature =
+      mediaType === "image/png"
+        ? bytes.length >= 8 &&
+          bytes.subarray(0, 8).equals(
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+          )
+        : bytes.length >= 3 &&
+          bytes[0] === 0xff &&
+          bytes[1] === 0xd8 &&
+          bytes[2] === 0xff;
+    if (!validSignature) {
+      throw new FirstSliceError(
+        400,
+        "attachment_image_signature_invalid",
+        "Attachment image data does not match its declared media type."
+      );
+    }
+    const fileName = input.fileName.trim().split(/[\\/]/).at(-1)?.trim() ?? "";
+    if (!fileName || fileName.length > 255) {
+      throw new FirstSliceError(
+        400,
+        "attachment_file_name_invalid",
+        "Attachment filenames must contain between 1 and 255 characters."
+      );
+    }
+
+    return {
+      fileName,
+      mediaType,
+      dataBase64,
+      extension: mediaType === "image/png" ? "png" : "jpg"
+    };
+  };
+
   const buildParticipantTestLogs = (input: {
     testRun: TestRun;
     deliveryId?: string;
@@ -19127,6 +19553,24 @@ export const createFirstSliceServices = (
         total + Object.keys(normalizeTestRun(testRun).unitResponses).length,
       0
     );
+    const deletedTestRunIdSet = new Set(deletedTestRunIds);
+    const deletedAttachmentIds = new Set(
+      (await buildWorkspaceAttachments(workspace))
+        .filter(attachment => deletedTestRunIdSet.has(attachment.testRunId))
+        .map(attachment => attachment.attachmentId)
+    );
+    const deletedAttachmentFiles = (
+      await repository.listAttachmentFilesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      )
+    ).filter(attachmentFile =>
+      deletedAttachmentIds.has(attachmentFile.attachmentId)
+    );
+    for (const attachmentFile of deletedAttachmentFiles) {
+      await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
+    }
+    const deletedAttachmentFileCount = deletedAttachmentFiles.length;
     const deletedReviewCount =
       await repository.deleteWorkspaceReviewsByTestRunIds(deletedTestRunIds);
     const deletedTestLogCount =
@@ -19152,6 +19596,7 @@ export const createFirstSliceServices = (
             deletedResponseCount,
             deletedReviewCount,
             deletedTestLogCount,
+            deletedAttachmentFileCount,
             affectedParticipantSessionIds,
             deletedTestRunIds
           }
@@ -19161,6 +19606,7 @@ export const createFirstSliceServices = (
             deletedResponseCount,
             deletedReviewCount,
             deletedTestLogCount,
+            deletedAttachmentFileCount,
             affectedParticipantSessionIds,
             deletedTestRunIds
           }
@@ -19225,6 +19671,166 @@ export const createFirstSliceServices = (
           }
         });
         return updatedSettings;
+      }
+    },
+    attachments: {
+      async listAttachments(input) {
+        const access = await requireAttachmentAccess({
+          ...input,
+          write: false
+        });
+        const requestedGroupKey = input.groupKey?.trim();
+        if (
+          requestedGroupKey &&
+          access.groupKeys &&
+          !access.groupKeys.includes(requestedGroupKey)
+        ) {
+          throw new FirstSliceError(
+            403,
+            "attachment_group_scope_forbidden",
+            "The requested group is outside the monitor's assigned groups."
+          );
+        }
+        return (await buildWorkspaceAttachments(access.workspace)).filter(
+          attachment =>
+            (!access.groupKeys || access.groupKeys.includes(attachment.groupKey)) &&
+            (!requestedGroupKey || attachment.groupKey === requestedGroupKey)
+        );
+      },
+      async getAttachment(input) {
+        const access = await requireAttachmentAccess({
+          ...input,
+          write: false
+        });
+        return requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: input.attachmentId
+        });
+      },
+      async uploadAttachmentFile(input) {
+        const access = await requireAttachmentAccess({
+          ...input,
+          write: true
+        });
+        const attachment = await requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: input.attachmentId
+        });
+        const normalizedFile = normalizeAttachmentFileInput(input);
+        const attachmentFile: AttachmentFile = {
+          attachmentFileId: `image:${idGenerator()}.${normalizedFile.extension}`,
+          attachmentId: attachment.attachmentId,
+          tenantId: access.workspace.tenantId,
+          workspaceId: access.workspace.workspaceId,
+          fileName: normalizedFile.fileName,
+          mediaType: normalizedFile.mediaType,
+          dataBase64: normalizedFile.dataBase64,
+          createdAt: now()
+        };
+        await repository.saveAttachmentFile(attachmentFile);
+        await recordWorkspaceActivity({
+          tenantId: access.workspace.tenantId,
+          workspaceId: access.workspace.workspaceId,
+          eventType: "attachment_file_uploaded",
+          actorId: access.actorAdminUserId,
+          subjectType: "test_run",
+          subjectId: attachment.testRunId,
+          summary: `Uploaded attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
+          details: {
+            attachmentId: attachment.attachmentId,
+            attachmentFileId: attachmentFile.attachmentFileId,
+            groupKey: attachment.groupKey,
+            loginKey: attachment.loginKey,
+            bookletKey: attachment.bookletKey,
+            unitKey: attachment.unitKey,
+            variableId: attachment.variableId,
+            mediaType: attachmentFile.mediaType
+          }
+        });
+        return requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: attachment.attachmentId
+        });
+      },
+      async getAttachmentFile(input) {
+        const access = await requireAttachmentAccess({
+          ...input,
+          write: false
+        });
+        const attachment = await requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: input.attachmentId
+        });
+        const attachmentFile = await repository.getAttachmentFileById(
+          input.attachmentFileId.trim()
+        );
+        if (
+          !attachmentFile ||
+          attachmentFile.attachmentId !== attachment.attachmentId ||
+          attachmentFile.tenantId !== access.workspace.tenantId ||
+          attachmentFile.workspaceId !== access.workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "attachment_file_not_found",
+            "The requested attachment file was not found."
+          );
+        }
+        return attachmentFile;
+      },
+      async deleteAttachmentFile(input) {
+        const access = await requireAttachmentAccess({
+          ...input,
+          write: true
+        });
+        const attachment = await requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: input.attachmentId
+        });
+        const attachmentFile = await repository.getAttachmentFileById(
+          input.attachmentFileId.trim()
+        );
+        if (
+          !attachmentFile ||
+          attachmentFile.attachmentId !== attachment.attachmentId ||
+          attachmentFile.tenantId !== access.workspace.tenantId ||
+          attachmentFile.workspaceId !== access.workspace.workspaceId
+        ) {
+          throw new FirstSliceError(
+            404,
+            "attachment_file_not_found",
+            "The requested attachment file was not found."
+          );
+        }
+        await repository.deleteAttachmentFile(attachmentFile.attachmentFileId);
+        await recordWorkspaceActivity({
+          tenantId: access.workspace.tenantId,
+          workspaceId: access.workspace.workspaceId,
+          eventType: "attachment_file_deleted",
+          actorId: access.actorAdminUserId,
+          subjectType: "test_run",
+          subjectId: attachment.testRunId,
+          summary: `Deleted attachment image '${attachmentFile.fileName}' for '${attachment.loginKey}'.`,
+          details: {
+            attachmentId: attachment.attachmentId,
+            attachmentFileId: attachmentFile.attachmentFileId,
+            groupKey: attachment.groupKey,
+            loginKey: attachment.loginKey,
+            bookletKey: attachment.bookletKey,
+            unitKey: attachment.unitKey,
+            variableId: attachment.variableId
+          }
+        });
+        return requireScopedAttachment({
+          workspace: access.workspace,
+          groupKeys: access.groupKeys,
+          attachmentId: attachment.attachmentId
+        });
       }
     },
     adminAuth: {

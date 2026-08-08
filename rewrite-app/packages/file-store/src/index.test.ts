@@ -7,6 +7,53 @@ import { describe, it } from "node:test";
 import { createFileFirstSliceRepository } from "./index.js";
 
 describe("createFileFirstSliceRepository", () => {
+  it("preserves and deletes attachment images across repository restarts", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-attachments-"));
+    const filePath = join(tempDirectory, "state.json");
+    const attachmentFile = {
+      attachmentFileId: "image:file-store.png",
+      attachmentId: "att-file-store",
+      tenantId: "tenant-file-store",
+      workspaceId: "workspace-file-store",
+      fileName: "capture.png",
+      mediaType: "image/png" as const,
+      dataBase64: "iVBORw0KGgo=",
+      createdAt: "2026-08-08T20:00:00.000Z"
+    };
+
+    try {
+      await createFileFirstSliceRepository(filePath).saveAttachmentFile(
+        attachmentFile
+      );
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.deepEqual(
+        await restarted.listAttachmentFilesByWorkspace(
+          attachmentFile.tenantId,
+          attachmentFile.workspaceId
+        ),
+        [attachmentFile]
+      );
+      assert.deepEqual(
+        await restarted.getAttachmentFileById(
+          attachmentFile.attachmentFileId
+        ),
+        attachmentFile
+      );
+      assert.equal(
+        await restarted.deleteAttachmentFile(attachmentFile.attachmentFileId),
+        true
+      );
+      assert.equal(
+        await createFileFirstSliceRepository(filePath).getAttachmentFileById(
+          attachmentFile.attachmentFileId
+        ),
+        null
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("preserves global application settings across repository restarts", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-settings-"));
     const filePath = join(tempDirectory, "state.json");

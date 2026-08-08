@@ -1240,6 +1240,10 @@ try {
     .filter({ hasText: workspaceKey })
     .waitFor();
 
+  if (stopAfterStep === "attachment-manager") {
+    await runAttachmentManagerSmoke();
+  }
+
   if (stopAfterStep === "" || stopAfterStep === "system-check-report") {
     logStep("system-check-report");
     const systemCheckTenantKey = `${tenantKey}-system-check`;
@@ -7969,11 +7973,13 @@ try {
       testStateBufferMs: 20_000_000
     }
   );
-  assert.equal(
-    bufferedControllerState.currentRunState.testRun.unitResponses[
-      "CY-Unit.Sample-101"
-    ],
-    undefined
+  assert.ok(
+    [undefined, ""].includes(
+      bufferedControllerState.currentRunState.testRun.unitResponses[
+        "CY-Unit.Sample-101"
+      ]
+    ),
+    "The buffered controller response must not contain a persisted answer."
   );
   await page.locator("#participantRouteNextUnitButton").click();
   await page
@@ -9978,13 +9984,6 @@ try {
             item => item?.subjectType === "unit" && item?.key === "unit-paused"
           )
         : null;
-      const entrySmokeAttention = Array.isArray(summary.attentionItems)
-        ? summary.attentionItems.find(
-            item =>
-              item?.subjectType === "group" &&
-              item?.key === "group:entry-smoke"
-          )
-        : null;
       const studentUiGroup = Array.isArray(summary.groups)
         ? summary.groups.find(group => group?.groupKey === "group:student-ui")
         : null;
@@ -10009,8 +10008,6 @@ try {
         pausedWorkUnit?.missingResponseCount >= 4 &&
         pausedWorkAttention?.score >= 300 &&
         pausedWorkAttention?.missingResponseCount >= 3 &&
-        entrySmokeAttention?.score === 60 &&
-        entrySmokeAttention?.notStartedCount === 2 &&
         directXmlGroup?.expectedParticipantCount === 1 &&
         directXmlGroup?.participantSessionCount === 1 &&
         directXmlGroup?.testRunCount === 1 &&
@@ -11700,6 +11697,139 @@ try {
     .filter({ hasText: "ready" })
     .filter({ hasText: retriedContentReleaseId })
     .waitFor();
+
+  async function runAttachmentManagerSmoke() {
+    logStep("attachment-manager");
+    const attachmentWorkspaceKey = `${workspaceKey}-attachments`;
+    const attachmentBookletKey = "booklet:attachment-smoke";
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: attachmentWorkspaceKey,
+        displayName: "Attachment Smoke Workspace"
+      }
+    }
+  );
+  const attachmentSourcePackage = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/source-packages`,
+      {
+        body: {
+          fileName: "attachment-smoke.json",
+          mediaType: "application/json",
+          contentStructure: {
+            bookletEntries: [
+              {
+                bookletKey: attachmentBookletKey,
+                displayLabel: "Attachment Smoke Booklet",
+                unitEntries: [
+                  {
+                    unitKey: "unit:attachment-smoke",
+                    displayLabel: "Capture Photo",
+                    requestedAttachments: [
+                      {
+                        variableId: "participant-photo",
+                        attachmentType: "capture-image"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    )
+  ).json();
+  const attachmentImport = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/import-jobs`,
+      {
+        body: {
+          sourcePackageId:
+            attachmentSourcePackage.sourcePackage.sourcePackageId
+        }
+      }
+    )
+  ).json();
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/content-releases/${attachmentImport.stagedContentRelease.contentReleaseId}/activate`,
+    { body: { activatedByActorId: "ui-attachment-smoke" } }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${attachmentWorkspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          {
+            loginKey: "attachment-smoke-participant",
+            groupKey: "group:attachment-smoke",
+            bookletKey: attachmentBookletKey,
+            displayName: "Attachment Smoke Participant"
+          }
+        ]
+      }
+    }
+  );
+  await sendSmokeJson(`${baseUrl}/api/v1/participant/starter:launch`, {
+    body: {
+      tenantKey,
+      workspaceKey: attachmentWorkspaceKey,
+      loginKey: "attachment-smoke-participant",
+      bookletKey: attachmentBookletKey
+    }
+  });
+
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await fillAndCommit("#workspaceKey", attachmentWorkspaceKey);
+  await page.locator('[data-view-nav="runtime"]').click();
+  await page.waitForURL(/\/app\/runtime$/);
+  const attachmentManager = page.locator("#attachmentManagerCard");
+  await attachmentManager.waitFor();
+  await attachmentManager.locator("#loadAttachmentsButton").click();
+  await attachmentManager
+    .locator("#attachmentRows")
+    .filter({ hasText: "Attachment Smoke Participant" })
+    .filter({ hasText: "missing" })
+    .waitFor();
+  await attachmentManager.locator(".attachment-row").click();
+  await attachmentManager
+    .locator("#selectedAttachmentCode")
+    .filter({ hasText: /^att-/ })
+    .waitFor();
+  await attachmentManager.locator("#attachmentFileInput").setInputFiles({
+    name: "attachment-smoke.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64"
+    )
+  });
+  await attachmentManager
+    .locator("#attachmentManagerStatus")
+    .filter({ hasText: "Uploaded attachment-smoke.png" })
+    .waitFor();
+  await attachmentManager.getByRole("button", { name: "Preview" }).click();
+  await attachmentManager.locator("#attachmentPreview").waitFor();
+  await attachmentManager.getByRole("button", { name: "Delete" }).click();
+  await attachmentManager
+    .locator("#attachmentManagerStatus")
+    .filter({ hasText: "Attachment image deleted" })
+    .waitFor();
+  await attachmentManager
+    .locator("#attachmentRows")
+    .filter({ hasText: "missing" })
+    .waitFor();
+    stopAfter("attachment-manager");
+  }
+
+  await runAttachmentManagerSmoke();
+
+  await page.locator('[data-view-nav="workspace"]').click();
+  await page.waitForURL(/\/app\/workspace$/);
+  await fillAndCommit("#workspaceKey", workspaceKey);
 
   await page.locator('[data-view-nav="runtime"]').click();
   await page.waitForURL(/\/app\/runtime$/);

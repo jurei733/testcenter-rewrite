@@ -42,6 +42,7 @@ import {
   type CreateTenantResponse,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResponse,
+  type DeleteAttachmentFileResponse,
   type DeleteGroupResultsResponse,
   type DeleteGroupResultsBulkRequest,
   type DeleteGroupResultsBulkResponse,
@@ -63,6 +64,7 @@ import {
   type GetRuntimeConfigResponse,
   type GetRuntimeDiagnosticsResponse,
   type GetApplicationSettingsResponse,
+  type GetAttachmentResponse,
   type GetSystemCheckAccessResponse,
   type GetSourcePackageResponse,
   type GetSourcePackageDeletionReadinessResponse,
@@ -84,6 +86,7 @@ import {
   type IssueMonitorRunCommandsResponse,
   type ListAdminAuditEventsResponse,
   type ListAdminSessionsResponse,
+  type ListAttachmentsResponse,
   type ListWorkspaceActivityEventsResponse,
   type ListImportJobsResponse,
   type ListAdminUsersResponse,
@@ -138,6 +141,8 @@ import {
   type UpdateAdminUserResponse,
   type UpdateApplicationSettingsRequest,
   type UpdateApplicationSettingsResponse,
+  type UploadAttachmentFileRequest,
+  type UploadAttachmentFileResponse,
   type UpdateParticipantReviewRequest,
   type AdminSessionListQuery,
   type AdminUserListQuery,
@@ -1573,6 +1578,18 @@ const studyMonitorRunPattern = createRoutePattern(
 const workspaceActivityEventListPattern = createRoutePattern(
   productionApiRoutes.workspace.listWorkspaceActivityEvents
 );
+const attachmentListPattern = createRoutePattern(
+  productionApiRoutes.workspace.listAttachments
+);
+const attachmentDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getAttachment
+);
+const attachmentFileUploadPattern = createRoutePattern(
+  productionApiRoutes.workspace.uploadAttachmentFile
+);
+const attachmentFileDetailPattern = createRoutePattern(
+  productionApiRoutes.workspace.getAttachmentFile
+);
 const sourcePackageCreatePattern = createRoutePattern(
   productionApiRoutes.workspace.createSourcePackage
 );
@@ -1778,6 +1795,11 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", studyMonitorUnitPattern],
   ["GET", studyMonitorRunPattern],
   ["GET", workspaceActivityEventListPattern],
+  ["GET", attachmentListPattern],
+  ["GET", attachmentDetailPattern],
+  ["POST", attachmentFileUploadPattern],
+  ["GET", attachmentFileDetailPattern],
+  ["DELETE", attachmentFileDetailPattern],
   ["POST", sourcePackageCreatePattern],
   ["POST", sourcePackageAssemblyPattern],
   ["GET", sourcePackageListPattern],
@@ -2028,6 +2050,11 @@ const monitorOperatorAccessByRequest = new WeakMap<
 >();
 
 const workspaceMonitorRouteChecks: Array<[string, RegExp]> = [
+  ["GET", attachmentListPattern],
+  ["GET", attachmentDetailPattern],
+  ["POST", attachmentFileUploadPattern],
+  ["GET", attachmentFileDetailPattern],
+  ["DELETE", attachmentFileDetailPattern],
   ["GET", openRunsCsvExportPattern],
   ["GET", monitorOpenRunsPattern],
   ["GET", monitorEventStreamPattern],
@@ -2525,6 +2552,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       workspaceActivityEventListPattern,
       productionApiRoutes.workspace.listWorkspaceActivityEvents
     ],
+    ["GET", attachmentListPattern, productionApiRoutes.workspace.listAttachments],
+    ["GET", attachmentDetailPattern, productionApiRoutes.workspace.getAttachment],
+    ["POST", attachmentFileUploadPattern, productionApiRoutes.workspace.uploadAttachmentFile],
+    ["GET", attachmentFileDetailPattern, productionApiRoutes.workspace.getAttachmentFile],
+    ["DELETE", attachmentFileDetailPattern, productionApiRoutes.workspace.deleteAttachmentFile],
     ["POST", sourcePackageCreatePattern, productionApiRoutes.workspace.createSourcePackage],
     [
       "POST",
@@ -4657,6 +4689,190 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           limit
         });
         sendJson<ListWorkspaceActivityEventsResponse>(response, 200, { items });
+        return;
+      }
+
+      const attachmentListMatch = attachmentListPattern.exec(pathname);
+      const attachmentDetailMatch = attachmentDetailPattern.exec(pathname);
+      const attachmentFileUploadMatch =
+        attachmentFileUploadPattern.exec(pathname);
+      const attachmentFileDetailMatch =
+        attachmentFileDetailPattern.exec(pathname);
+      if (request.method === "GET" && attachmentListMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const tenantKey = decodeRouteGroup(attachmentListMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          attachmentListMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const items = await services.attachments.listAttachments({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          groupKey: url.searchParams.get("groupKey")?.trim() || undefined
+        });
+        sendJson<ListAttachmentsResponse>(response, 200, { items });
+        return;
+      }
+
+      if (request.method === "GET" && attachmentFileDetailMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const tenantKey = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.workspaceKey
+        );
+        const attachmentId = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.attachmentId
+        );
+        const attachmentFileId = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.attachmentFileId
+        );
+        if (!tenantKey || !workspaceKey || !attachmentId || !attachmentFileId) {
+          sendError(
+            response,
+            400,
+            "invalid_attachment_scope",
+            "tenantKey, workspaceKey, attachmentId, and attachmentFileId are required."
+          );
+          return;
+        }
+        const attachmentFile = await services.attachments.getAttachmentFile({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          attachmentId,
+          attachmentFileId
+        });
+        const body = Buffer.from(attachmentFile.dataBase64, "base64");
+        sendAsset(response, 200, attachmentFile.mediaType, body, {
+          "content-disposition": buildAttachmentContentDisposition(
+            attachmentFile.fileName
+          ).replace(/^attachment;/, "inline;"),
+          "content-length": String(body.byteLength),
+          "cache-control": "no-store"
+        });
+        return;
+      }
+
+      if (request.method === "DELETE" && attachmentFileDetailMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const tenantKey = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.workspaceKey
+        );
+        const attachmentId = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.attachmentId
+        );
+        const attachmentFileId = decodeRouteGroup(
+          attachmentFileDetailMatch.groups.attachmentFileId
+        );
+        if (!tenantKey || !workspaceKey || !attachmentId || !attachmentFileId) {
+          sendError(
+            response,
+            400,
+            "invalid_attachment_scope",
+            "tenantKey, workspaceKey, attachmentId, and attachmentFileId are required."
+          );
+          return;
+        }
+        const attachment = await services.attachments.deleteAttachmentFile({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          attachmentId,
+          attachmentFileId
+        });
+        sendJson<DeleteAttachmentFileResponse>(response, 200, { attachment });
+        return;
+      }
+
+      if (request.method === "POST" && attachmentFileUploadMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const tenantKey = decodeRouteGroup(
+          attachmentFileUploadMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          attachmentFileUploadMatch.groups.workspaceKey
+        );
+        const attachmentId = decodeRouteGroup(
+          attachmentFileUploadMatch.groups.attachmentId
+        );
+        if (!tenantKey || !workspaceKey || !attachmentId) {
+          sendError(
+            response,
+            400,
+            "invalid_attachment_scope",
+            "tenantKey, workspaceKey, and attachmentId are required."
+          );
+          return;
+        }
+        const body =
+          await readSourcePackageRequestJsonBody<UploadAttachmentFileRequest>();
+        const attachment = await services.attachments.uploadAttachmentFile({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          attachmentId,
+          fileName: String(body.fileName ?? ""),
+          mediaType: String(body.mediaType ?? ""),
+          dataBase64: String(body.dataBase64 ?? "")
+        });
+        sendJson<UploadAttachmentFileResponse>(response, 201, { attachment });
+        return;
+      }
+
+      if (request.method === "GET" && attachmentDetailMatch?.groups) {
+        const sessionToken = requireBearerToken(request, response);
+        if (!sessionToken) {
+          return;
+        }
+        const tenantKey = decodeRouteGroup(attachmentDetailMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          attachmentDetailMatch.groups.workspaceKey
+        );
+        const attachmentId = decodeRouteGroup(
+          attachmentDetailMatch.groups.attachmentId
+        );
+        if (!tenantKey || !workspaceKey || !attachmentId) {
+          sendError(
+            response,
+            400,
+            "invalid_attachment_scope",
+            "tenantKey, workspaceKey, and attachmentId are required."
+          );
+          return;
+        }
+        const attachment = await services.attachments.getAttachment({
+          sessionToken,
+          tenantKey,
+          workspaceKey,
+          attachmentId
+        });
+        sendJson<GetAttachmentResponse>(response, 200, { attachment });
         return;
       }
 

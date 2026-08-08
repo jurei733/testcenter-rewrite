@@ -2716,6 +2716,35 @@ export class RuntimeViewFacade {
     );
   }
 
+  get attachmentSessionToken(): string {
+    return this.uiState.ops.adminSessionToken;
+  }
+
+  get canUseAttachmentManager(): boolean {
+    return (
+      this.canUseWorkspaceScope &&
+      this.attachmentSessionToken.trim().length > 0 &&
+      this.operatorAccess.mode !== "signed_out" &&
+      this.operatorAccess.mode !== "unassigned" &&
+      this.operatorAccess.mode !== "system_check"
+    );
+  }
+
+  get attachmentManagerReadOnly(): boolean {
+    if (this.operatorAccess.isReadOnlyAdmin) {
+      return true;
+    }
+    if (!this.operatorAccess.isMonitorOnly) {
+      return false;
+    }
+    return !this.operatorAccess.roleAssignments.some(
+      assignment =>
+        (assignment.role === "study_monitor" ||
+          assignment.role === "group_monitor") &&
+        assignment.accessMode === "read_write"
+    );
+  }
+
   get canUseParticipantSessionActions(): boolean {
     return (
       this.canUseWorkspaceScope &&

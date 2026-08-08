@@ -38,6 +38,7 @@ import type {
   Tenant,
   TestRun,
   Workspace,
+  WorkspaceAttachment,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
   WorkspaceActivityEventListItem,
@@ -1887,6 +1888,16 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/study-monitor/runs/:testRunId",
     listWorkspaceActivityEvents:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/activity-events",
+    listAttachments:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments",
+    getAttachment:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId",
+    uploadAttachmentFile:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId/files",
+    getAttachmentFile:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId/files/:attachmentFileId",
+    deleteAttachmentFile:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/attachments/:attachmentId/files/:attachmentFileId",
     createSourcePackage: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages",
     assembleSourcePackages:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-assemblies",
@@ -2587,6 +2598,24 @@ export type GetApplicationSettingsResponse = {
 };
 
 export type UpdateApplicationSettingsResponse = GetApplicationSettingsResponse;
+
+export type ListAttachmentsResponse = {
+  items: WorkspaceAttachment[];
+};
+
+export type GetAttachmentResponse = {
+  attachment: WorkspaceAttachment;
+};
+
+export type UploadAttachmentFileRequest = {
+  fileName: string;
+  mediaType: string;
+  dataBase64: string;
+};
+
+export type UploadAttachmentFileResponse = GetAttachmentResponse;
+
+export type DeleteAttachmentFileResponse = GetAttachmentResponse;
 
 export type GetWorkspaceOverviewResponse = {
   workspaceOverview: WorkspaceOverview;

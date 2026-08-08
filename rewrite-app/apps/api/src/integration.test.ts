@@ -1889,6 +1889,364 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);
 });
 
+test("attachment manager imports capture requests and enforces monitor scope", async () => {
+  const tenantKey = "attachment-tenant";
+  const workspaceKey = "attachment-workspace";
+  let platformSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "integration-secret"
+      }
+    }
+  );
+  if (platformSignIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    platformSignIn = await requestJson<{ sessionToken: string }>(
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "integration.admin",
+          password: "integration-secret"
+        }
+      }
+    );
+  }
+  assert.equal(platformSignIn.status, 200);
+  const authorization = `Bearer ${platformSignIn.body.sessionToken}`;
+
+  const tenant = await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    headers: { authorization },
+    body: { tenantKey, displayName: "Attachment Tenant" }
+  });
+  assert.equal(tenant.status, 201);
+  const workspace = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces`,
+    {
+      method: "POST",
+      headers: { authorization },
+      body: { workspaceKey, displayName: "Attachment Workspace" }
+    }
+  );
+  assert.equal(workspace.status, 201);
+
+  const bookletKey = "BOOKLET.ATTACHMENT";
+  const unitKey = "UNIT.ATTACHMENT";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${unitKey}" href="units/Unit.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Attachment Booklet</Label></Metadata>
+          <Units><Unit id="${unitKey}" alias="attachment-unit" label="Photo Unit" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${unitKey}</Id><Label>Photo Unit</Label></Metadata>
+          <BaseVariables>
+            <Variable id="participant-photo" type="attachment" format="capture-image" />
+          </BaseVariables>
+        </Unit>
+      `
+    }
+  ]);
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    headers: { authorization },
+    body: {
+      fileName: "attachment-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    stagedContentRelease: {
+      contentReleaseId: string;
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          unitEntries: Array<{
+            requestedAttachments?: Array<{
+              variableId: string;
+              attachmentType: string;
+            }>;
+          }>;
+        }>;
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    headers: { authorization },
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.deepEqual(
+    importResult.body.stagedContentRelease.runtimeSnapshot.bookletEntries[0]
+      ?.unitEntries[0]?.requestedAttachments,
+    [
+      {
+        variableId: "participant-photo",
+        attachmentType: "capture-image"
+      }
+    ]
+  );
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+    {
+      method: "POST",
+      headers: { authorization },
+      body: { activatedByActorId: "attachment-integration" }
+    }
+  );
+  assert.equal(activation.status, 200);
+
+  const roster = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        rosterText: [
+          {
+            loginKey: "attachment-a",
+            groupKey: "group-a",
+            bookletKey,
+            displayName: "Attachment Alpha"
+          },
+          {
+            loginKey: "attachment-b",
+            groupKey: "group-b",
+            bookletKey,
+            displayName: "Attachment Beta"
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(roster.status, 201);
+
+  for (const [loginKey, groupKey] of [
+    ["attachment-a", "group-a"],
+    ["attachment-b", "group-b"]
+  ]) {
+    const launch = await requestJson<{ testRun: { testRunId: string } }>(
+      "/api/v1/participant/starter:launch",
+      {
+        method: "POST",
+        body: { tenantKey, workspaceKey, loginKey, groupKey, bookletKey }
+      }
+    );
+    assert.equal(launch.status, 200);
+    assert.ok(launch.body.testRun.testRunId);
+  }
+
+  const missingSession = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments`
+  );
+  assert.equal(missingSession.status, 401);
+  assert.equal(missingSession.body.error, "admin_session_missing");
+
+  const inventory = await requestJson<{
+    items: Array<{
+      attachmentId: string;
+      groupKey: string;
+      loginKey: string;
+      variableId: string;
+      dataType: string;
+      attachmentFileIds: string[];
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments`, {
+    headers: { authorization }
+  });
+  assert.equal(inventory.status, 200);
+  assert.equal(inventory.body.items.length, 2);
+  assert.deepEqual(
+    inventory.body.items.map(item => [item.groupKey, item.loginKey, item.dataType]),
+    [
+      ["group-a", "attachment-a", "missing"],
+      ["group-b", "attachment-b", "missing"]
+    ]
+  );
+  assert.ok(
+    inventory.body.items.every(item => item.variableId === "participant-photo")
+  );
+
+  const groupMonitor = await requestJson<{
+    adminUser: { adminUserId: string };
+  }>("/api/v1/admin/users", {
+    method: "POST",
+    headers: { authorization },
+    body: {
+      username: "attachment.group.monitor",
+      password: "attachment-group-monitor-secret",
+      roleAssignments: [
+        {
+          role: "group_monitor",
+          accessMode: "read_write",
+          tenantKey,
+          workspaceKey,
+          groupKey: "group-a"
+        }
+      ]
+    }
+  });
+  assert.equal(groupMonitor.status, 201);
+  const groupMonitorSignIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "attachment.group.monitor",
+        password: "attachment-group-monitor-secret"
+      }
+    }
+  );
+  assert.equal(groupMonitorSignIn.status, 200);
+  const groupAuthorization = `Bearer ${groupMonitorSignIn.body.sessionToken}`;
+  const scopedInventory = await requestJson<typeof inventory.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(scopedInventory.status, 200);
+  assert.deepEqual(
+    scopedInventory.body.items.map(item => item.groupKey),
+    ["group-a"]
+  );
+  const groupBAttachment = inventory.body.items.find(
+    item => item.groupKey === "group-b"
+  );
+  assert.ok(groupBAttachment);
+  const forbiddenAttachment = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments/${encodeURIComponent(groupBAttachment.attachmentId)}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(forbiddenAttachment.status, 403);
+  assert.equal(
+    forbiddenAttachment.body.error,
+    "attachment_group_scope_forbidden"
+  );
+
+  const groupAAttachment = inventory.body.items.find(
+    item => item.groupKey === "group-a"
+  );
+  assert.ok(groupAAttachment);
+  const attachmentPath =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/attachments/` +
+    encodeURIComponent(groupAAttachment.attachmentId);
+  const invalidImage = await requestJson<{ error: string }>(
+    `${attachmentPath}/files`,
+    {
+      method: "POST",
+      headers: { authorization: groupAuthorization },
+      body: {
+        fileName: "not-a-photo.png",
+        mediaType: "image/png",
+        dataBase64: Buffer.from("not a png", "utf8").toString("base64")
+      }
+    }
+  );
+  assert.equal(invalidImage.status, 400);
+  assert.equal(invalidImage.body.error, "attachment_image_signature_invalid");
+
+  const onePixelPng =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const uploaded = await requestJson<{
+    attachment: {
+      dataType: string;
+      attachmentFileIds: string[];
+      lastModified: number;
+    };
+  }>(`${attachmentPath}/files`, {
+    method: "POST",
+    headers: { authorization: groupAuthorization },
+    body: {
+      fileName: "participant photo.png",
+      mediaType: "image/png",
+      dataBase64: onePixelPng
+    }
+  });
+  assert.equal(uploaded.status, 201);
+  assert.equal(uploaded.body.attachment.dataType, "image");
+  assert.equal(uploaded.body.attachment.attachmentFileIds.length, 1);
+  assert.equal(typeof uploaded.body.attachment.lastModified, "number");
+  const attachmentFileId = uploaded.body.attachment.attachmentFileIds[0];
+  assert.ok(attachmentFileId);
+
+  const download = await fetch(
+    `${baseUrl}${attachmentPath}/files/${encodeURIComponent(attachmentFileId)}`,
+    { headers: { authorization: groupAuthorization } }
+  );
+  assert.equal(download.status, 200);
+  assert.equal(download.headers.get("content-type"), "image/png");
+  assert.match(download.headers.get("content-disposition") ?? "", /^inline;/);
+  assert.deepEqual(
+    Buffer.from(await download.arrayBuffer()),
+    Buffer.from(onePixelPng, "base64")
+  );
+
+  const deleted = await requestJson<{
+    attachment: { dataType: string; attachmentFileIds: string[] };
+  }>(`${attachmentPath}/files/${encodeURIComponent(attachmentFileId)}`, {
+    method: "DELETE",
+    headers: { authorization: groupAuthorization }
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.attachment.dataType, "missing");
+  assert.deepEqual(deleted.body.attachment.attachmentFileIds, []);
+
+  const allActivity = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        eventType: string;
+        details: Record<string, unknown>;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?limit=100`,
+    { headers: { authorization } }
+  );
+  assert.deepEqual(
+    allActivity.body.items
+      .filter(
+        item =>
+          item.activityEvent.details["attachmentId"] ===
+          groupAAttachment.attachmentId
+      )
+      .map(item => item.activityEvent.eventType)
+      .sort(),
+    ["attachment_file_deleted", "attachment_file_uploaded"]
+  );
+});
+
 test("admin deletion removes roles and sessions while retaining audit evidence", async () => {
   let platformSignIn = await requestJson<{
     adminUser: { adminUserId: string };
@@ -5898,6 +6256,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
             deletedResponseCount?: number;
             deletedReviewCount?: number;
             deletedTestLogCount?: number;
+            deletedAttachmentFileCount?: number;
           };
         };
       }>;
@@ -5926,6 +6285,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       deletedResponseCount: 2,
       deletedReviewCount: 1,
       deletedTestLogCount: participantTestLogs.body.items.length,
+      deletedAttachmentFileCount: 0,
       affectedParticipantSessionIds: [
         participantSignIn.body.participantSession.participantSessionId
       ],
@@ -25773,13 +26133,23 @@ test("frontend shell exposes multi-view navigation and diagnostics entrypoints",
   assert.equal(scriptResponse.status, 200);
   assertSecurityHeaders(scriptResponse);
   assert.match(scriptResponse.headers.get("content-type") ?? "", /javascript/);
-  assert.match(scriptResponse.headers.get("cache-control") ?? "", /immutable/);
+  assert.match(
+    scriptResponse.headers.get("cache-control") ?? "",
+    /(?:^|\/)(?:chunk|main)-[a-z0-9]+\.js$/i.test(scriptMatch[1])
+      ? /immutable/
+      : /no-cache/
+  );
 
   const stylesheetResponse = await fetch(`${baseUrl}/app/${stylesheetMatch[1]}`);
   assert.equal(stylesheetResponse.status, 200);
   assertSecurityHeaders(stylesheetResponse);
   assert.match(stylesheetResponse.headers.get("content-type") ?? "", /text\/css/);
-  assert.match(stylesheetResponse.headers.get("cache-control") ?? "", /immutable/);
+  assert.match(
+    stylesheetResponse.headers.get("cache-control") ?? "",
+    /(?:^|\/)styles-[a-z0-9]+\.css$/i.test(stylesheetMatch[1])
+      ? /immutable/
+      : /no-cache/
+  );
 
   const serviceWorkerResponse = await fetch(`${baseUrl}/app/service-worker.js`);
   assert.equal(serviceWorkerResponse.status, 200);
