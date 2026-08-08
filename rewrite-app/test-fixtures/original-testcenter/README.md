@@ -27,6 +27,10 @@ proves that an explicit alias remains valid while duplicate Unit runtime keys
 and duplicate Testlet IDs are rejected. The byte-identical original
 `Booklet.xml`/`Booklet_sameBookletID.xml` collision pair additionally proves
 that different package filenames cannot hide a duplicate Booklet metadata ID.
+Normal workspace uploads reject both case-insensitive filename collisions and
+Booklet-ID collisions, while the explicit replacement path retains immutable
+version history. Prebuilt ZIPs remain guarded by the same identity rule during
+import.
 It also contains the byte-exact
 original sample `.itcr.zip` resource package as base64 so the binary fixture
 remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as

@@ -1744,6 +1744,68 @@ const decodePersistedSourceDocument = (
   }
 };
 
+const readStandaloneBookletId = (
+  sourcePackage: SourcePackage
+): string | null => {
+  const normalizedFileName = sourcePackage.fileName.trim().toLowerCase();
+  const normalizedMediaType = sourcePackage.mediaType.trim().toLowerCase();
+  if (
+    normalizedFileName.endsWith(".zip") ||
+    normalizedMediaType.includes("zip")
+  ) {
+    return null;
+  }
+  const persistedDocument = sourcePackage.sourceDocument;
+  if (!persistedDocument) {
+    return null;
+  }
+  const isDataUrl = /^data:/i.test(persistedDocument);
+  const decodedDocument = isDataUrl
+    ? decodePersistedSourceDocument(sourcePackage)
+    : null;
+  if (isDataUrl && !decodedDocument) {
+    return null;
+  }
+  const sourceDocument = decodedDocument
+    ? decodedDocument.bytes.toString("utf8")
+    : persistedDocument;
+  const documentHead = sourceDocument.slice(0, 256 * 1024);
+  if (/<!DOCTYPE\b/i.test(documentHead)) {
+    return null;
+  }
+  const rootName = documentHead
+    .replace(/^\uFEFF/, "")
+    .match(
+      /^\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)\b/i
+    )?.[1];
+  if (rootName?.toLowerCase() !== "booklet") {
+    return null;
+  }
+  const parserErrors: string[] = [];
+  let document: XmlDocument | null = null;
+  try {
+    document = new DOMParser({
+      onError(level, message) {
+        parserErrors.push(`${level}: ${message}`);
+      }
+    }).parseFromString(sourceDocument, "application/xml");
+  } catch {
+    return null;
+  }
+  const root = document?.documentElement;
+  if (
+    parserErrors.length > 0 ||
+    !root ||
+    xmlElementLocalName(root).toLowerCase() !== "booklet"
+  ) {
+    return null;
+  }
+  const metadata = xmlChildrenNamed(root, "Metadata")[0];
+  return metadata
+    ? xmlElementText(xmlChildrenNamed(metadata, "Id")[0]) || null
+    : null;
+};
+
 const classifyWorkspaceSourcePackage = (
   sourcePackage: SourcePackage,
   decodedDocument: { mediaType: string; bytes: Buffer } | null
@@ -18962,6 +19024,37 @@ export const createFirstSliceServices = (
           status: "uploaded",
           uploadedAt: now()
         };
+        const existingSourcePackages =
+          await repository.listSourcePackagesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          );
+        const duplicateFileName = existingSourcePackages.find(
+          existingSourcePackage =>
+            existingSourcePackage.fileName.trim().toLowerCase() ===
+            sourcePackage.fileName.toLowerCase()
+        );
+        if (duplicateFileName) {
+          throw new FirstSliceError(
+            409,
+            "source_package_file_name_duplicate",
+            `Source package file name '${sourcePackage.fileName}' already exists. Create a replacement for source package '${duplicateFileName.sourcePackageId}' to preserve its version history.`
+          );
+        }
+        const bookletId = readStandaloneBookletId(sourcePackage);
+        const duplicateBooklet = bookletId
+          ? existingSourcePackages.find(
+              existingSourcePackage =>
+                readStandaloneBookletId(existingSourcePackage) === bookletId
+            )
+          : null;
+        if (duplicateBooklet) {
+          throw new FirstSliceError(
+            409,
+            "source_package_booklet_id_duplicate",
+            `Booklet id '${bookletId}' already exists in source package '${duplicateBooklet.fileName}'. Create a replacement for source package '${duplicateBooklet.sourcePackageId}' to preserve its version history.`
+          );
+        }
         await repository.saveSourcePackage(sourcePackage);
         await recordWorkspaceActivity({
           tenantId: workspace.tenantId,

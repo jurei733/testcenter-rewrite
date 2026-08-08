@@ -7981,6 +7981,27 @@ test("original Testcenter compatibility corpus imports representative booklets",
     body: { workspaceKey, displayName: workspaceKey }
   });
 
+  let validationWorkspaceIndex = 0;
+  const createValidationWorkspace = async (
+    sourceLabel: string
+  ): Promise<string> => {
+    validationWorkspaceIndex += 1;
+    const validationWorkspaceKey =
+      `${workspaceKey}-validation-${validationWorkspaceIndex}`;
+    const validationWorkspace = await requestJson(
+      `/api/v1/tenants/${tenantKey}/workspaces`,
+      {
+        method: "POST",
+        body: {
+          workspaceKey: validationWorkspaceKey,
+          displayName: validationWorkspaceKey
+        }
+      }
+    );
+    assert.equal(validationWorkspace.status, 201, sourceLabel);
+    return validationWorkspaceKey;
+  };
+
   const releaseIdsByBookletKey = new Map<string, string>();
   for (const expectation of [...corpus.booklets, ...corpus.systemBooklets]) {
     const sourcePackage = await requestJson<{
@@ -8367,9 +8388,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
       "utf8"
     );
     if (expectation.kind === "source-package") {
+      const validationWorkspaceKey = await createValidationWorkspace(
+        expectation.sourcePath
+      );
       const invalidSourcePackage = await requestJson<{
         sourcePackage: { sourcePackageId: string };
-      }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
         method: "POST",
         body: {
           fileName: expectation.fixture.split("/").at(-1),
@@ -8384,7 +8408,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
           diagnostics: Array<{ code: string; severity: string }>;
         };
         stagedContentRelease: null;
-      }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
         method: "POST",
         body: {
           sourcePackageId:
@@ -8509,9 +8533,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_schema_reference_invalid"
     }
   ]) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      malformedCase.fileName
+    );
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
       method: "POST",
       body: {
         fileName: malformedCase.fileName,
@@ -8522,7 +8549,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     const importResult = await requestJson<{
       importJob: { status: string; diagnostics: Array<{ code: string }> };
       stagedContentRelease: null;
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
       method: "POST",
       body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
     });
@@ -8858,9 +8885,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     }
   ];
   for (const xsdFacetCase of xsdFacetCases) {
+    const validationWorkspaceKey = await createValidationWorkspace(
+      xsdFacetCase.name
+    );
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/source-packages`, {
       method: "POST",
       body: {
         fileName: `invalid-original-${xsdFacetCase.name}.xml`,
@@ -8871,7 +8901,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
     const importResult = await requestJson<{
       importJob: { status: string; diagnostics: Array<{ code: string }> };
       stagedContentRelease: null;
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${validationWorkspaceKey}/import-jobs`, {
       method: "POST",
       body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
     });
@@ -8885,9 +8915,12 @@ test("original Testcenter compatibility corpus imports representative booklets",
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
+  const numericBooleanWorkspaceKey = await createValidationWorkspace(
+    "valid-original-lock-boolean.xml"
+  );
   const numericBooleanPackage = await requestJson<{
     sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${numericBooleanWorkspaceKey}/source-packages`, {
     method: "POST",
     body: {
       fileName: "valid-original-lock-boolean.xml",
@@ -8898,7 +8931,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
   const numericBooleanImport = await requestJson<{
     importJob: { status: string; diagnostics: Array<{ code: string }> };
     stagedContentRelease: { contentReleaseId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${numericBooleanWorkspaceKey}/import-jobs`, {
     method: "POST",
     body: {
       sourcePackageId: numericBooleanPackage.body.sourcePackage.sourcePackageId
@@ -8920,7 +8953,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
       };
     };
   }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${numericBooleanImport.body.stagedContentRelease.contentReleaseId}`
+    `/api/v1/tenants/${tenantKey}/workspaces/${numericBooleanWorkspaceKey}/content-releases/${numericBooleanImport.body.stagedContentRelease.contentReleaseId}`
   );
   assert.equal(
     numericBooleanRelease.body.contentReleaseDetail.contentRelease.runtimeSnapshot
@@ -9102,55 +9135,133 @@ test("original Testcenter compatibility corpus rejects duplicate Booklet identit
     body: { workspaceKey, displayName: workspaceKey }
   });
 
-  const sourcePackages: Array<{ sourcePackageId: string }> = [];
-  for (const fileName of ["Booklet.xml", "Booklet_sameBookletID.xml"]) {
-    const upload = await requestJson<{
-      sourcePackage: { sourcePackageId: string };
-    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+  const originalUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "Booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument
+    }
+  });
+  assert.equal(originalUpload.status, 201, expectation.collidesWithSourcePath);
+
+  const duplicateFileName = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
       method: "POST",
       body: {
-        fileName,
+        fileName: "booklet.XML",
+        mediaType: "application/xml",
+        sourceDocument: sourceDocument.replace(
+          expectation.bookletKey,
+          "BOOKLET.DIFFERENT-100"
+        )
+      }
+    }
+  );
+  assert.equal(duplicateFileName.status, 409);
+  assert.equal(
+    duplicateFileName.body.error,
+    "source_package_file_name_duplicate"
+  );
+
+  const duplicateBookletId = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Booklet_sameBookletID.xml",
         mediaType: "application/xml",
         sourceDocument
       }
-    });
-    assert.equal(
-      upload.status,
-      201,
-      `${expectation.sourcePath} colliding with ${expectation.collidesWithSourcePath}`
-    );
-    sourcePackages.push(upload.body.sourcePackage);
-  }
+    }
+  );
+  assert.equal(duplicateBookletId.status, 409);
+  assert.equal(
+    duplicateBookletId.body.error,
+    "source_package_booklet_id_duplicate"
+  );
+  const sourcePackagesAfterConflicts = await requestJson<{
+    items: Array<{ sourcePackage: { sourcePackageId: string } }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`);
+  assert.deepEqual(
+    sourcePackagesAfterConflicts.body.items.map(
+      item => item.sourcePackage.sourcePackageId
+    ),
+    [originalUpload.body.sourcePackage.sourcePackageId]
+  );
 
-  const assembly = await requestJson<{
+  const replacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string; status: string };
+    importJob: { status: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${originalUpload.body.sourcePackage.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "Booklet.xml",
+        mediaType: "application/xml",
+        sourceDocument
+      }
+    }
+  );
+  assert.equal(replacement.status, 201);
+  assert.equal(replacement.body.replacementSourcePackage.status, "accepted");
+  assert.equal(replacement.body.importJob.status, "completed");
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="BOOKLET-ONE" href="Booklet.xml" />
+            <resource identifier="BOOKLET-TWO" href="Booklet_sameBookletID.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    { fileName: "export/Booklet.xml", content: sourceDocument },
+    {
+      fileName: "export/Booklet_sameBookletID.xml",
+      content: sourceDocument
+    }
+  ]);
+  const packageUpload = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "duplicate-booklet-identities.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(packageUpload.status, 201);
+
+  const packageImport = await requestJson<{
     importJob: {
       status: string;
       diagnostics: Array<{ code: string; message: string }>;
     };
     stagedContentRelease: null;
-  }>(
-    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-package-assemblies`,
-    {
-      method: "POST",
-      body: {
-        fileName: "duplicate-booklet-identities.zip",
-        sourcePackageIds: sourcePackages.map(
-          sourcePackage => sourcePackage.sourcePackageId
-        )
-      }
-    }
-  );
-  assert.equal(assembly.status, 201);
-  assert.equal(assembly.body.importJob.status, "failed");
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: packageUpload.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(packageImport.status, 201);
+  assert.equal(packageImport.body.importJob.status, "failed");
   assert.deepEqual(
-    assembly.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    packageImport.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
     [expectation.diagnosticCode]
   );
   assert.match(
-    assembly.body.importJob.diagnostics[0]?.message ?? "",
+    packageImport.body.importJob.diagnostics[0]?.message ?? "",
     /Booklet\.xml.*Booklet_sameBookletID\.xml.*BOOKLET\.SAMPLE-100/
   );
-  assert.equal(assembly.body.stagedContentRelease, null);
+  assert.equal(packageImport.body.stagedContentRelease, null);
 });
 
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {
@@ -11922,23 +12033,27 @@ test("original Testcenter compatibility corpus assembles loose dependency files"
     "source_package_assembly_path_invalid"
   );
 
-  const duplicatePathSource = await requestJson<{
-    sourcePackage: { sourcePackageId: string };
-  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
-    method: "POST",
-    body: {
-      fileName: "booklet2.XML",
-      mediaType: "application/xml",
-      sourceDocument: "<Booklet><Metadata><Id>duplicate</Id><Label>Duplicate</Label></Metadata><Units><Unit id=\"unit\" label=\"Unit\" /></Units></Booklet>"
+  const duplicatePathReplacement = await requestJson<{
+    replacementSourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages/${sourcePackages[0]!.sourcePackageId}/replacements`,
+    {
+      method: "POST",
+      body: {
+        fileName: "booklet2.XML",
+        mediaType: "application/xml",
+        sourceDocument: "<Booklet><Metadata><Id>duplicate</Id><Label>Duplicate</Label></Metadata><Units><Unit id=\"unit\" label=\"Unit\" /></Units></Booklet>"
+      }
     }
-  });
+  );
+  assert.equal(duplicatePathReplacement.status, 201);
   const duplicatePathAssembly = await requestJson<{ error: string }>(assemblyPath, {
     method: "POST",
     body: {
       fileName: "duplicate-path.zip",
       sourcePackageIds: [
         sourcePackages[0]!.sourcePackageId,
-        duplicatePathSource.body.sourcePackage.sourcePackageId
+        duplicatePathReplacement.body.replacementSourcePackage.sourcePackageId
       ]
     }
   });
