@@ -186,6 +186,29 @@ type OriginalTestcenterCorpus = {
     metadataFormat: string;
     unitDefinitionType: string;
   }>;
+  veronaPlayerFamilyPackages: Array<{
+    family: string;
+    playerFixture: string;
+    playerEncoding: "brotli-base64";
+    definitionFixture: string;
+    definitionEncoding: "base64";
+    sourceRepository: string;
+    sourceTag: string;
+    sourceCommit: string;
+    playerSourceUrl: string;
+    playerSha256: string;
+    definitionSourceUrl: string;
+    definitionSha256: string;
+    license: string;
+    playerKey: string;
+    playerModuleId: string;
+    playerModuleVersion: string;
+    playerApiVersion: string;
+    metadataApiVersion: string;
+    metadataFormat: string;
+    unitDefinitionType: string;
+    unitStateType: string;
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -509,6 +532,49 @@ test("original Testcenter compatibility corpus pins the official Verona 2 throug
   assert.equal(verona3?.metadataFormat, "legacy-jsonld");
   assert.equal(verona4?.metadataFormat, "experimental-jsonld");
   assert.equal(verona5?.metadataFormat, "metadata-2.0");
+});
+
+test("original Testcenter compatibility corpus pins the official ABI player family", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 1);
+  const player = corpus.veronaPlayerFamilyPackages[0];
+  assert.ok(player);
+  assert.equal(player.family, "ABI scripted survey");
+  assert.equal(player.sourceTag, "v3.3.0");
+  assert.equal(player.sourceCommit, "1e872a261c6a20b7dfe1f86d8916cfe643acdfb8");
+  assert.equal(player.license, "MIT");
+
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, player.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  const definitionDocument = Buffer.from(
+    readFileSync(resolve(corpusRoot, player.definitionFixture), "utf8").trim(),
+    "base64"
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    player.playerSha256,
+    player.playerSourceUrl
+  );
+  assert.equal(
+    createHash("sha256").update(definitionDocument).digest("hex"),
+    player.definitionSha256,
+    player.definitionSourceUrl
+  );
+  const playerHtml = playerDocument.toString("utf8");
+  assert.match(playerHtml, /"@id"\s*:\s*"iqb-player-abi"/);
+  assert.match(playerHtml, /"version"\s*:\s*"3\.3\.0"/);
+  assert.match(playerHtml, /"apiVersion"\s*:\s*"2\.0"/);
+  assert.match(playerHtml, /data-api-version="2\.1\.0"/);
+  assert.match(playerHtml, /data-supported-unit-definition-types="iqb-scripted@1\.0"/);
+  assert.match(playerHtml, /data-supported-unit-state-data-types="iqb-key-value@1\.0\.0"/);
+  assert.match(definitionDocument.toString("utf8"), /input-text::text_var1/);
+  assert.match(definitionDocument.toString("utf8"), /multiple-choice::mc_var1/);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

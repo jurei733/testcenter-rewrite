@@ -47,6 +47,14 @@ as Brotli-compressed base64 and gate metadata import, generation-specific
 Chromium. These fixtures come from the official Player repository rather than
 the pinned Testcenter tree; every source URL, SHA-256, tag, commit, and license
 is recorded in `corpus.json`.
+The corpus additionally pins the official MIT-licensed ABI 3.3.0 scripted-survey
+Player and its release example definition; both are encoded portably without
+changing the release bytes. This independent Player family uses
+Verona API 2.1 with `iqb-scripted@1.0` definitions and string-valued
+`allResponses` key/value state. Its production Chromium gate persists text and
+radio answers and restores both after reload. The host records each legacy data
+part's original value kind so API-2/3 object-valued and string-valued Players
+both receive the representation they emitted.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact

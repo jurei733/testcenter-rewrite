@@ -95,6 +95,7 @@ export type PersistedVeronaUnitResponse = {
   kind: "verona_unit_state";
   version: 1;
   unitState: VeronaUnitState;
+  dataPartValueTypes?: Record<string, "string" | "json">;
   playerState?: VeronaPlayerState;
 };
 
@@ -118,6 +119,36 @@ const normalizeDataParts = (value: unknown): Record<string, string> | undefined 
   return Object.keys(dataParts).length > 0 ? dataParts : undefined;
 };
 
+const readDataPartValueTypes = (
+  value: unknown
+): Record<string, "string" | "json"> | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const valueTypes = Object.fromEntries(
+    Object.entries(record).flatMap(([key, type]) =>
+      type === "string" || type === "json" ? [[key, type]] : []
+    )
+  ) as Record<string, "string" | "json">;
+  return Object.keys(valueTypes).length > 0 ? valueTypes : undefined;
+};
+
+const inferDataPartValueTypes = (
+  unitState: unknown
+): Record<string, "string" | "json"> | undefined => {
+  const dataParts = asRecord(asRecord(unitState)?.dataParts);
+  if (!dataParts || Object.keys(dataParts).length === 0) {
+    return undefined;
+  }
+  return Object.fromEntries(
+    Object.entries(dataParts).map(([key, content]) => [
+      key,
+      typeof content === "string" ? "string" : "json"
+    ])
+  );
+};
+
 export const normalizeVeronaUnitState = (value: unknown): VeronaUnitState => {
   const record = asRecord(value) ?? {};
   const dataParts = normalizeDataParts(record.dataParts);
@@ -129,13 +160,21 @@ export const normalizeVeronaUnitState = (value: unknown): VeronaUnitState => {
 
 export const serializeVeronaUnitResponse = (input: {
   unitState?: unknown;
+  dataPartValueTypes?: Record<string, "string" | "json">;
   playerState?: unknown;
 }): string => {
   const playerState = asRecord(input.playerState);
+  const dataPartValueTypes = Object.prototype.hasOwnProperty.call(
+    input,
+    "dataPartValueTypes"
+  )
+    ? readDataPartValueTypes(input.dataPartValueTypes)
+    : inferDataPartValueTypes(input.unitState);
   return JSON.stringify({
     kind: "verona_unit_state",
     version: 1,
     unitState: normalizeVeronaUnitState(input.unitState),
+    ...(dataPartValueTypes ? { dataPartValueTypes } : {}),
     ...(playerState ? { playerState } : {})
   } satisfies PersistedVeronaUnitResponse);
 };
@@ -151,6 +190,10 @@ export const mergeVeronaUnitResponse = (
   return serializeVeronaUnitResponse({
     unitState:
       update.unitState === undefined ? previous?.unitState : update.unitState,
+    dataPartValueTypes:
+      update.unitState === undefined
+        ? previous?.dataPartValueTypes
+        : inferDataPartValueTypes(update.unitState),
     playerState:
       update.playerState === undefined
         ? previous?.playerState
@@ -170,10 +213,14 @@ export const parseVeronaUnitResponse = (
     if (parsed?.kind !== "verona_unit_state" || parsed.version !== 1) {
       return null;
     }
+    const dataPartValueTypes = readDataPartValueTypes(
+      parsed.dataPartValueTypes
+    );
     return {
       kind: "verona_unit_state",
       version: 1,
       unitState: normalizeVeronaUnitState(parsed.unitState),
+      ...(dataPartValueTypes ? { dataPartValueTypes } : {}),
       ...(asRecord(parsed.playerState)
         ? { playerState: asRecord(parsed.playerState) as VeronaPlayerState }
         : {})
@@ -201,7 +248,8 @@ export const isSupportedVeronaPlayerApiVersion = (version: string): boolean => {
 
 export const prepareVeronaUnitStateForPlayer = (
   value: VeronaUnitState,
-  apiVersion: string
+  apiVersion: string,
+  dataPartValueTypes?: Record<string, "string" | "json">
 ): VeronaStartUnitState => {
   const apiMajor = Number.parseInt(apiVersion.split(".")[0] ?? "", 10);
   if (!Number.isInteger(apiMajor) || apiMajor >= 4 || !value.dataParts) {
@@ -212,6 +260,9 @@ export const prepareVeronaUnitStateForPlayer = (
     ...value,
     dataParts: Object.fromEntries(
       Object.entries(value.dataParts).map(([key, content]) => {
+        if (dataPartValueTypes?.[key] === "string") {
+          return [key, content];
+        }
         try {
           return [key, JSON.parse(content) as unknown];
         } catch {

@@ -471,7 +471,8 @@ export class VeronaPlayerHostComponent
         : {}),
       unitState: prepareVeronaUnitStateForPlayer(
         persistedResponse?.unitState ?? {},
-        this.apiVersion ?? String(SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX)
+        this.apiVersion ?? String(SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX),
+        persistedResponse?.dataPartValueTypes
       ),
       ...(this.restoreCurrentPageOnReturn && persistedResponse?.playerState
         ? { playerState: persistedResponse.playerState }

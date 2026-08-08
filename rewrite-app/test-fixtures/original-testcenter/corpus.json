@@ -710,6 +710,33 @@
       "unitDefinitionType": "verona-player-simple-5.2"
     }
   ],
+  "veronaPlayerFamilyPackages": [
+    {
+      "family": "ABI scripted survey",
+      "playerFixture": "players/iqb-player-abi-3.3.0.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/abi-example-script-3.3.0.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-abi",
+      "sourceTag": "v3.3.0",
+      "sourceCommit": "1e872a261c6a20b7dfe1f86d8916cfe643acdfb8",
+      "playerSourcePath": "iqb-player-abi@3.3.0.html",
+      "playerSourceUrl": "https://github.com/iqb-berlin/verona-player-abi/releases/download/v3.3.0/iqb-player-abi%403.3.0.html",
+      "playerSha256": "c035721f902f188d66ea38277e2ed09cd99d4210810e4127feb4ee30056516bb",
+      "definitionSourcePath": "example-script.voud",
+      "definitionSourceUrl": "https://github.com/iqb-berlin/verona-player-abi/releases/download/v3.3.0/example-script.voud",
+      "definitionSha256": "3acf683d0e47dc3e726c68138896cb777dbe59afb1fe179b0a0e35370da1a577",
+      "license": "MIT",
+      "playerKey": "iqb-player-abi@3.3",
+      "playerModuleId": "iqb-player-abi",
+      "playerModuleVersion": "3.3.0",
+      "playerApiVersion": "2.1.0",
+      "metadataApiVersion": "2.0",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "iqb-scripted@1.0",
+      "unitStateType": "iqb-key-value@1.0.0"
+    }
+  ],
   "playerPackages": [
     {
       "bookletFixture": "booklets/booklet-17.4.xml",

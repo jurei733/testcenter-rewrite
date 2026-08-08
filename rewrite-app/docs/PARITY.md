@@ -29,6 +29,15 @@ Priority:
 | 7 | P2 | Attachments and QR capture | Operationally valuable but separable from the first controlled digital-only rollout. |
 | 8 | P2 | Branding, custom texts, maintenance banner, themes | Needed for broad tenant rollout after core test integrity is proven. |
 
+Latest P0 player-family closure: the compatibility corpus now also pins the
+official MIT-licensed IQB ABI 3.3.0 scripted-survey Player, its `v3.3.0` tag
+commit, release HTML, and release example definition byte-for-byte. Import and
+production SQLite/Chromium gates negotiate Verona API 2.1, persist text plus
+radio answers, and restore them after reload. The versioned response envelope
+now records each legacy data part's original string/object value kind, so ABI's
+JSON-string `allResponses` and the Simple Player's object-valued state both
+round-trip correctly. Further representative families remain P0 corpus work.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

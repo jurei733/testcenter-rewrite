@@ -31,6 +31,7 @@ test("Verona response envelopes normalize and restore player state", () => {
       responseProgress: "some",
       unitStateDataType: "example@1"
     },
+    dataPartValueTypes: { answer: "json", untouched: "string" },
     playerState: { currentPage: "page-2" }
   });
   assert.equal(parseVeronaUnitResponse("legacy plain response"), null);
@@ -58,6 +59,63 @@ test("Verona 2 and 3 players receive restored object-valued data parts", () => {
   );
 });
 
+test("Verona 2 and 3 players retain data parts originally emitted as strings", () => {
+  const serialized = serializeVeronaUnitResponse({
+    unitState: {
+      dataParts: {
+        allResponses: '{"text_var1":"saved"}',
+        all: { answers: [{ id: "answer", value: "saved" }] }
+      }
+    }
+  });
+  const persisted = parseVeronaUnitResponse(serialized);
+  assert.ok(persisted);
+
+  assert.deepEqual(
+    prepareVeronaUnitStateForPlayer(
+      persisted.unitState,
+      "2.1.0",
+      persisted.dataPartValueTypes
+    ),
+    {
+      dataParts: {
+        allResponses: '{"text_var1":"saved"}',
+        all: { answers: [{ id: "answer", value: "saved" }] }
+      }
+    }
+  );
+});
+
+test("legacy Verona envelopes keep object restoration when player state is merged", () => {
+  const legacyResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      dataParts: {
+        all: '{"answers":[{"id":"answer","value":"saved"}]}'
+      }
+    }
+  });
+  const merged = mergeVeronaUnitResponse(legacyResponse, {
+    playerState: { currentPage: "2" }
+  });
+  const persisted = parseVeronaUnitResponse(merged);
+  assert.ok(persisted);
+  assert.equal(persisted.dataPartValueTypes, undefined);
+  assert.deepEqual(
+    prepareVeronaUnitStateForPlayer(
+      persisted.unitState,
+      "3.0.0",
+      persisted.dataPartValueTypes
+    ),
+    {
+      dataParts: {
+        all: { answers: [{ id: "answer", value: "saved" }] }
+      }
+    }
+  );
+});
+
 test("Verona response envelopes merge separately reported unit and player state", () => {
   const playerResponse = mergeVeronaUnitResponse(null, {
     playerState: { currentPage: "1", validPages: [{ id: "0" }, { id: "1" }] }
@@ -76,6 +134,7 @@ test("Verona response envelopes merge separately reported unit and player state"
       dataParts: { elementCodes: '[{"id":"radio_1","value":2}]' },
       responseProgress: "some"
     },
+    dataPartValueTypes: { elementCodes: "string" },
     playerState: {
       currentPage: "1",
       validPages: [{ id: "0" }, { id: "1" }]
