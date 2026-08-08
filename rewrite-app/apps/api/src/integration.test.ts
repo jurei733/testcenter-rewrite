@@ -2689,6 +2689,41 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       "small"
     );
 
+    const invalidMonitorProfileEnum = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          username: "invalid-monitor-profile",
+          displayName: "Invalid Monitor Profile",
+          password: "invalid-monitor-profile-secret",
+          roleAssignments: [
+            {
+              role: "group_monitor",
+              tenantKey: "auth-required-tenant",
+              workspaceKey: "auth-required-workspace",
+              groupKey: "group:allowed",
+              monitorProfiles: [
+                {
+                  profileId: "invalid-view",
+                  settings: { view: "wide" },
+                  filters: [],
+                  filtersEnabled: {}
+                }
+              ]
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(invalidMonitorProfileEnum.status, 400);
+    assert.equal(
+      invalidMonitorProfileEnum.body.error,
+      "admin_monitor_profiles_invalid"
+    );
+
     const groupMonitorSignIn = await requestJsonAt<{
       sessionToken: string;
       roleAssignments: Array<{
@@ -9840,6 +9875,105 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnostic => diagnostic.code === "testcenter_xml_login_mode_invalid"
     )
   );
+
+  const validRosterXml = readFileSync(
+    resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
+    "utf8"
+  );
+  const invalidRosterFacetCases = [
+    {
+      label: "missing monitor profile",
+      rosterText: validRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="missing" />'
+      ),
+      diagnosticCode: "testcenter_xml_monitor_profile_reference_missing"
+    },
+    {
+      label: "duplicate monitor profile id",
+      rosterText: validRosterXml.replace('id="all"', 'id="small"'),
+      diagnosticCode: "testcenter_xml_monitor_profile_id_duplicate"
+    },
+    {
+      label: "invalid monitor profile setting",
+      rosterText: validRosterXml.replace('view="small"', 'view="wide"'),
+      diagnosticCode: "testcenter_xml_monitor_profile_setting_invalid"
+    },
+    {
+      label: "invalid monitor filter field",
+      rosterText: validRosterXml.replace(
+        'field="bookletLabel"',
+        'field="bookletUnknown"'
+      ),
+      diagnosticCode: "testcenter_xml_monitor_filter_field_invalid"
+    },
+    {
+      label: "invalid monitor filter type",
+      rosterText: validRosterXml.replace('type="equal"', 'type="contains"'),
+      diagnosticCode: "testcenter_xml_monitor_filter_type_invalid"
+    },
+    {
+      label: "invalid monitor filter negation",
+      rosterText: validRosterXml.replace(
+        'field="bookletLabel"',
+        'field="bookletLabel" not="yes"'
+      ),
+      diagnosticCode: "testcenter_xml_monitor_filter_not_invalid"
+    },
+    {
+      label: "mixed login assignment types",
+      rosterText: validRosterXml.replace(
+        '<Profile id="all" />',
+        '<Booklet>BOOKLET.SAMPLE-1</Booklet><Profile id="all" />'
+      ),
+      diagnosticCode: "testcenter_xml_login_assignment_choice_invalid"
+    },
+    {
+      label: "invalid booklet state preset",
+      rosterText: validRosterXml.replace(
+        'state="bonus:yes"',
+        'state="Bonus:yes"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_state_preset_invalid"
+    },
+    {
+      label: "invalid monitor booklet visibility",
+      rosterText: validRosterXml.replace(
+        '<Profile id="small" />',
+        '<Profile id="small" /><ViewSettings monitorBookletVisibility="expanded" />'
+      ),
+      diagnosticCode: "testcenter_xml_login_booklet_visibility_invalid"
+    },
+    {
+      label: "duplicate custom text key",
+      rosterText: validRosterXml.replace(
+        '<CustomText key="somestr">string</CustomText>',
+        '<CustomText key="somestr">string</CustomText><CustomText key="somestr">duplicate</CustomText>'
+      ),
+      diagnosticCode: "testcenter_xml_custom_text_key_duplicate"
+    }
+  ];
+  for (const rosterFacetCase of invalidRosterFacetCases) {
+    const invalidRoster = await requestJson<{
+      error: string;
+      details: { diagnostics: Array<{ code: string }> };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+      method: "POST",
+      body: { rosterText: rosterFacetCase.rosterText }
+    });
+    assert.equal(invalidRoster.status, 400, rosterFacetCase.label);
+    assert.equal(
+      invalidRoster.body.error,
+      "participant_roster_xml_invalid",
+      rosterFacetCase.label
+    );
+    assert.ok(
+      invalidRoster.body.details.diagnostics.some(
+        diagnostic => diagnostic.code === rosterFacetCase.diagnosticCode
+      ),
+      rosterFacetCase.label
+    );
+  }
 
   const operationalOnlyRoster = await requestJson<{
     error: string;

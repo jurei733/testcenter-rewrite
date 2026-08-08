@@ -155,7 +155,7 @@ export class OpsViewFacade {
     "revoked"
   ];
   readonly adminAuditEventTypeOptions = adminAuditEventTypes;
-  readonly monitorProfileViewOptions = ["small", "middle", "large"];
+  readonly monitorProfileViewOptions = ["full", "medium", "small"];
   readonly monitorProfileColumnOptions = ["show", "hide"];
   readonly monitorProfileFilterTargetOptions = [
     "groupName",
@@ -178,7 +178,7 @@ export class OpsViewFacade {
   monitorProfileDraftSelectedId = "";
   monitorProfileDraftId = "";
   monitorProfileDraftLabel = "";
-  monitorProfileDraftView = "middle";
+  monitorProfileDraftView = "medium";
   monitorProfileDraftBlockColumn = "show";
   monitorProfileDraftUnitColumn = "show";
   monitorProfileDraftGroupColumn = "hide";
@@ -1174,7 +1174,12 @@ export class OpsViewFacade {
     this.monitorProfileDraftSelectedId = profile.profileId;
     this.monitorProfileDraftId = profile.profileId;
     this.monitorProfileDraftLabel = profile.label;
-    this.monitorProfileDraftView = profile.settings.view;
+    this.monitorProfileDraftView =
+      profile.settings.view === "middle"
+        ? "medium"
+        : profile.settings.view === "large"
+          ? "full"
+          : profile.settings.view;
     this.monitorProfileDraftBlockColumn = profile.settings.blockColumn;
     this.monitorProfileDraftUnitColumn = profile.settings.unitColumn;
     this.monitorProfileDraftGroupColumn = profile.settings.groupColumn;
@@ -1272,7 +1277,7 @@ export class OpsViewFacade {
     this.monitorProfileDraftSelectedId = "";
     this.monitorProfileDraftId = "";
     this.monitorProfileDraftLabel = "";
-    this.monitorProfileDraftView = "middle";
+    this.monitorProfileDraftView = "medium";
     this.monitorProfileDraftBlockColumn = "show";
     this.monitorProfileDraftUnitColumn = "show";
     this.monitorProfileDraftGroupColumn = "hide";

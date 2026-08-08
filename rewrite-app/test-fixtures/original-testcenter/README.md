@@ -25,7 +25,8 @@ fixtures for malformed booklet, unit, SysCheck, and Testtakers structures,
 invalid XML `xs:ID` metadata identities in Booklet, Unit, and SysCheck files,
 invalid or duplicate adaptive state/option identities, empty state option sets,
 broken `Show if/is` references, malformed recursive conditions and aggregates,
-unresolved adaptive Unit aliases or inline/external Unit variables, plus duplicate
+unresolved adaptive Unit aliases or inline/external Unit variables, dangling or
+invalid Testtakers monitor profiles, malformed multi-state presets, and duplicate
 runtime identities. The matching original repeated-Unit-ID fixture
 proves that an explicit alias remains valid while duplicate Unit runtime keys
 and duplicate Testlet IDs are rejected. The byte-identical original

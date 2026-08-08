@@ -215,6 +215,28 @@ describe("parseParticipantRosterText", () => {
     );
   });
 
+  it("parses Original Testcenter comma-separated booklet state presets", () => {
+    const [entry] = parseParticipantRosterText(
+      [
+        "<Testtakers>",
+        "  <Group id=\"adaptive\">",
+        "    <Login mode=\"run-review\" name=\"adaptive-review\">",
+        "      <Booklet state=\"level:advanced, bonus:yes\">BOOKLET.ADAPTIVE</Booklet>",
+        "    </Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    );
+
+    assert.deepEqual(entry?.bookletAssignments, [
+      {
+        assignmentKey: "BOOKLET.ADAPTIVE#level:advanced;bonus:yes",
+        bookletKey: "BOOKLET.ADAPTIVE",
+        statePreset: { level: "advanced", bonus: "yes" }
+      }
+    ]);
+  });
+
   it("classifies operational Testtakers logins without exposing passwords", () => {
     const operationalLogins = parseOriginalTestcenterOperationalLogins(
       [
@@ -326,6 +348,24 @@ describe("parseParticipantRosterText", () => {
       }),
       { role: "study_monitor", groupKey: null }
     );
+  });
+
+  it("uses Original Testcenter monitor profile defaults", () => {
+    const [candidate] = parseOriginalTestcenterOperationalLogins(
+      [
+        "<Testtakers>",
+        "  <Profiles><GroupMonitor>",
+        "    <Profile id=\"default\"><Filter field=\"personLabel\" value=\"Ada\" /></Profile>",
+        "  </GroupMonitor></Profiles>",
+        "  <Group id=\"operators\">",
+        "    <Login mode=\"monitor-group\" name=\"monitor\"><Profile id=\"default\" /></Login>",
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    );
+
+    assert.equal(candidate?.monitorProfiles[0]?.settings.view, "medium");
+    assert.equal(candidate?.monitorProfiles[0]?.filters[0]?.type, "equal");
   });
 
   it("applies Original Testtakers custom texts to every participant login", () => {

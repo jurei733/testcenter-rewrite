@@ -2684,6 +2684,28 @@ const normalizeMonitorProfileText = (
   return value.trim();
 };
 
+const normalizeMonitorProfileEnum = <const AllowedValues extends readonly string[]>(
+  value: unknown,
+  fieldName: string,
+  allowedValues: AllowedValues,
+  fallback: AllowedValues[number]
+): AllowedValues[number] => {
+  const normalized = normalizeMonitorProfileText(
+    value,
+    fieldName,
+    Math.max(...allowedValues.map(candidate => candidate.length)),
+    fallback
+  );
+  if (!allowedValues.includes(normalized)) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_profiles_invalid",
+      `${fieldName} must be one of: ${allowedValues.join(", ")}.`
+    );
+  }
+  return normalized as AllowedValues[number];
+};
+
 const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
   if (value === undefined || value === null) {
     return [];
@@ -2728,19 +2750,12 @@ const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
       );
     }
     const settings = settingsInput as Record<string, unknown>;
-    const autoselectNextBlock = normalizeMonitorProfileText(
+    const autoselectNextBlock = normalizeMonitorProfileEnum(
       settings.autoselectNextBlock,
       `monitorProfiles[${profileIndex}].settings.autoselectNextBlock`,
-      3,
+      ["yes", "no"],
       "yes"
     );
-    if (autoselectNextBlock !== "yes" && autoselectNextBlock !== "no") {
-      throw new FirstSliceError(
-        400,
-        "admin_monitor_profiles_invalid",
-        "Monitor profile autoselectNextBlock must be 'yes' or 'no'."
-      );
-    }
     if (!Array.isArray(input.filters) || input.filters.length > 50) {
       throw new FirstSliceError(
         400,
@@ -2769,14 +2784,38 @@ const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
         );
       }
       return {
-        target: normalizeMonitorProfileText(filter.target, "filter.target", 128),
+        target: normalizeMonitorProfileEnum(
+          filter.target,
+          "filter.target",
+          [
+            "bookletLabel",
+            "personLabel",
+            "state",
+            "blockLabel",
+            "groupName",
+            "bookletId",
+            "unitId",
+            "unitLabel",
+            "blockId",
+            "testState",
+            "mode",
+            "bookletSpecies",
+            "bookletStates"
+          ],
+          "personLabel"
+        ),
         value: normalizeMonitorProfileText(filter.value, "filter.value", 2_048),
         subValue:
           filter.subValue === undefined || filter.subValue === null
             ? null
             : normalizeMonitorProfileText(filter.subValue, "filter.subValue", 2_048),
         label: normalizeMonitorProfileText(filter.label, "filter.label", 256),
-        type: normalizeMonitorProfileText(filter.type, "filter.type", 64, "equal"),
+        type: normalizeMonitorProfileEnum(
+          filter.type,
+          "filter.type",
+          ["equal", "substring", "regex"],
+          "equal"
+        ),
         not: filter.not
       };
     });
@@ -2797,11 +2836,40 @@ const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
       profileId,
       label: normalizeMonitorProfileText(input.label, "monitor profile label", 256),
       settings: {
-        blockColumn: normalizeMonitorProfileText(settings.blockColumn, "blockColumn", 32, "show"),
-        unitColumn: normalizeMonitorProfileText(settings.unitColumn, "unitColumn", 32, "show"),
-        view: normalizeMonitorProfileText(settings.view, "view", 32, "middle"),
-        groupColumn: normalizeMonitorProfileText(settings.groupColumn, "groupColumn", 32, "hide"),
-        bookletColumn: normalizeMonitorProfileText(settings.bookletColumn, "bookletColumn", 32, "show"),
+        blockColumn: normalizeMonitorProfileEnum(
+          settings.blockColumn,
+          "blockColumn",
+          ["show", "hide"],
+          "show"
+        ),
+        unitColumn: normalizeMonitorProfileEnum(
+          settings.unitColumn,
+          "unitColumn",
+          ["show", "hide"],
+          "show"
+        ),
+        view: normalizeMonitorProfileEnum(
+          settings.view === "middle"
+            ? "medium"
+            : settings.view === "large"
+              ? "full"
+              : settings.view,
+          "view",
+          ["full", "medium", "small"],
+          "medium"
+        ),
+        groupColumn: normalizeMonitorProfileEnum(
+          settings.groupColumn,
+          "groupColumn",
+          ["show", "hide"],
+          "hide"
+        ),
+        bookletColumn: normalizeMonitorProfileEnum(
+          settings.bookletColumn,
+          "bookletColumn",
+          ["show", "hide"],
+          "show"
+        ),
         bookletStatesColumns: normalizeMonitorProfileText(
           settings.bookletStatesColumns,
           "bookletStatesColumns",
@@ -2811,8 +2879,18 @@ const normalizeMonitorViewProfiles = (value: unknown): MonitorViewProfile[] => {
       },
       filters,
       filtersEnabled: {
-        pending: normalizeMonitorProfileText(filtersEnabled.pending, "filterPending", 32, "no"),
-        locked: normalizeMonitorProfileText(filtersEnabled.locked, "filterLocked", 32, "no")
+        pending: normalizeMonitorProfileEnum(
+          filtersEnabled.pending,
+          "filterPending",
+          ["yes", "no"],
+          "no"
+        ),
+        locked: normalizeMonitorProfileEnum(
+          filtersEnabled.locked,
+          "filterLocked",
+          ["yes", "no"],
+          "no"
+        )
       }
     };
   });
@@ -8371,6 +8449,149 @@ const validateTestcenterXmlSourceDocument = (
       "sys-check-login"
     ]);
     const groups = xmlChildrenNamed(root, "Group");
+    const customTexts = xmlChildrenNamed(root, "CustomTexts").flatMap(container =>
+      xmlChildrenNamed(container, "CustomText")
+    );
+    for (const customText of customTexts) {
+      if (!customText.getAttribute("key")?.trim()) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_custom_text_key_missing",
+            `Original Testcenter roster '${sourceFileName}' contains CustomText without a key.`
+          )
+        );
+      }
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        customTexts.map(customText => ({
+          value: customText.getAttribute("key")?.trim() ?? "",
+          label: "custom text key"
+        })),
+        "testcenter_xml_custom_text_key_duplicate",
+        sourceFileName
+      )
+    );
+
+    const profileContainers = xmlChildrenNamed(root, "Profiles");
+    const groupMonitorContainers = profileContainers.flatMap(container =>
+      xmlChildrenNamed(container, "GroupMonitor")
+    );
+    const monitorProfiles = groupMonitorContainers.flatMap(container =>
+      xmlChildrenNamed(container, "Profile")
+    );
+    const monitorProfileIds = new Set(
+      monitorProfiles
+        .map(profile => profile.getAttribute("id")?.trim() ?? "")
+        .filter(Boolean)
+    );
+    const monitorColumnAttributes = [
+      "blockColumn",
+      "unitColumn",
+      "groupColumn",
+      "bookletColumn"
+    ];
+    const monitorFilterFields = new Set([
+      "bookletLabel",
+      "personLabel",
+      "state",
+      "blockLabel",
+      "groupName",
+      "bookletId",
+      "unitId",
+      "unitLabel",
+      "blockId",
+      "testState",
+      "mode",
+      "bookletSpecies",
+      "bookletStates"
+    ]);
+    for (const profile of monitorProfiles) {
+      const profileId = profile.getAttribute("id")?.trim() ?? "";
+      if (!profileId) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_monitor_profile_id_missing",
+            `Original Testcenter roster '${sourceFileName}' contains a monitor Profile without an id.`
+          )
+        );
+      }
+      for (const attributeName of monitorColumnAttributes) {
+        const value = profile.getAttribute(attributeName);
+        if (value !== null && value !== "show" && value !== "hide") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_profile_setting_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid Profile/@${attributeName} '${value}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+      }
+      const view = profile.getAttribute("view");
+      if (view !== null && !["full", "medium", "small"].includes(view)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_monitor_profile_setting_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains invalid Profile/@view '${view}' for '${profileId || "unknown"}'.`
+          )
+        );
+      }
+      for (const attributeName of [
+        "filterPending",
+        "filterLocked",
+        "autoselectNextBlock"
+      ]) {
+        const value = profile.getAttribute(attributeName);
+        if (value !== null && value !== "yes" && value !== "no") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_profile_setting_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid Profile/@${attributeName} '${value}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+      }
+      for (const filter of xmlChildrenNamed(profile, "Filter")) {
+        const field = filter.getAttribute("field");
+        if (field !== null && !monitorFilterFields.has(field)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_filter_field_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid monitor Filter/@field '${field}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+        const type = filter.getAttribute("type");
+        if (type !== null && !["equal", "substring", "regex"].includes(type)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_filter_type_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid monitor Filter/@type '${type}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+        const not = filter.getAttribute("not");
+        if (not !== null && parseTestcenterXmlBoolean(not) === null) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_filter_not_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid monitor Filter/@not '${not}' for '${profileId || "unknown"}'.`
+            )
+          );
+        }
+      }
+    }
+    diagnostics.push(
+      ...validateUniqueTestcenterXmlValues(
+        monitorProfiles.map(profile => ({
+          value: profile.getAttribute("id")?.trim() ?? "",
+          label: "monitor profile id"
+        })),
+        "testcenter_xml_monitor_profile_id_duplicate",
+        sourceFileName
+      )
+    );
+
     if (groups.length === 0) {
       diagnostics.push(
         createImportDiagnostic(
@@ -8415,6 +8636,73 @@ const validateTestcenterXmlSourceDocument = (
             `Original Testcenter roster '${sourceFileName}' contains unsupported login mode '${mode}'.`
           )
         );
+      }
+      const loginBooklets = xmlChildrenNamed(login, "Booklet");
+      const loginProfiles = xmlChildrenNamed(login, "Profile");
+      if (loginBooklets.length > 0 && loginProfiles.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_login_assignment_choice_invalid",
+            `Original Testcenter roster '${sourceFileName}' mixes Booklet and Profile assignments for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+          )
+        );
+      }
+      for (const booklet of loginBooklets) {
+        const state = booklet.getAttribute("state");
+        if (
+          state !== null &&
+          !/^[a-z\d-]+:[a-z\d-]+(?:\s*,\s*[a-z\d-]+:[a-z\d-]+)*$/.test(
+            state.trim()
+          )
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_state_preset_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid Booklet/@state '${state}' for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+        }
+      }
+      for (const profileReference of loginProfiles) {
+        const profileId = profileReference.getAttribute("id")?.trim() ?? "";
+        if (!profileId) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_profile_reference_id_missing",
+              `Original Testcenter roster '${sourceFileName}' contains a Profile reference without an id for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+        } else if (!monitorProfileIds.has(profileId)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_monitor_profile_reference_missing",
+              `Original Testcenter roster '${sourceFileName}' references unknown monitor Profile '${profileId}' for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+        }
+      }
+      const viewSettings = xmlChildrenNamed(login, "ViewSettings");
+      if (viewSettings.length > 1) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_login_view_settings_cardinality_invalid",
+            `Original Testcenter roster '${sourceFileName}' contains repeated ViewSettings for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+          )
+        );
+      }
+      for (const viewSetting of viewSettings) {
+        const visibility = viewSetting.getAttribute("monitorBookletVisibility");
+        if (
+          visibility !== null &&
+          !["visible", "collapsed", "hidden"].includes(visibility)
+        ) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_login_booklet_visibility_invalid",
+              `Original Testcenter roster '${sourceFileName}' contains invalid ViewSettings/@monitorBookletVisibility '${visibility}' for login '${login.getAttribute("name")?.trim() || "unknown"}'.`
+            )
+          );
+        }
       }
     }
     diagnostics.push(

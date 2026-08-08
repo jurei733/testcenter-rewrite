@@ -468,7 +468,7 @@ const parseBookletStatePreset = (
     return {};
   }
   return Object.fromEntries(
-    value.split(";").flatMap(tuple => {
+    value.split(/[;,]/).flatMap(tuple => {
       const separatorIndex = tuple.indexOf(":");
       if (separatorIndex < 1) {
         return [];
@@ -1654,7 +1654,7 @@ const parseOriginalTestcenterMonitorProfiles = (
           subValue:
             readXmlAttribute(filterAttributes, "subValue")?.trim() || null,
           label: readXmlAttribute(filterAttributes, "label")?.trim() || "",
-          type: readXmlAttribute(filterAttributes, "type")?.trim() || "equals",
+          type: readXmlAttribute(filterAttributes, "type")?.trim() || "equal",
           not:
             readXmlAttribute(filterAttributes, "not")?.trim().toLowerCase() ===
             "true"
@@ -1669,7 +1669,7 @@ const parseOriginalTestcenterMonitorProfiles = (
           readXmlAttribute(attributes, "blockColumn")?.trim() || "show",
         unitColumn:
           readXmlAttribute(attributes, "unitColumn")?.trim() || "show",
-        view: readXmlAttribute(attributes, "view")?.trim() || "middle",
+        view: readXmlAttribute(attributes, "view")?.trim() || "medium",
         groupColumn:
           readXmlAttribute(attributes, "groupColumn")?.trim() || "hide",
         bookletColumn:
