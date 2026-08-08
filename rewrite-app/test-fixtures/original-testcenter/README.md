@@ -34,6 +34,16 @@ remain guarded by the same typed identity rules during import.
 The byte-exact Verona 6 player additionally proves the original Resource rule:
 different HTML filenames cannot hide the same case-insensitive player module ID
 and major/minor version, either as loose uploads or inside a prebuilt ZIP.
+For runtime compatibility beyond the Player versions bundled by that Testcenter
+commit, the corpus also pins the official MIT-licensed
+`verona-player-simple` tag `2.1.0` at commit
+`9c4c48c77ecc0cfe7fbc8976c63ae7dc73b24710`. Its byte-exact HTML declares
+module version `2.1.0`, Verona API `3.0.0`, and the early JSON-LD
+`@id`/`@type` metadata shape. It is kept as Brotli-compressed base64 and gates
+legacy metadata import, object-valued `dataParts`, state restoration, and the
+real Player navigation request in Chromium. This fixture comes from the
+official Player repository rather than the pinned Testcenter tree; its source
+URL, SHA-256, tag, commit, and license are recorded in `corpus.json`.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact

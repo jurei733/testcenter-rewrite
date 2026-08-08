@@ -640,6 +640,25 @@
       }
     }
   ],
+  "legacyPlayerPackages": [
+    {
+      "fixture": "players/verona-simple-player-2.1.0.html.br.base64",
+      "encoding": "brotli-base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-player-simple",
+      "sourceTag": "2.1.0",
+      "sourceCommit": "9c4c48c77ecc0cfe7fbc8976c63ae7dc73b24710",
+      "sourcePath": "verona-simple-player-2.html",
+      "sourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-simple/2.1.0/verona-simple-player-2.html",
+      "sha256": "95343e3c9a9855da177f805b81a3b1a43136b4c9ca6f7a1c87a43cd34fb70770",
+      "license": "MIT",
+      "playerKey": "iqb-player-simple@2.1",
+      "playerModuleId": "iqb-player-simple",
+      "playerModuleVersion": "2.1.0",
+      "playerApiVersion": "3.0.0",
+      "metadataFormat": "legacy-jsonld",
+      "unitDefinitionType": "iqb-simple-html@1.0.0"
+    }
+  ],
   "playerPackages": [
     {
       "bookletFixture": "booklets/booklet-17.4.xml",

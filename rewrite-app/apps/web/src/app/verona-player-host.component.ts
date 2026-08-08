@@ -21,6 +21,7 @@ import {
   mergeVeronaUnitResponse,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
+  prepareVeronaUnitStateForPlayer,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
@@ -167,6 +168,7 @@ export class VeronaPlayerHostComponent
   private pendingPlayerHasFocus: boolean | undefined;
   private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
   private latestResponse = "";
+  private apiVersion: string | null = null;
   private viewReady = false;
 
   constructor(private readonly changeDetector: ChangeDetectorRef) {}
@@ -355,6 +357,7 @@ export class VeronaPlayerHostComponent
     this.status = "loading";
     this.loadingPhase = "pending";
     this.apiVersionLabel = "Waiting for player";
+    this.apiVersion = null;
     this.errorMessage = "";
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
       ? this.savedResponse
@@ -430,6 +433,7 @@ export class VeronaPlayerHostComponent
 
     this.clearReadyTimeout();
     this.loadingPhase = "complete";
+    this.apiVersion = apiVersion;
     this.apiVersionLabel = `API ${apiVersion}`;
     this.startPlayerRequest = globalThis.window?.requestAnimationFrame(() => {
       this.startPlayerRequest = null;
@@ -463,7 +467,10 @@ export class VeronaPlayerHostComponent
       ...(this.unitDefinitionType
         ? { unitDefinitionType: this.unitDefinitionType }
         : {}),
-      unitState: persistedResponse?.unitState ?? {},
+      unitState: prepareVeronaUnitStateForPlayer(
+        persistedResponse?.unitState ?? {},
+        this.apiVersion ?? String(SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX)
+      ),
       playerConfig: {
         ...(this.resourceBasePath
           ? {

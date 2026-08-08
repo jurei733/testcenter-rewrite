@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
+import { brotliDecompressSync } from "node:zlib";
 
 import {
   parseOriginalTestcenterOperationalLogins,
@@ -167,6 +168,23 @@ type OriginalTestcenterCorpus = {
       operationalLoginKeys: string[];
       customTexts: Record<string, string>;
     };
+  }>;
+  legacyPlayerPackages: Array<{
+    fixture: string;
+    encoding: "brotli-base64";
+    sourceRepository: string;
+    sourceTag: string;
+    sourceCommit: string;
+    sourcePath: string;
+    sourceUrl: string;
+    sha256: string;
+    license: string;
+    playerKey: string;
+    playerModuleId: string;
+    playerModuleVersion: string;
+    playerApiVersion: string;
+    metadataFormat: string;
+    unitDefinitionType: string;
   }>;
 };
 
@@ -437,6 +455,34 @@ test("original Testcenter compatibility corpus pins the Aspect player roster", (
   assert.equal(operationalLogins[0]?.loginMode, "monitor-group");
   assert.equal(operationalLogins[0]?.groupKey, roster.groupKey);
   assert.equal(operationalLogins[0]?.passwordRequired, true);
+});
+
+test("original Testcenter compatibility corpus pins the official Verona 3 player", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const legacyPlayer = corpus.legacyPlayerPackages[0];
+  assert.ok(legacyPlayer);
+
+  const playerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, legacyPlayer.fixture), "utf8").trim(),
+      "base64"
+    )
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    legacyPlayer.sha256,
+    legacyPlayer.sourceUrl
+  );
+  const playerHtml = playerDocument.toString("utf8");
+  assert.match(playerHtml, /"@id"\s*:\s*"iqb-player-simple"/);
+  assert.match(playerHtml, /"version"\s*:\s*"2\.1\.0"/);
+  assert.match(playerHtml, /"apiVersion"\s*:\s*"3\.0\.0"/);
+  assert.match(playerHtml, /data-api-version="3\.0\.0"/);
+  assert.equal(legacyPlayer.sourceTag, "2.1.0");
+  assert.equal(legacyPlayer.license, "MIT");
+  assert.equal(legacyPlayer.metadataFormat, "legacy-jsonld");
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

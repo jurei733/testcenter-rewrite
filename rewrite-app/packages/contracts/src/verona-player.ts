@@ -33,12 +33,16 @@ export type VeronaPlayerConfig = {
   startPage?: string | number;
 };
 
+export type VeronaStartUnitState = Omit<VeronaUnitState, "dataParts"> & {
+  dataParts?: Record<string, unknown>;
+};
+
 export type VeronaStartCommand = {
   type: "vopStartCommand";
   sessionId: string;
   unitDefinition: string;
   unitDefinitionType?: string;
-  unitState: VeronaUnitState;
+  unitState: VeronaStartUnitState;
   playerConfig: VeronaPlayerConfig;
 };
 
@@ -191,6 +195,29 @@ export const isSupportedVeronaPlayerApiVersion = (version: string): boolean => {
     major >= SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN &&
     major <= SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX
   );
+};
+
+export const prepareVeronaUnitStateForPlayer = (
+  value: VeronaUnitState,
+  apiVersion: string
+): VeronaStartUnitState => {
+  const apiMajor = Number.parseInt(apiVersion.split(".")[0] ?? "", 10);
+  if (!Number.isInteger(apiMajor) || apiMajor >= 4 || !value.dataParts) {
+    return value;
+  }
+
+  return {
+    ...value,
+    dataParts: Object.fromEntries(
+      Object.entries(value.dataParts).map(([key, content]) => {
+        try {
+          return [key, JSON.parse(content) as unknown];
+        } catch {
+          return [key, content];
+        }
+      })
+    )
+  };
 };
 
 export const parseVeronaIncomingNotification = (

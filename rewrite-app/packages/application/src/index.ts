@@ -10041,9 +10041,11 @@ const collectAssemblyResourceIdentifiers = (
     try {
       const metadata = JSON.parse(metadataMatch[1] ?? "") as {
         id?: unknown;
+        "@id"?: unknown;
         version?: unknown;
       };
-      const id = typeof metadata.id === "string" ? metadata.id.trim() : "";
+      const rawId = metadata.id ?? metadata["@id"];
+      const id = typeof rawId === "string" ? rawId.trim() : "";
       const moduleVersion =
         typeof metadata.version === "string"
           ? normalizeVeronaMajorMinorVersion(metadata.version)
@@ -10835,6 +10837,102 @@ const validateVeronaPlayerMetadataDocument = (
   };
 };
 
+const validateLegacyVeronaPlayerMetadataDocument = (
+  metadata: Record<string, unknown>
+): VeronaPlayerMetadataValidation => {
+  if (
+    typeof metadata["@type"] !== "string" ||
+    metadata["@type"].toLowerCase() !== "player"
+  ) {
+    return {
+      status: "invalid",
+      reason: "legacy player metadata field '@type' must be 'player'"
+    };
+  }
+  if (
+    metadata["@context"] !== undefined &&
+    !isVeronaMetadataUri(metadata["@context"])
+  ) {
+    return {
+      status: "invalid",
+      reason: "legacy player metadata field '@context' must be an absolute URI"
+    };
+  }
+
+  const id = typeof metadata["@id"] === "string" ? metadata["@id"] : "";
+  if (!veronaMetadataIdentifierPattern.test(id)) {
+    return {
+      status: "invalid",
+      reason: "legacy player metadata field '@id' must start with a letter and contain only letters, digits, underscores, or hyphens"
+    };
+  }
+  const version = typeof metadata.version === "string" ? metadata.version : "";
+  if (!veronaMetadataSemverPattern.test(version)) {
+    return {
+      status: "invalid",
+      reason: "legacy player metadata field 'version' must use SemVer MAJOR.MINOR.PATCH notation"
+    };
+  }
+  const apiVersion =
+    typeof metadata.apiVersion === "string" ? metadata.apiVersion : "";
+  const normalizedSpecVersion = normalizeVeronaMajorMinorVersion(apiVersion);
+  if (!normalizedSpecVersion) {
+    return {
+      status: "invalid",
+      reason: "legacy player metadata field 'apiVersion' must use a numeric Verona version"
+    };
+  }
+
+  for (const fieldName of ["name", "description"] as const) {
+    if (metadata[fieldName] === undefined) {
+      if (fieldName === "name") {
+        return {
+          status: "invalid",
+          reason: "legacy player metadata field 'name' must be a language map"
+        };
+      }
+      continue;
+    }
+    const languageMap = asVeronaMetadataRecord(metadata[fieldName]);
+    if (
+      !languageMap ||
+      Object.keys(languageMap).length === 0 ||
+      Object.entries(languageMap).some(
+        ([language, value]) =>
+          !/^[a-z]{2}$/i.test(language) ||
+          typeof value !== "string" ||
+          value.length === 0
+      )
+    ) {
+      return {
+        status: "invalid",
+        reason: `legacy player metadata field '${fieldName}' must be a non-empty language map`
+      };
+    }
+  }
+
+  if (metadata.notSupportedFeatures !== undefined) {
+    const features = metadata.notSupportedFeatures;
+    if (
+      !Array.isArray(features) ||
+      features.some(feature => typeof feature !== "string")
+    ) {
+      return {
+        status: "invalid",
+        reason: "legacy player metadata field 'notSupportedFeatures' must be a string list"
+      };
+    }
+  }
+
+  return {
+    status: "valid",
+    id,
+    version,
+    specVersion: normalizedSpecVersion,
+    metadataVersion: "legacy-jsonld"
+  };
+};
+
 const parseVeronaPlayerReference = (
   playerKey: string
 ): { id: string; moduleVersion: string | null } => {
@@ -10902,11 +11000,15 @@ const validateVeronaPlayerMetadata = (
         continue;
       }
       const metadata = parsed as Record<string, unknown>;
+      const metadataType = metadata.type ?? metadata["@type"];
       if (
-        typeof metadata.type !== "string" ||
-        metadata.type.toLowerCase() !== "player"
+        typeof metadataType !== "string" ||
+        metadataType.toLowerCase() !== "player"
       ) {
         continue;
+      }
+      if (metadata.type === undefined && metadata["@type"] !== undefined) {
+        return validateLegacyVeronaPlayerMetadataDocument(metadata);
       }
       return validateVeronaPlayerMetadataDocument(metadata);
     } catch {

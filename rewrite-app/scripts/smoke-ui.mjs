@@ -5148,6 +5148,246 @@ try {
     "beginner"
   );
 
+  logStep("participant-official-verona-3-player");
+  const legacyPlayerTenantKey = `${tenantKey}-verona-3`;
+  const legacyPlayerWorkspaceKey = `${workspaceKey}-verona-3`;
+  const legacyPlayerBookletKey = "BOOKLET.LEGACY.VERONA-3";
+  const legacyPlayerFirstUnitKey = "UNIT.LEGACY.VERONA-3.1";
+  const legacyPlayerSecondUnitKey = "UNIT.LEGACY.VERONA-3.2";
+  const legacyPlayerKey = "iqb-player-simple@2.1";
+  const legacyPlayerLoginKey = "student-official-verona-3";
+  const legacyPlayerResponse = "Restored by the Verona 3 host";
+  const legacyPlayerDocument = await readBrotliBase64Text(
+    resolve(
+      "test-fixtures/original-testcenter/players/verona-simple-player-2.1.0.html.br.base64"
+    )
+  );
+  const legacyPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${legacyPlayerBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${legacyPlayerFirstUnitKey}" href="units/Unit1.xml" />
+            <resource identifier="${legacyPlayerSecondUnitKey}" href="units/Unit2.xml" />
+            <resource identifier="${legacyPlayerKey}" href="players/verona-simple-player-2.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${legacyPlayerBookletKey}</Id>
+            <Label>Official Verona 3 Player</Label>
+          </Metadata>
+          <BookletConfig>
+            <Config key="paging_mode">separate</Config>
+          </BookletConfig>
+          <Units>
+            <Unit id="${legacyPlayerFirstUnitKey}" label="Legacy first unit" />
+            <Unit id="${legacyPlayerSecondUnitKey}" label="Legacy second unit" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit1.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${legacyPlayerFirstUnitKey}</Id>
+            <Label>Legacy first unit</Label>
+          </Metadata>
+          <Definition player="${legacyPlayerKey}"><![CDATA[
+            <fieldset>
+              <legend>Official Verona 3 first unit</legend>
+              <label>Legacy answer <input name="legacy-answer" /></label>
+            </fieldset>
+          ]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/units/Unit2.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${legacyPlayerSecondUnitKey}</Id>
+            <Label>Legacy second unit</Label>
+          </Metadata>
+          <Definition player="${legacyPlayerKey}"><![CDATA[
+            <fieldset>
+              <legend>Official Verona 3 second unit</legend>
+              <label>Second answer <input name="second-answer" /></label>
+            </fieldset>
+          ]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/verona-simple-player-2.html",
+      content: legacyPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: legacyPlayerTenantKey,
+      displayName: "Official Verona 3 Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${legacyPlayerTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: legacyPlayerWorkspaceKey,
+        displayName: "Official Verona 3 Player"
+      }
+    }
+  );
+  const legacyPlayerWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${legacyPlayerTenantKey}` +
+    `/workspaces/${legacyPlayerWorkspaceKey}`;
+  const legacyPlayerSourceResponse = await sendSmokeJson(
+    `${legacyPlayerWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-verona-3-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${legacyPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const legacyPlayerSourcePayload = await legacyPlayerSourceResponse.json();
+  const legacyPlayerImportResponse = await sendSmokeJson(
+    `${legacyPlayerWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          legacyPlayerSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const legacyPlayerImportPayload = await legacyPlayerImportResponse.json();
+  assert.equal(legacyPlayerImportPayload.importJob.status, "completed");
+  assert.equal(
+    legacyPlayerImportPayload.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(legacyPlayerImportPayload.importJob.diagnostics)
+  );
+  const legacyPlayerReleaseId =
+    legacyPlayerImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(legacyPlayerReleaseId);
+  await sendSmokeJson(
+    `${legacyPlayerWorkspaceApiUrl}/content-releases/${legacyPlayerReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${legacyPlayerWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: legacyPlayerLoginKey,
+          groupKey: "group:official-verona-3",
+          bookletKey: legacyPlayerBookletKey,
+          displayName: "Official Verona 3 Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: legacyPlayerTenantKey,
+      workspaceKey: legacyPlayerWorkspaceKey,
+      loginKey: legacyPlayerLoginKey,
+      bookletKey: legacyPlayerBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 3.0.0" })
+    .waitFor({ timeout: 30_000 });
+  const legacyPlayerFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  await legacyPlayerFrame
+    .getByText("Official Verona 3 first unit", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  const legacyPlayerAnswer = legacyPlayerFrame.locator(
+    "input[name='legacy-answer']"
+  );
+  await legacyPlayerAnswer.fill(legacyPlayerResponse);
+  await legacyPlayerAnswer.dispatchEvent("keyup", {
+    key: "t",
+    code: "KeyT"
+  });
+  const legacyPlayerParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(legacyPlayerParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${legacyPlayerParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          legacyPlayerFirstUnitKey
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const parsed = JSON.parse(response);
+        const all = JSON.parse(parsed.unitState?.dataParts?.all ?? "{}");
+        return all.answers?.["legacy-answer"] === legacyPlayerResponse;
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await legacyPlayerFrame.locator("#next-unit").dispatchEvent("click");
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: legacyPlayerSecondUnitKey })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame
+    .getByText("Official Verona 3 second unit", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame.locator("#prev-unit").dispatchEvent("click");
+  await page
+    .locator("#participantRouteUnitKey")
+    .filter({ hasText: legacyPlayerFirstUnitKey })
+    .waitFor({ timeout: 30_000 });
+  await legacyPlayerFrame
+    .getByText("Official Verona 3 first unit", { exact: true })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await legacyPlayerFrame
+      .locator("input[name='legacy-answer']")
+      .inputValue(),
+    legacyPlayerResponse
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      legacyPlayerParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: "API 3.0.0" })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await page
+      .frameLocator("#participantVeronaPlayerFrame")
+      .locator("input[name='legacy-answer']")
+      .inputValue(),
+    legacyPlayerResponse
+  );
+  stopAfter("participant-verona-3-player");
+
   logStep("participant-original-aspect-player");
   const aspectLoginKey = "testuser1";
   const aspectBookletKey = "booklet1";

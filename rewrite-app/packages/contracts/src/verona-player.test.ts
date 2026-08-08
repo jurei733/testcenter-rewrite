@@ -6,6 +6,7 @@ import {
   mergeVeronaUnitResponse,
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
+  prepareVeronaUnitStateForPlayer,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
@@ -33,6 +34,28 @@ test("Verona response envelopes normalize and restore player state", () => {
     playerState: { currentPage: "page-2" }
   });
   assert.equal(parseVeronaUnitResponse("legacy plain response"), null);
+});
+
+test("Verona 2 and 3 players receive restored object-valued data parts", () => {
+  const persistedState = {
+    dataParts: {
+      all: '{"answers":[{"id":"answer","value":"saved"}]}',
+      opaque: "not-json"
+    },
+    responseProgress: "some" as const
+  };
+
+  assert.deepEqual(prepareVeronaUnitStateForPlayer(persistedState, "3.0.0"), {
+    dataParts: {
+      all: { answers: [{ id: "answer", value: "saved" }] },
+      opaque: "not-json"
+    },
+    responseProgress: "some"
+  });
+  assert.deepEqual(
+    prepareVeronaUnitStateForPlayer(persistedState, "4.0"),
+    persistedState
+  );
 });
 
 test("Verona response envelopes merge separately reported unit and player state", () => {
