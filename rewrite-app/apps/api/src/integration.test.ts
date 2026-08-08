@@ -9532,6 +9532,63 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
   );
   assert.equal(duplicatePathImport.body.stagedContentRelease, null);
 
+  const duplicateManifestIdentifierZip = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="ASSET.CASE" href="resources/one.bin" />
+            <resource identifier="asset.case" href="resources/two.bin" />
+          </resources>
+        </manifest>
+      `
+    },
+    { fileName: "export/resources/one.bin", content: "asset one" },
+    { fileName: "export/resources/two.bin", content: "asset two" }
+  ]);
+  const duplicateManifestIdentifierPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "duplicate-manifest-resource-identifiers.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${duplicateManifestIdentifierZip}`
+    }
+  });
+  assert.equal(duplicateManifestIdentifierPackage.status, 201);
+  const duplicateManifestIdentifierImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        duplicateManifestIdentifierPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(duplicateManifestIdentifierImport.status, 201);
+  assert.equal(duplicateManifestIdentifierImport.body.importJob.status, "failed");
+  assert.deepEqual(
+    duplicateManifestIdentifierImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    ["source_document_manifest_resource_id_duplicate"]
+  );
+  assert.match(
+    duplicateManifestIdentifierImport.body.importJob.diagnostics[0]?.message ??
+      "",
+    /imsmanifest\.xml.*ASSET\.CASE.*asset\.case/
+  );
+  assert.equal(
+    duplicateManifestIdentifierImport.body.stagedContentRelease,
+    null
+  );
+
   const unsafePathZip = createZipBase64([
     {
       fileName: "export/imsmanifest.xml",

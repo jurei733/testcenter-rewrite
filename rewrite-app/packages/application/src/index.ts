@@ -8077,6 +8077,27 @@ type XmlManifestResource = {
   dependencyReferences: string[];
 };
 
+const xmlManifestResourcePattern =
+  /<((?:[a-zA-Z_][\w.-]*:)?resource)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+
+const collectXmlManifestResourceIdentifiers = (
+  sourceDocument: string
+): string[] =>
+  [...sourceDocument.matchAll(xmlManifestResourcePattern)]
+    .map(resourceMatch =>
+      normalizeManifestToken(
+        readXmlAttribute(
+          parseXmlAttributes(resourceMatch[2] ?? ""),
+          "identifier",
+          "id",
+          "key",
+          "resourceId",
+          "resourceIdentifier"
+        )
+      )
+    )
+    .filter((identifier): identifier is string => Boolean(identifier));
+
 const collectXmlManifestResources = (
   sourceDocument: string
 ): Map<string, XmlManifestResource> => {
@@ -8093,7 +8114,7 @@ const collectXmlManifestResources = (
   );
 
   for (const resourceMatch of sourceDocument.matchAll(
-    /<((?:[a-zA-Z_][\w.-]*:)?resource)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi
+    xmlManifestResourcePattern
   )) {
     const resourceAttributes = parseXmlAttributes(resourceMatch[2] ?? "");
     const identifier = normalizeManifestToken(
@@ -9630,8 +9651,7 @@ const createAssemblyManifest = (
   for (const entry of entries) {
     for (const identifier of collectAssemblyResourceIdentifiers(entry)) {
       const normalizedIdentifier = identifier.toLowerCase();
-      const existingFileName = identifiers.get(normalizedIdentifier);
-      if (existingFileName && existingFileName !== entry.fileName) {
+      if (identifiers.has(normalizedIdentifier)) {
         continue;
       }
       identifiers.set(normalizedIdentifier, entry.fileName);
@@ -11254,6 +11274,23 @@ const validateZipXmlEntries = (
   const manifestResources = collectXmlManifestResources(
     manifestExtraction.manifestText
   );
+  const manifestResourceIdentifierByKey = new Map<string, string>();
+  for (const resourceIdentifier of collectXmlManifestResourceIdentifiers(
+    manifestExtraction.manifestText
+  )) {
+    const identityKey = resourceIdentifier.toLowerCase();
+    const existingIdentifier = manifestResourceIdentifierByKey.get(identityKey);
+    if (existingIdentifier) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_manifest_resource_id_duplicate",
+          `Source package manifest '${manifestExtraction.manifestFileName}' declares duplicate case-insensitive resource identifiers '${existingIdentifier}' and '${resourceIdentifier}'.`
+        )
+      );
+    } else {
+      manifestResourceIdentifierByKey.set(identityKey, resourceIdentifier);
+    }
+  }
   for (const entry of manifestExtraction.entries) {
     if (
       entry.fileName.endsWith("/") ||
