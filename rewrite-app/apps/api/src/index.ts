@@ -619,6 +619,7 @@ const securityHeaders = {
 const MAX_RUNTIME_OPERATIONAL_EVENTS = 100;
 const DEFAULT_SHUTDOWN_DRAIN_DELAY_MS = 1_000;
 const DEFAULT_MAX_JSON_BODY_BYTES = 1_048_576;
+const MAX_APPLICATION_SETTINGS_JSON_BODY_BYTES = 28_100_000;
 const DEFAULT_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES = 72 * 1024 * 1024;
 const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 60_000;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
@@ -3542,6 +3543,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       readJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
     const readSourcePackageRequestJsonBody = <T>(): Promise<T> =>
       readJsonBody<T>(request, runtime.config.maxSourcePackageJsonBodyBytes);
+    const readApplicationSettingsRequestJsonBody = <T>(): Promise<T> =>
+      readJsonBody<T>(request, MAX_APPLICATION_SETTINGS_JSON_BODY_BYTES);
     const readOptionalRequestJsonBody = <T>(): Promise<T | null> =>
       readOptionalJsonBody<T>(request, runtime.config.maxJsonBodyBytes);
     const userAgentHeader = request.headers["user-agent"];
@@ -3845,11 +3848,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
         const body =
-          await readRequestJsonBody<UpdateApplicationSettingsRequest>();
+          await readApplicationSettingsRequestJsonBody<UpdateApplicationSettingsRequest>();
         const applicationSettings =
           await services.applicationSettings.updateApplicationSettings({
             sessionToken,
             appTitle: body.appTitle,
+            mainLogo: body.mainLogo,
+            themeName: body.themeName,
             globalWarningText: body.globalWarningText,
             globalWarningExpiresAt: body.globalWarningExpiresAt
           });

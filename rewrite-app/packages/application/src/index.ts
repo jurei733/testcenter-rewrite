@@ -951,6 +951,8 @@ export type ApplicationSettingsPort = {
   updateApplicationSettings(input: {
     sessionToken: string;
     appTitle: string;
+    mainLogo?: string;
+    themeName?: ApplicationSettings["themeName"];
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
@@ -3246,6 +3248,91 @@ const normalizeApplicationTitle = (value: unknown): string => {
     );
   }
   return title;
+};
+
+const MAX_APPLICATION_LOGO_BYTES = 20 * 1024 * 1024;
+const allowedApplicationLogoMediaTypes = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml"
+]);
+
+const normalizeApplicationLogo = (value: unknown): string => {
+  const logo = String(value ?? "").trim();
+  if (!logo || logo === defaultApplicationSettings.mainLogo) {
+    return defaultApplicationSettings.mainLogo;
+  }
+  const match = /^data:([^;,]+);base64,([a-z\d+/]*={0,2})$/i.exec(logo);
+  const mediaType = match?.[1]?.toLowerCase();
+  const dataBase64 = match?.[2] ?? "";
+  if (!mediaType || !allowedApplicationLogoMediaTypes.has(mediaType) || !dataBase64) {
+    throw new FirstSliceError(
+      400,
+      "application_logo_invalid",
+      "Application logo must be the default asset or a base64 PNG, JPEG, GIF, WebP, or SVG data URL."
+    );
+  }
+  const bytes = Buffer.from(dataBase64, "base64");
+  if (
+    bytes.length === 0 ||
+    bytes.toString("base64").replace(/=+$/, "") !==
+      dataBase64.replace(/=+$/, "")
+  ) {
+    throw new FirstSliceError(
+      400,
+      "application_logo_invalid",
+      "Application logo contains invalid base64 image data."
+    );
+  }
+  if (bytes.length > MAX_APPLICATION_LOGO_BYTES) {
+    throw new FirstSliceError(
+      400,
+      "application_logo_too_large",
+      "Application logo must not exceed 20 MiB.",
+      { maxBytes: MAX_APPLICATION_LOGO_BYTES }
+    );
+  }
+  const isExpectedImage =
+    (mediaType === "image/png" &&
+      bytes.length >= 8 &&
+      bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) ||
+    (mediaType === "image/jpeg" &&
+      bytes.length >= 3 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff) ||
+    (mediaType === "image/gif" &&
+      (bytes.subarray(0, 6).toString("ascii") === "GIF87a" ||
+        bytes.subarray(0, 6).toString("ascii") === "GIF89a")) ||
+    (mediaType === "image/webp" &&
+      bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+      bytes.subarray(8, 12).toString("ascii") === "WEBP") ||
+    (mediaType === "image/svg+xml" &&
+      /^(?:<\?xml[^>]*>\s*)?<svg\b/i.test(bytes.toString("utf8").trim()) &&
+      !/<script\b|\son[a-z]+\s*=|javascript:/i.test(bytes.toString("utf8")));
+  if (!isExpectedImage) {
+    throw new FirstSliceError(
+      400,
+      "application_logo_invalid",
+      "Application logo data does not match its declared safe image type."
+    );
+  }
+  return `data:${mediaType};base64,${bytes.toString("base64")}`;
+};
+
+const normalizeApplicationTheme = (
+  value: unknown
+): ApplicationSettings["themeName"] => {
+  if (value === "Primar" || value === "Sekundar" || value === "Erwachsene") {
+    return value;
+  }
+  throw new FirstSliceError(
+    400,
+    "application_theme_invalid",
+    "Application theme must be Primar, Sekundar, or Erwachsene."
+  );
 };
 
 const normalizeGlobalWarningText = (value: unknown): string | null => {
@@ -19715,6 +19802,14 @@ export const createFirstSliceServices = (
           (await repository.getApplicationSettings()) ?? defaultApplicationSettings;
         const updatedSettings: ApplicationSettings = {
           appTitle: normalizeApplicationTitle(input.appTitle),
+          mainLogo:
+            input.mainLogo === undefined
+              ? previousSettings.mainLogo
+              : normalizeApplicationLogo(input.mainLogo),
+          themeName:
+            input.themeName === undefined
+              ? previousSettings.themeName
+              : normalizeApplicationTheme(input.themeName),
           globalWarningText: normalizeGlobalWarningText(
             input.globalWarningText
           ),
@@ -19732,6 +19827,12 @@ export const createFirstSliceServices = (
           details: {
             previousAppTitle: previousSettings.appTitle,
             nextAppTitle: updatedSettings.appTitle,
+            previousThemeName: previousSettings.themeName,
+            nextThemeName: updatedSettings.themeName,
+            previousCustomLogo:
+              previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+            nextCustomLogo:
+              updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
             previousGlobalWarningText: previousSettings.globalWarningText,
             nextGlobalWarningText: updatedSettings.globalWarningText,
             previousGlobalWarningExpiresAt:

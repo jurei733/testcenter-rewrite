@@ -66,6 +66,7 @@ export class ApplicationSettingsService {
     this.settings.set(settings);
     this.loaded.set(true);
     document.title = settings.appTitle;
+    document.documentElement.dataset["applicationTheme"] = settings.themeName;
     this.scheduleWarningExpiration();
   }
 

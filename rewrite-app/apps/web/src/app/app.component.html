@@ -45,9 +45,17 @@
   </section>
   <ng-container *ngIf="isParticipantView; else operatorShell">
     <header class="participant-topbar">
-      <div>
-        <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
-        <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+      <div class="application-brand">
+        <img
+          id="applicationLogo"
+          class="application-logo"
+          [src]="applicationSettings.settings().mainLogo"
+          [alt]="applicationSettings.settings().appTitle + ' logo'"
+        />
+        <div>
+          <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
+          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+        </div>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
     </header>
@@ -72,6 +80,15 @@
   <ng-template #operatorShell>
     <section class="hero">
       <div class="hero-panel">
+        <div class="application-brand operator-brand">
+          <img
+            id="applicationLogo"
+            class="application-logo"
+            [src]="applicationSettings.settings().mainLogo"
+            [alt]="applicationSettings.settings().appTitle + ' logo'"
+          />
+          <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
+        </div>
         <span class="eyebrow">{{ app.isMonitorOnlySession || app.isReadOnlyAdminSession ? app.operatorAccessLabel : "Rewrite App Frontend Start" }}</span>
         <h1>{{ app.isMonitorOnlySession ? "Monitor The Active Test Session." : app.isReadOnlyAdminSession ? "Inspect The Workspace Without Changing It." : "Operate The First Slice Without Leaving The Browser." }}</h1>
         <p class="lead">

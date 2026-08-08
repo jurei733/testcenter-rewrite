@@ -12,6 +12,45 @@
   --radius-xl: 28px;
   --radius-lg: 18px;
   --radius-md: 12px;
+  --accent-rgb: 196 82 47;
+  --secondary-rgb: 31 92 84;
+  --bg-start: #fbf7ef;
+}
+
+:root[data-application-theme="Primar"] {
+  --bg: #edf6f4;
+  --panel: rgba(248, 253, 252, 0.92);
+  --accent: #c4522f;
+  --accent-soft: #f1d8c3;
+  --secondary: #196175;
+  --secondary-soft: #d4e9ed;
+  --accent-rgb: 196 82 47;
+  --secondary-rgb: 25 97 117;
+  --bg-start: #f8fcfb;
+}
+
+:root[data-application-theme="Sekundar"] {
+  --bg: #edf2fb;
+  --panel: rgba(248, 250, 255, 0.93);
+  --accent: #c04b35;
+  --accent-soft: #f5d8d1;
+  --secondary: #0b2d84;
+  --secondary-soft: #dbe4fa;
+  --accent-rgb: 192 75 53;
+  --secondary-rgb: 11 45 132;
+  --bg-start: #f8faff;
+}
+
+:root[data-application-theme="Erwachsene"] {
+  --bg: #f3eef8;
+  --panel: rgba(252, 249, 254, 0.93);
+  --accent: #a14a2f;
+  --accent-soft: #f0d9d0;
+  --secondary: #6b369a;
+  --secondary-soft: #e7d9f1;
+  --accent-rgb: 161 74 47;
+  --secondary-rgb: 107 54 154;
+  --bg-start: #fcf9fe;
 }
 
 * {
@@ -28,9 +67,9 @@ body {
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(196, 82, 47, 0.22), transparent 24%),
-    radial-gradient(circle at top right, rgba(31, 92, 84, 0.18), transparent 28%),
-    linear-gradient(180deg, #fbf7ef 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgb(var(--accent-rgb) / 0.22), transparent 24%),
+    radial-gradient(circle at top right, rgb(var(--secondary-rgb) / 0.18), transparent 28%),
+    linear-gradient(180deg, var(--bg-start) 0%, var(--bg) 100%);
 }
 
 app-root {
@@ -249,6 +288,37 @@ h1 {
 
 .card {
   padding: 22px;
+}
+
+.application-logo-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.55);
+}
+
+.application-logo-editor p {
+  margin: 4px 0 10px;
+  color: var(--muted);
+}
+
+.settings-logo-preview {
+  display: block;
+  width: auto;
+  max-width: 180px;
+  height: 72px;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  .application-logo-editor {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
 }
 
 .card h2,

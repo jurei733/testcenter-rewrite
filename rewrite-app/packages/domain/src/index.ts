@@ -396,8 +396,18 @@ export type AdminUser = {
   createdAt: string;
 };
 
+export const applicationThemeNames = [
+  "Primar",
+  "Sekundar",
+  "Erwachsene"
+] as const;
+
+export type ApplicationThemeName = (typeof applicationThemeNames)[number];
+
 export type ApplicationSettings = {
   appTitle: string;
+  mainLogo: string;
+  themeName: ApplicationThemeName;
   globalWarningText: string | null;
   globalWarningExpiresAt: string | null;
   updatedAt: string | null;
@@ -406,6 +416,8 @@ export type ApplicationSettings = {
 
 export const defaultApplicationSettings: ApplicationSettings = {
   appTitle: "IQB-Testcenter",
+  mainLogo: "app-icon.svg",
+  themeName: "Primar",
   globalWarningText: null,
   globalWarningExpiresAt: null,
   updatedAt: null,

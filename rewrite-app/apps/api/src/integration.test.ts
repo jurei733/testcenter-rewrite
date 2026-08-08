@@ -1676,6 +1676,8 @@ test("platform application settings are public, durable, validated, and audited"
   const defaultSettings = await requestJson<{
     applicationSettings: {
       appTitle: string;
+      mainLogo: string;
+      themeName: string;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -1685,6 +1687,8 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(defaultSettings.status, 200);
   assert.deepEqual(defaultSettings.body.applicationSettings, {
     appTitle: "IQB-Testcenter",
+    mainLogo: "app-icon.svg",
+    themeName: "Primar",
     globalWarningText: null,
     globalWarningExpiresAt: null,
     updatedAt: null,
@@ -1805,9 +1809,42 @@ test("platform application settings are public, durable, validated, and audited"
     "application_warning_expiration_invalid"
   );
 
+  const invalidTheme = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        themeName: "Midnight"
+      }
+    }
+  );
+  assert.equal(invalidTheme.status, 400);
+  assert.equal(invalidTheme.body.error, "application_theme_invalid");
+
+  const invalidLogo = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        mainLogo: "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9XCJhbGVydCgxKVwiPjwvc3ZnPg=="
+      }
+    }
+  );
+  assert.equal(invalidLogo.status, 400);
+  assert.equal(invalidLogo.body.error, "application_logo_invalid");
+
+  const configuredLogo =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
   const updatedSettings = await requestJson<{
     applicationSettings: {
       appTitle: string;
+      mainLogo: string;
+      themeName: string;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -1818,6 +1855,8 @@ test("platform application settings are public, durable, validated, and audited"
     headers: { authorization },
     body: {
       appTitle: "  Configured Testcenter  ",
+      mainLogo: configuredLogo,
+      themeName: "Sekundar",
       globalWarningText: "  Planned maintenance from 18:00.  ",
       globalWarningExpiresAt: "2050-12-12T19:00:00+01:00"
     }
@@ -1827,6 +1866,8 @@ test("platform application settings are public, durable, validated, and audited"
     updatedSettings.body.applicationSettings.appTitle,
     "Configured Testcenter"
   );
+  assert.equal(updatedSettings.body.applicationSettings.mainLogo, configuredLogo);
+  assert.equal(updatedSettings.body.applicationSettings.themeName, "Sekundar");
   assert.equal(
     updatedSettings.body.applicationSettings.globalWarningText,
     "Planned maintenance from 18:00."
@@ -1872,6 +1913,11 @@ test("platform application settings are public, durable, validated, and audited"
     settingsAudit.body.items[0]?.details["nextAppTitle"],
     "Configured Testcenter"
   );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextThemeName"],
+    "Sekundar"
+  );
+  assert.equal(settingsAudit.body.items[0]?.details["nextCustomLogo"], true);
 
   const resetSettings = await requestJson<typeof updatedSettings.body>(
     "/api/v1/admin/application-settings",
@@ -1880,6 +1926,8 @@ test("platform application settings are public, durable, validated, and audited"
       headers: { authorization },
       body: {
         appTitle: "",
+        mainLogo: "",
+        themeName: "Primar",
         globalWarningText: "",
         globalWarningExpiresAt: null
       }
@@ -1887,6 +1935,8 @@ test("platform application settings are public, durable, validated, and audited"
   );
   assert.equal(resetSettings.status, 200);
   assert.equal(resetSettings.body.applicationSettings.appTitle, "IQB-Testcenter");
+  assert.equal(resetSettings.body.applicationSettings.mainLogo, "app-icon.svg");
+  assert.equal(resetSettings.body.applicationSettings.themeName, "Primar");
   assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);
   assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);
 });

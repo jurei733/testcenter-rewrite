@@ -14,6 +14,8 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import {
   adminAuditEventTypes,
+  applicationThemeNames,
+  defaultApplicationSettings,
   type AdminRole,
   type AdminRoleAccessMode,
   type AdminSessionStatus,
@@ -205,6 +207,11 @@ export class OpsViewFacade {
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
+  applicationLogoDraft = defaultApplicationSettings.mainLogo;
+  applicationLogoDraftError = "";
+  applicationThemeDraft: ApplicationSettings["themeName"] =
+    defaultApplicationSettings.themeName;
+  readonly applicationThemeOptions = applicationThemeNames;
   applicationWarningTextDraft = "";
   applicationWarningExpiresAtDraft = "";
 
@@ -248,6 +255,8 @@ export class OpsViewFacade {
     return (
       this.canManageApplicationSettings &&
       this.applicationTitleDraft.trim().length <= 120 &&
+      this.applicationLogoDraft.length <= 28_000_000 &&
+      !this.applicationLogoDraftError &&
       this.applicationWarningTextDraft.trim().length <= 4_000 &&
       this.isApplicationWarningExpirationValid
     );
@@ -608,6 +617,8 @@ export class OpsViewFacade {
         this.ops.adminSessionToken.trim(),
         {
           appTitle: this.applicationTitleDraft,
+          mainLogo: this.applicationLogoDraft,
+          themeName: this.applicationThemeDraft,
           globalWarningText: this.applicationWarningTextDraft,
           globalWarningExpiresAt: expirationInput
             ? new Date(expirationInput).toISOString()
@@ -621,6 +632,62 @@ export class OpsViewFacade {
   clearApplicationWarning(): void {
     this.applicationWarningTextDraft = "";
     this.applicationWarningExpiresAtDraft = "";
+  }
+
+  selectApplicationLogo(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    this.applicationLogoDraftError = "";
+    if (!file) {
+      return;
+    }
+    const allowedTypes = new Set([
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "image/svg+xml"
+    ]);
+    if (!allowedTypes.has(file.type)) {
+      input.value = "";
+      this.applicationLogoDraftError =
+        "Choose a PNG, JPEG, GIF, WebP, or SVG logo.";
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      input.value = "";
+      this.applicationLogoDraftError = "Logo files must not exceed 20 MiB.";
+      return;
+    }
+    this.viewState.onActionAsync(
+      () =>
+        new Promise<void>(resolve => {
+          const reader = new FileReader();
+          reader.onerror = () => {
+            input.value = "";
+            this.applicationLogoDraftError =
+              "The selected logo could not be read.";
+            resolve();
+          };
+          reader.onload = () => {
+            input.value = "";
+            if (typeof reader.result !== "string") {
+              this.applicationLogoDraftError =
+                "The selected logo could not be read.";
+              resolve();
+              return;
+            }
+            this.applicationLogoDraft = reader.result;
+            resolve();
+          };
+          reader.readAsDataURL(file);
+        })
+    );
+  }
+
+  resetApplicationLogo(): void {
+    this.applicationLogoDraft = defaultApplicationSettings.mainLogo;
+    this.applicationLogoDraftError = "";
   }
 
   bootstrapOrSignInAdmin(): void {
@@ -2844,6 +2911,9 @@ export class OpsViewFacade {
 
   private applyApplicationSettingsDraft(settings: ApplicationSettings): void {
     this.applicationTitleDraft = settings.appTitle;
+    this.applicationLogoDraft = settings.mainLogo;
+    this.applicationLogoDraftError = "";
+    this.applicationThemeDraft = settings.themeName;
     this.applicationWarningTextDraft = settings.globalWarningText ?? "";
     this.applicationWarningExpiresAtDraft = settings.globalWarningExpiresAt
       ? this.toLocalDateTimeInput(settings.globalWarningExpiresAt)

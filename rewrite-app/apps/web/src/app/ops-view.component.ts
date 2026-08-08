@@ -88,7 +88,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </div>
           <span class="status-pill">Platform admin</span>
         </div>
-        <p>Set the public application title and an optional time-bounded warning shown above every participant and operator view.</p>
+        <p>Set the public title, logo, original audience theme, and an optional time-bounded warning shown above every participant and operator view.</p>
         <div class="form-grid">
           <label>
             Application Title
@@ -99,6 +99,36 @@ import { SummaryCardsComponent } from "./summary-cards.component";
               [(ngModel)]="view.applicationTitleDraft"
             />
           </label>
+          <label>
+            Theme
+            <select
+              id="applicationThemeSelect"
+              name="applicationThemeSelect"
+              [(ngModel)]="view.applicationThemeDraft"
+            >
+              <option *ngFor="let theme of view.applicationThemeOptions" [ngValue]="theme">{{ theme }}</option>
+            </select>
+          </label>
+          <div class="span-all application-logo-editor">
+            <div>
+              <strong>Application Logo</strong>
+              <p>PNG, JPEG, GIF, WebP, or safe SVG; up to 20 MiB.</p>
+              <input
+                id="applicationLogoInput"
+                name="applicationLogoInput"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                (change)="view.selectApplicationLogo($event)"
+              />
+            </div>
+            <img
+              id="applicationLogoPreview"
+              class="settings-logo-preview"
+              [src]="view.applicationLogoDraft"
+              alt="Application logo preview"
+            />
+            <button id="resetApplicationLogoButton" class="ghost" type="button" (click)="view.resetApplicationLogo()">Use Default Logo</button>
+          </div>
           <label>
             Warning Expires
             <input
@@ -123,6 +153,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p *ngIf="!view.isApplicationWarningExpirationValid">
           Enter a valid local date and time, or leave the expiration empty.
         </p>
+        <p id="applicationLogoError" *ngIf="view.applicationLogoDraftError">{{ view.applicationLogoDraftError }}</p>
         <p id="applicationSettingsStatus">{{ view.applicationSettingsStatus }}</p>
         <div class="actions">
           <button id="saveApplicationSettingsButton" class="primary" type="button" [disabled]="!view.canSaveApplicationSettings" (click)="view.saveApplicationSettings()">Save Application Settings</button>

@@ -956,6 +956,46 @@ try {
   logStep("application-settings");
   await page.locator("#applicationSettingsCard").waitFor();
   await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
+  await page.locator("#applicationThemeSelect").selectOption({ label: "Sekundar" });
+  const configuredLogoBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const configuredLogo = `data:image/png;base64,${configuredLogoBase64}`;
+  await page.locator("#applicationLogoInput").setInputFiles({
+    name: "ui-smoke-logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(configuredLogoBase64, "base64")
+  });
+  try {
+    await page.waitForFunction(
+      expected => {
+        const image = document.querySelector("#applicationLogoPreview");
+        return image instanceof HTMLImageElement && image.src === expected;
+      },
+      configuredLogo,
+      { timeout: 5_000 }
+    );
+  } catch (error) {
+    const logoState = await page.evaluate(() => {
+      const input = document.querySelector("#applicationLogoInput");
+      const preview = document.querySelector("#applicationLogoPreview");
+      return {
+        file:
+          input instanceof HTMLInputElement && input.files?.[0]
+            ? {
+                name: input.files[0].name,
+                type: input.files[0].type,
+                size: input.files[0].size
+              }
+            : null,
+        preview:
+          preview instanceof HTMLImageElement ? preview.getAttribute("src") : null,
+        error: document.querySelector("#applicationLogoError")?.textContent
+      };
+    });
+    throw new Error(`Logo preview did not update: ${JSON.stringify(logoState)}`, {
+      cause: error
+    });
+  }
   const warningExpiration = new Date(Date.now() + 60 * 60_000);
   const formatLocalDateTime = value => {
     const component = number => String(number).padStart(2, "0");
@@ -974,6 +1014,22 @@ try {
   );
   await clickAction("Save Application Settings");
   await page.waitForFunction(() => document.title === "UI Smoke Testcenter");
+  await page.waitForFunction(
+    expected =>
+      document.documentElement.dataset["applicationTheme"] === expected &&
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--secondary")
+        .trim()
+        .toLowerCase() === "#0b2d84",
+    "Sekundar"
+  );
+  await page.waitForFunction(
+    expected => {
+      const image = document.querySelector("#applicationLogo");
+      return image instanceof HTMLImageElement && image.src === expected;
+    },
+    configuredLogo
+  );
   await page
     .locator("#globalApplicationWarning")
     .filter({ hasText: "UI smoke planned maintenance warning" })
@@ -988,6 +1044,14 @@ try {
     "UI Smoke Testcenter"
   );
   assert.equal(
+    configuredSettingsPayload.applicationSettings.mainLogo,
+    configuredLogo
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.themeName,
+    "Sekundar"
+  );
+  assert.equal(
     configuredSettingsPayload.applicationSettings.globalWarningText,
     "UI smoke planned maintenance warning"
   );
@@ -995,6 +1059,27 @@ try {
     configuredSettingsPayload.applicationSettings.globalWarningExpiresAt,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/
   );
+
+  const brandedParticipantPage = await context.newPage();
+  await brandedParticipantPage.goto(`${baseUrl}/app/participant`, {
+    waitUntil: "networkidle"
+  });
+  await brandedParticipantPage.waitForFunction(
+    expected => {
+      const image = document.querySelector("#applicationLogo");
+      return (
+        document.documentElement.dataset["applicationTheme"] === "Sekundar" &&
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--secondary")
+          .trim()
+          .toLowerCase() === "#0b2d84" &&
+        image instanceof HTMLImageElement &&
+        image.src === expected
+      );
+    },
+    configuredLogo
+  );
+  await brandedParticipantPage.close();
 
   await fillAndCommit(
     "#applicationWarningExpiresAtInput",
@@ -1004,10 +1089,22 @@ try {
   await page.locator("#globalApplicationWarning").waitFor({ state: "detached" });
 
   await fillAndCommit("#applicationTitleInput", "IQB-Testcenter");
+  await page.locator("#applicationThemeSelect").selectOption({ label: "Primar" });
+  await page.locator("#resetApplicationLogoButton").click();
   await fillAndCommit("#applicationWarningTextInput", "");
   await fillAndCommit("#applicationWarningExpiresAtInput", "");
   await clickAction("Save Application Settings");
   await page.waitForFunction(() => document.title === "IQB-Testcenter");
+  await page.waitForFunction(
+    () => document.documentElement.dataset["applicationTheme"] === "Primar"
+  );
+  await page.waitForFunction(() => {
+    const image = document.querySelector("#applicationLogo");
+    return (
+      image instanceof HTMLImageElement &&
+      image.src.endsWith("/app/app-icon.svg")
+    );
+  });
   const settingsAuditResponse = await fetch(
     `${baseUrl}/api/v1/admin/audit-events?eventType=application_settings_updated`,
     {

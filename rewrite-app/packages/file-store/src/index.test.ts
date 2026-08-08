@@ -62,6 +62,8 @@ describe("createFileFirstSliceRepository", () => {
       const repository = createFileFirstSliceRepository(filePath);
       await repository.saveApplicationSettings({
         appTitle: "Assessment Portal",
+        mainLogo: "data:image/png;base64,iVBORw0KGgo=",
+        themeName: "Sekundar",
         globalWarningText: "Maintenance tonight",
         globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
         updatedAt: "2026-08-08T20:00:00.000Z",
@@ -72,12 +74,42 @@ describe("createFileFirstSliceRepository", () => {
         await createFileFirstSliceRepository(filePath).getApplicationSettings(),
         {
           appTitle: "Assessment Portal",
+          mainLogo: "data:image/png;base64,iVBORw0KGgo=",
+          themeName: "Sekundar",
           globalWarningText: "Maintenance tonight",
           globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
           updatedAt: "2026-08-08T20:00:00.000Z",
           updatedByAdminUserId: "platform-admin"
         }
       );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("normalizes legacy application settings with branding defaults", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-branding-"));
+    const filePath = join(tempDirectory, "state.json");
+
+    try {
+      await writeFile(
+        filePath,
+        JSON.stringify({
+          applicationSettings: {
+            appTitle: "Legacy Portal",
+            globalWarningText: null,
+            globalWarningExpiresAt: null,
+            updatedAt: "2026-08-08T20:00:00.000Z",
+            updatedByAdminUserId: "legacy-admin"
+          }
+        }),
+        "utf8"
+      );
+      const settings =
+        await createFileFirstSliceRepository(filePath).getApplicationSettings();
+      assert.equal(settings?.appTitle, "Legacy Portal");
+      assert.equal(settings?.mainLogo, "app-icon.svg");
+      assert.equal(settings?.themeName, "Primar");
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });
     }

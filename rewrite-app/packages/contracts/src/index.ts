@@ -2415,6 +2415,8 @@ export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
 
 export type UpdateApplicationSettingsRequest = {
   appTitle: string;
+  mainLogo?: string;
+  themeName?: ApplicationSettings["themeName"];
   globalWarningText?: string | null;
   globalWarningExpiresAt?: string | null;
 };

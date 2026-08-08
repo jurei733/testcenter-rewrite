@@ -159,6 +159,12 @@ const mapApplicationSettings = (
   row
     ? {
         appTitle: String(row.app_title),
+        mainLogo:
+          row.main_logo == null ? "app-icon.svg" : String(row.main_logo),
+        themeName:
+          row.theme_name === "Sekundar" || row.theme_name === "Erwachsene"
+            ? row.theme_name
+            : "Primar",
         globalWarningText:
           row.global_warning_text == null
             ? null
@@ -589,8 +595,6 @@ const mapParticipantTestLog = (row: Row | undefined): ParticipantTestLog | null 
         recordedAt: String(row.recorded_at)
       }
     : null;
-
-export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION = 33;
 
 const migrations: PostgresMigration[] = [
   {
@@ -1082,8 +1086,19 @@ const migrations: PostgresMigration[] = [
       CREATE INDEX IF NOT EXISTS attachment_files_workspace_attachment_idx
         ON attachment_files (tenant_id, workspace_id, attachment_id, created_at);
     `
+  },
+  {
+    version: 34,
+    name: "add_application_branding",
+    sql: `
+      ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS main_logo TEXT NOT NULL DEFAULT 'app-icon.svg';
+      ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS theme_name TEXT NOT NULL DEFAULT 'Primar';
+    `
   }
 ];
+
+export const POSTGRES_FIRST_SLICE_SCHEMA_VERSION =
+  migrations[migrations.length - 1]?.version ?? 0;
 
 const applyMigrations = async (pool: Pool): Promise<void> => {
   await pool.query(`
@@ -1201,7 +1216,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   return {
     async getApplicationSettings() {
       return one(
-        `SELECT app_title, global_warning_text, global_warning_expires_at,
+        `SELECT app_title, main_logo, theme_name,
+                global_warning_text, global_warning_expires_at,
                 updated_at, updated_by_admin_user_id
          FROM application_settings
          WHERE settings_key = 'global'`,
@@ -1212,17 +1228,22 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveApplicationSettings(settings) {
       await pool.query(
         `INSERT INTO application_settings (
-          settings_key, app_title, global_warning_text,
-          global_warning_expires_at, updated_at, updated_by_admin_user_id
-        ) VALUES ('global', $1, $2, $3, $4, $5)
+          settings_key, app_title, main_logo, theme_name,
+          global_warning_text, global_warning_expires_at,
+          updated_at, updated_by_admin_user_id
+        ) VALUES ('global', $1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT(settings_key) DO UPDATE SET
           app_title = EXCLUDED.app_title,
+          main_logo = EXCLUDED.main_logo,
+          theme_name = EXCLUDED.theme_name,
           global_warning_text = EXCLUDED.global_warning_text,
           global_warning_expires_at = EXCLUDED.global_warning_expires_at,
           updated_at = EXCLUDED.updated_at,
           updated_by_admin_user_id = EXCLUDED.updated_by_admin_user_id`,
         [
           settings.appTitle,
+          settings.mainLogo,
+          settings.themeName,
           settings.globalWarningText,
           settings.globalWarningExpiresAt,
           settings.updatedAt,

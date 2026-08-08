@@ -84,6 +84,8 @@ test("SQLite preserves global application settings", async () => {
   const repository = createSqliteFirstSliceRepository(":memory:");
   await repository.saveApplicationSettings({
     appTitle: "Assessment Portal",
+    mainLogo: "data:image/png;base64,iVBORw0KGgo=",
+    themeName: "Erwachsene",
     globalWarningText: "Maintenance tonight",
     globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
     updatedAt: "2026-08-08T20:00:00.000Z",
@@ -92,11 +94,58 @@ test("SQLite preserves global application settings", async () => {
 
   assert.deepEqual(await repository.getApplicationSettings(), {
     appTitle: "Assessment Portal",
+    mainLogo: "data:image/png;base64,iVBORw0KGgo=",
+    themeName: "Erwachsene",
     globalWarningText: "Maintenance tonight",
     globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
     updatedAt: "2026-08-08T20:00:00.000Z",
     updatedByAdminUserId: "platform-admin"
   });
+});
+
+test("SQLite adds branding defaults to legacy application settings", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-branding-"));
+  const databasePath = join(tempDirectory, "legacy.sqlite");
+  const database = new DatabaseSync(databasePath);
+  try {
+    database.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations (version, name, applied_at)
+      VALUES (39, 'add_attachment_files', '2026-08-08T20:00:00.000Z');
+      CREATE TABLE application_settings (
+        settings_key TEXT PRIMARY KEY,
+        app_title TEXT NOT NULL,
+        global_warning_text TEXT,
+        global_warning_expires_at TEXT,
+        updated_at TEXT,
+        updated_by_admin_user_id TEXT
+      );
+      INSERT INTO application_settings (
+        settings_key, app_title, global_warning_text,
+        global_warning_expires_at, updated_at, updated_by_admin_user_id
+      ) VALUES (
+        'global', 'Legacy Portal', NULL, NULL,
+        '2026-08-08T20:00:00.000Z', 'legacy-admin'
+      );
+    `);
+  } finally {
+    database.close();
+  }
+
+  try {
+    const settings = await createSqliteFirstSliceRepository(
+      databasePath
+    ).getApplicationSettings();
+    assert.equal(settings?.appTitle, "Legacy Portal");
+    assert.equal(settings?.mainLogo, "app-icon.svg");
+    assert.equal(settings?.themeName, "Primar");
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
 });
 
 test("SQLite preserves and deletes attachment images", async () => {

@@ -38,11 +38,13 @@ per-login loading texts; it does not invent byte percentages because the Player
 HTML and Unit definition already arrive in the participant current-state payload.
 
 Platform administrators can configure the original-style instance application
-title and a time-bounded global warning from the Angular Ops view. The public
-settings endpoint applies the title to the browser and participant shell, shows
-the warning across participant and operator routes, and removes it automatically
-when its persisted expiration passes. Updates are validated, audited, and stored
-by the memory, JSON-file, SQLite, and Postgres adapters.
+title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded
+global warning from the Angular Ops view. The public settings endpoint applies
+the branding to participant and operator shells, shows the warning across all
+routes, and removes it automatically when its persisted expiration passes. Logo
+type, bytes, safe SVG content, the original 20 MiB ceiling, and theme names are
+validated; updates are audited and stored by the memory, JSON-file, SQLite, and
+Postgres adapters.
 
 The same import classifies original `monitor-group`, `monitor-study`, and
 `sys-check-login` entries as explicit operational-login migration candidates.
