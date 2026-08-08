@@ -809,6 +809,24 @@
       "diagnosticCode": "testcenter_xml_metadata_missing"
     }
   ],
+  "systemCheckReports": [
+    {
+      "fixture": "system-checks/SysCheck-Report.json",
+      "sourcePath": "sampledata/SysCheck-Report.json",
+      "sha256": "7f98207e760f630aecb38344edf888861ee607f388d22f939bfcb96555935495",
+      "installedFileName": "SAMPLE_SYSCHECK-REPORT.JSON",
+      "date": "2020-02-17 13:01:31",
+      "checkId": "SYSCHECK.SAMPLE",
+      "checkLabel": "An example SysCheck definition",
+      "title": "SAMPLE SYS-CHECK REPORT",
+      "sectionEntryCounts": {
+        "environment": 11,
+        "network": 10,
+        "questionnaire": 5,
+        "unit": 1
+      }
+    }
+  ],
   "systemChecks": [
     {
       "fixture": "system-checks/SysCheck.xml",

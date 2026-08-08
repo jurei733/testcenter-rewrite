@@ -677,6 +677,12 @@ export type SystemCheckReport = {
   tenantId: string;
   workspaceId: string;
   sourcePackageId: string;
+  /** Original report filename when migrated from a file-based Testcenter workspace. */
+  originalFileName?: string;
+  /** Filesystem modification timestamp used by the legacy DatumTS/Datum export columns. */
+  fileModifiedAt?: string;
+  /** The report's original, human-readable `date` field. */
+  sourceDate?: string;
   checkId: string;
   checkLabel: string;
   title: string;

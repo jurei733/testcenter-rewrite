@@ -1855,6 +1855,30 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       "admin_session_missing"
     );
 
+    const rejectedSystemCheckReportsJson = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/exports/system-check-reports.json"
+    );
+    assert.equal(rejectedSystemCheckReportsJson.status, 401);
+    assert.equal(
+      rejectedSystemCheckReportsJson.body.error,
+      "admin_session_missing"
+    );
+
+    const rejectedSystemCheckReportImport = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/system-check-reports/import",
+      {
+        method: "POST",
+        body: { fileName: "report.json", report: {} }
+      }
+    );
+    assert.equal(rejectedSystemCheckReportImport.status, 401);
+    assert.equal(
+      rejectedSystemCheckReportImport.body.error,
+      "admin_session_missing"
+    );
+
     const overview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
     }>(
@@ -24407,7 +24431,7 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   assert.equal(csv.contentType, "text/csv; charset=utf-8");
   assert.match(
     csv.body,
-    /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"Datum";"Report-Id";"SourcePackage-Id";"Betriebssystem";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"\n/
+    /^"Titel";"SysCheck-Id";"SysCheck";"Responses";"DatumTS";"Datum";"FileName";"Betriebssystem";"Browser";"Gesamtbewertung";"Eingabefeld";"loading time"/
   );
   assert.match(csv.body, /"SAMPLE SYS-CHECK REPORT";"SYSCHECK\.SAMPLE"/);
 
@@ -24492,4 +24516,215 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`
   );
   assert.deepEqual(reportsAfterAllDeletions.body.items, []);
+
+  type LegacyReportEntry = {
+    id: string;
+    type: string;
+    label: string;
+    value: string | number | boolean | null;
+    warning: boolean;
+  };
+  const legacyReport = JSON.parse(
+    readFileSync(
+      resolve(
+        originalTestcenterCorpusRoot,
+        "system-checks/SysCheck-Report.json"
+      ),
+      "utf8"
+    )
+  ) as {
+    date: string;
+    checkId: string;
+    checkLabel: string;
+    title: string;
+    responses: unknown;
+    environment: LegacyReportEntry[];
+    network: LegacyReportEntry[];
+    questionnaire: LegacyReportEntry[];
+    unit: LegacyReportEntry[];
+  };
+  const importedDeprecatedReport = await requestJson<{
+    report: {
+      systemCheckReportId: string;
+      checkId: string;
+      environment: LegacyReportEntry[];
+      network: LegacyReportEntry[];
+      questionnaire: LegacyReportEntry[];
+      unit: LegacyReportEntry[];
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports/import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "DEPRECATED_SYSCHECK-REPORT.JSON",
+        report: {
+          date: legacyReport.date,
+          checkId: "SYSCHECK-2",
+          checkLabel: "Deprecated section report",
+          title: "DEPRECATED SYS-CHECK REPORT",
+          responses: "",
+          envData: legacyReport.environment,
+          netData: legacyReport.network,
+          questData: legacyReport.questionnaire,
+          unitData: legacyReport.unit
+        }
+      }
+    }
+  );
+  assert.equal(importedDeprecatedReport.status, 201);
+  assert.equal(importedDeprecatedReport.body.report.checkId, "SYSCHECK-2");
+  assert.deepEqual(
+    importedDeprecatedReport.body.report.environment,
+    legacyReport.environment
+  );
+  assert.deepEqual(
+    importedDeprecatedReport.body.report.network,
+    legacyReport.network
+  );
+  assert.deepEqual(
+    importedDeprecatedReport.body.report.questionnaire,
+    legacyReport.questionnaire
+  );
+  assert.deepEqual(
+    importedDeprecatedReport.body.report.unit,
+    legacyReport.unit
+  );
+  const removedDeprecatedReport = await requestJson<{
+    deletion: { deletedCount: number };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,
+    {
+      method: "DELETE",
+      body: { checkIds: ["syscheck-2"], confirmation: workspaceKey }
+    }
+  );
+  assert.equal(removedDeprecatedReport.body.deletion.deletedCount, 1);
+
+  const importedLegacyReport = await requestJson<{
+    report: {
+      systemCheckReportId: string;
+      originalFileName: string;
+      fileModifiedAt: string;
+      sourceDate: string;
+      createdAt: string;
+      checkLabel: string;
+      environment: LegacyReportEntry[];
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports/import`,
+    {
+      method: "POST",
+      body: {
+        fileName: "SAMPLE_SYSCHECK-REPORT.JSON",
+        modifiedAt: "2021-07-29T08:00:00.000Z",
+        report: legacyReport
+      }
+    }
+  );
+  assert.equal(importedLegacyReport.status, 201);
+  assert.equal(
+    importedLegacyReport.body.report.originalFileName,
+    "SAMPLE_SYSCHECK-REPORT.JSON"
+  );
+  assert.equal(
+    importedLegacyReport.body.report.fileModifiedAt,
+    "2021-07-29T08:00:00.000Z"
+  );
+  assert.equal(importedLegacyReport.body.report.sourceDate, legacyReport.date);
+  assert.equal(
+    importedLegacyReport.body.report.createdAt,
+    "2020-02-17T12:01:31.000Z"
+  );
+  assert.equal(
+    importedLegacyReport.body.report.checkLabel,
+    "An example SysCheck definition"
+  );
+  assert.deepEqual(
+    importedLegacyReport.body.report.environment,
+    legacyReport.environment
+  );
+
+  const legacyCsv = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.csv?checkId=SYSCHECK.SAMPLE`
+  );
+  assert.equal(legacyCsv.status, 200);
+  const quoteLegacyCsvCell = (value: unknown): string => {
+    const text =
+      typeof value === "boolean" ? (value ? "1" : "") : String(value ?? "");
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const legacyEntries = [
+    ...legacyReport.environment,
+    ...legacyReport.network,
+    ...legacyReport.questionnaire,
+    ...legacyReport.unit
+  ];
+  const expectedLegacyHeaders = [
+    "Titel",
+    "SysCheck-Id",
+    "SysCheck",
+    "Responses",
+    "DatumTS",
+    "Datum",
+    "FileName",
+    ...legacyEntries.map(entry => entry.label)
+  ];
+  const expectedLegacyValues = [
+    legacyReport.title,
+    legacyReport.checkId,
+    legacyReport.checkLabel,
+    "",
+    "1627545600",
+    "2021-07-29 10:00:00",
+    "SAMPLE_SYSCHECK-REPORT.JSON",
+    ...legacyEntries.map(entry => entry.value)
+  ];
+  assert.equal(
+    legacyCsv.body,
+    `${expectedLegacyHeaders.map(quoteLegacyCsvCell).join(";")}\n${expectedLegacyValues
+      .map(quoteLegacyCsvCell)
+      .join(";")}`
+  );
+
+  const legacyJson = await requestText(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/system-check-reports.json?checkId=SYSCHECK.SAMPLE`
+  );
+  assert.equal(legacyJson.status, 200);
+  assert.equal(legacyJson.contentType, "application/json; charset=utf-8");
+  const exportedLegacyReports = JSON.parse(legacyJson.body) as Array<{
+    date: string;
+    checkId: string;
+    checkLabel: string;
+    title: string;
+    environment: LegacyReportEntry[];
+    fileData: Array<{ id: string; label: string; value: string }>;
+  }>;
+  assert.equal(exportedLegacyReports.length, 1);
+  assert.deepEqual(exportedLegacyReports[0], {
+    ...legacyReport,
+    fileData: [
+      { id: "date", label: "DatumTS", value: "1627545600" },
+      { id: "datestr", label: "Datum", value: "2021-07-29 10:00:00" },
+      {
+        id: "filename",
+        label: "FileName",
+        value: "SAMPLE_SYSCHECK-REPORT.JSON"
+      }
+    ]
+  });
+
+  const removedLegacyReport = await requestJson<{
+    deletion: { deletedCount: number; deletedReportIds: string[] };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/system-check-reports`,
+    {
+      method: "DELETE",
+      body: { checkIds: [legacyReport.checkId], confirmation: workspaceKey }
+    }
+  );
+  assert.equal(removedLegacyReport.body.deletion.deletedCount, 1);
+  assert.deepEqual(removedLegacyReport.body.deletion.deletedReportIds, [
+    importedLegacyReport.body.report.systemCheckReportId
+  ]);
 });

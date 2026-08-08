@@ -74,6 +74,8 @@ import {
   type GetWorkspaceOverviewResponse,
   type ImportParticipantRosterRequest,
   type ImportParticipantRosterResponse,
+  type ImportSystemCheckReportRequest,
+  type ImportSystemCheckReportResponse,
   type IssueMonitorRunCommandRequest,
   type IssueMonitorRunCommandResponse,
   type IssueMonitorRunCommandsRequest,
@@ -1694,8 +1696,14 @@ const systemCheckReportListPattern = createRoutePattern(
 const systemCheckReportStatisticsPattern = createRoutePattern(
   productionApiRoutes.workspace.getSystemCheckReportStatistics
 );
+const systemCheckReportImportPattern = createRoutePattern(
+  productionApiRoutes.workspace.importSystemCheckReport
+);
 const systemCheckReportCsvExportPattern = createRoutePattern(
   productionApiRoutes.workspace.exportSystemCheckReportsCsv
+);
+const systemCheckReportJsonExportPattern = createRoutePattern(
+  productionApiRoutes.workspace.exportSystemCheckReportsJson
 );
 const systemCheckSpeedTestDownloadPattern = createRoutePattern(
   productionApiRoutes.system.downloadSpeedTestPackage
@@ -1806,7 +1814,9 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", systemCheckReportListPattern],
   ["GET", systemCheckReportStatisticsPattern],
   ["DELETE", systemCheckReportListPattern],
+  ["POST", systemCheckReportImportPattern],
   ["GET", systemCheckReportCsvExportPattern],
+  ["GET", systemCheckReportJsonExportPattern],
   ["GET", monitorOpenRunsPattern],
   ["GET", monitorEventStreamPattern],
   ["POST", monitorRunCommandsPattern],
@@ -2689,9 +2699,19 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.deleteSystemCheckReports
     ],
     [
+      "POST",
+      systemCheckReportImportPattern,
+      productionApiRoutes.workspace.importSystemCheckReport
+    ],
+    [
       "GET",
       systemCheckReportCsvExportPattern,
       productionApiRoutes.workspace.exportSystemCheckReportsCsv
+    ],
+    [
+      "GET",
+      systemCheckReportJsonExportPattern,
+      productionApiRoutes.workspace.exportSystemCheckReportsJson
     ],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
@@ -5875,8 +5895,12 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         systemCheckReportListPattern.exec(pathname);
       const systemCheckReportStatisticsMatch =
         systemCheckReportStatisticsPattern.exec(pathname);
+      const systemCheckReportImportMatch =
+        systemCheckReportImportPattern.exec(pathname);
       const systemCheckReportCsvExportMatch =
         systemCheckReportCsvExportPattern.exec(pathname);
+      const systemCheckReportJsonExportMatch =
+        systemCheckReportJsonExportPattern.exec(pathname);
       if (request.method === "GET" && systemCheckListMatch?.groups) {
         const tenantKey = decodeRouteGroup(systemCheckListMatch.groups.tenantKey);
         const workspaceKey = decodeRouteGroup(
@@ -5994,14 +6018,44 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         return;
       }
 
+      if (request.method === "POST" && systemCheckReportImportMatch?.groups) {
+        const tenantKey = decodeRouteGroup(
+          systemCheckReportImportMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          systemCheckReportImportMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+        const body = await readRequestJsonBody<ImportSystemCheckReportRequest>();
+        const report = await services.workspaceResults.importSystemCheckReport({
+          tenantKey,
+          workspaceKey,
+          fileName: body.fileName,
+          modifiedAt: body.modifiedAt,
+          report: body.report
+        });
+        sendJson<ImportSystemCheckReportResponse>(response, 201, { report });
+        return;
+      }
+
       if (
         request.method === "GET" &&
         (systemCheckReportListMatch?.groups ||
-          systemCheckReportCsvExportMatch?.groups)
+          systemCheckReportCsvExportMatch?.groups ||
+          systemCheckReportJsonExportMatch?.groups)
       ) {
         const groups =
           systemCheckReportListMatch?.groups ??
-          systemCheckReportCsvExportMatch?.groups;
+          systemCheckReportCsvExportMatch?.groups ??
+          systemCheckReportJsonExportMatch?.groups;
         const tenantKey = decodeRouteGroup(groups?.tenantKey);
         const workspaceKey = decodeRouteGroup(groups?.workspaceKey);
         if (!tenantKey || !workspaceKey) {
@@ -6041,6 +6095,27 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             200,
             `${workspaceKey}-system-check-reports.csv`,
             csv
+          );
+          return;
+        }
+        if (systemCheckReportJsonExportMatch?.groups) {
+          const json =
+            await services.workspaceAdminRead.exportSystemCheckReportsJson({
+              tenantKey,
+              workspaceKey,
+              checkId,
+              limit
+            });
+          sendAsset(
+            response,
+            200,
+            "application/json; charset=utf-8",
+            Buffer.from(json, "utf8"),
+            {
+              "content-disposition": buildAttachmentContentDisposition(
+                `${workspaceKey}-system-check-reports.json`
+              )
+            }
           );
           return;
         }

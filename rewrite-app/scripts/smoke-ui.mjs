@@ -1348,6 +1348,52 @@ try {
       systemCheckReportDownload.suggestedFilename(),
       `${systemCheckWorkspaceKey}-system-check-reports.csv`
     );
+    await expectButtonSelectorEnabled("#importSystemCheckReportButton");
+    await page.locator("#legacySystemCheckReportInput").setInputFiles(
+      resolve(
+        "test-fixtures/original-testcenter/system-checks/SysCheck-Report.json"
+      )
+    );
+    await page
+      .locator("#systemCheckReportOperatorStatus")
+      .filter({ hasText: "Imported SysCheck-Report.json." })
+      .waitFor({ timeout: 15_000 });
+    await page
+      .locator(".system-check-report-detail")
+      .filter({ hasText: "SAMPLE SYS-CHECK REPORT" })
+      .filter({ hasText: "Original file: SysCheck-Report.json" })
+      .filter({ hasText: "Linux" })
+      .waitFor({ timeout: 15_000 });
+    await expectButtonSelectorEnabled("#exportSystemCheckReportsJsonButton");
+    const systemCheckReportJsonDownloadPromise = page.waitForEvent("download");
+    await page.locator("#exportSystemCheckReportsJsonButton").click();
+    const systemCheckReportJsonDownload =
+      await systemCheckReportJsonDownloadPromise;
+    assert.equal(
+      systemCheckReportJsonDownload.suggestedFilename(),
+      `${systemCheckWorkspaceKey}-system-check-reports.json`
+    );
+    const systemCheckReportJsonPath = resolve(
+      ".data",
+      `${systemCheckWorkspaceKey}-system-check-reports.json`
+    );
+    await systemCheckReportJsonDownload.saveAs(systemCheckReportJsonPath);
+    const exportedSystemCheckReports = JSON.parse(
+      await readFile(systemCheckReportJsonPath, "utf8")
+    );
+    assert.equal(exportedSystemCheckReports.length, 2);
+    assert.ok(
+      exportedSystemCheckReports.some(
+        report =>
+          report.date === "2020-02-17 13:01:31" &&
+          report.fileData?.some(
+            entry =>
+              entry.label === "FileName" &&
+              entry.value === "SysCheck-Report.json"
+          )
+      ),
+      "UI smoke expected the migrated original report in the JSON export."
+    );
     await page
       .locator(".system-check-statistics")
       .filter({ hasText: "Chrome" })
@@ -1365,7 +1411,7 @@ try {
     await page.locator("#deleteSystemCheckReportsButton").click();
     await page
       .locator("#systemCheckReportOperatorStatus")
-      .filter({ hasText: "1 report(s) deleted." })
+      .filter({ hasText: "2 report(s) deleted." })
       .waitFor({ timeout: 15_000 });
 
     await page.getByRole("button", { name: "Choose Another Check" }).click();

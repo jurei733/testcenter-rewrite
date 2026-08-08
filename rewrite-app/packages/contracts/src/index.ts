@@ -1969,8 +1969,12 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports/statistics",
     deleteSystemCheckReports:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports",
+    importSystemCheckReport:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/system-check-reports/import",
     exportSystemCheckReportsCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.csv",
+    exportSystemCheckReportsJson:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/system-check-reports.json",
     getContentRelease:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/content-releases/:contentReleaseId",
     getContentReleaseActivationReadiness:
@@ -2165,6 +2169,12 @@ export type SaveSystemCheckReportRequest = {
 export type DeleteSystemCheckReportsRequest = {
   checkIds: string[];
   confirmation: string;
+};
+
+export type ImportSystemCheckReportRequest = {
+  fileName: string;
+  modifiedAt?: string;
+  report: unknown;
 };
 
 export type AdminUserListQuery = {
@@ -2765,6 +2775,10 @@ export type GetSystemCheckReportStatisticsResponse = {
 
 export type DeleteSystemCheckReportsResponse = {
   deletion: SystemCheckReportDeletion;
+};
+
+export type ImportSystemCheckReportResponse = {
+  report: SystemCheckReport;
 };
 
 export type ParticipantSignInResponse = {

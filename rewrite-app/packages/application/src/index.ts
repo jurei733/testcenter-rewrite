@@ -481,6 +481,12 @@ export type WorkspaceAdminReadPort = {
     checkId?: string;
     limit?: number;
   }): Promise<string>;
+  exportSystemCheckReportsJson(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<string>;
   getSystemCheckReportStatistics(input: {
     tenantKey: string;
     workspaceKey: string;
@@ -531,6 +537,13 @@ export type WorkspaceResultsPort = {
     checkIds: string[];
     confirmation: string;
   }): Promise<SystemCheckReportDeletion>;
+  importSystemCheckReport(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    fileName: string;
+    modifiedAt?: string;
+    report: unknown;
+  }): Promise<SystemCheckReport>;
 };
 
 export type WorkspaceReviewPort = {
@@ -15902,6 +15915,158 @@ export const createFirstSliceServices = (
     return systemCheck;
   };
 
+  const normalizeSystemCheckReportEntries = (
+    section: string,
+    entries: unknown
+  ): SystemCheckReportEntry[] => {
+    if (!Array.isArray(entries) || entries.length > 200) {
+      throw new FirstSliceError(
+        400,
+        "system_check_report_invalid",
+        `System-check report section '${section}' must contain at most 200 entries.`
+      );
+    }
+    return entries.map((candidate, index) => {
+      if (
+        !candidate ||
+        typeof candidate !== "object" ||
+        Array.isArray(candidate)
+      ) {
+        throw new FirstSliceError(
+          400,
+          "system_check_report_invalid",
+          `System-check report section '${section}' contains an invalid entry at index ${index}.`
+        );
+      }
+      const entry = candidate as Record<string, unknown>;
+      const label = String(entry.label ?? "").trim();
+      if (!label) {
+        throw new FirstSliceError(
+          400,
+          "system_check_report_invalid",
+          `System-check report section '${section}' contains an invalid entry at index ${index}.`
+        );
+      }
+      const value = entry.value;
+      if (
+        value !== null &&
+        typeof value !== "string" &&
+        typeof value !== "number" &&
+        typeof value !== "boolean"
+      ) {
+        throw new FirstSliceError(
+          400,
+          "system_check_report_invalid",
+          `System-check report value '${label}' must be scalar.`
+        );
+      }
+      return {
+        id: String(entry.id ?? index).trim() || String(index),
+        type: String(entry.type ?? section).trim() || section,
+        label,
+        value,
+        warning: Boolean(entry.warning)
+      };
+    });
+  };
+
+  const formatLegacySystemCheckDate = (timestamp: string): string => {
+    const timestampMs = Date.parse(timestamp);
+    if (!Number.isFinite(timestampMs)) {
+      return timestamp;
+    }
+    const [year, month, day, hour, minute, second] = readTimeZoneParts(
+      timestampMs,
+      participantAccessTimeZone
+    );
+    const pad = (value: number): string => String(value).padStart(2, "0");
+    return `${year}-${pad(month)}-${pad(day)} ${pad(hour)}:${pad(minute)}:${pad(second)}`;
+  };
+
+  const parseLegacySystemCheckDate = (value: string): string | null => {
+    const normalized = value.trim();
+    const localMatch =
+      /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(
+        normalized
+      );
+    if (localMatch) {
+      return localDateTimeToIso(
+        [
+          Number(localMatch[1]),
+          Number(localMatch[2]),
+          Number(localMatch[3]),
+          Number(localMatch[4]),
+          Number(localMatch[5]),
+          Number(localMatch[6])
+        ],
+        participantAccessTimeZone
+      );
+    }
+    const timestampMs = Date.parse(normalized);
+    return Number.isFinite(timestampMs) ? new Date(timestampMs).toISOString() : null;
+  };
+
+  const normalizeStoredSystemCheckReport = (
+    report: SystemCheckReport
+  ): SystemCheckReport => {
+    const createdAt =
+      String(report.createdAt ?? "").trim() || "1970-01-01T00:00:00.000Z";
+    const systemCheckReportId = String(report.systemCheckReportId ?? "").trim();
+    return {
+      ...report,
+      sourceDate:
+        String(report.sourceDate ?? "").trim() ||
+        formatLegacySystemCheckDate(createdAt),
+      originalFileName:
+        String(report.originalFileName ?? "").trim() ||
+        `report_${systemCheckReportId || "unknown"}.json`,
+      fileModifiedAt:
+        String(report.fileModifiedAt ?? "").trim() || createdAt,
+      createdAt
+    };
+  };
+
+  const legacySystemCheckFileData = (
+    report: SystemCheckReport
+  ): Array<{ id: string; label: string; value: string }> => {
+    const fileModifiedAt = report.fileModifiedAt ?? report.createdAt;
+    const timestampMs = Date.parse(fileModifiedAt);
+    return [
+      {
+        id: "date",
+        label: "DatumTS",
+        value: Number.isFinite(timestampMs)
+          ? String(Math.floor(timestampMs / 1_000))
+          : ""
+      },
+      {
+        id: "datestr",
+        label: "Datum",
+        value: formatLegacySystemCheckDate(fileModifiedAt)
+      },
+      {
+        id: "filename",
+        label: "FileName",
+        value:
+          report.originalFileName ??
+          `report_${report.systemCheckReportId}.json`
+      }
+    ];
+  };
+
+  const legacySystemCheckReportDocument = (report: SystemCheckReport) => ({
+    date: report.sourceDate ?? formatLegacySystemCheckDate(report.createdAt),
+    checkId: report.checkId,
+    checkLabel: report.checkLabel,
+    title: report.title,
+    responses: report.responses,
+    environment: report.environment,
+    network: report.network,
+    questionnaire: report.questionnaire,
+    unit: report.unit,
+    fileData: legacySystemCheckFileData(report)
+  });
+
   const readSystemCheckReportRecords = async (input: {
     tenantKey: string;
     workspaceKey: string;
@@ -15924,7 +16089,10 @@ export const createFirstSliceServices = (
       .flatMap(event => {
         const report = event.details.report;
         return report && typeof report === "object" && !Array.isArray(report)
-          ? [{ activityEventId: event.activityEventId, report: report as SystemCheckReport }]
+          ? [{
+              activityEventId: event.activityEventId,
+              report: normalizeStoredSystemCheckReport(report as SystemCheckReport)
+            }]
           : [];
       })
       .filter(
@@ -16022,9 +16190,9 @@ export const createFirstSliceServices = (
       "SysCheck-Id",
       "SysCheck",
       "Responses",
+      "DatumTS",
       "Datum",
-      "Report-Id",
-      "SourcePackage-Id"
+      "FileName"
     ];
     const dynamicHeaders: string[] = [];
     const rows = reports.map(report => {
@@ -16034,15 +16202,15 @@ export const createFirstSliceServices = (
         ["SysCheck", report.checkLabel],
         [
           "Responses",
-          report.responses == null
+          report.responses == null ||
+          report.responses === "" ||
+          report.responses === false ||
+          report.responses === 0 ||
+          (Array.isArray(report.responses) && report.responses.length === 0)
             ? ""
-            : typeof report.responses === "string"
-              ? report.responses
-              : JSON.stringify(report.responses)
+            : JSON.stringify(report.responses)
         ],
-        ["Datum", report.createdAt],
-        ["Report-Id", report.systemCheckReportId],
-        ["SourcePackage-Id", report.sourcePackageId]
+        ...legacySystemCheckFileData(report).map(entry => [entry.label, entry.value] as const)
       ]);
       for (const entry of [
         ...report.environment,
@@ -16050,9 +16218,7 @@ export const createFirstSliceServices = (
         ...report.questionnaire,
         ...report.unit
       ]) {
-        if (!values.has(entry.label)) {
-          values.set(entry.label, entry.value);
-        }
+        values.set(entry.label, entry.value);
         if (!baseHeaders.includes(entry.label) && !dynamicHeaders.includes(entry.label)) {
           dynamicHeaders.push(entry.label);
         }
@@ -16060,14 +16226,31 @@ export const createFirstSliceServices = (
       return values;
     });
     const headers = [...baseHeaders, ...dynamicHeaders];
-    const escapeSemicolonCsvCell = (value: unknown): string =>
-      `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const escapeSemicolonCsvCell = (value: unknown): string => {
+      const text =
+        typeof value === "boolean" ? (value ? "1" : "") : String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
     return `\uFEFF${[
       headers.map(escapeSemicolonCsvCell).join(";"),
       ...rows.map(row =>
         headers.map(header => escapeSemicolonCsvCell(row.get(header))).join(";")
       )
-    ].join("\n")}\n`;
+    ].join("\n")}`;
+  };
+
+  const exportSystemCheckReportsJson = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    checkId?: string;
+    limit?: number;
+  }): Promise<string> => {
+    const reports = await readSystemCheckReports(input);
+    return `${JSON.stringify(
+      reports.map(legacySystemCheckReportDocument),
+      null,
+      2
+    )}\n`;
   };
 
   const deleteWorkspaceGroupResults = async (input: {
@@ -18749,11 +18932,142 @@ export const createFirstSliceServices = (
       async exportSystemCheckReportsCsv(input) {
         return exportSystemCheckReportsCsv(input);
       },
+      async exportSystemCheckReportsJson(input) {
+        return exportSystemCheckReportsJson(input);
+      },
       async getSystemCheckReportStatistics(input) {
         return buildSystemCheckReportStatistics(input);
       }
     },
     workspaceResults: {
+      async importSystemCheckReport(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const originalFileName = String(input.fileName ?? "").trim();
+        if (
+          !originalFileName ||
+          originalFileName.length > 255 ||
+          /[/\\]/.test(originalFileName) ||
+          !/\.json$/i.test(originalFileName)
+        ) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_file_name_invalid",
+            "A plain JSON report filename with at most 255 characters is required."
+          );
+        }
+        if (
+          !input.report ||
+          typeof input.report !== "object" ||
+          Array.isArray(input.report)
+        ) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_invalid",
+            "The imported system-check report must be a JSON object."
+          );
+        }
+        const source = input.report as Record<string, unknown>;
+        const checkId = String(source.checkId ?? "").trim();
+        if (!checkId || checkId.length > 200) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_invalid",
+            "The imported system-check report must contain a valid checkId."
+          );
+        }
+        const systemCheck = await requireWorkspaceSystemCheck({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          checkId
+        });
+        const importedAt = now();
+        const requestedModifiedAt = String(input.modifiedAt ?? "").trim();
+        const fileModifiedAt = requestedModifiedAt
+          ? parseLegacySystemCheckDate(requestedModifiedAt)
+          : importedAt;
+        if (!fileModifiedAt) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_modified_at_invalid",
+            "The system-check report file modification timestamp is invalid."
+          );
+        }
+        const sourceDate = String(source.date ?? "").trim();
+        if (sourceDate.length > 100) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_invalid",
+            "The imported system-check report date is too long."
+          );
+        }
+        const createdAt =
+          (sourceDate ? parseLegacySystemCheckDate(sourceDate) : null) ??
+          fileModifiedAt;
+        const sourceCheckLabel = String(source.checkLabel ?? "").trim();
+        const sourceTitle = String(source.title ?? "").trim();
+        if (sourceCheckLabel.length > 500 || sourceTitle.length > 500) {
+          throw new FirstSliceError(
+            400,
+            "system_check_report_invalid",
+            "The imported system-check report label or title is too long."
+          );
+        }
+        const section = (current: string, deprecated: string): unknown =>
+          source[current] !== undefined
+            ? source[current]
+            : source[deprecated] ?? [];
+        const report: SystemCheckReport = {
+          systemCheckReportId: idGenerator(),
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          sourcePackageId: systemCheck.sourcePackageId,
+          originalFileName,
+          fileModifiedAt,
+          sourceDate: sourceDate || formatLegacySystemCheckDate(createdAt),
+          checkId,
+          checkLabel: sourceCheckLabel || systemCheck.displayLabel,
+          title:
+            sourceTitle ||
+            sourceCheckLabel ||
+            systemCheck.displayLabel,
+          responses: source.responses ?? "",
+          environment: normalizeSystemCheckReportEntries(
+            "environment",
+            section("environment", "envData")
+          ),
+          network: normalizeSystemCheckReportEntries(
+            "network",
+            section("network", "netData")
+          ),
+          questionnaire: normalizeSystemCheckReportEntries(
+            "questionnaire",
+            section("questionnaire", "questData")
+          ),
+          unit: normalizeSystemCheckReportEntries(
+            "unit",
+            section("unit", "unitData")
+          ),
+          createdAt
+        };
+        await recordWorkspaceActivity({
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "system_check_report_saved",
+          subjectType: "system_check_report",
+          subjectId: report.systemCheckReportId,
+          summary: `Imported legacy system-check report '${originalFileName}' for '${report.checkId}'.`,
+          details: {
+            report,
+            importFormat: "original_testcenter_json",
+            importedAt
+          }
+        });
+        return report;
+      },
       async deleteGroupResults(input) {
         const groupKey = normalizeGroupKey(input.groupKey);
         const deletion = await deleteWorkspaceGroupResults({
@@ -22074,66 +22388,32 @@ export const createFirstSliceServices = (
             "The system-check report key is invalid."
           );
         }
-        const normalizeReportEntries = (
-          section: string,
-          entries: SystemCheckReportEntry[]
-        ): SystemCheckReportEntry[] => {
-          if (!Array.isArray(entries) || entries.length > 200) {
-            throw new FirstSliceError(
-              400,
-              "system_check_report_invalid",
-              `System-check report section '${section}' must contain at most 200 entries.`
-            );
-          }
-          return entries.map((entry, index) => {
-            if (!entry || typeof entry !== "object" || !String(entry.label ?? "").trim()) {
-              throw new FirstSliceError(
-                400,
-                "system_check_report_invalid",
-                `System-check report section '${section}' contains an invalid entry at index ${index}.`
-              );
-            }
-            const value = entry.value;
-            if (
-              value !== null &&
-              typeof value !== "string" &&
-              typeof value !== "number" &&
-              typeof value !== "boolean"
-            ) {
-              throw new FirstSliceError(
-                400,
-                "system_check_report_invalid",
-                `System-check report value '${entry.label}' must be scalar.`
-              );
-            }
-            return {
-              id: String(entry.id ?? index).trim() || String(index),
-              type: String(entry.type ?? section).trim() || section,
-              label: String(entry.label).trim(),
-              value,
-              warning: Boolean(entry.warning)
-            };
-          });
-        };
         const createdAt = now();
+        const systemCheckReportId = idGenerator();
         const report: SystemCheckReport = {
-          systemCheckReportId: idGenerator(),
+          systemCheckReportId,
           tenantId: workspace.tenantId,
           workspaceId: workspace.workspaceId,
           sourcePackageId: systemCheck.sourcePackageId,
+          originalFileName: `report_${systemCheckReportId}.json`,
+          fileModifiedAt: createdAt,
+          sourceDate: formatLegacySystemCheckDate(createdAt),
           checkId: systemCheck.checkId,
           checkLabel: systemCheck.displayLabel,
           title:
             String(input.authenticatedLoginName ?? input.title ?? "").trim() ||
             systemCheck.displayLabel,
           responses: input.responses ?? "",
-          environment: normalizeReportEntries("environment", input.environment),
-          network: normalizeReportEntries("network", input.network),
-          questionnaire: normalizeReportEntries(
+          environment: normalizeSystemCheckReportEntries(
+            "environment",
+            input.environment
+          ),
+          network: normalizeSystemCheckReportEntries("network", input.network),
+          questionnaire: normalizeSystemCheckReportEntries(
             "questionnaire",
             input.questionnaire
           ),
-          unit: normalizeReportEntries("unit", input.unit),
+          unit: normalizeSystemCheckReportEntries("unit", input.unit),
           createdAt
         };
         await recordWorkspaceActivity({

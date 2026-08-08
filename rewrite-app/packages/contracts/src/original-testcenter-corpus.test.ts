@@ -53,6 +53,19 @@ type OriginalTestcenterCorpus = {
     skipNetwork: boolean;
     canSave: boolean;
   }>;
+  systemCheckReports: Array<
+    PinnedOriginalFixture & {
+      installedFileName: string;
+      date: string;
+      checkId: string;
+      checkLabel: string;
+      title: string;
+      sectionEntryCounts: Record<
+        "environment" | "network" | "questionnaire" | "unit",
+        number
+      >;
+    }
+  >;
   bookletConfigPackages: Array<{
     bookletKeys: string[];
     units: Array<[fixture: string, unitKey: string]>;
@@ -294,6 +307,33 @@ test("original Testcenter compatibility corpus separates participant and operati
       systemCheck.skipNetwork
     );
     assert.equal(/\bsavekey="[^"]+"/i.test(systemCheckXml), systemCheck.canSave);
+  }
+
+  assert.equal(corpus.systemCheckReports.length, 1);
+  for (const pinnedReport of corpus.systemCheckReports) {
+    const reportBuffer = readFileSync(resolve(corpusRoot, pinnedReport.fixture));
+    assert.equal(
+      createHash("sha256").update(reportBuffer).digest("hex"),
+      pinnedReport.sha256,
+      pinnedReport.sourcePath
+    );
+    const report = JSON.parse(reportBuffer.toString("utf8")) as Record<
+      string,
+      unknown
+    >;
+    assert.equal(report.date, pinnedReport.date);
+    assert.equal(report.checkId, pinnedReport.checkId);
+    assert.equal(report.checkLabel, pinnedReport.checkLabel);
+    assert.equal(report.title, pinnedReport.title);
+    for (const [section, expectedCount] of Object.entries(
+      pinnedReport.sectionEntryCounts
+    )) {
+      assert.equal(
+        Array.isArray(report[section]) ? report[section].length : -1,
+        expectedCount,
+        `${pinnedReport.sourcePath}#${section}`
+      );
+    }
   }
 
   const reviewParticipant = entries.find(entry => entry.loginKey === "test-review");

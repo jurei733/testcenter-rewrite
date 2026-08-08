@@ -13,6 +13,7 @@ import {
   type ListSystemCheckReportsResponse,
   type ListSystemChecksResponse,
   type DeleteSystemCheckReportsResponse,
+  type ImportSystemCheckReportResponse,
   type SaveSystemCheckReportRequest,
   type SaveSystemCheckReportResponse,
   type SystemCheckAccessMode,
@@ -248,10 +249,20 @@ type ThroughputResult = {
           </section>
           <section class="system-check-operator" *ngIf="!isSystemCheckSession">
             <h3>Operator report access</h3>
-            <p>Signed-in workspace operators can inspect report distributions, drill into recent reports, export CSV, or delete reports for selected checks.</p>
+            <p>Signed-in workspace operators can inspect report distributions, migrate original Testcenter JSON reports, export legacy-compatible files, or delete reports for selected checks.</p>
+            <input
+              #legacyReportInput
+              id="legacySystemCheckReportInput"
+              type="file"
+              accept=".json,application/json"
+              hidden
+              (change)="importOperatorReport($event)"
+            />
             <div class="actions">
               <button id="loadSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="loadOperatorReports()">Load Reports</button>
+              <button id="importSystemCheckReportButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="legacyReportInput.click()">Import original JSON</button>
               <button id="exportSystemCheckReportsButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReports()">Export CSV</button>
+              <button id="exportSystemCheckReportsJsonButton" class="ghost" type="button" [disabled]="!hasAdminSession || busy" (click)="exportOperatorReportsJson()">Export JSON</button>
               <button id="deleteSystemCheckReportsButton" class="danger" type="button" [disabled]="!hasAdminSession || busy || selectedOperatorCheckIds.length === 0" (click)="deleteOperatorReports()">Delete selected</button>
             </div>
             <p id="systemCheckReportOperatorStatus" *ngIf="operatorStatusMessage">{{ operatorStatusMessage }}</p>
@@ -284,6 +295,7 @@ type ThroughputResult = {
             <section class="system-check-report-detail" *ngIf="selectedOperatorReport as report">
               <h4>{{ report.title }}</h4>
               <p>{{ report.checkLabel }} · {{ report.systemCheckReportId }}</p>
+              <p *ngIf="report.originalFileName">Original file: {{ report.originalFileName }} · report date {{ report.sourceDate }}</p>
               <dl>
                 <div *ngFor="let entry of report.environment"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
                 <div *ngFor="let entry of report.network"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div>
@@ -876,34 +888,59 @@ export class SystemCheckViewComponent implements OnInit {
     const check = this.systemCheck;
     if (!check || !this.hasAdminSession) return;
     await this.run(async () => {
-      const reportsPath = `${this.workspaceRoute(
-        productionApiRoutes.workspace.listSystemCheckReports
-      )}?checkId=${encodeURIComponent(check.checkId)}&limit=25`;
-      const statisticsPath = this.workspaceRoute(
-        productionApiRoutes.workspace.getSystemCheckReportStatistics
-      );
-      const [reports, statistics] = await Promise.all([
-        this.api.send<ListSystemCheckReportsResponse>(
-          "GET",
-          reportsPath,
-          undefined,
-          this.adminHeaders
-        ),
-        this.api.send<GetSystemCheckReportStatisticsResponse>(
-          "GET",
-          statisticsPath,
-          undefined,
-          this.adminHeaders
-        )
-      ]);
-      this.operatorReports = reports.payload.items;
-      this.operatorStatistics = statistics.payload.items;
-      this.selectedOperatorReport = this.operatorReports[0] ?? null;
-      this.selectedOperatorCheckIds = this.selectedOperatorCheckIds.filter(checkId =>
-        this.operatorStatistics.some(item => item.checkId === checkId)
-      );
-      this.operatorStatusMessage = `${this.operatorReports.length} recent report(s), ${this.operatorStatistics.length} check(s).`;
+      await this.refreshOperatorReports(check);
     });
+  }
+
+  async importOperatorReport(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const check = this.systemCheck;
+    if (!file || !check || !this.hasAdminSession) {
+      input.value = "";
+      return;
+    }
+    try {
+      const report = JSON.parse(await file.text()) as unknown;
+      const importedCheckId =
+        report && typeof report === "object" && !Array.isArray(report)
+          ? String((report as Record<string, unknown>).checkId ?? "").trim()
+          : "";
+      if (importedCheckId.toUpperCase() !== check.checkId.toUpperCase()) {
+        throw new Error(
+          `The report belongs to '${importedCheckId || "an unknown check"}', not '${check.checkId}'.`
+        );
+      }
+      await this.run(async () => {
+        const { payload } = await this.api.send<ImportSystemCheckReportResponse>(
+          "POST",
+          this.workspaceRoute(
+            productionApiRoutes.workspace.importSystemCheckReport
+          ),
+          {
+            fileName: file.name,
+            ...(file.lastModified > 0
+              ? { modifiedAt: new Date(file.lastModified).toISOString() }
+              : {}),
+            report
+          },
+          this.adminHeaders
+        );
+        await this.refreshOperatorReports(check);
+        this.selectedOperatorReport = payload.report;
+        this.operatorStatusMessage = `Imported ${payload.report.originalFileName ?? file.name}.`;
+      });
+    } catch (error) {
+      this.errorMessage =
+        error instanceof SyntaxError
+          ? "The selected file is not valid JSON."
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      this.changeDetectorRef.detectChanges();
+    } finally {
+      input.value = "";
+    }
   }
 
   isOperatorCheckSelected(checkId: string): boolean {
@@ -956,6 +993,22 @@ export class SystemCheckViewComponent implements OnInit {
       const download = await this.api.download(path, this.adminHeaders);
       downloadBlobFile({
         filename: download.filename || `${this.workspaceKey}-system-check-reports.csv`,
+        blob: download.blob
+      });
+    });
+  }
+
+  async exportOperatorReportsJson(): Promise<void> {
+    const check = this.systemCheck;
+    if (!check || !this.hasAdminSession) return;
+    await this.run(async () => {
+      const path = `${this.workspaceRoute(
+        productionApiRoutes.workspace.exportSystemCheckReportsJson
+      )}?checkId=${encodeURIComponent(check.checkId)}`;
+      const download = await this.api.download(path, this.adminHeaders);
+      downloadBlobFile({
+        filename:
+          download.filename || `${this.workspaceKey}-system-check-reports.json`,
         blob: download.blob
       });
     });
@@ -1122,6 +1175,38 @@ export class SystemCheckViewComponent implements OnInit {
       questionnaire: this.questionnaireEntries,
       unit: this.unitEntries
     };
+  }
+
+  private async refreshOperatorReports(
+    check: WorkspaceSystemCheck
+  ): Promise<void> {
+    const reportsPath = `${this.workspaceRoute(
+      productionApiRoutes.workspace.listSystemCheckReports
+    )}?checkId=${encodeURIComponent(check.checkId)}&limit=25`;
+    const statisticsPath = this.workspaceRoute(
+      productionApiRoutes.workspace.getSystemCheckReportStatistics
+    );
+    const [reports, statistics] = await Promise.all([
+      this.api.send<ListSystemCheckReportsResponse>(
+        "GET",
+        reportsPath,
+        undefined,
+        this.adminHeaders
+      ),
+      this.api.send<GetSystemCheckReportStatisticsResponse>(
+        "GET",
+        statisticsPath,
+        undefined,
+        this.adminHeaders
+      )
+    ]);
+    this.operatorReports = reports.payload.items;
+    this.operatorStatistics = statistics.payload.items;
+    this.selectedOperatorReport = this.operatorReports[0] ?? null;
+    this.selectedOperatorCheckIds = this.selectedOperatorCheckIds.filter(checkId =>
+      this.operatorStatistics.some(item => item.checkId === checkId)
+    );
+    this.operatorStatusMessage = `${this.operatorReports.length} recent report(s), ${this.operatorStatistics.length} check(s).`;
   }
 
   private entry(
