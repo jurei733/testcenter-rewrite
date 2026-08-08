@@ -9212,6 +9212,46 @@ test("original Testcenter compatibility corpus imports representative booklets",
       diagnosticCode: "testcenter_xml_metadata_id_invalid"
     },
     {
+      fileName: "booklet-unsupported-direct-child.xml",
+      sourceDocument: validBookletXml.replace(
+        "  <Units>",
+        "  <Unexpected />\n\n  <Units>"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_child_invalid"
+    },
+    {
+      fileName: "booklet-duplicate-metadata-label.xml",
+      sourceDocument: validBookletXml.replace(
+        "</Label>",
+        "</Label><Label>Duplicate</Label>"
+      ),
+      diagnosticCode: "testcenter_xml_booklet_metadata_cardinality_invalid"
+    },
+    {
+      fileName: "booklet-invalid-config-key.xml",
+      sourceDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="1 invalid"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_config_key_invalid"
+    },
+    {
+      fileName: "booklet-nested-config-content.xml",
+      sourceDocument: validBookletXml.replace(
+        '<Config key="pagingMode">',
+        '<Config key="pagingMode"><Unexpected />'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_simple_content_invalid"
+    },
+    {
+      fileName: "booklet-unknown-config-attribute.xml",
+      sourceDocument: validBookletXml.replace(
+        'key="pagingMode"',
+        'key="pagingMode" ignored="true"'
+      ),
+      diagnosticCode: "testcenter_xml_booklet_attribute_invalid"
+    },
+    {
       fileName: "unit-invalid-metadata-id.xml",
       sourceDocument: validUnitXml.replace(
         "<Id>UNIT.SAMPLE-2</Id>",

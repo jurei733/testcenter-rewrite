@@ -7588,6 +7588,37 @@ const validateTestcenterXmlSourceDocument = (
   }
 
   if (canonicalRootName === "Booklet") {
+    const validateAttributes = (
+      element: XmlElement,
+      allowedAttributeNames: readonly string[],
+      context: string
+    ): void => {
+      for (const attributeName of xmlUnsupportedAttributeNames(
+        element,
+        new Set(allowedAttributeNames)
+      )) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_attribute_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains unsupported attribute '${attributeName}' on ${context}.`
+          )
+        );
+      }
+    };
+    const validateSimpleContent = (
+      element: XmlElement,
+      context: string
+    ): void => {
+      const nestedChildren = xmlChildElements(element);
+      if (nestedChildren.length > 0) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_simple_content_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains nested element '${xmlElementLocalName(nestedChildren[0])}' in text-only ${context}.`
+          )
+        );
+      }
+    };
     if (metadata && !xmlElementText(xmlChildrenNamed(metadata, "Id")[0])) {
       diagnostics.push(
         createImportDiagnostic(
@@ -7603,6 +7634,145 @@ const validateTestcenterXmlSourceDocument = (
           `Original Testcenter booklet '${sourceFileName}' requires Metadata/Label.`
         )
       );
+    }
+
+    const allowedDirectChildNames = new Set([
+      "Metadata",
+      "CustomTexts",
+      "BookletConfig",
+      "States",
+      "Units"
+    ]);
+    for (const child of xmlChildElements(root)) {
+      const childName = xmlElementLocalName(child);
+      if (!allowedDirectChildNames.has(childName)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_child_invalid",
+            `Original Testcenter booklet '${sourceFileName}' contains unsupported direct child '${childName}'.`
+          )
+        );
+      }
+    }
+    const metadataContainers = xmlChildrenNamed(root, "Metadata");
+    const customTextContainers = xmlChildrenNamed(root, "CustomTexts");
+    const bookletConfigContainers = xmlChildrenNamed(root, "BookletConfig");
+    const unitsContainers = xmlChildrenNamed(root, "Units");
+    if (
+      metadataContainers.length > 1 ||
+      customTextContainers.length > 1 ||
+      bookletConfigContainers.length > 1 ||
+      unitsContainers.length > 1
+    ) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "testcenter_xml_booklet_child_cardinality_invalid",
+          `Original Testcenter booklet '${sourceFileName}' contains repeated Metadata, CustomTexts, BookletConfig, or Units elements.`
+        )
+      );
+    }
+    for (const metadataContainer of metadataContainers) {
+      validateAttributes(metadataContainer, [], "Metadata");
+      const metadataChildren = xmlChildElements(metadataContainer);
+      const metadataChildRanks = new Map([
+        ["Id", 0],
+        ["Label", 1],
+        ["Description", 2]
+      ]);
+      let previousMetadataChildRank = -1;
+      for (const child of metadataChildren) {
+        const childName = xmlElementLocalName(child);
+        const rank = metadataChildRanks.get(childName);
+        if (rank === undefined) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_metadata_child_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains unsupported Metadata child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        validateAttributes(child, [], `Metadata/${childName}`);
+        validateSimpleContent(child, `Metadata/${childName}`);
+        if (rank < previousMetadataChildRank) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_metadata_sequence_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Metadata children outside schema order.`
+            )
+          );
+          break;
+        }
+        previousMetadataChildRank = rank;
+      }
+      if (
+        xmlChildrenNamed(metadataContainer, "Id").length !== 1 ||
+        xmlChildrenNamed(metadataContainer, "Label").length !== 1 ||
+        xmlChildrenNamed(metadataContainer, "Description").length > 1
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_metadata_cardinality_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires one Metadata/Id, one Metadata/Label, and at most one Metadata/Description.`
+          )
+        );
+      }
+    }
+    for (const customTextContainer of customTextContainers) {
+      validateAttributes(customTextContainer, [], "CustomTexts");
+      const children = xmlChildElements(customTextContainer);
+      if (
+        children.length === 0 ||
+        children.some(child => xmlElementLocalName(child) !== "CustomText")
+      ) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "testcenter_xml_booklet_custom_text_structure_invalid",
+            `Original Testcenter booklet '${sourceFileName}' requires CustomTexts to contain one or more CustomText elements only.`
+          )
+        );
+      }
+      for (const customText of children.filter(
+        child => xmlElementLocalName(child) === "CustomText"
+      )) {
+        const key = customText.getAttribute("key")?.trim() ?? "";
+        validateAttributes(customText, ["key"], "CustomText");
+        validateSimpleContent(customText, "CustomText");
+        if (!key || !isTestcenterXmlId(key)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_custom_text_key_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains CustomText key '${key || "missing"}', which is not a valid XML ID.`
+            )
+          );
+        }
+      }
+    }
+    for (const bookletConfigContainer of bookletConfigContainers) {
+      validateAttributes(bookletConfigContainer, [], "BookletConfig");
+      for (const child of xmlChildElements(bookletConfigContainer)) {
+        const childName = xmlElementLocalName(child);
+        if (childName !== "Config") {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_config_child_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains unsupported BookletConfig child '${childName}'.`
+            )
+          );
+          continue;
+        }
+        const key = child.getAttribute("key")?.trim() ?? "";
+        validateAttributes(child, ["key"], "BookletConfig/Config");
+        validateSimpleContent(child, "BookletConfig/Config");
+        if (!key || !isTestcenterXmlId(key)) {
+          diagnostics.push(
+            createImportDiagnostic(
+              "testcenter_xml_booklet_config_key_invalid",
+              `Original Testcenter booklet '${sourceFileName}' contains Config key '${key || "missing"}', which is not a valid XML ID.`
+            )
+          );
+        }
+      }
     }
 
     const statesContainers = xmlChildrenNamed(root, "States");
@@ -7727,7 +7897,7 @@ const validateTestcenterXmlSourceDocument = (
       )
     );
 
-    const units = xmlChildrenNamed(root, "Units")[0];
+    const units = unitsContainers[0];
     const unitEntries = units ? xmlDescendantsNamed(units, "Unit") : [];
     if (!units || unitEntries.length === 0) {
       diagnostics.push(
