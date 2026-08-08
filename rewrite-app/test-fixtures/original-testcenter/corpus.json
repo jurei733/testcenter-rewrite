@@ -603,6 +603,15 @@
       "playerModuleVersion": "2.12.3",
       "playerApiVersion": "6.0",
       "playerSha256": "9a65e1cfbeddbea1222d3f88afe57d69d075189809b80a5dcff26bbc710a1dd5",
+      "roster": {
+        "fixture": "rosters/aspect-testtaker1.xml",
+        "sourcePath": "sampledata/aspect/testtaker1.xml",
+        "sha256": "615fbfeb86c6a7060fadf3d72237002c16cd6fe8786f8659d5b1532efafd818c",
+        "groupKey": "TestTakerGroup_d4v9z",
+        "participantLoginKeys": ["testuser1", "testuser2", "testuser-review"],
+        "operationalLoginKeys": ["testuser-monitor"],
+        "customTexts": { "login_testEndButtonText": "Test beenden" }
+      },
       "units": [
         {
           "unitKey": "testcenter-sample1",

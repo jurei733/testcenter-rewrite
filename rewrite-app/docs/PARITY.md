@@ -112,3 +112,5 @@ The application may be presented as high-parity only when:
 7. the Postgres and container release gates remain green.
 
 Update this document in the same change that materially changes a capability status.
+
+The original Aspect 17.4 package gate now includes its byte-exact companion `testtaker1.xml`: contract and API tests pin its SHA-256, three participant modes, password policy, Custom Text propagation, and password-redacted monitor candidate. The production browser smoke imports that roster and executes the real passwordless `testuser1` account through all three Aspect Units instead of using a synthetic participant.

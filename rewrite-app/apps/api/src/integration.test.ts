@@ -12000,6 +12000,12 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     unitSha256: string;
     definitionSha256: string;
   };
+  type ImportedPlayerUnit = {
+    unitKey: string;
+    playerKey?: string;
+    unitDefinition?: string;
+    unitDefinitionType?: string;
+  };
   type PlayerPackage = {
     bookletFixture: string;
     playerFixture: string;
@@ -12008,6 +12014,14 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     playerModuleVersion: string;
     playerApiVersion: string;
     playerSha256: string;
+    roster: {
+      fixture: string;
+      sha256: string;
+      groupKey: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      customTexts: Record<string, string>;
+    };
     units: PlayerUnitPackage[];
   };
   const corpus = JSON.parse(
@@ -12149,12 +12163,7 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
         runtimeSnapshot: {
           bookletEntries: Array<{
             bookletKey: string;
-            unitEntries: Array<{
-              unitKey: string;
-              playerKey?: string;
-              unitDefinition?: string;
-              unitDefinitionType?: string;
-            }>;
+            unitEntries: ImportedPlayerUnit[];
           }>;
           playerEntries?: Array<{ playerKey: string; html: string }>;
         };
@@ -12174,10 +12183,10 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     unitPackages.map(unit => unit.unitKey)
   );
   for (const expectedUnit of unitPackages) {
-    const aspectUnit: (typeof aspectBooklet.unitEntries)[number] | undefined =
+    const aspectUnit: ImportedPlayerUnit | undefined =
       aspectBooklet.unitEntries.find(
-      unit => unit.unitKey === expectedUnit.unitKey
-    );
+        unit => unit.unitKey === expectedUnit.unitKey
+      );
     assert.ok(aspectUnit);
     assert.equal(aspectUnit.playerKey, expectation.playerKey);
     assert.equal(aspectUnit.unitDefinition, expectedUnit.definitionDocument.trim());
@@ -12186,6 +12195,147 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
   assert.deepEqual(snapshot.playerEntries, [
     { playerKey: expectation.playerKey, html: playerDocument }
   ]);
+
+  const activation = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activation.status, 200);
+
+  const rosterDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
+    "utf8"
+  );
+  assert.equal(
+    createHash("sha256").update(rosterDocument).digest("hex"),
+    expectation.roster.sha256
+  );
+  const rosterImport = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      groupKey: string;
+      bookletKey: string | null;
+      executionMode?: string;
+      passwordRequired: boolean;
+      customTexts?: Record<string, string>;
+      validationWarnings: Array<{ code: string }>;
+    }>;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      loginMode: string;
+      groupKey: string | null;
+      passwordRequired: boolean;
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      body: { rosterText: rosterDocument }
+    }
+  );
+  assert.equal(rosterImport.status, 201);
+  assert.deepEqual(
+    new Set(rosterImport.body.items.map(item => item.loginKey)),
+    new Set(expectation.roster.participantLoginKeys)
+  );
+  for (const item of rosterImport.body.items) {
+    assert.equal(item.groupKey, expectation.roster.groupKey);
+    assert.equal(item.bookletKey, expectation.bookletKey);
+    assert.deepEqual(item.customTexts, expectation.roster.customTexts);
+    assert.deepEqual(item.validationWarnings, []);
+  }
+  const rosterByLoginKey = new Map(
+    rosterImport.body.items.map(item => [item.loginKey, item])
+  );
+  assert.equal(rosterByLoginKey.get("testuser1")?.passwordRequired, false);
+  assert.equal(rosterByLoginKey.get("testuser2")?.passwordRequired, true);
+  assert.equal(
+    rosterByLoginKey.get("testuser-review")?.executionMode,
+    "run-review"
+  );
+  assert.deepEqual(
+    rosterImport.body.operationalLoginCandidates.map(
+      candidate => candidate.loginKey
+    ),
+    expectation.roster.operationalLoginKeys
+  );
+  const operationalLogin = rosterImport.body.operationalLoginCandidates[0];
+  assert.equal(operationalLogin?.loginKey, "testuser-monitor");
+  assert.equal(operationalLogin?.loginMode, "monitor-group");
+  assert.equal(operationalLogin?.groupKey, expectation.roster.groupKey);
+  assert.equal(operationalLogin?.passwordRequired, true);
+
+  type AspectSignInResponse = {
+    participantSession: {
+      participantSessionId: string;
+      executionMode?: string;
+    };
+    participantRosterEntry: {
+      customTexts?: Record<string, string>;
+    } | null;
+  };
+  const signIn = (loginKey: string, password?: string) =>
+    requestJson<AspectSignInResponse>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        tenantKey,
+        workspaceKey,
+        loginKey,
+        ...(password === undefined ? {} : { password })
+      }
+    });
+
+  const missingPassword = await signIn("testuser2");
+  assert.equal(missingPassword.status, 401);
+  assert.equal(
+    (missingPassword.body as unknown as { error: string }).error,
+    "participant_password_invalid"
+  );
+  const passwordSignIn = await signIn("testuser2", "user123");
+  assert.equal(passwordSignIn.status, 200);
+  assert.equal(
+    passwordSignIn.body.participantSession.executionMode,
+    "run-hot-return"
+  );
+
+  const passwordlessSignIn = await signIn("testuser1");
+  assert.equal(passwordlessSignIn.status, 200);
+  assert.deepEqual(
+    passwordlessSignIn.body.participantRosterEntry?.customTexts,
+    expectation.roster.customTexts
+  );
+  const participantSessionId =
+    passwordlessSignIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { currentUnitKey: string | null; executionMode?: string };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey: expectation.bookletKey }
+  });
+  assert.equal(resume.status, 200);
+  assert.equal(resume.body.testRun.currentUnitKey, unitPackages[0]?.unitKey);
+  assert.equal(resume.body.testRun.executionMode, "run-hot-return");
+  const currentState = await requestJson<{
+    currentRunState: {
+      currentUnit?: {
+        unitKey: string;
+        player?: { playerKey: string } | null;
+      };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.unitKey,
+    unitPackages[0]?.unitKey
+  );
+  assert.equal(
+    currentState.body.currentRunState.currentUnit?.player?.playerKey,
+    expectation.playerKey
+  );
+
+  const reviewSignIn = await signIn("testuser-review", "user123");
+  assert.equal(reviewSignIn.status, 200);
+  assert.equal(reviewSignIn.body.participantSession.executionMode, "run-review");
 });
 
 test("original Testcenter compatibility corpus assembles loose dependency files", async () => {

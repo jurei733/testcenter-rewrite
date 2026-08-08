@@ -667,6 +667,8 @@ For runtime probes:
 - [docker-compose.postgres.yml](/Users/julian/code/testcenter-rewrite/rewrite-app/docker-compose.postgres.yml) provides a local Postgres-backed release flow with separate migrate, runtime preflight, and api services, restart policies, and service healthchecks
 - [.env.example](/Users/julian/code/testcenter-rewrite/rewrite-app/.env.example) documents the supported runtime environment variables
 
+The original Aspect 17.4 execution gate now imports the byte-exact companion `testtaker1.xml` roster and runs its real passwordless `testuser1` account in the production browser. Contract and API coverage pin the source hash, group, Custom Text, password-free and password-protected Hot-Return accounts, Review account, and password-redacted monitor migration candidate before launching the original player package.
+
 It is still intentionally lightweight:
 
 - persistence can be in-memory, JSON-file-backed, SQLite-backed, or Postgres-backed

@@ -124,6 +124,17 @@ type OriginalTestcenterCorpus = {
       participantLoginKeys: string[];
     };
   }>;
+  playerPackages: Array<{
+    roster: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+      groupKey: string;
+      participantLoginKeys: string[];
+      operationalLoginKeys: string[];
+      customTexts: Record<string, string>;
+    };
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -281,6 +292,49 @@ test("original Testcenter compatibility corpus separates participant and operati
       "BOOKLET.SAMPLE-2#bonus:no"
     ]
   );
+});
+
+test("original Testcenter compatibility corpus pins the Aspect player roster", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  const roster = corpus.playerPackages[0]?.roster;
+  assert.ok(roster);
+  const rosterBuffer = readFileSync(resolve(corpusRoot, roster.fixture));
+  assert.equal(
+    createHash("sha256").update(rosterBuffer).digest("hex"),
+    roster.sha256,
+    roster.sourcePath
+  );
+
+  const participants = parseParticipantRosterText(
+    rosterBuffer.toString("utf8")
+  );
+  assert.deepEqual(
+    participants.map(participant => participant.loginKey),
+    roster.participantLoginKeys
+  );
+  for (const participant of participants) {
+    assert.equal(participant.groupKey, roster.groupKey);
+    assert.equal(participant.bookletKey, "booklet1");
+    assert.deepEqual(participant.customTexts, roster.customTexts);
+  }
+  assert.equal(participants[0]?.password, undefined);
+  assert.equal(participants[0]?.executionMode, "run-hot-return");
+  assert.equal(participants[1]?.password, "user123");
+  assert.equal(participants[1]?.executionMode, "run-hot-return");
+  assert.equal(participants[2]?.password, "user123");
+  assert.equal(participants[2]?.executionMode, "run-review");
+
+  const operationalLogins =
+    parseOriginalTestcenterOperationalLogins(rosterBuffer.toString("utf8"));
+  assert.deepEqual(
+    operationalLogins.map(login => login.loginKey),
+    roster.operationalLoginKeys
+  );
+  assert.equal(operationalLogins[0]?.loginMode, "monitor-group");
+  assert.equal(operationalLogins[0]?.groupKey, roster.groupKey);
+  assert.equal(operationalLogins[0]?.passwordRequired, true);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

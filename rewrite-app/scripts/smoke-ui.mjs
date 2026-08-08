@@ -5025,7 +5025,7 @@ try {
   );
 
   logStep("participant-original-aspect-player");
-  const aspectLoginKey = "student-original-aspect-smoke";
+  const aspectLoginKey = "testuser1";
   const aspectBookletKey = "booklet1";
   const aspectUnitKey = "testcenter-sample1";
   const aspectPlayerKey = "iqb-player-aspect@2.12";
@@ -5036,7 +5036,8 @@ try {
     aspectSecondUnitDocument,
     aspectSecondDefinitionDocument,
     aspectThirdUnitDocument,
-    aspectThirdDefinitionDocument
+    aspectThirdDefinitionDocument,
+    aspectRosterDocument
   ] = await Promise.all([
       readFile(
         resolve("test-fixtures/original-testcenter/booklets/booklet-17.4.xml"),
@@ -5074,6 +5075,12 @@ try {
       readFile(
         resolve(
           "test-fixtures/original-testcenter/definitions/aspect-testcenter-sample3.voud"
+        ),
+        "utf8"
+      ),
+      readFile(
+        resolve(
+          "test-fixtures/original-testcenter/rosters/aspect-testtaker1.xml"
         ),
         "utf8"
       )
@@ -5162,21 +5169,26 @@ try {
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${aspectReleaseId}/activate`,
     { body: { forceActivation: true } }
   );
-  await sendSmokeJson(
+  const aspectRosterImportResponse = await sendSmokeJson(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
-      body: {
-        rosterText: [
-          {
-            loginKey: aspectLoginKey,
-            groupKey: "group:original-aspect-smoke",
-            bookletKey: aspectBookletKey,
-            displayName: "Original Aspect Smoke Participant",
-            executionMode: "run-hot-return"
-          }
-        ]
-      }
+      body: { rosterText: aspectRosterDocument }
     }
+  );
+  const aspectRosterImportPayload = await aspectRosterImportResponse.json();
+  assert.equal(aspectRosterImportResponse.status, 201);
+  assert.equal(aspectRosterImportPayload.importedCount, 3);
+  for (const loginKey of ["testuser1", "testuser2", "testuser-review"]) {
+    assert.ok(
+      aspectRosterImportPayload.items.some(item => item.loginKey === loginKey),
+      `Original Aspect roster should expose ${loginKey}.`
+    );
+  }
+  assert.deepEqual(
+    aspectRosterImportPayload.operationalLoginCandidates.map(
+      candidate => candidate.loginKey
+    ),
+    ["testuser-monitor"]
   );
   await page.goto(
     `${baseUrl}/participant?${new URLSearchParams({
