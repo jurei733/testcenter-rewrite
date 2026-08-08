@@ -9479,6 +9479,67 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     ["source_document_zip_entry_name_duplicate"]
   );
   assert.equal(duplicatePathImport.body.stagedContentRelease, null);
+
+  const unsafePathZip = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="SAFE" href="resources/safe.bin" />
+          </resources>
+        </manifest>
+      `
+    },
+    { fileName: "export/resources/safe.bin", content: "safe" },
+    { fileName: "../escape.bin", content: "escape" },
+    { fileName: "/absolute.bin", content: "absolute" },
+    { fileName: "C:/drive.bin", content: "drive" },
+    { fileName: "export\\backslash.bin", content: "backslash" }
+  ]);
+  const unsafePathPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unsafe-entry-paths.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${unsafePathZip}`
+    }
+  });
+  assert.equal(unsafePathPackage.status, 201);
+  const unsafePathImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: unsafePathPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(unsafePathImport.status, 201);
+  assert.equal(unsafePathImport.body.importJob.status, "failed");
+  assert.deepEqual(
+    unsafePathImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.code
+    ),
+    [
+      "source_document_zip_entry_path_invalid",
+      "source_document_zip_entry_path_invalid",
+      "source_document_zip_entry_path_invalid",
+      "source_document_zip_entry_path_invalid"
+    ]
+  );
+  assert.deepEqual(
+    unsafePathImport.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.message.match(/'([^']+)'/)?.[1]
+    ),
+    ["../escape.bin", "/absolute.bin", "C:/drive.bin", "export\\backslash.bin"]
+  );
+  assert.equal(unsafePathImport.body.stagedContentRelease, null);
 });
 
 test("original Testcenter compatibility corpus executes adaptive ZIP dependencies", async () => {

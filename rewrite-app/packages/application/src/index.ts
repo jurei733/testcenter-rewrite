@@ -9366,6 +9366,25 @@ const normalizeZipEntryPath = (path: string): string => {
   return segments.join("/");
 };
 
+const isSafeRelativeArchivePath = (
+  fileName: string,
+  allowDirectory: boolean
+): boolean => {
+  const pathSegments = fileName.split("/");
+  const normalizedPath = normalizeZipEntryPath(fileName);
+  return (
+    Boolean(normalizedPath) &&
+    normalizedPath.length <= 512 &&
+    !fileName.includes("\\") &&
+    !/[\u0000-\u001F\u007F]/.test(fileName) &&
+    !fileName.startsWith("/") &&
+    !/^[a-z]:\//i.test(fileName) &&
+    !/^[a-z][a-z0-9+.-]*:/i.test(fileName) &&
+    !pathSegments.some(segment => segment === "..") &&
+    (allowDirectory || !fileName.endsWith("/"))
+  );
+};
+
 type SourcePackageAssemblyEntry = {
   sourcePackageId: string;
   fileName: string;
@@ -9438,18 +9457,9 @@ const createStoredZipArchive = (
 };
 
 const normalizeSourcePackageAssemblyPath = (fileName: string): string => {
-  const trimmedFileName = fileName.trim().replace(/\\/g, "/");
-  const pathSegments = trimmedFileName.split("/");
+  const trimmedFileName = fileName.trim();
   const normalizedPath = normalizeZipEntryPath(trimmedFileName);
-  if (
-    !normalizedPath ||
-    normalizedPath.length > 512 ||
-    trimmedFileName.startsWith("/") ||
-    /^[a-z]:\//i.test(trimmedFileName) ||
-    /^[a-z][a-z0-9+.-]*:/i.test(trimmedFileName) ||
-    pathSegments.some(segment => segment === "..") ||
-    normalizedPath.endsWith("/")
-  ) {
+  if (!isSafeRelativeArchivePath(trimmedFileName, false)) {
     throw new FirstSliceError(
       400,
       "source_package_assembly_path_invalid",
@@ -11112,6 +11122,15 @@ const validateZipXmlEntries = (
   const xmlIdentitySourceFileByKey = new Map<string, string>();
   const zipEntrySourceFileByPath = new Map<string, string>();
   for (const entry of manifestExtraction.entries) {
+    if (!isSafeRelativeArchivePath(entry.fileName, entry.fileName.endsWith("/"))) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_zip_entry_path_invalid",
+          `Source package ZIP entry '${entry.fileName}' is not a safe relative archive path.`
+        )
+      );
+      continue;
+    }
     if (entry.fileName.endsWith("/")) {
       continue;
     }
