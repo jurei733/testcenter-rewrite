@@ -12619,6 +12619,185 @@ test("original Testcenter compatibility corpus imports official independent play
   }
 });
 
+test("original Testcenter compatibility corpus imports the historical DAN DefinitionRef graph", async () => {
+  type LegacyTestbedPackage = {
+    playerFixture: string;
+    playerKey: string;
+    playerModuleVersion: string;
+    playerApiVersion: string;
+    playerSourceUrl: string;
+    playerSha256: string;
+    unitFixture: string;
+    unitSourceUrl: string;
+    unitSha256: string;
+  };
+  type DanFamilyPackage = {
+    family: string;
+    definitionFixture: string;
+    definitionSourceUrl: string;
+    definitionSha256: string;
+    legacyTestbedPackage?: LegacyTestbedPackage;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { veronaPlayerFamilyPackages: DanFamilyPackage[] };
+  const dan = corpus.veronaPlayerFamilyPackages.find(
+    playerPackage => playerPackage.family === "DAN visual assessment"
+  );
+  assert.ok(dan);
+  const legacy = dan.legacyTestbedPackage;
+  assert.ok(legacy);
+  const playerDocument = readBrotliBase64Fixture(
+    resolve(originalTestcenterCorpusRoot, legacy.playerFixture)
+  );
+  const unitDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, legacy.unitFixture)
+  );
+  const definitionBuffer = Buffer.from(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, dan.definitionFixture),
+      "utf8"
+    ).trim(),
+    "base64"
+  );
+  assert.equal(
+    createHash("sha256").update(playerDocument).digest("hex"),
+    legacy.playerSha256,
+    legacy.playerSourceUrl
+  );
+  assert.equal(
+    createHash("sha256").update(unitDocument).digest("hex"),
+    legacy.unitSha256,
+    legacy.unitSourceUrl
+  );
+  assert.equal(
+    createHash("sha256").update(definitionBuffer).digest("hex"),
+    dan.definitionSha256,
+    dan.definitionSourceUrl
+  );
+
+  const bookletKey = "BOOKLET.OFFICIAL.DAN-TESTBED";
+  const unitKey = "G231mm";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${unitKey}" href="units/G231mm.xml" />
+            <resource identifier="${legacy.playerKey}" href="players/IQBVisualUnitPlayerV2.99.2.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Historical DAN Testbed</Label></Metadata>
+          <Units><Unit id="${unitKey}" label="Sprachliche Mittel MM" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/G231mm.xml",
+      content: unitDocument.toString("utf8")
+    },
+    {
+      fileName: "export/units/G231mm.voud",
+      content: definitionBuffer.toString("utf8")
+    },
+    {
+      fileName: "export/players/IQBVisualUnitPlayerV2.99.2.html",
+      content: playerDocument
+    }
+  ]);
+  const tenantKey = "integration-tenant-historical-dan-testbed";
+  const workspaceKey = "integration-workspace-historical-dan-testbed";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "historical-dan-testbed.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ severity: string; code: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+  assert.equal(
+    importResult.body.importJob.diagnostics.some(
+      diagnostic => diagnostic.severity === "error"
+    ),
+    false,
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.equal(
+    importResult.body.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_player_metadata_missing" &&
+        diagnostic.severity === "warning"
+    ),
+    true,
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            unitEntries: Array<{
+              unitKey: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string }>;
+        };
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`
+  );
+  const snapshot =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  const importedUnit = snapshot.bookletEntries
+    .find(booklet => booklet.bookletKey === bookletKey)
+    ?.unitEntries.find(unit => unit.unitKey === unitKey);
+  assert.equal(importedUnit?.playerKey, legacy.playerKey);
+  assert.equal(importedUnit?.unitDefinition, definitionBuffer.toString("utf8"));
+  assert.equal(snapshot.playerEntries?.[0]?.playerKey, legacy.playerKey);
+});
+
 test("original Testcenter compatibility corpus imports the real Aspect player", async () => {
   type PlayerUnitPackage = {
     unitKey: string;

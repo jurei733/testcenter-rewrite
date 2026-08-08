@@ -37,8 +37,11 @@ Import and production SQLite/Chromium gates negotiate Verona API 2.1, persist
 text plus radio answers, and restore them after reload. The versioned response
 envelope records each legacy data part's original string/object value kind, so
 ABI's JSON-string `allResponses`, DAN's JSON-string `all`, and the Simple
-Player's object-valued state all round-trip correctly. Further representative
-families remain P0 corpus work.
+Player's object-valued state all round-trip correctly. A separate gate imports
+the Testbed's metadata-free `IQBVisualUnitPlayerV2.99.2.html`, original
+`G231mm.xml`, and relative `G231mm.voud` reference without inventing a modern
+module alias; the stable metadata warning leaves the runtime handshake
+authoritative. Further representative families remain P0 corpus work.
 
 ## Capability matrix
 

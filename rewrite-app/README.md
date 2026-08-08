@@ -611,6 +611,8 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 
 The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations plus the independent ABI 3.3.0 scripted-survey and DAN 3.0.0 visual-assessment Players, including type-faithful API-2 response restoration after reload.
 
+The DAN corpus additionally imports the official Testbed's historical, metadata-free `IQBVisualUnitPlayerV2.99.2.html`, original `G231mm.xml`, and byte-exact `G231mm.voud` as a real relative `DefinitionRef` graph. It keeps the stable legacy metadata warning and runtime-handshake authority instead of treating the historical definition-format key as an alias for the modern `iqb-player-dan` module id.
+
 The `smoke:ui:operator-auth` variant repeats the browser flow with `FIRST_SLICE_OPERATOR_AUTH_REQUIRED=true`, verifying that the shell can carry the admin bearer session into protected operator routes. The `smoke:ui:postgres` variant migrates the configured Postgres database first, then runs the protected browser flow against the Postgres-backed API.
 
 For the full containerized release path, run:

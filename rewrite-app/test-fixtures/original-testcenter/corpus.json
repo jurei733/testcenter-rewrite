@@ -761,7 +761,22 @@
       "metadataApiVersion": "2.1",
       "metadataFormat": "legacy-jsonld",
       "unitDefinitionType": "IQBVisualUnitPlayerV2.1.0",
-      "unitStateType": "IQBVisualUnitPlayerV2.1.0"
+      "unitStateType": "IQBVisualUnitPlayerV2.1.0",
+      "legacyTestbedPackage": {
+        "playerFixture": "players/iqb-visual-unit-player-v2.99.2.html.br.base64",
+        "playerEncoding": "brotli-base64",
+        "playerKey": "IQBVisualUnitPlayerV2",
+        "playerModuleVersion": "2.99.2",
+        "playerApiVersion": "2.1.0",
+        "playerSourcePath": "player/IQBVisualUnitPlayerV2.99.2.html",
+        "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/player/IQBVisualUnitPlayerV2.99.2.html",
+        "playerSha256": "d6fc46a7a2b8e4ea50a3ef1df04b400396f67e55f515dee11bf107ef984e65af",
+        "unitFixture": "units/dan-g231mm.xml",
+        "unitEncoding": "utf8",
+        "unitSourcePath": "example_units/G231mm.xml",
+        "unitSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.xml",
+        "unitSha256": "fbd8e6b7244ed46dd25ea1fe7ff8497f01d3384260a879293d68aca8f5c8c9b2"
+      }
     }
   ],
   "playerPackages": [

@@ -212,6 +212,21 @@ type OriginalTestcenterCorpus = {
     metadataFormat: string;
     unitDefinitionType: string;
     unitStateType: string;
+    legacyTestbedPackage?: {
+      playerFixture: string;
+      playerEncoding: "brotli-base64";
+      playerKey: string;
+      playerModuleVersion: string;
+      playerApiVersion: string;
+      playerSourcePath: string;
+      playerSourceUrl: string;
+      playerSha256: string;
+      unitFixture: string;
+      unitEncoding: "utf8";
+      unitSourcePath: string;
+      unitSourceUrl: string;
+      unitSha256: string;
+    };
   }>;
 };
 
@@ -617,6 +632,39 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(danDefinition, /"canvasElement4"/);
   assert.match(danDefinition, /"type":"multilineTextbox"/);
   assert.match(danDefinition, /"type":"multipleChoice"/);
+  const legacyTestbedPackage = dan.legacyTestbedPackage;
+  assert.ok(legacyTestbedPackage);
+  const legacyPlayerDocument = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, legacyTestbedPackage.playerFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    )
+  );
+  const legacyUnitDocument = readFileSync(
+    resolve(corpusRoot, legacyTestbedPackage.unitFixture)
+  );
+  assert.equal(
+    createHash("sha256").update(legacyPlayerDocument).digest("hex"),
+    legacyTestbedPackage.playerSha256,
+    legacyTestbedPackage.playerSourceUrl
+  );
+  assert.equal(
+    createHash("sha256").update(legacyUnitDocument).digest("hex"),
+    legacyTestbedPackage.unitSha256,
+    legacyTestbedPackage.unitSourceUrl
+  );
+  assert.doesNotMatch(legacyPlayerDocument.toString("utf8"), /application\/ld\+json/);
+  assert.match(
+    legacyPlayerDocument.toString("utf8"),
+    /data-version="2\.99\.2"[\s\S]*data-api-version="2\.1\.0"/
+  );
+  assert.match(
+    legacyUnitDocument.toString("utf8"),
+    /<DefinitionRef player="IQBVisualUnitPlayerV2">G231mm\.voud<\/DefinitionRef>/
+  );
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {
