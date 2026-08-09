@@ -24306,7 +24306,7 @@ test("original Testcenter compatibility corpus executes official IQB regex fragm
   );
 });
 
-test("original Testcenter compatibility corpus executes official IQB rule methods and status propagation", async () => {
+test("original Testcenter compatibility corpus executes official IQB rule and derive methods with status propagation", async () => {
   type CodingCase = {
     inputFixture: string;
     outcomeFixture: string;
@@ -24362,7 +24362,18 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       "rule-rulesets-boolean-and-joined",
       "rulesets-boolean-and-joined",
       1
-    ]
+    ],
+    ["solver-alias-chain", "derive-solver-case1", 3],
+    ["unique-values-processing", "derive-unique-values", 4],
+    ["concat-code-chain", "derive-concat-code", 1],
+    ["copy-value-unset", "derive-copy-value", 3],
+    ["sum-code-derived-coding", "derive-sum-code", 2],
+    ["sum-score-partial", "derive-sum-score", 3],
+    ["manual-derive-case1", "derive-manual-case1", 1],
+    ["manual-derive-case2", "derive-manual-case2", 1],
+    ["solver-case2", "derive-solver-case2", 1],
+    ["solver-case3", "derive-solver-case3", 1],
+    ["solver-same-id-alias", "derive-solver-same-id-alias", 3]
   ] as const;
   const families = familyDefinitions.map(([family, slug, caseCount]) => {
     const codingPackage = corpus.codingSchemePackages.find(
@@ -24377,9 +24388,13 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       version?: string;
       variableCodings: SchemeVariable[];
     };
+    const stateKey = `rules-${slug}-route`;
+    const primaryCaseId =
+      codingPackage.inputFixture.match(/case(\d+)-input\.json$/)?.[1] ??
+      "01";
     const cases = [
       {
-        caseId: "01",
+        caseId: primaryCaseId.padStart(2, "0"),
         inputFixture: codingPackage.inputFixture,
         outcomeFixture: codingPackage.outcomeFixture,
         expectedStates: codingPackage.expectedStates
@@ -24409,6 +24424,9 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       return {
         ...testCase,
         caseKey: `case${testCase.caseId}`,
+        expectedStates: {
+          [stateKey]: `case${testCase.caseId}`
+        },
         inputResponses,
         officialOutcome
       };
@@ -24423,12 +24441,12 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       bookletKey: `BOOKLET.IQB.RULES.${slug.toUpperCase()}`,
       unitId: `UNIT.IQB.RULES.${slug.toUpperCase()}`,
       unitKey: `rules-${slug}-unit`,
-      stateKey: `rules-${slug}-route`
+      stateKey
     };
   });
   assert.equal(
     families.reduce((total, family) => total + family.cases.length, 0),
-    38
+    61
   );
 
   const escapeXmlAttribute = (value: string): string =>
@@ -24439,6 +24457,9 @@ test("original Testcenter compatibility corpus executes official IQB rule method
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&apos;");
   const serializeConditionValue = (value: unknown): string => {
+    if (Array.isArray(value)) {
+      return JSON.stringify([...value].sort());
+    }
     if (value !== null && typeof value === "object") {
       return JSON.stringify(value);
     }
@@ -24460,7 +24481,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
     outcome
       .map(variable => {
         const valueCondition =
-          family.cases.length > 1
+          family.cases.length > 1 || family.slug.startsWith("derive-")
             ? condition(
                 "Value",
                 variable.id,
@@ -24528,7 +24549,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
           fileName: `export/booklets/Booklet-${family.slug}.xml`,
           content: `
             <Booklet>
-              <Metadata><Id>${family.bookletKey}</Id><Label>Official IQB ${family.slug} rules</Label></Metadata>
+              <Metadata><Id>${family.bookletKey}</Id><Label>Official IQB ${family.slug} coding</Label></Metadata>
               <States>
                 <State id="${family.stateKey}" label="${family.stateKey}">
                   ${family.cases
@@ -24544,7 +24565,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
                 </State>
               </States>
               <Units>
-                <Unit id="${family.unitId}" alias="${family.unitKey}" label="${family.slug} rule unit"/>
+                <Unit id="${family.unitId}" alias="${family.unitKey}" label="${family.slug} coding unit"/>
                 ${family.cases
                   .map(
                     testCase => `
@@ -24567,8 +24588,8 @@ test("original Testcenter compatibility corpus executes official IQB rule method
           fileName: `export/units/Unit-${family.slug}.xml`,
           content: `
             <Unit>
-              <Metadata><Id>${family.unitId}</Id><Label>Official IQB ${family.slug} rules</Label></Metadata>
-              <Definition player="verona-player-simple@6.0"><![CDATA[<p>${family.slug} rules</p>]]></Definition>
+              <Metadata><Id>${family.unitId}</Id><Label>Official IQB ${family.slug} coding</Label></Metadata>
+              <Definition player="verona-player-simple@6.0"><![CDATA[<p>${family.slug} coding</p>]]></Definition>
               <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/${family.slug}.json</CodingSchemeRef>
               <BaseVariables>
                 ${baseVariables

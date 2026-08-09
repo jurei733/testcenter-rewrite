@@ -1,0 +1,17 @@
+[
+  {
+    "id": "text-1",
+    "status": "CODING_COMPLETE",
+    "value": "2",
+    "code": 0,
+    "score": 0
+  },
+  {
+    "id": "text-2",
+    "status": "CODING_COMPLETE",
+    "value": "2",
+    "code": 0,
+    "score": 0
+  },
+  { "id": "a1", "value": 4, "status": "CODING_COMPLETE", "code": 0, "score": 0 }
+]

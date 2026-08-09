@@ -392,7 +392,29 @@
         "solver-decimal": "calculated",
         "alias-code": "coded",
         "alias-score": "scored"
-      }
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-solver-case1-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case1-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case1/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case1/02_outcome.json",
+          "inputSha256": "84feed40ee3bf5191da1827263cf15377f6c66ca58d8abc1537bc4389e86a502",
+          "outcomeSha256": "5ed653c0df09eadc2f551c1639400a298eedc8a21be5d637889cf5628bfa9caf",
+          "expectedStates": { "solver-case1-route": "case02" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-solver-case1-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case1-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case1/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case1/03_outcome.json",
+          "inputSha256": "a112eb39bbc17060234a277276559f34599857f0dd893cfdaa37366fa4e0862a",
+          "outcomeSha256": "b8bb877d079994cdf19cac040839b92b3ecdc5ec6cddebcfdcfccca4d582cf1c",
+          "expectedStates": { "solver-case1-route": "case03" }
+        }
+      ]
     },
     {
       "family": "unique-values-processing",
@@ -418,7 +440,39 @@
         "dispensable-spaces": "unique",
         "numeric-processing": "duplicate",
         "combined-processing": "unique"
-      }
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/01_outcome.json",
+          "inputSha256": "e3bce56b607addce368b2ae59bd798a22ff7ca556c72b4a4291610cf78a97887",
+          "outcomeSha256": "cdbb4d77b32752295eae8dacca944b27bf39cfebbd600427f5ed9dddabb3b626",
+          "expectedStates": { "unique-values-route": "case01" }
+        },
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/02_outcome.json",
+          "inputSha256": "b60c0ae8ac72f13db57ea73c60db7c46250a6219d17c5ee0cf9ca4e79efa7ea0",
+          "outcomeSha256": "fe96cb848b95840540ab8cc5d9d2d96e44e2678502307b17cebff64801958526",
+          "expectedStates": { "unique-values-route": "case02" }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-unique-values-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-unique-values-case4-outcome.json",
+          "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/04_input.json",
+          "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/04_outcome.json",
+          "inputSha256": "5d703180c74c262047ec8f5b89e9e85b858789526dd3ac7a62141ba52a005d3e",
+          "outcomeSha256": "576f575b49f51d67f13c568c73be4c4851b78daddfdd37179779f880637992e8",
+          "expectedStates": { "unique-values-route": "case04" }
+        }
+      ]
     },
     {
       "family": "concat-code-chain",
@@ -463,7 +517,29 @@
         "copy-dependency": "derive-error",
         "copy-score-sum": "calculated",
         "copy-unset": "preserved"
-      }
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-copy-value-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-copy-value-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/COPY_VALUE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/COPY_VALUE/01_outcome.json",
+          "inputSha256": "1a204a2e3fcaf0d4b82cd1228d19a5db955f204851bbbf7b1dfa1332eb3a0305",
+          "outcomeSha256": "944e6d26abc0b26aa66c3798c90ffd2e63c7a558ea62d5b6d51c656f68826c96",
+          "expectedStates": { "copy-value-route": "case01" }
+        },
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-copy-value-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-copy-value-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/COPY_VALUE/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/COPY_VALUE/02_outcome.json",
+          "inputSha256": "503104f07cd56b6f30a718b9d29bf57ac88768d313292abcb599696722e2517e",
+          "outcomeSha256": "e6554a6acaa1bb28061994d09455fd7f392ca996e248b8d854cc6d978ab51ffa",
+          "expectedStates": { "copy-value-route": "case02" }
+        }
+      ]
     },
     {
       "family": "sum-code-derived-coding",
@@ -485,7 +561,19 @@
         "sum-code-status": "complete",
         "sum-code-code": "coded",
         "sum-code-score": "defaulted"
-      }
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-sum-code-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-code-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_CODE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_CODE/01_outcome.json",
+          "inputSha256": "12c3ca714fc1d94330829b05b5afcade3922635d0b30a1e19b7161c56c2505f9",
+          "outcomeSha256": "af6779a73a8ff1c5dd3cf7b95fd2d6f2c2657f16ad8214f1e119c47ae69fc976",
+          "expectedStates": { "sum-code-route": "case01" }
+        }
+      ]
     },
     {
       "family": "sum-score-partial",
@@ -505,7 +593,136 @@
       "expectedStates": {
         "sum-score-invalid": "invalid",
         "sum-score-value": "calculated"
-      }
+      },
+      "additionalCases": [
+        {
+          "caseId": "01",
+          "inputFixture": "schemes/responses-3.6.0-sum-score-case1-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-score-case1-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_SCORE/01_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_SCORE/01_outcome.json",
+          "inputSha256": "6b2678e8b9f8a29e6f0111ac498d3e59c943d5f98ec3bc33fc5aec26940513f7",
+          "outcomeSha256": "c6629cbc517d3592b830037fcbb8867a73f89532556fcd1620f7ba9747552aec",
+          "expectedStates": { "sum-score-route": "case01" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-sum-score-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-sum-score-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SUM_SCORE/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SUM_SCORE/03_outcome.json",
+          "inputSha256": "7b621123b388814c3f2d166ea3bc8341d0d12f628836fb4af3a62856c032fc7a",
+          "outcomeSha256": "ddad77ac9cb433f16b56f18edcd9a30f294c20a0a64a3bd88f7b9dd8b729dcf2",
+          "expectedStates": { "sum-score-route": "case03" }
+        }
+      ]
+    },
+    {
+      "family": "manual-derive-case1",
+      "schemeFixture": "schemes/responses-3.6.0-manual-case1.json",
+      "inputFixture": "schemes/responses-3.6.0-manual-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-manual-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/MANUAL/case1/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/MANUAL/case1/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/MANUAL/case1/01_outcome.json",
+      "schemeSha256": "f150de62afb77c919d751fc29599c0ac659a455b24a816a11d70dbeb831d8142",
+      "inputSha256": "7dd29246868a4cd4d2e502acae00afea16bd5731a0b511ab1a04bca66f1f553a",
+      "outcomeSha256": "59eaa33ed6e5f5d5f6990a10cd665ce6d3d1cdcc04dc56c08e7bb7153db8d297",
+      "license": "MIT",
+      "expectedStates": { "manual-case1-route": "case01" }
+    },
+    {
+      "family": "manual-derive-case2",
+      "schemeFixture": "schemes/responses-3.6.0-manual-case2.json",
+      "inputFixture": "schemes/responses-3.6.0-manual-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-manual-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/MANUAL/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/MANUAL/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/MANUAL/case2/01_outcome.json",
+      "schemeSha256": "f150de62afb77c919d751fc29599c0ac659a455b24a816a11d70dbeb831d8142",
+      "inputSha256": "6832b3d99cf7161bcee8d000350d335f28b29e1e6e96bf0c6d08f1e18d3539a0",
+      "outcomeSha256": "aa6bf25667b065f1341988e7d41e9dc33f4a938efb78b2f0e4166ce02ec63db2",
+      "license": "MIT",
+      "expectedStates": { "manual-case2-route": "case01" }
+    },
+    {
+      "family": "solver-case2",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case2.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case2/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case2/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case2/01_outcome.json",
+      "schemeSha256": "cb30702cc2ae67c27d97aabe971d36fdc645f45448bbb3835a20ac758ab4c98a",
+      "inputSha256": "ebb9fa978e4f30385ce4259a372df845aa433bd0749ae133a1e6f8bd82bc68a4",
+      "outcomeSha256": "4c9a10951bc9702435e424951dd9accf0890caaa8d201c58a84cfb2a79685c45",
+      "license": "MIT",
+      "expectedStates": { "solver-case2-route": "case01" }
+    },
+    {
+      "family": "solver-case3",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case3.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case3/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case3/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case3/01_outcome.json",
+      "schemeSha256": "3c4ebfe5e928a300af61c9fe82c43b8031be5b8a68b59cd641351fa639520309",
+      "inputSha256": "cd00e6f2d73fd10396b1b1d7f6d6998f50d88fd8d00c2502367dc369e904a1f1",
+      "outcomeSha256": "86edbdc9238b8506d75cccf9b8bf99e6d68978bd83906a5e76e80a1608720eef",
+      "license": "MIT",
+      "expectedStates": { "solver-case3-route": "case01" }
+    },
+    {
+      "family": "solver-same-id-alias",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/01_outcome.json",
+      "schemeSha256": "c34018a20f2f362c9167923160c541212471d6452a3312bd3e3e60b8bfc76c9a",
+      "inputSha256": "22417d6f86dd5b2c1d9ac511e7093a1eaa8eb6884910b39045cabe3e1f52a6cc",
+      "outcomeSha256": "986fc3cdfbab881e23d4e1758679eaee589ac3b468114f67c140d27b419b45e0",
+      "license": "MIT",
+      "expectedStates": { "solver-same-id-alias-route": "case01" },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case2-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/02_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/02_outcome.json",
+          "inputSha256": "af204cc9e66073f704110cd9630ae6cb06f822a4e9b82a59fbf5986d20681593",
+          "outcomeSha256": "06493ad2d4d1f1995188a389879b45fb6c60e2466df8c47bfb541ce2977a264d",
+          "expectedStates": { "solver-same-id-alias-route": "case02" }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-solver-case4-same-id-alias-case3-outcome.json",
+          "inputSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/03_input.json",
+          "outcomeSourcePath": "test/coding/derive/SOLVER/case4-same-id-alias/03_outcome.json",
+          "inputSha256": "34aeb3bca094e63be4af82e969c08aede790d5e30910532bef81d071b76b4737",
+          "outcomeSha256": "a94bcc44ca63480bc47b0be22bd6a82e616fbdc451cac69c2ebf700e81fdede2",
+          "expectedStates": { "solver-same-id-alias-route": "case03" }
+        }
+      ]
     },
     {
       "family": "array-length-rulesets",

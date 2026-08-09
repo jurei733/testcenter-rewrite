@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 27);
+  assert.equal(corpus.codingSchemePackages.length, 32);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1050,6 +1050,66 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
         variable.score ?? null
       ]),
       expectedFamily.expectedOutcome
+    );
+  }
+
+  const derivedInputSourcePaths = corpus.codingSchemePackages
+    .filter(codingPackage =>
+      codingPackage.schemeSourcePath.startsWith("test/coding/derive/")
+    )
+    .flatMap(codingPackage => [
+      codingPackage.inputSourcePath,
+      ...(codingPackage.additionalCases ?? []).map(
+        additionalCase => additionalCase.inputSourcePath
+      )
+    ])
+    .sort();
+  assert.deepEqual(derivedInputSourcePaths, [
+    "test/coding/derive/CONCAT_CODE/01_input.json",
+    "test/coding/derive/COPY_VALUE/01_input.json",
+    "test/coding/derive/COPY_VALUE/02_input.json",
+    "test/coding/derive/COPY_VALUE/03_input.json",
+    "test/coding/derive/MANUAL/case1/01_input.json",
+    "test/coding/derive/MANUAL/case2/01_input.json",
+    "test/coding/derive/SOLVER/case1/01_input.json",
+    "test/coding/derive/SOLVER/case1/02_input.json",
+    "test/coding/derive/SOLVER/case1/03_input.json",
+    "test/coding/derive/SOLVER/case2/01_input.json",
+    "test/coding/derive/SOLVER/case3/01_input.json",
+    "test/coding/derive/SOLVER/case4-same-id-alias/01_input.json",
+    "test/coding/derive/SOLVER/case4-same-id-alias/02_input.json",
+    "test/coding/derive/SOLVER/case4-same-id-alias/03_input.json",
+    "test/coding/derive/SUM_CODE/01_input.json",
+    "test/coding/derive/SUM_CODE/02_input.json",
+    "test/coding/derive/SUM_SCORE/01_input.json",
+    "test/coding/derive/SUM_SCORE/02_input.json",
+    "test/coding/derive/SUM_SCORE/03_input.json",
+    "test/coding/derive/UNIQUE_VALUES/01_input.json",
+    "test/coding/derive/UNIQUE_VALUES/02_input.json",
+    "test/coding/derive/UNIQUE_VALUES/03_input.json",
+    "test/coding/derive/UNIQUE_VALUES/04_input.json"
+  ]);
+
+  for (const [family, expectedSourceTypes] of [
+    ["manual-derive-case1", ["BASE", "BASE", "MANUAL"]],
+    ["manual-derive-case2", ["BASE", "BASE", "MANUAL"]],
+    ["solver-case2", ["BASE", "BASE", "SOLVER"]],
+    ["solver-case3", ["BASE", "BASE", "BASE", "SOLVER"]],
+    [
+      "solver-same-id-alias",
+      ["BASE", "BASE", "BASE", "SOLVER", "SOLVER", "SOLVER", "SOLVER", "SOLVER"]
+    ]
+  ] as const) {
+    const codingPackage = corpus.codingSchemePackages.find(
+      candidate => candidate.family === family
+    );
+    assert.ok(codingPackage);
+    const derivedScheme = JSON.parse(
+      readFileSync(resolve(corpusRoot, codingPackage.schemeFixture), "utf8")
+    ) as { variableCodings: Array<{ sourceType: string }> };
+    assert.deepEqual(
+      derivedScheme.variableCodings.map(variable => variable.sourceType),
+      expectedSourceTypes
     );
   }
 
