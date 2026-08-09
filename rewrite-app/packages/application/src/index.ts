@@ -27,6 +27,7 @@ import {
 } from "@testcenter-rewrite-app/contracts";
 import type {
   AdminAccessWindowErrorDetails,
+  AdminUserAccessStatus,
   OriginalTestcenterOperationalLoginCandidate,
   ParticipantRosterSource,
   SourceDocumentSource
@@ -912,6 +913,8 @@ export type AdminDirectoryPort = {
     sessionToken: string;
     username?: string;
     status?: AdminUserStatus;
+    accessStatus?: AdminUserAccessStatus;
+    passwordChangeRequired?: boolean;
     role?: AdminRole;
     tenantKey?: string;
     workspaceKey?: string;
@@ -3363,6 +3366,17 @@ const resolveAdminAccessFailureReason = (
   return validUntil && Date.parse(validUntil) <= timestampMs
     ? "admin_access_expired"
     : null;
+};
+
+const resolveAdminUserAccessStatus = (
+  adminUser: AdminUser,
+  timestamp: string
+): AdminUserAccessStatus => {
+  const failureReason = resolveAdminAccessFailureReason(adminUser, timestamp);
+  if (failureReason === "admin_access_not_started") {
+    return "scheduled";
+  }
+  return failureReason === "admin_access_expired" ? "expired" : "available";
 };
 
 const hashPassword = (password: string): string => {
@@ -21582,6 +21596,7 @@ export const createFirstSliceServices = (
         );
         requireAdminManagementRole(currentSession.roleAssignments);
         const usernameFilter = input.username?.trim().toLowerCase() || undefined;
+        const accessStatusTimestamp = now();
         const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
         const tenantFilterKey = input.tenantKey?.trim() || undefined;
         const workspaceFilterKey = input.workspaceKey?.trim() || undefined;
@@ -21620,8 +21635,12 @@ export const createFirstSliceServices = (
         );
 
         return directoryItems
-          .filter(
-            item =>
+          .filter(item => {
+            const accessStatus = resolveAdminUserAccessStatus(
+              item.adminUser,
+              accessStatusTimestamp
+            );
+            return (
               (item.adminUser.adminUserId ===
                 currentSession.adminUser.adminUserId ||
                 canManageAdminUser(
@@ -21630,6 +21649,10 @@ export const createFirstSliceServices = (
                 )) &&
               (!usernameFilter || item.adminUser.username.includes(usernameFilter)) &&
               (!input.status || item.adminUser.status === input.status) &&
+              (!input.accessStatus || accessStatus === input.accessStatus) &&
+              (input.passwordChangeRequired === undefined ||
+                item.adminUser.passwordChangeRequired ===
+                  input.passwordChangeRequired) &&
               (!input.role ||
                 item.roleAssignments.some(
                   roleAssignment => roleAssignment.role === input.role
@@ -21643,7 +21666,8 @@ export const createFirstSliceServices = (
                   roleAssignment =>
                     roleAssignment.workspaceId === workspaceFilter.workspaceId
                 ))
-          )
+            );
+          })
           .slice(0, limit);
       },
       async createAdminUser(input) {

@@ -685,7 +685,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Admin User Filters</h2>
-        <p>Narrow the protected admin directory by username, status, role, scope, or a bounded result limit.</p>
+        <p>Narrow the protected admin directory by username, account status, current access state, password handoff, role, scope, or a bounded result limit.</p>
         <div class="form-grid">
           <label>
             Username Contains
@@ -696,6 +696,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <select id="adminUserStatusFilter" name="adminUserStatusFilter" [(ngModel)]="view.ops.adminUserStatusFilter" (change)="view.persistState()">
               <option value="">All statuses</option>
               <option *ngFor="let status of view.adminStatusOptions" [ngValue]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Current Access
+            <select id="adminUserAccessStatusFilter" name="adminUserAccessStatusFilter" [(ngModel)]="view.ops.adminUserAccessStatusFilter" (change)="view.persistState()">
+              <option value="">All access states</option>
+              <option *ngFor="let status of view.adminAccessStatusOptions" [ngValue]="status">{{ status }}</option>
+            </select>
+          </label>
+          <label>
+            Password Handoff
+            <select id="adminUserPasswordChangeFilter" name="adminUserPasswordChangeFilter" [(ngModel)]="view.ops.adminUserPasswordChangeFilter" (change)="view.persistState()">
+              <option value="">All handoff states</option>
+              <option value="true">Required</option>
+              <option value="false">Complete</option>
             </select>
           </label>
           <label>

@@ -157,6 +157,7 @@ import {
   type UpdateParticipantReviewRequest,
   type AdminSessionListQuery,
   type AdminUserListQuery,
+  type AdminUserAccessStatus,
   type ContentReleaseListQuery,
   type ImportJobListQuery,
   type SourcePackageListQuery,
@@ -1126,6 +1127,39 @@ const parseAdminUserListQuery = (
     return null;
   }
 
+  const accessStatus =
+    url.searchParams.get("accessStatus")?.trim() || undefined;
+  if (
+    accessStatus &&
+    accessStatus !== "available" &&
+    accessStatus !== "scheduled" &&
+    accessStatus !== "expired"
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_access_status_invalid",
+      `Admin access status '${accessStatus}' is not supported.`
+    );
+    return null;
+  }
+
+  const passwordChangeRequiredRaw =
+    url.searchParams.get("passwordChangeRequired")?.trim() || undefined;
+  if (
+    passwordChangeRequiredRaw &&
+    passwordChangeRequiredRaw !== "true" &&
+    passwordChangeRequiredRaw !== "false"
+  ) {
+    sendError(
+      response,
+      400,
+      "admin_password_change_required_filter_invalid",
+      "passwordChangeRequired must be true or false when provided."
+    );
+    return null;
+  }
+
   const role = url.searchParams.get("role")?.trim() || undefined;
   if (
     role &&
@@ -1163,6 +1197,11 @@ const parseAdminUserListQuery = (
   return {
     username,
     status: status as AdminUserStatus | undefined,
+    accessStatus: accessStatus as AdminUserAccessStatus | undefined,
+    passwordChangeRequired:
+      passwordChangeRequiredRaw === undefined
+        ? undefined
+        : passwordChangeRequiredRaw === "true",
     role: role as AdminRole | undefined,
     tenantKey: url.searchParams.get("tenantKey")?.trim() || undefined,
     workspaceKey: url.searchParams.get("workspaceKey")?.trim() || undefined,

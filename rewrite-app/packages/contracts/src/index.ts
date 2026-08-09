@@ -2240,11 +2240,15 @@ export type ImportSystemCheckReportRequest = {
 export type AdminUserListQuery = {
   username?: string;
   status?: AdminUserStatus;
+  accessStatus?: AdminUserAccessStatus;
+  passwordChangeRequired?: boolean;
   role?: AdminRole;
   tenantKey?: string;
   workspaceKey?: string;
   limit?: number;
 };
+
+export type AdminUserAccessStatus = "available" | "scheduled" | "expired";
 
 export type AdminSessionListQuery = {
   adminUserId?: string;

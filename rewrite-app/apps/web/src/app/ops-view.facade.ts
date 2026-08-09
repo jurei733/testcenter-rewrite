@@ -161,6 +161,7 @@ export class OpsViewFacade {
     { value: "read_only", label: "Read only (RO)" }
   ];
   readonly adminStatusOptions: AdminUserStatus[] = ["active", "disabled"];
+  readonly adminAccessStatusOptions = ["available", "scheduled", "expired"];
   readonly adminSessionStatusOptions: AdminSessionStatus[] = [
     "active",
     "expired",
@@ -1493,6 +1494,8 @@ export class OpsViewFacade {
   clearAdminUserFilters(): void {
     this.ops.adminUserUsernameFilter = "";
     this.ops.adminUserStatusFilter = "";
+    this.ops.adminUserAccessStatusFilter = "";
+    this.ops.adminUserPasswordChangeFilter = "";
     this.ops.adminUserRoleFilter = "";
     this.ops.adminUserTenantFilter = "";
     this.ops.adminUserWorkspaceFilter = "";
@@ -2119,6 +2122,10 @@ export class OpsViewFacade {
         [
           this.ops.adminUserUsernameFilter.trim() ? "username" : "",
           this.ops.adminUserStatusFilter.trim() ? "status" : "",
+          this.ops.adminUserAccessStatusFilter.trim() ? "access" : "",
+          this.ops.adminUserPasswordChangeFilter.trim()
+            ? "password handoff"
+            : "",
           this.ops.adminUserRoleFilter.trim() ? "role" : "",
           this.ops.adminUserTenantFilter.trim() ? "tenant" : "",
           this.ops.adminUserWorkspaceFilter.trim() ? "workspace" : ""

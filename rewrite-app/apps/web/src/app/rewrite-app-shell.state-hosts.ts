@@ -654,6 +654,18 @@ export function createShellPersistenceStateHost(args: {
     set adminUserStatusFilter(nextValue) {
       args.opsState.adminUserStatusFilter = nextValue;
     },
+    get adminUserAccessStatusFilter() {
+      return args.opsState.adminUserAccessStatusFilter;
+    },
+    set adminUserAccessStatusFilter(nextValue) {
+      args.opsState.adminUserAccessStatusFilter = nextValue;
+    },
+    get adminUserPasswordChangeFilter() {
+      return args.opsState.adminUserPasswordChangeFilter;
+    },
+    set adminUserPasswordChangeFilter(nextValue) {
+      args.opsState.adminUserPasswordChangeFilter = nextValue;
+    },
     get adminUserRoleFilter() {
       return args.opsState.adminUserRoleFilter;
     },

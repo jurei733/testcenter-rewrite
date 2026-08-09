@@ -1104,7 +1104,11 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
 
   const futureAccessAdmin = await requestJson<{
-    adminUser: { validFrom: string | null; firstSignedInAt: string | null };
+    adminUser: {
+      adminUserId: string;
+      validFrom: string | null;
+      firstSignedInAt: string | null;
+    };
   }>("/api/v1/admin/users", {
     method: "POST",
     headers: {
@@ -1178,7 +1182,11 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
 
   const expiredAccessAdmin = await requestJson<{
-    adminUser: { validTo: string | null; firstSignedInAt: string | null };
+    adminUser: {
+      adminUserId: string;
+      validTo: string | null;
+      firstSignedInAt: string | null;
+    };
   }>("/api/v1/admin/users", {
     method: "POST",
     headers: {
@@ -1248,6 +1256,51 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(
     expiredAccessSignIn.body.details.customTexts.gm_selection_text_expired,
     "Monitor expired at %date"
+  );
+
+  const scheduledPasswordHandoffAdmins = await requestJson<{
+    items: Array<{ adminUser: { adminUserId: string; username: string } }>;
+  }>("/api/v1/admin/users?accessStatus=scheduled&passwordChangeRequired=true", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+  assert.equal(scheduledPasswordHandoffAdmins.status, 200);
+  assert.deepEqual(
+    scheduledPasswordHandoffAdmins.body.items.map(
+      item => item.adminUser.adminUserId
+    ),
+    [futureAccessAdmin.body.adminUser.adminUserId]
+  );
+
+  const expiredPasswordHandoffAdmins = await requestJson<{
+    items: Array<{ adminUser: { adminUserId: string; username: string } }>;
+  }>("/api/v1/admin/users?accessStatus=expired&passwordChangeRequired=true", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+  assert.equal(expiredPasswordHandoffAdmins.status, 200);
+  assert.deepEqual(
+    expiredPasswordHandoffAdmins.body.items.map(
+      item => item.adminUser.adminUserId
+    ),
+    [expiredAccessAdmin.body.adminUser.adminUserId]
+  );
+
+  const availableCompletedHandoffs = await requestJson<{
+    items: Array<{ adminUser: { adminUserId: string; username: string } }>;
+  }>("/api/v1/admin/users?accessStatus=available&passwordChangeRequired=false", {
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    }
+  });
+  assert.equal(availableCompletedHandoffs.status, 200);
+  assert.deepEqual(
+    availableCompletedHandoffs.body.items.map(
+      item => item.adminUser.adminUserId
+    ),
+    [bootstrap.body.adminUser.adminUserId]
   );
 
   const firstLoginWindowValidTo = new Date(
@@ -1791,7 +1844,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   );
 
   const adminUsersCsvResponse = await fetch(
-    `${baseUrl}/api/v1/admin/users.csv?username=workspace&status=disabled&role=workspace_admin&tenantKey=${adminTenantKey}&workspaceKey=${adminWorkspaceKey}&limit=1`,
+    `${baseUrl}/api/v1/admin/users.csv?username=workspace&status=disabled&accessStatus=available&passwordChangeRequired=false&role=workspace_admin&tenantKey=${adminTenantKey}&workspaceKey=${adminWorkspaceKey}&limit=1`,
     {
       headers: {
         authorization: `Bearer ${signIn.body.sessionToken}`,
@@ -1838,6 +1891,34 @@ test("admin bootstrap and bearer session lifecycle", async () => {
 
   assert.equal(invalidAdminUserStatus.status, 400);
   assert.equal(invalidAdminUserStatus.body.error, "admin_user_status_invalid");
+
+  const invalidAdminAccessStatus = await requestJson<{ error: string }>(
+    "/api/v1/admin/users?accessStatus=unsupported",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(invalidAdminAccessStatus.status, 400);
+  assert.equal(
+    invalidAdminAccessStatus.body.error,
+    "admin_access_status_invalid"
+  );
+
+  const invalidAdminPasswordChangeFilter = await requestJson<{ error: string }>(
+    "/api/v1/admin/users?passwordChangeRequired=maybe",
+    {
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(invalidAdminPasswordChangeFilter.status, 400);
+  assert.equal(
+    invalidAdminPasswordChangeFilter.body.error,
+    "admin_password_change_required_filter_invalid"
+  );
 
   const invalidAdminRole = await requestJson<{ error: string }>(
     "/api/v1/admin/users?role=unsupported",

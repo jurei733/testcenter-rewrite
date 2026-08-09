@@ -104,6 +104,8 @@ export type ShellPersistenceTarget = {
   adminSessionRevokeTargetId: string;
   adminUserUsernameFilter: string;
   adminUserStatusFilter: string;
+  adminUserAccessStatusFilter: string;
+  adminUserPasswordChangeFilter: string;
   adminUserRoleFilter: string;
   adminUserTenantFilter: string;
   adminUserWorkspaceFilter: string;
@@ -237,6 +239,8 @@ export const createPersistedShellState = (
   adminSessionRevokeTargetId: target.adminSessionRevokeTargetId,
   adminUserUsernameFilter: target.adminUserUsernameFilter,
   adminUserStatusFilter: target.adminUserStatusFilter,
+  adminUserAccessStatusFilter: target.adminUserAccessStatusFilter,
+  adminUserPasswordChangeFilter: target.adminUserPasswordChangeFilter,
   adminUserRoleFilter: target.adminUserRoleFilter,
   adminUserTenantFilter: target.adminUserTenantFilter,
   adminUserWorkspaceFilter: target.adminUserWorkspaceFilter,
@@ -661,6 +665,14 @@ export const applyHydratedShellState = (
   target.adminUserStatusFilter = hydrateString(
     snapshot.adminUserStatusFilter,
     target.adminUserStatusFilter
+  );
+  target.adminUserAccessStatusFilter = hydrateString(
+    snapshot.adminUserAccessStatusFilter,
+    target.adminUserAccessStatusFilter
+  );
+  target.adminUserPasswordChangeFilter = hydrateString(
+    snapshot.adminUserPasswordChangeFilter,
+    target.adminUserPasswordChangeFilter
   );
   target.adminUserRoleFilter = hydrateString(
     snapshot.adminUserRoleFilter,

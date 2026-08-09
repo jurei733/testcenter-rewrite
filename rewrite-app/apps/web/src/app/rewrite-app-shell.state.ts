@@ -38,6 +38,8 @@ export interface ShellOpsState {
   adminAuditExportView: string;
   adminUserUsernameFilter: string;
   adminUserStatusFilter: string;
+  adminUserAccessStatusFilter: string;
+  adminUserPasswordChangeFilter: string;
   adminUserRoleFilter: string;
   adminUserTenantFilter: string;
   adminUserWorkspaceFilter: string;
@@ -272,6 +274,8 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminAuditExportView: "Export admin audit CSV to preview it here.",
     adminUserUsernameFilter: "",
     adminUserStatusFilter: "",
+    adminUserAccessStatusFilter: "",
+    adminUserPasswordChangeFilter: "",
     adminUserRoleFilter: "",
     adminUserTenantFilter: "",
     adminUserWorkspaceFilter: "",

@@ -964,6 +964,8 @@ export class RewriteAppOpsService {
     return this.appendQuery(productionApiRoutes.admin.listUsers, [
       ["username", this.opsState.adminUserUsernameFilter],
       ["status", this.opsState.adminUserStatusFilter],
+      ["accessStatus", this.opsState.adminUserAccessStatusFilter],
+      ["passwordChangeRequired", this.opsState.adminUserPasswordChangeFilter],
       ["role", this.opsState.adminUserRoleFilter],
       ["tenantKey", this.opsState.adminUserTenantFilter],
       ["workspaceKey", this.opsState.adminUserWorkspaceFilter],
@@ -991,6 +993,8 @@ export class RewriteAppOpsService {
     return this.appendQuery(productionApiRoutes.admin.exportUsersCsv, [
       ["username", this.opsState.adminUserUsernameFilter],
       ["status", this.opsState.adminUserStatusFilter],
+      ["accessStatus", this.opsState.adminUserAccessStatusFilter],
+      ["passwordChangeRequired", this.opsState.adminUserPasswordChangeFilter],
       ["role", this.opsState.adminUserRoleFilter],
       ["tenantKey", this.opsState.adminUserTenantFilter],
       ["workspaceKey", this.opsState.adminUserWorkspaceFilter],

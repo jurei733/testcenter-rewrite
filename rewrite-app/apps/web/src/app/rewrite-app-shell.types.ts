@@ -118,6 +118,8 @@ export type PersistedShellState = {
   adminSessionRevokeTargetId: string;
   adminUserUsernameFilter: string;
   adminUserStatusFilter: string;
+  adminUserAccessStatusFilter: string;
+  adminUserPasswordChangeFilter: string;
   adminUserRoleFilter: string;
   adminUserTenantFilter: string;
   adminUserWorkspaceFilter: string;

@@ -2323,6 +2323,8 @@ try {
   await fillAndCommit("#adminAccessWindowValidForMinutes", "");
   await fillAndCommit("#adminCustomTextsTargetUserId", "");
   await fillAndCommit("#adminCustomTextsUpdateDraft", "{}");
+  await selectAndCommit("#adminUserAccessStatusFilter", "");
+  await selectAndCommit("#adminUserPasswordChangeFilter", "");
   assert.equal(
     await page.locator("#adminCreatePassword").getAttribute("minlength"),
     "8"
@@ -3236,6 +3238,42 @@ try {
           item?.details?.nextValidForMinutes === 45
       )
   );
+  await selectAndCommit("#adminUserAccessStatusFilter", "scheduled");
+  await selectAndCommit("#adminUserPasswordChangeFilter", "true");
+  logStep("admin-user-lifecycle-filters");
+  const lifecycleFilterResponsePromise = page.waitForResponse(response => {
+    if (
+      response.request().method() !== "GET" ||
+      new URL(response.url()).pathname !== "/api/v1/admin/users"
+    ) {
+      return false;
+    }
+    const responseUrl = new URL(response.url());
+    return (
+      responseUrl.searchParams.get("accessStatus") === "scheduled" &&
+      responseUrl.searchParams.get("passwordChangeRequired") === "true"
+    );
+  });
+  await clickAction("Apply User Filters");
+  const lifecycleFilterResponse = await lifecycleFilterResponsePromise;
+  assert.equal(lifecycleFilterResponse.status(), 200);
+  const lifecycleFilterPayload = await lifecycleFilterResponse.json();
+  assert.deepEqual(
+    lifecycleFilterPayload.items.map(item => item.adminUser?.adminUserId),
+    [delegatedDisplayNameTargetUserId]
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: delegatedWorkspaceAdminUsername })
+    .waitFor();
+  await clickAction("Clear User Filters");
+  await expectInputValue("#adminUserAccessStatusFilter", "");
+  await expectInputValue("#adminUserPasswordChangeFilter", "");
+  await clickAction("Apply User Filters");
+  stopAfter("admin-user-lifecycle-filters");
   await fillAndCommit("#adminAccessWindowValidFrom", "");
   await fillAndCommit("#adminAccessWindowValidTo", "");
   await fillAndCommit("#adminAccessWindowValidForMinutes", "");

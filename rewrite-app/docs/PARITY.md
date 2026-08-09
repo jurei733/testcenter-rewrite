@@ -428,6 +428,15 @@ authored values. API and protected production Chromium/SQLite gates prove
 invalid-key rejection, normalization, refreshed sign-in copy, and audit
 redaction.
 
+The protected administrator directory and its CSV export can now isolate
+accounts by their current server-evaluated access state (`available`,
+`scheduled`, or `expired`) and by pending/completed password handoff. These
+filters compose with username, enabled status, role, scope, and limit, use one
+consistent server timestamp per directory read, reject ambiguous query values,
+and persist across Angular reloads. API coverage pins all three access classes
+and both handoff states; a protected production Chromium/SQLite gate proves the
+combined scheduled-plus-pending review workflow.
+
 All administrator password mutation paths now enforce the shared 8–60
 character policy. The 60-character ceiling preserves the original
 Testcenter's protection against excessively expensive password hashing while
