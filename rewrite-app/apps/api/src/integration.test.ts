@@ -37,6 +37,27 @@ type ZipFixtureEntry = {
   compressionMethod?: ZipCompressionMethod;
   compressedContent?: Buffer;
   uncompressedSize?: number;
+  checksum?: number;
+};
+
+const zipFixtureCrc32Table = Array.from({ length: 256 }, (_, value) => {
+  let checksum = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    checksum =
+      (checksum & 1) !== 0
+        ? 0xedb88320 ^ (checksum >>> 1)
+        : checksum >>> 1;
+  }
+  return checksum >>> 0;
+});
+
+const zipFixtureCrc32 = (content: Buffer): number => {
+  let checksum = 0xffffffff;
+  for (const byte of content) {
+    checksum =
+      zipFixtureCrc32Table[(checksum ^ byte) & 0xff]! ^ (checksum >>> 8);
+  }
+  return (checksum ^ 0xffffffff) >>> 0;
 };
 
 const createZipBase64 = (
@@ -58,13 +79,14 @@ const createZipBase64 = (
         ? deflateRawSync(uncompressedContent)
         : uncompressedContent);
     const uncompressedSize = entry.uncompressedSize ?? uncompressedContent.length;
+    const checksum = entry.checksum ?? zipFixtureCrc32(uncompressedContent);
     const localHeader = Buffer.alloc(30 + fileName.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
     localHeader.writeUInt16LE(0x0800, 6);
     localHeader.writeUInt16LE(compressionMethod, 8);
     localHeader.writeUInt32LE(0, 10);
-    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(checksum, 14);
     localHeader.writeUInt32LE(content.length, 18);
     localHeader.writeUInt32LE(uncompressedSize, 22);
     localHeader.writeUInt16LE(fileName.length, 26);
@@ -78,7 +100,7 @@ const createZipBase64 = (
     centralDirectoryHeader.writeUInt16LE(0x0800, 8);
     centralDirectoryHeader.writeUInt16LE(compressionMethod, 10);
     centralDirectoryHeader.writeUInt32LE(0, 12);
-    centralDirectoryHeader.writeUInt32LE(0, 16);
+    centralDirectoryHeader.writeUInt32LE(checksum, 16);
     centralDirectoryHeader.writeUInt32LE(content.length, 20);
     centralDirectoryHeader.writeUInt32LE(uncompressedSize, 24);
     centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
@@ -20305,7 +20327,8 @@ test("source document import resolves ZIP Testcenter unit definitions", async ()
       content: "",
       compressionMethod: 0,
       compressedContent: originalResourcePackage,
-      uncompressedSize: originalResourcePackage.length
+      uncompressedSize: originalResourcePackage.length,
+      checksum: zipFixtureCrc32(originalResourcePackage)
     }
   ]);
 
@@ -28808,6 +28831,80 @@ test("source document import bounds oversized deflated ZIP manifest entries", as
   assert.equal(
     importResult.body.importJob.diagnostics[0]?.code,
     "source_document_zip_manifest_unreadable"
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
+test("source document import rejects ZIP XML integrity failures", async () => {
+  const tenantKey = "integration-tenant-unreadable-zip-xml";
+  const workspaceKey = "integration-workspace-unreadable-zip-xml";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sizeMismatchedBooklet = "<Booklet />";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content:
+        '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources /></manifest>'
+    },
+    {
+      fileName: "units/checksum-damaged.xml",
+      content: "<Unit />",
+      checksum: 0
+    },
+    {
+      fileName: "booklets/size-mismatched.xml",
+      content: sizeMismatchedBooklet,
+      uncompressedSize: Buffer.byteLength(sizeMismatchedBooklet) + 1
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unreadable-xml-entries.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.deepEqual(
+    importResult.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    [
+      "source_document_zip_xml_unreadable",
+      "source_document_zip_xml_unreadable"
+    ]
+  );
+  assert.deepEqual(
+    importResult.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.message.match(/'([^']+)'/)?.[1]
+    ),
+    ["units/checksum-damaged.xml", "booklets/size-mismatched.xml"]
   );
   assert.equal(importResult.body.stagedContentRelease, null);
 });

@@ -12287,7 +12287,9 @@ const normalizeParsedXmlContentStructure = (
 
 type ZipEntry = {
   fileName: string;
+  generalPurposeBitFlag: number;
   compressionMethod: number;
+  checksum: number;
   compressedSize: number;
   uncompressedSize: number;
   localHeaderOffset: number;
@@ -12338,7 +12340,9 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
       return [];
     }
 
+    const generalPurposeBitFlag = zipBuffer.readUInt16LE(offset + 8);
     const compressionMethod = zipBuffer.readUInt16LE(offset + 10);
+    const checksum = zipBuffer.readUInt32LE(offset + 16);
     const compressedSize = zipBuffer.readUInt32LE(offset + 20);
     const uncompressedSize = zipBuffer.readUInt32LE(offset + 24);
     const fileNameLength = zipBuffer.readUInt16LE(offset + 28);
@@ -12354,7 +12358,9 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
 
     entries.push({
       fileName: zipBuffer.toString("utf8", fileNameStart, fileNameEnd),
+      generalPurposeBitFlag,
       compressionMethod,
+      checksum,
       compressedSize,
       uncompressedSize,
       localHeaderOffset
@@ -12373,13 +12379,30 @@ const readZipEntryBuffer = (
   if (
     entry.uncompressedSize > maxOutputBytes ||
     entry.localHeaderOffset + 30 > zipBuffer.length ||
-    zipBuffer.readUInt32LE(entry.localHeaderOffset) !== 0x04034b50
+    zipBuffer.readUInt32LE(entry.localHeaderOffset) !== 0x04034b50 ||
+    (entry.generalPurposeBitFlag & 0x0001) !== 0
   ) {
     return null;
   }
 
+  const localGeneralPurposeBitFlag = zipBuffer.readUInt16LE(
+    entry.localHeaderOffset + 6
+  );
+  const localCompressionMethod = zipBuffer.readUInt16LE(
+    entry.localHeaderOffset + 8
+  );
   const fileNameLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 26);
   const extraLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 28);
+  const fileNameStart = entry.localHeaderOffset + 30;
+  const fileNameEnd = fileNameStart + fileNameLength;
+  if (
+    localGeneralPurposeBitFlag !== entry.generalPurposeBitFlag ||
+    localCompressionMethod !== entry.compressionMethod ||
+    fileNameEnd > zipBuffer.length ||
+    zipBuffer.toString("utf8", fileNameStart, fileNameEnd) !== entry.fileName
+  ) {
+    return null;
+  }
   const dataStart = entry.localHeaderOffset + 30 + fileNameLength + extraLength;
   const dataEnd = dataStart + entry.compressedSize;
   if (dataEnd > zipBuffer.length) {
@@ -12401,7 +12424,12 @@ const readZipEntryBuffer = (
     return null;
   }
 
-  if (!data || data.length > maxOutputBytes) {
+  if (
+    !data ||
+    data.length > maxOutputBytes ||
+    data.length !== entry.uncompressedSize ||
+    crc32(data) !== entry.checksum
+  ) {
     return null;
   }
 
@@ -15109,7 +15137,7 @@ const validateZipXmlEntries = (
       diagnostics.push(
         createImportDiagnostic(
           "source_document_zip_xml_unreadable",
-          `Source package ZIP entry '${entry.fileName}' could not be read as bounded XML.`
+          `Source package ZIP XML entry '${entry.fileName}' failed its compression, size, or checksum integrity check.`
         )
       );
       continue;
