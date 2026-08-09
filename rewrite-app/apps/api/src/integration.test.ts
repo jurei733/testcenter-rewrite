@@ -20282,6 +20282,203 @@ test("source document import derives ZIP runtime structure from referenced bookl
   );
 });
 
+test("source document import assembles original manifestless root ZIP archives", async () => {
+  const tenantKey = "integration-tenant-manifestless-root-zip";
+  const workspaceKey = "integration-workspace-manifestless-root-zip";
+  const expectedResourceContent =
+    'This content was fetched dynamically by the player via directDownloadUrl from resource-package "sample_resource_package".\n';
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const originalResourcePackage = Buffer.from(
+    readFileSync(
+      resolve(
+        originalTestcenterCorpusRoot,
+        "resources/sample_resource_package.itcr.zip.base64"
+      ),
+      "utf8"
+    ).trim(),
+    "base64"
+  );
+  const playerDocument = `<!doctype html><script type="application/ld+json">${createVeronaPlayerMetadataV2()}</script><main>Manifestless player</main>`;
+  const zipPayload = createZipBase64([
+    {
+      fileName: "nested/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>MANIFESTLESS.BOOKLET</Id>
+            <Label>Manifestless root archive</Label>
+          </Metadata>
+          <Units>
+            <Unit id="MANIFESTLESS.UNIT" label="Manifestless unit" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "nested/content/Unit.xml",
+      content: `
+        <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/iqb-berlin/testcenter/17.6.0/definitions/vo_Unit.xsd">
+          <Metadata>
+            <Id>MANIFESTLESS.UNIT</Id>
+            <Label>Manifestless unit</Label>
+          </Metadata>
+          <DefinitionRef player="verona-player-simple@6.0">definition/Unit-Definition.html</DefinitionRef>
+          <Dependencies><File for="player">sample_resource_package.itcr.zip</File></Dependencies>
+        </Unit>
+      `
+    },
+    {
+      fileName: "nested/content/definition/Unit-Definition.html",
+      content: "<main>Manifestless external definition</main>"
+    },
+    {
+      fileName: "nested/resources/player.html",
+      content: playerDocument
+    },
+    {
+      fileName: "nested/resources/sample_resource_package.itcr.zip",
+      content: "",
+      compressedContent: originalResourcePackage,
+      uncompressedSize: originalResourcePackage.length,
+      checksum: zipFixtureCrc32(originalResourcePackage)
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "original-workspace-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const release = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            bookletKey: string;
+            displayLabel: string;
+            unitEntries: Array<{
+              unitKey: string;
+              displayLabel: string;
+              playerKey?: string;
+              unitDefinition?: string;
+            }>;
+          }>;
+          playerEntries?: Array<{ playerKey: string; html: string }>;
+          resourceEntries?: Array<{
+            resourcePath: string;
+            dataBase64: string;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const snapshot =
+    release.body.contentReleaseDetail.contentRelease.runtimeSnapshot;
+  assert.equal(snapshot.bookletEntries.length, 1);
+  assert.equal(snapshot.bookletEntries[0]?.bookletKey, "MANIFESTLESS.BOOKLET");
+  assert.equal(
+    snapshot.bookletEntries[0]?.displayLabel,
+    "Manifestless root archive"
+  );
+  assert.equal(snapshot.bookletEntries[0]?.unitEntries.length, 1);
+  const unitEntry = snapshot.bookletEntries[0]?.unitEntries[0];
+  assert.equal(unitEntry?.unitKey, "MANIFESTLESS.UNIT");
+  assert.equal(unitEntry?.displayLabel, "Manifestless unit");
+  assert.equal(unitEntry?.playerKey, "verona-player-simple@6.0");
+  assert.equal(
+    unitEntry?.unitDefinition,
+    "<main>Manifestless external definition</main>"
+  );
+  assert.deepEqual(snapshot.playerEntries, [
+    {
+      playerKey: "verona-player-simple@6.0",
+      html: playerDocument
+    }
+  ]);
+  const resourceEntry = snapshot.resourceEntries?.find(
+    entry => entry.resourcePath === "sample_resource_package/file.text"
+  );
+  assert.ok(resourceEntry);
+  assert.equal(
+    Buffer.from(resourceEntry.dataBase64, "base64").toString("utf8"),
+    expectedResourceContent
+  );
+});
+
+test("source document import keeps arbitrary manifestless ZIPs rejected", async () => {
+  const tenantKey = "integration-tenant-arbitrary-manifestless-zip";
+  const workspaceKey = "integration-workspace-arbitrary-manifestless-zip";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "notes.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createZipBase64([
+        { fileName: "notes.xml", content: "<Notes><Text>Not test content</Text></Notes>" }
+      ])}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.equal(
+    importResult.body.importJob.diagnostics[0]?.code,
+    "source_document_zip_manifest_missing"
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
 test("source document import resolves ZIP Testcenter unit definitions", async () => {
   const tenantKey = "integration-tenant-zip-testcenter-definition";
   const workspaceKey = "integration-workspace-zip-testcenter-definition";

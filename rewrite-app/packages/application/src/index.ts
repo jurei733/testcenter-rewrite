@@ -14755,6 +14755,35 @@ const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null =>
   return findZipEndOfCentralDirectoryOffset(zipBuffer) >= 0 ? zipBuffer : null;
 };
 
+const createManifestlessZipAssemblyManifest = (
+  zipBuffer: Buffer,
+  entries: ZipEntry[]
+): string | null => {
+  let hasTestcenterRuntimeRoot = false;
+  const members: SourcePackageAssemblyEntry[] = entries.map((entry, index) => {
+    const shouldInspectText = /\.(?:html?|xml)$/i.test(entry.fileName);
+    const bytes = shouldInspectText
+      ? readZipEntryBuffer(zipBuffer, entry, MAX_EXTRACTED_RESOURCE_BYTES)
+      : null;
+    if (
+      bytes &&
+      /\.xml$/i.test(entry.fileName) &&
+      /^\uFEFF?\s*(?:(?:<\?[^?]*\?>|<!--[\s\S]*?-->)\s*)*<(?:(?:[A-Za-z_][\w.-]*):)?(?:Booklet|SysCheck)\b/i.test(
+        bytes.toString("utf8")
+      )
+    ) {
+      hasTestcenterRuntimeRoot = true;
+    }
+    return {
+      sourcePackageId: `archive-entry-${index + 1}`,
+      fileName: entry.fileName,
+      bytes: bytes ?? Buffer.alloc(0)
+    };
+  });
+
+  return hasTestcenterRuntimeRoot ? createAssemblyManifest(members) : null;
+};
+
 const extractXmlManifestFromZipSourceDocument = (
   sourceDocument: string
 ): ZipManifestExtractionResult => {
@@ -14770,19 +14799,18 @@ const extractXmlManifestFromZipSourceDocument = (
   const entries = zipEntries.filter(
     entry => !entry.fileName.endsWith("/")
   );
-  const candidates = [
-    ...entries.filter(entry =>
-      entry.fileName.toLowerCase().endsWith("/imsmanifest.xml") ||
-      entry.fileName.toLowerCase() === "imsmanifest.xml"
-    ),
-    ...entries.filter(entry =>
-      entry.fileName.toLowerCase().endsWith("/manifest.xml") ||
-      entry.fileName.toLowerCase() === "manifest.xml"
-    ),
-    ...entries.filter(entry => entry.fileName.toLowerCase().endsWith(".xml"))
-  ];
+  const isNamedManifestEntry = (entry: ZipEntry): boolean =>
+    /(?:^|\/)(?:imsmanifest|manifest)\.xml$/i.test(entry.fileName);
+  const candidates = entries
+    .filter(entry => entry.fileName.toLowerCase().endsWith(".xml"))
+    .sort(
+      (left, right) =>
+        Number(isNamedManifestEntry(right)) -
+        Number(isNamedManifestEntry(left))
+    );
 
   let foundUnreadableCandidate = false;
+  let foundUnreadableNamedManifest = false;
   for (const entry of candidates) {
     const text = readZipEntryText(
       zipBuffer,
@@ -14791,6 +14819,7 @@ const extractXmlManifestFromZipSourceDocument = (
     );
     if (!text) {
       foundUnreadableCandidate = true;
+      foundUnreadableNamedManifest ||= isNamedManifestEntry(entry);
       continue;
     }
     if (text?.trimStart().startsWith("<") && /<[^>]*manifest\b/i.test(text)) {
@@ -14798,6 +14827,22 @@ const extractXmlManifestFromZipSourceDocument = (
         status: "found",
         manifestText: text,
         manifestFileName: entry.fileName,
+        zipBuffer,
+        entries
+      };
+    }
+  }
+
+  if (!foundUnreadableNamedManifest) {
+    const syntheticManifest = createManifestlessZipAssemblyManifest(
+      zipBuffer,
+      entries
+    );
+    if (syntheticManifest) {
+      return {
+        status: "found",
+        manifestText: syntheticManifest,
+        manifestFileName: "",
         zipBuffer,
         entries
       };
