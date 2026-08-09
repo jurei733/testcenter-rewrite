@@ -918,6 +918,7 @@ export type AdminDirectoryPort = {
     username: string;
     displayName?: string;
     password: string;
+    confirmationPassword?: string;
     customTexts?: Record<string, string>;
     validFrom?: string | null;
     validTo?: string | null;
@@ -955,6 +956,7 @@ export type AdminDirectoryPort = {
     sessionToken: string;
     adminUserId: string;
     role: AdminRole;
+    confirmationPassword?: string;
     accessMode?: AdminRoleAccessMode | "RW" | "RO";
     tenantKey?: string | null;
     workspaceKey?: string | null;
@@ -965,6 +967,7 @@ export type AdminDirectoryPort = {
     sessionToken: string;
     adminUserId: string;
     roleAssignmentId: string;
+    confirmationPassword?: string;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   listAdminAuditEvents(input: {
     sessionToken: string;
@@ -3296,6 +3299,29 @@ const verifyPassword = (password: string, passwordHash: string): boolean => {
 
 const hashAdminPassword = hashPassword;
 const verifyAdminPassword = verifyPassword;
+
+const requireAdminPasswordConfirmation = (
+  adminUser: AdminUser,
+  value: unknown
+): void => {
+  if (typeof value !== "string" || value === "") {
+    throw new FirstSliceError(
+      400,
+      "admin_password_confirmation_required",
+      "The acting administrator password is required for platform admin role changes."
+    );
+  }
+  if (
+    value.length > adminPasswordPolicy.maximumLength ||
+    !verifyAdminPassword(value, adminUser.passwordHash)
+  ) {
+    throw new FirstSliceError(
+      403,
+      "admin_password_confirmation_invalid",
+      "The acting administrator password is invalid."
+    );
+  }
+};
 
 const createAdminSessionToken = (): string => randomBytes(32).toString("base64url");
 
@@ -21323,6 +21349,15 @@ export const createFirstSliceServices = (
           resolvedRoleScopes.push(scope);
         }
 
+        if (
+          resolvedRoleScopes.some(scope => scope.role === "platform_admin")
+        ) {
+          requireAdminPasswordConfirmation(
+            currentSession.adminUser,
+            input.confirmationPassword
+          );
+        }
+
         await repository.saveAdminUser(adminUser);
 
         const savedRoleAssignments: AdminRoleAssignment[] = [];
@@ -21356,6 +21391,9 @@ export const createFirstSliceServices = (
             validTo: adminUser.validTo,
             validForMinutes: adminUser.validForMinutes,
             customTextCount: Object.keys(adminUser.customTexts).length,
+            platformRoleStepUpConfirmed: resolvedRoleScopes.some(
+              scope => scope.role === "platform_admin"
+            ),
             roleAssignments: savedRoleAssignments.map(summarizeAdminRoleAssignment)
           }
         });
@@ -21560,6 +21598,12 @@ export const createFirstSliceServices = (
           existingRoleAssignments
         );
         requireAdminDelegationScope(currentSession.roleAssignments, scope);
+        if (scope.role === "platform_admin") {
+          requireAdminPasswordConfirmation(
+            currentSession.adminUser,
+            input.confirmationPassword
+          );
+        }
         const existingRoleAssignment = existingRoleAssignments.find(roleAssignment =>
           isSameAdminRoleScope(roleAssignment, scope)
         );
@@ -21589,6 +21633,8 @@ export const createFirstSliceServices = (
             summary: `Admin '${currentSession.adminUser.username}' updated '${updatedRoleAssignment.role}' for '${adminUser.username}'.`,
             details: {
               username: adminUser.username,
+              platformRoleStepUpConfirmed:
+                updatedRoleAssignment.role === "platform_admin",
               roleAssignment: summarizeAdminRoleAssignment(updatedRoleAssignment)
             }
           });
@@ -21616,6 +21662,7 @@ export const createFirstSliceServices = (
           summary: `Admin '${currentSession.adminUser.username}' assigned '${roleAssignment.role}' to '${adminUser.username}'.`,
           details: {
             username: adminUser.username,
+            platformRoleStepUpConfirmed: roleAssignment.role === "platform_admin",
             roleAssignment: summarizeAdminRoleAssignment(roleAssignment)
           }
         });
@@ -21670,6 +21717,12 @@ export const createFirstSliceServices = (
           currentSession.roleAssignments,
           roleAssignment
         );
+        if (roleAssignment.role === "platform_admin") {
+          requireAdminPasswordConfirmation(
+            currentSession.adminUser,
+            input.confirmationPassword
+          );
+        }
 
         await repository.deleteAdminRoleAssignment(roleAssignment.roleAssignmentId);
 
@@ -21681,6 +21734,7 @@ export const createFirstSliceServices = (
           summary: `Admin '${currentSession.adminUser.username}' revoked '${roleAssignment.role}' from '${adminUser.username}'.`,
           details: {
             username: adminUser.username,
+            platformRoleStepUpConfirmed: roleAssignment.role === "platform_admin",
             roleAssignment: summarizeAdminRoleAssignment(roleAssignment)
           }
         });

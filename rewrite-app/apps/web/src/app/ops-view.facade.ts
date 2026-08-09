@@ -211,6 +211,7 @@ export class OpsViewFacade {
   adminUserRoleBatchResult: AdminUserRoleBatchResult | null = null;
   adminUserPasswordBatchResult: AdminUserPasswordBatchResult | null = null;
   adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
+  platformRoleConfirmationPassword = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -410,6 +411,8 @@ export class OpsViewFacade {
       this.adminRoleOptions.includes(this.ops.adminCreateRole) &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.isAdminPasswordValid(this.ops.adminCreatePassword) &&
+      (this.ops.adminCreateRole !== "platform_admin" ||
+        this.hasPlatformRoleConfirmation) &&
       this.isAdminCreateCustomTextsValid &&
       this.isAdminCreateAccessWindowValid &&
       this.isScopedAdminRoleInputComplete(
@@ -493,6 +496,36 @@ export class OpsViewFacade {
       this.ops.adminRoleRole === "study_monitor" ||
       this.ops.adminRoleRole === "group_monitor"
     );
+  }
+
+  get isRevokingPlatformAdminRole(): boolean {
+    const payload = parseJsonDocument<ListAdminUsersResponse>(
+      this.ops.adminUsersView
+    );
+    return Boolean(
+      payload?.items.some(item =>
+        item.adminUser.adminUserId ===
+          this.ops.adminRevokeTargetUserId.trim() &&
+        item.roleAssignments.some(
+          roleAssignment =>
+            roleAssignment.roleAssignmentId ===
+              this.ops.adminRevokeRoleAssignmentId.trim() &&
+            roleAssignment.role === "platform_admin"
+        )
+      )
+    );
+  }
+
+  get requiresPlatformRoleConfirmation(): boolean {
+    return (
+      this.ops.adminCreateRole === "platform_admin" ||
+      this.ops.adminRoleRole === "platform_admin" ||
+      this.isRevokingPlatformAdminRole
+    );
+  }
+
+  get hasPlatformRoleConfirmation(): boolean {
+    return this.platformRoleConfirmationPassword !== "";
   }
 
   get monitorProfileEditorProfiles(): MonitorViewProfile[] {
@@ -598,6 +631,8 @@ export class OpsViewFacade {
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.adminRoleOptions.includes(this.ops.adminRoleRole) &&
+      (this.ops.adminRoleRole !== "platform_admin" ||
+        this.hasPlatformRoleConfirmation) &&
       this.ops.adminRoleTargetUserId.trim() !== "" &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminRoleRole,
@@ -613,7 +648,8 @@ export class OpsViewFacade {
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminRevokeTargetUserId.trim() !== "" &&
-      this.ops.adminRevokeRoleAssignmentId.trim() !== ""
+      this.ops.adminRevokeRoleAssignmentId.trim() !== "" &&
+      (!this.isRevokingPlatformAdminRole || this.hasPlatformRoleConfirmation)
     );
   }
 
@@ -669,6 +705,8 @@ export class OpsViewFacade {
       this.canUseAdminSession &&
       this.adminUserBatchCount > 0 &&
       this.adminRoleOptions.includes(this.ops.adminRoleRole) &&
+      (this.ops.adminRoleRole !== "platform_admin" ||
+        this.hasPlatformRoleConfirmation) &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminRoleRole,
         this.ops.adminRoleTenantKey,
@@ -893,6 +931,7 @@ export class OpsViewFacade {
       return;
     }
     this.clearAdminBatches();
+    this.platformRoleConfirmationPassword = "";
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -984,14 +1023,32 @@ export class OpsViewFacade {
     if (!this.canCreateAdminUser) {
       return;
     }
-    this.viewState.onActionAsync(() => this.opsService.createAdminUser());
+    const requiresStepUp = this.ops.adminCreateRole === "platform_admin";
+    const confirmationPassword = requiresStepUp
+      ? this.platformRoleConfirmationPassword
+      : undefined;
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.createAdminUser(confirmationPassword);
+      if (requiresStepUp) {
+        this.platformRoleConfirmationPassword = "";
+      }
+    });
   }
 
   assignAdminRole(): void {
     if (!this.canAssignAdminRole) {
       return;
     }
-    this.viewState.onActionAsync(() => this.opsService.assignAdminRole());
+    const requiresStepUp = this.ops.adminRoleRole === "platform_admin";
+    const confirmationPassword = requiresStepUp
+      ? this.platformRoleConfirmationPassword
+      : undefined;
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.assignAdminRole(confirmationPassword);
+      if (requiresStepUp) {
+        this.platformRoleConfirmationPassword = "";
+      }
+    });
   }
 
   confirmRevokeAdminRole(): void {
@@ -1012,7 +1069,16 @@ export class OpsViewFacade {
     if (!this.canRevokeAdminRole) {
       return;
     }
-    this.viewState.onActionAsync(() => this.opsService.revokeAdminRole());
+    const requiresStepUp = this.isRevokingPlatformAdminRole;
+    const confirmationPassword = requiresStepUp
+      ? this.platformRoleConfirmationPassword
+      : undefined;
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.revokeAdminRole(confirmationPassword);
+      if (requiresStepUp) {
+        this.platformRoleConfirmationPassword = "";
+      }
+    });
   }
 
   confirmUpdateAdminUserStatus(): void {
@@ -1080,7 +1146,14 @@ export class OpsViewFacade {
     this.viewState.onActionAsync(async () => {
       this.adminUserPasswordBatchResult = null;
       this.adminUserDeletionBatchResult = null;
-      const result = await this.opsService.assignAdminRoles(selectedAdminUserIds);
+      const requiresStepUp = role === "platform_admin";
+      const result = await this.opsService.assignAdminRoles(
+        selectedAdminUserIds,
+        requiresStepUp ? this.platformRoleConfirmationPassword : undefined
+      );
+      if (requiresStepUp && result.succeededAdminUserIds.length > 0) {
+        this.platformRoleConfirmationPassword = "";
+      }
       this.adminUserStatusBatchResult = null;
       this.adminUserRoleBatchResult = result;
       for (const adminUserId of result.succeededAdminUserIds) {

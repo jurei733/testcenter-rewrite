@@ -131,6 +131,7 @@ import {
   type RuntimeOperationalEvent,
   type ResetAdminUserPasswordRequest,
   type ResetAdminUserPasswordResponse,
+  type RevokeAdminRoleRequest,
   type RevokeAdminRoleResponse,
   type RevokeAdminSessionsRequest,
   type RevokeAdminSessionsResponse,
@@ -4235,6 +4236,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           username: body.username,
           displayName: body.displayName,
           password: body.password,
+          confirmationPassword: body.confirmationPassword,
           customTexts: body.customTexts,
           validFrom: body.validFrom,
           validTo: body.validTo,
@@ -4350,6 +4352,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           sessionToken,
           adminUserId,
           role: body.role,
+          confirmationPassword: body.confirmationPassword,
           accessMode: body.accessMode,
           tenantKey: body.tenantKey,
           workspaceKey: body.workspaceKey,
@@ -4391,10 +4394,13 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
+        const body =
+          (await readOptionalRequestJsonBody<RevokeAdminRoleRequest>()) ?? {};
         const item = await services.adminDirectory.revokeAdminRole({
           sessionToken,
           adminUserId,
-          roleAssignmentId
+          roleAssignmentId,
+          confirmationPassword: body.confirmationPassword
         });
         sendJson<RevokeAdminRoleResponse>(
           response,

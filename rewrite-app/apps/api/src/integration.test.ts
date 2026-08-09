@@ -1921,6 +1921,240 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(revokedSession.body.error, "admin_session_invalid");
 });
 
+test("platform admin role changes require acting-password confirmation", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory"
+  });
+  const actingPassword = "platform-step-up-secret";
+
+  try {
+    const bootstrap = await requestJsonAt<{
+      adminUser: { adminUserId: string };
+    }>(isolated.baseUrl, "/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "platform.step.up.admin",
+        password: actingPassword
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+
+    const signIn = await requestJsonAt<{ sessionToken: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "platform.step.up.admin",
+          password: actingPassword
+        }
+      }
+    );
+    assert.equal(signIn.status, 200);
+    const adminHeaders = {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    };
+
+    const missingCreateConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          username: "platform.create.missing",
+          password: "platform-create-secret",
+          roleAssignments: [{ role: "platform_admin" }]
+        }
+      }
+    );
+    assert.equal(missingCreateConfirmation.status, 400);
+    assert.equal(
+      missingCreateConfirmation.body.error,
+      "admin_password_confirmation_required"
+    );
+
+    const invalidCreateConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/admin/users",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          username: "platform.create.invalid",
+          password: "platform-create-secret",
+          confirmationPassword: "wrong-platform-password",
+          roleAssignments: [{ role: "platform_admin" }]
+        }
+      }
+    );
+    assert.equal(invalidCreateConfirmation.status, 403);
+    assert.equal(
+      invalidCreateConfirmation.body.error,
+      "admin_password_confirmation_invalid"
+    );
+
+    const createdPlatformAdmin = await requestJsonAt<{
+      adminUser: { adminUserId: string };
+      roleAssignments: Array<{ role: string }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "platform.create.confirmed",
+        password: "platform-create-secret",
+        confirmationPassword: actingPassword,
+        roleAssignments: [{ role: "platform_admin" }]
+      }
+    });
+    assert.equal(createdPlatformAdmin.status, 201);
+    assert.equal(createdPlatformAdmin.body.roleAssignments[0]?.role, "platform_admin");
+
+    const unassignedTarget = await requestJsonAt<{
+      adminUser: { adminUserId: string };
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "platform.assignment.target",
+        password: "platform-target-secret"
+      }
+    });
+    assert.equal(unassignedTarget.status, 201);
+    const targetPath = `/api/v1/admin/users/${unassignedTarget.body.adminUser.adminUserId}/role-assignments`;
+
+    const missingAssignConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      targetPath,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: { role: "platform_admin" }
+      }
+    );
+    assert.equal(missingAssignConfirmation.status, 400);
+    assert.equal(
+      missingAssignConfirmation.body.error,
+      "admin_password_confirmation_required"
+    );
+
+    const invalidAssignConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      targetPath,
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          role: "platform_admin",
+          confirmationPassword: "wrong-platform-password"
+        }
+      }
+    );
+    assert.equal(invalidAssignConfirmation.status, 403);
+    assert.equal(
+      invalidAssignConfirmation.body.error,
+      "admin_password_confirmation_invalid"
+    );
+
+    const assignedPlatformRole = await requestJsonAt<{
+      roleAssignments: Array<{ role: string; roleAssignmentId: string }>;
+    }>(isolated.baseUrl, targetPath, {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        role: "platform_admin",
+        confirmationPassword: actingPassword
+      }
+    });
+    assert.equal(assignedPlatformRole.status, 200);
+    const platformRoleAssignmentId = assignedPlatformRole.body.roleAssignments.find(
+      roleAssignment => roleAssignment.role === "platform_admin"
+    )?.roleAssignmentId;
+    assert.ok(platformRoleAssignmentId);
+
+    const revokePath = `${targetPath}/${platformRoleAssignmentId}`;
+    const missingRevokeConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      revokePath,
+      {
+        method: "DELETE",
+        headers: adminHeaders
+      }
+    );
+    assert.equal(missingRevokeConfirmation.status, 400);
+    assert.equal(
+      missingRevokeConfirmation.body.error,
+      "admin_password_confirmation_required"
+    );
+
+    const invalidRevokeConfirmation = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      revokePath,
+      {
+        method: "DELETE",
+        headers: adminHeaders,
+        body: { confirmationPassword: "wrong-platform-password" }
+      }
+    );
+    assert.equal(invalidRevokeConfirmation.status, 403);
+    assert.equal(
+      invalidRevokeConfirmation.body.error,
+      "admin_password_confirmation_invalid"
+    );
+
+    const revokedPlatformRole = await requestJsonAt<{
+      roleAssignments: Array<{ role: string }>;
+    }>(isolated.baseUrl, revokePath, {
+      method: "DELETE",
+      headers: adminHeaders,
+      body: { confirmationPassword: actingPassword }
+    });
+    assert.equal(revokedPlatformRole.status, 200);
+    assert.equal(
+      revokedPlatformRole.body.roleAssignments.some(
+        roleAssignment => roleAssignment.role === "platform_admin"
+      ),
+      false
+    );
+
+    const directory = await requestJsonAt<{
+      items: Array<{
+        adminUser: { username: string };
+        roleAssignments: Array<{ role: string }>;
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", { headers: adminHeaders });
+    assert.equal(directory.status, 200);
+    assert.equal(
+      directory.body.items.some(
+        item =>
+          item.adminUser.username === "platform.create.missing" ||
+          item.adminUser.username === "platform.create.invalid"
+      ),
+      false
+    );
+
+    const audit = await requestJsonAt<{
+      items: Array<{ details: Record<string, unknown> }>;
+    }>(isolated.baseUrl, "/api/v1/admin/audit-events", {
+      headers: adminHeaders
+    });
+    assert.equal(audit.status, 200);
+    assert.equal(
+      audit.body.items.filter(
+        item => item.details["platformRoleStepUpConfirmed"] === true
+      ).length >= 3,
+      true
+    );
+    assert.equal(JSON.stringify(audit.body).includes(actingPassword), false);
+    assert.equal(
+      JSON.stringify(audit.body).includes("wrong-platform-password"),
+      false
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("admin sign-in uses the original persistent login sink", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",

@@ -347,6 +347,10 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Initial Group Key
             <input id="adminCreateGroupKey" name="adminCreateGroupKey" [(ngModel)]="view.ops.adminCreateGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'group_monitor'" />
           </label>
+          <label *ngIf="view.requiresPlatformRoleConfirmation">
+            Confirm Current Platform Admin Password
+            <input id="adminPlatformRoleConfirmationPassword" name="adminPlatformRoleConfirmationPassword" type="password" autocomplete="current-password" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.platformRoleConfirmationPassword" />
+          </label>
           <label>
             Access Starts (ISO timestamp)
             <input id="adminCreateValidFrom" name="adminCreateValidFrom" placeholder="2026-08-01T08:00:00Z" [(ngModel)]="view.ops.adminCreateValidFrom" (change)="view.persistState()" />
@@ -374,6 +378,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p *ngIf="!view.isAdminCreateAccessWindowValid">
           Enter valid ISO timestamps with the start no later than the end, and a
           whole duration between 1 and 5,256,000 minutes.
+        </p>
+        <p *ngIf="view.requiresPlatformRoleConfirmation">
+          Creating, assigning, batch-assigning, or revoking a platform_admin role
+          requires the current acting administrator password. The confirmation is
+          held in memory only and cleared after a successful sensitive action.
         </p>
         <div class="actions">
           <button id="adminCreateUserButton" class="primary" type="button" [disabled]="!view.canCreateAdminUser" (click)="view.createAdminUser()">{{ view.isCreatingSystemCheckAccount ? "Create System Check Account" : view.isCreatingMonitorAccount ? "Create Monitor Account" : "Create Admin User" }}</button>

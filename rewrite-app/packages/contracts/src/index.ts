@@ -2438,6 +2438,7 @@ export type CreateAdminUserRequest = {
   username: string;
   displayName?: string;
   password: string;
+  confirmationPassword?: string;
   customTexts?: Record<string, string>;
   validFrom?: string | null;
   validTo?: string | null;
@@ -2454,7 +2455,13 @@ export type ResetAdminUserPasswordRequest = {
   password: string;
 };
 
-export type AssignAdminRoleRequest = AdminRoleAssignmentRequest;
+export type AssignAdminRoleRequest = AdminRoleAssignmentRequest & {
+  confirmationPassword?: string;
+};
+
+export type RevokeAdminRoleRequest = {
+  confirmationPassword?: string;
+};
 
 export type UpdateApplicationSettingsRequest = {
   appTitle: string;

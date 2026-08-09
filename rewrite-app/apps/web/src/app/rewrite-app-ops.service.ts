@@ -18,6 +18,7 @@ import type {
   ListAdminUsersResponse,
   ResetAdminUserPasswordRequest,
   ResetAdminUserPasswordResponse,
+  RevokeAdminRoleRequest,
   RevokeAdminRoleResponse,
   RevokeAdminSessionsRequest,
   RevokeAdminSessionsResponse,
@@ -467,7 +468,7 @@ export class RewriteAppOpsService {
     );
   }
 
-  async createAdminUser(): Promise<void> {
+  async createAdminUser(confirmationPassword?: string): Promise<void> {
     if (!this.hasAdminSession()) {
       return;
     }
@@ -479,6 +480,7 @@ export class RewriteAppOpsService {
         username: this.opsState.adminCreateUsername.trim(),
         displayName: this.opsState.adminCreateDisplayName.trim() || undefined,
         password: this.opsState.adminCreatePassword,
+        confirmationPassword,
         customTexts:
           parseJsonDocument<Record<string, string>>(
             this.opsState.adminCreateCustomTextsJson
@@ -522,7 +524,7 @@ export class RewriteAppOpsService {
     await this.refreshAdminUsers();
   }
 
-  async assignAdminRole(): Promise<void> {
+  async assignAdminRole(confirmationPassword?: string): Promise<void> {
     if (!this.hasAdminSession()) {
       return;
     }
@@ -537,7 +539,8 @@ export class RewriteAppOpsService {
         this.opsState.adminRoleTenantKey,
         this.opsState.adminRoleWorkspaceKey,
         this.opsState.adminRoleGroupKey,
-        this.opsState.adminRoleMonitorProfilesJson
+        this.opsState.adminRoleMonitorProfilesJson,
+        confirmationPassword
       ) satisfies AssignAdminRoleRequest,
       { headers: this.createAdminHeaders() }
     );
@@ -557,7 +560,8 @@ export class RewriteAppOpsService {
   }
 
   async assignAdminRoles(
-    adminUserIds: string[]
+    adminUserIds: string[],
+    confirmationPassword?: string
   ): Promise<AdminUserRoleBatchResult> {
     if (!this.hasAdminSession()) {
       return {
@@ -575,7 +579,8 @@ export class RewriteAppOpsService {
       this.opsState.adminRoleTenantKey,
       this.opsState.adminRoleWorkspaceKey,
       this.opsState.adminRoleGroupKey,
-      this.opsState.adminRoleMonitorProfilesJson
+      this.opsState.adminRoleMonitorProfilesJson,
+      confirmationPassword
     );
     const succeededAdminUserIds: string[] = [];
     const failures: AdminUserRoleBatchResult["failures"] = [];
@@ -612,7 +617,7 @@ export class RewriteAppOpsService {
     };
   }
 
-  async revokeAdminRole(): Promise<void> {
+  async revokeAdminRole(confirmationPassword?: string): Promise<void> {
     if (!this.hasAdminSession()) {
       return;
     }
@@ -625,7 +630,7 @@ export class RewriteAppOpsService {
         adminUserId,
         roleAssignmentId
       }),
-      undefined,
+      { confirmationPassword } satisfies RevokeAdminRoleRequest,
       { headers: this.createAdminHeaders() }
     );
 
@@ -988,10 +993,11 @@ export class RewriteAppOpsService {
     tenantKey: string,
     workspaceKey: string,
     groupKey: string,
-    monitorProfilesJson?: string
+    monitorProfilesJson?: string,
+    confirmationPassword?: string
   ): AssignAdminRoleRequest {
     if (role === "platform_admin") {
-      return { role };
+      return { role, confirmationPassword };
     }
 
     if (role === "tenant_admin") {

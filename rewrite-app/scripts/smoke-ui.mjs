@@ -2601,6 +2601,148 @@ try {
       )
   );
 
+  await selectAndCommit("#adminRoleRole", "platform_admin");
+  await page.locator("#adminPlatformRoleConfirmationPassword").waitFor();
+  assert.equal(
+    await page
+      .locator("#adminPlatformRoleConfirmationPassword")
+      .getAttribute("maxlength"),
+    "60"
+  );
+  await expectButtonSelectorDisabled("#adminAssignRoleButton");
+  const wrongPlatformRoleConfirmation = "wrong-ui-platform-password";
+  await fillAndCommit(
+    "#adminPlatformRoleConfirmationPassword",
+    wrongPlatformRoleConfirmation
+  );
+  await expectButtonSelectorEnabled("#adminAssignRoleButton");
+  const rejectedPlatformRoleResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/api/v1/admin/users/${workspaceAdminUserId}/role-assignments`
+      )
+  );
+  await page.locator("#adminAssignRoleButton").click();
+  const rejectedPlatformRoleResponse =
+    await rejectedPlatformRoleResponsePromise;
+  assert.equal(rejectedPlatformRoleResponse.status(), 403);
+  assert.equal(
+    (await rejectedPlatformRoleResponse.json()).error,
+    "admin_password_confirmation_invalid"
+  );
+  await expectInputValue(
+    "#adminPlatformRoleConfirmationPassword",
+    wrongPlatformRoleConfirmation
+  );
+  const persistedAfterRejectedPlatformRole = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+  );
+  assert.equal(
+    JSON.stringify(persistedAfterRejectedPlatformRole).includes(
+      wrongPlatformRoleConfirmation
+    ),
+    false
+  );
+
+  await fillAndCommit("#adminPlatformRoleConfirmationPassword", adminPassword);
+  const assignedPlatformRoleResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(
+        `/api/v1/admin/users/${workspaceAdminUserId}/role-assignments`
+      )
+  );
+  logStep("assign-platform-admin-role-with-step-up");
+  await page.locator("#adminAssignRoleButton").click();
+  const assignedPlatformRoleResponse = await assignedPlatformRoleResponsePromise;
+  assert.equal(assignedPlatformRoleResponse.status(), 200);
+  await expectInputValue("#adminPlatformRoleConfirmationPassword", "");
+  const adminUsersWithPlatformRole = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          item?.roleAssignments?.some(
+            roleAssignment => roleAssignment?.role === "platform_admin"
+          )
+      )
+  );
+  const platformRoleAssignmentId = adminUsersWithPlatformRole.items
+    .find(item => item?.adminUser?.adminUserId === workspaceAdminUserId)
+    ?.roleAssignments.find(
+      roleAssignment => roleAssignment?.role === "platform_admin"
+    )?.roleAssignmentId;
+  assert.ok(
+    platformRoleAssignmentId,
+    "UI smoke expected the step-up-confirmed platform role assignment."
+  );
+
+  const targetPlatformRoleCard = page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Admin Role Assignments",
+        exact: true
+      })
+    })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", { name: "platform_admin", exact: true })
+    })
+    .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: platformRoleAssignmentId });
+  await targetPlatformRoleCard.waitFor();
+  await targetPlatformRoleCard
+    .getByRole("button", { name: "Edit Role Scope", exact: true })
+    .click();
+  await expectInputValue("#adminRevokeTargetUserId", workspaceAdminUserId);
+  await expectInputValue(
+    "#adminRevokeRoleAssignmentId",
+    platformRoleAssignmentId
+  );
+  await expectButtonSelectorDisabled("#adminRevokeRoleButton");
+  await fillAndCommit("#adminPlatformRoleConfirmationPassword", adminPassword);
+  await expectButtonSelectorEnabled("#adminRevokeRoleButton");
+  const revokePlatformRoleDialog = acceptNextDialog(
+    new RegExp(
+      `Revoke role assignment '${platformRoleAssignmentId}' from admin user '${workspaceAdminUserId}'\\?`
+    )
+  );
+  const revokedPlatformRoleResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "DELETE" &&
+      response.url().endsWith(
+        `/api/v1/admin/users/${workspaceAdminUserId}/role-assignments/${platformRoleAssignmentId}`
+      )
+  );
+  logStep("revoke-platform-admin-role-with-step-up");
+  await page.locator("#adminRevokeRoleButton").click();
+  await revokePlatformRoleDialog;
+  const revokedPlatformRoleResponse = await revokedPlatformRoleResponsePromise;
+  assert.equal(revokedPlatformRoleResponse.status(), 200);
+  await expectInputValue("#adminPlatformRoleConfirmationPassword", "");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.adminUserId === workspaceAdminUserId &&
+          !item?.roleAssignments?.some(
+            roleAssignment => roleAssignment?.role === "platform_admin"
+          )
+      )
+  );
+  logStep("admin-platform-role-step-up");
+  stopAfter("admin-platform-role-step-up");
+
   await fillAndCommit("#adminResetTargetUserId", workspaceAdminUserId);
   await fillAndCommit("#adminResetPassword", workspaceAdminResetPassword);
   await expectButtonSelectorEnabled("#adminResetPasswordButton");
