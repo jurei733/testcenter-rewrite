@@ -50,6 +50,8 @@ import {
   type DeleteReviewResponse,
   type DeleteSourcePackageRequest,
   type DeleteSourcePackageResponse,
+  type DeleteSourcePackagesRequest,
+  type DeleteSourcePackagesResponse,
   type DeleteSystemCheckReportsRequest,
   type DeleteSystemCheckReportsResponse,
   type DetailedResponseListQuery,
@@ -1751,6 +1753,9 @@ const sourcePackageDeletionReadinessPattern = createRoutePattern(
 const sourcePackageDeletePattern = createRoutePattern(
   productionApiRoutes.workspace.deleteSourcePackage
 );
+const sourcePackageBatchDeletePattern = createRoutePattern(
+  productionApiRoutes.workspace.deleteSourcePackages
+);
 const sourcePackageReplacePattern = createRoutePattern(
   productionApiRoutes.workspace.replaceSourcePackage
 );
@@ -1950,6 +1955,7 @@ const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", sourcePackageDownloadPattern],
   ["GET", sourcePackageDeletionReadinessPattern],
   ["DELETE", sourcePackageDeletePattern],
+  ["POST", sourcePackageBatchDeletePattern],
   ["POST", sourcePackageReplacePattern],
   ["GET", sourcePackageCsvExportPattern],
   ["POST", sourcePackageRetryImportPattern],
@@ -2728,6 +2734,11 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       "DELETE",
       sourcePackageDeletePattern,
       productionApiRoutes.workspace.deleteSourcePackage
+    ],
+    [
+      "POST",
+      sourcePackageBatchDeletePattern,
+      productionApiRoutes.workspace.deleteSourcePackages
     ],
     [
       "POST",
@@ -5194,6 +5205,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const sourcePackageDeletionReadinessMatch =
         sourcePackageDeletionReadinessPattern.exec(pathname);
       const sourcePackageDeleteMatch = sourcePackageDeletePattern.exec(pathname);
+      const sourcePackageBatchDeleteMatch =
+        sourcePackageBatchDeletePattern.exec(pathname);
       const sourcePackageReplaceMatch = sourcePackageReplacePattern.exec(pathname);
       const sourcePackageCsvExportMatch =
         sourcePackageCsvExportPattern.exec(pathname);
@@ -5353,6 +5366,108 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           confirmation: body.confirmation
         });
         sendJson<DeleteSourcePackageResponse>(response, 200, { deletion });
+        return;
+      }
+
+      if (
+        request.method === "POST" &&
+        sourcePackageBatchDeleteMatch?.groups
+      ) {
+        const tenantKey = decodeRouteGroup(
+          sourcePackageBatchDeleteMatch.groups.tenantKey
+        );
+        const workspaceKey = decodeRouteGroup(
+          sourcePackageBatchDeleteMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<DeleteSourcePackagesRequest>();
+        if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 200) {
+          sendError(
+            response,
+            400,
+            "source_package_delete_batch_invalid",
+            "Batch deletion requires between 1 and 200 source-package items."
+          );
+          return;
+        }
+        const normalizedItems = body.items.map(item => ({
+          sourcePackageId:
+            typeof item?.sourcePackageId === "string"
+              ? item.sourcePackageId.trim()
+              : "",
+          confirmation:
+            typeof item?.confirmation === "string" ? item.confirmation : ""
+        }));
+        if (
+          normalizedItems.some(item => !item.sourcePackageId) ||
+          new Set(normalizedItems.map(item => item.sourcePackageId)).size !==
+            normalizedItems.length
+        ) {
+          sendError(
+            response,
+            400,
+            "source_package_delete_batch_invalid",
+            "Every batch item requires a unique sourcePackageId."
+          );
+          return;
+        }
+
+        const report: DeleteSourcePackagesResponse["report"] = {
+          requestedCount: normalizedItems.length,
+          deleted: [],
+          didNotExist: [],
+          notAllowed: [],
+          wasUsed: [],
+          errors: []
+        };
+        for (const item of normalizedItems) {
+          try {
+            report.deleted.push(
+              await services.contentIntake.deleteSourcePackage({
+                tenantKey,
+                workspaceKey,
+                sourcePackageId: item.sourcePackageId,
+                confirmation: item.confirmation
+              })
+            );
+          } catch (error) {
+            const issue = isFirstSliceError(error)
+              ? {
+                  sourcePackageId: item.sourcePackageId,
+                  fileName: item.confirmation || null,
+                  error: String(error.errorCode),
+                  message: error.message,
+                  ...(error.details === undefined ? {} : { details: error.details })
+                }
+              : {
+                  sourcePackageId: item.sourcePackageId,
+                  fileName: item.confirmation || null,
+                  error: "unexpected_error",
+                  message: "Source package deletion failed unexpectedly."
+                };
+            if (issue.error === "source_package_not_found") {
+              report.didNotExist.push(issue);
+            } else if (
+              issue.error === "source_package_delete_confirmation_mismatch"
+            ) {
+              report.notAllowed.push(issue);
+            } else if (issue.error === "source_package_delete_blocked") {
+              report.wasUsed.push(issue);
+            } else {
+              report.errors.push(issue);
+            }
+          }
+        }
+        sendJson<DeleteSourcePackagesResponse>(response, 200, { report });
         return;
       }
 

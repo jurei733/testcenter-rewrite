@@ -19,6 +19,9 @@ const skipRuntimeCsvExports = ["1", "true", "yes", "on"].includes(
 const skipOfflineAppShell = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_SKIP_OFFLINE_APP_SHELL ?? "").toLowerCase()
 );
+const skipWorkspaceRename = ["1", "true", "yes", "on"].includes(
+  String(process.env.UI_SMOKE_SKIP_WORKSPACE_RENAME ?? "").toLowerCase()
+);
 const busyStartTimeoutMs = Number.parseInt(
   process.env.UI_SMOKE_BUSY_START_TIMEOUT_MS ?? "750",
   10
@@ -2169,53 +2172,55 @@ try {
     .waitFor();
   stopAfter("workspace-directory-reads");
 
-  logStep("workspace-rename");
-  const renamedWorkspaceDisplayName = `Renamed Workspace ${Date.now()}`;
-  await fillAndCommit("#workspaceDisplayNameInput", renamedWorkspaceDisplayName);
-  await expectButtonSelectorEnabled("#renameWorkspaceButton");
-  await clickAction("Rename Workspace");
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
-    payload =>
-      payload?.workspaceOverview?.workspace?.workspaceKey === workspaceKey &&
-      payload.workspaceOverview.workspace.displayName === renamedWorkspaceDisplayName
-  );
-  await page
-    .locator("article.card")
-    .filter({
-      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
-    })
-    .locator(".record-card")
-    .filter({
-      has: page.getByRole("heading", {
-        name: renamedWorkspaceDisplayName,
-        exact: true
+  if (!skipWorkspaceRename) {
+    logStep("workspace-rename");
+    const renamedWorkspaceDisplayName = `Renamed Workspace ${Date.now()}`;
+    await fillAndCommit("#workspaceDisplayNameInput", renamedWorkspaceDisplayName);
+    await expectButtonSelectorEnabled("#renameWorkspaceButton");
+    await clickAction("Rename Workspace");
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
+      payload =>
+        payload?.workspaceOverview?.workspace?.workspaceKey === workspaceKey &&
+        payload.workspaceOverview.workspace.displayName === renamedWorkspaceDisplayName
+    );
+    await page
+      .locator("article.card")
+      .filter({
+        has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
       })
-    })
-    .filter({ hasText: workspaceKey })
-    .waitFor();
-  await pollJsonWithPredicate(
-    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=workspace_updated`,
-    payload =>
-      Array.isArray(payload?.items) &&
-      payload.items.some(
-        item =>
-          item?.activityEvent?.eventType === "workspace_updated" &&
-          item.activityEvent?.details?.nextDisplayName === renamedWorkspaceDisplayName
-      )
-  );
-  await page.reload({ waitUntil: "networkidle" });
-  await waitForNotBusy("workspace-rename-reload");
-  await clickAction("Refresh Workspace Directory");
-  await page
-    .locator("article.card")
-    .filter({
-      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
-    })
-    .filter({ hasText: renamedWorkspaceDisplayName })
-    .filter({ hasText: workspaceKey })
-    .waitFor();
-  stopAfter("workspace-rename");
+      .locator(".record-card")
+      .filter({
+        has: page.getByRole("heading", {
+          name: renamedWorkspaceDisplayName,
+          exact: true
+        })
+      })
+      .filter({ hasText: workspaceKey })
+      .waitFor();
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=workspace_updated`,
+      payload =>
+        Array.isArray(payload?.items) &&
+        payload.items.some(
+          item =>
+            item?.activityEvent?.eventType === "workspace_updated" &&
+            item.activityEvent?.details?.nextDisplayName === renamedWorkspaceDisplayName
+        )
+    );
+    await page.reload({ waitUntil: "networkidle" });
+    await waitForNotBusy("workspace-rename-reload");
+    await clickAction("Refresh Workspace Directory");
+    await page
+      .locator("article.card")
+      .filter({
+        has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+      })
+      .filter({ hasText: renamedWorkspaceDisplayName })
+      .filter({ hasText: workspaceKey })
+      .waitFor();
+    stopAfter("workspace-rename");
+  }
 
   logStep("nav-ops-admin-management");
   await page.locator('[data-view-nav="ops"]').click();
@@ -3805,6 +3810,75 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  logStep("workspace-file-batch-delete");
+  const batchDisposableFileName = `ui-batch-disposable-${Date.now()}.txt`;
+  const batchDisposableResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: batchDisposableFileName,
+        mediaType: "text/plain",
+        sourceDocument: "Disposable workspace file for mixed batch deletion."
+      }
+    }
+  );
+  const batchDisposablePayload = await batchDisposableResponse.json();
+  assert.ok(batchDisposablePayload.sourcePackage?.sourcePackageId);
+  await page.locator("#refreshContentReadsButton").click();
+  await clickCardAction(
+    "Source Packages",
+    "Add To Delete Batch",
+    uploadedSourceFileName
+  );
+  await clickCardAction(
+    "Source Packages",
+    "Add To Delete Batch",
+    batchDisposableFileName
+  );
+  await page
+    .locator("#sourcePackageDeletionSelection")
+    .filter({ hasText: "2 file(s) selected" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#deleteSourcePackageBatchButton");
+  const deleteSourcePackageBatchDialog = acceptNextDialog(
+    /Delete 2 selected workspace file\(s\) and their unused derivatives\? Files that are still referenced will remain and be reported separately\./
+  );
+  await page.locator("#deleteSourcePackageBatchButton").click();
+  await deleteSourcePackageBatchDialog;
+  await page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Workspace File Batch Deletion Report"
+      })
+    })
+    .filter({ hasText: "1/2 deleted" })
+    .filter({ hasText: "1 used" })
+    .filter({ hasText: batchDisposableFileName })
+    .filter({ hasText: uploadedSourceFileName })
+    .waitFor({ timeout: 15_000 });
+  await page
+    .locator("#sourcePackageDeletionSelection")
+    .filter({ hasText: "1 file(s) selected" })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item => item?.sourcePackage?.fileName === uploadedSourceFileName
+      ) &&
+      !payload.items.some(
+        item => item?.sourcePackage?.fileName === batchDisposableFileName
+      )
+  );
+  await page.locator("#clearSourcePackageDeletionSelectionButton").click();
+  await page
+    .locator("#sourcePackageDeletionSelection")
+    .filter({ hasText: "0 file(s) selected" })
+    .waitFor();
   stopAfter("content-prompt-read-model");
 
   logStep("participant-entry-ambiguous-workspace-guidance");

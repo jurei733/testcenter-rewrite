@@ -3763,6 +3763,54 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       "workspace:auth-required-tenant/auth-required-workspace"
     );
 
+    const rejectedBatchDeleteByReadOnlyAdmin = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-package-deletions",
+      {
+        method: "POST",
+        headers: readOnlyHeaders,
+        body: {
+          items: [
+            {
+              sourcePackageId: "read-only-delete-denied",
+              confirmation: "read-only-delete-denied.xml"
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(rejectedBatchDeleteByReadOnlyAdmin.status, 403);
+    assert.equal(
+      rejectedBatchDeleteByReadOnlyAdmin.body.error,
+      "admin_write_role_required"
+    );
+
+    const writableBatchDelete = await requestJsonAt<{
+      report: { didNotExist: Array<{ sourcePackageId: string }> };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/source-package-deletions",
+      {
+        method: "POST",
+        headers: workspaceAdminHeaders,
+        body: {
+          items: [
+            {
+              sourcePackageId: "writable-missing-package",
+              confirmation: "writable-missing-package.xml"
+            }
+          ]
+        }
+      }
+    );
+    assert.equal(writableBatchDelete.status, 200);
+    assert.equal(
+      writableBatchDelete.body.report.didNotExist[0]?.sourcePackageId,
+      "writable-missing-package"
+    );
+
     const rejectedWorkspaceListByWorkspaceAdmin = await requestJsonAt<{
       error: string;
     }>(
@@ -8525,6 +8573,159 @@ test("source-package replacement preserves versions and deletion honors dependen
   assert.equal(
     deletionActivity.body.items[0]?.activityEvent.details.deletedContentReleaseCount,
     1
+  );
+});
+
+test("source-package batch deletion reports deleted, used, missing, and disallowed files", async () => {
+  const tenantKey = "integration-tenant-source-batch-delete";
+  const workspaceKey = "integration-workspace-source-batch-delete";
+  const workspaceUrl =
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`;
+  const createSourcePackage = async (fileName: string) => {
+    const created = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`${workspaceUrl}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName,
+        mediaType: "application/xml",
+        sourceDocument: `<assessment><booklet key="${fileName}"><unit key="unit:${fileName}" /></booklet></assessment>`
+      }
+    });
+    assert.equal(created.status, 201);
+    return created.body.sourcePackage;
+  };
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const disposable = await createSourcePackage("batch-disposable.xml");
+  const wrongConfirmation = await createSourcePackage("batch-confirmation.xml");
+  const used = await createSourcePackage("batch-used.xml");
+  const usedImport = await requestJson<{
+    stagedContentRelease: { contentReleaseId: string };
+  }>(`${workspaceUrl}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: used.sourcePackageId }
+  });
+  assert.ok(usedImport.body.stagedContentRelease.contentReleaseId);
+  const activation = await requestJson(
+    `${workspaceUrl}/content-releases/${usedImport.body.stagedContentRelease.contentReleaseId}/activate`,
+    { method: "POST", body: { activatedByActorId: "batch-delete-test" } }
+  );
+  assert.equal(activation.status, 200);
+
+  const deletedBatch = await requestJson<{
+    report: {
+      requestedCount: number;
+      deleted: Array<{ sourcePackageId: string; fileName: string }>;
+      didNotExist: Array<{ sourcePackageId: string; error: string }>;
+      notAllowed: Array<{ sourcePackageId: string; error: string }>;
+      wasUsed: Array<{ sourcePackageId: string; error: string }>;
+      errors: unknown[];
+    };
+  }>(`${workspaceUrl}/source-package-deletions`, {
+    method: "POST",
+    body: {
+      items: [
+        {
+          sourcePackageId: disposable.sourcePackageId,
+          confirmation: disposable.fileName
+        },
+        {
+          sourcePackageId: wrongConfirmation.sourcePackageId,
+          confirmation: "not-the-file-name.xml"
+        },
+        { sourcePackageId: used.sourcePackageId, confirmation: used.fileName },
+        {
+          sourcePackageId: "source-package-does-not-exist",
+          confirmation: "missing.xml"
+        }
+      ]
+    }
+  });
+  assert.equal(deletedBatch.status, 200);
+  assert.equal(deletedBatch.body.report.requestedCount, 4);
+  assert.deepEqual(
+    deletedBatch.body.report.deleted.map(item => item.sourcePackageId),
+    [disposable.sourcePackageId]
+  );
+  assert.deepEqual(
+    deletedBatch.body.report.notAllowed.map(item => [item.sourcePackageId, item.error]),
+    [[wrongConfirmation.sourcePackageId, "source_package_delete_confirmation_mismatch"]]
+  );
+  assert.deepEqual(
+    deletedBatch.body.report.wasUsed.map(item => [item.sourcePackageId, item.error]),
+    [[used.sourcePackageId, "source_package_delete_blocked"]]
+  );
+  assert.deepEqual(
+    deletedBatch.body.report.didNotExist.map(item => [item.sourcePackageId, item.error]),
+    [["source-package-does-not-exist", "source_package_not_found"]]
+  );
+  assert.deepEqual(deletedBatch.body.report.errors, []);
+
+  const packagesAfterPartialDeletion = await requestJson<{
+    items: Array<{ sourcePackage: { sourcePackageId: string } }>;
+  }>(`${workspaceUrl}/source-packages`);
+  assert.equal(
+    packagesAfterPartialDeletion.body.items.some(
+      item => item.sourcePackage.sourcePackageId === disposable.sourcePackageId
+    ),
+    false
+  );
+  assert.equal(
+    packagesAfterPartialDeletion.body.items.some(
+      item => item.sourcePackage.sourcePackageId === wrongConfirmation.sourcePackageId
+    ),
+    true
+  );
+  assert.equal(
+    packagesAfterPartialDeletion.body.items.some(
+      item => item.sourcePackage.sourcePackageId === used.sourcePackageId
+    ),
+    true
+  );
+
+  const retryWithExactConfirmation = await requestJson<{
+    report: { deleted: Array<{ sourcePackageId: string }> };
+  }>(`${workspaceUrl}/source-package-deletions`, {
+    method: "POST",
+    body: {
+      items: [
+        {
+          sourcePackageId: wrongConfirmation.sourcePackageId,
+          confirmation: wrongConfirmation.fileName
+        }
+      ]
+    }
+  });
+  assert.deepEqual(
+    retryWithExactConfirmation.body.report.deleted.map(item => item.sourcePackageId),
+    [wrongConfirmation.sourcePackageId]
+  );
+
+  const duplicateSelection = await requestJson<{ error: string }>(
+    `${workspaceUrl}/source-package-deletions`,
+    {
+      method: "POST",
+      body: {
+        items: [
+          { sourcePackageId: used.sourcePackageId, confirmation: used.fileName },
+          { sourcePackageId: used.sourcePackageId, confirmation: used.fileName }
+        ]
+      }
+    }
+  );
+  assert.equal(duplicateSelection.status, 400);
+  assert.equal(
+    duplicateSelection.body.error,
+    "source_package_delete_batch_invalid"
   );
 });
 
@@ -26807,6 +27008,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
         downloadSourcePackage: string;
         getSourcePackageDeletionReadiness: string;
         deleteSourcePackage: string;
+        deleteSourcePackages: string;
         replaceSourcePackage: string;
         listReviews: string;
         deleteGroupResults: string;
@@ -26906,6 +27108,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
   assert.match(
     manifest.routes.workspace.deleteSourcePackage,
     /source-packages\/.+/
+  );
+  assert.match(
+    manifest.routes.workspace.deleteSourcePackages,
+    /source-package-deletions/
   );
   assert.match(
     manifest.routes.workspace.replaceSourcePackage,

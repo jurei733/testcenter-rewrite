@@ -7,6 +7,8 @@ import {
   type CreateSourcePackageResponse,
   type DeleteSourcePackageRequest,
   type DeleteSourcePackageResponse,
+  type DeleteSourcePackagesRequest,
+  type DeleteSourcePackagesResponse,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
   type GetImportJobResponse,
@@ -360,6 +362,28 @@ export class RewriteAppContentService {
     this.contentState.sourcePackageId = "";
     this.contentState.importJobId = "";
     this.contentState.contentReleaseId = "";
+    host.persistShellState();
+    return payload;
+  }
+
+  async deleteSourcePackages(
+    items: DeleteSourcePackagesRequest["items"]
+  ): Promise<DeleteSourcePackagesResponse> {
+    const payload = await this.requestState.request<DeleteSourcePackagesResponse>(
+      "Delete Selected Source Packages",
+      "POST",
+      resolveRoutePath(productionApiRoutes.workspace.deleteSourcePackages, {
+        tenantKey: this.uiState.workspace.tenantKey.trim(),
+        workspaceKey: this.uiState.workspace.workspaceKey.trim()
+      }),
+      { items } satisfies DeleteSourcePackagesRequest
+    );
+    const host = this.createActionsHost();
+    this.feedback.rememberActivity(
+      "Source Package Batch Deleted",
+      `${payload.report.deleted.length}/${payload.report.requestedCount} selected file(s) were deleted; ${payload.report.wasUsed.length} remain in use and ${payload.report.notAllowed.length + payload.report.didNotExist.length + payload.report.errors.length} failed another check.`
+    );
+    await this.refreshContentReads();
     host.persistShellState();
     return payload;
   }

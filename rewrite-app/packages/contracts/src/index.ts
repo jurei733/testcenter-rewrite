@@ -1923,6 +1923,8 @@ export const productionApiRoutes = {
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/deletion-readiness",
     deleteSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId",
+    deleteSourcePackages:
+      "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-package-deletions",
     replaceSourcePackage:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/source-packages/:sourcePackageId/replacements",
     exportSourcePackagesCsv:
@@ -2098,6 +2100,21 @@ export type RetrySourcePackageImportRequest = {
 
 export type DeleteSourcePackageRequest = {
   confirmation: string;
+};
+
+export type DeleteSourcePackagesRequest = {
+  items: Array<{
+    sourcePackageId: string;
+    confirmation: string;
+  }>;
+};
+
+export type SourcePackageBatchDeletionIssue = {
+  sourcePackageId: string;
+  fileName: string | null;
+  error: string;
+  message: string;
+  details?: unknown;
 };
 
 export type ReplaceSourcePackageRequest = CreateSourcePackageRequest;
@@ -2718,6 +2735,17 @@ export type GetSourcePackageDeletionReadinessResponse = {
 
 export type DeleteSourcePackageResponse = {
   deletion: WorkspaceSourcePackageDeletion;
+};
+
+export type DeleteSourcePackagesResponse = {
+  report: {
+    requestedCount: number;
+    deleted: WorkspaceSourcePackageDeletion[];
+    didNotExist: SourcePackageBatchDeletionIssue[];
+    notAllowed: SourcePackageBatchDeletionIssue[];
+    wasUsed: SourcePackageBatchDeletionIssue[];
+    errors: SourcePackageBatchDeletionIssue[];
+  };
 };
 
 export type ReplaceSourcePackageResponse = {

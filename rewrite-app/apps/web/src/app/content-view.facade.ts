@@ -2,6 +2,7 @@ import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import type {
+  DeleteSourcePackagesResponse,
   GetContentReleaseActivationReadinessResponse,
   GetContentReleaseResponse,
   GetImportJobResponse,
@@ -57,6 +58,9 @@ export class ContentViewFacade {
   readonly contentReleaseStatusOptions = contentReleaseStatuses;
   assemblyFileName = "assembled-source-package.zip";
   private readonly assemblySourcePackageIds = new Set<string>();
+  private readonly deletionSourcePackages = new Map<string, string>();
+  sourcePackageBatchDeletionReport: DeleteSourcePackagesResponse["report"] | null =
+    null;
 
   private readonly participantSessionLinkRows = (
     participantSessionId?: string | null,
@@ -109,6 +113,14 @@ export class ContentViewFacade {
 
   get assemblySelectionLabel(): string {
     return `${this.assemblySourcePackageIds.size} file(s) selected`;
+  }
+
+  get sourcePackageDeletionSelectionLabel(): string {
+    return `${this.deletionSourcePackages.size} file(s) selected`;
+  }
+
+  get canDeleteSourcePackageBatch(): boolean {
+    return this.canWriteWorkspace && this.deletionSourcePackages.size > 0;
   }
 
   get canUseSelectedSourcePackage(): boolean {
@@ -651,7 +663,10 @@ export class ContentViewFacade {
         badges: [
           item.fileType,
           item.sourcePackage.status,
-          item.latestImportJob?.status ?? "no import"
+          item.latestImportJob?.status ?? "no import",
+          ...(this.deletionSourcePackages.has(item.sourcePackage.sourcePackageId)
+            ? ["delete selected"]
+            : [])
         ],
         rows: [
           { label: "Media Type", value: item.sourcePackage.mediaType },
@@ -684,8 +699,72 @@ export class ContentViewFacade {
           sourcePackageId: item.sourcePackage.sourcePackageId,
           sourceFileName: item.sourcePackage.fileName,
           sourceMediaType: item.sourcePackage.mediaType
-        }
+        },
+        actions: this.canWriteWorkspace
+          ? [
+              {
+                label: this.deletionSourcePackages.has(
+                  item.sourcePackage.sourcePackageId
+                )
+                  ? "Remove From Delete Batch"
+                  : "Add To Delete Batch",
+                payload: {
+                  sourcePackageBatchCommand: "toggle",
+                  sourcePackageId: item.sourcePackage.sourcePackageId,
+                  sourceFileName: item.sourcePackage.fileName
+                }
+              }
+            ]
+          : []
       }))
+    ];
+  }
+
+  get sourcePackageBatchDeletionItems(): RecordCollectionItem[] {
+    const report = this.sourcePackageBatchDeletionReport;
+    if (!report) {
+      return [];
+    }
+    const issueItems = (
+      status: string,
+      issues: DeleteSourcePackagesResponse["report"]["errors"]
+    ): RecordCollectionItem[] =>
+      issues.map(issue => ({
+        headline: issue.fileName ?? issue.sourcePackageId,
+        subline: issue.sourcePackageId,
+        badges: [status, issue.error],
+        rows: [{ label: "Outcome", value: issue.message }]
+      }));
+    return [
+      {
+        headline: "Batch deletion result",
+        subline: `${report.deleted.length}/${report.requestedCount} deleted`,
+        badges: [
+          `${report.wasUsed.length} used`,
+          `${report.notAllowed.length} not allowed`,
+          `${report.didNotExist.length} missing`,
+          `${report.errors.length} errors`
+        ],
+        rows: [
+          { label: "Requested", value: String(report.requestedCount) },
+          { label: "Deleted", value: String(report.deleted.length) }
+        ]
+      },
+      ...report.deleted.map(deletion => ({
+        headline: deletion.fileName,
+        subline: deletion.sourcePackageId,
+        badges: ["deleted"],
+        rows: [
+          {
+            label: "Unused derivatives",
+            value: `${deletion.deletedImportJobCount} import(s), ${deletion.deletedContentReleaseCount} release(s)`
+          }
+        ]
+      })),
+      ...issueItems("still used", report.wasUsed),
+      ...issueItems("not allowed", report.notAllowed),
+      ...issueItems("did not exist", report.didNotExist),
+      ...issueItems("error", report.errors)
     ];
   }
 
@@ -1949,6 +2028,19 @@ export class ContentViewFacade {
       return;
     }
 
+    if (item.actionPayload?.sourcePackageBatchCommand === "toggle") {
+      if (this.deletionSourcePackages.has(sourcePackageId)) {
+        this.deletionSourcePackages.delete(sourcePackageId);
+      } else if (this.deletionSourcePackages.size < 200) {
+        this.deletionSourcePackages.set(
+          sourcePackageId,
+          item.actionPayload.sourceFileName?.trim() || sourcePackageId
+        );
+      }
+      this.sourcePackageBatchDeletionReport = null;
+      return;
+    }
+
     this.content.sourcePackageId = sourcePackageId;
     this.content.sourcePackageDeletionReadinessView =
       'Use "Deletion Readiness".';
@@ -2203,6 +2295,36 @@ export class ContentViewFacade {
 
   clearAssemblySelection(): void {
     this.assemblySourcePackageIds.clear();
+  }
+
+  clearSourcePackageDeletionSelection(): void {
+    this.deletionSourcePackages.clear();
+    this.sourcePackageBatchDeletionReport = null;
+  }
+
+  confirmDeleteSourcePackageBatch(): void {
+    if (!this.canDeleteSourcePackageBatch) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Delete ${this.deletionSourcePackages.size} selected workspace file(s) and their unused derivatives? Files that are still referenced will remain and be reported separately.`
+    );
+    if (!confirmed) {
+      return;
+    }
+    const items = [...this.deletionSourcePackages].map(
+      ([sourcePackageId, confirmation]) => ({ sourcePackageId, confirmation })
+    );
+    this.viewState.onActionAsync(async () => {
+      const payload = await this.contentService.deleteSourcePackages(items);
+      this.sourcePackageBatchDeletionReport = payload.report;
+      for (const deletion of payload.report.deleted) {
+        this.deletionSourcePackages.delete(deletion.sourcePackageId);
+      }
+      for (const issue of payload.report.didNotExist) {
+        this.deletionSourcePackages.delete(issue.sourcePackageId);
+      }
+    });
   }
 
   assembleSourcePackages(): void {

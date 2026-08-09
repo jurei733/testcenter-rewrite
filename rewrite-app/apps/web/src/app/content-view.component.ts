@@ -181,10 +181,32 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Source Packages"
-        subtitle="Typed uploads and their latest import state."
+        subtitle="Typed uploads and their latest import state. Select individual files for detail or add multiple files to a guarded delete batch."
         [items]="view.sourcePackageItems"
         (itemAction)="view.selectSourcePackage($event)"
         emptyState="No source packages yet."
+      ></app-record-collection>
+
+      <article class="card">
+        <h2>Workspace File Batch Deletion</h2>
+        <p>Delete up to 200 selected files in one reviewed operation. Referenced files remain stored and are reported separately, matching the original workspace file workflow.</p>
+        <div class="form-grid full">
+          <label>
+            Selection
+            <span id="sourcePackageDeletionSelection" class="inline-toggle">{{ view.sourcePackageDeletionSelectionLabel }}</span>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="deleteSourcePackageBatchButton" class="danger" type="button" [disabled]="!view.canDeleteSourcePackageBatch" (click)="view.confirmDeleteSourcePackageBatch()">Delete Selected Workspace Files</button>
+          <button id="clearSourcePackageDeletionSelectionButton" class="ghost" type="button" [disabled]="view.sourcePackageDeletionSelectionLabel === '0 file(s) selected'" (click)="view.clearSourcePackageDeletionSelection()">Clear Selection</button>
+        </div>
+      </article>
+
+      <app-record-collection
+        title="Workspace File Batch Deletion Report"
+        subtitle="Deleted, still-used, missing, disallowed, and failed files from the most recent batch."
+        [items]="view.sourcePackageBatchDeletionItems"
+        emptyState="Run a workspace file batch deletion to inspect its partial result."
       ></app-record-collection>
 
       <article class="card">
