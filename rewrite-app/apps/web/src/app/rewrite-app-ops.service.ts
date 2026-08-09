@@ -673,6 +673,30 @@ export class RewriteAppOpsService {
     await this.refreshAdminUsers();
   }
 
+  async updateAdminUserDisplayName(
+    adminUserId: string,
+    displayName: string
+  ): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
+    const payload = await this.requestState.request<UpdateAdminUserResponse>(
+      "Update Admin User Display Name",
+      "PATCH",
+      resolveRoutePath(productionApiRoutes.admin.updateUser, {
+        adminUserId: adminUserId.trim()
+      }),
+      { displayName: displayName.trim() } satisfies UpdateAdminUserRequest,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.feedback.rememberActivity(
+      "Admin Display Name Updated",
+      `${payload.adminUser.username} is now shown as ${payload.adminUser.displayName}.`
+    );
+    await this.refreshAdminUsers();
+  }
+
   async updateAdminUsersStatus(
     adminUserIds: string[],
     status: AdminUserStatus

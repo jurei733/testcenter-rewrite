@@ -227,6 +227,8 @@ export class OpsViewFacade {
   adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
   platformRoleConfirmationPassword = "";
   adminResetPasswordConfirmation = "";
+  adminDisplayNameTargetUserId = "";
+  adminDisplayNameUpdateDraft = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -709,6 +711,15 @@ export class OpsViewFacade {
     );
   }
 
+  get canUpdateAdminUserDisplayName(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminDisplayNameTargetUserId.trim() !== "" &&
+      this.adminDisplayNameUpdateDraft.trim() !== ""
+    );
+  }
+
   private isAdminPasswordValid(password: string): boolean {
     return (
       password.length >= adminPasswordPolicy.minimumLength &&
@@ -963,6 +974,8 @@ export class OpsViewFacade {
     this.clearAdminBatches();
     this.platformRoleConfirmationPassword = "";
     this.adminResetPasswordConfirmation = "";
+    this.adminDisplayNameTargetUserId = "";
+    this.adminDisplayNameUpdateDraft = "";
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -1131,6 +1144,24 @@ export class OpsViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.opsService.updateAdminUserStatus());
+  }
+
+  confirmUpdateAdminUserDisplayName(): void {
+    const adminUserId = this.adminDisplayNameTargetUserId.trim();
+    const displayName = this.adminDisplayNameUpdateDraft.trim();
+    if (!this.canUpdateAdminUserDisplayName || !adminUserId || !displayName) {
+      return;
+    }
+    const confirmed = globalThis.window?.confirm(
+      `Change admin user '${adminUserId}' display name to '${displayName}'?`
+    );
+    if (!confirmed) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.updateAdminUserDisplayName(adminUserId, displayName);
+      this.adminDisplayNameUpdateDraft = displayName;
+    });
   }
 
   confirmUpdateAdminUserBatchStatus(): void {
@@ -1439,6 +1470,9 @@ export class OpsViewFacade {
     this.ops.adminRevokeTargetUserId = adminUserId;
     this.ops.adminStatusTargetUserId = adminUserId;
     this.ops.adminResetTargetUserId = adminUserId;
+    this.adminDisplayNameTargetUserId = adminUserId;
+    this.adminDisplayNameUpdateDraft =
+      item.actionPayload?.adminUserDisplayName ?? "";
     this.ops.adminRevokeRoleAssignmentId =
       item.actionPayload?.roleAssignmentId ??
       this.ops.adminRevokeRoleAssignmentId;
@@ -2020,12 +2054,14 @@ export class OpsViewFacade {
         selected:
           item.adminUser.adminUserId === this.ops.adminRoleTargetUserId ||
           item.adminUser.adminUserId === this.ops.adminRevokeTargetUserId ||
-          item.adminUser.adminUserId === this.ops.adminStatusTargetUserId,
+          item.adminUser.adminUserId === this.ops.adminStatusTargetUserId ||
+          item.adminUser.adminUserId === this.adminDisplayNameTargetUserId,
         actionLabel: "Use For Admin Actions",
         actionPayload: {
           adminUserId: item.adminUser.adminUserId,
           roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
-          adminUserStatus: item.adminUser.status
+          adminUserStatus: item.adminUser.status,
+          adminUserDisplayName: item.adminUser.displayName
         },
         actions:
           item.adminUser.adminUserId === this.currentAdminUserId

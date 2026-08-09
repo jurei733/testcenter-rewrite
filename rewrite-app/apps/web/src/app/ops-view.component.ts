@@ -472,6 +472,21 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="adminUpdateStatusButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserStatus" (click)="view.confirmUpdateAdminUserStatus()">Update Status</button>
         </div>
+
+        <div class="form-grid">
+          <label>
+            Display Name Target Admin User ID
+            <input id="adminDisplayNameTargetUserId" name="adminDisplayNameTargetUserId" placeholder="Select an admin user below" [(ngModel)]="view.adminDisplayNameTargetUserId" />
+          </label>
+          <label>
+            New Display Name
+            <input id="adminDisplayNameUpdateDraft" name="adminDisplayNameUpdateDraft" autocomplete="off" [(ngModel)]="view.adminDisplayNameUpdateDraft" />
+          </label>
+        </div>
+        <p>Display-name edits keep the stable username, roles, status, and session identity unchanged and are recorded in the admin audit trail.</p>
+        <div class="actions">
+          <button id="adminUpdateDisplayNameButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserDisplayName" (click)="view.confirmUpdateAdminUserDisplayName()">Update Display Name</button>
+        </div>
       </article>
 
       <ng-container *ngIf="view.isCreatingMonitorAccount || view.isAssigningMonitorRole">

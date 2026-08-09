@@ -401,6 +401,13 @@ and signs the browser out. The scoped Admin Users directory exposes each
 pending handoff as both a badge and an explicit status row. API and protected
 Chromium/SQLite gates cover the complete flow.
 
+The Angular administrator directory now also exposes the existing scoped
+display-name update contract. Selecting an account hydrates its stable user ID
+and current display name into a dedicated transient editor; the confirmed
+mutation preserves username, status, roles, and sessions, refreshes the
+directory, and records the previous and next values in the admin audit trail.
+A protected production Chromium/SQLite gate proves the complete handoff.
+
 All administrator password mutation paths now enforce the shared 8–60
 character policy. The 60-character ceiling preserves the original
 Testcenter's protection against excessively expensive password hashing while

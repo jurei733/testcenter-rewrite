@@ -2315,6 +2315,8 @@ try {
   await fillAndCommit("#adminResetPassword", "");
   await fillAndCommit("#adminResetPasswordConfirmation", "");
   await fillAndCommit("#adminStatusTargetUserId", "");
+  await fillAndCommit("#adminDisplayNameTargetUserId", "");
+  await fillAndCommit("#adminDisplayNameUpdateDraft", "");
   assert.equal(
     await page.locator("#adminCreatePassword").getAttribute("minlength"),
     "8"
@@ -3069,6 +3071,83 @@ try {
           )
       )
   );
+
+  await clickCardAction(
+    "Admin Users",
+    "Use For Admin Actions",
+    delegatedWorkspaceAdminUsername
+  );
+  const delegatedDisplayNameTargetUserId = await page
+    .locator("#adminStatusTargetUserId")
+    .inputValue();
+  assert.ok(delegatedDisplayNameTargetUserId.length > 0);
+  await expectInputValue(
+    "#adminDisplayNameTargetUserId",
+    delegatedDisplayNameTargetUserId
+  );
+  await expectInputValue(
+    "#adminDisplayNameUpdateDraft",
+    "UI Delegated Workspace Admin"
+  );
+  const delegatedWorkspaceAdminRenamedDisplayName =
+    "UI Renamed Delegated Workspace Admin";
+  await fillAndCommit(
+    "#adminDisplayNameUpdateDraft",
+    delegatedWorkspaceAdminRenamedDisplayName
+  );
+  await expectButtonSelectorEnabled("#adminUpdateDisplayNameButton");
+  logStep("admin-user-display-name");
+  const updateAdminDisplayNameDialog = acceptNextDialog(
+    new RegExp(
+      `Change admin user '.+' display name to '${delegatedWorkspaceAdminRenamedDisplayName}'\\?`
+    )
+  );
+  const updateAdminDisplayNameResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "PATCH" &&
+      /\/api\/v1\/admin\/users\/[^/]+$/.test(new URL(response.url()).pathname)
+  );
+  await page.locator("#adminUpdateDisplayNameButton").click();
+  await updateAdminDisplayNameDialog;
+  assert.equal((await updateAdminDisplayNameResponsePromise).status(), 200);
+  await waitForNotBusy("admin-user-display-name");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedWorkspaceAdminUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedWorkspaceAdminUsername &&
+          item?.adminUser?.displayName ===
+            delegatedWorkspaceAdminRenamedDisplayName
+      )
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=admin_user_updated&subjectAdminUserId=${delegatedDisplayNameTargetUserId}&limit=5`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.eventType === "admin_user_updated" &&
+          item?.subjectAdminUserId === delegatedDisplayNameTargetUserId &&
+          item?.details?.previousDisplayName ===
+            "UI Delegated Workspace Admin" &&
+          item?.details?.nextDisplayName ===
+            delegatedWorkspaceAdminRenamedDisplayName
+      )
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Admin Users", exact: true })
+    })
+    .filter({ hasText: delegatedWorkspaceAdminRenamedDisplayName })
+    .waitFor();
+  stopAfter("admin-user-display-name");
 
   await clickAction("Sign Out");
   await fillAndCommitUntilValue(
