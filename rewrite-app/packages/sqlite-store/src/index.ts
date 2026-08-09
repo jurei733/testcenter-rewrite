@@ -190,6 +190,11 @@ const mapApplicationSettings = (
           row.theme_name === "Sekundar" || row.theme_name === "Erwachsene"
             ? row.theme_name
             : "Primar",
+        introHtml: row.intro_html == null ? "" : String(row.intro_html),
+        legalNoticeHtml:
+          row.legal_notice_html == null
+            ? ""
+            : String(row.legal_notice_html),
         customTexts: (() => {
           try {
             const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
@@ -1210,6 +1215,14 @@ const sqliteMigrations: SqliteMigration[] = [
       );
       ALTER TABLE admin_users ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';
     `
+  },
+  {
+    version: 43,
+    name: "add_application_content",
+    sql: `
+      ALTER TABLE application_settings ADD COLUMN intro_html TEXT NOT NULL DEFAULT '';
+      ALTER TABLE application_settings ADD COLUMN legal_notice_html TEXT NOT NULL DEFAULT '';
+    `
   }
 ];
 
@@ -1325,7 +1338,8 @@ export const createSqliteFirstSliceRepository = (
     async getApplicationSettings() {
       const row = database
         .prepare(
-          `SELECT app_title, main_logo, theme_name, custom_texts_json,
+          `SELECT app_title, main_logo, theme_name, intro_html,
+                  legal_notice_html, custom_texts_json,
                   global_warning_text, global_warning_expires_at,
                   updated_at, updated_by_admin_user_id
            FROM application_settings
@@ -1338,14 +1352,17 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO application_settings (
-            settings_key, app_title, main_logo, theme_name, custom_texts_json,
+            settings_key, app_title, main_logo, theme_name, intro_html,
+            legal_notice_html, custom_texts_json,
             global_warning_text, global_warning_expires_at,
             updated_at, updated_by_admin_user_id
-          ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(settings_key) DO UPDATE SET
             app_title = excluded.app_title,
             main_logo = excluded.main_logo,
             theme_name = excluded.theme_name,
+            intro_html = excluded.intro_html,
+            legal_notice_html = excluded.legal_notice_html,
             custom_texts_json = excluded.custom_texts_json,
             global_warning_text = excluded.global_warning_text,
             global_warning_expires_at = excluded.global_warning_expires_at,
@@ -1356,6 +1373,8 @@ export const createSqliteFirstSliceRepository = (
           settings.appTitle,
           settings.mainLogo,
           settings.themeName,
+          settings.introHtml,
+          settings.legalNoticeHtml,
           JSON.stringify(settings.customTexts),
           settings.globalWarningText,
           settings.globalWarningExpiresAt,

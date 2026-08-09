@@ -3,6 +3,7 @@ import { Component, inject } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 
+import { ApplicationSettingsService } from "./application-settings.service";
 import { ParticipantViewFacade } from "./participant-view.facade";
 import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 
@@ -27,6 +28,12 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
             </small>
           </div>
         </header>
+        <section
+          id="applicationIntroContent"
+          class="configured-application-content"
+          *ngIf="applicationSettings.settings().introHtml.trim()"
+          [innerHTML]="applicationSettings.settings().introHtml"
+        ></section>
         <div class="participant-entry-context">
           <span id="participantEntryDisplayName">{{ view.player.displayNameLabel }}</span>
           <span>{{ view.player.loginLabel }}</span>
@@ -690,6 +697,7 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
 })
 export class ParticipantViewComponent implements OnInit, OnDestroy {
   readonly view = inject(ParticipantViewFacade);
+  readonly applicationSettings = inject(ApplicationSettingsService);
 
   get preventBrowserNavigation(): boolean {
     return this.view.preventBrowserNavigation;

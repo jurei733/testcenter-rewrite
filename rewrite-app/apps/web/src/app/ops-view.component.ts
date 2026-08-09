@@ -95,7 +95,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </div>
           <span class="status-pill">Platform admin</span>
         </div>
-        <p>Set the public title, logo, original audience theme, and an optional time-bounded warning shown above every participant and operator view.</p>
+        <p>Set the public title, logo, original audience theme, start-page introduction, legal notice, and an optional time-bounded warning shown above every participant and operator view.</p>
         <div class="form-grid">
           <label>
             Application Title
@@ -136,6 +136,36 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             />
             <button id="resetApplicationLogoButton" class="ghost" type="button" (click)="view.resetApplicationLogo()">Use Default Logo</button>
           </div>
+          <label class="span-all">
+            Start Page HTML
+            <textarea
+              id="applicationIntroHtmlInput"
+              name="applicationIntroHtmlInput"
+              maxlength="100000"
+              rows="7"
+              [(ngModel)]="view.applicationIntroHtmlDraft"
+              placeholder="Optional formatted introduction shown on participant entry."
+            ></textarea>
+          </label>
+          <section class="span-all configured-content-preview" *ngIf="view.applicationIntroHtmlDraft.trim()">
+            <strong>Sanitized start-page preview</strong>
+            <div id="applicationIntroHtmlPreview" [innerHTML]="view.applicationIntroHtmlDraft"></div>
+          </section>
+          <label class="span-all">
+            Legal Notice HTML
+            <textarea
+              id="applicationLegalNoticeHtmlInput"
+              name="applicationLegalNoticeHtmlInput"
+              maxlength="100000"
+              rows="9"
+              [(ngModel)]="view.applicationLegalNoticeHtmlDraft"
+              placeholder="Optional Impressum, privacy, and accessibility information."
+            ></textarea>
+          </label>
+          <section class="span-all configured-content-preview" *ngIf="view.applicationLegalNoticeHtmlDraft.trim()">
+            <strong>Sanitized legal-notice preview</strong>
+            <div id="applicationLegalNoticeHtmlPreview" [innerHTML]="view.applicationLegalNoticeHtmlDraft"></div>
+          </section>
           <details id="applicationCustomTextsEditor" class="span-all application-custom-texts-editor">
             <summary>Custom text overrides ({{ view.applicationCustomTextKeys.length }})</summary>
             <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Empty global values inherit the built-in default.</p>
@@ -194,6 +224,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <p *ngIf="!view.isApplicationWarningExpirationValid">
           Enter a valid local date and time, or leave the expiration empty.
+        </p>
+        <p *ngIf="!view.applicationContentHtmlValid">
+          Start-page and legal-notice HTML must each stay within 100,000 UTF-8 bytes.
         </p>
         <p id="applicationLogoError" *ngIf="view.applicationLogoDraftError">{{ view.applicationLogoDraftError }}</p>
         <p id="applicationSettingsStatus">{{ view.applicationSettingsStatus }}</p>

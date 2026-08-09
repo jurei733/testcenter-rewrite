@@ -956,6 +956,8 @@ export type ApplicationSettingsPort = {
     appTitle: string;
     mainLogo?: string;
     themeName?: ApplicationSettings["themeName"];
+    introHtml?: string;
+    legalNoticeHtml?: string;
     customTexts?: Record<string, string>;
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
@@ -3389,6 +3391,24 @@ const normalizeApplicationTheme = (
     "application_theme_invalid",
     "Application theme must be Primar, Sekundar, or Erwachsene."
   );
+};
+
+const MAX_APPLICATION_CONTENT_HTML_BYTES = 100_000;
+
+const normalizeApplicationContentHtml = (
+  value: unknown,
+  field: "intro" | "legal_notice"
+): string => {
+  const html = String(value ?? "").trim();
+  if (Buffer.byteLength(html, "utf8") > MAX_APPLICATION_CONTENT_HTML_BYTES) {
+    throw new FirstSliceError(
+      400,
+      `application_${field}_html_too_large`,
+      `Application ${field === "intro" ? "intro" : "legal notice"} HTML must not exceed ${MAX_APPLICATION_CONTENT_HTML_BYTES} UTF-8 bytes.`,
+      { maxBytes: MAX_APPLICATION_CONTENT_HTML_BYTES }
+    );
+  }
+  return html;
 };
 
 const MAX_APPLICATION_CUSTOM_TEXT_COUNT = 250;
@@ -20166,6 +20186,17 @@ export const createFirstSliceServices = (
             input.themeName === undefined
               ? previousSettings.themeName
               : normalizeApplicationTheme(input.themeName),
+          introHtml:
+            input.introHtml === undefined
+              ? previousSettings.introHtml
+              : normalizeApplicationContentHtml(input.introHtml, "intro"),
+          legalNoticeHtml:
+            input.legalNoticeHtml === undefined
+              ? previousSettings.legalNoticeHtml
+              : normalizeApplicationContentHtml(
+                  input.legalNoticeHtml,
+                  "legal_notice"
+                ),
           customTexts:
             input.customTexts === undefined
               ? previousSettings.customTexts
@@ -20198,6 +20229,27 @@ export const createFirstSliceServices = (
             nextAppTitle: updatedSettings.appTitle,
             previousThemeName: previousSettings.themeName,
             nextThemeName: updatedSettings.themeName,
+            introHtmlChanged:
+              previousSettings.introHtml !== updatedSettings.introHtml,
+            previousIntroHtmlBytes: Buffer.byteLength(
+              previousSettings.introHtml,
+              "utf8"
+            ),
+            nextIntroHtmlBytes: Buffer.byteLength(
+              updatedSettings.introHtml,
+              "utf8"
+            ),
+            legalNoticeHtmlChanged:
+              previousSettings.legalNoticeHtml !==
+              updatedSettings.legalNoticeHtml,
+            previousLegalNoticeHtmlBytes: Buffer.byteLength(
+              previousSettings.legalNoticeHtml,
+              "utf8"
+            ),
+            nextLegalNoticeHtmlBytes: Buffer.byteLength(
+              updatedSettings.legalNoticeHtml,
+              "utf8"
+            ),
             previousCustomLogo:
               previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
             nextCustomLogo:

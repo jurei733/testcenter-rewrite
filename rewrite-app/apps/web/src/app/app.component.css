@@ -62,6 +62,24 @@
   gap: 18px;
 }
 
+.application-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-top: 24px;
+  padding: 16px 4px 4px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+.application-footer a {
+  color: var(--secondary);
+  font-weight: 700;
+}
+
 .application-warning-banner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -122,5 +140,10 @@
 
   .application-warning-banner {
     grid-template-columns: 1fr;
+  }
+
+  .application-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

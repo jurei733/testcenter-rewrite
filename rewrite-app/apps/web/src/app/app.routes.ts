@@ -56,6 +56,13 @@ export const appRoutes: Routes = [
     canActivate: [rejectSystemCheckOperator]
   },
   {
+    path: "legal-notice",
+    loadComponent: () =>
+      import("./legal-notice.component").then(
+        module => module.LegalNoticeComponent
+      )
+  },
+  {
     path: "ops",
     loadComponent: () =>
       import("./ops-view.component").then(module => module.OpsViewComponent),

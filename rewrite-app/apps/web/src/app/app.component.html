@@ -54,7 +54,7 @@
         />
         <div>
           <span class="eyebrow">{{ applicationSettings.settings().appTitle }}</span>
-          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
+          <h1>{{ isAttachmentCaptureView ? "Capture Attachment" : isLegalNoticeView ? "Legal Notice" : app.activeView === "system-check" ? "System Check" : "Participant Test" }}</h1>
         </div>
       </div>
       <span id="readinessBadge">{{ app.ops.readinessBadge }}</span>
@@ -240,4 +240,8 @@
       </div>
     </section>
   </ng-template>
+  <footer class="application-footer">
+    <span>{{ applicationSettings.settings().appTitle }}</span>
+    <a id="applicationLegalNoticeLink" routerLink="/legal-notice">Legal notice · privacy · accessibility</a>
+  </footer>
 </div>

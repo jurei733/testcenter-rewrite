@@ -52,12 +52,17 @@ export class AppComponent implements OnInit, OnDestroy {
     return (
       this.app.activeView === "participant" ||
       this.app.activeView === "system-check" ||
-      this.isAttachmentCaptureView
+      this.isAttachmentCaptureView ||
+      this.isLegalNoticeView
     );
   }
 
   get isAttachmentCaptureView(): boolean {
     return this.router.url.split("?", 1)[0] === "/attachment-capture";
+  }
+
+  get isLegalNoticeView(): boolean {
+    return this.router.url.split("?", 1)[0] === "/legal-notice";
   }
 
   async ngOnInit(): Promise<void> {

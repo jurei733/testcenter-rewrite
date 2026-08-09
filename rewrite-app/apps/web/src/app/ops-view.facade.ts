@@ -217,6 +217,9 @@ export class OpsViewFacade {
   applicationLogoDraftError = "";
   applicationThemeDraft: ApplicationSettings["themeName"] =
     defaultApplicationSettings.themeName;
+  applicationIntroHtmlDraft = defaultApplicationSettings.introHtml;
+  applicationLegalNoticeHtmlDraft =
+    defaultApplicationSettings.legalNoticeHtml;
   readonly applicationThemeOptions = applicationThemeNames;
   applicationCustomTextDrafts: Record<string, string> = {};
   applicationCustomTextNewKey = "";
@@ -266,9 +269,19 @@ export class OpsViewFacade {
       this.applicationTitleDraft.trim().length <= 120 &&
       this.applicationLogoDraft.length <= 28_000_000 &&
       !this.applicationLogoDraftError &&
+      this.applicationContentHtmlValid &&
       this.applicationCustomTextsValid &&
       this.applicationWarningTextDraft.trim().length <= 4_000 &&
       this.isApplicationWarningExpirationValid
+    );
+  }
+
+  get applicationContentHtmlValid(): boolean {
+    const encoder = new TextEncoder();
+    return (
+      encoder.encode(this.applicationIntroHtmlDraft.trim()).length <= 100_000 &&
+      encoder.encode(this.applicationLegalNoticeHtmlDraft.trim()).length <=
+        100_000
     );
   }
 
@@ -705,6 +718,8 @@ export class OpsViewFacade {
           appTitle: this.applicationTitleDraft,
           mainLogo: this.applicationLogoDraft,
           themeName: this.applicationThemeDraft,
+          introHtml: this.applicationIntroHtmlDraft,
+          legalNoticeHtml: this.applicationLegalNoticeHtmlDraft,
           customTexts: this.normalizedApplicationCustomTexts(),
           globalWarningText: this.applicationWarningTextDraft,
           globalWarningExpiresAt: expirationInput
@@ -3036,6 +3051,8 @@ export class OpsViewFacade {
     this.applicationLogoDraft = settings.mainLogo;
     this.applicationLogoDraftError = "";
     this.applicationThemeDraft = settings.themeName;
+    this.applicationIntroHtmlDraft = settings.introHtml;
+    this.applicationLegalNoticeHtmlDraft = settings.legalNoticeHtml;
     this.applicationCustomTextDrafts = { ...settings.customTexts };
     this.applicationCustomTextNewKey = "";
     this.applicationCustomTextNewValue = "";

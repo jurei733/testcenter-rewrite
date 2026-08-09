@@ -1079,6 +1079,10 @@ try {
   const configuredLogoBase64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
   const configuredLogo = `data:image/png;base64,${configuredLogoBase64}`;
+  const configuredIntroHtml =
+    '<p id="uiConfiguredIntro">Welcome to the <strong>UI smoke assessment</strong>.</p><img id="uiIntroSanitizerProbe" src="missing-intro.png" onerror="document.body.dataset.introUnsafe=\'true\'">';
+  const configuredLegalNoticeHtml =
+    '<h3 id="uiConfiguredLegalHeading">UI Smoke Provider</h3><p>Privacy contact: <a id="uiConfiguredPrivacyLink" href="mailto:privacy@example.test" onclick="document.body.dataset.legalUnsafe=\'true\'">privacy@example.test</a></p>';
   await page.locator("#applicationLogoInput").setInputFiles({
     name: "ui-smoke-logo.png",
     mimeType: "image/png",
@@ -1123,6 +1127,11 @@ try {
     )}T${component(value.getHours())}:${component(value.getMinutes())}`;
   };
   await fillAndCommit("#applicationTitleInput", "UI Smoke Testcenter");
+  await fillAndCommit("#applicationIntroHtmlInput", configuredIntroHtml);
+  await fillAndCommit(
+    "#applicationLegalNoticeHtmlInput",
+    configuredLegalNoticeHtml
+  );
   await fillAndCommit(
     "#applicationWarningTextInput",
     "UI smoke planned maintenance warning"
@@ -1169,6 +1178,14 @@ try {
   assert.equal(
     configuredSettingsPayload.applicationSettings.themeName,
     "Sekundar"
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.introHtml,
+    configuredIntroHtml
+  );
+  assert.equal(
+    configuredSettingsPayload.applicationSettings.legalNoticeHtml,
+    configuredLegalNoticeHtml
   );
   assert.deepEqual(configuredSettingsPayload.applicationSettings.customTexts, {
     gm_menu_filter: "UI Global Hidden Sessions",
@@ -1279,6 +1296,42 @@ try {
     .filter({ hasText: "UI Global Selection" })
     .waitFor();
   await brandedParticipantPage
+    .locator("#applicationIntroContent p")
+    .filter({ hasText: "Welcome to the UI smoke assessment." })
+    .waitFor();
+  assert.equal(
+    await brandedParticipantPage
+      .locator('#applicationIntroContent img[src="missing-intro.png"]')
+      .getAttribute("onerror"),
+    null,
+    "Configured intro HTML must pass through Angular sanitization."
+  );
+  assert.equal(
+    await brandedParticipantPage.evaluate(
+      () => document.body.dataset["introUnsafe"] ?? null
+    ),
+    null
+  );
+  await brandedParticipantPage.locator("#applicationLegalNoticeLink").click();
+  await brandedParticipantPage.waitForURL(/\/app\/legal-notice$/);
+  await brandedParticipantPage
+    .locator("#applicationLegalNoticeContent h3")
+    .filter({ hasText: "UI Smoke Provider" })
+    .waitFor();
+  assert.equal(
+    await brandedParticipantPage
+      .locator(
+        '#applicationLegalNoticeContent a[href="mailto:privacy@example.test"]'
+      )
+      .getAttribute("onclick"),
+    null,
+    "Configured legal HTML must pass through Angular sanitization."
+  );
+  await brandedParticipantPage
+    .getByRole("link", { name: "Back to participant entry" })
+    .click();
+  await brandedParticipantPage.waitForURL(/\/app\/participant$/);
+  await brandedParticipantPage
     .locator("#participantRouteStartOrResumeButton")
     .filter({ hasText: "UI Global Resume" })
     .waitFor();
@@ -1321,6 +1374,8 @@ try {
   await page.locator("#globalApplicationWarning").waitFor({ state: "detached" });
 
   await fillAndCommit("#applicationTitleInput", "IQB-Testcenter");
+  await fillAndCommit("#applicationIntroHtmlInput", "");
+  await fillAndCommit("#applicationLegalNoticeHtmlInput", "");
   await page.locator("#applicationThemeSelect").selectOption({ label: "Primar" });
   await page.locator("#resetApplicationLogoButton").click();
   await page.locator("#resetApplicationCustomTextsButton").click();

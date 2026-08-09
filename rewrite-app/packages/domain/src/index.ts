@@ -409,6 +409,10 @@ export type ApplicationSettings = {
   appTitle: string;
   mainLogo: string;
   themeName: ApplicationThemeName;
+  /** Original instance Startseite HTML, rendered through the frontend sanitizer. */
+  introHtml: string;
+  /** Original public Impressum/Datenschutz HTML, rendered through the frontend sanitizer. */
+  legalNoticeHtml: string;
   customTexts: Record<string, string>;
   globalWarningText: string | null;
   globalWarningExpiresAt: string | null;
@@ -420,6 +424,8 @@ export const defaultApplicationSettings: ApplicationSettings = {
   appTitle: "IQB-Testcenter",
   mainLogo: "app-icon.svg",
   themeName: "Primar",
+  introHtml: "",
+  legalNoticeHtml: "",
   customTexts: {},
   globalWarningText: null,
   globalWarningExpiresAt: null,

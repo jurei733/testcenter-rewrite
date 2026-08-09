@@ -1746,6 +1746,8 @@ test("platform application settings are public, durable, validated, and audited"
       appTitle: string;
       mainLogo: string;
       themeName: string;
+      introHtml: string;
+      legalNoticeHtml: string;
       customTexts: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
@@ -1758,6 +1760,8 @@ test("platform application settings are public, durable, validated, and audited"
     appTitle: "IQB-Testcenter",
     mainLogo: "app-icon.svg",
     themeName: "Primar",
+    introHtml: "",
+    legalNoticeHtml: "",
     customTexts: {},
     globalWarningText: null,
     globalWarningExpiresAt: null,
@@ -1893,6 +1897,40 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(invalidTheme.status, 400);
   assert.equal(invalidTheme.body.error, "application_theme_invalid");
 
+  const invalidIntroHtml = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        introHtml: "x".repeat(100_001)
+      }
+    }
+  );
+  assert.equal(invalidIntroHtml.status, 400);
+  assert.equal(
+    invalidIntroHtml.body.error,
+    "application_intro_html_too_large"
+  );
+
+  const invalidLegalNoticeHtml = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        legalNoticeHtml: "x".repeat(100_001)
+      }
+    }
+  );
+  assert.equal(invalidLegalNoticeHtml.status, 400);
+  assert.equal(
+    invalidLegalNoticeHtml.body.error,
+    "application_legal_notice_html_too_large"
+  );
+
   const invalidCustomTexts = await requestJson<{ error: string }>(
     "/api/v1/admin/application-settings",
     {
@@ -1926,12 +1964,18 @@ test("platform application settings are public, durable, validated, and audited"
 
   const configuredLogo =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const configuredIntroHtml =
+    '<p>Welcome to the <strong>configured assessment</strong>.</p>';
+  const configuredLegalNoticeHtml =
+    '<h3>Provider</h3><p>Assessment Institute · <a href="mailto:privacy@example.test">Privacy contact</a></p>';
 
   const updatedSettings = await requestJson<{
     applicationSettings: {
       appTitle: string;
       mainLogo: string;
       themeName: string;
+      introHtml: string;
+      legalNoticeHtml: string;
       customTexts: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
@@ -1945,6 +1989,8 @@ test("platform application settings are public, durable, validated, and audited"
       appTitle: "  Configured Testcenter  ",
       mainLogo: configuredLogo,
       themeName: "Sekundar",
+      introHtml: `  ${configuredIntroHtml}  `,
+      legalNoticeHtml: `  ${configuredLegalNoticeHtml}  `,
       customTexts: {
         login_subtitle: "  Global test selection  ",
         login_testResumeButtonLabel: "Begin"
@@ -1960,6 +2006,14 @@ test("platform application settings are public, durable, validated, and audited"
   );
   assert.equal(updatedSettings.body.applicationSettings.mainLogo, configuredLogo);
   assert.equal(updatedSettings.body.applicationSettings.themeName, "Sekundar");
+  assert.equal(
+    updatedSettings.body.applicationSettings.introHtml,
+    configuredIntroHtml
+  );
+  assert.equal(
+    updatedSettings.body.applicationSettings.legalNoticeHtml,
+    configuredLegalNoticeHtml
+  );
   assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
     login_subtitle: "Global test selection",
     login_testResumeButtonLabel: "Begin"
@@ -2013,6 +2067,22 @@ test("platform application settings are public, durable, validated, and audited"
     settingsAudit.body.items[0]?.details["nextThemeName"],
     "Sekundar"
   );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["introHtmlChanged"],
+    true
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextIntroHtmlBytes"],
+    Buffer.byteLength(configuredIntroHtml, "utf8")
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["legalNoticeHtmlChanged"],
+    true
+  );
+  assert.equal(
+    settingsAudit.body.items[0]?.details["nextLegalNoticeHtmlBytes"],
+    Buffer.byteLength(configuredLegalNoticeHtml, "utf8")
+  );
   assert.equal(settingsAudit.body.items[0]?.details["nextCustomLogo"], true);
   assert.equal(settingsAudit.body.items[0]?.details["nextCustomTextCount"], 2);
   assert.deepEqual(
@@ -2029,6 +2099,8 @@ test("platform application settings are public, durable, validated, and audited"
         appTitle: "",
         mainLogo: "",
         themeName: "Primar",
+        introHtml: "",
+        legalNoticeHtml: "",
         customTexts: {},
         globalWarningText: "",
         globalWarningExpiresAt: null
@@ -2039,6 +2111,8 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(resetSettings.body.applicationSettings.appTitle, "IQB-Testcenter");
   assert.equal(resetSettings.body.applicationSettings.mainLogo, "app-icon.svg");
   assert.equal(resetSettings.body.applicationSettings.themeName, "Primar");
+  assert.equal(resetSettings.body.applicationSettings.introHtml, "");
+  assert.equal(resetSettings.body.applicationSettings.legalNoticeHtml, "");
   assert.deepEqual(resetSettings.body.applicationSettings.customTexts, {});
   assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);
   assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);

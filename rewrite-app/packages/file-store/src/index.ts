@@ -94,6 +94,14 @@ const readStateFromFile = async (
       state.applicationSettings = {
         ...defaultApplicationSettings,
         ...state.applicationSettings,
+        introHtml:
+          typeof state.applicationSettings.introHtml === "string"
+            ? state.applicationSettings.introHtml
+            : defaultApplicationSettings.introHtml,
+        legalNoticeHtml:
+          typeof state.applicationSettings.legalNoticeHtml === "string"
+            ? state.applicationSettings.legalNoticeHtml
+            : defaultApplicationSettings.legalNoticeHtml,
         globalWarningText: state.applicationSettings.globalWarningText ?? null,
         globalWarningExpiresAt:
           state.applicationSettings.globalWarningExpiresAt ?? null,

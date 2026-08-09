@@ -180,6 +180,11 @@ const mapApplicationSettings = (
           row.theme_name === "Sekundar" || row.theme_name === "Erwachsene"
             ? row.theme_name
             : "Primar",
+        introHtml: row.intro_html == null ? "" : String(row.intro_html),
+        legalNoticeHtml:
+          row.legal_notice_html == null
+            ? ""
+            : String(row.legal_notice_html),
         customTexts: (() => {
           try {
             const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
@@ -1138,6 +1143,14 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS custom_texts_json JSONB NOT NULL DEFAULT '{}'::jsonb;
     `
+  },
+  {
+    version: 37,
+    name: "add_application_content",
+    sql: `
+      ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS intro_html TEXT NOT NULL DEFAULT '';
+      ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS legal_notice_html TEXT NOT NULL DEFAULT '';
+    `
   }
 ];
 
@@ -1260,7 +1273,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
   return {
     async getApplicationSettings() {
       return one(
-        `SELECT app_title, main_logo, theme_name, custom_texts_json,
+        `SELECT app_title, main_logo, theme_name, intro_html,
+                legal_notice_html, custom_texts_json,
                 global_warning_text, global_warning_expires_at,
                 updated_at, updated_by_admin_user_id
          FROM application_settings
@@ -1272,14 +1286,17 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveApplicationSettings(settings) {
       await pool.query(
         `INSERT INTO application_settings (
-          settings_key, app_title, main_logo, theme_name, custom_texts_json,
+          settings_key, app_title, main_logo, theme_name, intro_html,
+          legal_notice_html, custom_texts_json,
           global_warning_text, global_warning_expires_at,
           updated_at, updated_by_admin_user_id
-        ) VALUES ('global', $1, $2, $3, $4, $5, $6, $7, $8)
+        ) VALUES ('global', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT(settings_key) DO UPDATE SET
           app_title = EXCLUDED.app_title,
           main_logo = EXCLUDED.main_logo,
           theme_name = EXCLUDED.theme_name,
+          intro_html = EXCLUDED.intro_html,
+          legal_notice_html = EXCLUDED.legal_notice_html,
           custom_texts_json = EXCLUDED.custom_texts_json,
           global_warning_text = EXCLUDED.global_warning_text,
           global_warning_expires_at = EXCLUDED.global_warning_expires_at,
@@ -1289,6 +1306,8 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           settings.appTitle,
           settings.mainLogo,
           settings.themeName,
+          settings.introHtml,
+          settings.legalNoticeHtml,
           JSON.stringify(settings.customTexts),
           settings.globalWarningText,
           settings.globalWarningExpiresAt,
