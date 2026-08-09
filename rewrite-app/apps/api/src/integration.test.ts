@@ -23083,6 +23083,443 @@ test("original Testcenter compatibility corpus executes the remaining official I
   );
 });
 
+test("original Testcenter compatibility corpus executes official IQB array rulesets", async () => {
+  type CodingCase = {
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  type CodingSchemePackage = CodingCase & {
+    family: string;
+    schemeFixture: string;
+    additionalCases?: Array<CodingCase & { caseId: string }>;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const codingPackage = corpus.codingSchemePackages.find(
+    candidate => candidate.family === "array-length-rulesets"
+  );
+  assert.ok(codingPackage);
+  assert.equal(codingPackage.additionalCases?.length, 1);
+  const schemeDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, codingPackage.schemeFixture),
+    "utf8"
+  );
+  const scheme = JSON.parse(schemeDocument) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      alias?: string;
+      sourceType: string;
+    }>;
+  };
+  assert.equal(scheme.version, "3.0");
+  assert.deepEqual(
+    scheme.variableCodings.map(variable => variable.sourceType),
+    ["BASE", "BASE", "BASE", "SUM_SCORE"]
+  );
+  const cases = [
+    {
+      caseKey: "full",
+      loginKey: "official-array-full-participant",
+      routeUnitKey: "full-route",
+      ...codingPackage
+    },
+    {
+      caseKey: "residual",
+      loginKey: "official-array-residual-participant",
+      routeUnitKey: "residual-route",
+      ...codingPackage.additionalCases![0]!
+    }
+  ].map(testCase => {
+    const inputResponses = JSON.parse(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, testCase.inputFixture),
+        "utf8"
+      )
+    ) as Array<{ id: string; status: string; value: unknown }>;
+    const officialOutcome = JSON.parse(
+      readFileSync(
+        resolve(originalTestcenterCorpusRoot, testCase.outcomeFixture),
+        "utf8"
+      )
+    ) as Array<{
+      id: string;
+      status: string;
+      value: unknown;
+      code?: number;
+      score?: number;
+    }>;
+    assert.deepEqual(
+      officialOutcome.map(variable => variable.id).sort(),
+      scheme.variableCodings
+        .map(variable => variable.alias ?? variable.id)
+        .sort()
+    );
+    return { ...testCase, inputResponses, officialOutcome };
+  });
+
+  const completeCondition = (variable: string): string =>
+    `<If><Status of="${variable}" from="array-unit"/><Is equal="CODING_COMPLETE"/></If>`;
+  const numericCondition = (
+    source: "Code" | "Score" | "Value",
+    variable: string,
+    value: number
+  ): string =>
+    `<If><${source} of="${variable}" from="array-unit"/><Is equal="${value}"/></If>`;
+  const valueCondition = (variable: string, value: string): string =>
+    `<If><Value of="${variable}" from="array-unit"/><Is equal="${value}"/></If>`;
+  const stateDefinitions = [
+    {
+      key: "array-first-code",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Code", "b1", 1) + completeCondition("b1")
+        }
+      ]
+    },
+    {
+      key: "array-open-code",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Code", "b2", 1) + completeCondition("b2")
+        },
+        {
+          key: "residual",
+          conditions:
+            numericCondition("Code", "b2", 0) + completeCondition("b2")
+        }
+      ]
+    },
+    {
+      key: "array-open-score",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Score", "b2", 1) + completeCondition("b2")
+        },
+        {
+          key: "zero",
+          conditions:
+            numericCondition("Score", "b2", 0) + completeCondition("b2")
+        }
+      ]
+    },
+    {
+      key: "array-open-value",
+      options: [
+        {
+          key: "pair",
+          conditions:
+            valueCondition(
+              "b2",
+              "[&quot;01_1&quot;,&quot;01_2&quot;]"
+            ) + completeCondition("b2")
+        },
+        {
+          key: "single",
+          conditions:
+            valueCondition("b2", "[&quot;01_2&quot;]") +
+            completeCondition("b2")
+        }
+      ]
+    },
+    {
+      key: "array-length-code",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Code", "b3", 1) + completeCondition("b3")
+        },
+        {
+          key: "residual",
+          conditions:
+            numericCondition("Code", "b3", 0) + completeCondition("b3")
+        }
+      ]
+    },
+    {
+      key: "array-derived-value",
+      options: [
+        {
+          key: "three",
+          conditions:
+            numericCondition("Value", "d1", 3) + completeCondition("d1")
+        },
+        {
+          key: "one",
+          conditions:
+            numericCondition("Value", "d1", 1) + completeCondition("d1")
+        }
+      ]
+    },
+    {
+      key: "array-derived-code",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Code", "d1", 1) + completeCondition("d1")
+        },
+        {
+          key: "residual",
+          conditions:
+            numericCondition("Code", "d1", 0) + completeCondition("d1")
+        }
+      ]
+    },
+    {
+      key: "array-derived-score",
+      options: [
+        {
+          key: "full",
+          conditions:
+            numericCondition("Score", "d1", 1) + completeCondition("d1")
+        },
+        {
+          key: "zero",
+          conditions:
+            numericCondition("Score", "d1", 0) + completeCondition("d1")
+        }
+      ]
+    }
+  ];
+  const statesDocument = stateDefinitions
+    .map(
+      state => `
+        <State id="${state.key}" label="${state.key}">
+          ${state.options
+            .map(
+              option =>
+                `<Option id="${option.key}" label="${option.key}">${option.conditions}</Option>`
+            )
+            .join("")}
+          <Option id="pending" label="Pending"/>
+        </State>
+      `
+    )
+    .join("");
+  const bookletKey = "BOOKLET.IQB.ARRAY-RULESETS";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-array-rulesets.xml"/>
+            <resource identifier="UNIT.IQB.ARRAY-RULESETS" href="units/Unit-array-rulesets.xml"/>
+            <resource identifier="array-rulesets.json" href="schemes/array-rulesets.json"/>
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-array-rulesets.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official IQB Array Rulesets</Label></Metadata>
+          <States>${statesDocument}</States>
+          <Units>
+            <Unit id="UNIT.IQB.ARRAY-RULESETS" alias="array-unit" label="Array Ruleset Unit"/>
+            <Testlet id="full-block">
+              <Restrictions><Show if="array-derived-value" is="three"/></Restrictions>
+              <Unit id="UNIT.IQB.ARRAY-FULL" alias="full-route" label="Full-credit route"/>
+            </Testlet>
+            <Testlet id="residual-block">
+              <Restrictions><Show if="array-derived-value" is="one"/></Restrictions>
+              <Unit id="UNIT.IQB.ARRAY-RESIDUAL" alias="residual-route" label="Residual route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="array-derived-value" is="pending"/></Restrictions>
+              <Unit id="UNIT.IQB.ARRAY-PENDING" alias="pending-route" label="Pending route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit-array-rulesets.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>UNIT.IQB.ARRAY-RULESETS</Id><Label>Official IQB Array Rulesets</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>Array Rulesets</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@3.0" schemeType="iqb@3.0">../schemes/array-rulesets.json</CodingSchemeRef>
+          <BaseVariables>
+            <Variable id="b1" type="string"/>
+            <Variable id="b2" type="string"/>
+            <Variable id="b3" type="string"/>
+          </BaseVariables>
+          <DerivedVariables><Variable id="d1" type="integer"/></DerivedVariables>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/schemes/array-rulesets.json",
+      content: schemeDocument
+    }
+  ]);
+  const tenantKey = "integration-tenant-official-array-rulesets";
+  const workspaceKey = "integration-workspace-official-array-rulesets";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-array-rulesets.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: {
+                version?: string;
+                variableCodings: Array<{ sourceType?: string }>;
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const importedUnit =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries.find(unit => unit.unitKey === "array-unit");
+  assert.equal(importedUnit?.codingScheme?.version, "3.0");
+  assert.deepEqual(
+    importedUnit?.codingScheme?.variableCodings.map(
+      variable => variable.sourceType
+    ),
+    ["BASE", "BASE", "BASE", "SUM_SCORE"]
+  );
+  const activate = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activate.status, 200);
+
+  for (const testCase of cases) {
+    const signIn = await requestJson<{
+      participantSession: { participantSessionId: string };
+    }>("/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: { tenantKey, workspaceKey, loginKey: testCase.loginKey }
+    });
+    assert.equal(signIn.status, 200);
+    const participantSessionId =
+      signIn.body.participantSession.participantSessionId;
+    const resume = await requestJson<{
+      testRun: {
+        testRunId: string;
+        bookletStates: Record<string, string>;
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+      method: "POST",
+      body: { bookletKey }
+    });
+    assert.deepEqual(
+      resume.body.testRun.bookletStates,
+      Object.fromEntries(stateDefinitions.map(state => [state.key, "pending"])),
+      testCase.caseKey
+    );
+    const rawPlayerResponse = JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        unitStateDataType: "iqb-standard@1.0",
+        presentationProgress: "complete",
+        responseProgress: "complete",
+        dataParts: { responses: JSON.stringify(testCase.inputResponses) }
+      }
+    });
+    const saveResult = await requestJson<{
+      testRun: {
+        bookletStates: Record<string, string>;
+        unitResponses: Record<string, string>;
+      };
+    }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey: "array-unit",
+        status: "running",
+        unitResponse: rawPlayerResponse
+      }
+    });
+    assert.equal(saveResult.status, 200, testCase.caseKey);
+    assert.deepEqual(
+      saveResult.body.testRun.bookletStates,
+      testCase.expectedStates,
+      testCase.caseKey
+    );
+    assert.equal(
+      saveResult.body.testRun.unitResponses["array-unit"],
+      rawPlayerResponse
+    );
+    const currentState = await requestJson<{
+      currentRunState: {
+        bookletUnits: Array<{ unitKey: string }>;
+        adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+        navigation: { nextUnitKey: string | null };
+      };
+    }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+    assert.deepEqual(
+      currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+      ["array-unit", testCase.routeUnitKey],
+      testCase.caseKey
+    );
+    assert.deepEqual(
+      Object.fromEntries(
+        currentState.body.currentRunState.adaptiveStates.map(state => [
+          state.stateKey,
+          state.optionKey
+        ])
+      ),
+      testCase.expectedStates,
+      testCase.caseKey
+    );
+    assert.equal(
+      currentState.body.currentRunState.navigation.nextUnitKey,
+      testCase.routeUnitKey
+    );
+  }
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";

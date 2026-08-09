@@ -261,6 +261,16 @@ type OriginalTestcenterCorpus = {
     outcomeSha256: string;
     license: string;
     expectedStates: Record<string, string>;
+    additionalCases?: Array<{
+      caseId: string;
+      inputFixture: string;
+      outcomeFixture: string;
+      inputSourcePath: string;
+      outcomeSourcePath: string;
+      inputSha256: string;
+      outcomeSha256: string;
+      expectedStates: Record<string, string>;
+    }>;
   }>;
 };
 
@@ -776,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 6);
+  assert.equal(corpus.codingSchemePackages.length, 7);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -791,7 +801,11 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     for (const [fixture, expectedHash] of [
       [codingPackage.schemeFixture, codingPackage.schemeSha256],
       [codingPackage.inputFixture, codingPackage.inputSha256],
-      [codingPackage.outcomeFixture, codingPackage.outcomeSha256]
+      [codingPackage.outcomeFixture, codingPackage.outcomeSha256],
+      ...(codingPackage.additionalCases ?? []).flatMap(additionalCase => [
+        [additionalCase.inputFixture, additionalCase.inputSha256] as const,
+        [additionalCase.outcomeFixture, additionalCase.outcomeSha256] as const
+      ])
     ] as const) {
       assert.equal(
         createHash("sha256")
@@ -1038,6 +1052,103 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       expectedFamily.expectedOutcome
     );
   }
+
+  const arrayLength = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "array-length-rulesets"
+  );
+  assert.ok(arrayLength);
+  assert.deepEqual(
+    [
+      arrayLength.schemeSourcePath,
+      arrayLength.inputSourcePath,
+      arrayLength.outcomeSourcePath,
+      arrayLength.additionalCases?.[0]?.inputSourcePath,
+      arrayLength.additionalCases?.[0]?.outcomeSourcePath
+    ],
+    [
+      "test/coding/array-length-check/coding-scheme.json",
+      "test/coding/array-length-check/01_input.json",
+      "test/coding/array-length-check/01_outcome.json",
+      "test/coding/array-length-check/02_input.json",
+      "test/coding/array-length-check/02_outcome.json"
+    ]
+  );
+  const arrayLengthScheme = JSON.parse(
+    readFileSync(resolve(corpusRoot, arrayLength.schemeFixture), "utf8")
+  ) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      sourceType: string;
+      deriveSources?: string[];
+      codes: Array<{
+        id: number;
+        ruleSetOperatorAnd?: boolean;
+        ruleSets: Array<{ valueArrayPos?: string }>;
+      }>;
+    }>;
+  };
+  assert.equal(arrayLengthScheme.version, "3.0");
+  assert.deepEqual(
+    arrayLengthScheme.variableCodings.map(variable => variable.sourceType),
+    ["BASE", "BASE", "BASE", "SUM_SCORE"]
+  );
+  assert.equal(
+    arrayLengthScheme.variableCodings[1]?.codes[0]?.ruleSetOperatorAnd,
+    true
+  );
+  assert.equal(
+    arrayLengthScheme.variableCodings[1]?.codes[0]?.ruleSets[1]?.valueArrayPos,
+    "ANY_OPEN"
+  );
+  assert.equal(
+    arrayLengthScheme.variableCodings[2]?.codes[0]?.ruleSets[1]?.valueArrayPos,
+    "LENGTH"
+  );
+  assert.deepEqual(arrayLengthScheme.variableCodings[3]?.deriveSources, [
+    "b1",
+    "b2",
+    "b3"
+  ]);
+  const arrayLengthOutcomes = [
+    arrayLength.outcomeFixture,
+    arrayLength.additionalCases?.[0]?.outcomeFixture
+  ].map(fixture =>
+    JSON.parse(readFileSync(resolve(corpusRoot, fixture!), "utf8"))
+  ) as Array<
+    Array<{
+      id: string;
+      status: string;
+      value: unknown;
+      code?: number;
+      score?: number;
+    }>
+  >;
+  assert.deepEqual(
+    arrayLengthOutcomes.map(outcome =>
+      outcome.map(variable => [
+        variable.id,
+        variable.value,
+        variable.status,
+        variable.code ?? null,
+        variable.score ?? null
+      ])
+    ),
+    [
+      [
+        ["b1", ["01_4"], "CODING_COMPLETE", 1, 1],
+        ["b2", ["01_2", "01_1"], "CODING_COMPLETE", 1, 1],
+        ["b3", ["01_3"], "CODING_COMPLETE", 1, 1],
+        ["d1", 3, "CODING_COMPLETE", 1, 1]
+      ],
+      [
+        ["b1", ["01_4"], "CODING_COMPLETE", 1, 1],
+        ["b2", ["01_2"], "CODING_COMPLETE", 0, 0],
+        ["b3", ["01_3", "01_1"], "CODING_COMPLETE", 0, 0],
+        ["d1", 1, "CODING_COMPLETE", 0, 0]
+      ]
+    ]
+  );
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

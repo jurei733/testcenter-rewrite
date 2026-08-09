@@ -175,6 +175,15 @@ memory, file, and SQLite. Raw Player envelopes remain unchanged while all
 calculated Booklet states and the final visible Unit route persist through the
 normal runtime path.
 
+Latest P0 array-coding closure: the same release corpus now pins the versioned
+3.0 `array-length-check` scheme and both official input/outcome cases
+byte-for-byte. One imported Unit executes AND-connected rule sets, `ANY_OPEN`
+and `LENGTH` array selectors, automatic residual code/score `0`, and derived
+`SUM_SCORE` recoding. Independent Participant runs prove the full-credit and
+residual routes, including original-compatible sorted-array equality, eight
+persisted Booklet states, raw response retention, and mutually exclusive
+visible Units across memory, file, and SQLite.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

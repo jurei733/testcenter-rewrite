@@ -19,7 +19,10 @@ derived-value core: `CONCAT_CODE/01`, `COPY_VALUE/03`, `SUM_CODE/02`, and
 `SUM_SCORE/02`. They retain alias-aware concatenation, sorted and chained
 codes, explicit code/score zeroes, missing-input `UNSET`, dependency
 `DERIVE_ERROR`, partial-input `INVALID`, and derived recoding. Every source
-path and hash is recorded separately in `corpus.json`.
+path and hash is recorded separately in `corpus.json`. The versioned 3.0
+`array-length-check` family adds both official cases for AND-connected rule
+sets, `ANY_OPEN`, `LENGTH`, automatic residual zeroes, derived `SUM_SCORE`,
+and sorted adaptive-array comparison.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
