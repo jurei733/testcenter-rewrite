@@ -20523,6 +20523,54 @@ test("original Testcenter code-gated testlets require a durable run unlock", asy
     testletKey
   ]);
 
+  const replayedUnlock = await requestJson<{
+    testRun: { unlockedTestletKeys?: string[] };
+  }>(`/api/v1/participant/test-runs/${testRunId}/testlets/${testletKey}/unlock`, {
+    method: "POST",
+    body: { code: "HASE" }
+  });
+  assert.equal(replayedUnlock.status, 200);
+  assert.deepEqual(replayedUnlock.body.testRun.unlockedTestletKeys, [
+    entryTestletKey,
+    testletKey
+  ]);
+
+  const codeUnlockLogs = await requestJson<{
+    items: Array<{
+      testLog: {
+        unitKey: string | null;
+        originalUnitId: string | null;
+        logKey: string;
+        logContent: string;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${testRunId}&logKey=TESTLETS_CLEARED_CODE&limit=100`
+  );
+  assert.equal(codeUnlockLogs.status, 200);
+  assert.deepEqual(
+    codeUnlockLogs.body.items.map(item => ({
+      unitKey: item.testLog.unitKey,
+      originalUnitId: item.testLog.originalUnitId,
+      logKey: item.testLog.logKey,
+      unlockedTestletKeys: JSON.parse(item.testLog.logContent) as string[]
+    })),
+    [
+      {
+        unitKey: null,
+        originalUnitId: null,
+        logKey: "TESTLETS_CLEARED_CODE",
+        unlockedTestletKeys: [entryTestletKey, testletKey]
+      },
+      {
+        unitKey: null,
+        originalUnitId: null,
+        logKey: "TESTLETS_CLEARED_CODE",
+        unlockedTestletKeys: [entryTestletKey]
+      }
+    ]
+  );
+
   const stateAfterUnlock = await requestJson<{
     currentRunState: {
       currentUnit: { unitKey: string | null; testletPath: string[] };

@@ -26697,16 +26697,27 @@ export const createFirstSliceServices = (
             : {})
         };
         await repository.saveTestRun(updatedRun);
-        if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
+        const executionMode = resolveParticipantExecutionMode(
+          updatedRun.executionMode
+        );
+        if (executionMode.saveResponses) {
+          const testStateEntries: ParticipantTestLogEntryInput[] = [{
+            key: "TESTLETS_CLEARED_CODE",
+            timeStamp: Date.parse(timestamp),
+            content: JSON.stringify(updatedRun.unlockedTestletKeys ?? [])
+          }];
+          if (updatedRun.currentUnitKey !== testRun.currentUnitKey) {
+            testStateEntries.push({
+              key: "CURRENT_UNIT_ID",
+              timeStamp: Date.parse(timestamp),
+              content: updatedRun.currentUnitKey ?? ""
+            });
+          }
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
               testRun: updatedRun,
               batches: [{
-                entries: [{
-                  key: "CURRENT_UNIT_ID",
-                  timeStamp: Date.parse(timestamp),
-                  content: updatedRun.currentUnitKey ?? ""
-                }]
+                entries: testStateEntries
               }]
             })
           );
