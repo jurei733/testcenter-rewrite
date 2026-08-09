@@ -118,6 +118,15 @@ const monitorViewTextKeys: Readonly<Record<string, MonitorCustomTextKey>> = {
   small: "gm_view_small"
 };
 
+const monitorBookletErrorTextKeys: Readonly<
+  Record<NonNullable<OpenMonitorRun["bookletError"]>, MonitorCustomTextKey>
+> = {
+  "missing-id": "gm_booklet_error_missing_id",
+  "missing-file": "gm_booklet_error_missing_file",
+  xml: "gm_booklet_error_xml",
+  general: "gm_booklet_error_general"
+};
+
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
   private readonly applicationRef = inject(ApplicationRef);
@@ -2132,6 +2141,9 @@ export class RuntimeViewFacade {
         const bookletStates = Object.entries(openRun.bookletStates).map(
           ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
         );
+        const bookletErrorText = openRun.bookletError
+          ? this.monitorText(monitorBookletErrorTextKeys[openRun.bookletError])
+          : null;
 
         return {
           headline: displayName ?? openRun.loginKey,
@@ -2142,6 +2154,9 @@ export class RuntimeViewFacade {
             openRun.groupKey,
             openRun.executionMode,
             openRun.bookletAssignmentKey,
+            ...(openRun.bookletError
+              ? [`booklet ${openRun.bookletError}`]
+              : []),
             ...(activeTimer
               ? [activeTimerText ?? `timer ${activeTimer.status}`]
               : []),
@@ -2174,16 +2189,28 @@ export class RuntimeViewFacade {
               : [
                   {
                     label: this.monitorText("gm_col_bookletLabel"),
-                    value: openRun.bookletLabel ?? openRun.bookletKey
+                    value:
+                      bookletErrorText ??
+                      openRun.bookletLabel ??
+                      openRun.bookletKey
                   },
                   {
                     label: "Booklet Species",
-                    value: openRun.bookletSpecies ?? "unknown"
+                    value: openRun.bookletSpecies ??
+                      (openRun.bookletError ? "unavailable" : "unknown")
                   },
                   {
                     label: "Booklet Assignment",
                     value: openRun.bookletAssignmentKey
-                  }
+                  },
+                  ...(openRun.bookletError && profile?.settings.view !== "small"
+                    ? [
+                        {
+                          label: "Booklet Reference",
+                          value: openRun.bookletKey || "none"
+                        }
+                      ]
+                    : [])
                 ]),
             ...this.monitorBookletStateRows(openRun, profile),
             ...(profile?.settings.blockColumn === "show"
@@ -2241,15 +2268,17 @@ export class RuntimeViewFacade {
             bookletSpecies: openRun.bookletSpecies ?? "",
             displayName: displayName ?? ""
           },
-          actions: [
-            {
-              label: batchSelected ? "Remove from Batch" : "Add to Batch",
-              payload: {
-                monitorBatchCommand: "toggle",
-                testRunId: openRun.testRunId
-              }
-            }
-          ]
+          actions: openRun.bookletError
+            ? []
+            : [
+                {
+                  label: batchSelected ? "Remove from Batch" : "Add to Batch",
+                  payload: {
+                    monitorBatchCommand: "toggle",
+                    testRunId: openRun.testRunId
+                  }
+                }
+              ]
         };
       })
     );
@@ -2437,10 +2466,15 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatch(): boolean {
+    const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
+      this.monitorBatchSelection.has(openRun.testRunId)
+    );
     return (
       this.canIssueMonitorCommands &&
       this.canUseWorkspaceScope &&
-      this.monitorBatchCount > 0
+      selectedRuns.length > 0 &&
+      selectedRuns.length === this.monitorBatchCount &&
+      selectedRuns.every(openRun => !openRun.bookletError)
     );
   }
 
@@ -3016,7 +3050,8 @@ export class RuntimeViewFacade {
     return (
       this.canIssueMonitorCommands &&
       this.canUseWorkspaceScope &&
-      this.runtime.testRunId.trim().length > 0
+      this.runtime.testRunId.trim().length > 0 &&
+      !this.selectedOpenMonitorRun?.bookletError
     );
   }
 
@@ -3533,7 +3568,9 @@ export class RuntimeViewFacade {
       payload?.items ?? [],
       this.activeMonitorProfile
     )) {
-      this.monitorBatchSelection.add(openRun.testRunId);
+      if (!openRun.bookletError) {
+        this.monitorBatchSelection.add(openRun.testRunId);
+      }
     }
     this.uiState.renderVersion.update(version => version + 1);
   }

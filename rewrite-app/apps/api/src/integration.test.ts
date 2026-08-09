@@ -5632,11 +5632,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","booklet:demo","\{\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","","booklet:demo","\{\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -6976,6 +6976,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
         groupKey: string;
         bookletKey: string;
         bookletSpecies: string | null;
+        bookletError: string | null;
         currentUnitKey: string | null;
       }>;
     }>(
@@ -6995,6 +6996,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(openRunsAfterPause.body.items[0]?.groupKey, "group:student-demo");
     assert.equal(openRunsAfterPause.body.items[0]?.bookletKey, "booklet:demo");
     assert.equal(openRunsAfterPause.body.items[0]?.bookletSpecies, "species: 0");
+    assert.equal(openRunsAfterPause.body.items[0]?.bookletError, null);
 
     const openRunsBySpecies = await requestJsonAt<{ items: unknown[] }>(
       isolated.baseUrl,
@@ -14213,6 +14215,7 @@ test("original Testcenter compatibility corpus executes the official group monit
         bookletKey: string;
         bookletLabel: string | null;
         bookletSpecies: string | null;
+        bookletError: string | null;
         currentUnitKey: string | null;
         currentUnitLabel: string | null;
         currentBlockKey: string | null;
@@ -14240,6 +14243,7 @@ test("original Testcenter compatibility corpus executes the official group monit
     assert.equal(openRuns.body.items[0]?.bookletKey, "Cy-Bklt_GM-1");
     assert.equal(openRuns.body.items[0]?.bookletLabel, "GM-1");
     assert.equal(openRuns.body.items[0]?.bookletSpecies, "species: 1");
+    assert.equal(openRuns.body.items[0]?.bookletError, null);
     assert.equal(openRuns.body.items[0]?.currentUnitLabel, "Startseite");
     assert.deepEqual(openRuns.body.items[0]?.blockNavigationTargets, [
       {
@@ -19107,7 +19111,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
 

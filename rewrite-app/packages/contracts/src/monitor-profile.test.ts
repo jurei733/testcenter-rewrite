@@ -21,6 +21,7 @@ const createOpenRun = (
   participantRosterEntry: null,
   bookletKey: "booklet:starter",
   bookletSpecies: "species: 2",
+  bookletError: null,
   bookletAssignmentKey: "booklet:starter",
   bookletStates,
   status,

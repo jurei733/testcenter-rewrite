@@ -8675,11 +8675,16 @@ try {
       "    <CustomText key=\"gm_timemax_tooltip\">UI Timer %s minutes</CustomText>",
       "    <CustomText key=\"gm_control_goto_unlock_blocks_confirm_headline\">UI Reopen Timed Section</CustomText>",
       "    <CustomText key=\"gm_control_goto_unlock_blocks_confirm_text\">UI Restore time before jumping.</CustomText>",
+      "    <CustomText key=\"gm_booklet_error_missing_id\">UI No Booklet Assigned</CustomText>",
+      "    <CustomText key=\"gm_booklet_error_missing_file\">UI Missing Booklet File</CustomText>",
+      "    <CustomText key=\"gm_booklet_error_xml\">UI Broken Booklet XML</CustomText>",
+      "    <CustomText key=\"gm_booklet_error_general\">UI Booklet Access Error</CustomText>",
       "  </CustomTexts>",
       "  <Profiles><GroupMonitor>",
       "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"yes\">",
       "      <Filter label=\"Current participant\" type=\"substring\" field=\"personLabel\" value=\"student-ui\" not=\"true\" />",
       "    </Profile>",
+      "    <Profile id=\"booklet-errors\" label=\"Booklet diagnostics\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" />",
       "  </GroupMonitor></Profiles>",
       `  <Group id="${participantGroupKey}" validFor="45">`,
       "    <Login name=\"entry-student-login\">",
@@ -8687,6 +8692,7 @@ try {
       "    </Login>",
       `    <Login mode="monitor-group" name="${groupMonitorUsername}" pw="operator-secret">`,
       "      <Profile id=\"all\" />",
+      "      <Profile id=\"booklet-errors\" />",
       "    </Login>",
       `    <Login mode="sys-check-login" name="${systemCheckUsername}" pw="system-check-secret" />`,
       "  </Group>",
@@ -8725,7 +8731,8 @@ try {
     "All sessions (all)",
     "all: small view; block hide",
     "all: Current participant not substring student-ui",
-    "39 imported override(s)"
+    "Booklet diagnostics (booklet-errors)",
+    "43 imported override(s)"
   ]) {
     assert.ok(
       operationalLoginCandidateText.includes(expectedText),
@@ -8755,8 +8762,8 @@ try {
   await expectInputValue("#adminCreateValidTo", "");
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
-  await page.getByText("1 imported monitor profile(s)").waitFor();
-  await page.getByText("39 login-specific custom text(s)").waitFor();
+  await page.getByText("2 imported monitor profile(s)").waitFor();
+  await page.getByText("43 login-specific custom text(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -8794,7 +8801,7 @@ try {
     initialGroupMonitorSignIn.roleAssignments[0]?.monitorProfiles.map(
       profile => profile.profileId
     ),
-    ["all"]
+    ["all", "booklet-errors"]
   );
   assert.equal(
     initialGroupMonitorSignIn.adminUser.firstSignedInAt,
@@ -10358,6 +10365,81 @@ try {
     .getByRole("heading", { name: "0", exact: true })
     .waitFor();
   stopAfter("group-monitor-auto-next-block");
+
+  logStep("group-monitor-booklet-error-copy");
+  const monitorOpenRunsRoute = new RegExp(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs(?:\\?.*)?$`
+  );
+  const monitorBookletErrors = [
+    ["missing-id", "UI No Booklet Assigned"],
+    ["missing-file", "UI Missing Booklet File"],
+    ["xml", "UI Broken Booklet XML"],
+    ["general", "UI Booklet Access Error"]
+  ];
+  let monitorBookletErrorTemplate;
+  const monitorBookletErrorRouteOperations = new Set();
+  await page.route(monitorOpenRunsRoute, route => {
+    const operation = (async () => {
+      const response = await route.fetch();
+      const payload = await response.json();
+      const template = payload.items?.[0] ?? monitorBookletErrorTemplate;
+      assert.ok(template, "Booklet-error presentation needs one real scoped run.");
+      monitorBookletErrorTemplate = template;
+      await route.fulfill({
+        response,
+        json: {
+          ...payload,
+          items: monitorBookletErrors.map(([bookletError], index) => ({
+            ...template,
+            testRunId: `${template.testRunId}:booklet-error:${bookletError}`,
+            participantSessionId: `${template.participantSessionId}:booklet-error:${index}`,
+            loginKey: `${template.loginKey}-${bookletError}`,
+            bookletKey:
+              bookletError === "missing-id" ? "" : `broken-${bookletError}`,
+            bookletLabel: null,
+            bookletSpecies: null,
+            bookletError,
+            blockNavigationTargets: [],
+            activeTestletTimer: null
+          }))
+        }
+      });
+    })();
+    monitorBookletErrorRouteOperations.add(operation);
+    void operation.then(
+      () => monitorBookletErrorRouteOperations.delete(operation),
+      () => monitorBookletErrorRouteOperations.delete(operation)
+    );
+    return operation;
+  });
+  await selectAndCommit("#monitorProfile", "booklet-errors");
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-booklet-error-copy");
+  for (const [, expectedCopy] of monitorBookletErrors) {
+    await scopedOpenRuns.getByText(expectedCopy, { exact: true }).waitFor();
+  }
+  assert.equal(
+    await scopedOpenRuns.getByRole("button", { name: "Add to Batch" }).count(),
+    0,
+    "Broken-booklet runs must not be available to batch commands."
+  );
+  await scopedOpenRuns
+    .getByRole("button", { name: "Select + Sync" })
+    .first()
+    .click();
+  await waitForNotBusy("group-monitor-booklet-error-copy-select");
+  await expectButtonSelectorDisabled("#monitorConsolePauseButton");
+  await expectButtonSelectorDisabled("#monitorConsoleCompleteButton");
+  while (monitorBookletErrorRouteOperations.size > 0) {
+    await Promise.all([...monitorBookletErrorRouteOperations]);
+  }
+  await page.unroute(monitorOpenRunsRoute);
+  await selectAndCommit("#monitorProfile", "all");
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-booklet-error-copy-restore");
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  stopAfter("group-monitor-booklet-error-copy");
+
   await page.waitForFunction(
     () => !document.querySelector(".status-banner.is-error"),
     undefined,

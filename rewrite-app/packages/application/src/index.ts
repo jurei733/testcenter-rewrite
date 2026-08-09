@@ -63,6 +63,7 @@ import type {
   ImportJob,
   ImportJobStatus,
   ImportJobDiagnostic,
+  MonitorBookletError,
   MonitorTestletTimer,
   MonitorRunCommandResult,
   MonitorRunCommandType,
@@ -4301,11 +4302,17 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     )
     .map(testRun => {
       const normalizedTestRun = normalizeTestRun(testRun);
-      const testletTimers = buildMonitorTestletTimers(
+      const bookletError = resolveOpenMonitorBookletError(
         input.activeContentRelease,
-        normalizedTestRun,
-        input.timestamp
+        normalizedTestRun
       );
+      const testletTimers = bookletError
+        ? []
+        : buildMonitorTestletTimers(
+            input.activeContentRelease,
+            normalizedTestRun,
+            input.timestamp
+          );
       const location = resolveOpenMonitorRunLocation(
         input.activeContentRelease,
         normalizedTestRun,
@@ -4334,6 +4341,7 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         bookletKey: testRun.bookletKey,
         bookletLabel: location.bookletLabel,
         bookletSpecies: location.bookletSpecies,
+        bookletError: location.bookletError,
         bookletAssignmentKey:
           testRun.bookletAssignmentKey ?? testRun.bookletKey,
         bookletStates: normalizedTestRun.bookletStates ?? {},
@@ -4355,6 +4363,106 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     });
 };
 
+type OpenMonitorBookletResolution = {
+  booklet: ContentReleaseBookletEntry | undefined;
+  error: MonitorBookletError | null;
+};
+
+const isOpenMonitorRecord = (
+  value: unknown
+): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isOpenMonitorOptionalRecordArray = (value: unknown): boolean =>
+  value === undefined ||
+  (Array.isArray(value) && value.every(entry => isOpenMonitorRecord(entry)));
+
+const isStructurallyReadableMonitorBooklet = (
+  value: Record<string, unknown>
+): boolean =>
+  typeof value.bookletKey === "string" &&
+  value.bookletKey.trim().length > 0 &&
+  typeof value.displayLabel === "string" &&
+  Array.isArray(value.unitEntries) &&
+  value.unitEntries.every(
+    unit =>
+      isOpenMonitorRecord(unit) &&
+      typeof unit.unitKey === "string" &&
+      typeof unit.displayLabel === "string" &&
+      (unit.testletPath === undefined ||
+        (Array.isArray(unit.testletPath) &&
+          unit.testletPath.every(testletKey => typeof testletKey === "string")))
+  ) &&
+  isOpenMonitorOptionalRecordArray(value.testletEntries) &&
+  (value.testletEntries === undefined ||
+    (value.testletEntries as Array<Record<string, unknown>>).every(
+      testlet =>
+        typeof testlet.testletKey === "string" &&
+        typeof testlet.displayLabel === "string"
+    )) &&
+  isOpenMonitorOptionalRecordArray(value.stateEntries) &&
+  (value.stateEntries === undefined ||
+    (value.stateEntries as Array<Record<string, unknown>>).every(
+      state =>
+        typeof state.stateKey === "string" &&
+        typeof state.displayLabel === "string" &&
+        Array.isArray(state.options) &&
+        state.options.length > 0 &&
+        state.options.every(
+          option =>
+            isOpenMonitorRecord(option) &&
+            typeof option.optionKey === "string" &&
+            typeof option.displayLabel === "string" &&
+            Array.isArray(option.conditions)
+        )
+    ));
+
+const resolveOpenMonitorBooklet = (
+  contentRelease: ContentRelease | null,
+  testRun: TestRun
+): OpenMonitorBookletResolution => {
+  const bookletKey = String(testRun.bookletKey ?? "").trim();
+  if (!bookletKey) {
+    return { booklet: undefined, error: "missing-id" };
+  }
+  if (!contentRelease) {
+    return { booklet: undefined, error: "general" };
+  }
+  const runtimeSnapshot = (contentRelease as { runtimeSnapshot?: unknown })
+    .runtimeSnapshot;
+  if (!isOpenMonitorRecord(runtimeSnapshot)) {
+    return { booklet: undefined, error: "general" };
+  }
+  const bookletEntries = runtimeSnapshot.bookletEntries;
+  if (!Array.isArray(bookletEntries)) {
+    return { booklet: undefined, error: "general" };
+  }
+  const rawBooklet = bookletEntries.find(
+    entry =>
+      isOpenMonitorRecord(entry) && entry.bookletKey === bookletKey
+  );
+  if (!rawBooklet) {
+    return { booklet: undefined, error: "missing-file" };
+  }
+  if (
+    !isOpenMonitorRecord(rawBooklet) ||
+    !isStructurallyReadableMonitorBooklet(rawBooklet)
+  ) {
+    return { booklet: undefined, error: "xml" };
+  }
+  return {
+    booklet: rawBooklet as ContentReleaseBookletEntry,
+    error: null
+  };
+};
+
+/** Classifies the original group-monitor booklet load failures without hiding the run. */
+export const resolveOpenMonitorBookletError = (
+  contentRelease: ContentRelease | null,
+  testRun: TestRun
+): MonitorBookletError | null =>
+  resolveOpenMonitorBooklet(contentRelease, testRun).error;
+
 const resolveOpenMonitorRunLocation = (
   contentRelease: ContentRelease | null,
   testRun: TestRun,
@@ -4363,76 +4471,101 @@ const resolveOpenMonitorRunLocation = (
   OpenMonitorRun,
   | "bookletLabel"
   | "bookletSpecies"
+  | "bookletError"
   | "currentUnitLabel"
   | "currentBlockKey"
   | "currentBlockLabel"
   | "blockNavigationTargets"
 > => {
-  const booklet = contentRelease?.runtimeSnapshot.bookletEntries.find(
-    entry => entry.bookletKey === testRun.bookletKey
-  );
-  const unit = booklet?.unitEntries.find(
-    entry => entry.unitKey === testRun.currentUnitKey
-  );
-  const currentBlockKey = unit?.testletPath?.at(-1) ?? null;
-  const currentBlock = currentBlockKey
-    ? booklet?.testletEntries?.find(entry => entry.testletKey === currentBlockKey)
-    : null;
-  const visibleUnits = resolveVisibleBookletUnits(booklet, testRun);
-  const testletsByKey = new Map(
-    (booklet?.testletEntries ?? []).map(testlet => [
-      testlet.testletKey,
-      testlet
-    ])
-  );
-  const blockNavigationTargets: NonNullable<
-    OpenMonitorRun["blockNavigationTargets"]
-  > = [];
-  const navigationTargetsByBlock = new Map(
-    blockNavigationTargets.map(target => [target.blockKey, target])
-  );
-  for (const visibleUnit of visibleUnits) {
-    const blockKey = visibleUnit.testletPath?.[0];
-    if (!blockKey) {
-      continue;
-    }
-    const existingTarget = navigationTargetsByBlock.get(blockKey);
-    if (existingTarget) {
-      existingTarget.unitKeys.push(visibleUnit.unitKey);
-      continue;
-    }
-    const timedTestlet = resolveTimedTestletForUnit(
-      booklet,
-      visibleUnit.unitKey
-    );
-    const target = {
-      blockKey,
-      blockLabel: testletsByKey.get(blockKey)?.displayLabel ?? blockKey,
-      targetUnitKey: visibleUnit.unitKey,
-      unitKeys: [visibleUnit.unitKey],
-      timeMaxMinutes:
-        timedTestlet?.restrictions?.timeMax?.minutes ?? null,
-      timer: timedTestlet
-        ? testletTimers.find(
-            candidate => candidate.testletKey === timedTestlet.testletKey
-          ) ?? null
-        : null
+  const bookletResolution = resolveOpenMonitorBooklet(contentRelease, testRun);
+  const booklet = bookletResolution.booklet;
+  if (bookletResolution.error) {
+    return {
+      bookletLabel: testRun.bookletKey || undefined,
+      bookletSpecies: null,
+      bookletError: bookletResolution.error,
+      currentUnitLabel: testRun.currentUnitKey,
+      currentBlockKey: null,
+      currentBlockLabel: null,
+      blockNavigationTargets: []
     };
-    blockNavigationTargets.push(target);
-    navigationTargetsByBlock.set(blockKey, target);
   }
-  return {
-    bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
-    bookletSpecies: booklet
-      ? `species: ${(booklet.testletEntries ?? []).filter(
-          entry => !entry.parentTestletKey
-        ).length}`
-      : null,
-    currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
-    currentBlockKey,
-    currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey,
-    blockNavigationTargets
-  };
+  try {
+    const unit = booklet?.unitEntries.find(
+      entry => entry.unitKey === testRun.currentUnitKey
+    );
+    const currentBlockKey = unit?.testletPath?.at(-1) ?? null;
+    const currentBlock = currentBlockKey
+      ? booklet?.testletEntries?.find(
+          entry => entry.testletKey === currentBlockKey
+        )
+      : null;
+    const visibleUnits = resolveVisibleBookletUnits(booklet, testRun);
+    const testletsByKey = new Map(
+      (booklet?.testletEntries ?? []).map(testlet => [
+        testlet.testletKey,
+        testlet
+      ])
+    );
+    const blockNavigationTargets: NonNullable<
+      OpenMonitorRun["blockNavigationTargets"]
+    > = [];
+    const navigationTargetsByBlock = new Map(
+      blockNavigationTargets.map(target => [target.blockKey, target])
+    );
+    for (const visibleUnit of visibleUnits) {
+      const blockKey = visibleUnit.testletPath?.[0];
+      if (!blockKey) {
+        continue;
+      }
+      const existingTarget = navigationTargetsByBlock.get(blockKey);
+      if (existingTarget) {
+        existingTarget.unitKeys.push(visibleUnit.unitKey);
+        continue;
+      }
+      const timedTestlet = resolveTimedTestletForUnit(
+        booklet,
+        visibleUnit.unitKey
+      );
+      const target = {
+        blockKey,
+        blockLabel: testletsByKey.get(blockKey)?.displayLabel ?? blockKey,
+        targetUnitKey: visibleUnit.unitKey,
+        unitKeys: [visibleUnit.unitKey],
+        timeMaxMinutes: timedTestlet?.restrictions?.timeMax?.minutes ?? null,
+        timer: timedTestlet
+          ? testletTimers.find(
+              candidate => candidate.testletKey === timedTestlet.testletKey
+            ) ?? null
+          : null
+      };
+      blockNavigationTargets.push(target);
+      navigationTargetsByBlock.set(blockKey, target);
+    }
+    return {
+      bookletLabel: booklet?.displayLabel ?? testRun.bookletKey,
+      bookletSpecies: booklet
+        ? `species: ${(booklet.testletEntries ?? []).filter(
+            entry => !entry.parentTestletKey
+          ).length}`
+        : null,
+      bookletError: null,
+      currentUnitLabel: unit?.displayLabel ?? testRun.currentUnitKey,
+      currentBlockKey,
+      currentBlockLabel: currentBlock?.displayLabel ?? currentBlockKey,
+      blockNavigationTargets
+    };
+  } catch {
+    return {
+      bookletLabel: testRun.bookletKey || undefined,
+      bookletSpecies: null,
+      bookletError: "xml",
+      currentUnitLabel: testRun.currentUnitKey,
+      currentBlockKey: null,
+      currentBlockLabel: null,
+      blockNavigationTargets: []
+    };
+  }
 };
 
 const getLatestParticipantSessionRun = async (
@@ -5752,6 +5885,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "bookletKey",
     "bookletLabel",
     "bookletSpecies",
+    "bookletError",
     "bookletAssignmentKey",
     "bookletStates",
     "status",
@@ -5780,6 +5914,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.bookletKey,
         item.bookletLabel ?? item.bookletKey,
         item.bookletSpecies ?? "",
+        item.bookletError ?? "",
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
         item.status,
@@ -21311,7 +21446,9 @@ export const createFirstSliceServices = (
               candidate.contentReleaseId === storedTestRun.contentReleaseId
           );
           testRuns.push(
-            contentRelease && storedTestRun.status !== "completed"
+            contentRelease &&
+              storedTestRun.status !== "completed" &&
+              !resolveOpenMonitorBookletError(contentRelease, storedTestRun)
               ? await persistEffectiveTestletTimerState({
                   contentRelease,
                   testRun: storedTestRun,
@@ -26143,11 +26280,17 @@ export const createFirstSliceServices = (
               candidate =>
                 candidate.contentReleaseId === testRun.contentReleaseId
             ) ?? null;
-            const testletTimers = buildMonitorTestletTimers(
+            const bookletError = resolveOpenMonitorBookletError(
               contentRelease,
-              testRun,
-              timestamp
+              testRun
             );
+            const testletTimers = bookletError
+              ? []
+              : buildMonitorTestletTimers(
+                  contentRelease,
+                  testRun,
+                  timestamp
+                );
             const participantSession =
               participantSessions.find(
                 candidate =>
@@ -26175,6 +26318,7 @@ export const createFirstSliceServices = (
               bookletKey: testRun.bookletKey,
               bookletLabel: location.bookletLabel,
               bookletSpecies: location.bookletSpecies,
+              bookletError: location.bookletError,
               bookletAssignmentKey:
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},

@@ -1018,6 +1018,15 @@ export type WorkspaceActivityEvent = {
   details: Record<string, unknown>;
 };
 
+export const monitorBookletErrors = [
+  "missing-id",
+  "missing-file",
+  "xml",
+  "general"
+] as const;
+
+export type MonitorBookletError = (typeof monitorBookletErrors)[number];
+
 export type OpenMonitorRun = {
   testRunId: string;
   participantSessionId: string;
@@ -1028,6 +1037,8 @@ export type OpenMonitorRun = {
   bookletKey: string;
   bookletLabel?: string;
   bookletSpecies: string | null;
+  /** Original group-monitor booklet load failure, retained for corrupt legacy data. */
+  bookletError: MonitorBookletError | null;
   bookletAssignmentKey: string;
   bookletStates: Record<string, string>;
   status: TestRunStatus;
