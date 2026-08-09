@@ -13,6 +13,8 @@ import type {
   GetRuntimeDiagnosticsResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
+  originalMonitorCustomTextDefaults,
+  originalMonitorCustomTextKeys,
   originalParticipantCustomTextDefaults,
   originalParticipantCustomTextKeys
 } from "@testcenter-rewrite-app/contracts";
@@ -273,14 +275,21 @@ export class OpsViewFacade {
   get applicationCustomTextKeys(): string[] {
     return [...new Set([
       ...originalParticipantCustomTextKeys,
+      ...originalMonitorCustomTextKeys,
       ...Object.keys(this.applicationCustomTextDrafts)
     ])].sort((left, right) => left.localeCompare(right));
   }
 
   applicationCustomTextDefault(key: string): string {
-    return originalParticipantCustomTextDefaults[
-      key as keyof typeof originalParticipantCustomTextDefaults
-    ] ?? "";
+    return (
+      originalParticipantCustomTextDefaults[
+        key as keyof typeof originalParticipantCustomTextDefaults
+      ] ??
+      originalMonitorCustomTextDefaults[
+        key as keyof typeof originalMonitorCustomTextDefaults
+      ] ??
+      ""
+    );
   }
 
   get applicationCustomTextsValid(): boolean {
@@ -387,6 +396,7 @@ export class OpsViewFacade {
       this.adminRoleOptions.includes(this.ops.adminCreateRole) &&
       this.ops.adminCreateUsername.trim() !== "" &&
       this.ops.adminCreatePassword !== "" &&
+      this.isAdminCreateCustomTextsValid &&
       this.isAdminCreateAccessWindowValid &&
       this.isScopedAdminRoleInputComplete(
         this.ops.adminCreateRole,
@@ -437,6 +447,31 @@ export class OpsViewFacade {
       this.ops.adminCreateMonitorProfilesJson
     );
     return Array.isArray(profiles) ? profiles.length : 0;
+  }
+
+  get adminCreateCustomTextCount(): number {
+    const customTexts = parseJsonDocument<Record<string, unknown>>(
+      this.ops.adminCreateCustomTextsJson
+    );
+    return customTexts && !Array.isArray(customTexts)
+      ? Object.keys(customTexts).length
+      : 0;
+  }
+
+  get isAdminCreateCustomTextsValid(): boolean {
+    const customTexts = parseJsonDocument<Record<string, unknown>>(
+      this.ops.adminCreateCustomTextsJson
+    );
+    return Boolean(
+      customTexts &&
+        !Array.isArray(customTexts) &&
+        Object.entries(customTexts).every(
+          ([key, value]) =>
+            /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) &&
+            key.length <= 120 &&
+            typeof value === "string"
+        )
+    );
   }
 
   get isAssigningMonitorRole(): boolean {

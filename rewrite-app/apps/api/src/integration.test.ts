@@ -3393,7 +3393,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
 
     const readOnlyWorkspaceAdmin = await requestJsonAt<{
-      adminUser: { username: string };
+      adminUser: { username: string; customTexts: Record<string, string> };
       roleAssignments: Array<{ role: string; accessMode: string }>;
     }>(isolated.baseUrl, "/api/v1/admin/users", {
       method: "POST",
@@ -3600,7 +3600,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
 
     const groupMonitor = await requestJsonAt<{
-      adminUser: { username: string };
+      adminUser: { username: string; customTexts: Record<string, string> };
       roleAssignments: Array<{
         role: string;
         groupKey: string | null;
@@ -3618,6 +3618,10 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
         username: "Group.Required.Monitor",
         displayName: "Group Required Monitor",
         password: "group-required-secret",
+        customTexts: {
+          gm_headline: "Scoped group monitor",
+          gm_control_pause: "Hold tests"
+        },
         roleAssignments: [
           {
             role: "group_monitor",
@@ -3656,6 +3660,10 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     });
 
     assert.equal(groupMonitor.status, 201);
+    assert.deepEqual(groupMonitor.body.adminUser.customTexts, {
+      gm_headline: "Scoped group monitor",
+      gm_control_pause: "Hold tests"
+    });
     assert.equal(groupMonitor.body.roleAssignments[0]?.role, "group_monitor");
     assert.equal(groupMonitor.body.roleAssignments[0]?.groupKey, "group:allowed");
     assert.equal(
@@ -3703,6 +3711,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     );
 
     const groupMonitorSignIn = await requestJsonAt<{
+      adminUser: { customTexts: Record<string, string> };
       sessionToken: string;
       roleAssignments: Array<{
         monitorProfiles: Array<{ profileId: string; filters: unknown[] }>;
@@ -3721,6 +3730,13 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     const groupMonitorHeaders = {
       authorization: `Bearer ${groupMonitorSignIn.body.sessionToken}`
     };
+    assert.deepEqual(
+      groupMonitorSignIn.body.adminUser.customTexts,
+      {
+        gm_headline: "Scoped group monitor",
+        gm_control_pause: "Hold tests"
+      }
+    );
     assert.deepEqual(
       groupMonitorSignIn.body.roleAssignments[0]?.monitorProfiles.map(
         profile => profile.profileId
@@ -11571,6 +11587,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
         groupKey: string | null;
         passwordRequired: boolean;
         profileIds: string[];
+        customTexts: Record<string, string>;
       }>;
     };
   }>(
@@ -11598,6 +11615,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
         passwordRequired: false,
         profileIds: [],
         monitorProfiles: [],
+        customTexts: {},
         unresolvedProfileIds: []
       }
     ]
@@ -24262,6 +24280,10 @@ test("workspace participant roster can be imported, updated, and listed", async 
       passwordRequired: true,
       profileIds: [],
       monitorProfiles: [],
+      customTexts: {
+        login_subtitle: "Project test selection",
+        login_testEndButtonLabel: "Submit project test"
+      },
       unresolvedProfileIds: []
     }
   ]);

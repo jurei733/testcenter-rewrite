@@ -45,7 +45,11 @@ shows the warning across all routes, and removes it automatically when its
 persisted expiration passes. Participant copy follows the original precedence:
 global settings are overridden by the signed-in Testtakers/Login scope and then
 by the active Booklet scope. System-check-specific text overrides global copy on
-the system-check surface. Logo type, bytes, safe SVG content, the original 20 MiB
+the system-check surface. The complete original 58-key `gm_*` catalog is also a
+versioned contract. Imported Testtakers monitor text is preserved on the migrated
+operator account and overrides global settings after monitor sign-in; the focused
+monitor console applies it to its headline, controls, core columns, and summary
+labels. Logo type, bytes, safe SVG content, the original 20 MiB
 ceiling, theme names, custom-text keys, and bounded text payloads are validated;
 updates are audited without copying text values into the audit trail and stored
 by the memory, JSON-file, SQLite, and Postgres adapters.
@@ -53,7 +57,8 @@ by the memory, JSON-file, SQLite, and Postgres adapters.
 The same import classifies original `monitor-group`, `monitor-study`, and
 `sys-check-login` entries as explicit operational-login migration candidates.
 Responses retain their group, resolved monitor profile definitions, access
-window, and only a `passwordRequired` flag—never the source password. The
+window, login-specific custom texts, and only a `passwordRequired` flag—never
+the source password. The
 migration preview includes original view, column, auto-next, and filter settings
 and flags missing profile definitions. Mixed rosters import their participant
 rows and show the candidates in a dedicated Runtime card;

@@ -1900,7 +1900,7 @@ try {
     await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   }
   logStep("workspace-directory-reads");
-  const expectedTenantDirectoryCount = stopAfterStep === "" ? 2 : 1;
+  const expectedTenantDirectoryCount = 2;
   await clickAction("Refresh Tenant Directory");
   await page
     .locator("article.card")
@@ -8486,6 +8486,21 @@ try {
     "#entryRosterText",
     [
       "<Testtakers>",
+      "  <CustomTexts>",
+      "    <CustomText key=\"gm_headline\">UI Scoped Monitor</CustomText>",
+      "    <CustomText key=\"gm_controls\">UI Test Controls</CustomText>",
+      "    <CustomText key=\"gm_control_pause\">UI Hold</CustomText>",
+      "    <CustomText key=\"gm_control_resume\">UI Continue</CustomText>",
+      "    <CustomText key=\"gm_control_goto\">UI Jump</CustomText>",
+      "    <CustomText key=\"gm_control_unlock\">UI Release</CustomText>",
+      "    <CustomText key=\"gm_control_finish_everything\">UI Finish All</CustomText>",
+      "    <CustomText key=\"gm_col_groupName\">UI Cohort</CustomText>",
+      "    <CustomText key=\"gm_col_bookletLabel\">UI Test Booklet</CustomText>",
+      "    <CustomText key=\"gm_col_blockLabel\">UI Section</CustomText>",
+      "    <CustomText key=\"gm_col_unitLabel\">UI Task</CustomText>",
+      "    <CustomText key=\"gm_col_personLabel\">UI Candidate</CustomText>",
+      "    <CustomText key=\"gm_col_state\">UI Activity</CustomText>",
+      "  </CustomTexts>",
       "  <Profiles><GroupMonitor>",
       "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"yes\">",
       "      <Filter label=\"Current participant\" type=\"substring\" field=\"personLabel\" value=\"student-ui\" not=\"true\" />",
@@ -8534,7 +8549,8 @@ try {
     "password protected",
     "All sessions (all)",
     "all: small view; block hide",
-    "all: Current participant not substring student-ui"
+    "all: Current participant not substring student-ui",
+    "13 imported override(s)"
   ]) {
     assert.ok(
       operationalLoginCandidateText.includes(expectedText),
@@ -8565,6 +8581,7 @@ try {
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
   await page.getByText("1 imported monitor profile(s)").waitFor();
+  await page.getByText("13 login-specific custom text(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -9858,6 +9875,8 @@ try {
   const groupMonitorSignIn = await groupMonitorSignInResponse.json();
   assert.equal(groupMonitorSignIn.adminUser.validForMinutes, 45);
   assert.ok(groupMonitorSignIn.adminUser.firstSignedInAt);
+  assert.equal(groupMonitorSignIn.adminUser.customTexts.gm_headline, "UI Scoped Monitor");
+  assert.equal(groupMonitorSignIn.adminUser.customTexts.gm_control_pause, "UI Hold");
   assert.equal(
     Date.parse(groupMonitorSignIn.adminSession.expiresAt),
     Date.parse(groupMonitorSignIn.adminUser.firstSignedInAt) + 45 * 60_000
@@ -9891,6 +9910,12 @@ try {
   });
   await page.waitForURL(/\/app\/runtime$/);
   await page.locator("#monitorOperatorConsole").waitFor();
+  await page.locator("#monitorCustomHeadline", { hasText: "UI Scoped Monitor" }).waitFor();
+  await page.locator("#monitorConsolePauseButton", { hasText: "UI Hold" }).waitFor();
+  await page.locator("#monitorConsoleResumeButton", { hasText: "UI Continue" }).waitFor();
+  await page.locator("#monitorConsoleGotoButton", { hasText: "UI Jump" }).waitFor();
+  await page.locator("#monitorConsoleUnlockTestButton", { hasText: "UI Release" }).waitFor();
+  await page.locator("#monitorConsoleCompleteButton", { hasText: "UI Finish All" }).waitFor();
   assert.equal(
     (await page.locator("#monitorProfile option:checked").textContent())?.trim(),
     "All sessions"
@@ -9931,7 +9956,7 @@ try {
     .waitFor();
   await monitorOverview
     .locator(".summary-card")
-    .filter({ hasText: "Participants" })
+    .filter({ hasText: "UI Candidate" })
     .getByRole("heading", { name: "1", exact: true })
     .waitFor();
   await monitorOverview
@@ -9968,7 +9993,7 @@ try {
   await waitForNotBusy("group-monitor-overview-filter");
   await expectInputValue("#openRunGroupFilter", participantGroupKey);
   assert.equal(
-    await scopedOpenRuns.getByText("Group", { exact: true }).count(),
+    await scopedOpenRuns.getByText("UI Cohort", { exact: true }).count(),
     1,
     "Imported monitor profile must show the configured group column."
   );

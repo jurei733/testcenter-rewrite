@@ -159,6 +159,7 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(adminUser?.validTo, null);
       assert.equal(adminUser?.validForMinutes, null);
       assert.equal(adminUser?.firstSignedInAt, null);
+      assert.deepEqual(adminUser?.customTexts, {});
       const [roleAssignment] =
         await repository.listAdminRoleAssignmentsByUserId("admin-user-id");
       assert.equal(roleAssignment?.accessMode, "read_write");

@@ -327,7 +327,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           first-login durations are copied into these fields and enforced at sign-in.
           <ng-container *ngIf="view.isCreatingMonitorAccount">
             {{ view.adminCreateMonitorProfileCount }} imported monitor profile(s)
-            will be stored with the scoped role.
+            and {{ view.adminCreateCustomTextCount }} login-specific custom text(s)
+            will be stored with the account.
           </ng-container>
         </p>
         <p *ngIf="!view.isAdminCreateAccessWindowValid">

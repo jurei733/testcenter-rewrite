@@ -241,6 +241,7 @@ describe("parseParticipantRosterText", () => {
     const operationalLogins = parseOriginalTestcenterOperationalLogins(
       [
         "<Testtakers>",
+        "  <CustomTexts><CustomText key=\"gm_headline\">Custom monitor</CustomText></CustomTexts>",
         "  <Profiles><GroupMonitor>",
         "    <Profile id=\"all\" label=\"All sessions\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" bookletStatesColumns=\"level bonus\" autoselectNextBlock=\"no\" />",
         "    <Profile id=\"small\" label=\"Reduced\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"hide\" bookletColumn=\"hide\" filterLocked=\"yes\" filterPending=\"yes\"><Filter label=\"Reduced Booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Reduced Booklet\" not=\"true\" /></Profile>",
@@ -307,6 +308,7 @@ describe("parseParticipantRosterText", () => {
             filtersEnabled: { pending: "yes", locked: "yes" }
           }
         ],
+        customTexts: { gm_headline: "Custom monitor" },
         unresolvedProfileIds: ["missing"],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
@@ -318,6 +320,7 @@ describe("parseParticipantRosterText", () => {
         passwordRequired: false,
         profileIds: [],
         monitorProfiles: [],
+        customTexts: { gm_headline: "Custom monitor" },
         unresolvedProfileIds: [],
         validFrom: "1/6/2023 10:00",
         validForMinutes: 45
@@ -344,6 +347,7 @@ describe("parseParticipantRosterText", () => {
         passwordRequired: true,
         profileIds: [],
         monitorProfiles: [],
+        customTexts: {},
         unresolvedProfileIds: []
       }),
       { role: "study_monitor", groupKey: null }

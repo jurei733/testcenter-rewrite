@@ -738,6 +738,12 @@ export function createShellPersistenceStateHost(args: {
     set adminCreateMonitorProfilesJson(nextValue) {
       args.opsState.adminCreateMonitorProfilesJson = nextValue;
     },
+    get adminCreateCustomTextsJson() {
+      return args.opsState.adminCreateCustomTextsJson;
+    },
+    set adminCreateCustomTextsJson(nextValue) {
+      args.opsState.adminCreateCustomTextsJson = nextValue;
+    },
     get adminCreateValidFrom() {
       return args.opsState.adminCreateValidFrom;
     },

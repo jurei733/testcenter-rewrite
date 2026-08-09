@@ -11,6 +11,9 @@ import { parseJsonDocument } from "./rewrite-app-shell.readers";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
 type OperatorSessionView = {
+  adminUser?: {
+    customTexts?: Record<string, string>;
+  };
   roleAssignments?: PublicAdminRoleAssignment[];
 };
 
@@ -23,6 +26,13 @@ export class RewriteAppOperatorAccessService {
       this.uiState.ops.adminSessionView
     );
     return session?.roleAssignments ?? [];
+  }
+
+  get customTexts(): Record<string, string> {
+    const session = parseJsonDocument<OperatorSessionView>(
+      this.uiState.ops.adminSessionView
+    );
+    return session?.adminUser?.customTexts ?? {};
   }
 
   get mode(): OperatorAccessMode | "signed_out" {

@@ -389,6 +389,7 @@ export type AdminUser = {
   displayName: string;
   passwordHash: string;
   status: AdminUserStatus;
+  customTexts: Record<string, string>;
   validFrom: string | null;
   validTo: string | null;
   validForMinutes: number | null;

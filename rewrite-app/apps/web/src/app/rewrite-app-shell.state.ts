@@ -54,6 +54,7 @@ export interface ShellOpsState {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;
@@ -284,6 +285,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateWorkspaceKey: "demo-workspace",
     adminCreateGroupKey: "group:student-demo",
     adminCreateMonitorProfilesJson: "[]",
+    adminCreateCustomTextsJson: "{}",
     adminCreateValidFrom: "",
     adminCreateValidTo: "",
     adminCreateValidForMinutes: "",

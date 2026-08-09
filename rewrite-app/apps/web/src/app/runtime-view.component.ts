@@ -59,8 +59,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <article id="monitorOperatorConsole" class="card" *ngIf="view.isMonitorOnlySession">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">Scoped operator console</span>
-            <h2>{{ view.operatorAccessLabel }}</h2>
+            <span class="eyebrow">{{ view.monitorText("gm_controls", "Scoped operator console") }}</span>
+            <h2 id="monitorCustomHeadline">{{ view.monitorText("gm_headline", view.operatorAccessLabel) }}</h2>
           </div>
           <span class="status-pill">Server-enforced scope</span>
         </div>
@@ -92,7 +92,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="monitorSelectedTestRunId" name="monitorSelectedTestRunId" readonly [value]="view.runtime.testRunId || 'Select an open run below'" />
           </label>
           <label *ngIf="view.monitorBlockNavigationTargets.length > 0; else monitorTargetUnitInput">
-            Target Block
+            {{ view.monitorText("gm_col_blockLabel", "Target Block") }}
             <select id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()">
               <option value="">Choose a block</option>
               <option *ngFor="let target of view.monitorBlockNavigationTargets" [value]="target.targetUnitKey">
@@ -115,15 +115,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
-          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">Pause</button>
-          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">Resume</button>
-          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">Go To Block</button>
+          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">{{ view.monitorText("gm_control_pause", "Pause") }}</button>
+          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">{{ view.monitorText("gm_control_resume", "Resume") }}</button>
+          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">{{ view.monitorText("gm_control_goto", "Go To Block") }}</button>
           <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
           <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
-          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">Unlock Test</button>
+          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">{{ view.monitorText("gm_control_unlock", "Unlock Test") }}</button>
           <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
-          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">Complete</button>
+          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">{{ view.monitorText("gm_control_finish_everything", "Complete") }}</button>
         </div>
       </article>
 

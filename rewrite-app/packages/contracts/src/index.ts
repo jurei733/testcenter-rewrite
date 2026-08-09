@@ -75,6 +75,7 @@ export * from "./verona-player.js";
 export * from "./booklet-policy.js";
 export * from "./browser-compatibility.js";
 export * from "./monitor-event-stream.js";
+export * from "./monitor-custom-texts.js";
 export * from "./participant-custom-texts.js";
 
 export type ParsedParticipantRosterEntry = {
@@ -118,6 +119,7 @@ export type OriginalTestcenterOperationalLoginCandidate = {
   passwordRequired: boolean;
   profileIds: string[];
   monitorProfiles: OriginalTestcenterMonitorProfile[];
+  customTexts: Record<string, string>;
   unresolvedProfileIds: string[];
   validFrom?: string | null;
   validTo?: string | null;
@@ -1248,6 +1250,32 @@ const findNearestXmlRosterContextValue = (
   return matchingRanges[0]?.value ?? null;
 };
 
+const parseXmlRosterCustomTexts = (
+  rosterText: string
+): Record<string, string> => {
+  const section = rosterText.match(
+    /<((?:[a-zA-Z_][\w.-]*:)?customtexts)\b[^>]*>([\s\S]*?)<\/\1>/i
+  )?.[2];
+  if (!section) {
+    return {};
+  }
+  return Object.fromEntries(
+    Array.from(
+      section.matchAll(
+        /<((?:[a-zA-Z_][\w.-]*:)?customtext)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+      )
+    ).flatMap(match => {
+      const key = normalizeRosterTextValue(
+        readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "key")
+      );
+      if (!key) {
+        return [];
+      }
+      return [[key, decodeXmlText((match[3] ?? "").trim())] as const];
+    })
+  );
+};
+
 const parseParticipantRosterXmlText = (
   rosterText: string
 ): ParsedParticipantRosterEntry[] => {
@@ -1256,29 +1284,7 @@ const parseParticipantRosterXmlText = (
   }
 
   const entries: ParsedParticipantRosterEntry[] = [];
-  const customTexts = (() => {
-    const section = rosterText.match(
-      /<((?:[a-zA-Z_][\w.-]*:)?customtexts)\b[^>]*>([\s\S]*?)<\/\1>/i
-    )?.[2];
-    if (!section) {
-      return {};
-    }
-    return Object.fromEntries(
-      Array.from(
-        section.matchAll(
-          /<((?:[a-zA-Z_][\w.-]*:)?customtext)\b([^>]*)>([\s\S]*?)<\/\1>/gi
-        )
-      ).flatMap(match => {
-        const key = normalizeRosterTextValue(
-          readXmlAttribute(parseXmlAttributes(match[2] ?? ""), "key")
-        );
-        if (!key) {
-          return [];
-        }
-        return [[key, decodeXmlText((match[3] ?? "").trim())] as const];
-      })
-    );
-  })();
+  const customTexts = parseXmlRosterCustomTexts(rosterText);
   const groupContextRanges = collectXmlRosterContextRanges(
     rosterText,
     "group|groupRef|group-ref|class|classRef|class-ref",
@@ -1739,6 +1745,7 @@ export const parseOriginalTestcenterOperationalLogins = (
     originalTestcenterOperationalLoginModes
   );
   const monitorProfiles = parseOriginalTestcenterMonitorProfiles(rosterText);
+  const customTexts = parseXmlRosterCustomTexts(rosterText);
   const candidates: OriginalTestcenterOperationalLoginCandidate[] = [];
 
   for (const match of rosterText.matchAll(
@@ -1798,6 +1805,7 @@ export const parseOriginalTestcenterOperationalLogins = (
         const profile = monitorProfiles.get(profileId);
         return profile ? [profile] : [];
       }),
+      customTexts: { ...customTexts },
       unresolvedProfileIds: uniqueProfileIds.filter(
         profileId => !monitorProfiles.has(profileId)
       ),
@@ -2396,6 +2404,7 @@ export type CreateAdminUserRequest = {
   username: string;
   displayName?: string;
   password: string;
+  customTexts?: Record<string, string>;
   validFrom?: string | null;
   validTo?: string | null;
   validForMinutes?: number | null;

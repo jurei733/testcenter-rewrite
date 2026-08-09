@@ -114,6 +114,7 @@ export type ShellPersistenceTarget = {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;
@@ -244,6 +245,7 @@ export const createPersistedShellState = (
   adminCreateWorkspaceKey: target.adminCreateWorkspaceKey,
   adminCreateGroupKey: target.adminCreateGroupKey,
   adminCreateMonitorProfilesJson: target.adminCreateMonitorProfilesJson,
+  adminCreateCustomTextsJson: target.adminCreateCustomTextsJson,
   adminCreateValidFrom: target.adminCreateValidFrom,
   adminCreateValidTo: target.adminCreateValidTo,
   adminCreateValidForMinutes: target.adminCreateValidForMinutes,
@@ -669,6 +671,10 @@ export const applyHydratedShellState = (
   target.adminCreateMonitorProfilesJson = hydrateString(
     snapshot.adminCreateMonitorProfilesJson,
     target.adminCreateMonitorProfilesJson
+  );
+  target.adminCreateCustomTextsJson = hydrateString(
+    snapshot.adminCreateCustomTextsJson,
+    target.adminCreateCustomTextsJson
   );
   target.adminCreateValidFrom = hydrateString(
     snapshot.adminCreateValidFrom,

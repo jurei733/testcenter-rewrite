@@ -2,9 +2,12 @@ import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
+  mergeMonitorCustomTextScopes,
   mapOriginalTestcenterOperationalLoginToAdminRole,
   filterOpenMonitorRunsByProfile,
-  parseParticipantRosterText
+  parseParticipantRosterText,
+  resolveMonitorCustomText,
+  type MonitorCustomTextKey
 } from "@testcenter-rewrite-app/contracts";
 import type {
   GetParticipantSessionResponse,
@@ -46,6 +49,7 @@ import { RewriteAppRuntimeService } from "./rewrite-app-runtime.service";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
 import { RewriteAppViewStateService } from "./rewrite-app-view-state.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
+import { ApplicationSettingsService } from "./application-settings.service";
 import {
   buildParticipantEntryUrl,
   participantSessionLinkRows
@@ -84,6 +88,7 @@ export class RuntimeViewFacade {
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly monitorBatchSelection = new Set<string>();
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
@@ -106,6 +111,17 @@ export class RuntimeViewFacade {
 
   get monitorProfiles(): MonitorViewProfile[] {
     return this.operatorAccess.monitorProfiles;
+  }
+
+  monitorText(key: MonitorCustomTextKey, fallback: string): string {
+    return resolveMonitorCustomText(
+      mergeMonitorCustomTextScopes(
+        this.applicationSettings.settings().customTexts,
+        this.operatorAccess.customTexts
+      ),
+      key,
+      fallback
+    );
   }
 
   get activeMonitorProfile(): MonitorViewProfile | null {
@@ -1017,6 +1033,10 @@ export class RuntimeViewFacade {
                   : "unlimited"
               },
               {
+                label: "Custom Texts",
+                value: `${Object.keys(candidate.customTexts).length} imported override(s)`
+              },
+              {
                 label: "Migration Decision",
                 value: roleDraft
                   ? `Create a ${roleDraft.role} account with a newly assigned password; the source password remains unavailable.`
@@ -1035,6 +1055,7 @@ export class RuntimeViewFacade {
                     role: roleDraft.role,
                     groupKey: roleDraft.groupKey ?? "",
                     monitorProfilesJson: JSON.stringify(candidate.monitorProfiles),
+                    customTextsJson: JSON.stringify(candidate.customTexts),
                     validFrom: candidate.validFrom ?? "",
                     validTo: candidate.validTo ?? "",
                     validForMinutes: candidate.validForMinutes
@@ -1078,6 +1099,8 @@ export class RuntimeViewFacade {
       role === "group_monitor" || role === "study_monitor"
         ? item.actionPayload.monitorProfilesJson ?? "[]"
         : "[]";
+    ops.adminCreateCustomTextsJson =
+      item.actionPayload.customTextsJson ?? "{}";
     ops.adminCreateValidFrom = item.actionPayload.validFrom?.trim() ?? "";
     ops.adminCreateValidTo = item.actionPayload.validTo?.trim() ?? "";
     ops.adminCreateValidForMinutes =
@@ -1975,7 +1998,7 @@ export class RuntimeViewFacade {
               bookletKey: openRun.bookletKey
             }),
             ...(profile?.settings.groupColumn === "show"
-              ? [{ label: "Group", value: openRun.groupKey }]
+              ? [{ label: this.monitorText("gm_col_groupName", "Group"), value: openRun.groupKey }]
               : []),
             ...(profile?.settings.view === "small"
               ? []
@@ -1984,7 +2007,7 @@ export class RuntimeViewFacade {
               ? []
               : [
                   {
-                    label: "Booklet",
+                    label: this.monitorText("gm_col_bookletLabel", "Booklet"),
                     value: openRun.bookletLabel ?? openRun.bookletKey
                   },
                   {
@@ -2000,7 +2023,7 @@ export class RuntimeViewFacade {
             ...(profile?.settings.blockColumn === "show"
               ? [
                   {
-                    label: "Current Block",
+                    label: this.monitorText("gm_col_blockLabel", "Current Block"),
                     value:
                       openRun.currentBlockLabel ??
                       openRun.currentBlockKey ??
@@ -2012,7 +2035,7 @@ export class RuntimeViewFacade {
               ? []
               : [
                   {
-                    label: "Current Unit",
+                    label: this.monitorText("gm_col_unitLabel", "Current Unit"),
                     value:
                       openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "none"
                   }
@@ -2083,7 +2106,7 @@ export class RuntimeViewFacade {
           : "No imported profile filter applied."
       },
       {
-        label: "Participants",
+        label: this.monitorText("gm_col_personLabel", "Participants"),
         headline: String(participantCount),
         detail: "Unique visible participant logins."
       },
@@ -2103,7 +2126,7 @@ export class RuntimeViewFacade {
         detail: "Whole-test locks in the visible scope."
       },
       {
-        label: "Groups",
+        label: this.monitorText("gm_col_groupName", "Groups"),
         headline: String(groupCount),
         detail: "Server-authorized groups represented below."
       }
@@ -2170,10 +2193,16 @@ export class RuntimeViewFacade {
             `${timedCount} timed`
           ],
           rows: [
-            { label: "Booklets", value: booklets.join(" | ") || "none" },
-            { label: "Current Blocks", value: blocks.join(" | ") || "none" },
             {
-              label: "Latest Activity",
+              label: this.monitorText("gm_col_bookletLabel", "Booklets"),
+              value: booklets.join(" | ") || "none"
+            },
+            {
+              label: this.monitorText("gm_col_blockLabel", "Current Blocks"),
+              value: blocks.join(" | ") || "none"
+            },
+            {
+              label: this.monitorText("gm_col_state", "Latest Activity"),
               value: latestActivityAt
                 ? this.formatDateTime(latestActivityAt)
                 : "none"

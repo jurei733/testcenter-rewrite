@@ -107,6 +107,10 @@ const readStateFromFile = async (
         adminUserId,
         {
           ...adminUser,
+          customTexts:
+            adminUser.customTexts && typeof adminUser.customTexts === "object"
+              ? adminUser.customTexts
+              : {},
           validFrom: adminUser.validFrom ?? null,
           validTo: adminUser.validTo ?? null,
           validForMinutes: adminUser.validForMinutes ?? null,

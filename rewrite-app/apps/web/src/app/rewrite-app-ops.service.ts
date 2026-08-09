@@ -41,7 +41,7 @@ import {
   refreshMetricsOnlyAction,
   refreshOperationalDiagnosticsAction
 } from "./rewrite-app-shell.ops";
-import { prettyPrintJson } from "./rewrite-app-shell.readers";
+import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellOpsHostsService } from "./rewrite-app-shell-ops-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
@@ -418,6 +418,10 @@ export class RewriteAppOpsService {
         username: this.opsState.adminCreateUsername.trim(),
         displayName: this.opsState.adminCreateDisplayName.trim() || undefined,
         password: this.opsState.adminCreatePassword,
+        customTexts:
+          parseJsonDocument<Record<string, string>>(
+            this.opsState.adminCreateCustomTextsJson
+          ) ?? {},
         validFrom: this.opsState.adminCreateValidFrom.trim() || undefined,
         validTo: this.opsState.adminCreateValidTo.trim() || undefined,
         validForMinutes: this.opsState.adminCreateValidForMinutes.trim()
@@ -442,6 +446,7 @@ export class RewriteAppOpsService {
     this.opsState.adminCreateValidTo = "";
     this.opsState.adminCreateValidForMinutes = "";
     this.opsState.adminCreateMonitorProfilesJson = "[]";
+    this.opsState.adminCreateCustomTextsJson = "{}";
     this.opsState.adminRoleTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeRoleAssignmentId =

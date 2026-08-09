@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import type { AdminRoleAssignment, TestRun } from "@testcenter-rewrite-app/domain";
+import type { AdminRoleAssignment, AdminUser, TestRun } from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
 
@@ -103,6 +103,33 @@ test("SQLite preserves global application settings", async () => {
     updatedAt: "2026-08-08T20:00:00.000Z",
     updatedByAdminUserId: "platform-admin"
   });
+});
+
+test("SQLite preserves login-specific admin custom texts", async () => {
+  const repository = createSqliteFirstSliceRepository(":memory:");
+  const adminUser: AdminUser = {
+    adminUserId: "monitor-custom-texts",
+    username: "monitor.custom",
+    displayName: "Monitor Custom",
+    passwordHash: "stored-password-hash",
+    status: "active",
+    customTexts: {
+      gm_headline: "Scoped monitor",
+      gm_control_pause: "Hold"
+    },
+    validFrom: null,
+    validTo: null,
+    validForMinutes: null,
+    firstSignedInAt: null,
+    createdAt: "2026-08-09T00:00:00.000Z"
+  };
+
+  await repository.saveAdminUser(adminUser);
+
+  assert.deepEqual(
+    await repository.getAdminUserByUsername(adminUser.username),
+    adminUser
+  );
 });
 
 test("SQLite adds current defaults to legacy application settings", async () => {

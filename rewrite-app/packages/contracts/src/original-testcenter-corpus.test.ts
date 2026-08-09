@@ -804,6 +804,7 @@ test("original Testcenter compatibility corpus pins official group monitoring se
         filtersEnabled: { pending: "yes", locked: "yes" }
       }
     ],
+    customTexts: {},
     unresolvedProfileIds: []
   });
 });

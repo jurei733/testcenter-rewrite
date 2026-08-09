@@ -890,6 +890,7 @@ export type AdminDirectoryPort = {
     username: string;
     displayName?: string;
     password: string;
+    customTexts?: Record<string, string>;
     validFrom?: string | null;
     validTo?: string | null;
     validForMinutes?: number | null;
@@ -1496,6 +1497,58 @@ const normalizeAdminDisplayName = (
   }
 
   return value.trim() || fallbackDisplayName;
+};
+
+const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
+  if (value === undefined || value === null) {
+    return {};
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new FirstSliceError(
+      400,
+      "admin_custom_texts_invalid",
+      "Admin custom texts must be a key-value object."
+    );
+  }
+  const entries = Object.entries(value);
+  if (entries.length > 250) {
+    throw new FirstSliceError(
+      400,
+      "admin_custom_texts_too_large",
+      "Admin custom texts must not contain more than 250 keys."
+    );
+  }
+  const customTexts: Record<string, string> = {};
+  let totalBytes = 0;
+  for (const [rawKey, rawValue] of entries) {
+    const key = rawKey.trim();
+    if (
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) ||
+      key.length > 120 ||
+      typeof rawValue !== "string"
+    ) {
+      throw new FirstSliceError(
+        400,
+        "admin_custom_texts_invalid",
+        `Admin custom text key '${rawKey || "missing"}' or its value is invalid.`
+      );
+    }
+    const text = rawValue.trim();
+    if (!text) {
+      continue;
+    }
+    const valueBytes = Buffer.byteLength(text, "utf8");
+    totalBytes += Buffer.byteLength(key, "utf8") + valueBytes;
+    if (valueBytes > 10_000 || totalBytes > 250_000) {
+      throw new FirstSliceError(
+        400,
+        "admin_custom_texts_too_large",
+        "Admin custom texts exceed the supported size limit."
+      );
+    }
+    customTexts[key] = text;
+  }
+  return customTexts;
 };
 
 const normalizeAdminUserStatus = (value: unknown): AdminUserStatus => {
@@ -20143,6 +20196,7 @@ export const createFirstSliceServices = (
           displayName,
           passwordHash: hashAdminPassword(password),
           status: "active",
+          customTexts: {},
           validFrom: null,
           validTo: null,
           validForMinutes: null,
@@ -20579,6 +20633,7 @@ export const createFirstSliceServices = (
           displayName: normalizeAdminDisplayName(input.displayName, username),
           passwordHash: hashAdminPassword(password),
           status: "active",
+          customTexts: normalizeAdminCustomTexts(input.customTexts),
           ...accessWindow,
           firstSignedInAt: null,
           createdAt: timestamp
@@ -20648,6 +20703,7 @@ export const createFirstSliceServices = (
             validFrom: adminUser.validFrom,
             validTo: adminUser.validTo,
             validForMinutes: adminUser.validForMinutes,
+            customTextCount: Object.keys(adminUser.customTexts).length,
             roleAssignments: savedRoleAssignments.map(summarizeAdminRoleAssignment)
           }
         });

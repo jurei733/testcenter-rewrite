@@ -64,6 +64,21 @@ const mapAdminUser = (row: Row | undefined): AdminUser | null =>
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
         status: row.status as AdminUser["status"],
+        customTexts: (() => {
+          try {
+            const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? Object.fromEntries(
+                  Object.entries(parsed).filter(
+                    (entry): entry is [string, string] =>
+                      typeof entry[1] === "string"
+                  )
+                )
+              : {};
+          } catch {
+            return {};
+          }
+        })(),
         validFrom: row.valid_from == null ? null : String(row.valid_from),
         validTo: row.valid_to == null ? null : String(row.valid_to),
         validForMinutes:
@@ -1116,6 +1131,13 @@ const migrations: PostgresMigration[] = [
     sql: `
       ALTER TABLE application_settings ADD COLUMN IF NOT EXISTS custom_texts_json TEXT NOT NULL DEFAULT '{}';
     `
+  },
+  {
+    version: 36,
+    name: "add_admin_custom_texts",
+    sql: `
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS custom_texts_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `
   }
 ];
 
@@ -1331,7 +1353,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async listAdminUsers() {
       return many(
-        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          ORDER BY created_at ASC`,
         [],
@@ -1340,7 +1362,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserById(adminUserId) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE admin_user_id = $1`,
         [adminUserId],
@@ -1349,7 +1371,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     },
     async getAdminUserByUsername(username) {
       return one(
-        `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
          FROM admin_users
          WHERE username = $1`,
         [username],
@@ -1359,13 +1381,14 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
     async saveAdminUser(adminUser) {
       await pool.query(
         `INSERT INTO admin_users (
-          admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
         ON CONFLICT(admin_user_id) DO UPDATE SET
           username = EXCLUDED.username,
           display_name = EXCLUDED.display_name,
           password_hash = EXCLUDED.password_hash,
           status = EXCLUDED.status,
+          custom_texts_json = EXCLUDED.custom_texts_json,
           valid_from = EXCLUDED.valid_from,
           valid_to = EXCLUDED.valid_to,
           valid_for_minutes = EXCLUDED.valid_for_minutes,
@@ -1377,6 +1400,7 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           adminUser.displayName,
           adminUser.passwordHash,
           adminUser.status,
+          JSON.stringify(adminUser.customTexts),
           adminUser.validFrom,
           adminUser.validTo,
           adminUser.validForMinutes,

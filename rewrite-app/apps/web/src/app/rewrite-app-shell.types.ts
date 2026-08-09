@@ -132,6 +132,7 @@ export type PersistedShellState = {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
   adminCreateValidForMinutes: string;

@@ -71,6 +71,21 @@ const mapAdminUser = (row: Record<string, unknown> | undefined): AdminUser | nul
         displayName: String(row.display_name),
         passwordHash: String(row.password_hash),
         status: row.status as AdminUser["status"],
+        customTexts: (() => {
+          try {
+            const parsed = JSON.parse(String(row.custom_texts_json ?? "{}"));
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+              ? Object.fromEntries(
+                  Object.entries(parsed).filter(
+                    (entry): entry is [string, string] =>
+                      typeof entry[1] === "string"
+                  )
+                )
+              : {};
+          } catch {
+            return {};
+          }
+        })(),
         validFrom: row.valid_from == null ? null : String(row.valid_from),
         validTo: row.valid_to == null ? null : String(row.valid_to),
         validForMinutes:
@@ -1176,6 +1191,25 @@ const sqliteMigrations: SqliteMigration[] = [
     sql: `
       ALTER TABLE application_settings ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';
     `
+  },
+  {
+    version: 42,
+    name: "add_admin_custom_texts",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_users (
+        admin_user_id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        display_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        status TEXT NOT NULL,
+        valid_from TEXT,
+        valid_to TEXT,
+        valid_for_minutes INTEGER,
+        first_signed_in_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      ALTER TABLE admin_users ADD COLUMN custom_texts_json TEXT NOT NULL DEFAULT '{}';
+    `
   }
 ];
 
@@ -1391,7 +1425,7 @@ export const createSqliteFirstSliceRepository = (
     async listAdminUsers() {
       const rows = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            ORDER BY created_at ASC`
         )
@@ -1401,7 +1435,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserById(adminUserId) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE admin_user_id = ?`
         )
@@ -1411,7 +1445,7 @@ export const createSqliteFirstSliceRepository = (
     async getAdminUserByUsername(username) {
       const row = database
         .prepare(
-          `SELECT admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          `SELECT admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
            FROM admin_users
            WHERE username = ?`
         )
@@ -1422,13 +1456,14 @@ export const createSqliteFirstSliceRepository = (
       database
         .prepare(
           `INSERT INTO admin_users (
-            admin_user_id, username, display_name, password_hash, status, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            admin_user_id, username, display_name, password_hash, status, custom_texts_json, valid_from, valid_to, valid_for_minutes, first_signed_in_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(admin_user_id) DO UPDATE SET
             username = excluded.username,
             display_name = excluded.display_name,
             password_hash = excluded.password_hash,
             status = excluded.status,
+            custom_texts_json = excluded.custom_texts_json,
             valid_from = excluded.valid_from,
             valid_to = excluded.valid_to,
             valid_for_minutes = excluded.valid_for_minutes,
@@ -1441,6 +1476,7 @@ export const createSqliteFirstSliceRepository = (
           adminUser.displayName,
           adminUser.passwordHash,
           adminUser.status,
+          JSON.stringify(adminUser.customTexts),
           adminUser.validFrom,
           adminUser.validTo,
           adminUser.validForMinutes,
