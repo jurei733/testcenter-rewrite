@@ -16208,6 +16208,30 @@ const activateCurrentLeaveLock = (
         })
   });
 
+const buildLeaveLockTestStateEntry = (input: {
+  booklet: ContentReleaseBookletEntry | undefined;
+  testRun: TestRun;
+  leaveLock: NonNullable<ReturnType<typeof resolveCurrentLeaveLock>>;
+  timestamp: number;
+}): ParticipantTestLogEntryInput => ({
+  key:
+    input.leaveLock.scope === "testlet"
+      ? "TESTLETS_LOCKED_AFTER_LEAVE"
+      : "UNITS_LOCKED_AFTER_LEAVE",
+  timeStamp: input.timestamp,
+  content: JSON.stringify(
+    input.leaveLock.scope === "testlet"
+      ? input.testRun.lockedTestletKeys ?? []
+      : (input.testRun.lockedUnitKeys ?? [])
+          .map(unitKey =>
+            (input.booklet?.unitEntries.findIndex(
+              candidate => candidate.unitKey === unitKey
+            ) ?? -1) + 1
+          )
+          .filter(sequenceId => sequenceId > 0)
+  )
+});
+
 const resolveActiveLeaveLock = (
   contentRelease: ContentRelease,
   testRun: TestRun
@@ -26417,6 +26441,16 @@ export const createFirstSliceServices = (
             content: nextStatus.toUpperCase()
           });
         }
+        if (activatedLeaveLock) {
+          testStateEntries.push(
+            buildLeaveLockTestStateEntry({
+              booklet,
+              testRun: updatedRun,
+              leaveLock: activatedLeaveLock,
+              timestamp: logTimestamp
+            })
+          );
+        }
         if (testStateEntries.length > 0) {
           runtimeLogBatches.push({ entries: testStateEntries });
         }
@@ -26900,16 +26934,26 @@ export const createFirstSliceServices = (
         };
         await repository.saveTestRun(completedRun);
         if (executionMode.saveResponses) {
+          const completedStateEntries: ParticipantTestLogEntryInput[] = [];
+          if (leavingLock) {
+            completedStateEntries.push(
+              buildLeaveLockTestStateEntry({
+                booklet,
+                testRun: completedRun,
+                leaveLock: leavingLock,
+                timestamp: Date.parse(timestamp)
+              })
+            );
+          }
+          completedStateEntries.push({
+            key: "CONTROLLER",
+            timeStamp: Date.parse(timestamp),
+            content: lockOnTermination ? "LOCKED" : "TERMINATED"
+          });
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
-            testRun: completedRun,
-            batches: [{
-              entries: [{
-                key: "CONTROLLER",
-                timeStamp: Date.parse(timestamp),
-                content: lockOnTermination ? "LOCKED" : "TERMINATED"
-              }]
-            }]
+              testRun: completedRun,
+              batches: [{ entries: completedStateEntries }]
             })
           );
         }

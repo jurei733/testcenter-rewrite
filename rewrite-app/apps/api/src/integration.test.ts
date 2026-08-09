@@ -21836,6 +21836,36 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
     "UNIT.LOCK.2"
   ]);
 
+  const participantLeaveLockLogs = await requestJson<{
+    items: Array<{
+      testLog: { logKey: string; logContent: string; unitKey: string | null };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${testRunId}&limit=100`
+  );
+  assert.deepEqual(
+    new Set(
+      participantLeaveLockLogs.body.items
+        .filter(item => item.testLog.logKey === "UNITS_LOCKED_AFTER_LEAVE")
+        .map(item => item.testLog.logContent)
+    ),
+    new Set(["[1]", "[1,2]"])
+  );
+  assert.deepEqual(
+    participantLeaveLockLogs.body.items
+      .filter(item => item.testLog.logKey === "TESTLETS_LOCKED_AFTER_LEAVE")
+      .map(item => item.testLog.logContent),
+    [`["${testletLockTestletKey}"]`]
+  );
+  assert.ok(
+    participantLeaveLockLogs.body.items
+      .filter(item =>
+        item.testLog.logKey === "UNITS_LOCKED_AFTER_LEAVE" ||
+        item.testLog.logKey === "TESTLETS_LOCKED_AFTER_LEAVE"
+      )
+      .every(item => item.testLog.unitKey === null)
+  );
+
   const stateAfterReload = await requestJson<{
     currentRunState: {
       bookletUnits: Array<{ unitKey: string; isLocked: boolean }>;
@@ -21979,6 +22009,18 @@ test("original Testcenter leave locks persist for unit and testlet scopes", asyn
   assert.deepEqual(confirmedCompletion.body.testRun.lockedUnitKeys, [
     "UNIT.LOCK.1"
   ]);
+
+  const completionLeaveLockLogs = await requestJson<{
+    items: Array<{ testLog: { logKey: string; logContent: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${completionRunId}&limit=100`
+  );
+  assert.ok(
+    completionLeaveLockLogs.body.items.some(item =>
+      item.testLog.logKey === "UNITS_LOCKED_AFTER_LEAVE" &&
+      item.testLog.logContent === "[1]"
+    )
+  );
 
   const lockActivities = await requestJson<{
     items: Array<{ activityEvent: { eventType: string } }>;
