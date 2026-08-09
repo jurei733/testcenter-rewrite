@@ -30808,6 +30808,34 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     ),
     false
   );
+  const navigatedDemo = await requestJson<{
+    testRun: {
+      currentUnitKey: string | null;
+      bookletStateOverrides: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "alternate-unit", status: "running" }
+  });
+  assert.equal(navigatedDemo.status, 200);
+  assert.equal(navigatedDemo.body.testRun.currentUnitKey, "alternate-unit");
+  const reopenedDemo = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      bookletStateOverrides: Record<string, string>;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${demo.participantSessionId}/resume`, {
+    method: "POST"
+  });
+  assert.equal(reopenedDemo.status, 200);
+  assert.equal(reopenedDemo.body.testRun.testRunId, demo.testRunId);
+  assert.equal(reopenedDemo.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.deepEqual(reopenedDemo.body.testRun.bookletStateOverrides, {
+    route: "alternate"
+  });
+  assert.deepEqual(reopenedDemo.body.testRun.unitResponses, {});
 
   const review = await start("mode-review");
   assert.equal(review.currentRunState.executionMode.saveResponses, false);
@@ -31022,6 +31050,33 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(reviewSave.body.testRun.currentUnitKey, "UNIT.FINISH");
   assert.deepEqual(reviewSave.body.testRun.unitResponses, {});
   assert.deepEqual(reviewSave.body.testRun.testletTimers, {});
+  const retainedReview = await requestJson<{
+    review: { reviewId: string };
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`, {
+    method: "POST",
+    body: { category: "general", comment: "Retained across review re-entry" }
+  });
+  assert.equal(retainedReview.status, 201);
+  const reopenedReview = await requestJson<{
+    testRun: {
+      testRunId: string;
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${review.participantSessionId}/resume`, {
+    method: "POST"
+  });
+  assert.equal(reopenedReview.status, 200);
+  assert.equal(reopenedReview.body.testRun.testRunId, review.testRunId);
+  assert.equal(reopenedReview.body.testRun.currentUnitKey, "UNIT.INTRO");
+  assert.deepEqual(reopenedReview.body.testRun.unitResponses, {});
+  const reviewsAfterReentry = await requestJson<{
+    items: Array<{ reviewId: string; comment: string }>;
+  }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
+  assert.deepEqual(
+    reviewsAfterReentry.body.items.map(item => [item.reviewId, item.comment]),
+    [[retainedReview.body.review.reviewId, "Retained across review re-entry"]]
+  );
   const reviewLogs = await requestJson<{ items: unknown[] }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${review.testRunId}`
   );

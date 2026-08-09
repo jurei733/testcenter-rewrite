@@ -27253,7 +27253,7 @@ export const createFirstSliceServices = (
         );
 
         if (existingRun) {
-          const normalizedExistingRun = normalizeTestRun(existingRun);
+          let normalizedExistingRun = normalizeTestRun(existingRun);
           requireParticipantTestRunUnlocked(normalizedExistingRun);
           if (
             requestedBookletKey &&
@@ -27264,6 +27264,32 @@ export const createFirstSliceServices = (
               "participant_session_open_run_booklet_conflict",
               `Participant session '${participantSessionId}' already has an open run for booklet '${existingRun.bookletKey}'.`
             );
+          }
+
+          const executionMode = resolveParticipantExecutionMode(
+            normalizedExistingRun.executionMode ?? participantSession.executionMode
+          );
+          if (!executionMode.saveResponses) {
+            const contentRelease = await requireContentRelease(
+              repository,
+              normalizedExistingRun.contentReleaseId
+            );
+            const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
+              candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
+            );
+            const firstVisibleUnit = resolveVisibleBookletUnits(
+              booklet,
+              normalizedExistingRun
+            )[0];
+            const resetCurrentUnitKey = firstVisibleUnit?.unitKey ?? null;
+            if (normalizedExistingRun.currentUnitKey !== resetCurrentUnitKey) {
+              normalizedExistingRun = {
+                ...normalizedExistingRun,
+                currentUnitKey: resetCurrentUnitKey,
+                updatedAt: now()
+              };
+              await repository.saveTestRun(normalizedExistingRun);
+            }
           }
 
           if (existingRun.status === "paused") {
@@ -27279,8 +27305,7 @@ export const createFirstSliceServices = (
             );
             await repository.saveTestRun(resumedRun);
             if (
-              resolveParticipantExecutionMode(resumedRun.executionMode)
-                .saveResponses
+              executionMode.saveResponses
             ) {
               const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
                 key: "CONTROLLER",
