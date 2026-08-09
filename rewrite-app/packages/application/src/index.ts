@@ -15617,6 +15617,9 @@ const resolveAdaptiveVariables = (
           ) {
             continue;
           }
+          // Original Testcenter tracks adaptive responses by variable ID, not by
+          // subform. Preserve its data-part order: a later repeated ID replaces
+          // the earlier subform value before server-side coding and routing.
           variables.set(value.id, {
             id: value.id,
             status: value.status,

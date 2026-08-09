@@ -21758,15 +21758,42 @@ test("original coding schemes derive adaptive variables server-side", async () =
       presentationProgress: "complete",
       responseProgress: "complete",
       dataParts: {
-        responses: JSON.stringify([
-          { id: "var1", status: "VALUE_CHANGED", value: "a" },
-          { id: "var2", status: "VALUE_CHANGED", value: "b" }
+        firstSubform: JSON.stringify([
+          {
+            id: "var1",
+            status: "VALUE_CHANGED",
+            value: "not-a",
+            subform: "form-a"
+          },
+          {
+            id: "var2",
+            status: "VALUE_CHANGED",
+            value: "a",
+            subform: "form-a"
+          }
+        ]),
+        secondSubform: JSON.stringify([
+          {
+            id: "var1",
+            status: "VALUE_CHANGED",
+            value: "a",
+            subform: "form-b"
+          },
+          {
+            id: "var2",
+            status: "VALUE_CHANGED",
+            value: "b",
+            subform: "form-b"
+          }
         ])
       }
     }
   });
   const saveResult = await requestJson<{
-    testRun: { bookletStates: Record<string, string> };
+    testRun: {
+      bookletStates: Record<string, string>;
+      unitResponses: Record<string, string>;
+    };
   }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
     method: "POST",
     body: {
@@ -21784,6 +21811,10 @@ test("original coding schemes derive adaptive variables server-side", async () =
     "initial-value": "answered",
     "initial-score": "scored"
   });
+  assert.equal(
+    saveResult.body.testRun.unitResponses["decision-unit"],
+    rawPlayerResponse
+  );
 
   const currentState = await requestJson<{
     currentRunState: {
