@@ -33,6 +33,8 @@ const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 type ZipCompressionMethod = 0 | 8;
 type ZipFixtureEntry = {
   fileName: string;
+  fileNameBytes?: Buffer;
+  usesUtf8FileName?: boolean;
   content: string;
   compressionMethod?: ZipCompressionMethod;
   compressedContent?: Buffer;
@@ -75,7 +77,7 @@ const createZipBase64 = (
   for (const entry of entries) {
     const compressionMethod =
       entry.compressionMethod ?? options.compressionMethod ?? 0;
-    const fileName = Buffer.from(entry.fileName, "utf8");
+    const fileName = entry.fileNameBytes ?? Buffer.from(entry.fileName, "utf8");
     const uncompressedContent = Buffer.from(entry.content, "utf8");
     const content =
       entry.compressedContent ??
@@ -85,7 +87,8 @@ const createZipBase64 = (
     const uncompressedSize = entry.uncompressedSize ?? uncompressedContent.length;
     const checksum = entry.checksum ?? zipFixtureCrc32(uncompressedContent);
     const generalPurposeBitFlag =
-      0x0800 | (entry.usesDataDescriptor ? 0x0008 : 0);
+      (entry.usesUtf8FileName === false ? 0 : 0x0800) |
+      (entry.usesDataDescriptor ? 0x0008 : 0);
     const localHeader = Buffer.alloc(30 + fileName.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
@@ -28885,6 +28888,96 @@ test("source document import accepts ZIP data descriptor entries", async () => {
   assert.equal(importResult.body.importJob.status, "completed");
   assert.deepEqual(importResult.body.importJob.diagnostics, []);
   assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+});
+
+test("source document import resolves legacy CP437 ZIP file names", async () => {
+  const tenantKey = "integration-tenant-zip-cp437";
+  const workspaceKey = "integration-workspace-zip-cp437";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="legacy-cp437-booklet" href="booklets/Booklet.xml" />
+            <resource identifier="legacy-cp437-unit" href="units/Größe.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>legacy-cp437-booklet</Id><Label>Legacy CP437 Booklet</Label></Metadata>
+          <Units><Unit id="legacy-cp437-unit" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Größe.xml",
+      fileNameBytes: Buffer.concat([
+        Buffer.from("export/units/Gr", "ascii"),
+        Buffer.from([0x94, 0xe1]),
+        Buffer.from("e.xml", "ascii")
+      ]),
+      usesUtf8FileName: false,
+      content: `
+        <Unit>
+          <Metadata><Id>legacy-cp437-unit</Id><Label>Legacy CP437 Unit</Label></Metadata>
+        </Unit>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "legacy-cp437-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          unitEntries: Array<{ unitKey: string; content?: string }>;
+        }>;
+      };
+    } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const importedUnit =
+    importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]
+      ?.unitEntries[0];
+  assert.equal(importedUnit?.unitKey, "legacy-cp437-unit");
+  assert.match(
+    importedUnit?.content ?? "",
+    /<Label>Legacy CP437 Unit<\/Label>/
+  );
 });
 
 test("source document import bounds oversized deflated ZIP manifest entries", async () => {

@@ -12321,6 +12321,31 @@ const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
   return -1;
 };
 
+const ZIP_CP437_EXTENDED_CHARACTERS = [
+  "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ",
+  "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐",
+  "└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀",
+  "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ "
+].join("");
+
+const decodeZipFileName = (
+  fileNameBytes: Buffer,
+  generalPurposeBitFlag: number
+): string => {
+  if ((generalPurposeBitFlag & 0x0800) !== 0) {
+    return fileNameBytes.toString("utf8");
+  }
+
+  let fileName = "";
+  for (const byte of fileNameBytes) {
+    fileName +=
+      byte < 0x80
+        ? String.fromCharCode(byte)
+        : ZIP_CP437_EXTENDED_CHARACTERS.charAt(byte - 0x80);
+  }
+  return fileName;
+};
+
 const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
   const endOfCentralDirectoryOffset =
     findZipEndOfCentralDirectoryOffset(zipBuffer);
@@ -12357,7 +12382,10 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
     }
 
     entries.push({
-      fileName: zipBuffer.toString("utf8", fileNameStart, fileNameEnd),
+      fileName: decodeZipFileName(
+        zipBuffer.subarray(fileNameStart, fileNameEnd),
+        generalPurposeBitFlag
+      ),
       generalPurposeBitFlag,
       compressionMethod,
       checksum,
@@ -12411,7 +12439,10 @@ const readZipEntryBuffer = (
         localCompressedSize !== entry.compressedSize ||
         localUncompressedSize !== entry.uncompressedSize)) ||
     fileNameEnd > zipBuffer.length ||
-    zipBuffer.toString("utf8", fileNameStart, fileNameEnd) !== entry.fileName
+    decodeZipFileName(
+      zipBuffer.subarray(fileNameStart, fileNameEnd),
+      localGeneralPurposeBitFlag
+    ) !== entry.fileName
   ) {
     return null;
   }

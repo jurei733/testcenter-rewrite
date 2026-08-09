@@ -378,6 +378,12 @@ invalid XML entries fail staging with the stable
 `source_document_zip_xml_unreadable` diagnostic instead of entering the
 dependency graph as apparently valid content.
 
+ZIP entry-name decoding now follows the archive flag instead of assuming every
+package is UTF-8. Bit-11 names remain UTF-8; legacy entries without that flag
+use the required CP437 mapping. A production API gate encodes
+`units/Größe.xml` as raw CP437, references the Unicode path from the manifest,
+and requires the resolved Unit XML to reach the staged runtime snapshot.
+
 Nested `.itcr.zip` resource packages now apply the same safe relative-path
 contract as the outer upload before resource projection. Traversal segments,
 absolute and drive-qualified paths, backslashes, control characters, and
