@@ -38,6 +38,7 @@ import type {
   Tenant,
   TestRun,
   Workspace,
+  WorkspaceDeletion,
   WorkspaceAttachment,
   WorkspaceContentReleaseListItem,
   WorkspaceContentReleaseDetail,
@@ -1879,6 +1880,7 @@ export const productionApiRoutes = {
     exportWorkspacesCsv: "/api/v1/tenants/:tenantKey/workspaces.csv",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
     updateWorkspace: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
+    deleteWorkspace: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
     exportWorkspaceOverviewCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/workspace-overview.csv",
     getStudyMonitorSummary:
@@ -2068,6 +2070,10 @@ export type CreateWorkspaceRequest = {
 
 export type UpdateWorkspaceRequest = {
   displayName: string;
+};
+
+export type DeleteWorkspaceRequest = {
+  confirmation: string;
 };
 
 export type SourceDocumentSource =
@@ -2555,6 +2561,10 @@ export type CreateWorkspaceResponse = {
 
 export type UpdateWorkspaceResponse = {
   workspace: Workspace;
+};
+
+export type DeleteWorkspaceResponse = {
+  deletion: WorkspaceDeletion;
 };
 
 export type ListWorkspacesResponse = {

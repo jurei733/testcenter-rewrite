@@ -99,7 +99,9 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
         </div>
         <div class="actions">
           <button id="renameWorkspaceButton" class="secondary" type="button" [disabled]="!view.canRenameWorkspace" (click)="view.renameWorkspace()">Rename Workspace</button>
+          <button id="deleteWorkspaceButton" class="danger" type="button" [disabled]="!view.canDeleteWorkspace" (click)="view.confirmDeleteWorkspace()">Permanently Delete Workspace</button>
         </div>
+        <p>Permanent deletion is limited to platform administrators and removes all workspace content, participant state, results, reports, attachments, and scoped role assignments in one transaction. The global admin audit entry is retained.</p>
       </article>
 
       <article class="card">

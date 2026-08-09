@@ -1779,6 +1779,87 @@ export const createSqliteFirstSliceRepository = (
           scope.workspace.createdAt
         );
     },
+    async deleteWorkspaceAggregate(input) {
+      database.exec("BEGIN IMMEDIATE");
+      try {
+        const current = database
+          .prepare(
+            `SELECT workspace_id
+             FROM workspaces
+             WHERE tenant_key = ? AND workspace_key = ? AND tenant_id = ? AND workspace_id = ?`
+          )
+          .get(
+            input.tenantKey,
+            input.workspaceKey,
+            input.tenantId,
+            input.workspaceId
+          );
+        if (!current) {
+          database.exec("ROLLBACK");
+          return null;
+        }
+        const deleteScoped = (tableName: string): number =>
+          Number(
+            database
+              .prepare(
+                `DELETE FROM ${tableName} WHERE tenant_id = ? AND workspace_id = ?`
+              )
+              .run(input.tenantId, input.workspaceId).changes
+          );
+        const counts = {
+          deletedWorkspaceCount: 0,
+          deletedAdminRoleAssignmentCount: Number(
+            database
+              .prepare(`DELETE FROM admin_role_assignments WHERE workspace_id = ?`)
+              .run(input.workspaceId).changes
+          ),
+          deletedAttachmentFileCount: deleteScoped("attachment_files"),
+          deletedActivityEventCount: deleteScoped("workspace_activity_events"),
+          deletedReviewCount: deleteScoped("workspace_reviews"),
+          deletedSourcePackageCount: deleteScoped("source_packages"),
+          deletedImportJobCount: deleteScoped("import_jobs"),
+          deletedContentReleaseCount: deleteScoped("content_releases"),
+          deletedParticipantSessionCount: deleteScoped("participant_sessions"),
+          deletedRosterEntryCount: deleteScoped("participant_roster_entries"),
+          deletedLoginAttemptCount: deleteScoped("participant_login_attempts"),
+          deletedTestRunCount: deleteScoped("test_runs"),
+          deletedTestLogCount: deleteScoped("participant_test_logs")
+        };
+        counts.deletedWorkspaceCount = Number(
+          database
+            .prepare(
+              `DELETE FROM workspaces
+               WHERE tenant_id = ? AND workspace_id = ? AND workspace_key = ?`
+            )
+            .run(input.tenantId, input.workspaceId, input.workspaceKey).changes
+        );
+        if (counts.deletedWorkspaceCount !== 1) {
+          database.exec("ROLLBACK");
+          return null;
+        }
+        database
+          .prepare(
+            `INSERT INTO admin_audit_events (
+              admin_audit_event_id, event_type, actor_admin_user_id,
+              subject_admin_user_id, occurred_at, summary, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            input.auditEvent.adminAuditEventId,
+            input.auditEvent.eventType,
+            input.auditEvent.actorAdminUserId,
+            input.auditEvent.subjectAdminUserId,
+            input.auditEvent.occurredAt,
+            input.auditEvent.summary,
+            JSON.stringify(input.auditEvent.details)
+          );
+        database.exec("COMMIT");
+        return counts;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
       const rows = database
         .prepare(

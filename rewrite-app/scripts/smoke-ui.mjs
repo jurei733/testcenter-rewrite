@@ -625,12 +625,12 @@ try {
       { timeout: 15_000 }
     );
   };
-  const acceptNextDialog = expectedMessagePattern =>
+  const acceptNextDialog = (expectedMessagePattern, promptText) =>
     new Promise((resolvePromise, reject) => {
       page.once("dialog", async dialog => {
         try {
           assert.match(dialog.message(), expectedMessagePattern);
-          await dialog.accept();
+          await dialog.accept(promptText);
           resolvePromise(undefined);
         } catch (error) {
           reject(error);
@@ -2220,6 +2220,86 @@ try {
       .filter({ hasText: workspaceKey })
       .waitFor();
     stopAfter("workspace-rename");
+
+    logStep("workspace-delete");
+    const disposableWorkspaceKey = `ui-delete-${Date.now()}`;
+    const disposableWorkspaceDisplayName = "Disposable Workspace";
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
+      {
+        body: {
+          workspaceKey: disposableWorkspaceKey,
+          displayName: disposableWorkspaceDisplayName
+        }
+      }
+    );
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${disposableWorkspaceKey}/source-packages`,
+      {
+        body: {
+          fileName: "disposable-workspace.json",
+          mediaType: "application/json",
+          contentStructure: { bookletEntries: [] },
+          sourceDocument: '{"booklets":[]}'
+        }
+      }
+    );
+    await clickAction("Refresh Workspace Directory");
+    await clickCardAction(
+      "Workspace Directory",
+      "Use Workspace",
+      disposableWorkspaceDisplayName
+    );
+    await page.waitForFunction(
+      expectedWorkspaceKey =>
+        document.querySelector("#workspaceKey")?.value === expectedWorkspaceKey,
+      disposableWorkspaceKey
+    );
+    await expectButtonSelectorEnabled("#deleteWorkspaceButton");
+    const deleteDialog = acceptNextDialog(
+      new RegExp(
+        `Permanently delete '${tenantKey}/${disposableWorkspaceKey}'.+Type the exact workspace key\\.`
+      ),
+      disposableWorkspaceKey
+    );
+    await page.locator("#deleteWorkspaceButton").click();
+    await deleteDialog;
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces`,
+      payload =>
+        Array.isArray(payload?.items) &&
+        !payload.items.some(
+          workspace => workspace?.workspaceKey === disposableWorkspaceKey
+        )
+    );
+    await pollJsonWithPredicate(
+      `${baseUrl}/api/v1/admin/audit-events?eventType=workspace_deleted`,
+      payload =>
+        Array.isArray(payload?.items) &&
+        payload.items.some(
+          event =>
+            event?.eventType === "workspace_deleted" &&
+            event?.details?.workspaceKey === disposableWorkspaceKey
+        )
+    );
+    await page
+      .locator("article.card")
+      .filter({
+        has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+      })
+      .filter({ hasNotText: disposableWorkspaceKey })
+      .waitFor();
+    await clickCardAction(
+      "Workspace Directory",
+      "Use Workspace",
+      renamedWorkspaceDisplayName
+    );
+    await page.waitForFunction(
+      expectedWorkspaceKey =>
+        document.querySelector("#workspaceKey")?.value === expectedWorkspaceKey,
+      workspaceKey
+    );
+    stopAfter("workspace-delete");
   }
 
   logStep("nav-ops-admin-management");

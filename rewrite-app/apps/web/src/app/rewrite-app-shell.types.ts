@@ -110,6 +110,7 @@ export type PersistedShellState = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminSessionView: string;
   adminSessionUserFilter: string;
   adminSessionStatusFilter: "" | AdminSessionStatus;
   adminSessionLimit: string;

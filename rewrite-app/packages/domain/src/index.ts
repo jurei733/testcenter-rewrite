@@ -21,6 +21,7 @@ export type AdminAuditEventType =
   | "admin_password_reset"
   | "admin_role_assigned"
   | "admin_role_revoked"
+  | "workspace_deleted"
   | "application_settings_updated";
 export type SourcePackageStatus = "uploaded" | "accepted" | "rejected";
 export const sourcePackageStatuses = [
@@ -234,6 +235,7 @@ export const adminAuditEventTypes = [
   "admin_password_reset",
   "admin_role_assigned",
   "admin_role_revoked",
+  "workspace_deleted",
   "application_settings_updated"
 ] as const satisfies readonly AdminAuditEventType[];
 export type WorkspaceActivityEventType =
@@ -494,6 +496,27 @@ export type AdminAuditEvent = {
   occurredAt: string;
   summary: string;
   details: Record<string, unknown>;
+};
+
+export type WorkspaceAggregateDeletionCounts = {
+  deletedWorkspaceCount: number;
+  deletedAdminRoleAssignmentCount: number;
+  deletedAttachmentFileCount: number;
+  deletedActivityEventCount: number;
+  deletedReviewCount: number;
+  deletedSourcePackageCount: number;
+  deletedImportJobCount: number;
+  deletedContentReleaseCount: number;
+  deletedParticipantSessionCount: number;
+  deletedRosterEntryCount: number;
+  deletedLoginAttemptCount: number;
+  deletedTestRunCount: number;
+  deletedTestLogCount: number;
+};
+
+export type WorkspaceDeletion = {
+  workspace: Workspace;
+  counts: WorkspaceAggregateDeletionCounts;
 };
 
 export type SourcePackage = {

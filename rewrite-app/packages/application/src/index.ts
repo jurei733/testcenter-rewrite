@@ -119,6 +119,8 @@ import type {
   WorkspaceSourcePackageDetail,
   WorkspaceSourcePackageDeletion,
   WorkspaceSourcePackageDeletionReadiness,
+  WorkspaceAggregateDeletionCounts,
+  WorkspaceDeletion,
   WorkspaceSourcePackageDownload,
   WorkspaceSourcePackageListItem,
   WorkspaceFileDependencyEdge,
@@ -156,6 +158,12 @@ export type PlatformPort = {
     displayName: string;
     actorId?: string | null;
   }): Promise<Workspace>;
+  deleteWorkspace(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    confirmation: string;
+    actorId?: string | null;
+  }): Promise<WorkspaceDeletion>;
 };
 
 export type ContentIntakePort = {
@@ -1166,6 +1174,13 @@ export type FirstSliceRepository = {
     workspaceKey: string;
     workspace: Workspace;
   }): Promise<void>;
+  deleteWorkspaceAggregate(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    tenantId: string;
+    workspaceId: string;
+    auditEvent: AdminAuditEvent;
+  }): Promise<WorkspaceAggregateDeletionCounts | null>;
   listWorkspaceActivityEventsByWorkspace(
     tenantId: string,
     workspaceId: string
@@ -21545,6 +21560,50 @@ export const createFirstSliceServices = (
           }
         });
         return updatedWorkspace;
+      },
+      async deleteWorkspace(input) {
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        if (input.confirmation !== workspace.workspaceKey) {
+          throw new FirstSliceError(
+            400,
+            "workspace_delete_confirmation_mismatch",
+            "Workspace deletion confirmation must exactly match the workspace key."
+          );
+        }
+        const occurredAt = now();
+        const auditEvent: AdminAuditEvent = {
+          adminAuditEventId: idGenerator(),
+          eventType: "workspace_deleted",
+          actorAdminUserId: input.actorId ?? null,
+          subjectAdminUserId: null,
+          occurredAt,
+          summary: `Workspace '${workspace.workspaceKey}' permanently deleted.`,
+          details: {
+            tenantKey: input.tenantKey,
+            workspaceKey: workspace.workspaceKey,
+            workspaceId: workspace.workspaceId,
+            displayName: workspace.displayName
+          }
+        };
+        const counts = await repository.deleteWorkspaceAggregate({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          tenantId: workspace.tenantId,
+          workspaceId: workspace.workspaceId,
+          auditEvent
+        });
+        if (!counts) {
+          throw new FirstSliceError(
+            409,
+            "workspace_delete_conflict",
+            `Workspace '${input.workspaceKey}' changed before it could be deleted.`
+          );
+        }
+        return { workspace, counts };
       }
     },
     workspaceAdminRead: {

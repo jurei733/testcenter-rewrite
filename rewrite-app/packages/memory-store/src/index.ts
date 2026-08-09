@@ -196,6 +196,77 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       );
       state.workspacesByKey.set(scope.workspace.workspaceKey, scope.workspace);
     },
+    async deleteWorkspaceAggregate(input) {
+      const scopeKey = workspaceScopeKey(input.tenantKey, input.workspaceKey);
+      const workspace = state.workspacesByScope.get(scopeKey);
+      if (!workspace || workspace.workspaceId !== input.workspaceId) {
+        return null;
+      }
+      const deleteMatching = <Value>(
+        values: Map<string, Value>,
+        matches: (value: Value) => boolean
+      ): number => {
+        let deletedCount = 0;
+        for (const [key, value] of values) {
+          if (matches(value)) {
+            values.delete(key);
+            deletedCount += 1;
+          }
+        }
+        return deletedCount;
+      };
+      const workspaceMatches = (value: { tenantId: string; workspaceId: string }) =>
+        value.tenantId === input.tenantId && value.workspaceId === input.workspaceId;
+      const counts = {
+        deletedWorkspaceCount: 1,
+        deletedAdminRoleAssignmentCount: deleteMatching(
+          state.adminRoleAssignments,
+          value => value.workspaceId === input.workspaceId
+        ),
+        deletedAttachmentFileCount: deleteMatching(state.attachmentFiles, workspaceMatches),
+        deletedActivityEventCount: deleteMatching(
+          state.workspaceActivityEvents,
+          workspaceMatches
+        ),
+        deletedReviewCount: deleteMatching(state.workspaceReviews, workspaceMatches),
+        deletedSourcePackageCount: deleteMatching(state.sourcePackages, workspaceMatches),
+        deletedImportJobCount: deleteMatching(state.importJobs, workspaceMatches),
+        deletedContentReleaseCount: deleteMatching(state.contentReleases, workspaceMatches),
+        deletedParticipantSessionCount: deleteMatching(
+          state.participantSessions,
+          workspaceMatches
+        ),
+        deletedRosterEntryCount: deleteMatching(
+          state.participantRosterEntries,
+          workspaceMatches
+        ),
+        deletedLoginAttemptCount: deleteMatching(
+          state.participantLoginAttempts,
+          workspaceMatches
+        ),
+        deletedTestRunCount: deleteMatching(state.testRuns, workspaceMatches),
+        deletedTestLogCount: deleteMatching(state.participantTestLogs, workspaceMatches)
+      };
+      for (const key of state.participantRosterPasswordHashes.keys()) {
+        if (key.startsWith(`${input.tenantId}::${input.workspaceId}::`)) {
+          state.participantRosterPasswordHashes.delete(key);
+        }
+      }
+      state.workspacesByScope.delete(scopeKey);
+      const remainingWorkspaceWithSameKey = Array.from(
+        state.workspacesByScope.values()
+      ).find(candidate => candidate.workspaceKey === workspace.workspaceKey);
+      if (remainingWorkspaceWithSameKey) {
+        state.workspacesByKey.set(
+          remainingWorkspaceWithSameKey.workspaceKey,
+          remainingWorkspaceWithSameKey
+        );
+      } else {
+        state.workspacesByKey.delete(workspace.workspaceKey);
+      }
+      state.adminAuditEvents.set(input.auditEvent.adminAuditEventId, input.auditEvent);
+      return counts;
+    },
     async listWorkspaceActivityEventsByWorkspace(tenantId, workspaceId) {
       return Array.from(state.workspaceActivityEvents.values()).filter(
         activityEvent =>

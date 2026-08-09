@@ -2336,6 +2336,10 @@ export class WorkspaceViewFacade {
     );
   }
 
+  get canDeleteWorkspace(): boolean {
+    return this.operatorAccess.isPlatformAdmin && this.canUseWorkspaceScope;
+  }
+
   get canUseDirectoryScope(): boolean {
     return !this.operatorAccess.isReadOnlyAdmin;
   }
@@ -2377,6 +2381,30 @@ export class WorkspaceViewFacade {
       if (displayName) {
         this.workspaceDisplayNameDraft = displayName;
       }
+    });
+  }
+
+  confirmDeleteWorkspace(): void {
+    if (!this.canDeleteWorkspace) {
+      return;
+    }
+    const tenantKey = this.workspace.tenantKey.trim();
+    const workspaceKey = this.workspace.workspaceKey.trim();
+    const confirmation = globalThis.window?.prompt(
+      `Permanently delete '${tenantKey}/${workspaceKey}' and all content, sessions, results, reports, attachments, and scoped role assignments? Type the exact workspace key.`,
+      ""
+    );
+    if (confirmation !== workspaceKey) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      await this.workspaceService.deleteWorkspace(confirmation);
+      this.workspace.workspaceKey = "";
+      this.workspaceDisplayNameDraft = "";
+      this.workspace.workspaceOverviewView = 'Use "Refresh Workspace Overview".';
+      this.workspace.workspaceActivityView = 'Use "Refresh Content Reads".';
+      this.workspace.workspaceLoaded = false;
+      this.persistState();
     });
   }
 

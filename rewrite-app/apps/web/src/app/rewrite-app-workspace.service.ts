@@ -1,6 +1,8 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  DeleteWorkspaceRequest,
+  DeleteWorkspaceResponse,
   GetStudyMonitorBookletResponse,
   GetStudyMonitorGroupResponse,
   GetStudyMonitorParticipantResponse,
@@ -86,6 +88,32 @@ export class RewriteAppWorkspaceService {
       `${payload.workspace.displayName} now labels ${tenantKey}/${workspaceKey}; the workspace key is unchanged.`
     );
     return payload.workspace.displayName;
+  }
+
+  async deleteWorkspace(confirmation: string): Promise<DeleteWorkspaceResponse> {
+    if (!this.hasWorkspaceScope()) {
+      throw new Error("Workspace scope is required for deletion.");
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<DeleteWorkspaceResponse>(
+      "Delete Workspace",
+      "DELETE",
+      resolveRoutePath(productionApiRoutes.workspace.deleteWorkspace, {
+        tenantKey,
+        workspaceKey
+      }),
+      { confirmation } satisfies DeleteWorkspaceRequest
+    );
+    await this.refreshWorkspaceDirectory();
+    const removedDataCount = Object.entries(payload.deletion.counts)
+      .filter(([key]) => key !== "deletedWorkspaceCount")
+      .reduce((total, [, count]) => total + count, 0);
+    this.feedback.rememberActivity(
+      "Workspace Deleted",
+      `${tenantKey}/${workspaceKey} and ${removedDataCount} dependent record(s) were permanently deleted; the admin audit remains.`
+    );
+    return payload;
   }
 
   async refreshWorkspaceOverview(quiet = false): Promise<void> {

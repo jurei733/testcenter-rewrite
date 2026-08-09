@@ -2978,6 +2978,79 @@ test("admin deletion removes roles and sessions while retaining audit evidence",
   assert.equal(repeatedDeletion.body.error, "admin_user_not_found");
 });
 
+test("workspace aggregate deletion runs on the configured integration store", async () => {
+  const tenantKey = "workspace-delete-store-tenant";
+  const workspaceKey = "workspace-delete-store-workspace";
+
+  const tenant = await requestJson<{ tenant: { tenantKey: string } }>(
+    "/api/v1/platform/tenants",
+    {
+      method: "POST",
+      body: { tenantKey, displayName: "Workspace Delete Store Tenant" }
+    }
+  );
+  assert.equal(tenant.status, 201);
+
+  const workspace = await requestJson<{
+    workspace: { workspaceKey: string; workspaceId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces`,
+    {
+      method: "POST",
+      body: { workspaceKey, displayName: "Workspace Delete Store Fixture" }
+    }
+  );
+  assert.equal(workspace.status, 201);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`,
+    {
+      method: "POST",
+      body: {
+        fileName: "workspace-delete-store-fixture.txt",
+        mediaType: "text/plain",
+        sourceDocument: "Workspace deletion store fixture"
+      }
+    }
+  );
+  assert.equal(sourcePackage.status, 201);
+
+  const deletion = await requestJson<{
+    deletion: {
+      workspace: { workspaceKey: string; workspaceId: string };
+      counts: {
+        deletedWorkspaceCount: number;
+        deletedActivityEventCount: number;
+        deletedSourcePackageCount: number;
+      };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
+    {
+      method: "DELETE",
+      body: { confirmation: workspaceKey }
+    }
+  );
+  assert.equal(deletion.status, 200);
+  assert.equal(deletion.body.deletion.workspace.workspaceKey, workspaceKey);
+  assert.equal(
+    deletion.body.deletion.workspace.workspaceId,
+    workspace.body.workspace.workspaceId
+  );
+  assert.equal(deletion.body.deletion.counts.deletedWorkspaceCount, 1);
+  assert.equal(deletion.body.deletion.counts.deletedSourcePackageCount, 1);
+  assert.ok(deletion.body.deletion.counts.deletedActivityEventCount >= 2);
+
+  const missingWorkspace = await requestJson<{ error: string }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`
+  );
+  assert.equal(missingWorkspace.status, 404);
+  assert.equal(missingWorkspace.body.error, "workspace_not_found");
+
+});
+
 test("operator API enforces authenticated and scoped admin bearer roles", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
@@ -4616,6 +4689,149 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       delegatedStudyMonitor.body.adminUser.adminUserId
     );
     assert.equal(delegatedDeletion.body.deletedRoleAssignmentCount, 1);
+
+    const deletionScopedAdmin = await requestJsonAt<{
+      adminUser: { adminUserId: string };
+      roleAssignments: Array<{ workspaceId: string | null }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users", {
+      method: "POST",
+      headers: adminHeaders,
+      body: {
+        username: "Deletion.Scoped.Admin",
+        password: "deletion-scoped-admin-secret",
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            tenantKey: "other-admin-tenant",
+            workspaceKey: "other-admin-workspace"
+          }
+        ]
+      }
+    });
+    assert.equal(deletionScopedAdmin.status, 201);
+    assert.ok(deletionScopedAdmin.body.roleAssignments[0]?.workspaceId);
+
+    const deletionSourcePackage = await requestJsonAt<{
+      sourcePackage: { sourcePackageId: string };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace/source-packages",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          fileName: "workspace-deletion-fixture.txt",
+          mediaType: "text/plain",
+          sourceDocument: "Workspace deletion fixture"
+        }
+      }
+    );
+    assert.equal(deletionSourcePackage.status, 201);
+
+    for (const headers of [tenantAdminHeaders, workspaceAdminHeaders]) {
+      const rejectedWorkspaceDeletion = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace",
+        {
+          method: "DELETE",
+          headers,
+          body: { confirmation: "other-admin-workspace" }
+        }
+      );
+      assert.equal(rejectedWorkspaceDeletion.status, 403);
+      assert.equal(rejectedWorkspaceDeletion.body.error, "admin_role_required");
+    }
+
+    const mismatchedWorkspaceDeletion = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace",
+      {
+        method: "DELETE",
+        headers: adminHeaders,
+        body: { confirmation: "wrong-workspace" }
+      }
+    );
+    assert.equal(mismatchedWorkspaceDeletion.status, 400);
+    assert.equal(
+      mismatchedWorkspaceDeletion.body.error,
+      "workspace_delete_confirmation_mismatch"
+    );
+    const workspaceAfterMismatch = await requestJsonAt<{
+      workspaceOverview: { workspace: { workspaceKey: string } };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace",
+      { headers: adminHeaders }
+    );
+    assert.equal(workspaceAfterMismatch.status, 200);
+
+    const deletedWorkspace = await requestJsonAt<{
+      deletion: {
+        workspace: { workspaceKey: string };
+        counts: Record<string, number>;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace",
+      {
+        method: "DELETE",
+        headers: adminHeaders,
+        body: { confirmation: "other-admin-workspace" }
+      }
+    );
+    assert.equal(deletedWorkspace.status, 200);
+    assert.equal(
+      deletedWorkspace.body.deletion.workspace.workspaceKey,
+      "other-admin-workspace"
+    );
+    assert.equal(deletedWorkspace.body.deletion.counts.deletedWorkspaceCount, 1);
+    assert.equal(
+      deletedWorkspace.body.deletion.counts.deletedAdminRoleAssignmentCount,
+      1
+    );
+    assert.equal(
+      deletedWorkspace.body.deletion.counts.deletedSourcePackageCount,
+      1
+    );
+    assert.ok(
+      deletedWorkspace.body.deletion.counts.deletedActivityEventCount >= 2
+    );
+
+    const missingDeletedWorkspace = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/other-admin-tenant/workspaces/other-admin-workspace",
+      { headers: adminHeaders }
+    );
+    assert.equal(missingDeletedWorkspace.status, 404);
+    assert.equal(missingDeletedWorkspace.body.error, "workspace_not_found");
+
+    const deletedWorkspaceRoleDirectory = await requestJsonAt<{
+      items: Array<{ roleAssignments: unknown[] }>;
+    }>(isolated.baseUrl, "/api/v1/admin/users?username=deletion.scoped.admin", {
+      headers: adminHeaders
+    });
+    assert.equal(deletedWorkspaceRoleDirectory.status, 200);
+    assert.deepEqual(
+      deletedWorkspaceRoleDirectory.body.items[0]?.roleAssignments,
+      []
+    );
+
+    const workspaceDeletionAudit = await requestJsonAt<{
+      items: Array<{
+        eventType: string;
+        actorAdminUserId: string | null;
+        details: Record<string, unknown>;
+      }>;
+    }>(isolated.baseUrl, "/api/v1/admin/audit-events?eventType=workspace_deleted", {
+      headers: adminHeaders
+    });
+    assert.equal(workspaceDeletionAudit.status, 200);
+    assert.equal(workspaceDeletionAudit.body.items.length, 1);
+    assert.equal(
+      workspaceDeletionAudit.body.items[0]?.details.workspaceKey,
+      "other-admin-workspace"
+    );
+    assert.ok(workspaceDeletionAudit.body.items[0]?.actorAdminUserId);
   } finally {
     await closeServer(isolated.server);
   }
@@ -19782,7 +19998,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       body: {
         commandType: "goto",
         targetUnitKey: "UNIT.TIMED",
-        remainingSeconds: 1,
+        remainingSeconds: 10,
         actorId: "timer-monitor"
       }
     }
@@ -19801,12 +20017,12 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.durationSeconds,
-    1
+    10
   );
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.remainingSeconds,
-    1
+    10
   );
   assert.match(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
@@ -19834,7 +20050,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
         commandType: "goto",
         testRunIds: [testRunId],
         targetUnitKey: "UNIT.TIMED",
-        remainingSeconds: 2,
+        remainingSeconds: 20,
         actorId: "timer-monitor-batch"
       }
     }
@@ -19856,7 +20072,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
           remainingSeconds: batchTimer.remainingSeconds
         }
       : null,
-    { status: "running", durationSeconds: 2, remainingSeconds: 2 }
+    { status: "running", durationSeconds: 20, remainingSeconds: 20 }
   );
 
   const monitorActivity = await requestJson<{
@@ -19882,7 +20098,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   const gotoRestorationActivity = monitorActivity.body.items.find(
     item =>
       item.activityEvent.details.commandType === "goto" &&
-      item.activityEvent.details.remainingSeconds === 1
+      item.activityEvent.details.remainingSeconds === 10
   );
   assert.ok(gotoRestorationActivity);
   assert.equal(
@@ -26986,6 +27202,7 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
       workspace: {
         exportWorkspacesCsv: string;
         exportWorkspaceOverviewCsv: string;
+        deleteWorkspace: string;
         importParticipantRoster: string;
         listParticipantRoster: string;
         exportParticipantRosterCsv: string;
@@ -27097,6 +27314,10 @@ test("metrics endpoint exposes runtime counters and request ids", async () => {
     /workspace-overview\.csv/
   );
   assert.match(manifest.routes.workspace.listParticipantRoster, /participant-roster/);
+  assert.match(
+    manifest.routes.workspace.deleteWorkspace,
+    /workspaces\/:workspaceKey/
+  );
   assert.match(
     manifest.routes.workspace.downloadSourcePackage,
     /source-packages\/.+\/download/

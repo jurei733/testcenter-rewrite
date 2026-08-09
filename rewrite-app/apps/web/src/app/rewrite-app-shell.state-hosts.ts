@@ -606,6 +606,12 @@ export function createShellPersistenceStateHost(args: {
     set adminSessionToken(nextValue) {
       args.opsState.adminSessionToken = nextValue;
     },
+    get adminSessionView() {
+      return args.opsState.adminSessionView;
+    },
+    set adminSessionView(nextValue) {
+      args.opsState.adminSessionView = nextValue;
+    },
     get adminSessionUserFilter() {
       return args.opsState.adminSessionUserFilter;
     },

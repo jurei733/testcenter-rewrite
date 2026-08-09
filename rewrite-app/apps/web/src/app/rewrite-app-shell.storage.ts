@@ -92,6 +92,7 @@ export type ShellPersistenceTarget = {
   adminUsername: string;
   adminDisplayName: string;
   adminSessionToken: string;
+  adminSessionView: string;
   adminSessionUserFilter: string;
   adminSessionStatusFilter: "" | AdminSessionStatus;
   adminSessionLimit: string;
@@ -223,6 +224,7 @@ export const createPersistedShellState = (
   adminUsername: target.adminUsername,
   adminDisplayName: target.adminDisplayName,
   adminSessionToken: target.adminSessionToken,
+  adminSessionView: target.adminSessionView,
   adminSessionUserFilter: target.adminSessionUserFilter,
   adminSessionStatusFilter: target.adminSessionStatusFilter,
   adminSessionLimit: target.adminSessionLimit,
@@ -594,6 +596,10 @@ export const applyHydratedShellState = (
   target.adminSessionToken = hydrateString(
     snapshot.adminSessionToken,
     target.adminSessionToken
+  );
+  target.adminSessionView = hydrateString(
+    snapshot.adminSessionView,
+    target.adminSessionView
   );
   target.adminSessionUserFilter = hydrateString(
     snapshot.adminSessionUserFilter,

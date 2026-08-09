@@ -54,6 +54,8 @@ import {
   type DeleteSourcePackagesResponse,
   type DeleteSystemCheckReportsRequest,
   type DeleteSystemCheckReportsResponse,
+  type DeleteWorkspaceRequest,
+  type DeleteWorkspaceResponse,
   type DetailedResponseListQuery,
   type GetContentReleaseActivationReadinessResponse,
   type GetContentReleaseResponse,
@@ -2024,6 +2026,11 @@ const resolveOperatorAccessScope = (
     return { kind: "platform" };
   }
 
+  const workspaceDeleteMatch = workspaceOverviewPattern.exec(pathname);
+  if (method === "DELETE" && workspaceDeleteMatch?.groups) {
+    return { kind: "platform" };
+  }
+
   const workspaceCreateMatch = workspaceCreatePattern.exec(pathname);
   if ((method === "POST" || method === "GET") && workspaceCreateMatch?.groups) {
     const tenantKey = decodeRouteGroup(workspaceCreateMatch.groups.tenantKey);
@@ -2660,6 +2667,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
     ["PATCH", workspaceOverviewPattern, productionApiRoutes.workspace.updateWorkspace],
+    ["DELETE", workspaceOverviewPattern, productionApiRoutes.workspace.deleteWorkspace],
     [
       "GET",
       workspaceOverviewCsvExportPattern,
@@ -4535,6 +4543,32 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           actorId: operatorAdminUserIdByRequest.get(request)
         });
         sendJson<UpdateWorkspaceResponse>(response, 200, { workspace });
+        return;
+      }
+
+      if (request.method === "DELETE" && workspaceOverviewMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          workspaceOverviewMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<DeleteWorkspaceRequest>();
+        const deletion = await services.platform.deleteWorkspace({
+          tenantKey,
+          workspaceKey,
+          confirmation: body.confirmation,
+          actorId: operatorAdminUserIdByRequest.get(request)
+        });
+        sendJson<DeleteWorkspaceResponse>(response, 200, { deletion });
         return;
       }
 
