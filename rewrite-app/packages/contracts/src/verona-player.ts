@@ -21,10 +21,32 @@ export type VeronaPlayerState = {
   [key: string]: unknown;
 };
 
+export type VeronaStateLogEntry = {
+  key: string;
+  timeStamp: number;
+  content: string;
+};
+
+export const projectVeronaUnitStateLogs = (
+  unitState: VeronaUnitState,
+  timeStamp: number = Date.now()
+): VeronaStateLogEntry[] => [
+  {
+    key: "PRESENTATION_PROGRESS",
+    timeStamp,
+    content: unitState.presentationProgress || ""
+  },
+  {
+    key: "RESPONSE_PROGRESS",
+    timeStamp,
+    content: unitState.responseProgress || ""
+  }
+];
+
 export type VeronaPageStateProjection = {
   pages: Array<{ id: string; label: string }>;
   currentPageIndex: number;
-  logEntries: Array<{ key: string; timeStamp: number; content: string }>;
+  logEntries: VeronaStateLogEntry[];
 };
 
 export const projectVeronaPageState = (

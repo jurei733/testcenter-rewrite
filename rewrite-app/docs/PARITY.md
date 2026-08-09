@@ -164,7 +164,10 @@ use the Player's authored page ID, the host-resolved zero-based page index, and
 the current valid-page count, and travel through the same bounded idempotent
 save outbox as Player logs and responses. The production Chromium/SQLite gate
 drives both host page buttons and proves the `page-1`/`page-2`, `0`/`1`, and
-`2` records through the operator test-log API.
+`2` records through the operator test-log API. Every Verona `unitState` report
+also restores the original `PRESENTATION_PROGRESS` and `RESPONSE_PROGRESS`
+records, including empty values for omitted progress fields and final reports
+from a retiring Player frame.
 
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,

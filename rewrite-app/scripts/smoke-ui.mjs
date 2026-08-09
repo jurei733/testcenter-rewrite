@@ -6233,6 +6233,37 @@ try {
     new Set(veronaPageCountLogs.items.map(item => item.testLog?.logContent)),
     new Set(["2"])
   );
+  const veronaPresentationProgressLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PRESENTATION_PROGRESS&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(item => item.testLog?.logContent === "complete")
+  );
+  assert.deepEqual(
+    new Set(
+      veronaPresentationProgressLogs.items.map(
+        item => item.testLog?.logContent
+      )
+    ),
+    new Set(["complete"])
+  );
+  const veronaResponseProgressLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=RESPONSE_PROGRESS&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload => {
+      const contents = payload?.items?.map(item => item.testLog?.logContent) ?? [];
+      return contents.includes("none") && contents.includes("complete");
+    }
+  );
+  assert.deepEqual(
+    new Set(
+      veronaResponseProgressLogs.items.map(item => item.testLog?.logContent)
+    ),
+    new Set(["none", "complete"])
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

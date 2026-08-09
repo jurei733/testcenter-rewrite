@@ -23,6 +23,7 @@ import {
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
   projectVeronaPageState,
+  projectVeronaUnitStateLogs,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
@@ -394,6 +395,9 @@ export class VeronaPlayerHostComponent
           logEntries.push(
             ...this.updatePageNavigation(notification.playerState)
           );
+        }
+        if (notification.unitState !== undefined) {
+          logEntries.push(...projectVeronaUnitStateLogs(notification.unitState));
         }
         if (Array.isArray(notification.log)) {
           logEntries.push(...this.normalizeLogEntries(notification.log));
@@ -791,6 +795,9 @@ export class VeronaPlayerHostComponent
       logEntries.push(
         ...projectVeronaPageState(notification.playerState).logEntries
       );
+    }
+    if (notification.unitState !== undefined) {
+      logEntries.push(...projectVeronaUnitStateLogs(notification.unitState));
     }
     if (Array.isArray(notification.log)) {
       logEntries.push(...this.normalizeLogEntries(notification.log));

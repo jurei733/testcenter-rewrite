@@ -8,6 +8,7 @@ import {
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
   projectVeronaPageState,
+  projectVeronaUnitStateLogs,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
@@ -196,6 +197,28 @@ test("Verona page state supports legacy page maps and numeric indices", () => {
       ]
     }
   );
+});
+
+test("Verona unit state projects the original host-side progress logs", () => {
+  const timeStamp = 1_786_278_400_001;
+
+  assert.deepEqual(
+    projectVeronaUnitStateLogs(
+      {
+        presentationProgress: "complete",
+        responseProgress: "some"
+      },
+      timeStamp
+    ),
+    [
+      { key: "PRESENTATION_PROGRESS", timeStamp, content: "complete" },
+      { key: "RESPONSE_PROGRESS", timeStamp, content: "some" }
+    ]
+  );
+  assert.deepEqual(projectVeronaUnitStateLogs({}, timeStamp), [
+    { key: "PRESENTATION_PROGRESS", timeStamp, content: "" },
+    { key: "RESPONSE_PROGRESS", timeStamp, content: "" }
+  ]);
 });
 
 test("Verona notifications and supported API versions are validated", () => {
