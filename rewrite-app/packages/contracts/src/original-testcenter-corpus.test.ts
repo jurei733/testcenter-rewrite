@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 8);
+  assert.equal(corpus.codingSchemePackages.length, 9);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1261,6 +1261,91 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
         ["b2", null, "UNSET", null, null],
         ["b3", null, "UNSET", null, null]
       ]
+    ]
+  );
+
+  const fragmenting = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "regex-fragmenting"
+  );
+  assert.ok(fragmenting);
+  assert.deepEqual(
+    [
+      fragmenting.schemeSourcePath,
+      fragmenting.inputSourcePath,
+      fragmenting.outcomeSourcePath
+    ],
+    [
+      "test/coding/fragmenting/coding-scheme.json",
+      "test/coding/fragmenting/01_input.json",
+      "test/coding/fragmenting/01_outcome.json"
+    ]
+  );
+  const fragmentingScheme = JSON.parse(
+    readFileSync(resolve(corpusRoot, fragmenting.schemeFixture), "utf8")
+  ) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      sourceType: string;
+      processing?: string[];
+      fragmenting?: string;
+      codes: Array<{
+        ruleSets: Array<{
+          rules: Array<{
+            fragment?: number;
+            method: string;
+            parameters: string[];
+          }>;
+        }>;
+      }>;
+    }>;
+  };
+  assert.equal(fragmentingScheme.version, undefined);
+  assert.deepEqual(
+    fragmentingScheme.variableCodings.map(variable => [
+      variable.sourceType,
+      variable.fragmenting,
+      variable.processing ?? []
+    ]),
+    [
+      ["BASE", "(\\d+)\\s*(\\w+)", []],
+      ["BASE", "(\\d+)\\s*(\\w+)", []],
+      ["BASE", "(\\d+)\\s*(\\w+)", ["IGNORE_CASE"]]
+    ]
+  );
+  assert.deepEqual(
+    fragmentingScheme.variableCodings.map(
+      variable => variable.codes[0]?.ruleSets[0]?.rules[0]?.fragment
+    ),
+    [0, 1, 1]
+  );
+  assert.deepEqual(
+    fragmentingScheme.variableCodings.map(
+      variable => variable.codes[0]?.ruleSets[0]?.rules[0]?.parameters[0]
+    ),
+    ["2", "kg", "KG"]
+  );
+  const fragmentingOutcome = JSON.parse(
+    readFileSync(resolve(corpusRoot, fragmenting.outcomeFixture), "utf8")
+  ) as Array<{
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  }>;
+  assert.deepEqual(
+    fragmentingOutcome.map(variable => [
+      variable.id,
+      variable.value,
+      variable.status,
+      variable.code ?? null,
+      variable.score ?? null
+    ]),
+    [
+      ["b1", "2 kg", "CODING_COMPLETE", 1, 1],
+      ["b2", "2 kg", "CODING_COMPLETE", 1, 1],
+      ["b3", "2 kg", "CODING_COMPLETE", 1, 7]
     ]
   );
 });

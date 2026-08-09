@@ -25,7 +25,9 @@ sets, `ANY_OPEN`, `LENGTH`, automatic residual zeroes, derived `SUM_SCORE`,
 and sorted adaptive-array comparison. The deliberately versionless `arrays`
 family adds all four official cases for `SORT_ARRAY`, numeric array positions,
 `SUM`, `ANY_OTHER`, `ANY`, untouched raw array values, and the ambiguous
-multi-value result `CODING_INCOMPLETE`.
+multi-value result `CODING_INCOMPLETE`. The versionless `fragmenting` family
+adds its official regex case, including first/second capture selection,
+`IGNORE_CASE` after fragmentation, exact scores, and unchanged response text.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

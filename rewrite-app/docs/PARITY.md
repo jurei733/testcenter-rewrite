@@ -192,6 +192,14 @@ and distinguish `UNSET`, `CODING_COMPLETE`, and the intentionally ambiguous
 `CODING_INCOMPLETE` result. Five persisted Booklet states select exactly one
 aggregate, any-other, incomplete, or any route across memory, file, and SQLite.
 
+Latest P0 fragment-coding closure: the same release corpus now pins the
+deliberately versionless `fragmenting` scheme, input, and expected outcome
+byte-for-byte. A real imported Unit applies `(\d+)\s*(\w+)`, selects capture
+groups zero and one, combines the second fragment with `IGNORE_CASE`, and
+reproduces all three official code/score pairs. Eight persisted Booklet states,
+the unchanged `2 kg` raw Player response, and the exclusive matched route are
+gated across memory, file, and SQLite.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

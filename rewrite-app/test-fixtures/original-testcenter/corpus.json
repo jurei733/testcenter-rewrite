@@ -626,6 +626,32 @@
           }
         }
       ]
+    },
+    {
+      "family": "regex-fragmenting",
+      "schemeFixture": "schemes/responses-3.6.0-fragmenting.json",
+      "inputFixture": "schemes/responses-3.6.0-fragmenting-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-fragmenting-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/fragmenting/coding-scheme.json",
+      "inputSourcePath": "test/coding/fragmenting/01_input.json",
+      "outcomeSourcePath": "test/coding/fragmenting/01_outcome.json",
+      "schemeSha256": "e40658fe13f03bd59cdb610fd8c848ec8d277bacfc271347f156b604bc14f484",
+      "inputSha256": "9155b7a30aff382493013492b5a8b5d20be0a091e7715b4e8b6bbb0ed6bd930e",
+      "outcomeSha256": "5d5d76e1a1aea1f00e2991ce58fbf586539f4ceb0f8749440af65a08f2ba9198",
+      "license": "MIT",
+      "expectedStates": {
+        "fragment-route": "matched",
+        "fragment-number-code": "full",
+        "fragment-number-score": "one",
+        "fragment-unit-code": "full",
+        "fragment-unit-score": "one",
+        "fragment-case-code": "full",
+        "fragment-case-score": "seven",
+        "fragment-value": "retained"
+      }
     }
   ],
   "bookletConfigPackages": [

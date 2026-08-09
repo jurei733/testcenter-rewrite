@@ -23945,6 +23945,367 @@ test("original Testcenter compatibility corpus executes official IQB array selec
   }
 });
 
+test("original Testcenter compatibility corpus executes official IQB regex fragmenting", async () => {
+  type CodingSchemePackage = {
+    family: string;
+    schemeFixture: string;
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const codingPackage = corpus.codingSchemePackages.find(
+    candidate => candidate.family === "regex-fragmenting"
+  );
+  assert.ok(codingPackage);
+  const schemeDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, codingPackage.schemeFixture),
+    "utf8"
+  );
+  const scheme = JSON.parse(schemeDocument) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      alias?: string;
+      sourceType: string;
+      processing?: string[];
+      fragmenting?: string;
+      codes: Array<{
+        ruleSets: Array<{
+          rules: Array<{ fragment?: number; parameters: string[] }>;
+        }>;
+      }>;
+    }>;
+  };
+  assert.equal(scheme.version, undefined);
+  assert.deepEqual(
+    scheme.variableCodings.map(variable => [
+      variable.sourceType,
+      variable.fragmenting,
+      variable.processing ?? [],
+      variable.codes[0]?.ruleSets[0]?.rules[0]?.fragment
+    ]),
+    [
+      ["BASE", "(\\d+)\\s*(\\w+)", [], 0],
+      ["BASE", "(\\d+)\\s*(\\w+)", [], 1],
+      ["BASE", "(\\d+)\\s*(\\w+)", ["IGNORE_CASE"], 1]
+    ]
+  );
+  const inputResponses = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, codingPackage.inputFixture),
+      "utf8"
+    )
+  ) as Array<{ id: string; status: string; value: unknown }>;
+  const officialOutcome = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, codingPackage.outcomeFixture),
+      "utf8"
+    )
+  ) as Array<{
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  }>;
+  assert.deepEqual(
+    officialOutcome.map(variable => variable.id),
+    scheme.variableCodings.map(variable => variable.alias ?? variable.id)
+  );
+
+  const statusCondition = (variable: string): string =>
+    `<If><Status of="${variable}" from="fragment-unit"/><Is equal="CODING_COMPLETE"/></If>`;
+  const numericCondition = (
+    source: "Code" | "Score",
+    variable: string,
+    value: number
+  ): string =>
+    `<If><${source} of="${variable}" from="fragment-unit"/><Is equal="${value}"/></If>`;
+  const codedCondition = (variable: string, code: number): string =>
+    numericCondition("Code", variable, code) + statusCondition(variable);
+  const stateDefinitions = [
+    {
+      key: "fragment-route",
+      option: "matched",
+      conditions:
+        codedCondition("b1", 1) +
+        codedCondition("b2", 1) +
+        codedCondition("b3", 1) +
+        numericCondition("Score", "b3", 7)
+    },
+    {
+      key: "fragment-number-code",
+      option: "full",
+      conditions: codedCondition("b1", 1)
+    },
+    {
+      key: "fragment-number-score",
+      option: "one",
+      conditions:
+        numericCondition("Score", "b1", 1) + statusCondition("b1")
+    },
+    {
+      key: "fragment-unit-code",
+      option: "full",
+      conditions: codedCondition("b2", 1)
+    },
+    {
+      key: "fragment-unit-score",
+      option: "one",
+      conditions:
+        numericCondition("Score", "b2", 1) + statusCondition("b2")
+    },
+    {
+      key: "fragment-case-code",
+      option: "full",
+      conditions: codedCondition("b3", 1)
+    },
+    {
+      key: "fragment-case-score",
+      option: "seven",
+      conditions:
+        numericCondition("Score", "b3", 7) + statusCondition("b3")
+    },
+    {
+      key: "fragment-value",
+      option: "retained",
+      conditions:
+        `<If><Value of="b3" from="fragment-unit"/><Is equal="2 kg"/></If>` +
+        statusCondition("b3")
+    }
+  ];
+  assert.deepEqual(
+    codingPackage.expectedStates,
+    Object.fromEntries(
+      stateDefinitions.map(state => [state.key, state.option])
+    )
+  );
+  const statesDocument = stateDefinitions
+    .map(
+      state => `
+        <State id="${state.key}" label="${state.key}">
+          <Option id="${state.option}" label="${state.option}">${state.conditions}</Option>
+          <Option id="pending" label="Pending"/>
+        </State>
+      `
+    )
+    .join("");
+  const bookletKey = "BOOKLET.IQB.FRAGMENTING";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-fragmenting.xml"/>
+            <resource identifier="UNIT.IQB.FRAGMENTING" href="units/Unit-fragmenting.xml"/>
+            <resource identifier="fragmenting.json" href="schemes/fragmenting.json"/>
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-fragmenting.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official IQB Fragmenting</Label></Metadata>
+          <States>${statesDocument}</States>
+          <Units>
+            <Unit id="UNIT.IQB.FRAGMENTING" alias="fragment-unit" label="Fragmenting Unit"/>
+            <Testlet id="matched-block">
+              <Restrictions><Show if="fragment-route" is="matched"/></Restrictions>
+              <Unit id="UNIT.IQB.FRAGMENT-MATCHED" alias="matched-route" label="Matched route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="fragment-route" is="pending"/></Restrictions>
+              <Unit id="UNIT.IQB.FRAGMENT-PENDING" alias="pending-route" label="Pending route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit-fragmenting.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>UNIT.IQB.FRAGMENTING</Id><Label>Official IQB Fragmenting</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>Fragmenting</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/fragmenting.json</CodingSchemeRef>
+          <BaseVariables>
+            <Variable id="b1" type="string"/>
+            <Variable id="b2" type="string"/>
+            <Variable id="b3" type="string"/>
+          </BaseVariables>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/schemes/fragmenting.json",
+      content: schemeDocument
+    }
+  ]);
+  const tenantKey = "integration-tenant-official-fragmenting";
+  const workspaceKey = "integration-workspace-official-fragmenting";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-fragmenting.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: {
+                version?: string;
+                variableCodings: Array<{
+                  fragmenting?: string;
+                  processing?: string[];
+                }>;
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const importedUnit =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries.find(unit => unit.unitKey === "fragment-unit");
+  assert.equal(importedUnit?.codingScheme?.version, undefined);
+  assert.deepEqual(
+    importedUnit?.codingScheme?.variableCodings.map(variable => [
+      variable.fragmenting,
+      variable.processing ?? []
+    ]),
+    [
+      ["(\\d+)\\s*(\\w+)", []],
+      ["(\\d+)\\s*(\\w+)", []],
+      ["(\\d+)\\s*(\\w+)", ["IGNORE_CASE"]]
+    ]
+  );
+  const activate = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activate.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "official-fragmenting-participant"
+    }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: {
+      testRunId: string;
+      bookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.deepEqual(
+    resume.body.testRun.bookletStates,
+    Object.fromEntries(stateDefinitions.map(state => [state.key, "pending"]))
+  );
+  const rawPlayerResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: { responses: JSON.stringify(inputResponses) }
+    }
+  });
+  const saveResult = await requestJson<{
+    testRun: {
+      bookletStates: Record<string, string>;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "fragment-unit",
+      status: "running",
+      unitResponse: rawPlayerResponse
+    }
+  });
+  assert.equal(saveResult.status, 200);
+  assert.deepEqual(
+    saveResult.body.testRun.bookletStates,
+    codingPackage.expectedStates
+  );
+  assert.equal(
+    saveResult.body.testRun.unitResponses["fragment-unit"],
+    rawPlayerResponse
+  );
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["fragment-unit", "matched-route"]
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      currentState.body.currentRunState.adaptiveStates.map(state => [
+        state.stateKey,
+        state.optionKey
+      ])
+    ),
+    codingPackage.expectedStates
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "matched-route"
+  );
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";
