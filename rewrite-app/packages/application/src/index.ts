@@ -16373,6 +16373,29 @@ const getTestletTimerRemainingSeconds = (
   return Math.max(0, Math.ceil((expiresAtMs - timestampMs) / 1_000));
 };
 
+const buildTestletTimeLeftTestStateEntry = (
+  testRun: TestRun,
+  timestamp: string
+): ParticipantTestLogEntryInput => ({
+  key: "TESTLETS_TIMELEFT",
+  timeStamp: Date.parse(timestamp),
+  content: JSON.stringify(
+    Object.fromEntries(
+      Object.entries(testRun.testletTimers ?? {}).map(([testletKey, timer]) => [
+        testletKey,
+        getTestletTimerRemainingSeconds(timer, timestamp) / 60
+      ])
+    )
+  )
+});
+
+const testletTimerStateChanged = (
+  previousRun: TestRun,
+  nextRun: TestRun
+): boolean =>
+  JSON.stringify(previousRun.testletTimers ?? {}) !==
+  JSON.stringify(nextRun.testletTimers ?? {});
+
 const activateCurrentTestletTimer = (
   contentRelease: ContentRelease,
   testRun: TestRun,
@@ -19629,6 +19652,31 @@ export const createFirstSliceServices = (
       activated.startedTestletKey != null;
     if (changed) {
       await repository.saveTestRun(effectiveRun);
+    }
+    if (
+      resolveParticipantExecutionMode(effectiveRun.executionMode).saveResponses &&
+      (reconciled.expiredTestletKeys.length > 0 || activated.startedTestletKey)
+    ) {
+      const timerStateEntries: ParticipantTestLogEntryInput[] = [];
+      if (reconciled.expiredTestletKeys.length > 0) {
+        timerStateEntries.push(
+          buildTestletTimeLeftTestStateEntry(
+            reconciled.testRun,
+            input.timestamp
+          )
+        );
+      }
+      if (activated.startedTestletKey) {
+        timerStateEntries.push(
+          buildTestletTimeLeftTestStateEntry(effectiveRun, input.timestamp)
+        );
+      }
+      await repository.saveParticipantTestLogs(
+        buildParticipantTestLogs({
+          testRun: effectiveRun,
+          batches: [{ entries: timerStateEntries }]
+        })
+      );
     }
     if (activated.startedTestletKey) {
       const timer = effectiveRun.testletTimers?.[activated.startedTestletKey];
@@ -26237,6 +26285,22 @@ export const createFirstSliceServices = (
               timestamp
             );
             await repository.saveTestRun(resumedRun);
+            if (
+              resolveParticipantExecutionMode(resumedRun.executionMode)
+                .saveResponses &&
+              testletTimerStateChanged(normalizedExistingRun, resumedRun)
+            ) {
+              await repository.saveParticipantTestLogs(
+                buildParticipantTestLogs({
+                  testRun: resumedRun,
+                  batches: [{
+                    entries: [
+                      buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+                    ]
+                  }]
+                })
+              );
+            }
             const effectiveRun = await persistEffectiveTestletTimerState({
               contentRelease,
               testRun: resumedRun,
@@ -26427,6 +26491,11 @@ export const createFirstSliceServices = (
           entries: ParticipantTestLogEntryInput[];
         }> = [];
         const testStateEntries: ParticipantTestLogEntryInput[] = [];
+        if (testletTimerStateChanged(testRun, updatedRun)) {
+          testStateEntries.push(
+            buildTestletTimeLeftTestStateEntry(updatedRun, timestamp)
+          );
+        }
         if (nextCurrentUnitKey !== testRun.currentUnitKey) {
           testStateEntries.push({
             key: "CURRENT_UNIT_ID",
@@ -26788,15 +26857,21 @@ export const createFirstSliceServices = (
         );
         await repository.saveTestRun(resumedRun);
         if (resolveParticipantExecutionMode(testRun.executionMode).saveResponses) {
+          const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
+            key: "CONTROLLER",
+            timeStamp: Date.parse(timestamp),
+            content: "RUNNING"
+          }];
+          if (testletTimerStateChanged(testRun, resumedRun)) {
+            resumedStateEntries.unshift(
+              buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+            );
+          }
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
             testRun: resumedRun,
             batches: [{
-              entries: [{
-                key: "CONTROLLER",
-                timeStamp: Date.parse(timestamp),
-                content: "RUNNING"
-              }]
+              entries: resumedStateEntries
             }]
             })
           );
@@ -26946,6 +27021,11 @@ export const createFirstSliceServices = (
         await repository.saveTestRun(completedRun);
         if (executionMode.saveResponses) {
           const completedStateEntries: ParticipantTestLogEntryInput[] = [];
+          if (testletTimerStateChanged(testRun, completedRun)) {
+            completedStateEntries.push(
+              buildTestletTimeLeftTestStateEntry(completedRun, timestamp)
+            );
+          }
           if (leavingLock) {
             completedStateEntries.push(
               buildLeaveLockTestStateEntry({
@@ -27342,7 +27422,12 @@ export const createFirstSliceServices = (
             content: nextTestRun.currentUnitKey ?? ""
           });
         }
-        if (monitorTestLogEntries.length > 0) {
+        if (testletTimerStateChanged(testRun, nextTestRun)) {
+          monitorTestLogEntries.unshift(
+            buildTestletTimeLeftTestStateEntry(nextTestRun, issuedAt)
+          );
+        }
+        if (executionMode.saveResponses && monitorTestLogEntries.length > 0) {
           await repository.saveParticipantTestLogs(
             buildParticipantTestLogs({
               testRun: nextTestRun,

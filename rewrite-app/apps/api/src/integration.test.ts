@@ -21503,6 +21503,45 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   );
   assert.equal(startedActivity.body.items.length, 2);
   assert.equal(expiredActivity.body.items.length, 2);
+
+  const timerStateLogs = await requestJson<{
+    items: Array<{
+      testLog: {
+        unitKey: string | null;
+        originalUnitId: string | null;
+        logKey: string;
+        logContent: string;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${testRunId}&logKey=TESTLETS_TIMELEFT&limit=100`
+  );
+  assert.equal(timerStateLogs.status, 200);
+  assert.equal(timerStateLogs.body.items.length, 8);
+  assert.equal(
+    timerStateLogs.body.items.every(
+      item =>
+        item.testLog.unitKey === null &&
+        item.testLog.originalUnitId === null &&
+        item.testLog.logKey === "TESTLETS_TIMELEFT"
+    ),
+    true
+  );
+  const timerStateMinutes = timerStateLogs.body.items.map(item =>
+    (JSON.parse(item.testLog.logContent) as Record<string, number>)[testletKey]
+  );
+  for (const expectedMinutes of [
+    authoredTimerDurationSeconds / 60,
+    0,
+    1 / 60,
+    10 / 60,
+    20 / 60
+  ]) {
+    assert.ok(
+      timerStateMinutes.includes(expectedMinutes),
+      `Expected a TESTLETS_TIMELEFT snapshot with ${expectedMinutes} minutes.`
+    );
+  }
 });
 
 test("original Testcenter timed testlets enforce confirm and allowed leave policies", async () => {
