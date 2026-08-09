@@ -21,6 +21,65 @@ export type VeronaPlayerState = {
   [key: string]: unknown;
 };
 
+export type VeronaPageStateProjection = {
+  pages: Array<{ id: string; label: string }>;
+  currentPageIndex: number;
+  logEntries: Array<{ key: string; timeStamp: number; content: string }>;
+};
+
+export const projectVeronaPageState = (
+  playerState: VeronaPlayerState,
+  timeStamp: number = Date.now()
+): VeronaPageStateProjection => {
+  const validPages = playerState.validPages;
+  const pages = Array.isArray(validPages)
+    ? validPages.flatMap(page => {
+        const id = typeof page?.id === "string" ? page.id : "";
+        const label =
+          typeof page?.label === "string" && page.label ? page.label : id;
+        return id ? [{ id, label }] : [];
+      })
+    : validPages && typeof validPages === "object"
+      ? Object.entries(validPages).map(([id, label]) => ({
+          id,
+          label: typeof label === "string" && label ? label : id
+        }))
+      : [];
+  const currentPage = playerState.currentPage;
+  const currentPageId = currentPage == null ? "" : String(currentPage);
+  const currentPageById = pages.findIndex(page => page.id === currentPageId);
+  const currentPageIndex =
+    currentPageById >= 0
+      ? currentPageById
+      : typeof currentPage === "number" &&
+          Number.isSafeInteger(currentPage) &&
+          currentPage >= 0 &&
+          currentPage < pages.length
+        ? currentPage
+        : -1;
+  return {
+    pages,
+    currentPageIndex,
+    logEntries: [
+      {
+        key: "CURRENT_PAGE_NR",
+        timeStamp,
+        content: String(currentPage)
+      },
+      {
+        key: "CURRENT_PAGE_ID",
+        timeStamp,
+        content: String(currentPageIndex)
+      },
+      {
+        key: "PAGE_COUNT",
+        timeStamp,
+        content: String(pages.length)
+      }
+    ]
+  };
+};
+
 export type VeronaPlayerConfig = {
   directDownloadUrl?: string;
   enabledNavigationTargets: Array<"next" | "previous" | "first" | "last" | "end">;

@@ -22,6 +22,7 @@ import {
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
+  projectVeronaPageState,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
@@ -388,18 +389,21 @@ export class VeronaPlayerHostComponent
     switch (notification.type) {
       case "vopStateChangedNotification":
         this.status = "running";
+        const logEntries: ParticipantTestLogEntryInput[] = [];
         if (notification.playerState !== undefined) {
-          this.updatePageNavigation(notification.playerState);
+          logEntries.push(
+            ...this.updatePageNavigation(notification.playerState)
+          );
         }
         if (Array.isArray(notification.log)) {
-          const logEntries = this.normalizeLogEntries(notification.log);
-          if (logEntries.length > 0) {
-            this.logEntries.emit({
-              testRunId: this.frameTestRunId,
-              unitKey: this.frameUnitKey,
-              entries: logEntries
-            });
-          }
+          logEntries.push(...this.normalizeLogEntries(notification.log));
+        }
+        if (logEntries.length > 0) {
+          this.logEntries.emit({
+            testRunId: this.frameTestRunId,
+            unitKey: this.frameUnitKey,
+            entries: logEntries
+          });
         }
         this.latestResponse = mergeVeronaUnitResponse(this.latestResponse, {
           unitState: notification.unitState,
@@ -671,33 +675,13 @@ export class VeronaPlayerHostComponent
     this.frame.contentWindow.postMessage(command, "*");
   }
 
-  private updatePageNavigation(playerState: VeronaPlayerState): void {
-    const validPages = playerState.validPages;
-    this.pages = Array.isArray(validPages)
-      ? validPages.flatMap(page => {
-          const id = typeof page?.id === "string" ? page.id : "";
-          return id
-            ? [{ id, label: page.label || id }]
-            : [];
-        })
-      : validPages && typeof validPages === "object"
-        ? Object.entries(validPages).map(([id, label]) => ({
-            id,
-            label: typeof label === "string" && label ? label : id
-          }))
-        : [];
-    const currentPage = playerState.currentPage;
-    const currentPageId = currentPage == null ? "" : String(currentPage);
-    const currentPageById = this.pages.findIndex(page => page.id === currentPageId);
-    this.currentPageIndex =
-      currentPageById >= 0
-        ? currentPageById
-        : typeof currentPage === "number" &&
-            Number.isSafeInteger(currentPage) &&
-            currentPage >= 0 &&
-            currentPage < this.pages.length
-          ? currentPage
-          : -1;
+  private updatePageNavigation(
+    playerState: VeronaPlayerState
+  ): ParticipantTestLogEntryInput[] {
+    const projection = projectVeronaPageState(playerState);
+    this.pages = projection.pages;
+    this.currentPageIndex = projection.currentPageIndex;
+    return projection.logEntries;
   }
 
   private sendNavigationDenied(reasons: readonly string[]): void {
@@ -802,15 +786,21 @@ export class VeronaPlayerHostComponent
     ) {
       return;
     }
+    const logEntries: ParticipantTestLogEntryInput[] = [];
+    if (notification.playerState !== undefined) {
+      logEntries.push(
+        ...projectVeronaPageState(notification.playerState).logEntries
+      );
+    }
     if (Array.isArray(notification.log)) {
-      const entries = this.normalizeLogEntries(notification.log);
-      if (entries.length > 0) {
-        this.logEntries.emit({
-          testRunId: frame.testRunId,
-          unitKey: frame.unitKey,
-          entries
-        });
-      }
+      logEntries.push(...this.normalizeLogEntries(notification.log));
+    }
+    if (logEntries.length > 0) {
+      this.logEntries.emit({
+        testRunId: frame.testRunId,
+        unitKey: frame.unitKey,
+        entries: logEntries
+      });
     }
     frame.latestResponse = mergeVeronaUnitResponse(frame.latestResponse, {
       unitState: notification.unitState,

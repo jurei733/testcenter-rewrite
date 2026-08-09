@@ -6193,6 +6193,46 @@ try {
     ),
     new Set(["LOADING", "RUNNING"])
   );
+  const veronaCurrentPageLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=CURRENT_PAGE_NR&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload => {
+      const contents = payload?.items?.map(item => item.testLog?.logContent) ?? [];
+      return contents.includes("page-1") && contents.includes("page-2");
+    }
+  );
+  assert.deepEqual(
+    new Set(veronaCurrentPageLogs.items.map(item => item.testLog?.logContent)),
+    new Set(["page-1", "page-2"])
+  );
+  const veronaCurrentPageIndexLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=CURRENT_PAGE_ID&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload => {
+      const contents = payload?.items?.map(item => item.testLog?.logContent) ?? [];
+      return contents.includes("0") && contents.includes("1");
+    }
+  );
+  assert.deepEqual(
+    new Set(
+      veronaCurrentPageIndexLogs.items.map(item => item.testLog?.logContent)
+    ),
+    new Set(["0", "1"])
+  );
+  const veronaPageCountLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&logKey=PAGE_COUNT&unitKey=${encodeURIComponent(veronaUnitKey)}`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(item => item.testLog?.logContent === "2")
+  );
+  assert.deepEqual(
+    new Set(veronaPageCountLogs.items.map(item => item.testLog?.logContent)),
+    new Set(["2"])
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

@@ -7,6 +7,7 @@ import {
   parseVeronaIncomingNotification,
   parseVeronaUnitResponse,
   prepareVeronaUnitStateForPlayer,
+  projectVeronaPageState,
   readVeronaPlayerApiVersion,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
@@ -140,6 +141,61 @@ test("Verona response envelopes merge separately reported unit and player state"
       validPages: [{ id: "0" }, { id: "1" }]
     }
   });
+});
+
+test("Verona page state projects the original host-side page logs", () => {
+  const timeStamp = 1_786_278_400_000;
+
+  assert.deepEqual(
+    projectVeronaPageState(
+      {
+        currentPage: "page-2",
+        validPages: [
+          { id: "page-1", label: "Introduction" },
+          { id: "page-2", label: "Review" }
+        ]
+      },
+      timeStamp
+    ),
+    {
+      pages: [
+        { id: "page-1", label: "Introduction" },
+        { id: "page-2", label: "Review" }
+      ],
+      currentPageIndex: 1,
+      logEntries: [
+        { key: "CURRENT_PAGE_NR", timeStamp, content: "page-2" },
+        { key: "CURRENT_PAGE_ID", timeStamp, content: "1" },
+        { key: "PAGE_COUNT", timeStamp, content: "2" }
+      ]
+    }
+  );
+});
+
+test("Verona page state supports legacy page maps and numeric indices", () => {
+  const timeStamp = 123;
+
+  assert.deepEqual(
+    projectVeronaPageState(
+      {
+        currentPage: 0,
+        validPages: { first: "First", second: "Second" }
+      },
+      timeStamp
+    ),
+    {
+      pages: [
+        { id: "first", label: "First" },
+        { id: "second", label: "Second" }
+      ],
+      currentPageIndex: 0,
+      logEntries: [
+        { key: "CURRENT_PAGE_NR", timeStamp, content: "0" },
+        { key: "CURRENT_PAGE_ID", timeStamp, content: "0" },
+        { key: "PAGE_COUNT", timeStamp, content: "2" }
+      ]
+    }
+  );
 });
 
 test("Verona notifications and supported API versions are validated", () => {

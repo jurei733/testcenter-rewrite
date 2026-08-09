@@ -157,6 +157,15 @@ timer, blocks premature completion according to `leave`, persists through the
 existing timer model, and completes the whole Booklet on expiry. Participant,
 monitor, and timer-adjustment paths share the same root timer identity.
 
+Latest P0 Player page-state closure: every Verona `playerState` report now
+produces the original host-side `CURRENT_PAGE_NR`, `CURRENT_PAGE_ID`, and
+`PAGE_COUNT` Unit logs alongside the durable response envelope. These records
+use the Player's authored page ID, the host-resolved zero-based page index, and
+the current valid-page count, and travel through the same bounded idempotent
+save outbox as Player logs and responses. The production Chromium/SQLite gate
+drives both host page buttons and proves the `page-1`/`page-2`, `0`/`1`, and
+`2` records through the operator test-log API.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,
 and STARS 0.6.19 choice-interaction Players. ABI retains its release example
