@@ -22382,6 +22382,7 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     {
       method: "POST",
       body: {
+        deliveryId: "adaptive-decision-state",
         currentUnitKey: "decision-unit",
         status: "running",
         unitResponse: adaptiveResponse
@@ -22394,6 +22395,70 @@ test("original Testcenter adaptive states select and enforce visible testlets", 
     quality: "gold",
     numeric: "high"
   });
+  const replayedDecision = await requestJson<{
+    testRun: { bookletStates: Record<string, string> };
+  }>(
+    `/api/v1/participant/test-runs/${testRunId}/save-progress`,
+    {
+      method: "POST",
+      body: {
+        deliveryId: "adaptive-decision-state",
+        currentUnitKey: "decision-unit",
+        status: "running",
+        unitResponse: adaptiveResponse
+      }
+    }
+  );
+  assert.equal(replayedDecision.status, 200);
+  assert.deepEqual(replayedDecision.body.testRun.bookletStates, {
+    level: "professional",
+    quality: "gold",
+    numeric: "high"
+  });
+
+  const bookletStateLogs = await requestJson<{
+    items: Array<{
+      testLog: {
+        unitKey: string | null;
+        originalUnitId: string | null;
+        logKey: string;
+        logContent: string;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${testRunId}&logKey=BOOKLET_STATES&limit=100`
+  );
+  assert.equal(bookletStateLogs.status, 200);
+  assert.deepEqual(
+    bookletStateLogs.body.items.map(item => ({
+      unitKey: item.testLog.unitKey,
+      originalUnitId: item.testLog.originalUnitId,
+      logKey: item.testLog.logKey,
+      bookletStates: JSON.parse(item.testLog.logContent) as Record<string, string>
+    })),
+    [
+      {
+        unitKey: null,
+        originalUnitId: null,
+        logKey: "BOOKLET_STATES",
+        bookletStates: {
+          level: "professional",
+          quality: "gold",
+          numeric: "high"
+        }
+      },
+      {
+        unitKey: null,
+        originalUnitId: null,
+        logKey: "BOOKLET_STATES",
+        bookletStates: {
+          level: "advanced",
+          quality: "basic",
+          numeric: "low"
+        }
+      }
+    ]
+  );
 
   const routedState = await readState();
   assert.deepEqual(routedState.body.currentRunState.testRun.bookletStates, {

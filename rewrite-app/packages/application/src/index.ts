@@ -16083,6 +16083,15 @@ const withEvaluatedBookletStates = (
   bookletStates: evaluateTestRunBookletStates(booklet, testRun)
 });
 
+const buildBookletStatesTestStateEntry = (
+  testRun: TestRun,
+  timestamp: string
+): ParticipantTestLogEntryInput => ({
+  key: "BOOKLET_STATES",
+  timeStamp: Date.parse(timestamp),
+  content: JSON.stringify(testRun.bookletStates ?? {})
+});
+
 const hasCompleteBookletStatesSnapshot = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun
@@ -25763,6 +25772,21 @@ export const createFirstSliceServices = (
           updatedAt: timestamp
         });
         await repository.saveTestRun(updatedRun);
+        if (
+          executionMode.saveResponses &&
+          Object.keys(updatedRun.bookletStates ?? {}).length > 0
+        ) {
+          await repository.saveParticipantTestLogs(
+            buildParticipantTestLogs({
+              testRun: updatedRun,
+              batches: [{
+                entries: [
+                  buildBookletStatesTestStateEntry(updatedRun, timestamp)
+                ]
+              }]
+            })
+          );
+        }
         await recordWorkspaceActivity({
           tenantId: updatedRun.tenantId,
           workspaceId: updatedRun.workspaceId,
@@ -26218,6 +26242,9 @@ export const createFirstSliceServices = (
                       timeStamp: Date.parse(timestamp),
                       content: effectiveTestRun.currentUnitKey
                     }]
+                  : []),
+                ...(Object.keys(effectiveTestRun.bookletStates ?? {}).length > 0
+                  ? [buildBookletStatesTestStateEntry(effectiveTestRun, timestamp)]
                   : [])
               ]
             }]
@@ -26491,6 +26518,15 @@ export const createFirstSliceServices = (
           entries: ParticipantTestLogEntryInput[];
         }> = [];
         const testStateEntries: ParticipantTestLogEntryInput[] = [];
+        if (
+          responseUnitKey &&
+          nextUnitResponse != null &&
+          Object.keys(updatedRun.bookletStates ?? {}).length > 0
+        ) {
+          testStateEntries.push(
+            buildBookletStatesTestStateEntry(updatedRun, timestamp)
+          );
+        }
         if (testletTimerStateChanged(testRun, updatedRun)) {
           testStateEntries.push(
             buildTestletTimeLeftTestStateEntry(updatedRun, timestamp)
