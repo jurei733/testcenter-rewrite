@@ -35,6 +35,8 @@ type ZipFixtureEntry = {
   fileName: string;
   fileNameBytes?: Buffer;
   usesUtf8FileName?: boolean;
+  unicodePathExtra?: string;
+  unicodePathChecksum?: number;
   content: string;
   compressionMethod?: ZipCompressionMethod;
   compressedContent?: Buffer;
@@ -86,10 +88,26 @@ const createZipBase64 = (
         : uncompressedContent);
     const uncompressedSize = entry.uncompressedSize ?? uncompressedContent.length;
     const checksum = entry.checksum ?? zipFixtureCrc32(uncompressedContent);
+    const unicodePath = entry.unicodePathExtra == null
+      ? null
+      : Buffer.from(entry.unicodePathExtra, "utf8");
+    const extraField = unicodePath == null
+      ? Buffer.alloc(0)
+      : Buffer.alloc(9 + unicodePath.length);
+    if (unicodePath && extraField.length > 0) {
+      extraField.writeUInt16LE(0x7075, 0);
+      extraField.writeUInt16LE(5 + unicodePath.length, 2);
+      extraField.writeUInt8(1, 4);
+      extraField.writeUInt32LE(
+        entry.unicodePathChecksum ?? zipFixtureCrc32(fileName),
+        5
+      );
+      unicodePath.copy(extraField, 9);
+    }
     const generalPurposeBitFlag =
       (entry.usesUtf8FileName === false ? 0 : 0x0800) |
       (entry.usesDataDescriptor ? 0x0008 : 0);
-    const localHeader = Buffer.alloc(30 + fileName.length);
+    const localHeader = Buffer.alloc(30 + fileName.length + extraField.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
     localHeader.writeUInt16LE(generalPurposeBitFlag, 6);
@@ -110,7 +128,9 @@ const createZipBase64 = (
       22
     );
     localHeader.writeUInt16LE(fileName.length, 26);
+    localHeader.writeUInt16LE(extraField.length, 28);
     fileName.copy(localHeader, 30);
+    extraField.copy(localHeader, 30 + fileName.length);
     const dataDescriptor = entry.usesDataDescriptor ? Buffer.alloc(16) : null;
     if (dataDescriptor) {
       dataDescriptor.writeUInt32LE(0x08074b50, 0);
@@ -124,7 +144,9 @@ const createZipBase64 = (
       ...(dataDescriptor ? [dataDescriptor] : [])
     );
 
-    const centralDirectoryHeader = Buffer.alloc(46 + fileName.length);
+    const centralDirectoryHeader = Buffer.alloc(
+      46 + fileName.length + extraField.length
+    );
     centralDirectoryHeader.writeUInt32LE(0x02014b50, 0);
     centralDirectoryHeader.writeUInt16LE(20, 4);
     centralDirectoryHeader.writeUInt16LE(20, 6);
@@ -135,8 +157,10 @@ const createZipBase64 = (
     centralDirectoryHeader.writeUInt32LE(content.length, 20);
     centralDirectoryHeader.writeUInt32LE(uncompressedSize, 24);
     centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
+    centralDirectoryHeader.writeUInt16LE(extraField.length, 30);
     centralDirectoryHeader.writeUInt32LE(offset, 42);
     fileName.copy(centralDirectoryHeader, 46);
+    extraField.copy(centralDirectoryHeader, 46 + fileName.length);
     centralDirectoryHeaders.push(centralDirectoryHeader);
 
     offset += localHeader.length + content.length + (dataDescriptor?.length ?? 0);
@@ -28932,6 +28956,8 @@ test("source document import resolves legacy CP437 ZIP file names", async () => 
         Buffer.from("e.xml", "ascii")
       ]),
       usesUtf8FileName: false,
+      unicodePathExtra: "export/units/ignored.xml",
+      unicodePathChecksum: 0,
       content: `
         <Unit>
           <Metadata><Id>legacy-cp437-unit</Id><Label>Legacy CP437 Unit</Label></Metadata>
@@ -28978,6 +29004,89 @@ test("source document import resolves legacy CP437 ZIP file names", async () => 
     importedUnit?.content ?? "",
     /<Label>Legacy CP437 Unit<\/Label>/
   );
+});
+
+test("source document import resolves ZIP Unicode path extra fields", async () => {
+  const tenantKey = "integration-tenant-zip-unicode-path";
+  const workspaceKey = "integration-workspace-zip-unicode-path";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="unicode-path-booklet" href="booklets/Booklet.xml" />
+            <resource identifier="unicode-path-unit" href="units/測定.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>unicode-path-booklet</Id><Label>Unicode Path Booklet</Label></Metadata>
+          <Units><Unit id="unicode-path-unit" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/unit.xml",
+      usesUtf8FileName: false,
+      unicodePathExtra: "export/units/測定.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>unicode-path-unit</Id><Label>Unicode Path Unit</Label></Metadata>
+        </Unit>
+      `
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unicode-path-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: {
+      runtimeSnapshot: {
+        bookletEntries: Array<{
+          unitEntries: Array<{ unitKey: string; content?: string }>;
+        }>;
+      };
+    } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const importedUnit =
+    importResult.body.stagedContentRelease?.runtimeSnapshot.bookletEntries[0]
+      ?.unitEntries[0];
+  assert.equal(importedUnit?.unitKey, "unicode-path-unit");
+  assert.match(importedUnit?.content ?? "", /<Label>Unicode Path Unit<\/Label>/);
 });
 
 test("source document import bounds oversized deflated ZIP manifest entries", async () => {

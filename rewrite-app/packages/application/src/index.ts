@@ -12287,6 +12287,7 @@ const normalizeParsedXmlContentStructure = (
 
 type ZipEntry = {
   fileName: string;
+  rawFileName: Buffer;
   generalPurposeBitFlag: number;
   compressionMethod: number;
   checksum: number;
@@ -12328,12 +12329,56 @@ const ZIP_CP437_EXTENDED_CHARACTERS = [
   "αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ "
 ].join("");
 
+const readZipUnicodePathExtraField = (
+  fileNameBytes: Buffer,
+  extraFields: Buffer
+): string | null => {
+  let offset = 0;
+  while (offset + 4 <= extraFields.length) {
+    const headerId = extraFields.readUInt16LE(offset);
+    const dataSize = extraFields.readUInt16LE(offset + 2);
+    const dataStart = offset + 4;
+    const dataEnd = dataStart + dataSize;
+    if (dataEnd > extraFields.length) {
+      return null;
+    }
+
+    if (
+      headerId === 0x7075 &&
+      dataSize >= 5 &&
+      extraFields[dataStart] === 1 &&
+      extraFields.readUInt32LE(dataStart + 1) === crc32(fileNameBytes)
+    ) {
+      try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(
+          extraFields.subarray(dataStart + 5, dataEnd)
+        );
+      } catch {
+        return null;
+      }
+    }
+
+    offset = dataEnd;
+  }
+
+  return null;
+};
+
 const decodeZipFileName = (
   fileNameBytes: Buffer,
-  generalPurposeBitFlag: number
+  generalPurposeBitFlag: number,
+  extraFields: Buffer = Buffer.alloc(0)
 ): string => {
   if ((generalPurposeBitFlag & 0x0800) !== 0) {
     return fileNameBytes.toString("utf8");
+  }
+
+  const unicodePath = readZipUnicodePathExtraField(
+    fileNameBytes,
+    extraFields
+  );
+  if (unicodePath != null) {
+    return unicodePath;
   }
 
   let fileName = "";
@@ -12376,16 +12421,24 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
     const localHeaderOffset = zipBuffer.readUInt32LE(offset + 42);
     const fileNameStart = offset + 46;
     const fileNameEnd = fileNameStart + fileNameLength;
+    const extraEnd = fileNameEnd + extraLength;
+    const commentEnd = extraEnd + commentLength;
 
-    if (fileNameEnd > zipBuffer.length) {
+    if (commentEnd > zipBuffer.length) {
       return [];
     }
 
+    const rawFileName = Buffer.from(
+      zipBuffer.subarray(fileNameStart, fileNameEnd)
+    );
+
     entries.push({
       fileName: decodeZipFileName(
-        zipBuffer.subarray(fileNameStart, fileNameEnd),
-        generalPurposeBitFlag
+        rawFileName,
+        generalPurposeBitFlag,
+        zipBuffer.subarray(fileNameEnd, extraEnd)
       ),
+      rawFileName,
       generalPurposeBitFlag,
       compressionMethod,
       checksum,
@@ -12393,7 +12446,7 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
       uncompressedSize,
       localHeaderOffset
     });
-    offset = fileNameEnd + extraLength + commentLength;
+    offset = commentEnd;
   }
 
   return entries;
@@ -12430,6 +12483,15 @@ const readZipEntryBuffer = (
   const extraLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 28);
   const fileNameStart = entry.localHeaderOffset + 30;
   const fileNameEnd = fileNameStart + fileNameLength;
+  const extraEnd = fileNameEnd + extraLength;
+  const localRawFileName = zipBuffer.subarray(fileNameStart, fileNameEnd);
+  const localUnicodePath =
+    (localGeneralPurposeBitFlag & 0x0800) === 0 && extraEnd <= zipBuffer.length
+      ? readZipUnicodePathExtraField(
+          localRawFileName,
+          zipBuffer.subarray(fileNameEnd, extraEnd)
+        )
+      : null;
   const usesDataDescriptor = (entry.generalPurposeBitFlag & 0x0008) !== 0;
   if (
     localGeneralPurposeBitFlag !== entry.generalPurposeBitFlag ||
@@ -12438,15 +12500,13 @@ const readZipEntryBuffer = (
       (localChecksum !== entry.checksum ||
         localCompressedSize !== entry.compressedSize ||
         localUncompressedSize !== entry.uncompressedSize)) ||
-    fileNameEnd > zipBuffer.length ||
-    decodeZipFileName(
-      zipBuffer.subarray(fileNameStart, fileNameEnd),
-      localGeneralPurposeBitFlag
-    ) !== entry.fileName
+    extraEnd > zipBuffer.length ||
+    !localRawFileName.equals(entry.rawFileName) ||
+    (localUnicodePath != null && localUnicodePath !== entry.fileName)
   ) {
     return null;
   }
-  const dataStart = entry.localHeaderOffset + 30 + fileNameLength + extraLength;
+  const dataStart = extraEnd;
   const dataEnd = dataStart + entry.compressedSize;
   if (dataEnd > zipBuffer.length) {
     return null;

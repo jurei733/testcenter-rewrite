@@ -382,7 +382,12 @@ ZIP entry-name decoding now follows the archive flag instead of assuming every
 package is UTF-8. Bit-11 names remain UTF-8; legacy entries without that flag
 use the required CP437 mapping. A production API gate encodes
 `units/Größe.xml` as raw CP437, references the Unicode path from the manifest,
-and requires the resolved Unit XML to reach the staged runtime snapshot.
+and requires the resolved Unit XML to reach the staged runtime snapshot. The
+Info-ZIP Unicode Path extra field (`0x7075`) is also honored when its version,
+UTF-8 payload, and CRC-32 binding to the raw header name are valid; an invalid
+binding falls back to CP437 instead of redirecting dependency resolution. A
+second gate resolves the non-CP437 path `units/測定.xml` through that field and
+retains its Unit content in the staged release.
 
 Nested `.itcr.zip` resource packages now apply the same safe relative-path
 contract as the outer upload before resource projection. Traversal segments,
