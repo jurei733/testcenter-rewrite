@@ -27309,18 +27309,48 @@ export const createFirstSliceServices = (
             const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
               candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
             );
+            const resetUnlockedTestletKeys = executionMode.presetCode
+              ? booklet?.testletEntries
+                  ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
+                  .map(testlet => testlet.testletKey) ?? []
+              : [];
             const resetEvaluationRun = withEvaluatedBookletStates(booklet, {
               ...normalizedExistingRun,
-              unitResponses: {}
+              locked: false,
+              unitResponses: {},
+              unlockedTestletKeys: resetUnlockedTestletKeys,
+              monitorNavigationUnlocked: false,
+              testletTimers: {},
+              lockedTestletKeys: [],
+              lockedUnitKeys: []
             });
             const firstVisibleUnit = resolveVisibleBookletUnits(
               booklet,
               resetEvaluationRun
             )[0];
-            const resetCurrentUnitKey = firstVisibleUnit?.unitKey ?? null;
+            const firstUnitRequiresCode =
+              executionMode.forceNaviRestrictions &&
+              !executionMode.presetCode &&
+              (firstVisibleUnit?.testletPath ?? []).some(testletKey =>
+                Boolean(
+                  booklet?.testletEntries?.find(
+                    testlet => testlet.testletKey === testletKey
+                  )?.restrictions?.codeToEnter?.code
+                )
+              );
+            const resetCurrentUnitKey = firstUnitRequiresCode
+              ? null
+              : firstVisibleUnit?.unitKey ?? null;
             if (
               normalizedExistingRun.currentUnitKey !== resetCurrentUnitKey ||
               Object.keys(normalizedExistingRun.unitResponses).length > 0 ||
+              normalizedExistingRun.locked ||
+              normalizedExistingRun.monitorNavigationUnlocked ||
+              JSON.stringify(normalizedExistingRun.unlockedTestletKeys ?? []) !==
+                JSON.stringify(resetUnlockedTestletKeys) ||
+              Object.keys(normalizedExistingRun.testletTimers ?? {}).length > 0 ||
+              (normalizedExistingRun.lockedTestletKeys ?? []).length > 0 ||
+              (normalizedExistingRun.lockedUnitKeys ?? []).length > 0 ||
               JSON.stringify(normalizedExistingRun.bookletStates ?? {}) !==
                 JSON.stringify(resetEvaluationRun.bookletStates ?? {})
             ) {

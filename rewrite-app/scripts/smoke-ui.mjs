@@ -7178,8 +7178,80 @@ try {
     await page.locator("#participantRouteRunId").textContent()
   )?.trim();
   assert.ok(simulationRunId, "Simulation smoke expected a run id.");
+  const simulationSessionId = (
+    await page.locator("#participantRouteSessionLabel").textContent()
+  )?.trim();
+  assert.ok(simulationSessionId, "Simulation smoke expected a session id.");
   const ephemeralSimulationAnswer = "Ephemeral simulation response";
   await simulationVeronaFrame
+    .locator("#playerAnswer")
+    .fill(ephemeralSimulationAnswer);
+  await expectButtonSelectorEnabled("#participantRouteCompleteButton");
+  const activeSimulationState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        simulationSessionId
+      )}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.deepEqual(
+    activeSimulationState.currentRunState?.testRun?.unlockedTestletKeys,
+    [veronaTestletKey]
+  );
+  assert.ok(
+    activeSimulationState.currentRunState?.testRun?.testletTimers?.[
+      veronaTestletKey
+    ]
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .locator("#participantRouteExecutionMode")
+    .filter({ hasText: "run-simulation" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    (await page.locator("#participantRouteRunId").textContent())?.trim(),
+    simulationRunId,
+    "Simulation re-entry must reuse the open run."
+  );
+  const resetSimulationState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        simulationSessionId
+      )}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.equal(resetSimulationState.currentRunState?.testRun?.currentUnitKey, null);
+  assert.deepEqual(
+    resetSimulationState.currentRunState?.testRun?.unlockedTestletKeys,
+    []
+  );
+  assert.deepEqual(resetSimulationState.currentRunState?.testRun?.testletTimers, {});
+  assert.deepEqual(resetSimulationState.currentRunState?.testRun?.lockedTestletKeys, []);
+  assert.deepEqual(resetSimulationState.currentRunState?.testRun?.lockedUnitKeys, []);
+  assert.equal(
+    await page.evaluate(answer =>
+      Object.values(localStorage).some(value => value.includes(answer)),
+      ephemeralSimulationAnswer
+    ),
+    false,
+    "Simulation responses must not survive re-entry in local storage."
+  );
+  await page.locator("#participantRouteTestletUnlockCode").fill(veronaTestletCode);
+  await page.locator("#participantRouteTestletUnlockButton").click();
+  const resumedSimulationVeronaFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await resumedSimulationVeronaFrame
+    .locator("#playerDefinition")
+    .filter({ hasText: "Smoke unit definition" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    await resumedSimulationVeronaFrame.locator("#playerAnswer").inputValue(),
+    ""
+  );
+  await resumedSimulationVeronaFrame
     .locator("#playerAnswer")
     .fill(ephemeralSimulationAnswer);
   await expectButtonSelectorEnabled("#participantRouteCompleteButton");
@@ -7192,7 +7264,7 @@ try {
   const completedSimulationState = await (
     await sendSmokeJson(
       `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
-        (await page.locator("#participantRouteSessionLabel").textContent())?.trim() ?? ""
+        simulationSessionId
       )}/current-state`,
       { method: "GET" }
     )

@@ -30555,7 +30555,12 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
             </State>
           </States>
           <Units>
-            <Unit id="UNIT.INTRO" label="Introduction" />
+            <Testlet id="intro-testlet" label="Introduction Testlet">
+              <Restrictions>
+                <LockAfterLeaving confirm="false" scope="unit" />
+              </Restrictions>
+              <Unit id="UNIT.INTRO" label="Introduction" />
+            </Testlet>
             <Testlet id="${protectedTestletKey}" label="Protected Testlet">
               <Restrictions>
                 <CodeToEnter code="Mode-Code">Supervisor code</CodeToEnter>
@@ -30825,6 +30830,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       currentUnitKey: string | null;
       bookletStateOverrides: Record<string, string>;
       unitResponses: Record<string, string>;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, unknown>;
     };
   }>(`/api/v1/participant/sessions/${demo.participantSessionId}/resume`, {
     method: "POST"
@@ -30836,6 +30843,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     route: "alternate"
   });
   assert.deepEqual(reopenedDemo.body.testRun.unitResponses, {});
+  assert.deepEqual(reopenedDemo.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
+  ]);
+  assert.deepEqual(reopenedDemo.body.testRun.testletTimers, {});
 
   const review = await start("mode-review");
   assert.equal(review.currentRunState.executionMode.saveResponses, false);
@@ -31062,6 +31073,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       testRunId: string;
       currentUnitKey: string | null;
       unitResponses: Record<string, string>;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, unknown>;
     };
   }>(`/api/v1/participant/sessions/${review.participantSessionId}/resume`, {
     method: "POST"
@@ -31070,6 +31083,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.equal(reopenedReview.body.testRun.testRunId, review.testRunId);
   assert.equal(reopenedReview.body.testRun.currentUnitKey, "UNIT.INTRO");
   assert.deepEqual(reopenedReview.body.testRun.unitResponses, {});
+  assert.deepEqual(reopenedReview.body.testRun.unlockedTestletKeys, [
+    protectedTestletKey
+  ]);
+  assert.deepEqual(reopenedReview.body.testRun.testletTimers, {});
   const reviewsAfterReentry = await requestJson<{
     items: Array<{ reviewId: string; comment: string }>;
   }>(`/api/v1/participant/test-runs/${review.testRunId}/reviews`);
@@ -31219,6 +31236,8 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       currentUnitKey: string | null;
       unitResponses: Record<string, string>;
       bookletStates?: Record<string, string>;
+      testletTimers?: Record<string, unknown>;
+      lockedUnitKeys?: string[];
     };
   }>(`/api/v1/participant/test-runs/${simulation.testRunId}/save-progress`, {
     method: "POST",
@@ -31241,6 +31260,16 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(transientSimulationNavigation.body.testRun.bookletStates, {
     route: "alternate"
   });
+  assert.equal(
+    transientSimulationNavigation.body.testRun.testletTimers?.[
+      protectedTestletKey
+    ] != null,
+    true
+  );
+  assert.deepEqual(
+    transientSimulationNavigation.body.testRun.lockedUnitKeys,
+    ["UNIT.INTRO"]
+  );
   const simulationLogs = await requestJson<{ items: unknown[] }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${simulation.testRunId}`
   );
@@ -31250,6 +31279,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
       testRunId: string;
       currentUnitKey: string | null;
       bookletStates?: Record<string, string>;
+      unlockedTestletKeys?: string[];
+      testletTimers?: Record<string, unknown>;
+      lockedTestletKeys?: string[];
+      lockedUnitKeys?: string[];
     };
   }>(`/api/v1/participant/sessions/${simulation.participantSessionId}/resume`, {
     method: "POST"
@@ -31260,6 +31293,10 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
   assert.deepEqual(reopenedSimulation.body.testRun.bookletStates, {
     route: "basic"
   });
+  assert.deepEqual(reopenedSimulation.body.testRun.unlockedTestletKeys, []);
+  assert.deepEqual(reopenedSimulation.body.testRun.testletTimers, {});
+  assert.deepEqual(reopenedSimulation.body.testRun.lockedTestletKeys, []);
+  assert.deepEqual(reopenedSimulation.body.testRun.lockedUnitKeys, []);
 
   const hotReturnFirst = await requestJson<{
     participantSession: { participantSessionId: string; executionMode?: string };
