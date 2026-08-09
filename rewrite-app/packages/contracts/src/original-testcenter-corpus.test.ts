@@ -245,6 +245,23 @@ type OriginalTestcenterCorpus = {
       unitSha256: string;
     };
   }>;
+  codingSchemePackages: Array<{
+    family: string;
+    schemeFixture: string;
+    inputFixture: string;
+    outcomeFixture: string;
+    sourceRepository: string;
+    sourceTag: string;
+    sourceCommit: string;
+    schemeSourcePath: string;
+    inputSourcePath: string;
+    outcomeSourcePath: string;
+    schemeSha256: string;
+    inputSha256: string;
+    outcomeSha256: string;
+    license: string;
+    expectedStates: Record<string, string>;
+  }>;
 };
 
 const corpusRoot = resolve(
@@ -753,6 +770,94 @@ test("original Testcenter compatibility corpus pins independent official player 
     legacyUnitDocument.toString("utf8"),
     /<DefinitionRef player="IQBVisualUnitPlayerV2">G231mm\.voud<\/DefinitionRef>/
   );
+});
+
+test("original Testcenter compatibility corpus pins official IQB solver coding fixtures", () => {
+  const corpus = JSON.parse(
+    readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
+  ) as OriginalTestcenterCorpus;
+  assert.equal(corpus.codingSchemePackages.length, 1);
+  const solver = corpus.codingSchemePackages[0];
+  assert.ok(solver);
+  assert.equal(solver.family, "solver-alias-chain");
+  assert.equal(
+    solver.sourceRepository,
+    "https://github.com/iqb-berlin/responses"
+  );
+  assert.equal(solver.sourceTag, "3.6.0");
+  assert.equal(
+    solver.sourceCommit,
+    "e04e585e6514e5257ac42f48b629628326471f90"
+  );
+  assert.equal(solver.license, "MIT");
+  assert.deepEqual(
+    [
+      solver.schemeSourcePath,
+      solver.inputSourcePath,
+      solver.outcomeSourcePath
+    ],
+    [
+      "test/coding/derive/SOLVER/case1/coding-scheme.json",
+      "test/coding/derive/SOLVER/case1/01_input.json",
+      "test/coding/derive/SOLVER/case1/01_outcome.json"
+    ]
+  );
+
+  for (const [fixture, expectedHash] of [
+    [solver.schemeFixture, solver.schemeSha256],
+    [solver.inputFixture, solver.inputSha256],
+    [solver.outcomeFixture, solver.outcomeSha256]
+  ] as const) {
+    assert.equal(
+      createHash("sha256")
+        .update(readFileSync(resolve(corpusRoot, fixture)))
+        .digest("hex"),
+      expectedHash
+    );
+  }
+
+  const scheme = JSON.parse(
+    readFileSync(resolve(corpusRoot, solver.schemeFixture), "utf8")
+  ) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      alias?: string;
+      sourceType: string;
+      deriveSources?: string[];
+      sourceParameters?: { solverExpression?: string };
+    }>;
+  };
+  assert.equal(scheme.version, undefined);
+  assert.deepEqual(
+    scheme.variableCodings.slice(0, 3).map(variable => variable.alias),
+    ["b1_alias", "b2_alias", "b3_alias"]
+  );
+  assert.deepEqual(
+    scheme.variableCodings.slice(3).map(variable => variable.sourceType),
+    ["SOLVER", "SOLVER", "SOLVER", "SOLVER", "SOLVER"]
+  );
+  assert.deepEqual(scheme.variableCodings[4]?.deriveSources, ["d1", "b2"]);
+  assert.match(
+    scheme.variableCodings[7]?.sourceParameters?.solverExpression ?? "",
+    /irgendein anderer Quatsch/
+  );
+
+  const outcome = JSON.parse(
+    readFileSync(resolve(corpusRoot, solver.outcomeFixture), "utf8")
+  ) as Array<{ id: string; status: string; value: unknown }>;
+  assert.deepEqual(
+    outcome.slice(3).map(variable => [variable.id, variable.status]),
+    [
+      ["d1", "NO_CODING"],
+      ["d2", "DERIVE_ERROR"],
+      ["d3", "DERIVE_ERROR"],
+      ["d4", "NO_CODING"],
+      ["d5", "DERIVE_ERROR"]
+    ]
+  );
+  assert.equal(outcome[3]?.value, 1124);
+  assert.equal(outcome[6]?.value, 111.01801801801801);
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

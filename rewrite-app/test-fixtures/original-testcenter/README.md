@@ -4,6 +4,14 @@ These fixtures are pinned from IQB Testcenter commit
 `284a4ffcd9452d56dddd51939707ac7f646c3da7` (2026-04-20). Their source
 paths and executable expectations are declared in `corpus.json`.
 
+The coding-scheme corpus also pins the official MIT-licensed
+`@iqb/responses` 3.6.0 `SOLVER/case1` scheme, input, and expected outcome at
+commit `e04e585e6514e5257ac42f48b629628326471f90`. Those byte-exact fixtures are
+kept versionless on purpose: they exercise the same legacy normalization used
+by the original Testcenter, including base-variable aliases, chained solver
+derivation, successful decimal calculation, `NO_CODING`, and `DERIVE_ERROR`.
+Their three source paths and hashes are recorded separately in `corpus.json`.
+
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,
 all 17 original Test-Controller system booklets, all four original

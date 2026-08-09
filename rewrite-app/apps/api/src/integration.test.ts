@@ -21908,6 +21908,300 @@ test("original coding schemes derive adaptive variables server-side", async () =
   ]);
 });
 
+test("original Testcenter compatibility corpus executes official IQB solver coding", async () => {
+  type CodingSchemePackage = {
+    schemeFixture: string;
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const expectation = corpus.codingSchemePackages[0];
+  assert.ok(expectation);
+  const codingSchemeDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.schemeFixture),
+    "utf8"
+  );
+  const inputResponses = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.inputFixture),
+      "utf8"
+    )
+  ) as Array<{ id: string; status: string; value: unknown }>;
+  const officialOutcome = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.outcomeFixture),
+      "utf8"
+    )
+  ) as Array<{
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  }>;
+  assert.deepEqual(officialOutcome, [
+    {
+      id: "b1_alias",
+      status: "CODING_COMPLETE",
+      value: "111",
+      code: 1,
+      score: 1
+    },
+    { id: "b2_alias", status: "CODING_INCOMPLETE", value: "10" },
+    {
+      id: "b3_alias",
+      status: "CODING_COMPLETE",
+      value: "555",
+      code: 1,
+      score: 7
+    },
+    { id: "d1", value: 1124, status: "NO_CODING" },
+    { id: "d2", value: null, status: "DERIVE_ERROR" },
+    { id: "d3", value: null, status: "DERIVE_ERROR" },
+    {
+      id: "d4",
+      value: 111.01801801801801,
+      status: "NO_CODING"
+    },
+    { id: "d5", value: null, status: "DERIVE_ERROR" }
+  ]);
+
+  const tenantKey = "integration-tenant-official-solver";
+  const workspaceKey = "integration-workspace-official-solver";
+  const bookletKey = "BOOKLET.IQB.SOLVER";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-solver.xml" />
+            <resource identifier="UNIT.IQB.SOLVER" href="units/Unit-solver.xml" />
+            <resource identifier="solver.json" href="schemes/solver.json" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-solver.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official IQB Solver</Label></Metadata>
+          <States>
+            <State id="solver-value" label="Chained solver value">
+              <Option id="calculated" label="Calculated">
+                <If><Value of="d1" from="decision-unit"/><Is greaterThan="1123"/></If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+            <State id="solver-error" label="Solver error">
+              <Option id="derive-error" label="Derive error">
+                <If><Status of="d2" from="decision-unit"/><Is equal="DERIVE_ERROR"/></If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+            <State id="solver-decimal" label="Solver decimal">
+              <Option id="calculated" label="Calculated">
+                <If><Value of="d4" from="decision-unit"/><Is greaterThan="111"/></If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+            <State id="alias-code" label="Alias code">
+              <Option id="coded" label="Coded">
+                <If><Code of="b1_alias" from="decision-unit"/><Is equal="1"/></If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+            <State id="alias-score" label="Alias score">
+              <Option id="scored" label="Scored">
+                <If><Score of="b3_alias" from="decision-unit"/><Is greaterThan="6"/></If>
+              </Option>
+              <Option id="pending" label="Pending"/>
+            </State>
+          </States>
+          <Units>
+            <Unit id="UNIT.IQB.SOLVER" alias="decision-unit" label="Solver Decision Unit"/>
+            <Testlet id="calculated-block">
+              <Restrictions><Show if="solver-value" is="calculated"/></Restrictions>
+              <Unit id="UNIT.CALCULATED" alias="calculated-unit" label="Calculated Route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="solver-value" is="pending"/></Restrictions>
+              <Unit id="UNIT.PENDING" alias="pending-unit" label="Pending Route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit-solver.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>UNIT.IQB.SOLVER</Id><Label>Official IQB Solver Unit</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>Solver</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/solver.json</CodingSchemeRef>
+          <BaseVariables>
+            <Variable id="b1_alias" type="string"/>
+            <Variable id="b2_alias" type="string"/>
+            <Variable id="b3_alias" type="string"/>
+          </BaseVariables>
+          <DerivedVariables>
+            <Variable id="d1" type="number"/>
+            <Variable id="d2" type="number"/>
+            <Variable id="d3" type="boolean"/>
+            <Variable id="d4" type="number"/>
+            <Variable id="d5" type="number"/>
+          </DerivedVariables>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/schemes/solver.json",
+      content: codingSchemeDocument
+    }
+  ]);
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-solver.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const decisionUnit =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries.find(unit => unit.unitKey === "decision-unit");
+  assert.equal(decisionUnit?.codingScheme?.version, undefined);
+  assert.equal(decisionUnit?.codingScheme?.variableCodings.length, 8);
+
+  const activate = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activate.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "official-solver-participant" }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.deepEqual(resume.body.testRun.bookletStates, {
+    "solver-value": "pending",
+    "solver-error": "pending",
+    "solver-decimal": "pending",
+    "alias-code": "pending",
+    "alias-score": "pending"
+  });
+
+  const rawPlayerResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: { responses: JSON.stringify(inputResponses) }
+    }
+  });
+  const saveResult = await requestJson<{
+    testRun: {
+      bookletStates: Record<string, string>;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse: rawPlayerResponse
+    }
+  });
+  assert.equal(saveResult.status, 200);
+  assert.deepEqual(saveResult.body.testRun.bookletStates, expectation.expectedStates);
+  assert.equal(
+    saveResult.body.testRun.unitResponses["decision-unit"],
+    rawPlayerResponse
+  );
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "calculated-unit"]
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      currentState.body.currentRunState.adaptiveStates.map(state => [
+        state.stateKey,
+        state.optionKey
+      ])
+    ),
+    expectation.expectedStates
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "calculated-unit"
+  );
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";

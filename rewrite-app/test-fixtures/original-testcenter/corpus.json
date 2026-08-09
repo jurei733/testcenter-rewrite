@@ -370,6 +370,31 @@
       "expectedVisibleUnitKeys": ["decision-unit", "professional-unit"]
     }
   ],
+  "codingSchemePackages": [
+    {
+      "family": "solver-alias-chain",
+      "schemeFixture": "schemes/responses-3.6.0-solver-case1.json",
+      "inputFixture": "schemes/responses-3.6.0-solver-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-solver-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SOLVER/case1/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SOLVER/case1/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/SOLVER/case1/01_outcome.json",
+      "schemeSha256": "95c28c77be210e3a0b741a320a3d2ae58799cb817418cd30c7ea46e3b0b1e4d5",
+      "inputSha256": "f45675987705acdef5642e38656ded4031b5b5556c60332ab26df2669bcca13a",
+      "outcomeSha256": "94a52e8d06ca106c13cb6d5cdad6d62a3b7e72306cd04355c222786417167abd",
+      "license": "MIT",
+      "expectedStates": {
+        "solver-value": "calculated",
+        "solver-error": "derive-error",
+        "solver-decimal": "calculated",
+        "alias-code": "coded",
+        "alias-score": "scored"
+      }
+    }
+  ],
   "bookletConfigPackages": [
     {
       "bookletKeys": [
