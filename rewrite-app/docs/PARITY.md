@@ -211,6 +211,13 @@ unithost contract. Later configuration, page, and navigation-denial messages
 retain that same session identity. The production Chromium gate asserts the
 identity directly inside the embedded Player.
 
+Latest P0 adaptive Verona-config closure: changes to the visible adaptive
+Booklet route now update `playerConfig.unitCount` in the already-running Player
+instead of leaving its start-time count stale. The production Chromium gate
+drives the original adaptive Booklet from two to three visible Units through
+its Bonus state, keeps the current Player frame mounted, and observes the
+updated count in `vopPlayerConfigChangedNotification`.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,
 and STARS 0.6.19 choice-interaction Players. ABI retains its release example

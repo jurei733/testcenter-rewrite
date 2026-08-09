@@ -7374,6 +7374,65 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await originalAdaptiveFrame.locator("body").evaluate(() => {
+    globalThis.__adaptivePlayerConfigUpdates = [];
+    addEventListener("message", event => {
+      if (event.data?.type === "vopPlayerConfigChangedNotification") {
+        globalThis.__adaptivePlayerConfigUpdates.push(event.data.playerConfig);
+      }
+    });
+  });
+  await page.evaluate(() => {
+    const select = document.querySelector("#participantRouteAdaptiveState-bonus");
+    if (!(select instanceof HTMLSelectElement)) {
+      throw new Error("Adaptive bonus selector is unavailable.");
+    }
+    select.value = "yes";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page
+    .locator("#participantRouteAdaptiveStateFeedback")
+    .filter({ hasText: "ja" })
+    .waitFor({ timeout: 15_000 });
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(
+        "#participantRouteUnitRail [data-unit-key]"
+      ).length === 3,
+    undefined,
+    { timeout: 15_000 }
+  );
+  const adaptivePlayerUnitCount = await originalAdaptiveFrame
+    .locator("body")
+    .evaluate(
+      () =>
+        new Promise((resolvePromise, reject) => {
+          const deadline = Date.now() + 15_000;
+          const poll = () => {
+            const latestConfig =
+              globalThis.__adaptivePlayerConfigUpdates?.at(-1);
+            if (latestConfig?.unitCount === 3) {
+              resolvePromise(latestConfig.unitCount);
+              return;
+            }
+            if (Date.now() >= deadline) {
+              reject(
+                new Error(
+                  `Expected adaptive unitCount 3, received ${JSON.stringify(latestConfig)}`
+                )
+              );
+              return;
+            }
+            setTimeout(poll, 50);
+          };
+          poll();
+        })
+    );
+  assert.equal(
+    adaptivePlayerUnitCount,
+    3,
+    "The running Verona Player must receive the updated adaptive Unit count."
+  );
   await page.goto(
     `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
       originalAdaptiveParticipantSessionId
@@ -7398,6 +7457,11 @@ try {
     await page.locator("#participantRouteAdaptiveState-level").inputValue(),
     "beginner"
   );
+  assert.equal(
+    await page.locator("#participantRouteAdaptiveState-bonus").inputValue(),
+    "yes"
+  );
+  stopAfter("participant-original-verona-player");
 
   logStep("participant-official-verona-3-player");
   const legacyPlayerTenantKey = `${tenantKey}-verona-3`;
