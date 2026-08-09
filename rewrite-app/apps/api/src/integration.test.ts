@@ -22202,6 +22202,356 @@ test("original Testcenter compatibility corpus executes official IQB solver codi
   );
 });
 
+test("original Testcenter compatibility corpus executes official IQB unique-value coding", async () => {
+  type CodingSchemePackage = {
+    family: string;
+    schemeFixture: string;
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const expectation = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "unique-values-processing"
+  );
+  assert.ok(expectation);
+  const codingSchemeDocument = readFileSync(
+    resolve(originalTestcenterCorpusRoot, expectation.schemeFixture),
+    "utf8"
+  );
+  const inputResponses = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.inputFixture),
+      "utf8"
+    )
+  ) as Array<{ id: string; status: string; value: unknown }>;
+  const officialOutcome = JSON.parse(
+    readFileSync(
+      resolve(originalTestcenterCorpusRoot, expectation.outcomeFixture),
+      "utf8"
+    )
+  ) as Array<{
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  }>;
+  const outcomeById = new Map(
+    officialOutcome.map(variable => [variable.id, variable])
+  );
+  assert.deepEqual(outcomeById.get("d1"), {
+    id: "d1",
+    value: null,
+    status: "DERIVE_ERROR"
+  });
+  assert.deepEqual(outcomeById.get("d3"), {
+    id: "d3",
+    value: true,
+    status: "CODING_COMPLETE",
+    code: 1,
+    score: 7
+  });
+  assert.deepEqual(
+    ["d2", "d4", "d5", "d6", "d7"].map(variableKey => [
+      variableKey,
+      outcomeById.get(variableKey)?.value,
+      outcomeById.get(variableKey)?.status
+    ]),
+    [
+      ["d2", true, "NO_CODING"],
+      ["d4", false, "NO_CODING"],
+      ["d5", true, "NO_CODING"],
+      ["d6", false, "NO_CODING"],
+      ["d7", true, "NO_CODING"]
+    ]
+  );
+
+  const states = [
+    {
+      key: "dependency-error",
+      label: "Dependency error",
+      option: "derive-error",
+      optionLabel: "Derive error",
+      source: "Status",
+      variable: "d1",
+      comparison: 'equal="DERIVE_ERROR"'
+    },
+    {
+      key: "plain-uniqueness",
+      label: "Plain uniqueness",
+      option: "unique",
+      optionLabel: "Unique",
+      source: "Value",
+      variable: "d2",
+      comparison: 'equal="true"'
+    },
+    {
+      key: "derived-code",
+      label: "Derived code",
+      option: "coded",
+      optionLabel: "Coded",
+      source: "Code",
+      variable: "d3",
+      comparison: 'equal="1"'
+    },
+    {
+      key: "derived-score",
+      label: "Derived score",
+      option: "scored",
+      optionLabel: "Scored",
+      source: "Score",
+      variable: "d3",
+      comparison: 'greaterThan="6"'
+    },
+    {
+      key: "all-spaces",
+      label: "Remove all spaces",
+      option: "duplicate",
+      optionLabel: "Duplicate",
+      source: "Value",
+      variable: "d4",
+      comparison: 'equal="false"'
+    },
+    {
+      key: "dispensable-spaces",
+      label: "Remove dispensable spaces",
+      option: "unique",
+      optionLabel: "Unique",
+      source: "Value",
+      variable: "d5",
+      comparison: 'equal="true"'
+    },
+    {
+      key: "numeric-processing",
+      label: "Numeric processing",
+      option: "duplicate",
+      optionLabel: "Duplicate",
+      source: "Value",
+      variable: "d6",
+      comparison: 'equal="false"'
+    },
+    {
+      key: "combined-processing",
+      label: "Combined processing",
+      option: "unique",
+      optionLabel: "Unique",
+      source: "Value",
+      variable: "d7",
+      comparison: 'equal="true"'
+    }
+  ] as const;
+  const statesDocument = states
+    .map(state => `
+      <State id="${state.key}" label="${state.label}">
+        <Option id="${state.option}" label="${state.optionLabel}">
+          <If><${state.source} of="${state.variable}" from="decision-unit"/><Is ${state.comparison}/></If>
+        </Option>
+        <Option id="pending" label="Pending"/>
+      </State>
+    `)
+    .join("");
+  const tenantKey = "integration-tenant-official-unique-values";
+  const workspaceKey = "integration-workspace-official-unique-values";
+  const bookletKey = "BOOKLET.IQB.UNIQUE-VALUES";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-unique-values.xml" />
+            <resource identifier="UNIT.IQB.UNIQUE-VALUES" href="units/Unit-unique-values.xml" />
+            <resource identifier="unique-values.json" href="schemes/unique-values.json" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-unique-values.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official IQB Unique Values</Label></Metadata>
+          <States>${statesDocument}</States>
+          <Units>
+            <Unit id="UNIT.IQB.UNIQUE-VALUES" alias="decision-unit" label="Unique Values Decision Unit"/>
+            <Testlet id="processed-block">
+              <Restrictions><Show if="dispensable-spaces" is="unique"/></Restrictions>
+              <Unit id="UNIT.PROCESSED" alias="processed-unit" label="Processed Route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="dispensable-spaces" is="pending"/></Restrictions>
+              <Unit id="UNIT.PENDING" alias="pending-unit" label="Pending Route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit-unique-values.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>UNIT.IQB.UNIQUE-VALUES</Id><Label>Official IQB Unique Values Unit</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>Unique Values</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/unique-values.json</CodingSchemeRef>
+          <BaseVariables>
+            <Variable id="b1" type="string"/>
+            <Variable id="b2" type="string"/>
+            <Variable id="b3" type="string"/>
+          </BaseVariables>
+          <DerivedVariables>
+            <Variable id="d1" type="boolean"/>
+            <Variable id="d2" type="boolean"/>
+            <Variable id="d3" type="boolean"/>
+            <Variable id="d4" type="boolean"/>
+            <Variable id="d5" type="boolean"/>
+            <Variable id="d6" type="boolean"/>
+            <Variable id="d7" type="boolean"/>
+          </DerivedVariables>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/schemes/unique-values.json",
+      content: codingSchemeDocument
+    }
+  ]);
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-unique-values.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: { version?: string; variableCodings: unknown[] };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const decisionUnit =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries.find(unit => unit.unitKey === "decision-unit");
+  assert.equal(decisionUnit?.codingScheme?.version, undefined);
+  assert.equal(decisionUnit?.codingScheme?.variableCodings.length, 10);
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "official-unique-values-participant" }
+  });
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: { testRunId: string; bookletStates: Record<string, string> };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.deepEqual(
+    resume.body.testRun.bookletStates,
+    Object.fromEntries(states.map(state => [state.key, "pending"]))
+  );
+
+  const rawPlayerResponse = JSON.stringify({
+    kind: "verona_unit_state",
+    version: 1,
+    unitState: {
+      unitStateDataType: "iqb-standard@1.0",
+      presentationProgress: "complete",
+      responseProgress: "complete",
+      dataParts: { responses: JSON.stringify(inputResponses) }
+    }
+  });
+  const saveResult = await requestJson<{
+    testRun: {
+      bookletStates: Record<string, string>;
+      unitResponses: Record<string, string>;
+    };
+  }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: {
+      currentUnitKey: "decision-unit",
+      status: "running",
+      unitResponse: rawPlayerResponse
+    }
+  });
+  assert.equal(saveResult.status, 200);
+  assert.deepEqual(saveResult.body.testRun.bookletStates, expectation.expectedStates);
+  assert.equal(
+    saveResult.body.testRun.unitResponses["decision-unit"],
+    rawPlayerResponse
+  );
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    ["decision-unit", "processed-unit"]
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      currentState.body.currentRunState.adaptiveStates.map(state => [
+        state.stateKey,
+        state.optionKey
+      ])
+    ),
+    expectation.expectedStates
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "processed-unit"
+  );
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";

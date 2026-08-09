@@ -10,7 +10,12 @@ commit `e04e585e6514e5257ac42f48b629628326471f90`. Those byte-exact fixtures are
 kept versionless on purpose: they exercise the same legacy normalization used
 by the original Testcenter, including base-variable aliases, chained solver
 derivation, successful decimal calculation, `NO_CODING`, and `DERIVE_ERROR`.
-Their three source paths and hashes are recorded separately in `corpus.json`.
+The same pinned release contributes the byte-exact `UNIQUE_VALUES` scheme plus
+case-03 input and outcome. That second family covers dependent derivation,
+derived code/score, boolean results, and the `REMOVE_ALL_SPACES`,
+`REMOVE_DISPENSABLE_SPACES`, `TO_NUMBER`, and combined lower-case/space
+processing paths. Every source path and hash is recorded separately in
+`corpus.json`.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

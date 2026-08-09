@@ -393,6 +393,32 @@
         "alias-code": "coded",
         "alias-score": "scored"
       }
+    },
+    {
+      "family": "unique-values-processing",
+      "schemeFixture": "schemes/responses-3.6.0-unique-values.json",
+      "inputFixture": "schemes/responses-3.6.0-unique-values-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-unique-values-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/UNIQUE_VALUES/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/UNIQUE_VALUES/03_input.json",
+      "outcomeSourcePath": "test/coding/derive/UNIQUE_VALUES/03_outcome.json",
+      "schemeSha256": "3c2692a7c8e3c8253977f86ad437b82c92b72eb9bca7126e6ea6934e47137710",
+      "inputSha256": "acc3977aeb4dda684dea1cca8292cd2fa248947ef07c6a88a5b876f525f62551",
+      "outcomeSha256": "4b618a0b700666913c1b7000a30456fcb597ba0c45e4b937db256d3b3a691cf4",
+      "license": "MIT",
+      "expectedStates": {
+        "dependency-error": "derive-error",
+        "plain-uniqueness": "unique",
+        "derived-code": "coded",
+        "derived-score": "scored",
+        "all-spaces": "duplicate",
+        "dispensable-spaces": "unique",
+        "numeric-processing": "duplicate",
+        "combined-processing": "unique"
+      }
     }
   ],
   "bookletConfigPackages": [

@@ -772,24 +772,40 @@ test("original Testcenter compatibility corpus pins independent official player 
   );
 });
 
-test("original Testcenter compatibility corpus pins official IQB solver coding fixtures", () => {
+test("original Testcenter compatibility corpus pins official IQB coding fixtures", () => {
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 1);
-  const solver = corpus.codingSchemePackages[0];
+  assert.equal(corpus.codingSchemePackages.length, 2);
+  for (const codingPackage of corpus.codingSchemePackages) {
+    assert.equal(
+      codingPackage.sourceRepository,
+      "https://github.com/iqb-berlin/responses"
+    );
+    assert.equal(codingPackage.sourceTag, "3.6.0");
+    assert.equal(
+      codingPackage.sourceCommit,
+      "e04e585e6514e5257ac42f48b629628326471f90"
+    );
+    assert.equal(codingPackage.license, "MIT");
+    for (const [fixture, expectedHash] of [
+      [codingPackage.schemeFixture, codingPackage.schemeSha256],
+      [codingPackage.inputFixture, codingPackage.inputSha256],
+      [codingPackage.outcomeFixture, codingPackage.outcomeSha256]
+    ] as const) {
+      assert.equal(
+        createHash("sha256")
+          .update(readFileSync(resolve(corpusRoot, fixture)))
+          .digest("hex"),
+        expectedHash
+      );
+    }
+  }
+
+  const solver = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "solver-alias-chain"
+  );
   assert.ok(solver);
-  assert.equal(solver.family, "solver-alias-chain");
-  assert.equal(
-    solver.sourceRepository,
-    "https://github.com/iqb-berlin/responses"
-  );
-  assert.equal(solver.sourceTag, "3.6.0");
-  assert.equal(
-    solver.sourceCommit,
-    "e04e585e6514e5257ac42f48b629628326471f90"
-  );
-  assert.equal(solver.license, "MIT");
   assert.deepEqual(
     [
       solver.schemeSourcePath,
@@ -802,19 +818,6 @@ test("original Testcenter compatibility corpus pins official IQB solver coding f
       "test/coding/derive/SOLVER/case1/01_outcome.json"
     ]
   );
-
-  for (const [fixture, expectedHash] of [
-    [solver.schemeFixture, solver.schemeSha256],
-    [solver.inputFixture, solver.inputSha256],
-    [solver.outcomeFixture, solver.outcomeSha256]
-  ] as const) {
-    assert.equal(
-      createHash("sha256")
-        .update(readFileSync(resolve(corpusRoot, fixture)))
-        .digest("hex"),
-      expectedHash
-    );
-  }
 
   const scheme = JSON.parse(
     readFileSync(resolve(corpusRoot, solver.schemeFixture), "utf8")
@@ -858,6 +861,77 @@ test("original Testcenter compatibility corpus pins official IQB solver coding f
   );
   assert.equal(outcome[3]?.value, 1124);
   assert.equal(outcome[6]?.value, 111.01801801801801);
+
+  const uniqueValues = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "unique-values-processing"
+  );
+  assert.ok(uniqueValues);
+  assert.deepEqual(
+    [
+      uniqueValues.schemeSourcePath,
+      uniqueValues.inputSourcePath,
+      uniqueValues.outcomeSourcePath
+    ],
+    [
+      "test/coding/derive/UNIQUE_VALUES/coding-scheme.json",
+      "test/coding/derive/UNIQUE_VALUES/03_input.json",
+      "test/coding/derive/UNIQUE_VALUES/03_outcome.json"
+    ]
+  );
+  const uniqueScheme = JSON.parse(
+    readFileSync(resolve(corpusRoot, uniqueValues.schemeFixture), "utf8")
+  ) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      sourceType: string;
+      sourceParameters?: { processing?: string[] };
+    }>;
+  };
+  assert.equal(uniqueScheme.version, undefined);
+  assert.deepEqual(
+    uniqueScheme.variableCodings.slice(3).map(variable => variable.sourceType),
+    [
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES",
+      "UNIQUE_VALUES"
+    ]
+  );
+  assert.deepEqual(
+    uniqueScheme.variableCodings[9]?.sourceParameters?.processing,
+    ["TO_LOWER_CASE", "REMOVE_DISPENSABLE_SPACES"]
+  );
+  const uniqueOutcome = JSON.parse(
+    readFileSync(resolve(corpusRoot, uniqueValues.outcomeFixture), "utf8")
+  ) as Array<{
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  }>;
+  assert.deepEqual(
+    uniqueOutcome.slice(3).map(variable => [
+      variable.id,
+      variable.value,
+      variable.status,
+      variable.code ?? null,
+      variable.score ?? null
+    ]),
+    [
+      ["d1", null, "DERIVE_ERROR", null, null],
+      ["d2", true, "NO_CODING", null, null],
+      ["d3", true, "CODING_COMPLETE", 1, 7],
+      ["d4", false, "NO_CODING", null, null],
+      ["d5", true, "NO_CODING", null, null],
+      ["d6", false, "NO_CODING", null, null],
+      ["d7", true, "NO_CODING", null, null]
+    ]
+  );
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {
