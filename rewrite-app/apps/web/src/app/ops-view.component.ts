@@ -69,6 +69,13 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="adminAuditEventsButton" *ngIf="view.canUseAdminManagement" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.refreshAdminAuditEvents()">Admin Audit Events</button>
           <button id="adminSignOutButton" class="ghost" type="button" [disabled]="!view.canUseAdminSession" (click)="view.signOutAdmin()">Sign Out</button>
         </div>
+        <p
+          *ngIf="view.ops.adminAccessWindowNotice"
+          id="adminAccessWindowNotice"
+          class="operator-access-window-notice"
+          role="alert"
+          aria-live="assertive"
+        >{{ view.ops.adminAccessWindowNotice }}</p>
       </article>
 
       <app-record-collection

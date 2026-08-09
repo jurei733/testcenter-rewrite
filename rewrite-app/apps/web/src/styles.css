@@ -518,6 +518,16 @@ textarea {
   gap: 10px;
 }
 
+.operator-access-window-notice {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(196, 82, 47, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(241, 216, 195, 0.68);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .participant-unit-navigation-label {
   display: inline-flex;
   align-items: center;

@@ -24,6 +24,7 @@ export interface ShellOpsState {
   adminDisplayName: string;
   adminPassword: string;
   adminSessionToken: string;
+  adminAccessWindowNotice: string;
   adminSessionView: string;
   adminSessionsView: string;
   adminSessionsExportView: string;
@@ -257,6 +258,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminDisplayName: "Platform Admin",
     adminPassword: "",
     adminSessionToken: "",
+    adminAccessWindowNotice: "",
     adminSessionView: "Use admin bootstrap or sign-in.",
     adminSessionsView: 'Use "Admin Sessions".',
     adminSessionsExportView: "Export admin sessions CSV to preview it here.",

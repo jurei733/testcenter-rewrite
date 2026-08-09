@@ -25,6 +25,7 @@ import {
   readBookletConfigValues
 } from "@testcenter-rewrite-app/contracts";
 import type {
+  AdminAccessWindowErrorDetails,
   OriginalTestcenterOperationalLoginCandidate,
   ParticipantRosterSource,
   SourceDocumentSource
@@ -20301,18 +20302,13 @@ export const createFirstSliceServices = (
         const password = requireAdminCredentialsPassword(input.password);
         const adminUser = await repository.getAdminUserByUsername(username);
         const timestamp = now();
-        const accessFailureReason = adminUser
-          ? resolveAdminAccessFailureReason(adminUser, timestamp)
-          : null;
         const signInFailureReason = !adminUser
           ? "admin_user_not_found"
           : adminUser.status !== "active"
             ? "admin_user_not_active"
             : !verifyAdminPassword(password, adminUser.passwordHash)
               ? "password_mismatch"
-              : accessFailureReason
-                ? accessFailureReason
-                : null;
+              : null;
         if (
           !adminUser ||
           adminUser.status !== "active" ||
@@ -20332,6 +20328,39 @@ export const createFirstSliceServices = (
             401,
             "admin_credentials_invalid",
             "Admin credentials are invalid."
+          );
+        }
+
+        const accessFailureReason = resolveAdminAccessFailureReason(
+          adminUser,
+          timestamp
+        );
+        if (accessFailureReason) {
+          await recordAdminAuditEvent({
+            eventType: "admin_sign_in_failed",
+            subjectAdminUserId: adminUser.adminUserId,
+            summary: `Admin sign-in failed for '${username}'.`,
+            details: {
+              username,
+              reason: accessFailureReason,
+              adminUserStatus: adminUser.status
+            }
+          });
+          const expired = accessFailureReason === "admin_access_expired";
+          const accessAt = expired
+            ? resolveAdminAccessValidUntil(adminUser)
+            : adminUser.validFrom;
+          throw new FirstSliceError(
+            expired ? 410 : 403,
+            accessFailureReason,
+            expired
+              ? "Admin access has expired."
+              : "Admin access has not started.",
+            {
+              accessStatus: expired ? "expired" : "scheduled",
+              accessAt: accessAt ?? timestamp,
+              customTexts: { ...adminUser.customTexts }
+            } satisfies AdminAccessWindowErrorDetails
           );
         }
 

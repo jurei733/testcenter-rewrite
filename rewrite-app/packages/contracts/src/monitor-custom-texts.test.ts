@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  formatMonitorDateCustomText,
   formatMonitorCustomText,
   mergeMonitorCustomTextScopes,
   originalMonitorCustomTextKeys,
@@ -38,5 +39,24 @@ test("monitor selection text substitutes original placeholders in order", () => 
   assert.equal(
     formatMonitorCustomText({}, "gm_timeleft_tooltip", [3, 10]),
     "Verbleibende Zeit: 3 von 10 Minute(n)"
+  );
+});
+
+test("monitor access-window text substitutes documented date placeholders", () => {
+  assert.equal(
+    formatMonitorDateCustomText(
+      { gm_selection_text_scheduled: "Available from $date" },
+      "gm_selection_text_scheduled",
+      "1 January 2999"
+    ),
+    "Available from 1 January 2999"
+  );
+  assert.equal(
+    formatMonitorDateCustomText(
+      {},
+      "gm_selection_text_expired",
+      "1 January 2000"
+    ),
+    "Gruppe abgelaufen seit 1 January 2000."
   );
 });

@@ -2391,6 +2391,12 @@ export type AdminSignInRequest = {
   password: string;
 };
 
+export type AdminAccessWindowErrorDetails = {
+  accessStatus: "scheduled" | "expired";
+  accessAt: string;
+  customTexts: Record<string, string>;
+};
+
 export type AdminRoleAssignmentRequest = {
   role: AdminRole;
   accessMode?: AdminRoleAssignment["accessMode"] | "RW" | "RO";

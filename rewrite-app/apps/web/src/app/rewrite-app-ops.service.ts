@@ -1,6 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 
 import type {
+  AdminAccessWindowErrorDetails,
   AdminSignInRequest,
   AdminSignInResponse,
   AdminSignOutResponse,
@@ -25,6 +26,8 @@ import type {
   UpdateAdminUserResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
+  formatMonitorDateCustomText,
+  mergeMonitorCustomTextScopes,
   productionApiRoutes,
   resolveRoutePath
 } from "@testcenter-rewrite-app/contracts";
@@ -34,6 +37,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
+import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppShellPersistenceService } from "./rewrite-app-shell-persistence.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { downloadTextFile } from "./download-text-file";
@@ -95,6 +99,7 @@ export class RewriteAppOpsService {
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly persistence = inject(RewriteAppShellPersistenceService);
   private readonly uiState = inject(RewriteAppUiStateService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
 
   private readonly opsState = this.uiState.ops;
 
@@ -132,15 +137,25 @@ export class RewriteAppOpsService {
   }
 
   async signInAdmin(): Promise<void> {
-    const payload = await this.requestState.request<AdminSignInResponse>(
-      "Admin Sign In",
-      "POST",
-      productionApiRoutes.admin.signIn,
-      {
-        username: this.opsState.adminUsername.trim(),
-        password: this.opsState.adminPassword
-      } satisfies AdminSignInRequest
-    );
+    this.opsState.adminAccessWindowNotice = "";
+    let payload: AdminSignInResponse;
+    try {
+      payload = await this.requestState.request<AdminSignInResponse>(
+        "Admin Sign In",
+        "POST",
+        productionApiRoutes.admin.signIn,
+        {
+          username: this.opsState.adminUsername.trim(),
+          password: this.opsState.adminPassword
+        } satisfies AdminSignInRequest
+      );
+    } catch (error) {
+      const notice = this.readAdminAccessWindowNotice(error);
+      if (notice) {
+        this.opsState.adminAccessWindowNotice = notice;
+      }
+      throw error;
+    }
 
     this.applyAdminAuthPayload(payload);
     this.opsState.adminSessionToken = payload.sessionToken;
@@ -150,6 +165,52 @@ export class RewriteAppOpsService {
       `${payload.adminUser.username} has ${payload.roleAssignments.length} role assignment(s).`
     );
     this.persistence.persistShellState();
+  }
+
+  private readAdminAccessWindowNotice(error: unknown): string | null {
+    if (
+      !this.requestState.isApiError(error) ||
+      (error.error !== "admin_access_not_started" &&
+        error.error !== "admin_access_expired") ||
+      !this.isAdminAccessWindowErrorDetails(error.details)
+    ) {
+      return null;
+    }
+    const details = error.details;
+    const date = this.formatDateTime(details.accessAt);
+    const customTexts = mergeMonitorCustomTextScopes(
+      this.applicationSettings.settings().customTexts,
+      details.customTexts
+    );
+    return formatMonitorDateCustomText(
+      customTexts,
+      details.accessStatus === "expired"
+        ? "gm_selection_text_expired"
+        : "gm_selection_text_scheduled",
+      date
+    );
+  }
+
+  private isAdminAccessWindowErrorDetails(
+    value: unknown
+  ): value is AdminAccessWindowErrorDetails {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+    const candidate = value as Partial<AdminAccessWindowErrorDetails>;
+    return (
+      (candidate.accessStatus === "scheduled" ||
+        candidate.accessStatus === "expired") &&
+      typeof candidate.accessAt === "string" &&
+      !!candidate.customTexts &&
+      typeof candidate.customTexts === "object" &&
+      !Array.isArray(candidate.customTexts)
+    );
+  }
+
+  private formatDateTime(value: string): string {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString() : value;
   }
 
   async refreshAdminSession(): Promise<void> {

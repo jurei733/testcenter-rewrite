@@ -944,6 +944,112 @@ try {
     ),
     true
   );
+  logStep("admin-access-window-copy");
+  const scheduledAdminUsername = `ui-scheduled-admin-${Date.now()}`;
+  const scheduledAdminPassword = "ui-scheduled-admin-secret";
+  const scheduledAdminResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/admin/users`,
+    {
+      body: {
+        username: scheduledAdminUsername,
+        password: scheduledAdminPassword,
+        validFrom: "2999-01-01T00:00:00.000Z",
+        customTexts: {
+          gm_selection_text_scheduled: "Scheduled monitor opens $date"
+        },
+        roleAssignments: []
+      }
+    }
+  );
+  const scheduledAdminPayload = await scheduledAdminResponse.json();
+  const expiredAdminUsername = `ui-expired-admin-${Date.now()}`;
+  const expiredAdminPassword = "ui-expired-admin-secret";
+  const expiredAdminResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/admin/users`,
+    {
+      body: {
+        username: expiredAdminUsername,
+        password: expiredAdminPassword,
+        validTo: "2000-01-01T00:00:00.000Z",
+        customTexts: {
+          gm_selection_text_expired: "Expired monitor closed %date"
+        },
+        roleAssignments: []
+      }
+    }
+  );
+  const expiredAdminPayload = await expiredAdminResponse.json();
+  const accessWindowContext = await browser.newContext();
+  const accessWindowPage = await accessWindowContext.newPage();
+  try {
+    await accessWindowPage.goto(`${baseUrl}/app/ops`, {
+      waitUntil: "domcontentloaded"
+    });
+    await accessWindowPage.locator("#adminSignInButton").waitFor();
+    const attemptAccessWindowSignIn = async (username, password, statusCode) => {
+      await accessWindowPage.locator("#adminUsername").fill(username);
+      await accessWindowPage.locator("#adminPassword").fill(password);
+      const responsePromise = accessWindowPage.waitForResponse(
+        response =>
+          response.request().method() === "POST" &&
+          response.url().endsWith("/api/v1/admin/auth/sign-in")
+      );
+      await accessWindowPage.locator("#adminSignInButton").click();
+      assert.equal((await responsePromise).status(), statusCode);
+    };
+
+    await attemptAccessWindowSignIn(
+      scheduledAdminUsername,
+      "wrong-scheduled-secret",
+      401
+    );
+    assert.equal(
+      await accessWindowPage.locator("#adminAccessWindowNotice").count(),
+      0
+    );
+    await attemptAccessWindowSignIn(
+      scheduledAdminUsername,
+      scheduledAdminPassword,
+      403
+    );
+    const scheduledAccessNotice = accessWindowPage.locator(
+      "#adminAccessWindowNotice"
+    );
+    await scheduledAccessNotice.waitFor();
+    assert.match(
+      await scheduledAccessNotice.innerText(),
+      /^Scheduled monitor opens /
+    );
+    assert.match(await scheduledAccessNotice.innerText(), /2999/);
+    assert.doesNotMatch(await scheduledAccessNotice.innerText(), /\$date|%date/);
+
+    await attemptAccessWindowSignIn(
+      expiredAdminUsername,
+      expiredAdminPassword,
+      410
+    );
+    const expiredAccessNotice = accessWindowPage.locator(
+      "#adminAccessWindowNotice"
+    );
+    await expiredAccessNotice.waitFor();
+    assert.match(
+      await expiredAccessNotice.innerText(),
+      /^Expired monitor closed /
+    );
+    assert.match(await expiredAccessNotice.innerText(), /2000/);
+    assert.doesNotMatch(await expiredAccessNotice.innerText(), /\$date|%date/);
+  } finally {
+    await accessWindowContext.close();
+  }
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/admin/users/${scheduledAdminPayload.adminUser.adminUserId}`,
+    { method: "DELETE" }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/admin/users/${expiredAdminPayload.adminUser.adminUserId}`,
+    { method: "DELETE" }
+  );
+  stopAfter("admin-access-window-copy");
   logStep("admin-current-session");
   await clickAction("Current Session");
   await page

@@ -94,3 +94,14 @@ export const formatMonitorCustomText = (
     resolveMonitorCustomText(customTexts, key, fallback),
     replacements
   );
+
+export const formatMonitorDateCustomText = (
+  customTexts: Readonly<Record<string, string>> | null | undefined,
+  key: "gm_selection_text_expired" | "gm_selection_text_scheduled",
+  date: string,
+  fallback: string = originalMonitorCustomTextDefaults[key]
+): string =>
+  resolveMonitorCustomText(customTexts, key, fallback).replace(
+    /(?:%|\$)date/g,
+    date
+  );

@@ -994,6 +994,9 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       username: "future.access.admin",
       password: "future-access-secret",
       validFrom: "2999-01-01T00:00:00.000Z",
+      customTexts: {
+        gm_selection_text_scheduled: "Monitor available from $date"
+      },
       roleAssignments: [
         {
           role: "workspace_admin",
@@ -1010,7 +1013,29 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "2999-01-01T00:00:00.000Z"
   );
   assert.equal(futureAccessAdmin.body.adminUser.firstSignedInAt, null);
-  const futureAccessSignIn = await requestJson<{ error: string }>(
+  const futureAccessWrongPassword = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "future.access.admin",
+        password: "wrong-future-access-secret"
+      }
+    }
+  );
+  assert.equal(futureAccessWrongPassword.status, 401);
+  assert.equal(
+    futureAccessWrongPassword.body.error,
+    "admin_credentials_invalid"
+  );
+  const futureAccessSignIn = await requestJson<{
+    error: string;
+    details: {
+      accessStatus: string;
+      accessAt: string;
+      customTexts: Record<string, string>;
+    };
+  }>(
     "/api/v1/admin/auth/sign-in",
     {
       method: "POST",
@@ -1020,8 +1045,17 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       }
     }
   );
-  assert.equal(futureAccessSignIn.status, 401);
-  assert.equal(futureAccessSignIn.body.error, "admin_credentials_invalid");
+  assert.equal(futureAccessSignIn.status, 403);
+  assert.equal(futureAccessSignIn.body.error, "admin_access_not_started");
+  assert.equal(futureAccessSignIn.body.details.accessStatus, "scheduled");
+  assert.equal(
+    futureAccessSignIn.body.details.accessAt,
+    "2999-01-01T00:00:00.000Z"
+  );
+  assert.equal(
+    futureAccessSignIn.body.details.customTexts.gm_selection_text_scheduled,
+    "Monitor available from $date"
+  );
 
   const expiredAccessAdmin = await requestJson<{
     adminUser: { validTo: string | null; firstSignedInAt: string | null };
@@ -1034,6 +1068,9 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       username: "expired.access.admin",
       password: "expired-access-secret",
       validTo: "2000-01-01T00:00:00.000Z",
+      customTexts: {
+        gm_selection_text_expired: "Monitor expired at %date"
+      },
       roleAssignments: [
         {
           role: "workspace_admin",
@@ -1049,7 +1086,29 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     expiredAccessAdmin.body.adminUser.validTo,
     "2000-01-01T00:00:00.000Z"
   );
-  const expiredAccessSignIn = await requestJson<{ error: string }>(
+  const expiredAccessWrongPassword = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "expired.access.admin",
+        password: "wrong-expired-access-secret"
+      }
+    }
+  );
+  assert.equal(expiredAccessWrongPassword.status, 401);
+  assert.equal(
+    expiredAccessWrongPassword.body.error,
+    "admin_credentials_invalid"
+  );
+  const expiredAccessSignIn = await requestJson<{
+    error: string;
+    details: {
+      accessStatus: string;
+      accessAt: string;
+      customTexts: Record<string, string>;
+    };
+  }>(
     "/api/v1/admin/auth/sign-in",
     {
       method: "POST",
@@ -1059,8 +1118,17 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       }
     }
   );
-  assert.equal(expiredAccessSignIn.status, 401);
-  assert.equal(expiredAccessSignIn.body.error, "admin_credentials_invalid");
+  assert.equal(expiredAccessSignIn.status, 410);
+  assert.equal(expiredAccessSignIn.body.error, "admin_access_expired");
+  assert.equal(expiredAccessSignIn.body.details.accessStatus, "expired");
+  assert.equal(
+    expiredAccessSignIn.body.details.accessAt,
+    "2000-01-01T00:00:00.000Z"
+  );
+  assert.equal(
+    expiredAccessSignIn.body.details.customTexts.gm_selection_text_expired,
+    "Monitor expired at %date"
+  );
 
   const firstLoginWindowValidTo = new Date(
     Date.now() + 10 * 60_000
