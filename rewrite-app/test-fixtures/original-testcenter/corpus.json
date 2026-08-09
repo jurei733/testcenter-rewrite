@@ -1910,6 +1910,35 @@
         "unitSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/example_units/G231mm.xml",
         "unitSha256": "fbd8e6b7244ed46dd25ea1fe7ff8497f01d3384260a879293d68aca8f5c8c9b2"
       }
+    },
+    {
+      "family": "STARS choice interaction",
+      "playerFixture": "players/iqb-player-stars-0.6.19.html.br.base64",
+      "playerEncoding": "brotli-base64",
+      "definitionFixture": "definitions/stars-buttons-radio-0.6.19.voud.base64",
+      "definitionEncoding": "base64",
+      "sourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "sourceTag": "0.6.19",
+      "sourceCommit": "fdc2eb01016ec65bf1e5250eb44c0acfb54c690d",
+      "playerSourceRepository": "https://github.com/iqb-berlin/verona-player-testbed",
+      "playerSourceCommit": "1343550c864701daf9ca4a1b064351b37a617d89",
+      "playerSourcePath": "player/iqb-player-stars-0.6.19.html",
+      "playerSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-player-testbed/1343550c864701daf9ca4a1b064351b37a617d89/player/iqb-player-stars-0.6.19.html",
+      "playerSha256": "288e78a1a11313b4af8de8cc859408e512ef967e0b5fe2f8883c99fea3c5c1b2",
+      "definitionSourceRepository": "https://github.com/iqb-berlin/verona-modules-stars",
+      "definitionSourceCommit": "fdc2eb01016ec65bf1e5250eb44c0acfb54c690d",
+      "definitionSourcePath": "projects/player/test/unitdata/buttons/radio/buttons_2Rows_2-2_big_radio_option_text.json",
+      "definitionSourceUrl": "https://raw.githubusercontent.com/iqb-berlin/verona-modules-stars/fdc2eb01016ec65bf1e5250eb44c0acfb54c690d/projects/player/test/unitdata/buttons/radio/buttons_2Rows_2-2_big_radio_option_text.json",
+      "definitionSha256": "0d28877bcd1f08ff963328dd558dbc89914f35567c1b88224e24c7be29d75d43",
+      "license": "MIT",
+      "playerKey": "iqb-player-stars@0.6",
+      "playerModuleId": "iqb-player-stars",
+      "playerModuleVersion": "0.6.19",
+      "playerApiVersion": "6.0",
+      "metadataApiVersion": "6.0",
+      "metadataFormat": "metadata-2.0",
+      "unitDefinitionType": "stars-unit-definition@0.17",
+      "unitStateType": "iqb-standard@1.1"
     }
   ],
   "playerPackages": [

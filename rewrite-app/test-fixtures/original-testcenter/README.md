@@ -124,6 +124,12 @@ the official DAN 3.0.0 Player release plus the byte-exact `G231mm.voud`
 definition from the official Verona Player Testbed at a fixed commit. Its
 production Chromium gate persists and restores a positioned multiline-text and
 multiple-choice response through DAN's JSON-string `all` data part. The corpus
+adds the official STARS 0.6.19 Player from a fixed Testbed commit and a
+byte-exact radio-button definition from its matching source tag as a third
+independent family. STARS declares
+metadata 2.0 and Verona API 6, emits `iqb-standard@1.1` state through its
+JSON-string `responses` data part, and restores the selected option after a
+production Chromium/SQLite reload. The corpus
 also retains the Testbed's historical metadata-free `IQBVisualUnitPlayerV2.99.2`
 artifact and original `G231mm.xml`; import and production browser gates resolve
 and execute their unmodified

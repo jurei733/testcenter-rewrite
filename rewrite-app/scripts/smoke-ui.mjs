@@ -7696,6 +7696,200 @@ try {
       .isChecked(),
     true
   );
+
+  logStep("participant-official-stars-player-family");
+  const starsPlayerPackage =
+    officialProtocolCorpus.veronaPlayerFamilyPackages.find(
+      playerPackage => playerPackage.family === "STARS choice interaction"
+    );
+  assert.ok(
+    starsPlayerPackage,
+    "The official STARS player fixture should be pinned."
+  );
+  const starsTenantKey = `${tenantKey}-verona-stars`;
+  const starsWorkspaceKey = `${workspaceKey}-verona-stars`;
+  const starsBookletKey = "BOOKLET.OFFICIAL.STARS-0.6";
+  const starsUnitKey = "UNIT.OFFICIAL.STARS-0.6";
+  const starsLoginKey = "student-official-stars";
+  const starsExpectedValue = "3";
+  const [starsPlayerDocument, starsDefinitionDocument] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.playerFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        starsPlayerPackage.definitionFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+  ]);
+  const starsPlayerZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${starsBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${starsUnitKey}" href="units/Unit.xml" />
+            <resource identifier="${starsPlayerPackage.playerKey}" href="players/Player.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${starsBookletKey}</Id>
+            <Label>Official STARS choice interaction</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${starsUnitKey}" label="STARS choice interaction" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata>
+            <Id>${starsUnitKey}</Id>
+            <Label>Official STARS choice interaction</Label>
+          </Metadata>
+          <Definition player="${starsPlayerPackage.playerKey}" type="${starsPlayerPackage.unitDefinitionType}"><![CDATA[${starsDefinitionDocument}]]></Definition>
+        </Unit>
+      `
+    },
+    {
+      fileName: "export/players/Player.html",
+      content: starsPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: starsTenantKey,
+      displayName: "Official STARS Player"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${starsTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: starsWorkspaceKey,
+        displayName: "Official STARS Player"
+      }
+    }
+  );
+  const starsWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${starsTenantKey}` +
+    `/workspaces/${starsWorkspaceKey}`;
+  const starsSourceResponse = await sendSmokeJson(
+    `${starsWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "official-stars-0.6-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${starsPlayerZip.toString("base64")}`
+      }
+    }
+  );
+  const starsSourcePayload = await starsSourceResponse.json();
+  const starsImportResponse = await sendSmokeJson(
+    `${starsWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: starsSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const starsImportPayload = await starsImportResponse.json();
+  assert.equal(
+    starsImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(starsImportPayload.importJob.diagnostics)
+  );
+  const starsReleaseId = starsImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(starsReleaseId, "Official STARS import should stage a release.");
+  await sendSmokeJson(
+    `${starsWorkspaceApiUrl}/content-releases/${starsReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${starsWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: starsLoginKey,
+          groupKey: "group:official-stars",
+          bookletKey: starsBookletKey,
+          displayName: "Official STARS Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: starsTenantKey,
+      workspaceKey: starsWorkspaceKey,
+      loginKey: starsLoginKey,
+      bookletKey: starsBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const starsFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const starsChoice = starsFrame.locator("#BUTTONS_2");
+  await starsChoice.waitFor({ state: "attached", timeout: 30_000 });
+  await starsChoice.dispatchEvent("click");
+  const starsParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(starsParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${starsParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[starsUnitKey];
+      if (typeof response !== "string") return false;
+      try {
+        const responses = JSON.parse(response).unitState?.dataParts?.responses;
+        if (typeof responses !== "string") return false;
+        const values = JSON.parse(responses);
+        return values?.some(
+          value =>
+            value?.id === "BUTTONS" &&
+            value?.status === "VALUE_CHANGED" &&
+            value?.value === starsExpectedValue
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      starsParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${starsPlayerPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredStarsFrame = page.frameLocator("#participantVeronaPlayerFrame");
+  const restoredStarsChoice = restoredStarsFrame.locator("#BUTTONS_2");
+  await restoredStarsChoice.waitFor({ state: "attached", timeout: 30_000 });
+  assert.equal(await restoredStarsChoice.isChecked(), true);
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");

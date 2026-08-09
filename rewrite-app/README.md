@@ -648,7 +648,9 @@ The `smoke:ui:content` variant is a fast browser slice that stops after admin/wo
 - retrying that failed import on the same package identity
 - diagnostics and config reads
 
-The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent ABI 3.3.0 scripted-survey and DAN 3.0.0 visual-assessment Players, and the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph, including type-faithful API-2 response restoration after reload.
+The named `smoke:ui:verona-player-families` slice stops after executing the official Simple Player generations, the independent ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment, and STARS 0.6.19 choice-interaction Players, and the historical metadata-free `IQBVisualUnitPlayerV2.99.2` Testbed graph. It gates type-faithful API-2 and API-6 response restoration after reload while leaving the separate PWA offline-shell check to its dedicated smoke slice.
+
+The STARS corpus pins the byte-exact metadata-2.0/API-6 Player from a fixed official Testbed commit and a radio-button definition from the matching 0.6.19 source tag. Its production SQLite/Chromium gate imports and launches the unmodified assets, persists the `iqb-standard@1.1` JSON-string `responses` data part, and restores the selected option after a new Participant navigation.
 
 The DAN corpus additionally imports and executes the official Testbed's historical, metadata-free `IQBVisualUnitPlayerV2.99.2.html`, original `G231mm.xml`, and byte-exact `G231mm.voud` as a real relative `DefinitionRef` graph. Its production SQLite/Chromium gate proves the API-2.1 handshake, response save, and reload restoration while retaining the stable legacy metadata warning and runtime-handshake authority instead of treating the historical definition-format key as an alias for the modern `iqb-player-dan` module id.
 

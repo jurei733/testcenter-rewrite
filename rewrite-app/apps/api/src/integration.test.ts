@@ -15673,7 +15673,7 @@ test("original Testcenter compatibility corpus imports official independent play
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as { veronaPlayerFamilyPackages: VeronaPlayerFamilyPackage[] };
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 2);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 3);
 
   for (const expectation of corpus.veronaPlayerFamilyPackages) {
     const playerDocument = readBrotliBase64Fixture(
@@ -15697,10 +15697,30 @@ test("original Testcenter compatibility corpus imports official independent play
       expectation.definitionSha256,
       expectation.definitionSourceUrl
     );
-    assert.match(playerDocument, new RegExp(`"@id"\\s*:\\s*"${expectation.playerModuleId}"`));
-    assert.match(playerDocument, new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`));
-    assert.match(playerDocument, new RegExp(`"apiVersion"\\s*:\\s*"${expectation.metadataApiVersion}"`));
-    assert.match(playerDocument, new RegExp(`data-api-version="${expectation.playerApiVersion}"`));
+    assert.match(
+      playerDocument,
+      new RegExp(
+        `"${expectation.metadataFormat === "metadata-2.0" ? "id" : "@id"}"\\s*:\\s*"${expectation.playerModuleId}"`
+      )
+    );
+    assert.match(
+      playerDocument,
+      new RegExp(`"version"\\s*:\\s*"${expectation.playerModuleVersion}"`)
+    );
+    assert.match(
+      playerDocument,
+      new RegExp(
+        `"${expectation.metadataFormat === "metadata-2.0" ? "specVersion" : "apiVersion"}"\\s*:\\s*"${expectation.metadataApiVersion}"`
+      )
+    );
+    if (expectation.metadataFormat === "metadata-2.0") {
+      assert.match(playerDocument, /"metadataVersion"\s*:\s*"2\.0"/);
+    } else {
+      assert.match(
+        playerDocument,
+        new RegExp(`data-api-version="${expectation.playerApiVersion}"`)
+      );
+    }
 
     const packageSuffix = expectation.playerModuleId.replaceAll("iqb-player-", "");
     const bookletKey = `BOOKLET.OFFICIAL.${packageSuffix.toUpperCase()}`;

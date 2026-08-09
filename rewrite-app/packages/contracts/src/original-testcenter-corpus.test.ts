@@ -223,6 +223,8 @@ type OriginalTestcenterCorpus = {
     sourceRepository: string;
     sourceTag: string;
     sourceCommit: string;
+    playerSourceRepository?: string;
+    playerSourceCommit?: string;
     playerSourcePath: string;
     playerSourceUrl: string;
     playerSha256: string;
@@ -730,7 +732,7 @@ test("original Testcenter compatibility corpus pins independent official player 
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.veronaPlayerFamilyPackages.length, 2);
+  assert.equal(corpus.veronaPlayerFamilyPackages.length, 3);
   const playersByFamily = new Map(
     corpus.veronaPlayerFamilyPackages.map(player => [player.family, player])
   );
@@ -837,6 +839,54 @@ test("original Testcenter compatibility corpus pins independent official player 
   assert.match(
     legacyUnitDocument.toString("utf8"),
     /<DefinitionRef player="IQBVisualUnitPlayerV2">G231mm\.voud<\/DefinitionRef>/
+  );
+
+  const stars = playersByFamily.get("STARS choice interaction");
+  assert.ok(stars);
+  assert.equal(stars.sourceTag, "0.6.19");
+  assert.equal(stars.sourceCommit, "fdc2eb01016ec65bf1e5250eb44c0acfb54c690d");
+  assert.equal(
+    stars.playerSourceRepository,
+    "https://github.com/iqb-berlin/verona-player-testbed"
+  );
+  assert.equal(
+    stars.playerSourceCommit,
+    "1343550c864701daf9ca4a1b064351b37a617d89"
+  );
+  assert.equal(stars.definitionSourceCommit, stars.sourceCommit);
+  const starsPlayerHtml = brotliDecompressSync(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, stars.playerFixture), "utf8").trim(),
+      "base64"
+    )
+  ).toString("utf8");
+  const starsDefinition = JSON.parse(
+    Buffer.from(
+      readFileSync(resolve(corpusRoot, stars.definitionFixture), "utf8").trim(),
+      "base64"
+    ).toString("utf8")
+  ) as {
+    id: string;
+    version: string;
+    interactionType: string;
+    interactionParameters: {
+      variableId: string;
+      multiSelect: boolean;
+      options: { buttons: Array<{ text: string }> };
+    };
+  };
+  assert.match(starsPlayerHtml, /"id"\s*:\s*"iqb-player-stars"/);
+  assert.match(starsPlayerHtml, /"version"\s*:\s*"0\.6\.19"/);
+  assert.match(starsPlayerHtml, /"specVersion"\s*:\s*"6\.0"/);
+  assert.match(starsPlayerHtml, /"metadataVersion"\s*:\s*"2\.0"/);
+  assert.equal(starsDefinition.id, "stars-unit-definition");
+  assert.equal(starsDefinition.version, "0.17");
+  assert.equal(starsDefinition.interactionType, "BUTTONS");
+  assert.equal(starsDefinition.interactionParameters.variableId, "BUTTONS");
+  assert.equal(starsDefinition.interactionParameters.multiSelect, false);
+  assert.deepEqual(
+    starsDefinition.interactionParameters.options.buttons.map(button => button.text),
+    ["A", "B", "C", "D"]
   );
 });
 
