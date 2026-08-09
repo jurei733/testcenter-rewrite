@@ -1137,6 +1137,14 @@ export const firstSliceUseCases = {
 export type CreateImportJobResult = {
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ParticipantRosterImportSummary;
+};
+
+export type ParticipantRosterImportSummary = {
+  sourceFileNames: string[];
+  importedCount: number;
+  updatedCount: number;
+  operationalLoginCandidateCount: number;
 };
 
 export type ContentReleaseActivationSummary = {
@@ -14755,6 +14763,50 @@ const decodeBase64ZipSourceDocument = (sourceDocument: string): Buffer | null =>
   return findZipEndOfCentralDirectoryOffset(zipBuffer) >= 0 ? zipBuffer : null;
 };
 
+type ParticipantRosterDocument = {
+  sourceFileName: string;
+  rosterText: ParticipantRosterSource;
+};
+
+const extractTesttakersRosterDocumentsFromZipSourcePackage = (
+  sourcePackage: SourcePackage
+): ParticipantRosterDocument[] => {
+  if (
+    !sourcePackage.sourceDocument ||
+    (!sourcePackage.fileName.toLowerCase().endsWith(".zip") &&
+      !sourcePackage.mediaType.toLowerCase().includes("zip"))
+  ) {
+    return [];
+  }
+
+  const zipBuffer = decodeBase64ZipSourceDocument(sourcePackage.sourceDocument);
+  const entries = zipBuffer ? readZipEntries(zipBuffer) : null;
+  if (!zipBuffer || !entries) {
+    return [];
+  }
+
+  const rosterDocuments: ParticipantRosterDocument[] = [];
+  for (const entry of entries) {
+    if (
+      entry.fileName.endsWith("/") ||
+      !entry.fileName.toLowerCase().endsWith(".xml")
+    ) {
+      continue;
+    }
+    const rosterText = readZipEntryText(zipBuffer, entry);
+    if (
+      rosterText &&
+      readTestcenterXmlFileIdentity(rosterText)?.fileType === "Testtakers"
+    ) {
+      rosterDocuments.push({
+        sourceFileName: entry.fileName,
+        rosterText
+      });
+    }
+  }
+  return rosterDocuments;
+};
+
 const createManifestlessZipAssemblyManifest = (
   zipBuffer: Buffer,
   entries: ZipEntry[]
@@ -20192,6 +20244,241 @@ export const createFirstSliceServices = (
     return effectiveRun;
   };
 
+  const importParticipantRosterDocumentsForWorkspace = async (input: {
+    tenantKey: string;
+    workspaceKey: string;
+    rosterDocuments: ParticipantRosterDocument[];
+    sourcePackageId?: string;
+  }) => {
+    const workspace = await requireWorkspace(
+      repository,
+      input.tenantKey,
+      input.workspaceKey
+    );
+    const parsedEntries = [] as ReturnType<typeof parseParticipantRosterText>;
+    const operationalLoginCandidates = [] as OriginalTestcenterOperationalLoginCandidate[];
+
+    for (const rosterDocument of input.rosterDocuments) {
+      if (
+        typeof rosterDocument.rosterText === "string" &&
+        rosterDocument.rosterText.trimStart().startsWith("<")
+      ) {
+        const xmlDiagnostics = validateTestcenterXmlSourceDocument(
+          rosterDocument.rosterText,
+          rosterDocument.sourceFileName
+        );
+        if (xmlDiagnostics.some(diagnostic => diagnostic.severity === "error")) {
+          throw new FirstSliceError(
+            400,
+            "participant_roster_xml_invalid",
+            `Participant roster '${rosterDocument.sourceFileName}' failed Original Testcenter compatibility validation.`,
+            { diagnostics: xmlDiagnostics }
+          );
+        }
+      }
+      parsedEntries.push(
+        ...parseParticipantRosterText(rosterDocument.rosterText)
+      );
+      operationalLoginCandidates.push(
+        ...parseOriginalTestcenterOperationalLogins(rosterDocument.rosterText)
+      );
+    }
+
+    if (parsedEntries.length === 0 && operationalLoginCandidates.length === 0) {
+      throw new FirstSliceError(
+        400,
+        "participant_roster_empty",
+        "Participant roster did not contain any participant login entries."
+      );
+    }
+
+    const seenLoginKeys = new Set<string>();
+    for (const loginKey of [
+      ...parsedEntries.map(entry => entry.loginKey),
+      ...operationalLoginCandidates.map(candidate => candidate.loginKey)
+    ]) {
+      const normalizedLoginKey = loginKey.toLocaleLowerCase("en-US");
+      if (seenLoginKeys.has(normalizedLoginKey)) {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_login_duplicate",
+          `Participant roster contains duplicate login '${loginKey}'.`
+        );
+      }
+      seenLoginKeys.add(normalizedLoginKey);
+    }
+
+    const normalizedParsedEntries = parsedEntries.map(parsedEntry => {
+      const validFrom = normalizeParticipantAccessBoundary(
+        parsedEntry.validFrom,
+        participantAccessTimeZone
+      );
+      const validTo = normalizeParticipantAccessBoundary(
+        parsedEntry.validTo,
+        participantAccessTimeZone
+      );
+      if (parsedEntry.validFrom && !validFrom) {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_valid_from_invalid",
+          `Participant '${parsedEntry.loginKey}' has an invalid valid-from timestamp.`
+        );
+      }
+      if (parsedEntry.validTo && !validTo) {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_valid_to_invalid",
+          `Participant '${parsedEntry.loginKey}' has an invalid valid-to timestamp.`
+        );
+      }
+      if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
+        throw new FirstSliceError(
+          400,
+          "participant_roster_access_window_invalid",
+          `Participant '${parsedEntry.loginKey}' has a valid-from timestamp after valid-to.`
+        );
+      }
+      return { parsedEntry, validFrom, validTo };
+    });
+
+    const existingEntries =
+      await repository.listParticipantRosterEntriesByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      );
+    const entriesByLoginKey = new Map(
+      existingEntries.map(entry => [entry.loginKey, entry])
+    );
+    let importedCount = 0;
+    let updatedCount = 0;
+
+    for (const { parsedEntry, validFrom, validTo } of normalizedParsedEntries) {
+      const existingEntry = entriesByLoginKey.get(parsedEntry.loginKey);
+      const participantRosterEntry: ParticipantRosterEntry = {
+        participantRosterEntryId:
+          existingEntry?.participantRosterEntryId ?? idGenerator(),
+        tenantId: workspace.tenantId,
+        workspaceId: workspace.workspaceId,
+        loginKey: parsedEntry.loginKey,
+        executionMode:
+          parsedEntry.executionMode ??
+          existingEntry?.executionMode ??
+          defaultParticipantExecutionMode,
+        groupKey: parsedEntry.groupKey,
+        bookletKey: parsedEntry.bookletKey,
+        ...(parsedEntry.bookletKeys?.length
+          ? { bookletKeys: parsedEntry.bookletKeys }
+          : {}),
+        ...(parsedEntry.bookletStatePresets
+          ? { bookletStatePresets: parsedEntry.bookletStatePresets }
+          : {}),
+        ...(parsedEntry.bookletAssignments?.length
+          ? { bookletAssignments: parsedEntry.bookletAssignments }
+          : {}),
+        displayName: parsedEntry.displayName,
+        passwordRequired: Boolean(parsedEntry.password),
+        validFrom,
+        validTo,
+        validForMinutes: parsedEntry.validForMinutes ?? null,
+        customTexts: parsedEntry.customTexts ?? {},
+        importedAt: now()
+      };
+
+      await repository.saveParticipantRosterEntry(
+        participantRosterEntry,
+        parsedEntry.password ? hashPassword(parsedEntry.password) : null
+      );
+      entriesByLoginKey.set(parsedEntry.loginKey, participantRosterEntry);
+      if (existingEntry) {
+        updatedCount += 1;
+      } else {
+        importedCount += 1;
+      }
+    }
+
+    const participantSessions =
+      await repository.listParticipantSessionsByWorkspace(
+        workspace.tenantId,
+        workspace.workspaceId
+      );
+    const accessStartedAtByLoginAndCode = new Map<string, string>();
+    for (const participantSession of participantSessions) {
+      const accessKey = `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`;
+      const currentStartedAt = accessStartedAtByLoginAndCode.get(accessKey);
+      if (
+        !currentStartedAt ||
+        participantSession.createdAt.localeCompare(currentStartedAt) < 0
+      ) {
+        accessStartedAtByLoginAndCode.set(accessKey, participantSession.createdAt);
+      }
+    }
+    for (const participantSession of participantSessions) {
+      const rosterEntry = entriesByLoginKey.get(participantSession.loginKey);
+      if (!rosterEntry) {
+        continue;
+      }
+      const validUntil = resolveParticipantSessionValidUntil(
+        rosterEntry,
+        accessStartedAtByLoginAndCode.get(
+          `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`
+        ) ?? participantSession.createdAt
+      );
+      if (validUntil !== participantSession.validUntil) {
+        await repository.saveParticipantSession({
+          ...participantSession,
+          validUntil
+        });
+      }
+    }
+
+    await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(
+      workspace.tenantId,
+      workspace.workspaceId,
+      operationalLoginCandidates
+    );
+
+    const migrationOnly = parsedEntries.length === 0;
+    await recordWorkspaceActivity({
+      tenantId: workspace.tenantId,
+      workspaceId: workspace.workspaceId,
+      eventType: "participant_roster_imported",
+      subjectType: "workspace",
+      subjectId: workspace.workspaceId,
+      summary: migrationOnly
+        ? `Classified ${operationalLoginCandidates.length} operational login candidate${operationalLoginCandidates.length === 1 ? "" : "s"} for explicit account migration.`
+        : `Imported ${importedCount} and updated ${updatedCount} participant roster entries.`,
+      details: {
+        importedCount,
+        updatedCount,
+        parsedCount: parsedEntries.length,
+        migrationOnly,
+        operationalLoginCandidateCount: operationalLoginCandidates.length,
+        ...(input.sourcePackageId
+          ? {
+              sourcePackageId: input.sourcePackageId,
+              sourceFileNames: input.rosterDocuments.map(
+                rosterDocument => rosterDocument.sourceFileName
+              )
+            }
+          : {})
+      }
+    });
+
+    return {
+      importedCount,
+      updatedCount,
+      operationalLoginCandidates,
+      items: buildParticipantRosterReadItems(
+        Array.from(entriesByLoginKey.values()),
+        await getActiveWorkspaceRelease(
+          repository,
+          workspace.tenantId,
+          workspace.workspaceId
+        )
+      )
+    };
+  };
+
   const recordAdminAuditEvent = async (input: {
     eventType: AdminAuditEvent["eventType"];
     actorAdminUserId?: string | null;
@@ -20324,12 +20611,14 @@ export const createFirstSliceServices = (
         }
       : standaloneImportResolution;
 
-    if (!importResolution.runtimeSnapshot) {
+    const failImport = async (
+      diagnostics: ImportJobDiagnostic[]
+    ): Promise<CreateImportJobResult> => {
       const failedImportJob: ImportJob = {
         ...importJob,
         status: "failed",
         finishedAt: timestamp,
-        diagnostics: importResolution.diagnostics
+        diagnostics
       };
 
       await repository.saveImportJob(failedImportJob);
@@ -20354,6 +20643,44 @@ export const createFirstSliceServices = (
         importJob: failedImportJob,
         stagedContentRelease: null
       };
+    };
+
+    if (!importResolution.runtimeSnapshot) {
+      return failImport(importResolution.diagnostics);
+    }
+
+    const rosterDocuments =
+      extractTesttakersRosterDocumentsFromZipSourcePackage(sourcePackage);
+    let participantRosterImport: ParticipantRosterImportSummary | undefined;
+    if (rosterDocuments.length > 0) {
+      try {
+        const rosterImport =
+          await importParticipantRosterDocumentsForWorkspace({
+            tenantKey: input.tenantKey,
+            workspaceKey: input.workspaceKey,
+            rosterDocuments,
+            sourcePackageId: sourcePackage.sourcePackageId
+          });
+        participantRosterImport = {
+          sourceFileNames: rosterDocuments.map(
+            rosterDocument => rosterDocument.sourceFileName
+          ),
+          importedCount: rosterImport.importedCount,
+          updatedCount: rosterImport.updatedCount,
+          operationalLoginCandidateCount:
+            rosterImport.operationalLoginCandidates.length
+        };
+      } catch (error) {
+        if (!(error instanceof FirstSliceError)) {
+          throw error;
+        }
+        return failImport([
+          createImportDiagnostic(
+            "source_document_testtakers_import_failed",
+            `Testtakers import failed compatibility validation (${error.errorCode}).`
+          )
+        ]);
+      }
     }
 
     const completedImportJob: ImportJob = {
@@ -20393,7 +20720,11 @@ export const createFirstSliceServices = (
           diagnostics: completedImportJob.diagnostics
         }
       });
-      return { importJob: completedImportJob, stagedContentRelease: null };
+      return {
+        importJob: completedImportJob,
+        stagedContentRelease: null,
+        ...(participantRosterImport ? { participantRosterImport } : {})
+      };
     }
     const stagedContentRelease: ContentRelease = {
       contentReleaseId: idGenerator(),
@@ -20423,11 +20754,16 @@ export const createFirstSliceServices = (
       details: {
         sourcePackageId: sourcePackage.sourcePackageId,
         contentReleaseId: stagedContentRelease.contentReleaseId,
+        participantRosterImport: participantRosterImport ?? null,
         diagnostics: completedImportJob.diagnostics
       }
     });
 
-    return { importJob: completedImportJob, stagedContentRelease };
+    return {
+      importJob: completedImportJob,
+      stagedContentRelease,
+      ...(participantRosterImport ? { participantRosterImport } : {})
+    };
   };
 
   const listWorkspaceSystemChecks = async (input: {
@@ -23834,214 +24170,16 @@ export const createFirstSliceServices = (
         });
       },
       async importParticipantRoster(input) {
-        const workspace = await requireWorkspace(
-          repository,
-          input.tenantKey,
-          input.workspaceKey
-        );
-        if (
-          typeof input.rosterText === "string" &&
-          input.rosterText.trimStart().startsWith("<")
-        ) {
-          const xmlDiagnostics = validateTestcenterXmlSourceDocument(
-            input.rosterText,
-            "participant-roster.xml"
-          );
-          if (xmlDiagnostics.some(diagnostic => diagnostic.severity === "error")) {
-            throw new FirstSliceError(
-              400,
-              "participant_roster_xml_invalid",
-              "Participant roster XML failed Original Testcenter compatibility validation.",
-              { diagnostics: xmlDiagnostics }
-            );
-          }
-        }
-        const operationalLoginCandidates =
-          parseOriginalTestcenterOperationalLogins(input.rosterText);
-        const parsedEntries = parseParticipantRosterText(input.rosterText);
-        if (
-          parsedEntries.length === 0 &&
-          operationalLoginCandidates.length === 0
-        ) {
-          throw new FirstSliceError(
-            400,
-            "participant_roster_empty",
-            "Participant roster did not contain any participant login entries."
-          );
-        }
-        const existingEntries =
-          await repository.listParticipantRosterEntriesByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          );
-        const entriesByLoginKey = new Map(
-          existingEntries.map(entry => [entry.loginKey, entry])
-        );
-        let importedCount = 0;
-        let updatedCount = 0;
-
-        const normalizedParsedEntries = parsedEntries.map(parsedEntry => {
-          const validFrom = normalizeParticipantAccessBoundary(
-            parsedEntry.validFrom,
-            participantAccessTimeZone
-          );
-          const validTo = normalizeParticipantAccessBoundary(
-            parsedEntry.validTo,
-            participantAccessTimeZone
-          );
-          if (parsedEntry.validFrom && !validFrom) {
-            throw new FirstSliceError(
-              400,
-              "participant_roster_valid_from_invalid",
-              `Participant '${parsedEntry.loginKey}' has an invalid valid-from timestamp.`
-            );
-          }
-          if (parsedEntry.validTo && !validTo) {
-            throw new FirstSliceError(
-              400,
-              "participant_roster_valid_to_invalid",
-              `Participant '${parsedEntry.loginKey}' has an invalid valid-to timestamp.`
-            );
-          }
-          if (validFrom && validTo && Date.parse(validFrom) > Date.parse(validTo)) {
-            throw new FirstSliceError(
-              400,
-              "participant_roster_access_window_invalid",
-              `Participant '${parsedEntry.loginKey}' has a valid-from timestamp after valid-to.`
-            );
-          }
-          return { parsedEntry, validFrom, validTo };
-        });
-
-        for (const {
-          parsedEntry,
-          validFrom,
-          validTo
-        } of normalizedParsedEntries) {
-          const existingEntry = entriesByLoginKey.get(parsedEntry.loginKey);
-          const participantRosterEntry: ParticipantRosterEntry = {
-            participantRosterEntryId:
-              existingEntry?.participantRosterEntryId ?? idGenerator(),
-            tenantId: workspace.tenantId,
-            workspaceId: workspace.workspaceId,
-            loginKey: parsedEntry.loginKey,
-            executionMode:
-              parsedEntry.executionMode ??
-              existingEntry?.executionMode ??
-              defaultParticipantExecutionMode,
-            groupKey: parsedEntry.groupKey,
-            bookletKey: parsedEntry.bookletKey,
-            ...(parsedEntry.bookletKeys?.length
-              ? { bookletKeys: parsedEntry.bookletKeys }
-              : {}),
-            ...(parsedEntry.bookletStatePresets
-              ? { bookletStatePresets: parsedEntry.bookletStatePresets }
-              : {}),
-            ...(parsedEntry.bookletAssignments?.length
-              ? { bookletAssignments: parsedEntry.bookletAssignments }
-              : {}),
-            displayName: parsedEntry.displayName,
-            passwordRequired: Boolean(parsedEntry.password),
-            validFrom,
-            validTo,
-            validForMinutes: parsedEntry.validForMinutes ?? null,
-            customTexts: parsedEntry.customTexts ?? {},
-            importedAt: now()
-          };
-
-          await repository.saveParticipantRosterEntry(
-            participantRosterEntry,
-            parsedEntry.password ? hashPassword(parsedEntry.password) : null
-          );
-          entriesByLoginKey.set(parsedEntry.loginKey, participantRosterEntry);
-
-          if (existingEntry) {
-            updatedCount += 1;
-          } else {
-            importedCount += 1;
-          }
-        }
-
-        const participantSessions =
-          await repository.listParticipantSessionsByWorkspace(
-            workspace.tenantId,
-            workspace.workspaceId
-          );
-        const accessStartedAtByLoginAndCode = new Map<string, string>();
-        for (const participantSession of participantSessions) {
-          const accessKey = `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`;
-          const currentStartedAt = accessStartedAtByLoginAndCode.get(accessKey);
-          if (
-            !currentStartedAt ||
-            participantSession.createdAt.localeCompare(currentStartedAt) < 0
-          ) {
-            accessStartedAtByLoginAndCode.set(accessKey, participantSession.createdAt);
-          }
-        }
-        for (const participantSession of participantSessions) {
-          const rosterEntry = entriesByLoginKey.get(participantSession.loginKey);
-          if (!rosterEntry) {
-            continue;
-          }
-          const validUntil = resolveParticipantSessionValidUntil(
-            rosterEntry,
-            accessStartedAtByLoginAndCode.get(
-              `${participantSession.loginKey}\u0000${participantSession.participantCode ?? ""}`
-            ) ??
-              participantSession.createdAt
-          );
-          if (validUntil !== participantSession.validUntil) {
-            await repository.saveParticipantSession({
-              ...participantSession,
-              validUntil
-            });
-          }
-        }
-
-        await repository.replaceOperationalLoginMigrationCandidatesByWorkspace(
-          workspace.tenantId,
-          workspace.workspaceId,
-          operationalLoginCandidates
-        );
-
-        if (
-          parsedEntries.length > 0 ||
-          operationalLoginCandidates.length > 0
-        ) {
-          const migrationOnly = parsedEntries.length === 0;
-          await recordWorkspaceActivity({
-            tenantId: workspace.tenantId,
-            workspaceId: workspace.workspaceId,
-            eventType: "participant_roster_imported",
-            subjectType: "workspace",
-            subjectId: workspace.workspaceId,
-            summary: migrationOnly
-              ? `Classified ${operationalLoginCandidates.length} operational login candidate${operationalLoginCandidates.length === 1 ? "" : "s"} for explicit account migration.`
-              : `Imported ${importedCount} and updated ${updatedCount} participant roster entries.`,
-            details: {
-              importedCount,
-              updatedCount,
-              parsedCount: parsedEntries.length,
-              migrationOnly,
-              operationalLoginCandidateCount:
-                operationalLoginCandidates.length
+        return importParticipantRosterDocumentsForWorkspace({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          rosterDocuments: [
+            {
+              sourceFileName: "participant-roster.xml",
+              rosterText: input.rosterText
             }
-          });
-        }
-
-        return {
-          importedCount,
-          updatedCount,
-          operationalLoginCandidates,
-          items: buildParticipantRosterReadItems(
-            Array.from(entriesByLoginKey.values()),
-            await getActiveWorkspaceRelease(
-              repository,
-              workspace.tenantId,
-              workspace.workspaceId
-            )
-          )
-        };
+          ]
+        });
       },
       async listParticipantRoster(input) {
         const workspace = await requireWorkspace(
@@ -25434,7 +25572,10 @@ export const createFirstSliceServices = (
             (await repository.getSourcePackageById(updatedSourcePackage.sourcePackageId)) ??
             updatedSourcePackage,
           importJob: result.importJob,
-          stagedContentRelease: result.stagedContentRelease
+          stagedContentRelease: result.stagedContentRelease,
+          ...(result.participantRosterImport
+            ? { participantRosterImport: result.participantRosterImport }
+            : {})
         };
       },
       async replaceSourcePackage(input) {
@@ -25507,7 +25648,10 @@ export const createFirstSliceServices = (
           replacedSourcePackage,
           replacementSourcePackage: persistedReplacement,
           importJob: result.importJob,
-          stagedContentRelease: result.stagedContentRelease
+          stagedContentRelease: result.stagedContentRelease,
+          ...(result.participantRosterImport
+            ? { participantRosterImport: result.participantRosterImport }
+            : {})
         };
       },
       async deleteSourcePackage(input) {

@@ -48,6 +48,13 @@ import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.servi
 import { RewriteAppShellContentHostsService } from "./rewrite-app-shell-content-hosts.service";
 import { RewriteAppUiStateService } from "./rewrite-app-ui-state.service";
 
+const describeParticipantRosterImport = (
+  summary: AssembleSourcePackagesResponse["participantRosterImport"]
+): string =>
+  summary
+    ? ` Roster: ${summary.importedCount} imported, ${summary.updatedCount} updated, ${summary.operationalLoginCandidateCount} operational candidate(s) from ${summary.sourceFileNames.length} file(s).`
+    : "";
+
 @Injectable({ providedIn: "root" })
 export class RewriteAppContentService {
   private readonly api = inject(RewriteAppApiService);
@@ -90,7 +97,7 @@ export class RewriteAppContentService {
     this.createActionsHost().persistShellState();
     this.feedback.rememberActivity(
       "Source Packages Assembled",
-      `${payload.assembledFrom.length} file(s) assembled as ${payload.sourcePackage.fileName}; import ${payload.importJob.status}.`
+      `${payload.assembledFrom.length} file(s) assembled as ${payload.sourcePackage.fileName}; import ${payload.importJob.status}.${describeParticipantRosterImport(payload.participantRosterImport)}`
     );
     await this.refreshContentReads();
     await this.loadSourcePackageDetail();
@@ -316,7 +323,7 @@ export class RewriteAppContentService {
     host.persistShellState();
     this.feedback.rememberActivity(
       "Source Package Replaced",
-      `${payload.replacementSourcePackage.fileName} imported as ${payload.importJob.status}; the prior version remains.`
+      `${payload.replacementSourcePackage.fileName} imported as ${payload.importJob.status}; the prior version remains.${describeParticipantRosterImport(payload.participantRosterImport)}`
     );
     await this.refreshContentReads();
     await this.loadSourcePackageDetail();

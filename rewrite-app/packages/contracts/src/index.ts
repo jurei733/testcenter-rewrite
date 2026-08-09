@@ -2821,6 +2821,13 @@ export type CreateSourcePackageResponse = {
   sourcePackage: SourcePackage;
 };
 
+export type ParticipantRosterImportSummary = {
+  sourceFileNames: string[];
+  importedCount: number;
+  updatedCount: number;
+  operationalLoginCandidateCount: number;
+};
+
 export type AssembleSourcePackagesResponse = {
   sourcePackage: SourcePackage;
   assembledFrom: Array<{
@@ -2830,17 +2837,20 @@ export type AssembleSourcePackagesResponse = {
   }>;
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ParticipantRosterImportSummary;
 };
 
 export type CreateImportJobResponse = {
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ParticipantRosterImportSummary;
 };
 
 export type RetrySourcePackageImportResponse = {
   sourcePackage: SourcePackage;
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ParticipantRosterImportSummary;
 };
 
 export type GetSourcePackageDeletionReadinessResponse = {
@@ -2867,6 +2877,7 @@ export type ReplaceSourcePackageResponse = {
   replacementSourcePackage: SourcePackage;
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
+  participantRosterImport?: ParticipantRosterImportSummary;
 };
 
 export type ListSourcePackagesResponse = {

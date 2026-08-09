@@ -11,6 +11,13 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import { productionApiRoutes, resolveRoutePath } from "@testcenter-rewrite-app/contracts";
 
+const describeParticipantRosterImport = (
+  summary: CreateImportJobResponse["participantRosterImport"]
+): string =>
+  summary
+    ? ` Roster: ${summary.importedCount} imported, ${summary.updatedCount} updated, ${summary.operationalLoginCandidateCount} operational candidate(s) from ${summary.sourceFileNames.length} file(s).`
+    : "";
+
 export interface ContentActionsHost {
   request<T>(
     label: string,
@@ -94,8 +101,8 @@ export async function createImportJobAction(host: ContentActionsHost): Promise<v
       ? "Workspace Dependencies Resolved"
       : "Import Started",
     resolvedWorkspaceDependencies
-      ? `Import ${payload.importJob.importJobId} captured matching workspace files in immutable package ${payload.importJob.sourcePackageId}.`
-      : `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.`
+      ? `Import ${payload.importJob.importJobId} captured matching workspace files in immutable package ${payload.importJob.sourcePackageId}.${describeParticipantRosterImport(payload.participantRosterImport)}`
+      : `Import ${payload.importJob.importJobId} finished as ${payload.importJob.status}.${describeParticipantRosterImport(payload.participantRosterImport)}`
   );
 
   await host.refreshContentReads();
@@ -132,7 +139,7 @@ export async function retrySourcePackageImportAction(
   host.persistShellState();
   host.rememberActivity(
     "Import Retried",
-    `Package ${host.getSourcePackageId()} produced import ${payload.importJob?.importJobId ?? "n/a"} with status ${payload.importJob?.status ?? "unknown"}.`
+    `Package ${host.getSourcePackageId()} produced import ${payload.importJob?.importJobId ?? "n/a"} with status ${payload.importJob?.status ?? "unknown"}.${describeParticipantRosterImport(payload.participantRosterImport)}`
   );
 
   await host.refreshContentReads();

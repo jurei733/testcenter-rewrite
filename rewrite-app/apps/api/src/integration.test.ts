@@ -20351,6 +20351,32 @@ test("source document import assembles original manifestless root ZIP archives",
       compressedContent: originalResourcePackage,
       uncompressedSize: originalResourcePackage.length,
       checksum: zipFixtureCrc32(originalResourcePackage)
+    },
+    {
+      fileName: "nested/rosters/Participants-A.xml",
+      content: [
+        "<Testtakers>",
+        '  <Group id="manifestless-participants-a">',
+        '    <Login mode="run-hot-return" name="manifestless-participant-a" pw="participant-a-secret">',
+        "      <Booklet>MANIFESTLESS.BOOKLET</Booklet>",
+        "    </Login>",
+        '    <Login mode="monitor-study" name="manifestless-study-monitor" pw="monitor-secret" />',
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
+    },
+    {
+      fileName: "nested/rosters/Participants-B.xml",
+      content: [
+        "<Testtakers>",
+        '  <Group id="manifestless-participants-b">',
+        '    <Login mode="run-hot-return" name="manifestless-participant-b" pw="participant-b-secret">',
+        "      <Booklet>MANIFESTLESS.BOOKLET</Booklet>",
+        "    </Login>",
+        '    <Login mode="sys-check-login" name="manifestless-system-check" pw="system-check-secret" />',
+        "  </Group>",
+        "</Testtakers>"
+      ].join("\n")
     }
   ]);
 
@@ -20367,6 +20393,12 @@ test("source document import assembles original manifestless root ZIP archives",
   const importResult = await requestJson<{
     importJob: { status: string; diagnostics: Array<{ code: string }> };
     stagedContentRelease: { contentReleaseId: string } | null;
+    participantRosterImport?: {
+      sourceFileNames: string[];
+      importedCount: number;
+      updatedCount: number;
+      operationalLoginCandidateCount: number;
+    };
   }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
     method: "POST",
     body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
@@ -20379,6 +20411,17 @@ test("source document import assembles original manifestless root ZIP archives",
     JSON.stringify(importResult.body.importJob.diagnostics)
   );
   assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.deepEqual(importResult.body.participantRosterImport, {
+    sourceFileNames: [
+      "nested/rosters/Participants-A.xml",
+      "nested/rosters/Participants-B.xml"
+    ],
+    importedCount: 2,
+    updatedCount: 0,
+    operationalLoginCandidateCount: 2
+  });
+  assert.equal(JSON.stringify(importResult.body).includes("participant-a-secret"), false);
+  assert.equal(JSON.stringify(importResult.body).includes("monitor-secret"), false);
   const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
   assert.ok(contentReleaseId);
 
@@ -20436,6 +20479,135 @@ test("source document import assembles original manifestless root ZIP archives",
     Buffer.from(resourceEntry.dataBase64, "base64").toString("utf8"),
     expectedResourceContent
   );
+
+  const roster = await requestJson<{
+    items: Array<{
+      loginKey: string;
+      bookletKey: string | null;
+      passwordRequired: boolean;
+    }>;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      loginMode: string;
+      passwordRequired: boolean;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`);
+  assert.deepEqual(
+    roster.body.items.map(item => ({
+      loginKey: item.loginKey,
+      bookletKey: item.bookletKey,
+      passwordRequired: item.passwordRequired
+    })),
+    [
+      {
+        loginKey: "manifestless-participant-a",
+        bookletKey: "MANIFESTLESS.BOOKLET",
+        passwordRequired: true
+      },
+      {
+        loginKey: "manifestless-participant-b",
+        bookletKey: "MANIFESTLESS.BOOKLET",
+        passwordRequired: true
+      }
+    ]
+  );
+  assert.deepEqual(
+    roster.body.operationalLoginCandidates.map(candidate => ({
+      loginKey: candidate.loginKey,
+      loginMode: candidate.loginMode,
+      passwordRequired: candidate.passwordRequired
+    })),
+    [
+      {
+        loginKey: "manifestless-study-monitor",
+        loginMode: "monitor-study",
+        passwordRequired: true
+      },
+      {
+        loginKey: "manifestless-system-check",
+        loginMode: "sys-check-login",
+        passwordRequired: true
+      }
+    ]
+  );
+  assert.equal(JSON.stringify(roster.body).includes("participant-b-secret"), false);
+  assert.equal(JSON.stringify(roster.body).includes("system-check-secret"), false);
+
+  const rosterActivities = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        details: Record<string, unknown>;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
+  );
+  assert.equal(rosterActivities.body.items.length, 1);
+  assert.deepEqual(rosterActivities.body.items[0]?.activityEvent.details, {
+    importedCount: 2,
+    updatedCount: 0,
+    parsedCount: 2,
+    migrationOnly: false,
+    operationalLoginCandidateCount: 2,
+    sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId,
+    sourceFileNames: [
+      "nested/rosters/Participants-A.xml",
+      "nested/rosters/Participants-B.xml"
+    ]
+  });
+  assert.equal(JSON.stringify(rosterActivities.body).includes("monitor-secret"), false);
+
+  await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: { activatedByActorId: "manifestless-import-test" } }
+  );
+  const rejectedSignIn = await requestJson<{ error: string }>(
+    "/api/v1/participant/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        tenantKey,
+        workspaceKey,
+        loginKey: "manifestless-participant-a",
+        password: "incorrect"
+      }
+    }
+  );
+  assert.equal(rejectedSignIn.status, 401);
+  const acceptedSignIn = await requestJson<{
+    participantSession: { loginKey: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "manifestless-participant-a",
+      password: "participant-a-secret"
+    }
+  });
+  assert.equal(acceptedSignIn.status, 200);
+  assert.equal(
+    acceptedSignIn.body.participantSession.loginKey,
+    "manifestless-participant-a"
+  );
+
+  const repeatedImport = await requestJson<typeof importResult.body>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`,
+    {
+      method: "POST",
+      body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+    }
+  );
+  assert.equal(repeatedImport.status, 201);
+  assert.deepEqual(repeatedImport.body.participantRosterImport, {
+    sourceFileNames: [
+      "nested/rosters/Participants-A.xml",
+      "nested/rosters/Participants-B.xml"
+    ],
+    importedCount: 0,
+    updatedCount: 2,
+    operationalLoginCandidateCount: 2
+  });
 });
 
 test("source document import keeps arbitrary manifestless ZIPs rejected", async () => {
