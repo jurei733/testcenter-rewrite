@@ -380,6 +380,7 @@ The first production workspace now serves a small in-memory HTTP baseline with:
 - `GET /api/v1/tenants/{tenantKey}/workspaces.csv`
 - `POST /api/v1/tenants/{tenantKey}/workspaces`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
+- `PATCH /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/exports/workspace-overview.csv`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/summary`
 - `GET /api/v1/tenants/{tenantKey}/workspaces/{workspaceKey}/study-monitor/participants`
@@ -456,7 +457,7 @@ The added read side now makes the first slice inspectable:
 - the Angular shell derives the active operator access mode from the authenticated session; monitor-only accounts receive a reduced Monitor plus Access & Diagnostics navigation, a focused open-run command console, scoped SSE/polling refresh, and no workspace/content/admin-management controls. A protected browser gate signs in as an actual group monitor and verifies that unrelated group runs are absent
 - participant review routes are bound to an opaque participant run, reject execution modes without `canReview`, and expose only that run's own test-, unit-, and task/page-level comments; Original Testcenter page/page-label metadata, priorities `0–3`, and simultaneous `tech`/`content`/`design` categories survive create, edit, storage, filtering, and reload
 - password-protected participant sign-in and starter launch share a durable, workspace-scoped login sink with the original five-failure/30-minute defaults and stable `429` retry responses
-- tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace
+- tenant and workspace directory reads let operators discover available scopes before drilling into a specific workspace; authorized writers can rename the selected workspace without changing its stable key, links, or stored content, while duplicate display names are rejected and the change is recorded in workspace activity
 - workspace overview returns workspace state plus source-package, import, release, session, and open-run counts, with a one-row CSV export for operator handoff
 - study monitor summary returns workspace-wide group, booklet, and unit progress with participant sessions, saved-roster expected/not-started participants for groups and booklets, roster-derived missing unit expectations, prioritized attention items, latest run states, response counts, review counts, and latest activity timestamps
 - study monitor group detail drills into one group with participant sessions, saved roster entries, status counts, latest runs, response counts, review counts, and per-run context for operator follow-up

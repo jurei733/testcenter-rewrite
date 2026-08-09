@@ -238,6 +238,7 @@ export const adminAuditEventTypes = [
 ] as const satisfies readonly AdminAuditEventType[];
 export type WorkspaceActivityEventType =
   | "workspace_created"
+  | "workspace_updated"
   | "source_package_created"
   | "source_package_assembled"
   | "source_package_replaced"
@@ -269,6 +270,7 @@ export type WorkspaceActivityEventType =
   | "system_check_reports_deleted";
 export const workspaceActivityEventTypes = [
   "workspace_created",
+  "workspace_updated",
   "source_package_created",
   "source_package_assembled",
   "source_package_replaced",

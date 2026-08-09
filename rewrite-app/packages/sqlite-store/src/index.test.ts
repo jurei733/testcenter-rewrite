@@ -5,9 +5,51 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import type { AdminRoleAssignment, AdminUser, TestRun } from "@testcenter-rewrite-app/domain";
+import type {
+  AdminRoleAssignment,
+  AdminUser,
+  TestRun,
+  Workspace
+} from "@testcenter-rewrite-app/domain";
 
 import { createSqliteFirstSliceRepository } from "./index.js";
+
+test("SQLite persists a renamed workspace without changing its stable identity", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-workspace-"));
+  const databasePath = join(tempDirectory, "workspace.sqlite");
+  const workspace: Workspace = {
+    workspaceId: "workspace-stable-id",
+    tenantId: "tenant-stable-id",
+    workspaceKey: "stable-key",
+    displayName: "Original Workspace",
+    status: "active",
+    createdAt: "2026-08-09T00:00:00.000Z"
+  };
+
+  try {
+    const repository = createSqliteFirstSliceRepository(databasePath);
+    await repository.saveWorkspace({
+      tenantKey: "stable-tenant",
+      workspaceKey: workspace.workspaceKey,
+      workspace
+    });
+    await repository.saveWorkspace({
+      tenantKey: "stable-tenant",
+      workspaceKey: workspace.workspaceKey,
+      workspace: { ...workspace, displayName: "Renamed Workspace" }
+    });
+
+    assert.deepEqual(
+      await createSqliteFirstSliceRepository(databasePath).getWorkspaceByScope(
+        "stable-tenant",
+        workspace.workspaceKey
+      ),
+      { ...workspace, displayName: "Renamed Workspace" }
+    );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
 
 test("SQLite preserves whole-test locks through every run lookup", async () => {
   const repository = createSqliteFirstSliceRepository(":memory:");

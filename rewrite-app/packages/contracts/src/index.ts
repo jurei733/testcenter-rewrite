@@ -1878,6 +1878,7 @@ export const productionApiRoutes = {
     listWorkspaces: "/api/v1/tenants/:tenantKey/workspaces",
     exportWorkspacesCsv: "/api/v1/tenants/:tenantKey/workspaces.csv",
     getWorkspaceOverview: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
+    updateWorkspace: "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey",
     exportWorkspaceOverviewCsv:
       "/api/v1/tenants/:tenantKey/workspaces/:workspaceKey/exports/workspace-overview.csv",
     getStudyMonitorSummary:
@@ -2060,6 +2061,10 @@ export type CreateTenantRequest = {
 
 export type CreateWorkspaceRequest = {
   workspaceKey: string;
+  displayName: string;
+};
+
+export type UpdateWorkspaceRequest = {
   displayName: string;
 };
 
@@ -2528,6 +2533,10 @@ export type ListTenantsResponse = {
 };
 
 export type CreateWorkspaceResponse = {
+  workspace: Workspace;
+};
+
+export type UpdateWorkspaceResponse = {
   workspace: Workspace;
 };
 

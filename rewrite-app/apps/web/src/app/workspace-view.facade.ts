@@ -54,6 +54,7 @@ export class WorkspaceViewFacade {
   private readonly workspaceService = inject(RewriteAppWorkspaceService);
 
   readonly workspace = this.uiState.workspace;
+  workspaceDisplayNameDraft = "";
   readonly workspaceActivityEventTypeOptions = workspaceActivityEventTypes;
   readonly workspaceActivitySubjectTypeOptions = workspaceActivitySubjectTypes;
 
@@ -2041,7 +2042,8 @@ export class WorkspaceViewFacade {
         actionLabel: "Use Workspace",
         actionPayload: {
           tenantKey: this.workspace.tenantKey,
-          workspaceKey: workspace.workspaceKey
+          workspaceKey: workspace.workspaceKey,
+          workspaceDisplayName: workspace.displayName
         }
       }))
     ];
@@ -2321,12 +2323,25 @@ export class WorkspaceViewFacade {
     return !this.operatorAccess.isReadOnlyAdmin && this.canUseWorkspaceScope;
   }
 
+  get canRenameWorkspace(): boolean {
+    const displayName = this.workspaceDisplayNameDraft.trim();
+    const currentWorkspace = this.currentWorkspaceDirectoryEntry;
+    return (
+      !this.operatorAccess.isReadOnlyAdmin &&
+      this.canUseWorkspaceScope &&
+      Boolean(currentWorkspace) &&
+      Array.from(displayName).length >= 3 &&
+      Array.from(displayName).length <= 200 &&
+      displayName !== currentWorkspace?.displayName
+    );
+  }
+
   get canUseDirectoryScope(): boolean {
     return !this.operatorAccess.isReadOnlyAdmin;
   }
 
   get canUseWorkspaceDirectoryScope(): boolean {
-    return this.canUseDirectoryScope && this.canUseTenantScope;
+    return this.operatorAccess.canReadWorkspaceDirectory && this.canUseTenantScope;
   }
 
   persistState(): void {
@@ -2349,6 +2364,20 @@ export class WorkspaceViewFacade {
       return;
     }
     this.viewState.onActionAsync(() => this.workspaceService.createWorkspace());
+  }
+
+  renameWorkspace(): void {
+    if (!this.canRenameWorkspace) {
+      return;
+    }
+    this.viewState.onActionAsync(async () => {
+      const displayName = await this.workspaceService.updateWorkspaceDisplayName(
+        this.workspaceDisplayNameDraft
+      );
+      if (displayName) {
+        this.workspaceDisplayNameDraft = displayName;
+      }
+    });
   }
 
   refreshWorkspaceOverview(): void {
@@ -2738,6 +2767,7 @@ export class WorkspaceViewFacade {
 
     this.workspace.tenantKey = tenantKey;
     this.workspace.workspaceKey = "";
+    this.workspaceDisplayNameDraft = "";
     this.persistState();
     this.refreshWorkspaceDirectory();
   }
@@ -2753,8 +2783,35 @@ export class WorkspaceViewFacade {
       this.workspace.tenantKey = tenantKey;
     }
     this.workspace.workspaceKey = workspaceKey;
+    this.workspaceDisplayNameDraft =
+      item.actionPayload?.workspaceDisplayName?.trim() ?? "";
     this.persistState();
     this.refreshWorkspaceOverview();
+  }
+
+  private get currentWorkspaceDirectoryEntry(): {
+    displayName: string;
+  } | null {
+    const directory = parseJsonDocument<ListWorkspacesResponse>(
+      this.workspace.workspacesView
+    );
+    const directoryWorkspace = directory?.items.find(
+      workspace => workspace.workspaceKey === this.workspace.workspaceKey.trim()
+    );
+    if (directoryWorkspace) {
+      return directoryWorkspace;
+    }
+
+    const overview = parseJsonDocument<GetWorkspaceOverviewResponse>(
+      this.workspace.workspaceOverviewView
+    )?.workspaceOverview;
+    if (
+      overview?.tenant.tenantKey === this.workspace.tenantKey.trim() &&
+      overview.workspace.workspaceKey === this.workspace.workspaceKey.trim()
+    ) {
+      return overview.workspace;
+    }
+    return null;
   }
 
   runWorkspaceSuggestion(item: RecordCollectionItem): void {

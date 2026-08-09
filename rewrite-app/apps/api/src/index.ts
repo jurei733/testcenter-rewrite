@@ -150,6 +150,8 @@ import {
   type ImportJobListQuery,
   type SourcePackageListQuery,
   type UpdateReviewRequest,
+  type UpdateWorkspaceRequest,
+  type UpdateWorkspaceResponse,
   type WorkspaceReviewListQuery,
   productionApiRoutes,
   type PublicAdminSession,
@@ -1924,6 +1926,7 @@ type OperatorAccessScope =
 
 const workspaceScopedOperatorRouteChecks: Array<[string, RegExp]> = [
   ["GET", workspaceOverviewPattern],
+  ["PATCH", workspaceOverviewPattern],
   ["GET", workspaceOverviewCsvExportPattern],
   ["GET", studyMonitorSummaryPattern],
   ["GET", studyMonitorParticipantMatrixPattern],
@@ -2188,6 +2191,7 @@ const monitorOperatorAccessByRequest = new WeakMap<
   IncomingMessage,
   MonitorOperatorAccess
 >();
+const operatorAdminUserIdByRequest = new WeakMap<IncomingMessage, string>();
 
 const workspaceMonitorRouteChecks: Array<[string, RegExp]> = [
   ["GET", attachmentListPattern],
@@ -2649,6 +2653,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
       productionApiRoutes.workspace.exportWorkspacesCsv
     ],
     ["GET", workspaceOverviewPattern, productionApiRoutes.workspace.getWorkspaceOverview],
+    ["PATCH", workspaceOverviewPattern, productionApiRoutes.workspace.updateWorkspace],
     [
       "GET",
       workspaceOverviewCsvExportPattern,
@@ -4338,9 +4343,9 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           return;
         }
 
-        const { roleAssignments } = await services.adminAuth.getCurrentSession({
-          sessionToken
-        });
+        const { adminUser, roleAssignments } =
+          await services.adminAuth.getCurrentSession({ sessionToken });
+        operatorAdminUserIdByRequest.set(request, adminUser.adminUserId);
         const adminAccessMode = operatorAccessScope
           ? await resolveOperatorAdminAccess(
               runtime.repository,
@@ -4496,6 +4501,32 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       const studyMonitorBookletMatch = studyMonitorBookletPattern.exec(pathname);
       const studyMonitorUnitMatch = studyMonitorUnitPattern.exec(pathname);
       const studyMonitorRunMatch = studyMonitorRunPattern.exec(pathname);
+      if (request.method === "PATCH" && workspaceOverviewMatch?.groups) {
+        const tenantKey = decodeRouteGroup(workspaceOverviewMatch.groups.tenantKey);
+        const workspaceKey = decodeRouteGroup(
+          workspaceOverviewMatch.groups.workspaceKey
+        );
+        if (!tenantKey || !workspaceKey) {
+          sendError(
+            response,
+            400,
+            "invalid_workspace_scope",
+            "tenantKey and workspaceKey are required."
+          );
+          return;
+        }
+
+        const body = await readRequestJsonBody<UpdateWorkspaceRequest>();
+        const workspace = await services.platform.updateWorkspace({
+          tenantKey,
+          workspaceKey,
+          displayName: body.displayName,
+          actorId: operatorAdminUserIdByRequest.get(request)
+        });
+        sendJson<UpdateWorkspaceResponse>(response, 200, { workspace });
+        return;
+      }
+
       if (request.method === "GET" && workspaceOverviewCsvExportMatch?.groups) {
         const tenantKey = decodeRouteGroup(
           workspaceOverviewCsvExportMatch.groups.tenantKey

@@ -150,6 +150,12 @@ export type PlatformPort = {
     workspaceKey: string;
     displayName: string;
   }): Promise<Workspace>;
+  updateWorkspace(input: {
+    tenantKey: string;
+    workspaceKey: string;
+    displayName: string;
+    actorId?: string | null;
+  }): Promise<Workspace>;
 };
 
 export type ContentIntakePort = {
@@ -1026,6 +1032,7 @@ export const firstSliceUseCases = {
   listWorkspaces: "ListWorkspaces",
   exportWorkspacesCsv: "ExportWorkspacesCsv",
   createWorkspace: "CreateWorkspace",
+  updateWorkspace: "UpdateWorkspace",
   getWorkspaceOverview: "GetWorkspaceOverview",
   exportWorkspaceOverviewCsv: "ExportWorkspaceOverviewCsv",
   getStudyMonitorSummary: "GetStudyMonitorSummary",
@@ -1501,6 +1508,32 @@ const normalizeAdminDisplayName = (
   }
 
   return value.trim() || fallbackDisplayName;
+};
+
+const normalizeWorkspaceDisplayName = (value: unknown): string => {
+  if (typeof value !== "string") {
+    throw new FirstSliceError(
+      400,
+      "workspace_display_name_invalid",
+      "Workspace display name must be a string between 3 and 200 characters."
+    );
+  }
+
+  const displayName = value.trim();
+  const characterCount = Array.from(displayName).length;
+  if (
+    characterCount < 3 ||
+    characterCount > 200 ||
+    /[\u0000-\u001F\u007F]/u.test(displayName)
+  ) {
+    throw new FirstSliceError(
+      400,
+      "workspace_display_name_invalid",
+      "Workspace display name must be between 3 and 200 characters and cannot contain control characters."
+    );
+  }
+
+  return displayName;
 };
 
 const normalizeAdminCustomTexts = (value: unknown): Record<string, string> => {
@@ -21437,7 +21470,7 @@ export const createFirstSliceServices = (
           workspaceId: idGenerator(),
           tenantId: tenant.tenantId,
           workspaceKey: input.workspaceKey,
-          displayName: input.displayName,
+          displayName: normalizeWorkspaceDisplayName(input.displayName),
           status: "active",
           createdAt: now()
         };
@@ -21459,6 +21492,59 @@ export const createFirstSliceServices = (
           }
         });
         return workspace;
+      },
+      async updateWorkspace(input) {
+        const tenant = await requireTenant(repository, input.tenantKey);
+        const workspace = await requireWorkspace(
+          repository,
+          input.tenantKey,
+          input.workspaceKey
+        );
+        const displayName = normalizeWorkspaceDisplayName(input.displayName);
+
+        const conflictingWorkspace = (
+          await repository.listWorkspacesByTenantId(tenant.tenantId)
+        ).find(
+          candidate =>
+            candidate.workspaceId !== workspace.workspaceId &&
+            candidate.displayName.toLowerCase() === displayName.toLowerCase()
+        );
+        if (conflictingWorkspace) {
+          throw new FirstSliceError(
+            409,
+            "workspace_display_name_conflict",
+            `Workspace display name '${displayName}' already exists in tenant '${input.tenantKey}'.`
+          );
+        }
+
+        if (workspace.displayName === displayName) {
+          return workspace;
+        }
+
+        const updatedWorkspace: Workspace = {
+          ...workspace,
+          displayName
+        };
+        await repository.saveWorkspace({
+          tenantKey: input.tenantKey,
+          workspaceKey: input.workspaceKey,
+          workspace: updatedWorkspace
+        });
+        await recordWorkspaceActivity({
+          tenantId: tenant.tenantId,
+          workspaceId: workspace.workspaceId,
+          eventType: "workspace_updated",
+          actorId: input.actorId,
+          subjectType: "workspace",
+          subjectId: workspace.workspaceId,
+          summary: `Workspace '${workspace.workspaceKey}' renamed.`,
+          details: {
+            workspaceKey: workspace.workspaceKey,
+            previousDisplayName: workspace.displayName,
+            nextDisplayName: displayName
+          }
+        });
+        return updatedWorkspace;
       }
     },
     workspaceAdminRead: {

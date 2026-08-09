@@ -82,6 +82,27 @@ import { WorkspaceViewFacade } from "./workspace-view.facade";
       </article>
 
       <article class="card">
+        <h2>Workspace Identity</h2>
+        <p>Change the operator-facing name of the selected workspace. Tenant scope, workspace key, stored content, and participant links remain unchanged.</p>
+        <div class="form-grid">
+          <label>
+            Workspace Display Name
+            <input
+              id="workspaceDisplayNameInput"
+              name="workspaceDisplayName"
+              minlength="3"
+              maxlength="200"
+              [placeholder]="'Display name for ' + (view.workspace.workspaceKey || 'the selected workspace')"
+              [(ngModel)]="view.workspaceDisplayNameDraft"
+            />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="renameWorkspaceButton" class="secondary" type="button" [disabled]="!view.canRenameWorkspace" (click)="view.renameWorkspace()">Rename Workspace</button>
+        </div>
+      </article>
+
+      <article class="card">
         <h2>Workspace Snapshot</h2>
         <p>Keep the current scope, active release line, participant load, and refresh state visible while you operate the slice.</p>
         <app-summary-cards [cards]="view.workspaceCards"></app-summary-cards>

@@ -3067,7 +3067,14 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       true
     );
 
-    await requestJsonAt(
+    const createdWorkspace = await requestJsonAt<{
+      workspace: {
+        workspaceId: string;
+        workspaceKey: string;
+        displayName: string;
+        createdAt: string;
+      };
+    }>(
       isolated.baseUrl,
       "/api/v1/tenants/auth-required-tenant/workspaces",
       {
@@ -3079,6 +3086,7 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
         }
       }
     );
+    assert.equal(createdWorkspace.status, 201);
 
     const workspaceList = await requestJsonAt<{
       items: Array<{ workspaceKey: string }>;
@@ -3103,6 +3111,17 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
 
     assert.equal(rejectedOverview.status, 401);
     assert.equal(rejectedOverview.body.error, "admin_session_missing");
+
+    const rejectedWorkspaceRename = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      {
+        method: "PATCH",
+        body: { displayName: "Rejected Rename" }
+      }
+    );
+    assert.equal(rejectedWorkspaceRename.status, 401);
+    assert.equal(rejectedWorkspaceRename.body.error, "admin_session_missing");
 
     const rejectedWorkspaceOverviewCsv = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
@@ -3481,6 +3500,70 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       /"auth-required-tenant","auth-required-workspace","Auth Required Workspace"/
     );
 
+    const invalidWorkspaceRename = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: { displayName: "x" }
+      }
+    );
+    assert.equal(invalidWorkspaceRename.status, 400);
+    assert.equal(
+      invalidWorkspaceRename.body.error,
+      "workspace_display_name_invalid"
+    );
+
+    await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces",
+      {
+        method: "POST",
+        headers: adminHeaders,
+        body: {
+          workspaceKey: "conflicting-workspace",
+          displayName: "Conflicting Workspace"
+        }
+      }
+    );
+    const conflictingWorkspaceRename = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/conflicting-workspace",
+      {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: { displayName: "auth required workspace" }
+      }
+    );
+    assert.equal(conflictingWorkspaceRename.status, 409);
+    assert.equal(
+      conflictingWorkspaceRename.body.error,
+      "workspace_display_name_conflict"
+    );
+
+    const platformWorkspaceRename = await requestJsonAt<{
+      workspace: {
+        workspaceId: string;
+        workspaceKey: string;
+        displayName: string;
+        createdAt: string;
+      };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: { displayName: "  Renamed Workspace  " }
+      }
+    );
+    assert.equal(platformWorkspaceRename.status, 200);
+    assert.deepEqual(platformWorkspaceRename.body.workspace, {
+      ...createdWorkspace.body.workspace,
+      displayName: "Renamed Workspace"
+    });
+
     const workspaceAdmin = await requestJsonAt<{
       adminUser: { adminUserId: string; username: string };
       roleAssignments: Array<{ role: string }>;
@@ -3519,6 +3602,48 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
     const workspaceAdminHeaders = {
       authorization: `Bearer ${workspaceAdminSignIn.body.sessionToken}`
     };
+
+    const scopedWorkspaceRename = await requestJsonAt<{
+      workspace: { workspaceKey: string; displayName: string };
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      {
+        method: "PATCH",
+        headers: workspaceAdminHeaders,
+        body: { displayName: "Workspace Admin Rename" }
+      }
+    );
+    assert.equal(scopedWorkspaceRename.status, 200);
+    assert.equal(
+      scopedWorkspaceRename.body.workspace.displayName,
+      "Workspace Admin Rename"
+    );
+
+    const workspaceRenameActivity = await requestJsonAt<{
+      items: Array<{
+        activityEvent: {
+          eventType: string;
+          actorId: string | null;
+          details: Record<string, unknown>;
+        };
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace/activity-events?eventType=workspace_updated",
+      { headers: workspaceAdminHeaders }
+    );
+    assert.equal(workspaceRenameActivity.status, 200);
+    assert.equal(workspaceRenameActivity.body.items.length, 2);
+    assert.equal(
+      workspaceRenameActivity.body.items[0]?.activityEvent.actorId,
+      workspaceAdmin.body.adminUser.adminUserId
+    );
+    assert.deepEqual(workspaceRenameActivity.body.items[0]?.activityEvent.details, {
+      workspaceKey: "auth-required-workspace",
+      previousDisplayName: "Renamed Workspace",
+      nextDisplayName: "Workspace Admin Rename"
+    });
 
     const scopedOverview = await requestJsonAt<{
       workspaceOverview: { workspace: { workspaceKey: string } };
@@ -3583,6 +3708,23 @@ test("operator API enforces authenticated and scoped admin bearer roles", async 
       { headers: readOnlyHeaders }
     );
     assert.equal(readOnlyOverview.status, 200);
+
+    const rejectedRenameByReadOnlyAdmin = await requestJsonAt<{
+      error: string;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/auth-required-tenant/workspaces/auth-required-workspace",
+      {
+        method: "PATCH",
+        headers: readOnlyHeaders,
+        body: { displayName: "Read Only Rename" }
+      }
+    );
+    assert.equal(rejectedRenameByReadOnlyAdmin.status, 403);
+    assert.equal(
+      rejectedRenameByReadOnlyAdmin.body.error,
+      "admin_write_role_required"
+    );
 
     const readOnlySourcePackages = await requestJsonAt<{ items: unknown[] }>(
       isolated.baseUrl,

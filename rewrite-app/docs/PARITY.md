@@ -201,6 +201,14 @@ representative families remain P0 corpus work.
 
 ### Results, review, admin, and operations
 
+Current superadmin workspace parity includes a protected Angular/API rename
+workflow. It trims and bounds the display name, rejects case-insensitive
+duplicates inside one tenant, preserves the stable workspace key/ID and all
+dependent data, refreshes directory/overview/activity read models, and records
+the acting admin plus old/new names. File and SQLite restart tests and a
+production-built protected SQLite browser gate prove persistence. Workspace
+deletion remains a separate destructive lifecycle gap.
+
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
 | Response inspection/export | workspace results | done | P1 | detailed filters, explicit session/test-run identity on response cards, run drill-down, CSV |

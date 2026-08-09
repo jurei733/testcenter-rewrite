@@ -16,6 +16,9 @@ const stopAfterStep = process.env.UI_SMOKE_STOP_AFTER_STEP ?? "";
 const skipRuntimeCsvExports = ["1", "true", "yes", "on"].includes(
   String(process.env.UI_SMOKE_SKIP_RUNTIME_CSV_EXPORTS ?? "").toLowerCase()
 );
+const skipOfflineAppShell = ["1", "true", "yes", "on"].includes(
+  String(process.env.UI_SMOKE_SKIP_OFFLINE_APP_SHELL ?? "").toLowerCase()
+);
 const busyStartTimeoutMs = Number.parseInt(
   process.env.UI_SMOKE_BUSY_START_TIMEOUT_MS ?? "750",
   10
@@ -768,25 +771,26 @@ try {
     [port, operatorAuthRequired ? "required" : "open"],
     { timeout: 15_000 }
   );
-  logStep("offline-app-shell");
-  const offlineShellContext = await browser.newContext({
-    serviceWorkers: "allow"
-  });
-  const offlineShellPage = await offlineShellContext.newPage();
-  try {
-    await offlineShellPage.goto(`${baseUrl}/app/participant`, {
-      waitUntil: "networkidle"
+  if (!skipOfflineAppShell) {
+    logStep("offline-app-shell");
+    const offlineShellContext = await browser.newContext({
+      serviceWorkers: "allow"
     });
-    await offlineShellPage.locator("#participantLoginKey").waitFor();
-    const serviceWorkerRegistration = await offlineShellPage.evaluate(async () => {
+    const offlineShellPage = await offlineShellContext.newPage();
+    try {
+      await offlineShellPage.goto(`${baseUrl}/app/participant`, {
+        waitUntil: "networkidle"
+      });
+      await offlineShellPage.locator("#participantLoginKey").waitFor();
+      const serviceWorkerRegistration = await offlineShellPage.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;
       return {
         scope: registration.scope,
         activeState: registration.active?.state ?? null
       };
-    });
-    assert.equal(serviceWorkerRegistration.scope, `${baseUrl}/app/`);
-    assert.equal(serviceWorkerRegistration.activeState, "activated");
+      });
+      assert.equal(serviceWorkerRegistration.scope, `${baseUrl}/app/`);
+      assert.equal(serviceWorkerRegistration.activeState, "activated");
 
     await offlineShellPage.reload({ waitUntil: "networkidle" });
     await offlineShellPage.waitForFunction(
@@ -847,9 +851,10 @@ try {
       offlineShellCache.urls.every(url => new URL(url).pathname.startsWith("/app/")),
       "The Service Worker must not cache API or participant-state requests."
     );
-  } finally {
-    await offlineShellContext.setOffline(false);
-    await offlineShellContext.close();
+    } finally {
+      await offlineShellContext.setOffline(false);
+      await offlineShellContext.close();
+    }
   }
   stopAfter("offline-app-shell");
   logStep("raw-debug-toggle");
@@ -2163,6 +2168,54 @@ try {
     .filter({ hasText: workspaceKey })
     .waitFor();
   stopAfter("workspace-directory-reads");
+
+  logStep("workspace-rename");
+  const renamedWorkspaceDisplayName = `Renamed Workspace ${Date.now()}`;
+  await fillAndCommit("#workspaceDisplayNameInput", renamedWorkspaceDisplayName);
+  await expectButtonSelectorEnabled("#renameWorkspaceButton");
+  await clickAction("Rename Workspace");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}`,
+    payload =>
+      payload?.workspaceOverview?.workspace?.workspaceKey === workspaceKey &&
+      payload.workspaceOverview.workspace.displayName === renamedWorkspaceDisplayName
+  );
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: renamedWorkspaceDisplayName,
+        exact: true
+      })
+    })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=workspace_updated`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item?.activityEvent?.eventType === "workspace_updated" &&
+          item.activityEvent?.details?.nextDisplayName === renamedWorkspaceDisplayName
+      )
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await waitForNotBusy("workspace-rename-reload");
+  await clickAction("Refresh Workspace Directory");
+  await page
+    .locator("article.card")
+    .filter({
+      has: page.getByRole("heading", { name: "Workspace Directory", exact: true })
+    })
+    .filter({ hasText: renamedWorkspaceDisplayName })
+    .filter({ hasText: workspaceKey })
+    .waitFor();
+  stopAfter("workspace-rename");
 
   logStep("nav-ops-admin-management");
   await page.locator('[data-view-nav="ops"]').click();

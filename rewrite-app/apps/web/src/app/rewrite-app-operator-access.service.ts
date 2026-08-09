@@ -54,6 +54,17 @@ export class RewriteAppOperatorAccessService {
     return this.mode === "admin_read_only";
   }
 
+  get canReadWorkspaceDirectory(): boolean {
+    return (
+      this.mode === "signed_out" ||
+      this.roleAssignments.some(
+        assignment =>
+          assignment.role === "platform_admin" ||
+          assignment.role === "tenant_admin"
+      )
+    );
+  }
+
   get hasMonitorRole(): boolean {
     return this.roleAssignments.some(
       assignment =>

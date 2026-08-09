@@ -11,7 +11,9 @@ import type {
   ListParticipantTestLogsResponse,
   ListWorkspaceActivityEventsResponse,
   ListTenantsResponse,
-  ListWorkspacesResponse
+  ListWorkspacesResponse,
+  UpdateWorkspaceRequest,
+  UpdateWorkspaceResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
   productionApiRoutes,
@@ -22,6 +24,7 @@ import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { RewriteAppShellContentHostsService } from "./rewrite-app-shell-content-hosts.service";
 import { refreshWorkspaceOverviewAction } from "./rewrite-app-shell.content-reads";
 import { RewriteAppShellFeedbackService } from "./rewrite-app-shell-feedback.service";
+import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
 import { RewriteAppShellWorkspaceHostsService } from "./rewrite-app-shell-workspace-hosts.service";
 import { createBootstrapWorkspaceFlowHost } from "./rewrite-app-shell.hosts";
@@ -39,6 +42,7 @@ export class RewriteAppWorkspaceService {
   private readonly api = inject(RewriteAppApiService);
   private readonly contentHosts = inject(RewriteAppShellContentHostsService);
   private readonly hosts = inject(RewriteAppShellWorkspaceHostsService);
+  private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly feedback = inject(RewriteAppShellFeedbackService);
   private readonly requestState = inject(RewriteAppShellRequestService);
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -51,6 +55,37 @@ export class RewriteAppWorkspaceService {
 
   async createWorkspace(): Promise<void> {
     await createWorkspaceAction(this.hosts.createWorkspaceActionsHost());
+  }
+
+  async updateWorkspaceDisplayName(displayName: string): Promise<string> {
+    if (!this.hasWorkspaceScope()) {
+      return "";
+    }
+    const tenantKey = this.workspaceState.tenantKey.trim();
+    const workspaceKey = this.workspaceState.workspaceKey.trim();
+    const payload = await this.requestState.request<UpdateWorkspaceResponse>(
+      "Rename Workspace",
+      "PATCH",
+      resolveRoutePath(productionApiRoutes.workspace.updateWorkspace, {
+        tenantKey,
+        workspaceKey
+      }),
+      { displayName } satisfies UpdateWorkspaceRequest
+    );
+
+    const readModelRefreshes: Array<Promise<void>> = [
+      this.refreshWorkspaceOverview(true),
+      this.refreshWorkspaceActivity(true)
+    ];
+    if (this.operatorAccess.canReadWorkspaceDirectory) {
+      readModelRefreshes.push(this.refreshWorkspaceDirectory());
+    }
+    await Promise.all(readModelRefreshes);
+    this.feedback.rememberActivity(
+      "Workspace Renamed",
+      `${payload.workspace.displayName} now labels ${tenantKey}/${workspaceKey}; the workspace key is unchanged.`
+    );
+    return payload.workspace.displayName;
   }
 
   async refreshWorkspaceOverview(quiet = false): Promise<void> {

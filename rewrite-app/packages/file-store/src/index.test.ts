@@ -4,9 +4,48 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import type { Workspace } from "@testcenter-rewrite-app/domain";
+
 import { createFileFirstSliceRepository } from "./index.js";
 
 describe("createFileFirstSliceRepository", () => {
+  it("persists a renamed workspace without changing its stable identity", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-workspace-"));
+    const filePath = join(tempDirectory, "state.json");
+    const workspace: Workspace = {
+      workspaceId: "workspace-stable-id",
+      tenantId: "tenant-stable-id",
+      workspaceKey: "stable-key",
+      displayName: "Original Workspace",
+      status: "active",
+      createdAt: "2026-08-09T00:00:00.000Z"
+    };
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveWorkspace({
+        tenantKey: "stable-tenant",
+        workspaceKey: workspace.workspaceKey,
+        workspace
+      });
+      await repository.saveWorkspace({
+        tenantKey: "stable-tenant",
+        workspaceKey: workspace.workspaceKey,
+        workspace: { ...workspace, displayName: "Renamed Workspace" }
+      });
+
+      assert.deepEqual(
+        await createFileFirstSliceRepository(filePath).getWorkspaceByScope(
+          "stable-tenant",
+          workspace.workspaceKey
+        ),
+        { ...workspace, displayName: "Renamed Workspace" }
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("preserves and deletes attachment images across repository restarts", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-attachments-"));
     const filePath = join(tempDirectory, "state.json");
