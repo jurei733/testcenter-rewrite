@@ -6603,7 +6603,12 @@ try {
       }
     }
   );
-  await backgroundSyncedVeronaFrame.locator("#playerRuntimeError").click();
+  await backgroundSyncedVeronaFrame
+    .locator("#playerRuntimeError")
+    .evaluate(button => {
+      button.click();
+      button.click();
+    });
   await page
     .locator("#participantVeronaPlayerError")
     .filter({ hasText: "runtime-error: Synthetic player failure" })
@@ -6621,6 +6626,24 @@ try {
           item.testLog?.unitKey === veronaUnitKey
       )
   );
+  const veronaControllerErrorLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${encodeURIComponent(
+      veronaTestRunId
+    )}&logKey=CONTROLLER&limit=100`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.filter(
+        item =>
+          item.testLog?.logContent === "ERROR" &&
+          item.testLog?.unitKey === null &&
+          item.testLog?.originalUnitId === null
+      ).length === 1
+  );
+  const veronaControllerErrorTimestamp =
+    veronaControllerErrorLogs.items.find(
+      item => item.testLog?.logContent === "ERROR"
+    )?.testLog?.timestamp;
+  assert.ok(Number.isSafeInteger(veronaControllerErrorTimestamp));
   await page.locator("#participantVeronaReloadPlayerButton").click();
   const unloadRecoveredVeronaFrame = page.frameLocator(
     "#participantVeronaPlayerFrame"
@@ -6632,6 +6655,26 @@ try {
     .locator("#playerDefinition")
     .filter({ hasText: "Smoke unit definition" })
     .waitFor({ timeout: 15_000 });
+  const recoveredVeronaControllerLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${encodeURIComponent(
+      veronaTestRunId
+    )}&logKey=CONTROLLER&limit=100`,
+    payload =>
+      Array.isArray(payload?.items) &&
+      payload.items.some(
+        item =>
+          item.testLog?.logContent === "RUNNING" &&
+          item.testLog?.unitKey === null &&
+          item.testLog?.timestamp > veronaControllerErrorTimestamp
+      )
+  );
+  assert.equal(
+    recoveredVeronaControllerLogs.items.filter(
+      item => item.testLog?.logContent === "ERROR"
+    ).length,
+    1,
+    "Repeated notifications from one failed Player frame must persist one controller error."
+  );
   assert.equal(
     await unloadRecoveredVeronaFrame.locator("#playerAnswer").inputValue(),
     "Saved during player unload"

@@ -231,7 +231,7 @@ export class VeronaPlayerHostComponent
   @Output() readonly responseChange = new EventEmitter<string>();
   @Output() readonly responseUpdate = new EventEmitter<VeronaResponseChange>();
   @Output() readonly logEntries = new EventEmitter<VeronaLogChange>();
-  @Output() readonly focusLogEntries =
+  @Output() readonly testLogEntries =
     new EventEmitter<ParticipantTestLogEntryInput[]>();
   @Output() readonly navigationRequest = new EventEmitter<string>();
   @Output() readonly retrySave = new EventEmitter<void>();
@@ -250,6 +250,8 @@ export class VeronaPlayerHostComponent
   private focusLogTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingPlayerHasFocus: boolean | undefined;
   private lastFocusLogContent: "HAS" | "HAS_NOT" | null = null;
+  private controllerErrorLoggedForFrame = false;
+  private controllerRecoveryTestRunId: string | null = null;
   private latestResponse = "";
   private frameTestRunId = "";
   private frameUnitKey = "";
@@ -470,6 +472,7 @@ export class VeronaPlayerHostComponent
     this.apiVersionLabel = "Waiting for player";
     this.apiVersion = null;
     this.errorMessage = "";
+    this.controllerErrorLoggedForFrame = false;
     this.pages = [];
     this.currentPageIndex = -1;
     this.latestResponse = parseVeronaUnitResponse(this.savedResponse)
@@ -589,6 +592,14 @@ export class VeronaPlayerHostComponent
       timeStamp: Date.now(),
       content: "RUNNING"
     }, this.savedResponse);
+    if (this.controllerRecoveryTestRunId === this.frameTestRunId) {
+      this.testLogEntries.emit([{
+        key: "CONTROLLER",
+        timeStamp: Date.now(),
+        content: "RUNNING"
+      }]);
+    }
+    this.controllerRecoveryTestRunId = null;
   }
 
   private handleNavigationRequest(
@@ -892,7 +903,7 @@ export class VeronaPlayerHostComponent
         return;
       }
       this.lastFocusLogContent = content;
-      this.focusLogEntries.emit([{
+      this.testLogEntries.emit([{
         key: "FOCUS",
         timeStamp: Date.now(),
         content
@@ -905,6 +916,15 @@ export class VeronaPlayerHostComponent
     this.clearScheduledFrames();
     this.status = "error";
     this.errorMessage = message;
+    if (!this.controllerErrorLoggedForFrame) {
+      this.controllerErrorLoggedForFrame = true;
+      this.controllerRecoveryTestRunId = this.frameTestRunId;
+      this.testLogEntries.emit([{
+        key: "CONTROLLER",
+        timeStamp: Date.now(),
+        content: "ERROR"
+      }]);
+    }
   }
 
   private clearReadyTimeout(): void {

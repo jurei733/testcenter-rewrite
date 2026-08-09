@@ -1783,7 +1783,7 @@ export class ParticipantViewFacade {
     });
   }
 
-  saveVeronaFocusLogs(entries: ParticipantTestLogEntryInput[]): void {
+  saveVeronaTestLogs(entries: ParticipantTestLogEntryInput[]): void {
     const currentState = this.readCurrentRunState();
     if (
       !currentState ||
