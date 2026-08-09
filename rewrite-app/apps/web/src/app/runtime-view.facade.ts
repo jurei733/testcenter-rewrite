@@ -3505,7 +3505,7 @@ export class RuntimeViewFacade {
       return;
     }
     this.viewState.onActionAsync(() =>
-      this.runtimeService.issueMonitorRunCommand("complete")
+      this.runtimeService.issueMonitorRunCommand("complete_and_lock")
     );
   }
 
@@ -3625,6 +3625,7 @@ export class RuntimeViewFacade {
       | "pause"
       | "resume"
       | "complete"
+      | "complete_and_lock"
       | "goto"
       | "lock_test"
       | "unlock_test"

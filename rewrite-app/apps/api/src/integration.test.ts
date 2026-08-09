@@ -8005,7 +8005,7 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
   }
 });
 
-test("monitor command endpoint pauses and resumes an open run", async () => {
+test("monitor command endpoint pauses, resumes, and atomically completes and locks a run", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",
     FIRST_SLICE_BOOTSTRAP_DEMO: "true",
@@ -8416,22 +8416,28 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
       command: {
         commandType: string;
         previousStatus: string;
-        testRun: { status: string; currentUnitKey: string | null; completedAt: string | null };
+        testRun: {
+          status: string;
+          locked?: boolean;
+          currentUnitKey: string | null;
+          completedAt: string | null;
+        };
         participantSession: { status: string };
       };
     }>(isolated.baseUrl, commandPath, {
       method: "POST",
       headers: { authorization },
       body: {
-        commandType: "complete",
+        commandType: "complete_and_lock",
         actorId: "operator-demo"
       }
     });
 
     assert.equal(completeCommand.status, 200);
-    assert.equal(completeCommand.body.command.commandType, "complete");
+    assert.equal(completeCommand.body.command.commandType, "complete_and_lock");
     assert.equal(completeCommand.body.command.previousStatus, "running");
     assert.equal(completeCommand.body.command.testRun.status, "completed");
+    assert.equal(completeCommand.body.command.testRun.locked, true);
     assert.equal(completeCommand.body.command.testRun.currentUnitKey, null);
     assert.match(completeCommand.body.command.testRun.completedAt ?? "", ISO_DATE_REGEX);
     assert.equal(completeCommand.body.command.participantSession.status, "closed");
@@ -8479,6 +8485,8 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
             commandType?: string;
             previousStatus?: string;
             nextStatus?: string;
+            previousLocked?: boolean;
+            locked?: boolean;
             completedAt?: string | null;
             previousUnitKey?: string | null;
             targetUnitKey?: string | null;
@@ -8503,7 +8511,7 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.deepEqual(
       commandActivity.body.items.map(item => item.activityEvent.details.commandType),
       [
-        "complete",
+        "complete_and_lock",
         "goto",
         "resume",
         "unlock_test",
@@ -8520,6 +8528,8 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     );
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousStatus, "running");
     assert.equal(commandActivity.body.items[0]?.activityEvent.details.nextStatus, "completed");
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.previousLocked, false);
+    assert.equal(commandActivity.body.items[0]?.activityEvent.details.locked, true);
     assert.match(
       String(commandActivity.body.items[0]?.activityEvent.details.completedAt ?? ""),
       ISO_DATE_REGEX

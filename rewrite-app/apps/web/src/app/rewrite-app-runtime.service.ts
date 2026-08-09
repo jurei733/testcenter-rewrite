@@ -119,6 +119,7 @@ export class RewriteAppRuntimeService {
       | "pause"
       | "resume"
       | "complete"
+      | "complete_and_lock"
       | "goto"
       | "lock_test"
       | "unlock_test"
@@ -140,6 +141,7 @@ export class RewriteAppRuntimeService {
       pause: "Monitor Pause Issued",
       resume: "Monitor Resume Issued",
       complete: "Monitor Complete Issued",
+      complete_and_lock: "Monitor Complete And Lock Issued",
       goto: "Monitor Go To Issued",
       lock_test: "Monitor Test Locked",
       unlock_test: "Monitor Test Unlocked",
@@ -160,6 +162,7 @@ export class RewriteAppRuntimeService {
       | "pause"
       | "resume"
       | "complete"
+      | "complete_and_lock"
       | "goto"
       | "lock_test"
       | "unlock_test"

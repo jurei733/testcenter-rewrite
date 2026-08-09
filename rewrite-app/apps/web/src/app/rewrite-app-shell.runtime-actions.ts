@@ -257,6 +257,7 @@ export async function issueMonitorRunCommandAction(
     | "pause"
     | "resume"
     | "complete"
+    | "complete_and_lock"
     | "goto"
     | "lock_test"
     | "unlock_test"
@@ -270,6 +271,7 @@ export async function issueMonitorRunCommandAction(
     pause: "Monitor Pause Run",
     resume: "Monitor Resume Run",
     complete: "Monitor Complete Run",
+    complete_and_lock: "Monitor Complete And Lock Run",
     goto: "Monitor Go To Unit",
     lock_test: "Monitor Lock Test",
     unlock_test: "Monitor Unlock Test",
@@ -322,7 +324,10 @@ export async function issueMonitorRunCommandAction(
     applyResumeRunResult(host.createRuntimePresentationHost(), {
       testRun: payload.command.testRun
     });
-  } else if (commandType === "complete") {
+  } else if (
+    commandType === "complete" ||
+    commandType === "complete_and_lock"
+  ) {
     applyCompleteRunResult(host.createRuntimePresentationHost(), {
       testRun: payload.command.testRun
     });
@@ -345,6 +350,7 @@ export async function issueMonitorRunCommandsAction(
     | "pause"
     | "resume"
     | "complete"
+    | "complete_and_lock"
     | "goto"
     | "lock_test"
     | "unlock_test"

@@ -171,13 +171,50 @@ try {
     name: "Monitor Resume",
     exact: true
   });
+  const resumeResponsePromise = operatorPage.waitForResponse(
+    response =>
+      response.url().includes(`/monitor/open-runs/${testRunId}/commands`) &&
+      response.request().method() === "POST"
+  );
   await resumeButton.click();
+  assert.equal((await resumeResponsePromise).status(), 200);
   await participantPage
     .locator("#participantRouteStatus", { hasText: "running" })
     .waitFor({ timeout: 15_000 });
 
+  const openRunCard = operatorPage
+    .locator("#openMonitorRunsCollection .record-card")
+    .filter({ hasText: testRunId });
+  await openRunCard.waitFor({ timeout: 15_000 });
+  await openRunCard.getByRole("button", { name: "Add to Batch" }).click();
+  const completeButton = operatorPage.locator("#monitorBatchCompleteButton");
+  await operatorPage.waitForFunction(
+    () =>
+      (document.querySelector("#monitorBatchCompleteButton") instanceof
+        HTMLButtonElement) &&
+      !document.querySelector("#monitorBatchCompleteButton").disabled
+  );
+  const completeResponsePromise = operatorPage.waitForResponse(
+    response =>
+      response.url().endsWith("/monitor/open-runs/commands") &&
+      response.request().method() === "POST"
+  );
+  operatorPage.once("dialog", dialog => dialog.accept());
+  await completeButton.click();
+  const completeResponse = await completeResponsePromise;
+  assert.equal(completeResponse.status(), 200);
+  const completePayload = await completeResponse.json();
+  assert.equal(completePayload.succeededCount, 1);
+  assert.equal(completePayload.failedCount, 0);
+  assert.equal(completePayload.commands?.[0]?.commandType, "complete_and_lock");
+  assert.equal(completePayload.commands?.[0]?.testRun?.status, "completed");
+  assert.equal(completePayload.commands?.[0]?.testRun?.locked, true);
+  await participantPage
+    .locator("#participantRouteStatus", { hasText: "completed" })
+    .waitFor({ timeout: 15_000 });
+
   process.stdout.write(
-    `Participant monitor live smoke passed for run=${testRunId} at ${baseUrl}/app\n`
+    `Participant monitor live pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
   );
 } catch (error) {
   if (serverOutput) {

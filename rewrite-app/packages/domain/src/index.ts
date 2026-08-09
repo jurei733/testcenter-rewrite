@@ -207,6 +207,7 @@ export type MonitorRunCommandType =
   | "pause"
   | "resume"
   | "complete"
+  | "complete_and_lock"
   | "goto"
   | "lock_test"
   | "unlock_test"
@@ -217,6 +218,7 @@ export const monitorRunCommandTypes = [
   "pause",
   "resume",
   "complete",
+  "complete_and_lock",
   "goto",
   "lock_test",
   "unlock_test",

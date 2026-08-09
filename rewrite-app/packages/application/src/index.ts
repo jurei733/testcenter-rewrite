@@ -1693,7 +1693,7 @@ const normalizeMonitorRunCommandType = (value: unknown): MonitorRunCommandType =
     throw new FirstSliceError(
       400,
       "monitor_run_command_type_invalid",
-      "Monitor run command type must be 'pause', 'resume', 'complete', 'goto', 'lock_test', 'unlock_test', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
+      "Monitor run command type must be 'pause', 'resume', 'complete', 'complete_and_lock', 'goto', 'lock_test', 'unlock_test', 'unlock_navigation', 'lock_navigation', or 'set_testlet_time'."
     );
   }
 
@@ -27353,18 +27353,21 @@ export const createFirstSliceServices = (
           nextStatus = "paused";
         } else if (commandType === "resume" || commandType === "goto") {
           nextStatus = "running";
-        } else if (commandType === "complete") {
+        } else if (
+          commandType === "complete" ||
+          commandType === "complete_and_lock"
+        ) {
           nextStatus = "completed";
         }
         let adjustedTestletKey: string | null = null;
         let previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null =
           null;
         const nextTestRun: TestRun =
-          commandType === "complete"
+          commandType === "complete" || commandType === "complete_and_lock"
             ? {
                 ...closeRunningTestletTimers(testRun, issuedAt),
                 status: "completed",
-                locked: false,
+                locked: commandType === "complete_and_lock",
                 currentUnitKey: null,
                 updatedAt: issuedAt,
                 completedAt: issuedAt
@@ -27472,7 +27475,7 @@ export const createFirstSliceServices = (
           );
         }
         const effectiveNextTestRun =
-          commandType === "complete"
+          commandType === "complete" || commandType === "complete_and_lock"
             ? nextTestRun
             : await persistEffectiveTestletTimerState({
                 contentRelease,
@@ -27508,7 +27511,7 @@ export const createFirstSliceServices = (
           });
         }
         const nextParticipantSession =
-          commandType === "complete"
+          commandType === "complete" || commandType === "complete_and_lock"
             ? {
                 ...participantSession,
                 status: await resolveParticipantSessionStatusAfterCompletion(

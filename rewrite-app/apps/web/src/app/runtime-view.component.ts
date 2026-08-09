@@ -837,7 +837,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorBatchLockTestButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('lock_test')">Lock Tests</button>
           <button id="monitorBatchUnlockTestButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('unlock_test')">Unlock Tests</button>
           <button id="monitorBatchSetTimeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatchTime" (click)="view.issueMonitorBatchCommand('set_testlet_time')">Set Time On Selected</button>
-          <button id="monitorBatchCompleteButton" class="danger" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('complete')">Complete Selected</button>
+          <button id="monitorBatchCompleteButton" class="danger" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('complete_and_lock')">Complete + Lock Selected</button>
         </div>
       </article>
 
