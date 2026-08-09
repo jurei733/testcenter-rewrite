@@ -1742,6 +1742,119 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(revokedSession.body.error, "admin_session_invalid");
 });
 
+test("admin sign-in uses the original persistent login sink", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+    FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES: "2",
+    FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS: "500"
+  });
+
+  try {
+    const config = await requestJsonAt<{
+      runtimeConfig: {
+        adminLoginProtection: {
+          maxFailures: number;
+          failureWindowMs: number;
+        };
+        environment: {
+          firstSliceAdminLoginMaxFailuresPresent: boolean;
+          firstSliceAdminLoginFailureWindowMsPresent: boolean;
+        };
+      };
+    }>(isolated.baseUrl, "/diagnostics/config");
+    assert.deepEqual(config.body.runtimeConfig.adminLoginProtection, {
+      maxFailures: 2,
+      failureWindowMs: 500
+    });
+    assert.equal(
+      config.body.runtimeConfig.environment.firstSliceAdminLoginMaxFailuresPresent,
+      true
+    );
+    assert.equal(
+      config.body.runtimeConfig.environment
+        .firstSliceAdminLoginFailureWindowMsPresent,
+      true
+    );
+
+    const bootstrap = await requestJsonAt(
+      isolated.baseUrl,
+      "/api/v1/admin/auth/bootstrap",
+      {
+        method: "POST",
+        body: {
+          username: "sink.admin",
+          password: "correct-admin-secret"
+        }
+      }
+    );
+    assert.equal(bootstrap.status, 201);
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const rejected = await requestJsonAt<{ error: string }>(
+        isolated.baseUrl,
+        "/api/v1/admin/auth/sign-in",
+        {
+          method: "POST",
+          body: {
+            username: "sink.admin",
+            password: "wrong-admin-secret"
+          }
+        }
+      );
+      assert.equal(rejected.status, 401);
+      assert.equal(rejected.body.error, "admin_credentials_invalid");
+    }
+
+    const blockedCorrectLogin = await requestJsonAt<{
+      error: string;
+      details: { retryAfterSeconds: number; maxFailures: number };
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "sink.admin",
+        password: "correct-admin-secret"
+      }
+    });
+    assert.equal(blockedCorrectLogin.status, 429);
+    assert.equal(blockedCorrectLogin.body.error, "admin_login_rate_limited");
+    assert.equal(blockedCorrectLogin.body.details.maxFailures, 2);
+    assert.ok(blockedCorrectLogin.body.details.retryAfterSeconds >= 1);
+    assert.equal(blockedCorrectLogin.headers.get("retry-after"), "1");
+
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    const recoveredLogin = await requestJsonAt<{
+      sessionToken: string;
+    }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
+      method: "POST",
+      body: {
+        username: "sink.admin",
+        password: "correct-admin-secret"
+      }
+    });
+    assert.equal(recoveredLogin.status, 200);
+
+    const auditEvents = await requestJsonAt<{
+      items: Array<{ details: Record<string, unknown> }>;
+    }>(isolated.baseUrl, "/api/v1/admin/audit-events", {
+      headers: {
+        authorization: `Bearer ${recoveredLogin.body.sessionToken}`
+      }
+    });
+    assert.equal(auditEvents.status, 200);
+    assert.equal(
+      auditEvents.body.items.some(
+        item =>
+          item.details["reason"] === "admin_login_rate_limited" &&
+          item.details["failedAttempts"] === 2
+      ),
+      true
+    );
+  } finally {
+    await closeServer(isolated.server);
+  }
+});
+
 test("platform application settings are public, durable, validated, and audited", async () => {
   const defaultSettings = await requestJson<{
     applicationSettings: {

@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import type {
+  AdminLoginAttempt,
   AdminRoleAssignment,
   AdminUser,
   OperationalLoginMigrationCandidate,
@@ -145,6 +146,45 @@ test("SQLite persists and replaces operational login migration candidates", asyn
       ),
       []
     );
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite persists and atomically advances admin login failures", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-admin-login-"));
+  const databasePath = join(tempDirectory, "admin-login.sqlite");
+
+  try {
+    const firstAttempt = await createSqliteFirstSliceRepository(
+      databasePath
+    ).recordAdminLoginFailure({
+      username: "sink.admin",
+      attemptedAt: "2026-01-01T00:00:00.000Z",
+      expiresAt: "2026-01-01T00:30:00.000Z"
+    });
+    assert.equal(firstAttempt.failedAttempts, 1);
+
+    const restarted = createSqliteFirstSliceRepository(databasePath);
+    const secondAttempt = await restarted.recordAdminLoginFailure({
+      username: "sink.admin",
+      attemptedAt: "2026-01-01T00:01:00.000Z",
+      expiresAt: "2026-01-01T00:31:00.000Z"
+    });
+    assert.equal(secondAttempt.failedAttempts, 2);
+    assert.deepEqual(
+      await createSqliteFirstSliceRepository(databasePath).getAdminLoginAttempt(
+        "sink.admin"
+      ),
+      secondAttempt satisfies AdminLoginAttempt
+    );
+
+    const resetAttempt = await restarted.recordAdminLoginFailure({
+      username: "sink.admin",
+      attemptedAt: "2026-01-01T01:00:00.000Z",
+      expiresAt: "2026-01-01T01:30:00.000Z"
+    });
+    assert.equal(resetAttempt.failedAttempts, 1);
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });
   }

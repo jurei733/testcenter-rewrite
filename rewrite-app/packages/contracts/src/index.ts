@@ -3077,6 +3077,10 @@ export type GetRuntimeConfigResponse = {
       keepAliveTimeoutMs: number;
     };
     operatorAuthRequired: boolean;
+    adminLoginProtection: {
+      maxFailures: number;
+      failureWindowMs: number;
+    };
     participantLoginProtection: {
       maxFailures: number;
       failureWindowMs: number;
@@ -3094,6 +3098,8 @@ export type GetRuntimeConfigResponse = {
       firstSliceMaxJsonBodyBytesPresent: boolean;
       firstSliceMaxSourcePackageJsonBodyBytesPresent: boolean;
       firstSliceOperatorAuthRequired: boolean;
+      firstSliceAdminLoginMaxFailuresPresent: boolean;
+      firstSliceAdminLoginFailureWindowMsPresent: boolean;
       firstSliceParticipantLoginMaxFailuresPresent: boolean;
       firstSliceParticipantLoginFailureWindowMsPresent: boolean;
       firstSliceBootstrapDemo: boolean;

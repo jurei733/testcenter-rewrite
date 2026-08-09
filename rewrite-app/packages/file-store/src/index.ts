@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import { defaultApplicationSettings } from "@testcenter-rewrite-app/domain";
 import type {
+  AdminLoginAttempt,
   AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
@@ -29,6 +30,7 @@ type PersistedFirstSliceState = {
   applicationSettings: ApplicationSettings | null;
   attachmentFiles: Record<string, AttachmentFile>;
   adminUsers: Record<string, AdminUser>;
+  adminLoginAttempts: Record<string, AdminLoginAttempt>;
   adminRoleAssignments: Record<string, AdminRoleAssignment>;
   adminAuditEvents: Record<string, AdminAuditEvent>;
   adminSessions: Record<string, AdminSession>;
@@ -56,6 +58,7 @@ const createInitialState = (): PersistedFirstSliceState => ({
   applicationSettings: null,
   attachmentFiles: {},
   adminUsers: {},
+  adminLoginAttempts: {},
   adminRoleAssignments: {},
   adminAuditEvents: {},
   adminSessions: {},
@@ -287,6 +290,30 @@ export const createFileFirstSliceRepository = (
           adminUser => adminUser.username === username
         ) ?? null
       );
+    },
+    async getAdminLoginAttempt(username) {
+      const state = await getState();
+      return state.adminLoginAttempts[username] ?? null;
+    },
+    async recordAdminLoginFailure(input) {
+      let result: AdminLoginAttempt | null = null;
+      await mutate(state => {
+        const current = state.adminLoginAttempts[input.username];
+        result = {
+          username: input.username,
+          failedAttempts:
+            !current || current.expiresAt <= input.attemptedAt
+              ? 1
+              : current.failedAttempts + 1,
+          expiresAt: input.expiresAt,
+          updatedAt: input.attemptedAt
+        };
+        state.adminLoginAttempts[input.username] = result;
+      });
+      if (!result) {
+        throw new Error("Admin login failure could not be persisted.");
+      }
+      return result;
     },
     async saveAdminUser(adminUser) {
       await mutate(state => {

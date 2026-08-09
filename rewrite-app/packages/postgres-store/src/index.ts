@@ -2,6 +2,7 @@ import { Pool, type QueryResultRow } from "pg";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminLoginAttempt,
   AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
@@ -546,6 +547,16 @@ const mapParticipantLoginAttempt = (
         tenantId: String(row.tenant_id),
         workspaceId: String(row.workspace_id),
         loginKey: String(row.login_key),
+        failedAttempts: Number(row.failed_attempts),
+        expiresAt: String(row.expires_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+
+const mapAdminLoginAttempt = (row: Row | undefined): AdminLoginAttempt | null =>
+  row
+    ? {
+        username: String(row.username),
         failedAttempts: Number(row.failed_attempts),
         expiresAt: String(row.expires_at),
         updatedAt: String(row.updated_at)
@@ -1165,6 +1176,20 @@ const migrations: PostgresMigration[] = [
         PRIMARY KEY (tenant_id, workspace_id)
       );
     `
+  },
+  {
+    version: 39,
+    name: "add_admin_login_attempts",
+    sql: `
+      CREATE TABLE IF NOT EXISTS admin_login_attempts (
+        username TEXT PRIMARY KEY,
+        failed_attempts INTEGER NOT NULL,
+        expires_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_expiry
+        ON admin_login_attempts (expires_at);
+    `
   }
 ];
 
@@ -1410,6 +1435,36 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
         [username],
         mapAdminUser
       );
+    },
+    async getAdminLoginAttempt(username) {
+      return one(
+        `SELECT username, failed_attempts, expires_at, updated_at
+         FROM admin_login_attempts
+         WHERE username = $1`,
+        [username],
+        mapAdminLoginAttempt
+      );
+    },
+    async recordAdminLoginFailure(input) {
+      const result = await pool.query<Row>(
+        `INSERT INTO admin_login_attempts (
+          username, failed_attempts, expires_at, updated_at
+        ) VALUES ($1, 1, $2, $3)
+        ON CONFLICT (username) DO UPDATE SET
+          failed_attempts = CASE
+            WHEN admin_login_attempts.expires_at <= EXCLUDED.updated_at THEN 1
+            ELSE admin_login_attempts.failed_attempts + 1
+          END,
+          expires_at = EXCLUDED.expires_at,
+          updated_at = EXCLUDED.updated_at
+        RETURNING username, failed_attempts, expires_at, updated_at`,
+        [input.username, input.expiresAt, input.attemptedAt]
+      );
+      const loginAttempt = mapAdminLoginAttempt(result.rows[0]);
+      if (!loginAttempt) {
+        throw new Error("Admin login failure could not be persisted.");
+      }
+      return loginAttempt;
     },
     async saveAdminUser(adminUser) {
       await pool.query(

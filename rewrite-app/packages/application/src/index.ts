@@ -38,6 +38,7 @@ import {
   participantExecutionModes
 } from "@testcenter-rewrite-app/domain";
 import type {
+  AdminLoginAttempt,
   AdminAuditEvent,
   AdminAuditEventType,
   AdminRole,
@@ -1148,6 +1149,12 @@ export type FirstSliceRepository = {
   listAdminUsers(): Promise<AdminUser[]>;
   getAdminUserById(adminUserId: string): Promise<AdminUser | null>;
   getAdminUserByUsername(username: string): Promise<AdminUser | null>;
+  getAdminLoginAttempt(username: string): Promise<AdminLoginAttempt | null>;
+  recordAdminLoginFailure(input: {
+    username: string;
+    attemptedAt: string;
+    expiresAt: string;
+  }): Promise<AdminLoginAttempt>;
   saveAdminUser(adminUser: AdminUser): Promise<void>;
   deleteAdminUser(adminUserId: string): Promise<{
     deletedRoleAssignmentCount: number;
@@ -1290,12 +1297,16 @@ export type FirstSliceDependencies = {
   idGenerator?: () => string;
   now?: () => string;
   adminSessionTtlMs?: number;
+  adminLoginMaxFailures?: number;
+  adminLoginFailureWindowMs?: number;
   participantAccessTimeZone?: string;
   participantLoginMaxFailures?: number;
   participantLoginFailureWindowMs?: number;
 };
 
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
+const DEFAULT_ADMIN_LOGIN_MAX_FAILURES = 5;
+const DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 const PASSWORD_HASH_KEY_LENGTH = 64;
 const ADMIN_ROLES: AdminRole[] = [
   "platform_admin",
@@ -18873,6 +18884,11 @@ export const createFirstSliceServices = (
     return new Date(nextTimestampMs).toISOString();
   };
   const adminSessionTtlMs = dependencies.adminSessionTtlMs ?? ADMIN_SESSION_TTL_MS;
+  const adminLoginMaxFailures =
+    dependencies.adminLoginMaxFailures ?? DEFAULT_ADMIN_LOGIN_MAX_FAILURES;
+  const adminLoginFailureWindowMs =
+    dependencies.adminLoginFailureWindowMs ??
+    DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS;
   const participantAccessTimeZone =
     dependencies.participantAccessTimeZone ??
     DEFAULT_PARTICIPANT_ACCESS_TIME_ZONE;
@@ -18882,6 +18898,15 @@ export const createFirstSliceServices = (
   const participantLoginFailureWindowMs =
     dependencies.participantLoginFailureWindowMs ??
     DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS;
+  if (!Number.isInteger(adminLoginMaxFailures) || adminLoginMaxFailures <= 0) {
+    throw new Error("adminLoginMaxFailures must be a positive integer.");
+  }
+  if (
+    !Number.isInteger(adminLoginFailureWindowMs) ||
+    adminLoginFailureWindowMs <= 0
+  ) {
+    throw new Error("adminLoginFailureWindowMs must be a positive integer.");
+  }
   if (
     !Number.isInteger(participantLoginMaxFailures) ||
     participantLoginMaxFailures <= 0
@@ -20698,8 +20723,44 @@ export const createFirstSliceServices = (
       async signIn(input) {
         const username = normalizeAdminUsername(input.username);
         const password = requireAdminCredentialsPassword(input.password);
-        const adminUser = await repository.getAdminUserByUsername(username);
         const timestamp = now();
+        const loginAttempt = await repository.getAdminLoginAttempt(username);
+        const loginAttemptExpiresAtMs = Date.parse(loginAttempt?.expiresAt ?? "");
+        const timestampMs = Date.parse(timestamp);
+        if (
+          loginAttempt &&
+          loginAttempt.failedAttempts >= adminLoginMaxFailures &&
+          Number.isFinite(loginAttemptExpiresAtMs) &&
+          loginAttemptExpiresAtMs > timestampMs
+        ) {
+          const retryAfterSeconds = Math.max(
+            1,
+            Math.ceil((loginAttemptExpiresAtMs - timestampMs) / 1_000)
+          );
+          const adminUser = await repository.getAdminUserByUsername(username);
+          await recordAdminAuditEvent({
+            eventType: "admin_sign_in_failed",
+            subjectAdminUserId: adminUser?.adminUserId ?? null,
+            summary: `Admin sign-in rate limited for '${username}'.`,
+            details: {
+              username,
+              reason: "admin_login_rate_limited",
+              failedAttempts: loginAttempt.failedAttempts,
+              retryAfterSeconds
+            }
+          });
+          throw new FirstSliceError(
+            429,
+            "admin_login_rate_limited",
+            "Too many failed admin login attempts. Try again later.",
+            {
+              retryAfterSeconds,
+              maxFailures: adminLoginMaxFailures
+            }
+          );
+        }
+
+        const adminUser = await repository.getAdminUserByUsername(username);
         const signInFailureReason = !adminUser
           ? "admin_user_not_found"
           : adminUser.status !== "active"
@@ -20712,6 +20773,13 @@ export const createFirstSliceServices = (
           adminUser.status !== "active" ||
           signInFailureReason !== null
         ) {
+          const failedLoginAttempt = await repository.recordAdminLoginFailure({
+            username,
+            attemptedAt: timestamp,
+            expiresAt: new Date(
+              timestampMs + adminLoginFailureWindowMs
+            ).toISOString()
+          });
           await recordAdminAuditEvent({
             eventType: "admin_sign_in_failed",
             subjectAdminUserId: adminUser?.adminUserId ?? null,
@@ -20719,7 +20787,9 @@ export const createFirstSliceServices = (
             details: {
               username,
               reason: signInFailureReason,
-              adminUserStatus: adminUser?.status ?? null
+              adminUserStatus: adminUser?.status ?? null,
+              failedAttempts: failedLoginAttempt.failedAttempts,
+              loginAttemptExpiresAt: failedLoginAttempt.expiresAt
             }
           });
           throw new FirstSliceError(

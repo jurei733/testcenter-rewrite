@@ -476,6 +476,14 @@ const createApiRuntime = async () => {
     "FIRST_SLICE_OPERATOR_AUTH_REQUIRED",
     false
   );
+  const adminLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES",
+    DEFAULT_ADMIN_LOGIN_MAX_FAILURES
+  );
+  const adminLoginFailureWindowMs = parsePositiveIntegerEnvironmentValue(
+    "FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS",
+    DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS
+  );
   const participantLoginMaxFailures = parsePositiveIntegerEnvironmentValue(
     "FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES",
     DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES
@@ -492,6 +500,8 @@ const createApiRuntime = async () => {
   const repository = repositoryConfig.repository;
   const services = createFirstSliceServices({
     repository,
+    adminLoginMaxFailures,
+    adminLoginFailureWindowMs,
     participantAccessTimeZone:
       process.env.FIRST_SLICE_PARTICIPANT_TIME_ZONE ?? "Europe/Berlin",
     participantLoginMaxFailures,
@@ -514,6 +524,10 @@ const createApiRuntime = async () => {
         keepAliveTimeoutMs: httpKeepAliveTimeoutMs
       },
       operatorAuthRequired,
+      adminLoginProtection: {
+        maxFailures: adminLoginMaxFailures,
+        failureWindowMs: adminLoginFailureWindowMs
+      },
       participantLoginProtection: {
         maxFailures: participantLoginMaxFailures,
         failureWindowMs: participantLoginFailureWindowMs
@@ -530,6 +544,12 @@ const createApiRuntime = async () => {
           process.env.FIRST_SLICE_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES
         ),
         firstSliceOperatorAuthRequired: operatorAuthRequired,
+        firstSliceAdminLoginMaxFailuresPresent: Boolean(
+          process.env.FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES
+        ),
+        firstSliceAdminLoginFailureWindowMsPresent: Boolean(
+          process.env.FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS
+        ),
         firstSliceParticipantLoginMaxFailuresPresent: Boolean(
           process.env.FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES
         ),
@@ -630,6 +650,8 @@ const DEFAULT_MAX_SOURCE_PACKAGE_JSON_BODY_BYTES = 72 * 1024 * 1024;
 const DEFAULT_HTTP_HEADERS_TIMEOUT_MS = 60_000;
 const DEFAULT_HTTP_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_HTTP_KEEP_ALIVE_TIMEOUT_MS = 5_000;
+const DEFAULT_ADMIN_LOGIN_MAX_FAILURES = 5;
+const DEFAULT_ADMIN_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 const DEFAULT_PARTICIPANT_LOGIN_MAX_FAILURES = 5;
 const DEFAULT_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1_000;
 
@@ -3786,6 +3808,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
               runtime.config.maxSourcePackageJsonBodyBytes,
             httpTimeouts: runtime.config.httpTimeouts,
             operatorAuthRequired: runtime.config.operatorAuthRequired,
+            adminLoginProtection: runtime.config.adminLoginProtection,
             participantLoginProtection:
               runtime.config.participantLoginProtection,
             storage: {
@@ -7771,7 +7794,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       if (isFirstSliceError(error)) {
         metrics.errorCounts.firstSlice += 1;
         if (
-          error.errorCode === "participant_login_rate_limited" &&
+          (error.errorCode === "participant_login_rate_limited" ||
+            error.errorCode === "admin_login_rate_limited") &&
           typeof error.details === "object" &&
           error.details !== null &&
           "retryAfterSeconds" in error.details &&

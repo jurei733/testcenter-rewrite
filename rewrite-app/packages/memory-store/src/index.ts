@@ -1,5 +1,6 @@
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminLoginAttempt,
   AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
@@ -26,6 +27,7 @@ type InMemoryFirstSliceState = {
   attachmentFiles: Map<string, AttachmentFile>;
   adminUsers: Map<string, AdminUser>;
   adminUsersByUsername: Map<string, AdminUser>;
+  adminLoginAttempts: Map<string, AdminLoginAttempt>;
   adminRoleAssignments: Map<string, AdminRoleAssignment>;
   adminAuditEvents: Map<string, AdminAuditEvent>;
   adminSessionsByToken: Map<string, AdminSession>;
@@ -54,6 +56,7 @@ const createInitialState = (): InMemoryFirstSliceState => ({
   attachmentFiles: new Map(),
   adminUsers: new Map(),
   adminUsersByUsername: new Map(),
+  adminLoginAttempts: new Map(),
   adminRoleAssignments: new Map(),
   adminAuditEvents: new Map(),
   adminSessionsByToken: new Map(),
@@ -119,6 +122,23 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
     },
     async getAdminUserByUsername(username) {
       return state.adminUsersByUsername.get(username) ?? null;
+    },
+    async getAdminLoginAttempt(username) {
+      return state.adminLoginAttempts.get(username) ?? null;
+    },
+    async recordAdminLoginFailure(input) {
+      const current = state.adminLoginAttempts.get(input.username);
+      const next: AdminLoginAttempt = {
+        username: input.username,
+        failedAttempts:
+          !current || current.expiresAt <= input.attemptedAt
+            ? 1
+            : current.failedAttempts + 1,
+        expiresAt: input.expiresAt,
+        updatedAt: input.attemptedAt
+      };
+      state.adminLoginAttempts.set(input.username, next);
+      return next;
     },
     async saveAdminUser(adminUser) {
       state.adminUsers.set(adminUser.adminUserId, adminUser);

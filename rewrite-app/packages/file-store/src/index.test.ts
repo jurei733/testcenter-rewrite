@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import type {
+  AdminLoginAttempt,
   OperationalLoginMigrationCandidate,
   Workspace
 } from "@testcenter-rewrite-app/domain";
@@ -141,6 +142,45 @@ describe("createFileFirstSliceRepository", () => {
         ),
         []
       );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("persists and atomically advances admin login failures", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-admin-login-"));
+    const filePath = join(tempDirectory, "state.json");
+
+    try {
+      const firstAttempt = await createFileFirstSliceRepository(
+        filePath
+      ).recordAdminLoginFailure({
+        username: "sink.admin",
+        attemptedAt: "2026-01-01T00:00:00.000Z",
+        expiresAt: "2026-01-01T00:30:00.000Z"
+      });
+      assert.equal(firstAttempt.failedAttempts, 1);
+
+      const restarted = createFileFirstSliceRepository(filePath);
+      const secondAttempt = await restarted.recordAdminLoginFailure({
+        username: "sink.admin",
+        attemptedAt: "2026-01-01T00:01:00.000Z",
+        expiresAt: "2026-01-01T00:31:00.000Z"
+      });
+      assert.equal(secondAttempt.failedAttempts, 2);
+      assert.deepEqual(
+        await createFileFirstSliceRepository(filePath).getAdminLoginAttempt(
+          "sink.admin"
+        ),
+        secondAttempt satisfies AdminLoginAttempt
+      );
+
+      const resetAttempt = await restarted.recordAdminLoginFailure({
+        username: "sink.admin",
+        attemptedAt: "2026-01-01T01:00:00.000Z",
+        expiresAt: "2026-01-01T01:30:00.000Z"
+      });
+      assert.equal(resetAttempt.failedAttempts, 1);
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });
     }

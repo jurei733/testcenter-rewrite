@@ -236,6 +236,8 @@ Set `RUNTIME_PREFLIGHT_REQUIRE_BUILD_METADATA=true` in release contexts when `AP
 
 Original Testcenter roster timestamps such as `1/6/2023 10:00` are interpreted in `FIRST_SLICE_PARTICIPANT_TIME_ZONE` (default `Europe/Berlin`) and persisted as ISO timestamps. Set the variable to the field-operation timezone before importing participant rosters.
 
+Admin sign-in reproduces the original login sink with a durable global username counter: after five failed attempts, even correct credentials are rejected for 30 minutes. Configure the positive integer settings with `FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES` and `FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS`. Every adapter advances the counter atomically; blocked attempts are audited and return `429 admin_login_rate_limited` with `Retry-After`.
+
 Password-protected participant accounts use the original login-sink threshold by default: after five failed password attempts, the same tenant/workspace/login is blocked for 30 minutes, including attempts with the correct password. The persisted counter is shared by participant sign-in and starter launch across all storage adapters; unknown and passwordless logins do not increase it. Tune the positive integer settings with `FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES` and `FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS`. Blocked requests return `429 participant_login_rate_limited` and a `Retry-After` header.
 
 The `:built` variants are intended for already-built container/runtime contexts, where `tsc` is not available:

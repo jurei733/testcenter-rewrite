@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
 import type {
+  AdminLoginAttempt,
   AdminAuditEvent,
   AdminRoleAssignment,
   AdminSession,
@@ -559,6 +560,18 @@ const mapParticipantLoginAttempt = (
         tenantId: String(row.tenant_id),
         workspaceId: String(row.workspace_id),
         loginKey: String(row.login_key),
+        failedAttempts: Number(row.failed_attempts),
+        expiresAt: String(row.expires_at),
+        updatedAt: String(row.updated_at)
+      }
+    : null;
+
+const mapAdminLoginAttempt = (
+  row: Record<string, unknown> | undefined
+): AdminLoginAttempt | null =>
+  row
+    ? {
+        username: String(row.username),
         failedAttempts: Number(row.failed_attempts),
         expiresAt: String(row.expires_at),
         updatedAt: String(row.updated_at)
@@ -1237,6 +1250,20 @@ const sqliteMigrations: SqliteMigration[] = [
         PRIMARY KEY (tenant_id, workspace_id)
       );
     `
+  },
+  {
+    version: 45,
+    name: "add_admin_login_attempts",
+    sql: `
+      CREATE TABLE admin_login_attempts (
+        username TEXT PRIMARY KEY,
+        failed_attempts INTEGER NOT NULL,
+        expires_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_admin_login_attempts_expiry
+        ON admin_login_attempts (expires_at);
+    `
   }
 ];
 
@@ -1484,6 +1511,41 @@ export const createSqliteFirstSliceRepository = (
         )
         .get(username) as Record<string, unknown> | undefined;
       return mapAdminUser(row);
+    },
+    async getAdminLoginAttempt(username) {
+      return mapAdminLoginAttempt(
+        database
+          .prepare(
+            `SELECT username, failed_attempts, expires_at, updated_at
+             FROM admin_login_attempts
+             WHERE username = ?`
+          )
+          .get(username) as Record<string, unknown> | undefined
+      );
+    },
+    async recordAdminLoginFailure(input) {
+      const row = database
+        .prepare(
+          `INSERT INTO admin_login_attempts (
+            username, failed_attempts, expires_at, updated_at
+          ) VALUES (?, 1, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET
+            failed_attempts = CASE
+              WHEN admin_login_attempts.expires_at <= excluded.updated_at THEN 1
+              ELSE admin_login_attempts.failed_attempts + 1
+            END,
+            expires_at = excluded.expires_at,
+            updated_at = excluded.updated_at
+          RETURNING username, failed_attempts, expires_at, updated_at`
+        )
+        .get(input.username, input.expiresAt, input.attemptedAt) as
+        | Record<string, unknown>
+        | undefined;
+      const result = mapAdminLoginAttempt(row);
+      if (!result) {
+        throw new Error("Admin login failure could not be persisted.");
+      }
+      return result;
     },
     async saveAdminUser(adminUser) {
       database

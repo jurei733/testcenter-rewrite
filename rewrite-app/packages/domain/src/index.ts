@@ -367,6 +367,13 @@ export type ParticipantLoginAttempt = {
   updatedAt: string;
 };
 
+export type AdminLoginAttempt = {
+  username: string;
+  failedAttempts: number;
+  expiresAt: string;
+  updatedAt: string;
+};
+
 export type ParticipantBookletAssignment = {
   assignmentKey: string;
   bookletKey: string;
