@@ -24306,6 +24306,447 @@ test("original Testcenter compatibility corpus executes official IQB regex fragm
   );
 });
 
+test("original Testcenter compatibility corpus executes official IQB rule methods", async () => {
+  type CodingCase = {
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  type CodingSchemePackage = CodingCase & {
+    family: string;
+    schemeFixture: string;
+    additionalCases?: Array<CodingCase & { caseId: string }>;
+  };
+  type SchemeVariable = {
+    id: string;
+    alias?: string;
+    sourceType: string;
+  };
+  type CodingResponse = {
+    id: string;
+    status: string;
+    value: unknown;
+    code?: number;
+    score?: number;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const familyDefinitions = [
+    ["rule-matching-processing", "matching", 4],
+    ["rule-numeric-range", "numeric-range", 3],
+    ["rule-numeric-full-range", "numeric-full-range", 3],
+    ["rule-boolean-values", "boolean", 1],
+    ["rule-null-values", "null", 1],
+    ["rule-empty-values", "empty", 1],
+    ["rule-zero-values", "zero", 1],
+    ["rule-empty-array", "empty-array", 1]
+  ] as const;
+  const families = familyDefinitions.map(([family, slug, caseCount]) => {
+    const codingPackage = corpus.codingSchemePackages.find(
+      candidate => candidate.family === family
+    );
+    assert.ok(codingPackage);
+    const schemeDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, codingPackage.schemeFixture),
+      "utf8"
+    );
+    const scheme = JSON.parse(schemeDocument) as {
+      version?: string;
+      variableCodings: SchemeVariable[];
+    };
+    const cases = [
+      {
+        caseId: "01",
+        inputFixture: codingPackage.inputFixture,
+        outcomeFixture: codingPackage.outcomeFixture,
+        expectedStates: codingPackage.expectedStates
+      },
+      ...(codingPackage.additionalCases ?? [])
+    ].map(testCase => {
+      const inputResponses = JSON.parse(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, testCase.inputFixture),
+          "utf8"
+        )
+      ) as CodingResponse[];
+      const officialOutcome = JSON.parse(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, testCase.outcomeFixture),
+          "utf8"
+        )
+      ) as CodingResponse[];
+      assert.deepEqual(
+        officialOutcome.map(variable => variable.id).sort(),
+        scheme.variableCodings
+          .map(variable => variable.alias ?? variable.id)
+          .sort(),
+        `${family} case ${testCase.caseId}`
+      );
+      return {
+        ...testCase,
+        caseKey: `case${testCase.caseId}`,
+        inputResponses,
+        officialOutcome
+      };
+    });
+    assert.equal(cases.length, caseCount);
+    return {
+      family,
+      slug,
+      scheme,
+      schemeDocument,
+      cases,
+      bookletKey: `BOOKLET.IQB.RULES.${slug.toUpperCase()}`,
+      unitId: `UNIT.IQB.RULES.${slug.toUpperCase()}`,
+      unitKey: `rules-${slug}-unit`,
+      stateKey: `rules-${slug}-route`
+    };
+  });
+  assert.equal(
+    families.reduce((total, family) => total + family.cases.length, 0),
+    15
+  );
+
+  const escapeXmlAttribute = (value: string): string =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  const serializeConditionValue = (value: unknown): string => {
+    if (value !== null && typeof value === "object") {
+      return JSON.stringify(value);
+    }
+    return String(value);
+  };
+  const condition = (
+    source: "Status" | "Code" | "Score" | "Value",
+    variable: string,
+    unitKey: string,
+    expected: unknown
+  ): string =>
+    `<If><${source} of="${variable}" from="${unitKey}"/><Is equal="${escapeXmlAttribute(
+      serializeConditionValue(expected)
+    )}"/></If>`;
+  const optionConditions = (
+    family: (typeof families)[number],
+    outcome: CodingResponse[]
+  ): string =>
+    outcome
+      .map(variable => {
+        const valueCondition =
+          family.cases.length > 1
+            ? condition(
+                "Value",
+                variable.id,
+                family.unitKey,
+                variable.value
+              )
+            : "";
+        return (
+          condition(
+            "Status",
+            variable.id,
+            family.unitKey,
+            variable.status
+          ) +
+          (variable.code === undefined
+            ? ""
+            : condition(
+                "Code",
+                variable.id,
+                family.unitKey,
+                variable.code
+              )) +
+          (variable.score === undefined
+            ? ""
+            : condition(
+                "Score",
+                variable.id,
+                family.unitKey,
+                variable.score
+              )) +
+          valueCondition
+        );
+      })
+      .join("");
+  const zipEntries: ZipFixtureEntry[] = [
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            ${families
+              .flatMap(family => [
+                `<resource identifier="${family.bookletKey}" href="booklets/Booklet-${family.slug}.xml"/>`,
+                `<resource identifier="${family.unitId}" href="units/Unit-${family.slug}.xml"/>`,
+                `<resource identifier="${family.slug}.json" href="schemes/${family.slug}.json"/>`
+              ])
+              .join("")}
+          </resources>
+        </manifest>
+      `
+    },
+    ...families.flatMap(family => {
+      const baseVariables = family.scheme.variableCodings.filter(
+        variable => variable.sourceType === "BASE"
+      );
+      const derivedVariables = family.scheme.variableCodings.filter(
+        variable => variable.sourceType !== "BASE"
+      );
+      return [
+        {
+          fileName: `export/booklets/Booklet-${family.slug}.xml`,
+          content: `
+            <Booklet>
+              <Metadata><Id>${family.bookletKey}</Id><Label>Official IQB ${family.slug} rules</Label></Metadata>
+              <States>
+                <State id="${family.stateKey}" label="${family.stateKey}">
+                  ${family.cases
+                    .map(
+                      testCase =>
+                        `<Option id="${testCase.caseKey}" label="${testCase.caseKey}">${optionConditions(
+                          family,
+                          testCase.officialOutcome
+                        )}</Option>`
+                    )
+                    .join("")}
+                  <Option id="pending" label="Pending"/>
+                </State>
+              </States>
+              <Units>
+                <Unit id="${family.unitId}" alias="${family.unitKey}" label="${family.slug} rule unit"/>
+                ${family.cases
+                  .map(
+                    testCase => `
+                      <Testlet id="${family.slug}-${testCase.caseKey}-block">
+                        <Restrictions><Show if="${family.stateKey}" is="${testCase.caseKey}"/></Restrictions>
+                        <Unit id="${family.unitId}.${testCase.caseKey.toUpperCase()}" alias="${family.slug}-${testCase.caseKey}-route" label="${testCase.caseKey} route"/>
+                      </Testlet>
+                    `
+                  )
+                  .join("")}
+                <Testlet id="${family.slug}-pending-block">
+                  <Restrictions><Show if="${family.stateKey}" is="pending"/></Restrictions>
+                  <Unit id="${family.unitId}.PENDING" alias="${family.slug}-pending-route" label="Pending route"/>
+                </Testlet>
+              </Units>
+            </Booklet>
+          `
+        },
+        {
+          fileName: `export/units/Unit-${family.slug}.xml`,
+          content: `
+            <Unit>
+              <Metadata><Id>${family.unitId}</Id><Label>Official IQB ${family.slug} rules</Label></Metadata>
+              <Definition player="verona-player-simple@6.0"><![CDATA[<p>${family.slug} rules</p>]]></Definition>
+              <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/${family.slug}.json</CodingSchemeRef>
+              <BaseVariables>
+                ${baseVariables
+                  .map(
+                    variable =>
+                      `<Variable id="${variable.alias ?? variable.id}" type="string"/>`
+                  )
+                  .join("")}
+              </BaseVariables>
+              ${derivedVariables.length > 0
+                ? `<DerivedVariables>${derivedVariables
+                    .map(
+                      variable =>
+                        `<Variable id="${variable.alias ?? variable.id}" type="number"/>`
+                    )
+                    .join("")}</DerivedVariables>`
+                : ""}
+            </Unit>
+          `
+        },
+        {
+          fileName: `export/schemes/${family.slug}.json`,
+          content: family.schemeDocument
+        }
+      ];
+    })
+  ];
+  const tenantKey = "integration-tenant-official-rule-methods";
+  const workspaceKey = "integration-workspace-official-rule-methods";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-rule-methods.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${createZipBase64(
+        zipEntries
+      )}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: {
+                version?: string;
+                variableCodings: Array<{ sourceType?: string }>;
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const importedUnits =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries.flatMap(booklet => booklet.unitEntries);
+  for (const family of families) {
+    const importedUnit = importedUnits.find(
+      unit => unit.unitKey === family.unitKey
+    );
+    assert.ok(importedUnit, family.family);
+    assert.equal(
+      importedUnit.codingScheme?.version,
+      family.scheme.version,
+      family.family
+    );
+    assert.deepEqual(
+      importedUnit.codingScheme?.variableCodings.map(
+        variable => variable.sourceType
+      ),
+      family.scheme.variableCodings.map(variable => variable.sourceType),
+      family.family
+    );
+  }
+  const activate = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activate.status, 200);
+
+  for (const family of families) {
+    for (const testCase of family.cases) {
+      const signIn = await requestJson<{
+        participantSession: { participantSessionId: string };
+      }>("/api/v1/participant/auth/sign-in", {
+        method: "POST",
+        body: {
+          tenantKey,
+          workspaceKey,
+          loginKey: `official-${family.slug}-${testCase.caseKey}-participant`
+        }
+      });
+      assert.equal(signIn.status, 200);
+      const participantSessionId =
+        signIn.body.participantSession.participantSessionId;
+      const resume = await requestJson<{
+        testRun: {
+          testRunId: string;
+          bookletStates: Record<string, string>;
+        };
+      }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+        method: "POST",
+        body: { bookletKey: family.bookletKey }
+      });
+      assert.equal(resume.status, 200);
+      assert.deepEqual(
+        resume.body.testRun.bookletStates,
+        { [family.stateKey]: "pending" },
+        `${family.family} ${testCase.caseKey}`
+      );
+      const rawPlayerResponse = JSON.stringify({
+        kind: "verona_unit_state",
+        version: 1,
+        unitState: {
+          unitStateDataType: "iqb-standard@1.0",
+          presentationProgress: "complete",
+          responseProgress: "complete",
+          dataParts: { responses: JSON.stringify(testCase.inputResponses) }
+        }
+      });
+      const saveResult = await requestJson<{
+        testRun: {
+          bookletStates: Record<string, string>;
+          unitResponses: Record<string, string>;
+        };
+      }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+        method: "POST",
+        body: {
+          currentUnitKey: family.unitKey,
+          status: "running",
+          unitResponse: rawPlayerResponse
+        }
+      });
+      assert.equal(saveResult.status, 200);
+      assert.deepEqual(
+        saveResult.body.testRun.bookletStates,
+        testCase.expectedStates,
+        `${family.family} ${testCase.caseKey}`
+      );
+      assert.equal(
+        saveResult.body.testRun.unitResponses[family.unitKey],
+        rawPlayerResponse
+      );
+      const currentState = await requestJson<{
+        currentRunState: {
+          bookletUnits: Array<{ unitKey: string }>;
+          adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+          navigation: { nextUnitKey: string | null };
+        };
+      }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+      const routeUnitKey = `${family.slug}-${testCase.caseKey}-route`;
+      assert.deepEqual(
+        currentState.body.currentRunState.bookletUnits.map(
+          unit => unit.unitKey
+        ),
+        [family.unitKey, routeUnitKey],
+        `${family.family} ${testCase.caseKey}`
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          currentState.body.currentRunState.adaptiveStates.map(state => [
+            state.stateKey,
+            state.optionKey
+          ])
+        ),
+        testCase.expectedStates,
+        `${family.family} ${testCase.caseKey}`
+      );
+      assert.equal(
+        currentState.body.currentRunState.navigation.nextUnitKey,
+        routeUnitKey
+      );
+    }
+  }
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";

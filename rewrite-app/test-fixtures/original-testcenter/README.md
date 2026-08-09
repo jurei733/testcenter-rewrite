@@ -28,6 +28,12 @@ family adds all four official cases for `SORT_ARRAY`, numeric array positions,
 multi-value result `CODING_INCOMPLETE`. The versionless `fragmenting` family
 adds its official regex case, including first/second capture selection,
 `IGNORE_CASE` after fragmentation, exact scores, and unchanged response text.
+Eight `rules/*` families add all 15 official cases for matching/regex and
+legacy preprocessing, open and closed numeric ranges, one-sided numeric
+comparisons, boolean/null/empty predicates, numeric zero with derived
+`SUM_SCORE`, and empty arrays. They pin the boundary-specific
+`CODING_INCOMPLETE`, empty-string `INVALID`, automatic residual zero, and
+empty-array code 34 outcomes used by the multi-booklet Participant gate.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

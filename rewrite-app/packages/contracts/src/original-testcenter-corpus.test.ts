@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 9);
+  assert.equal(corpus.codingSchemePackages.length, 17);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1346,6 +1346,198 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       ["b1", "2 kg", "CODING_COMPLETE", 1, 1],
       ["b2", "2 kg", "CODING_COMPLETE", 1, 1],
       ["b3", "2 kg", "CODING_COMPLETE", 1, 7]
+    ]
+  );
+
+  const ruleFamilies = [
+    ["rule-matching-processing", "matching", 4],
+    ["rule-numeric-range", "numeric-range", 3],
+    ["rule-numeric-full-range", "numeric-full-range", 3],
+    ["rule-boolean-values", "boolean", 1],
+    ["rule-null-values", "null", 1],
+    ["rule-empty-values", "empty", 1],
+    ["rule-zero-values", "zero", 1],
+    ["rule-empty-array", "empty-array", 1]
+  ] as const;
+  type RuleScheme = {
+    version?: string;
+    variableCodings: Array<{
+      processing?: string[];
+      sourceParameters?: { processing?: string[] };
+      codes: Array<{
+        ruleSets: Array<{
+          rules: Array<{ method: string }>;
+        }>;
+      }>;
+    }>;
+  };
+  type RuleOutcome = Array<{
+    id: string;
+    value: unknown;
+    status: string;
+    code?: number;
+    score?: number;
+  }>;
+  const loadedRuleFamilies = ruleFamilies.map(
+    ([family, sourceDirectory, caseCount]) => {
+      const codingPackage = corpus.codingSchemePackages.find(
+        candidate => candidate.family === family
+      );
+      assert.ok(codingPackage);
+      assert.equal(
+        codingPackage.schemeSourcePath,
+        `test/coding/rules/${sourceDirectory}/coding-scheme.json`
+      );
+      assert.equal(1 + (codingPackage.additionalCases?.length ?? 0), caseCount);
+      const cases = [
+        {
+          caseId: "01",
+          inputFixture: codingPackage.inputFixture,
+          outcomeFixture: codingPackage.outcomeFixture
+        },
+        ...(codingPackage.additionalCases ?? [])
+      ];
+      assert.deepEqual(
+        cases.map(testCase => testCase.caseId),
+        Array.from({ length: caseCount }, (_, index) =>
+          String(index + 1).padStart(2, "0")
+        )
+      );
+      return {
+        family,
+        scheme: JSON.parse(
+          readFileSync(resolve(corpusRoot, codingPackage.schemeFixture), "utf8")
+        ) as RuleScheme,
+        outcomes: cases.map(testCase =>
+          JSON.parse(
+            readFileSync(
+              resolve(corpusRoot, testCase.outcomeFixture),
+              "utf8"
+            )
+          ) as RuleOutcome
+        )
+      };
+    }
+  );
+  const ruleMethods = new Set(
+    loadedRuleFamilies.flatMap(({ scheme }) =>
+      scheme.variableCodings.flatMap(variable =>
+        variable.codes.flatMap(code =>
+          code.ruleSets.flatMap(ruleSet =>
+            ruleSet.rules.map(rule => rule.method)
+          )
+        )
+      )
+    )
+  );
+  assert.deepEqual([...ruleMethods].sort(), [
+    "IS_EMPTY",
+    "IS_FALSE",
+    "IS_NULL",
+    "IS_TRUE",
+    "MATCH",
+    "MATCH_REGEX",
+    "NUMERIC_FULL_RANGE",
+    "NUMERIC_LESS_THAN",
+    "NUMERIC_MATCH",
+    "NUMERIC_MAX",
+    "NUMERIC_MIN",
+    "NUMERIC_MORE_THAN",
+    "NUMERIC_RANGE"
+  ]);
+  const processing = new Set(
+    loadedRuleFamilies.flatMap(({ scheme }) =>
+      scheme.variableCodings.flatMap(variable => [
+        ...(variable.processing ?? []),
+        ...(variable.sourceParameters?.processing ?? [])
+      ])
+    )
+  );
+  assert.ok(processing.has("IGNORE_ALL_SPACES"));
+  assert.ok(processing.has("IGNORE_CASE"));
+  assert.ok(processing.has("TAKE_DISPLAYED_AS_VALUE_CHANGED"));
+  assert.ok(processing.has("TAKE_EMPTY_AS_VALID"));
+
+  const outcomeTuples = Object.fromEntries(
+    loadedRuleFamilies.map(({ family, outcomes }) => [
+      family,
+      outcomes.map(outcome =>
+        outcome.map(variable => [
+          variable.id,
+          variable.value,
+          variable.status,
+          variable.code ?? null,
+          variable.score ?? null
+        ])
+      )
+    ])
+  );
+  assert.deepEqual(outcomeTuples["rule-numeric-range"]?.[0], [
+    ["b1", "111", "CODING_INCOMPLETE", null, null],
+    ["b2", 555, "CODING_COMPLETE", 2, 5],
+    ["b3", 60, "CODING_COMPLETE", 2, 2]
+  ]);
+  assert.deepEqual(outcomeTuples["rule-numeric-full-range"]?.[0], [
+    ["b1", "111", "CODING_COMPLETE", 1, 1],
+    ["b2", 555, "CODING_COMPLETE", 2, 5],
+    ["b3", 60, "CODING_COMPLETE", 2, 2]
+  ]);
+  assert.deepEqual(
+    outcomeTuples["rule-matching-processing"]?.map(outcome =>
+      outcome.map(variable => variable.slice(2))
+    ),
+    [
+      [
+        ["CODING_COMPLETE", 1, 1],
+        ["CODING_COMPLETE", 1, 100],
+        ["CODING_COMPLETE", 1, 7]
+      ],
+      [
+        ["CODING_COMPLETE", 1, 1],
+        ["CODING_COMPLETE", 1, 100],
+        ["CODING_COMPLETE", 1, 7]
+      ],
+      [
+        ["CODING_COMPLETE", 2, 2],
+        ["CODING_COMPLETE", 1, 100],
+        ["CODING_COMPLETE", 2, 2]
+      ],
+      [
+        ["CODING_COMPLETE", 2, 2],
+        ["CODING_COMPLETE", 0, 0],
+        ["CODING_COMPLETE", 2, 2]
+      ]
+    ]
+  );
+  assert.deepEqual(outcomeTuples["rule-boolean-values"]?.[0], [
+    ["b1", true, "CODING_COMPLETE", 1, 1],
+    ["b2", "true", "CODING_COMPLETE", 2, 5],
+    ["b3", 1, "CODING_COMPLETE", 2, 2]
+  ]);
+  assert.deepEqual(
+    [
+      outcomeTuples["rule-null-values"]?.[0],
+      outcomeTuples["rule-empty-values"]?.[0],
+      outcomeTuples["rule-zero-values"]?.[0],
+      outcomeTuples["rule-empty-array"]?.[0]
+    ],
+    [
+      [
+        ["b1", null, "CODING_INCOMPLETE", null, null],
+        ["b2", null, "CODING_COMPLETE", 1, 100],
+        ["b3", null, "CODING_INCOMPLETE", null, null]
+      ],
+      [
+        ["b1", "", "INVALID", null, null],
+        ["b2", "", "CODING_COMPLETE", 1, 100],
+        ["b3", "", "INVALID", null, null]
+      ],
+      [
+        ["b1", 0, "CODING_COMPLETE", 1, 1],
+        ["b2", 9, "CODING_COMPLETE", 1, 1],
+        ["d1", 2, "CODING_COMPLETE", 1, 1]
+      ],
+      [["b1", [], "CODING_COMPLETE", 34, 0]]
     ]
   );
 });

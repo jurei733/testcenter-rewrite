@@ -1,0 +1,134 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "alias": "b1",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": ["IGNORE_ALL_SPACES"],
+      "fragmenting": "",
+      "manualInstruction": "<p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">0</p>",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["0"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": "<p style=\"padding-left: 0; text-indent: 0; margin-bottom: 0; margin-top: 0\">\n                                Alle anderen Antworten  (automatisch)\n                              </p>"
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "alias": "b2",
+      "label": "",
+      "sourceType": "BASE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": [],
+      "processing": ["IGNORE_ALL_SPACES"],
+      "fragmenting": "",
+      "manualInstruction": "<p style=\"padding-left: 0px; text-indent: 0px; margin-bottom: 0px; margin-top: 0\" indent=\"0\" indentsize=\"20\">9</p>",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["9"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": "<p style=\"padding-left: 0; text-indent: 0; margin-bottom: 0; margin-top: 0\">\n                                Alle anderen Antworten  (automatisch)\n                              </p>"
+        }
+      ]
+    },
+    {
+      "id": "d1",
+      "alias": "d1",
+      "label": "",
+      "sourceType": "SUM_SCORE",
+      "sourceParameters": { "solverExpression": "", "processing": [] },
+      "deriveSources": ["b1", "b2"],
+      "processing": [],
+      "fragmenting": "",
+      "manualInstruction": "",
+      "codeModel": "NONE",
+      "page": "0",
+      "codes": [
+        {
+          "id": 1,
+          "label": "Richtig",
+          "score": 1,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [
+            {
+              "ruleOperatorAnd": true,
+              "rules": [
+                {
+                  "method": "NUMERIC_MATCH",
+                  "parameters": ["2"]
+                }
+              ]
+            }
+          ],
+          "manualInstruction": "",
+          "type": "FULL_CREDIT"
+        },
+        {
+          "id": 0,
+          "type": "RESIDUAL_AUTO",
+          "label": "",
+          "score": 0,
+          "ruleSetOperatorAnd": false,
+          "ruleSets": [],
+          "manualInstruction": "<p style=\"padding-left: 0; text-indent: 0; margin-bottom: 0; margin-top: 0\">\n                                Alle anderen Antworten  (automatisch)\n                              </p>"
+        }
+      ]
+    }
+  ],
+  "version": "3.0"
+}

@@ -1,0 +1,107 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_TRUE"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_FALSE"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "score": 1,
+      "sourceType": "BASE",
+      "sourceParameters": {
+        "processing": [
+          "TAKE_EMPTY_AS_VALID"
+        ]
+      },
+      "codes": [
+        {
+          "id": 1,
+          "score": 100,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_FALSE"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 5,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_TRUE"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "score": 1,
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_FALSE"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "rules": [
+                {
+                  "method": "IS_TRUE"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

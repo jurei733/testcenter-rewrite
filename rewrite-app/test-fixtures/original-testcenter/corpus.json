@@ -652,6 +652,248 @@
         "fragment-case-score": "seven",
         "fragment-value": "retained"
       }
+    },
+    {
+      "family": "rule-matching-processing",
+      "schemeFixture": "schemes/responses-3.6.0-rules-matching.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-matching-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/matching/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/matching/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/matching/01_outcome.json",
+      "schemeSha256": "f054b2818602b7fec816c273a5ca3cb65853f0c6461c5872d9621f3d14dcfe0e",
+      "inputSha256": "3e02747bcd69d79de1a797946c070c88afbd9e4f0b581ffc335ef6421f1bb094",
+      "outcomeSha256": "c327a0e46c1e33c3f3f8e1e0f4981d3f4df177c78d33690e5507385095cf8040",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-matching-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/02_outcome.json",
+          "inputSha256": "f3df4659eebc4761e2a1edfc4d960839b35c8ed77b61d41e7e5226380f70276b",
+          "outcomeSha256": "8c8af7ba3f6f24951ffbb108a7f5d1c52ee20497d151344ac48e6fdaa3552147",
+          "expectedStates": {
+            "rules-matching-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/03_outcome.json",
+          "inputSha256": "5bc0be096163ad76f96d1b8844f5f6eb1e1c8d1ef76cce2ec1c3d172371b162d",
+          "outcomeSha256": "777734c0abcafdc94d49da2e56825c1b55d68cfe529ae85fc655e0ad86b5a3c4",
+          "expectedStates": {
+            "rules-matching-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-matching-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-matching-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/matching/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/matching/04_outcome.json",
+          "inputSha256": "74d5bb98f06b94de7f21c3b9f99c0e5fe4c6523021decc31c415ad58bbf301e5",
+          "outcomeSha256": "d1d8bbe71142298a745f59474b7665c3666952cf18cc5f1a3cb234232eae78a3",
+          "expectedStates": {
+            "rules-matching-route": "case04"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-numeric-range",
+      "schemeFixture": "schemes/responses-3.6.0-rules-numeric-range.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/numeric-range/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/numeric-range/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/numeric-range/01_outcome.json",
+      "schemeSha256": "0f3335f7d696858dffe0bdd947ab51a94a372be58777af593bf9287d3cf48e50",
+      "inputSha256": "60b826905c704fdd6b7124f1867ded7f274f0b7ed7d1111b4141c3b94ff91ddb",
+      "outcomeSha256": "d8641de26f336619d69b896b22ef466f69c7ba281ab0b5434aea8862f31159b2",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-numeric-range-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-range/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-range/02_outcome.json",
+          "inputSha256": "051f00ee309e9d51f9be2f096f769763c360595e4d131acc2a648e05c6084a43",
+          "outcomeSha256": "0fdcae3c86ba8cf453e9a7033332804f360e4ae44c8f82f7a27f82fc568bf551",
+          "expectedStates": {
+            "rules-numeric-range-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-range-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-range-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-range/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-range/03_outcome.json",
+          "inputSha256": "e0583c8ee6ea408bf188fc18cad88058608791a391f595aa90372c5af47b4fef",
+          "outcomeSha256": "72ef4c354ffa9c46f34f6a66a2b28ce79a321ec3b68767ebfae5f5aa92315442",
+          "expectedStates": {
+            "rules-numeric-range-route": "case03"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-numeric-full-range",
+      "schemeFixture": "schemes/responses-3.6.0-rules-numeric-full-range.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/numeric-full-range/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/numeric-full-range/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/numeric-full-range/01_outcome.json",
+      "schemeSha256": "dd4726f5c8b448ec522e0eb36080a5a4d2fdd4740e09bace4c52cf885b487bdd",
+      "inputSha256": "60b826905c704fdd6b7124f1867ded7f274f0b7ed7d1111b4141c3b94ff91ddb",
+      "outcomeSha256": "1817fbd5e1146f44088fcb1250d435b8cb2204f95f1bb9d091cebb2987c1a828",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-numeric-full-range-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-full-range/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-full-range/02_outcome.json",
+          "inputSha256": "051f00ee309e9d51f9be2f096f769763c360595e4d131acc2a648e05c6084a43",
+          "outcomeSha256": "0fdcae3c86ba8cf453e9a7033332804f360e4ae44c8f82f7a27f82fc568bf551",
+          "expectedStates": {
+            "rules-numeric-full-range-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-numeric-full-range-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/numeric-full-range/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/numeric-full-range/03_outcome.json",
+          "inputSha256": "e0583c8ee6ea408bf188fc18cad88058608791a391f595aa90372c5af47b4fef",
+          "outcomeSha256": "72ef4c354ffa9c46f34f6a66a2b28ce79a321ec3b68767ebfae5f5aa92315442",
+          "expectedStates": {
+            "rules-numeric-full-range-route": "case03"
+          }
+        }
+      ]
+    },
+    {
+      "family": "rule-boolean-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-boolean.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-boolean-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-boolean-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/boolean/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/boolean/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/boolean/01_outcome.json",
+      "schemeSha256": "c09fcb2cc32dca9687b3fa82fe7614885bc5e3df0c55fa2970f4f926439ed350",
+      "inputSha256": "1c1bed41377db8a7a848f63e221d5626aaf2da0595211920d7268188d817edfc",
+      "outcomeSha256": "0f1d590cb4071193dbc20b97da8cdbc009ff10608607ba51e0b85e67a188c47b",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-boolean-route": "case01"
+      }
+    },
+    {
+      "family": "rule-null-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-null.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-null-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-null-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/null/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/null/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/null/01_outcome.json",
+      "schemeSha256": "6d3af6152fbe0632ef6f5f32a8807b17db77afffdb3cebb8f97a591ca3c40d0b",
+      "inputSha256": "e9383b6fdce142a12b696c227d2b5fac10c146f6644df76653095e863afb13c5",
+      "outcomeSha256": "8ffc362ef51ae900b7897e37dc3d59503dd2294602f2294f3c0af847d529d15e",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-null-route": "case01"
+      }
+    },
+    {
+      "family": "rule-empty-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-empty.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-empty-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-empty-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/empty/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/empty/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/empty/01_outcome.json",
+      "schemeSha256": "bb5f702497b3bba59cfb52938f56f5466f19f2321ba62681401b87f2ec6b8656",
+      "inputSha256": "dbf549ff516379b071a2589ef9b0de28fa667b314de53fb01152c2b5a8c4cfdc",
+      "outcomeSha256": "6bfb593e0274a25b810968cf2932f508730b0e72ff16880d84a9a65108c3283d",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-empty-route": "case01"
+      }
+    },
+    {
+      "family": "rule-zero-values",
+      "schemeFixture": "schemes/responses-3.6.0-rules-zero.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-zero-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-zero-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/zero/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/zero/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/zero/01_outcome.json",
+      "schemeSha256": "3a3f63ef66c3104920a7e5af61f659f96f9b41b3b05f681044e74e79cbcd452b",
+      "inputSha256": "ab6d0d586dbef115d1ee9a978840227dd6fc2ea7d99921da1c7d72d5a9e02448",
+      "outcomeSha256": "8aceca0cdac947345ba33da0be150365f0ac58c8de3fbccdaf14d0231986a828",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-zero-route": "case01"
+      }
+    },
+    {
+      "family": "rule-empty-array",
+      "schemeFixture": "schemes/responses-3.6.0-rules-empty-array.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-empty-array-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-empty-array-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/empty-array/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/empty-array/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/empty-array/01_outcome.json",
+      "schemeSha256": "375db85649ed56e7f40ea27168576fbe3417c90690e31ccd94a28050765618af",
+      "inputSha256": "950303fb3a26ca225cc6a5511bb6082ae341a43547ca8ca00f3dd05861982cd3",
+      "outcomeSha256": "cbc000b5aecdc45bfa7899dd970ce882ba172d0b1fbc3a035ef39e92e9ed81d0",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-empty-array-route": "case01"
+      }
     }
   ],
   "bookletConfigPackages": [
