@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 17);
+  assert.equal(corpus.codingSchemePackages.length, 18);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1357,11 +1357,16 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
     ["rule-null-values", "null", 1],
     ["rule-empty-values", "empty", 1],
     ["rule-zero-values", "zero", 1],
-    ["rule-empty-array", "empty-array", 1]
+    ["rule-empty-array", "empty-array", 1],
+    ["rule-injected-variables", "injected-vars", 4]
   ] as const;
   type RuleScheme = {
     version?: string;
     variableCodings: Array<{
+      id: string;
+      alias?: string;
+      sourceType: string;
+      codeModel?: string;
       processing?: string[];
       sourceParameters?: { processing?: string[] };
       codes: Array<{
@@ -1457,6 +1462,8 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   assert.ok(processing.has("IGNORE_CASE"));
   assert.ok(processing.has("TAKE_DISPLAYED_AS_VALUE_CHANGED"));
   assert.ok(processing.has("TAKE_EMPTY_AS_VALID"));
+  assert.ok(processing.has("REPLAY_REQUIRED"));
+  assert.ok(processing.has("NO_CODING"));
 
   const outcomeTuples = Object.fromEntries(
     loadedRuleFamilies.map(({ family, outcomes }) => [
@@ -1538,6 +1545,32 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
         ["d1", 2, "CODING_COMPLETE", 1, 1]
       ],
       [["b1", [], "CODING_COMPLETE", 34, 0]]
+    ]
+  );
+  const injectedFamily = loadedRuleFamilies.find(
+    family => family.family === "rule-injected-variables"
+  );
+  assert.ok(injectedFamily);
+  assert.deepEqual(
+    injectedFamily.scheme.variableCodings.map(variable => [
+      variable.alias ?? variable.id,
+      variable.sourceType,
+      variable.codeModel
+    ]),
+    [
+      ["b1", "BASE", "MANUAL_ONLY"],
+      ["b2", "BASE", "MANUAL_ONLY"],
+      ["b3", "BASE", "MANUAL_ONLY"],
+      ["d1", "", "MANUAL_ONLY"]
+    ]
+  );
+  assert.deepEqual(
+    outcomeTuples["rule-injected-variables"]?.map(outcome => outcome[3]),
+    [
+      ["d1", "", "CODING_COMPLETE", 0, 0],
+      ["d1", "", "DISPLAYED", -97, -99],
+      ["d1", "", "INVALID", -98, 0],
+      ["d1", "", "CODING_ERROR", -97, 0]
     ]
   );
 });

@@ -24340,7 +24340,8 @@ test("original Testcenter compatibility corpus executes official IQB rule method
     ["rule-null-values", "null", 1],
     ["rule-empty-values", "empty", 1],
     ["rule-zero-values", "zero", 1],
-    ["rule-empty-array", "empty-array", 1]
+    ["rule-empty-array", "empty-array", 1],
+    ["rule-injected-variables", "injected-vars", 4]
   ] as const;
   const families = familyDefinitions.map(([family, slug, caseCount]) => {
     const codingPackage = corpus.codingSchemePackages.find(
@@ -24405,7 +24406,7 @@ test("original Testcenter compatibility corpus executes official IQB rule method
   });
   assert.equal(
     families.reduce((total, family) => total + family.cases.length, 0),
-    15
+    19
   );
 
   const escapeXmlAttribute = (value: string): string =>

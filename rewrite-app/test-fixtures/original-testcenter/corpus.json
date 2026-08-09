@@ -894,6 +894,63 @@
       "expectedStates": {
         "rules-empty-array-route": "case01"
       }
+    },
+    {
+      "family": "rule-injected-variables",
+      "schemeFixture": "schemes/responses-3.6.0-rules-injected-vars.json",
+      "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/rules/injected-vars/coding-scheme.json",
+      "inputSourcePath": "test/coding/rules/injected-vars/01_input.json",
+      "outcomeSourcePath": "test/coding/rules/injected-vars/01_outcome.json",
+      "schemeSha256": "c52fb5e575ff1bdf73fac86d452acbc460cb9e29ce90a229ba69875d22584bec",
+      "inputSha256": "7dbb67dc1239ddac52ce784f06bb22596f88abb3630d851c1e45dbeff71a8b00",
+      "outcomeSha256": "31faefefbe3473b2ff911b000aeccbad1ca49687cbb4239cf4c492f2b0d25167",
+      "license": "MIT",
+      "expectedStates": {
+        "rules-injected-vars-route": "case01"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case2-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/02_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/02_outcome.json",
+          "inputSha256": "663abde2439cbdb5b1f7da7a1ded329b8c84a38d332ca73868a3df1d042f31df",
+          "outcomeSha256": "0b027c6336bdac12a141f1e2506e9ac4c737b790550612f6be7dd3b5fee538a8",
+          "expectedStates": {
+            "rules-injected-vars-route": "case02"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case3-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/03_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/03_outcome.json",
+          "inputSha256": "8c98158a3266aad85b8590a61c15f8a9305f4318c9614193fa77239a6bc1b9f8",
+          "outcomeSha256": "81c530309593132170e7d1160464538a502d0bb3fe81a8e0c13dd88d98d523c9",
+          "expectedStates": {
+            "rules-injected-vars-route": "case03"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-rules-injected-vars-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-rules-injected-vars-case4-outcome.json",
+          "inputSourcePath": "test/coding/rules/injected-vars/04_input.json",
+          "outcomeSourcePath": "test/coding/rules/injected-vars/04_outcome.json",
+          "inputSha256": "d31ed032c1983bd84c08204f0bc6485c8d4c3fca1e8cb100908d2927833c71f8",
+          "outcomeSha256": "319dfe20888b9034c0bb79202a5cf8aacea53be36c9e51404b41d777ca59ad4e",
+          "expectedStates": {
+            "rules-injected-vars-route": "case04"
+          }
+        }
+      ]
     }
   ],
   "bookletConfigPackages": [

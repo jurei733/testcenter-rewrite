@@ -15589,6 +15589,7 @@ const resolveAdaptiveVariables = (
       )
     ])
   );
+  const suppliedVariableKeysByUnitKey = new Map<string, Set<string>>();
   for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
     const parsedResponse = parseVeronaUnitResponse(response);
     if (
@@ -15599,6 +15600,8 @@ const resolveAdaptiveVariables = (
       continue;
     }
     const variables = variablesByUnitKey.get(unitKey) ?? new Map();
+    const suppliedVariableKeys =
+      suppliedVariableKeysByUnitKey.get(unitKey) ?? new Set<string>();
     for (const dataPart of Object.values(
       parsedResponse.unitState.dataParts ?? {}
     )) {
@@ -15627,6 +15630,7 @@ const resolveAdaptiveVariables = (
             ...(typeof value.code === "number" ? { code: value.code } : {}),
             ...(typeof value.score === "number" ? { score: value.score } : {})
           });
+          suppliedVariableKeys.add(value.id);
         }
       } catch {
         // Invalid data parts remain persisted for player restoration, but cannot
@@ -15634,6 +15638,7 @@ const resolveAdaptiveVariables = (
       }
     }
     variablesByUnitKey.set(unitKey, variables);
+    suppliedVariableKeysByUnitKey.set(unitKey, suppliedVariableKeys);
   }
 
   for (const unitEntry of booklet.unitEntries) {
@@ -15663,7 +15668,47 @@ const resolveAdaptiveVariables = (
               value: null
             } satisfies IqbResponse);
       });
-      for (const codedVariable of codingScheme.code(baseResponses)) {
+      const baseVariableKeySet = new Set(baseVariableKeys);
+      const injectableVariableKeys = new Set(
+        codingScheme.variableCodings
+          .filter(
+            variableCoding =>
+              variableCoding.sourceType !== "BASE" &&
+              variableCoding.sourceType !== "BASE_NO_VALUE"
+          )
+          .flatMap(variableCoding => [
+            variableCoding.id,
+            variableCoding.alias || variableCoding.id
+          ])
+      );
+      // IQB-standard Player state may already contain a manually coded or
+      // externally injected derived response. Keep only values that were
+      // actually supplied by the Player and belong to this coding scheme;
+      // launch-time UNSET placeholders must not suppress normal derivation.
+      const injectedResponses = [
+        ...(suppliedVariableKeysByUnitKey.get(unitEntry.unitKey) ?? [])
+      ].flatMap(variableKey => {
+        const variable = variables.get(variableKey);
+        return variable &&
+          !baseVariableKeySet.has(variableKey) &&
+          injectableVariableKeys.has(variableKey)
+          ? [
+              {
+                id: variable.id,
+                status: variable.status as IqbResponse["status"],
+                value: variable.value as IqbResponse["value"],
+                ...(variable.code === undefined ? {} : { code: variable.code }),
+                ...(variable.score === undefined
+                  ? {}
+                  : { score: variable.score })
+              } satisfies IqbResponse
+            ]
+          : [];
+      });
+      for (const codedVariable of codingScheme.code([
+        ...baseResponses,
+        ...injectedResponses
+      ])) {
         if (!trackedVariableKeys.has(codedVariable.id)) {
           continue;
         }

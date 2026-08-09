@@ -34,6 +34,11 @@ comparisons, boolean/null/empty predicates, numeric zero with derived
 `SUM_SCORE`, and empty arrays. They pin the boundary-specific
 `CODING_INCOMPLETE`, empty-string `INVALID`, automatic residual zero, and
 empty-array code 34 outcomes used by the multi-booklet Participant gate.
+The four byte-exact `rules/injected-vars` cases extend that gate with a ninth
+family. They preserve a Player-supplied non-Base `d1` response across
+`CODING_COMPLETE`, `DISPLAYED`, `INVALID`, and `CODING_ERROR`, including zero
+and negative code/score values, while the three Base values still normalize to
+`NO_CODING` through the official server-side coder.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

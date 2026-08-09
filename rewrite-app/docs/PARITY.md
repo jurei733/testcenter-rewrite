@@ -200,16 +200,19 @@ reproduces all three official code/score pairs. Eight persisted Booklet states,
 the unchanged `2 kg` raw Player response, and the exclusive matched route are
 gated across memory, file, and SQLite.
 
-Latest P0 rule-method closure: eight more official `@iqb/responses` 3.6.0
-families contribute 15 byte-exact scheme/input/outcome cases for matching,
-numeric ranges, booleans, nulls, empty strings, numeric zero, and empty arrays.
-A single imported eight-booklet package executes `MATCH`, `MATCH_REGEX`,
+Latest P0 rule-method closure: nine more official `@iqb/responses` 3.6.0
+families contribute 19 byte-exact scheme/input/outcome cases for matching,
+numeric ranges, booleans, nulls, empty strings, numeric zero, empty arrays, and
+Player-injected variables. A single imported nine-booklet package executes `MATCH`, `MATCH_REGEX`,
 `NUMERIC_MATCH`, `NUMERIC_RANGE`, `NUMERIC_FULL_RANGE`, all four numeric
 one-sided comparisons, `IS_TRUE`, `IS_FALSE`, `IS_NULL`, and `IS_EMPTY`, plus
 the original whitespace/case/displayed/empty preprocessing. The Participant
 gate distinguishes open from closed boundary behavior, residual zero coding,
 `INVALID`, `CODING_INCOMPLETE`, empty-array code 34, and derived `SUM_SCORE`;
-all 15 official raw inputs retain their envelopes and select exactly one
+it also preserves actually supplied non-Base responses instead of replacing
+their manual/external `CODING_COMPLETE`, `DISPLAYED`, `INVALID`, or
+`CODING_ERROR` status and signed code/score values with an initialized `UNSET`.
+All 19 official raw inputs retain their envelopes and select exactly one
 persisted route across memory, file, and SQLite.
 
 ## Capability matrix
