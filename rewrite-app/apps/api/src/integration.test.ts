@@ -12303,17 +12303,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
   }
 
   const operationalOnlyRoster = await requestJson<{
-    error: string;
-    details: {
-      operationalLoginCandidates: Array<{
-        loginKey: string;
-        loginMode: string;
-        groupKey: string | null;
-        passwordRequired: boolean;
-        profileIds: string[];
-        customTexts: Record<string, string>;
-      }>;
-    };
+    importedCount: number;
+    updatedCount: number;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      loginMode: string;
+      groupKey: string | null;
+      passwordRequired: boolean;
+      profileIds: string[];
+      monitorProfiles: unknown[];
+      customTexts: Record<string, string>;
+      unresolvedProfileIds: string[];
+    }>;
   }>(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
     {
@@ -12324,13 +12325,11 @@ test("original Testcenter compatibility corpus imports representative booklets",
       }
     }
   );
-  assert.equal(operationalOnlyRoster.status, 400);
-  assert.equal(
-    operationalOnlyRoster.body.error,
-    "participant_roster_operational_only"
-  );
+  assert.equal(operationalOnlyRoster.status, 201);
+  assert.equal(operationalOnlyRoster.body.importedCount, 0);
+  assert.equal(operationalOnlyRoster.body.updatedCount, 0);
   assert.deepEqual(
-    operationalOnlyRoster.body.details.operationalLoginCandidates,
+    operationalOnlyRoster.body.operationalLoginCandidates,
     [
       {
         loginKey: "study-monitor",
@@ -28381,6 +28380,140 @@ test("participant launch rejects closed sessions after completion", async () => 
 
   assert.equal(directLaunch.status, 409);
   assert.equal(directLaunch.body.error, "participant_session_closed");
+});
+
+test("workspace participant roster accepts operational-only Testtakers as migration input", async () => {
+  const tenantKey = "integration-tenant-operational-only-roster";
+  const workspaceKey = "integration-workspace-operational-only-roster";
+  const rosterText = [
+    "<Testtakers>",
+    "  <CustomTexts>",
+    '    <CustomText key="gm_headline">Imported monitor headline</CustomText>',
+    "  </CustomTexts>",
+    "  <Profiles><GroupMonitor>",
+    '    <Profile id="all" label="All sessions" view="small" />',
+    "  </GroupMonitor></Profiles>",
+    '  <Group id="operators" validFor="30">',
+    '    <Login mode="monitor-study" name="study-migration" pw="source-study-secret">',
+    '      <Profile id="all" />',
+    "    </Login>",
+    '    <Login mode="sys-check-login" name="system-check-migration" pw="source-system-secret" />',
+    "  </Group>",
+    "</Testtakers>"
+  ].join("\n");
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const importResult = await requestJson<{
+    importedCount: number;
+    updatedCount: number;
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      loginMode: string;
+      groupKey: string | null;
+      passwordRequired: boolean;
+      profileIds: string[];
+      monitorProfiles: Array<{ profileId: string; label: string }>;
+      customTexts: Record<string, string>;
+      validForMinutes: number | null;
+    }>;
+    items: unknown[];
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: { rosterText }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importedCount, 0);
+  assert.equal(importResult.body.updatedCount, 0);
+  assert.deepEqual(importResult.body.items, []);
+  assert.deepEqual(
+    importResult.body.operationalLoginCandidates.map(candidate => ({
+      loginKey: candidate.loginKey,
+      loginMode: candidate.loginMode,
+      groupKey: candidate.groupKey,
+      passwordRequired: candidate.passwordRequired,
+      profileIds: candidate.profileIds,
+      monitorProfileIds: candidate.monitorProfiles.map(
+        profile => profile.profileId
+      ),
+      customTexts: candidate.customTexts,
+      validForMinutes: candidate.validForMinutes
+    })),
+    [
+      {
+        loginKey: "study-migration",
+        loginMode: "monitor-study",
+        groupKey: "operators",
+        passwordRequired: true,
+        profileIds: ["all"],
+        monitorProfileIds: ["all"],
+        customTexts: { gm_headline: "Imported monitor headline" },
+        validForMinutes: 30
+      },
+      {
+        loginKey: "system-check-migration",
+        loginMode: "sys-check-login",
+        groupKey: "operators",
+        passwordRequired: true,
+        profileIds: [],
+        monitorProfileIds: [],
+        customTexts: { gm_headline: "Imported monitor headline" },
+        validForMinutes: 30
+      }
+    ]
+  );
+  assert.equal(
+    JSON.stringify(importResult.body).includes("source-study-secret"),
+    false
+  );
+  assert.equal(
+    JSON.stringify(importResult.body).includes("source-system-secret"),
+    false
+  );
+
+  const savedRoster = await requestJson<{ items: unknown[] }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`
+  );
+  assert.equal(savedRoster.status, 200);
+  assert.deepEqual(savedRoster.body.items, []);
+
+  const activityEvents = await requestJson<{
+    items: Array<{
+      activityEvent: {
+        summary: string;
+        details: {
+          importedCount: number;
+          updatedCount: number;
+          parsedCount: number;
+          migrationOnly: boolean;
+          operationalLoginCandidateCount: number;
+        };
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/activity-events?eventType=participant_roster_imported`
+  );
+  assert.equal(activityEvents.status, 200);
+  assert.equal(activityEvents.body.items.length, 1);
+  assert.match(
+    activityEvents.body.items[0]!.activityEvent.summary,
+    /Classified 2 operational login candidates/
+  );
+  assert.deepEqual(activityEvents.body.items[0]!.activityEvent.details, {
+    importedCount: 0,
+    updatedCount: 0,
+    parsedCount: 0,
+    migrationOnly: true,
+    operationalLoginCandidateCount: 2
+  });
 });
 
 test("workspace participant roster can be imported, updated, and listed", async () => {

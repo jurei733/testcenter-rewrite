@@ -22927,15 +22927,10 @@ export const createFirstSliceServices = (
         const operationalLoginCandidates =
           parseOriginalTestcenterOperationalLogins(input.rosterText);
         const parsedEntries = parseParticipantRosterText(input.rosterText);
-        if (parsedEntries.length === 0) {
-          if (operationalLoginCandidates.length > 0) {
-            throw new FirstSliceError(
-              400,
-              "participant_roster_operational_only",
-              "Testtakers XML contains only operational logins; explicit role mapping is required before admin accounts can be created.",
-              { operationalLoginCandidates }
-            );
-          }
+        if (
+          parsedEntries.length === 0 &&
+          operationalLoginCandidates.length === 0
+        ) {
           throw new FirstSliceError(
             400,
             "participant_roster_empty",
@@ -23071,18 +23066,25 @@ export const createFirstSliceServices = (
           }
         }
 
-        if (parsedEntries.length > 0) {
+        if (
+          parsedEntries.length > 0 ||
+          operationalLoginCandidates.length > 0
+        ) {
+          const migrationOnly = parsedEntries.length === 0;
           await recordWorkspaceActivity({
             tenantId: workspace.tenantId,
             workspaceId: workspace.workspaceId,
             eventType: "participant_roster_imported",
             subjectType: "workspace",
             subjectId: workspace.workspaceId,
-            summary: `Imported ${importedCount} and updated ${updatedCount} participant roster entries.`,
+            summary: migrationOnly
+              ? `Classified ${operationalLoginCandidates.length} operational login candidate${operationalLoginCandidates.length === 1 ? "" : "s"} for explicit account migration.`
+              : `Imported ${importedCount} and updated ${updatedCount} participant roster entries.`,
             details: {
               importedCount,
               updatedCount,
               parsedCount: parsedEntries.length,
+              migrationOnly,
               operationalLoginCandidateCount:
                 operationalLoginCandidates.length
             }

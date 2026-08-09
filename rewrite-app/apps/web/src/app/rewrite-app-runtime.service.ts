@@ -279,8 +279,14 @@ export class RewriteAppRuntimeService {
     const operationalCandidateSummary = operationalCandidateCount
       ? `, ${operationalCandidateCount} operational login candidate${operationalCandidateCount === 1 ? "" : "s"} awaiting explicit role mapping`
       : "";
+    const migrationOnly =
+      payload.importedCount === 0 &&
+      payload.updatedCount === 0 &&
+      operationalCandidateCount > 0;
     this.feedback.rememberActivity(
-      "Participant Roster Imported",
+      migrationOnly
+        ? "Operational Logins Classified"
+        : "Participant Roster Imported",
       `${payload.importedCount} imported, ${payload.updatedCount} updated${operationalCandidateSummary}.`
     );
     await this.refreshCrossViewStateAfterRuntimeChange();

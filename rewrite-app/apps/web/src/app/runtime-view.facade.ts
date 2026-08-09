@@ -6,6 +6,7 @@ import {
   mergeMonitorCustomTextScopes,
   mapOriginalTestcenterOperationalLoginToAdminRole,
   filterOpenMonitorRunsByProfile,
+  parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText,
   resolveMonitorCustomText,
   type MonitorCustomTextKey
@@ -822,6 +823,8 @@ export class RuntimeViewFacade {
     }
 
     let entries: ParsedParticipantRosterEntry[];
+    const operationalLoginCandidates =
+      this.parseEntryOperationalLoginCandidatesPreview();
     try {
       entries = parseParticipantRosterText(rosterText);
     } catch (error) {
@@ -838,6 +841,41 @@ export class RuntimeViewFacade {
             }
           ]
         }
+      ];
+    }
+
+    if (entries.length === 0 && operationalLoginCandidates.length > 0) {
+      return [
+        {
+          headline: `${operationalLoginCandidates.length} operational login candidate${operationalLoginCandidates.length === 1 ? "" : "s"} detected`,
+          subline:
+            "Import will classify password-redacted monitor and system-check accounts without creating participant rows.",
+          badges: ["local preview", "migration ready"],
+          rows: [
+            {
+              label: "Password Safety",
+              value:
+                "Source passwords stay unavailable; every migrated account needs a newly assigned password."
+            }
+          ]
+        },
+        ...operationalLoginCandidates.slice(0, 5).map(candidate => ({
+          headline: candidate.loginKey,
+          subline: candidate.loginMode,
+          badges: [
+            candidate.groupKey ?? "group missing",
+            candidate.passwordRequired ? "password protected" : "passwordless"
+          ],
+          rows: [
+            { label: "Original Mode", value: candidate.loginMode },
+            { label: "Original Group", value: candidate.groupKey ?? "none" },
+            {
+              label: "Migration",
+              value:
+                "Explicit non-escalating account mapping after successful import"
+            }
+          ]
+        }))
       ];
     }
 
@@ -3102,7 +3140,8 @@ export class RuntimeViewFacade {
     return (
       this.canWriteWorkspace &&
       this.canUseWorkspaceScope &&
-      this.parseEntryRosterRowsPreview().length > 0
+      (this.parseEntryRosterRowsPreview().length > 0 ||
+        this.parseEntryOperationalLoginCandidatesPreview().length > 0)
     );
   }
 
@@ -4329,6 +4368,16 @@ export class RuntimeViewFacade {
   private parseEntryRosterRowsPreview(): ParsedParticipantRosterEntry[] {
     try {
       return parseParticipantRosterText(this.runtime.entryRosterText);
+    } catch {
+      return [];
+    }
+  }
+
+  private parseEntryOperationalLoginCandidatesPreview() {
+    try {
+      return parseOriginalTestcenterOperationalLogins(
+        this.runtime.entryRosterText
+      );
     } catch {
       return [];
     }

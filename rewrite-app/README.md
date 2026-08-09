@@ -65,9 +65,10 @@ window, login-specific custom texts, and only a `passwordRequired` flag—never
 the source password. The
 migration preview includes original view, column, auto-next, and filter settings
 and flags missing profile definitions. Mixed rosters import their participant
-rows and show the candidates in a dedicated Runtime card;
-operational-only rosters return the
-stable `participant_roster_operational_only` error. Administrators can create
+rows and show the candidates in a dedicated Runtime card. Operational-only
+rosters are accepted as an explicit account-migration input: they make zero
+participant changes, retain only password-redacted candidates, and record the
+classification in workspace activity. Administrators can create
 non-escalating `group_monitor`, `study_monitor`, and `system_check` accounts with
 the resolved monitor profiles attached to their scoped role. Monitor sign-in
 restores those profiles, offers the original alternatives for selection, applies

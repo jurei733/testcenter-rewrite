@@ -3961,6 +3961,86 @@ try {
     .waitFor();
   stopAfter("content-prompt-read-model");
 
+  logStep("operational-only-login-migration-candidates");
+  const operationalOnlyStudyUsername =
+    "entry-operational-only-study-monitor";
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
+  await page.locator("#entryRosterText").waitFor();
+  await fillAndCommit(
+    "#entryRosterText",
+    [
+      "<Testtakers>",
+      "  <CustomTexts>",
+      "    <CustomText key=\"gm_headline\">Operational-only monitor</CustomText>",
+      "  </CustomTexts>",
+      "  <Profiles><GroupMonitor>",
+      "    <Profile id=\"all\" label=\"All operational sessions\" view=\"small\" />",
+      "  </GroupMonitor></Profiles>",
+      "  <Group id=\"group:operational-only\" validFor=\"30\">",
+      `    <Login mode="monitor-study" name="${operationalOnlyStudyUsername}" pw="operational-source-secret">`,
+      "      <Profile id=\"all\" />",
+      "    </Login>",
+      "  </Group>",
+      "</Testtakers>"
+    ].join("\n")
+  );
+  const operationalOnlyPreview = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", { name: "Roster Input Preview" })
+    });
+  await operationalOnlyPreview
+    .filter({ hasText: "1 operational login candidate detected" })
+    .filter({ hasText: operationalOnlyStudyUsername })
+    .filter({ hasText: "migration ready" })
+    .filter({ hasText: "Source passwords stay unavailable" })
+    .waitFor();
+  await expectButtonSelectorEnabled("#importParticipantRosterButton");
+  await expectButtonSelectorDisabled("#generateEntryLinksButton");
+  const operationalOnlyImportResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/participant-roster")
+  );
+  await page.locator("#importParticipantRosterButton").click();
+  const operationalOnlyImportResponse =
+    await operationalOnlyImportResponsePromise;
+  assert.equal(operationalOnlyImportResponse.status(), 201);
+  const operationalOnlyImportPayload =
+    await operationalOnlyImportResponse.json();
+  assert.equal(operationalOnlyImportPayload.importedCount, 0);
+  assert.equal(operationalOnlyImportPayload.updatedCount, 0);
+  assert.equal(
+    operationalOnlyImportPayload.operationalLoginCandidates[0]?.loginKey,
+    operationalOnlyStudyUsername
+  );
+  assert.equal(
+    JSON.stringify(operationalOnlyImportPayload).includes(
+      "operational-source-secret"
+    ),
+    false
+  );
+  const operationalOnlyCandidateCard = page
+    .locator("app-record-collection")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Operational Login Migration Candidates"
+      })
+    })
+    .locator(".record-card")
+    .filter({
+      has: page.getByRole("heading", {
+        name: operationalOnlyStudyUsername
+      })
+    })
+    .filter({ hasText: "Ready to prepare a study_monitor account draft" })
+    .filter({ hasText: "All operational sessions (all)" });
+  await operationalOnlyCandidateCard.waitFor();
+  await operationalOnlyCandidateCard
+    .getByRole("button", { name: "Prepare Monitor Account" })
+    .waitFor();
+  stopAfter("operational-only-login-migration-candidates");
+
   logStep("participant-entry-ambiguous-workspace-guidance");
   const ambiguousParticipantWorkspaceKey = `ui-ambiguous-workspace-${Date.now()}`;
   const ambiguousParticipantTenantA = `ui-ambiguous-tenant-a-${Date.now()}`;

@@ -486,7 +486,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <article class="card">
         <h2>Participant Entry Links</h2>
-        <p>Import participant rows into the workspace roster, then generate start links from saved entries. CSV/TSV/semicolon rows can use headers such as login, group, booklet, name or the canonical loginKey, groupKey, bookletKey, displayName columns; positional rows, Testtaker/Participant-style XML, and JSON roster structures are accepted too.</p>
+        <p>Import participant rows into the workspace roster, then generate start links from saved entries. Original Testtakers XML containing only monitor or system-check logins is accepted as password-redacted account-migration input without creating participant rows. CSV/TSV/semicolon rows can use headers such as login, group, booklet, name or the canonical loginKey, groupKey, bookletKey, displayName columns; positional rows, Testtaker/Participant-style XML, and JSON roster structures are accepted too.</p>
         <label>
           Load Roster File
           <input
@@ -503,9 +503,9 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </label>
         <app-record-collection
           title="Roster Input Preview"
-          subtitle="Local parser result before importing or generating links."
+          subtitle="Local participant or operational-account parser result before importing or generating links."
           [items]="view.entryRosterPreviewItems"
-          emptyState="Paste CSV/TSV/semicolon, XML, or JSON roster text to preview parsed participants."
+          emptyState="Paste CSV/TSV/semicolon, XML, or JSON roster text to preview participants or operational-account migration candidates."
         ></app-record-collection>
         <div class="actions">
           <button id="importParticipantRosterButton" class="primary" type="button" [disabled]="!view.canImportParticipantRoster" (click)="view.importParticipantRoster()">Import Saved Roster</button>
