@@ -12755,6 +12755,8 @@ const collectLooseSourcePackageDependencyReferences = (
   }
 
   if (rootName === "unit") {
+    const metadata = xmlChildrenNamed(root, "Metadata")[0];
+    addReference(xmlElementText(xmlChildrenNamed(metadata, "Reference")[0]));
     const definition =
       xmlChildrenNamed(root, "DefinitionRef")[0] ??
       xmlChildrenNamed(root, "Definition")[0];

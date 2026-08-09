@@ -237,6 +237,15 @@ original ID-only last-write view, while the full raw multi-subform Player
 envelope remains byte-for-byte restorable. Alias and final subform
 status/value/code/score routes persist across memory, file, and SQLite.
 
+Latest P0 Unit-metadata dependency closure: the pinned original Aspect package
+now includes the two byte-exact `.vomd` documents referenced by
+`Unit/Metadata/Reference`. Automatic loose-file resolution follows those
+references alongside Booklet, Unit, Voud, and Player dependencies, producing a
+ten-file audited immutable assembly whose downloadable snapshot retains both
+metadata documents unchanged. A partial chain with a missing `.vomd` fails
+with `source_document_workspace_dependency_incomplete` and names the missing
+path. The complete graph and failure path run across memory, file, and SQLite.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

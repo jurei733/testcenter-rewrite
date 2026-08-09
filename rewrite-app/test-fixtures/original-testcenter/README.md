@@ -144,8 +144,10 @@ original sample `.itcr.zip` resource package as base64 so the binary fixture
 remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as
 Brotli-compressed base64 together with the complete original three-unit 17.4
 booklet. Its media-heavy 16.17 MB second Voud definition is compressed the same
-way; tests decode both artifacts with Node's built-in Brotli support and verify
-every original Unit/Voud/player SHA-256 recorded in `corpus.json`. The rewrite
+way. The two byte-identical `.vomd` documents referenced from Unit metadata are
+stored as base64 without changing their source bytes. Tests decode the artifacts
+with Node's built-in Brotli/Base64 support and verify every original
+Unit/Voud/Vomd/player SHA-256 recorded in `corpus.json`. The rewrite
 uses these fixtures to gate successful imports,
 compiled runtime policies, restriction semantics, and a compatibility profile
 for the original schemas. It does not yet claim complete XSD coverage or every

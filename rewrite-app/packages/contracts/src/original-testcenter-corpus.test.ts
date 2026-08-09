@@ -176,6 +176,17 @@ type OriginalTestcenterCorpus = {
     };
   }>;
   playerPackages: Array<{
+    units: Array<{
+      unitKey: string;
+      unitFixture: string;
+      metadataReferenceFixture?: string;
+      metadataReferenceEncoding?: "base64";
+      metadataReferenceSha256?: string;
+      sourcePaths: {
+        unit: string;
+        metadataReference?: string;
+      };
+    }>;
     roster: {
       fixture: string;
       sourcePath: string;
@@ -612,6 +623,53 @@ test("original Testcenter compatibility corpus pins the Aspect player roster", (
   assert.equal(operationalLogins[0]?.loginMode, "monitor-group");
   assert.equal(operationalLogins[0]?.groupKey, roster.groupKey);
   assert.equal(operationalLogins[0]?.passwordRequired, true);
+
+  const aspectPackage = corpus.playerPackages[0];
+  assert.ok(aspectPackage);
+  const metadataUnits = aspectPackage.units.filter(
+    unit => unit.metadataReferenceFixture
+  );
+  assert.deepEqual(
+    metadataUnits.map(unit => [
+      unit.unitKey,
+      unit.sourcePaths.metadataReference
+    ]),
+    [
+      [
+        "testcenter-sample1",
+        "sampledata/aspect/testcenter-sample1.vomd"
+      ],
+      [
+        "testcenter-sample3",
+        "sampledata/aspect/testcenter-sample3.vomd"
+      ]
+    ]
+  );
+  for (const unit of metadataUnits) {
+    assert.equal(unit.metadataReferenceEncoding, "base64");
+    assert.ok(unit.metadataReferenceFixture);
+    assert.ok(unit.metadataReferenceSha256);
+    const metadataDocument = Buffer.from(
+      readFileSync(
+        resolve(corpusRoot, unit.metadataReferenceFixture),
+        "utf8"
+      ).trim(),
+      "base64"
+    );
+    assert.equal(
+      createHash("sha256").update(metadataDocument).digest("hex"),
+      unit.metadataReferenceSha256,
+      unit.sourcePaths.metadataReference
+    );
+    assert.deepEqual(JSON.parse(metadataDocument.toString("utf8")), {
+      profiles: [],
+      items: []
+    });
+    assert.match(
+      readFileSync(resolve(corpusRoot, unit.unitFixture), "utf8"),
+      new RegExp(`<Reference>${unit.unitKey}\\.vomd<\\/Reference>`)
+    );
+  }
 });
 
 test("original Testcenter compatibility corpus pins the official Verona 2 through 5 players", () => {

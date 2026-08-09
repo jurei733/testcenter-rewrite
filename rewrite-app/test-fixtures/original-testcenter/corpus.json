@@ -1940,12 +1940,16 @@
           "unitFixture": "units/aspect-testcenter-sample1.xml",
           "definitionFixture": "definitions/aspect-testcenter-sample1.voud",
           "definitionEncoding": "utf8",
+          "metadataReferenceFixture": "definitions/aspect-testcenter-sample1.vomd.base64",
+          "metadataReferenceEncoding": "base64",
           "sourcePaths": {
             "unit": "sampledata/aspect/testcenter-sample1.xml",
-            "definition": "sampledata/aspect/testcenter-sample1.voud"
+            "definition": "sampledata/aspect/testcenter-sample1.voud",
+            "metadataReference": "sampledata/aspect/testcenter-sample1.vomd"
           },
           "unitSha256": "d4f699a4af07b36edfbe34e3fd0f7e02425df22b533d0c763877e2409416232c",
-          "definitionSha256": "2b62797529990581859363634476a4ca96d4c916b31b8655a2599511e89818f3"
+          "definitionSha256": "2b62797529990581859363634476a4ca96d4c916b31b8655a2599511e89818f3",
+          "metadataReferenceSha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
         },
         {
           "unitKey": "testcenter-sample2",
@@ -1964,12 +1968,16 @@
           "unitFixture": "units/aspect-testcenter-sample3.xml",
           "definitionFixture": "definitions/aspect-testcenter-sample3.voud",
           "definitionEncoding": "utf8",
+          "metadataReferenceFixture": "definitions/aspect-testcenter-sample3.vomd.base64",
+          "metadataReferenceEncoding": "base64",
           "sourcePaths": {
             "unit": "sampledata/aspect/testcenter-sample3.xml",
-            "definition": "sampledata/aspect/testcenter-sample3.voud"
+            "definition": "sampledata/aspect/testcenter-sample3.voud",
+            "metadataReference": "sampledata/aspect/testcenter-sample3.vomd"
           },
           "unitSha256": "cdea5bcc2145e9d55e4a300eae8a99e39a9d4e836991c65c77f71d7ade6eca67",
-          "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a"
+          "definitionSha256": "5a64638e783060927532e50179c2d7fd857cee07b0ce96fe388de3d941e6e77a",
+          "metadataReferenceSha256": "6109866263bb49ff2ced5f8ff28c12a55b80c32b043037f4fc96b2b0aba32007"
         }
       ]
     }

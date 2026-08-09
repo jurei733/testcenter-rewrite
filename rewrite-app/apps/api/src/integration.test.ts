@@ -16179,6 +16179,9 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
     unitFixture: string;
     definitionFixture: string;
     definitionEncoding: "utf8" | "brotli-base64";
+    metadataReferenceFixture?: string;
+    metadataReferenceEncoding?: "base64";
+    metadataReferenceSha256?: string;
     unitSha256: string;
     definitionSha256: string;
   };
@@ -16237,7 +16240,33 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
       createHash("sha256").update(definitionDocument.trim()).digest("hex"),
       unit.definitionSha256
     );
-    return { ...unit, unitDocument, definitionDocument };
+    const metadataReferenceDocument = unit.metadataReferenceFixture
+      ? Buffer.from(
+          readFileSync(
+            resolve(
+              originalTestcenterCorpusRoot,
+              unit.metadataReferenceFixture
+            ),
+            "utf8"
+          ).trim(),
+          "base64"
+        ).toString("utf8")
+      : null;
+    if (metadataReferenceDocument !== null) {
+      assert.equal(unit.metadataReferenceEncoding, "base64");
+      assert.equal(
+        createHash("sha256")
+          .update(metadataReferenceDocument)
+          .digest("hex"),
+        unit.metadataReferenceSha256
+      );
+    }
+    return {
+      ...unit,
+      unitDocument,
+      definitionDocument,
+      metadataReferenceDocument
+    };
   });
   assert.equal(unitPackages.length, 3);
   const playerDocument = readBrotliBase64Fixture(
@@ -16267,7 +16296,12 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
               ${unitPackages
                 .flatMap(unit => [
                   `<resource identifier="${unit.unitKey}" href="units/${unit.unitKey}.xml" />`,
-                  `<resource identifier="${unit.unitKey}.voud" href="units/${unit.unitKey}.voud" />`
+                  `<resource identifier="${unit.unitKey}.voud" href="units/${unit.unitKey}.voud" />`,
+                  ...(unit.metadataReferenceDocument === null
+                    ? []
+                    : [
+                        `<resource identifier="${unit.unitKey}.vomd" href="units/${unit.unitKey}.vomd" />`
+                      ])
                 ])
                 .join("\n              ")}
               <resource identifier="${expectation.playerKey}" href="players/iqb-player-aspect-2.12.3.html" />
@@ -16287,7 +16321,15 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
         {
           fileName: `export/units/${unit.unitKey}.voud`,
           content: unit.definitionDocument
-        }
+        },
+        ...(unit.metadataReferenceDocument === null
+          ? []
+          : [
+              {
+                fileName: `export/units/${unit.unitKey}.vomd`,
+                content: unit.metadataReferenceDocument
+              }
+            ])
       ]),
       {
         fileName: "export/players/iqb-player-aspect-2.12.3.html",
@@ -16518,6 +16560,256 @@ test("original Testcenter compatibility corpus imports the real Aspect player", 
   const reviewSignIn = await signIn("testuser-review", "user123");
   assert.equal(reviewSignIn.status, 200);
   assert.equal(reviewSignIn.body.participantSession.executionMode, "run-review");
+});
+
+test("original Testcenter compatibility corpus assembles complete loose Aspect metadata references", async () => {
+  type PlayerUnitPackage = {
+    unitKey: string;
+    unitFixture: string;
+    definitionFixture: string;
+    definitionEncoding: "utf8" | "brotli-base64";
+    metadataReferenceFixture?: string;
+    metadataReferenceEncoding?: "base64";
+    metadataReferenceSha256?: string;
+  };
+  type PlayerPackage = {
+    bookletFixture: string;
+    playerFixture: string;
+    bookletKey: string;
+    playerKey: string;
+    units: PlayerUnitPackage[];
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { playerPackages: PlayerPackage[] };
+  const expectation = corpus.playerPackages[0];
+  assert.ok(expectation);
+
+  const readDefinition = (unit: PlayerUnitPackage): string =>
+    unit.definitionEncoding === "brotli-base64"
+      ? readBrotliBase64Fixture(
+          resolve(originalTestcenterCorpusRoot, unit.definitionFixture)
+        )
+      : readFileSync(
+          resolve(originalTestcenterCorpusRoot, unit.definitionFixture),
+          "utf8"
+        );
+  const readMetadataReference = (unit: PlayerUnitPackage): string | null => {
+    if (!unit.metadataReferenceFixture) {
+      return null;
+    }
+    const stored = readFileSync(
+      resolve(originalTestcenterCorpusRoot, unit.metadataReferenceFixture),
+      "utf8"
+    );
+    const document =
+      unit.metadataReferenceEncoding === "base64"
+        ? Buffer.from(stored.trim(), "base64")
+        : Buffer.from(stored, "utf8");
+    assert.equal(
+      createHash("sha256").update(document).digest("hex"),
+      unit.metadataReferenceSha256
+    );
+    return document.toString("utf8");
+  };
+  const files = [
+    {
+      fileName: "booklet1.xml",
+      mediaType: "application/xml",
+      sourceDocument: readFileSync(
+        resolve(originalTestcenterCorpusRoot, expectation.bookletFixture),
+        "utf8"
+      )
+    },
+    ...expectation.units.flatMap(unit => {
+      const metadataReference = readMetadataReference(unit);
+      return [
+        {
+          fileName: `${unit.unitKey}.xml`,
+          mediaType: "application/xml",
+          sourceDocument: readFileSync(
+            resolve(originalTestcenterCorpusRoot, unit.unitFixture),
+            "utf8"
+          )
+        },
+        {
+          fileName: `${unit.unitKey}.voud`,
+          mediaType: "application/json",
+          sourceDocument: readDefinition(unit)
+        },
+        ...(metadataReference === null
+          ? []
+          : [
+              {
+                fileName: `${unit.unitKey}.vomd`,
+                mediaType: "application/json",
+                sourceDocument: metadataReference
+              }
+            ])
+      ];
+    }),
+    {
+      fileName: "iqb-player-aspect-2.12.3.html",
+      mediaType: "text/html",
+      sourceDocument: readBrotliBase64Fixture(
+        resolve(originalTestcenterCorpusRoot, expectation.playerFixture)
+      )
+    }
+  ];
+  assert.equal(files.length, 10);
+
+  const tenantKey = "integration-tenant-loose-aspect-metadata";
+  const workspaceKey = "integration-workspace-loose-aspect-metadata";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const sourcePackages: Array<{
+    sourcePackageId: string;
+    fileName: string;
+  }> = [];
+  for (const file of files) {
+    const upload = await requestJson<{
+      sourcePackage: { sourcePackageId: string; fileName: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: file
+    });
+    assert.equal(upload.status, 201, file.fileName);
+    sourcePackages.push(upload.body.sourcePackage);
+  }
+
+  const imported = await requestJson<{
+    importJob: {
+      sourcePackageId: string;
+      status: string;
+      diagnostics: Array<{ code: string; severity: string; message: string }>;
+    };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackages[0]!.sourcePackageId }
+  });
+  assert.equal(imported.status, 201);
+  assert.equal(
+    imported.body.importJob.status,
+    "completed",
+    JSON.stringify(imported.body.importJob.diagnostics)
+  );
+  assert.ok(imported.body.stagedContentRelease?.contentReleaseId);
+  assert.notEqual(
+    imported.body.importJob.sourcePackageId,
+    sourcePackages[0]!.sourcePackageId
+  );
+
+  const detail = await requestJson<{
+    sourcePackageDetail: {
+      sourcePackage: { fileName: string; mediaType: string };
+      dependencyGraph: { edges: Array<{ relationshipType: string }> };
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${imported.body.importJob.sourcePackageId}`
+  );
+  assert.equal(
+    detail.body.sourcePackageDetail.sourcePackage.fileName,
+    "booklet1.workspace-dependencies.zip"
+  );
+  assert.equal(
+    detail.body.sourcePackageDetail.sourcePackage.mediaType,
+    "application/zip"
+  );
+  assert.equal(
+    detail.body.sourcePackageDetail.dependencyGraph.edges.filter(
+      edge => edge.relationshipType === "assembled_from"
+    ).length,
+    files.length
+  );
+
+  const download = await fetch(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}` +
+      `/source-packages/${imported.body.importJob.sourcePackageId}/download`
+  );
+  assert.equal(download.status, 200);
+  const snapshotEntries = readStoredZipTextEntries(
+    Buffer.from(await download.arrayBuffer())
+  );
+  assert.equal(snapshotEntries.size, files.length + 1);
+  for (const unit of expectation.units.filter(
+    candidate => candidate.metadataReferenceFixture
+  )) {
+    assert.equal(
+      snapshotEntries.get(`${unit.unitKey}.vomd`),
+      readMetadataReference(unit),
+      unit.unitKey
+    );
+  }
+
+  const missingMetadataUnit = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "missing-meta-unit.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Unit>
+          <Metadata>
+            <Id>missing-meta-unit</Id>
+            <Label>Missing metadata reference</Label>
+            <Reference>missing-meta-unit.vomd</Reference>
+          </Metadata>
+          <Definition player="${expectation.playerKey}"><![CDATA[<p>Inline</p>]]></Definition>
+        </Unit>
+      `
+    }
+  });
+  assert.equal(missingMetadataUnit.status, 201);
+  const missingMetadataBooklet = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "missing-meta-booklet.xml",
+      mediaType: "application/xml",
+      sourceDocument: `
+        <Booklet>
+          <Metadata><Id>missing-meta-booklet</Id><Label>Missing metadata</Label></Metadata>
+          <Units><Unit id="missing-meta-unit" label="Missing metadata" /></Units>
+        </Booklet>
+      `
+    }
+  });
+  assert.equal(missingMetadataBooklet.status, 201);
+  const blocked = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        missingMetadataBooklet.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(blocked.status, 201);
+  assert.equal(blocked.body.importJob.status, "failed");
+  assert.equal(blocked.body.stagedContentRelease, null);
+  assert.deepEqual(
+    blocked.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    ["source_document_workspace_dependency_incomplete"]
+  );
+  assert.match(
+    blocked.body.importJob.diagnostics[0]?.message ?? "",
+    /missing-meta-unit\.vomd/
+  );
 });
 
 test("original Testcenter compatibility corpus executes the complete 17.6 sample package", async () => {
