@@ -12391,13 +12391,25 @@ const readZipEntryBuffer = (
   const localCompressionMethod = zipBuffer.readUInt16LE(
     entry.localHeaderOffset + 8
   );
+  const localChecksum = zipBuffer.readUInt32LE(entry.localHeaderOffset + 14);
+  const localCompressedSize = zipBuffer.readUInt32LE(
+    entry.localHeaderOffset + 18
+  );
+  const localUncompressedSize = zipBuffer.readUInt32LE(
+    entry.localHeaderOffset + 22
+  );
   const fileNameLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 26);
   const extraLength = zipBuffer.readUInt16LE(entry.localHeaderOffset + 28);
   const fileNameStart = entry.localHeaderOffset + 30;
   const fileNameEnd = fileNameStart + fileNameLength;
+  const usesDataDescriptor = (entry.generalPurposeBitFlag & 0x0008) !== 0;
   if (
     localGeneralPurposeBitFlag !== entry.generalPurposeBitFlag ||
     localCompressionMethod !== entry.compressionMethod ||
+    (!usesDataDescriptor &&
+      (localChecksum !== entry.checksum ||
+        localCompressedSize !== entry.compressedSize ||
+        localUncompressedSize !== entry.uncompressedSize)) ||
     fileNameEnd > zipBuffer.length ||
     zipBuffer.toString("utf8", fileNameStart, fileNameEnd) !== entry.fileName
   ) {
