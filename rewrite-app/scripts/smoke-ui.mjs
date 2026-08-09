@@ -42,6 +42,22 @@ const readBrotliBase64Text = async fixturePath =>
     Buffer.from(await readFile(fixturePath, "utf8"), "base64")
   ).toString("utf8");
 
+const crc32Table = Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    crc = (crc & 1) !== 0 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+  }
+  return crc >>> 0;
+});
+
+const crc32 = content => {
+  let crc = 0xffffffff;
+  for (const byte of content) {
+    crc = crc32Table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
 const createStoredZipBuffer = entries => {
   const localFileHeaders = [];
   const centralDirectoryHeaders = [];
@@ -50,13 +66,14 @@ const createStoredZipBuffer = entries => {
   for (const entry of entries) {
     const fileName = Buffer.from(entry.fileName, "utf8");
     const content = Buffer.from(entry.content, "utf8");
+    const checksum = crc32(content);
     const localHeader = Buffer.alloc(30 + fileName.length);
     localHeader.writeUInt32LE(0x04034b50, 0);
     localHeader.writeUInt16LE(20, 4);
     localHeader.writeUInt16LE(0x0800, 6);
     localHeader.writeUInt16LE(0, 8);
     localHeader.writeUInt32LE(0, 10);
-    localHeader.writeUInt32LE(0, 14);
+    localHeader.writeUInt32LE(checksum, 14);
     localHeader.writeUInt32LE(content.length, 18);
     localHeader.writeUInt32LE(content.length, 22);
     localHeader.writeUInt16LE(fileName.length, 26);
@@ -70,7 +87,7 @@ const createStoredZipBuffer = entries => {
     centralDirectoryHeader.writeUInt16LE(0x0800, 8);
     centralDirectoryHeader.writeUInt16LE(0, 10);
     centralDirectoryHeader.writeUInt32LE(0, 12);
-    centralDirectoryHeader.writeUInt32LE(0, 16);
+    centralDirectoryHeader.writeUInt32LE(checksum, 16);
     centralDirectoryHeader.writeUInt32LE(content.length, 20);
     centralDirectoryHeader.writeUInt32LE(content.length, 24);
     centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
@@ -5921,6 +5938,7 @@ try {
     <html><body>
       <strong id="playerDefinition"></strong>
       <output id="playerConfig"></output>
+      <output id="playerSessionId"></output>
       <output id="playerStartCount">0</output>
       <output id="playerConfigChangeCount">0</output>
       <output id="playerNavigationDenied"></output>
@@ -5976,6 +5994,7 @@ try {
           }
           if (event.data?.type !== "vopStartCommand") return;
           sessionId = event.data.sessionId;
+          document.querySelector("#playerSessionId").textContent = sessionId;
           const startCount = Number(document.querySelector("#playerStartCount").textContent || "0");
           document.querySelector("#playerStartCount").textContent = String(startCount + 1);
           document.querySelector("#playerDefinition").textContent = event.data.unitDefinition;
@@ -6446,6 +6465,16 @@ try {
     .filter({ hasText: '"pagingMode":"concat-scroll"' })
     .filter({ hasText: '"logPolicy":"debug"' })
     .waitFor();
+  assert.equal(
+    await veronaFrame.locator("#playerSessionId").textContent(),
+    veronaUnitKey,
+    "The Verona session id must retain the original active Unit alias."
+  );
+  assert.equal(
+    JSON.parse((await veronaFrame.locator("#playerConfig").textContent()) ?? "{}")
+      .unitId,
+    veronaUnitKey
+  );
   await page
     .locator("#participantVeronaPageLabel")
     .filter({ hasText: "Introduction" })
@@ -8149,7 +8178,7 @@ try {
       loginKey: abiLoginKey,
       bookletKey: abiBookletKey
     }).toString()}`,
-    { waitUntil: "networkidle" }
+    { waitUntil: "domcontentloaded" }
   );
   await page
     .locator("#participantVeronaPlayerVersion")
@@ -9114,8 +9143,7 @@ try {
       target: request.target
     }, "*"),
     {
-      sessionId:
-        `${savedAspectState.currentRunState.testRun.testRunId}:${aspectUnitKey}`,
+      sessionId: aspectUnitKey,
       target: "testcenter-sample2"
     }
   );

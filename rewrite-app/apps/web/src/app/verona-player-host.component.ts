@@ -269,7 +269,7 @@ export class VeronaPlayerHostComponent
   constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
   private get sessionId(): string {
-    return `${this.testRunId}:${this.unitKey}`;
+    return this.unitKey;
   }
 
   get saveStatusLabel(): string {

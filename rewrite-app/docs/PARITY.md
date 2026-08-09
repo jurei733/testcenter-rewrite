@@ -204,6 +204,13 @@ case preservation; the production Chromium/SQLite gate drives the original
 three-Unit Aspect booklet from Unit 1 to Unit 2 through an absolute Player
 notification and verifies the server-authoritative current Unit.
 
+Latest P0 Verona session-identity closure: the Participant host now sends the
+exact active Booklet Unit key (the original Unit alias) as both
+`vopStartCommand.sessionId` and `playerConfig.unitId`, matching the original
+unithost contract. Later configuration, page, and navigation-denial messages
+retain that same session identity. The production Chromium gate asserts the
+identity directly inside the embedded Player.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,
 and STARS 0.6.19 choice-interaction Players. ABI retains its release example
