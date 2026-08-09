@@ -1083,6 +1083,26 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "admin_access_window_invalid"
   );
 
+  const invalidAdminCustomTextsUpdate = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`,
+    {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        customTexts: {
+          "invalid key": "This key must be rejected."
+        }
+      }
+    }
+  );
+  assert.equal(invalidAdminCustomTextsUpdate.status, 400);
+  assert.equal(
+    invalidAdminCustomTextsUpdate.body.error,
+    "admin_custom_texts_invalid"
+  );
+
   const futureAccessAdmin = await requestJson<{
     adminUser: { validFrom: string | null; firstSignedInAt: string | null };
   }>("/api/v1/admin/users", {
@@ -1624,9 +1644,31 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(restoredAdminAccessWindow.body.adminUser.validTo, null);
   assert.equal(restoredAdminAccessWindow.body.adminUser.validForMinutes, null);
 
+  const updatedAdminCustomTexts = await requestJson<{
+    adminUser: { customTexts: Record<string, string> };
+  }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`, {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      customTexts: {
+        gm_headline: "Updated workspace headline",
+        gm_control_pause: "Hold workspace tests",
+        empty_value: "   "
+      }
+    }
+  });
+  assert.equal(updatedAdminCustomTexts.status, 200);
+  assert.deepEqual(updatedAdminCustomTexts.body.adminUser.customTexts, {
+    gm_headline: "Updated workspace headline",
+    gm_control_pause: "Hold workspace tests"
+  });
+
   const accessWindowRestoredSignIn = await requestJson<{
     sessionToken: string;
     adminSession: { adminSessionId: string };
+    adminUser: { customTexts: Record<string, string> };
   }>("/api/v1/admin/auth/sign-in", {
     method: "POST",
     body: {
@@ -1635,6 +1677,10 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     }
   });
   assert.equal(accessWindowRestoredSignIn.status, 200);
+  assert.deepEqual(accessWindowRestoredSignIn.body.adminUser.customTexts, {
+    gm_headline: "Updated workspace headline",
+    gm_control_pause: "Hold workspace tests"
+  });
 
   const selfDisable = await requestJson<{ error: string }>(
     `/api/v1/admin/users/${bootstrap.body.adminUser.adminUserId}`,
@@ -1875,6 +1921,36 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         )
     ),
     true
+  );
+  const adminCustomTextsUpdateAuditEvent = adminAuditEvents.body.items.find(
+    item =>
+      item.eventType === "admin_user_updated" &&
+      item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
+      item.details["previousCustomTextCount"] === 0 &&
+      item.details["nextCustomTextCount"] === 2 &&
+      Array.isArray(item.details["changedCustomTextKeys"]) &&
+      item.details["changedCustomTextKeys"].length === 2
+  );
+  assert.ok(adminCustomTextsUpdateAuditEvent);
+  assert.deepEqual(
+    [
+      ...(adminCustomTextsUpdateAuditEvent.details[
+        "changedCustomTextKeys"
+      ] as string[])
+    ].sort(),
+    ["gm_control_pause", "gm_headline"]
+  );
+  assert.equal(
+    JSON.stringify(adminCustomTextsUpdateAuditEvent.details).includes(
+      "Updated workspace headline"
+    ),
+    false
+  );
+  assert.equal(
+    JSON.stringify(adminCustomTextsUpdateAuditEvent.details).includes(
+      "Hold workspace tests"
+    ),
+    false
   );
   assert.equal(
     adminAuditEvents.body.items.some(

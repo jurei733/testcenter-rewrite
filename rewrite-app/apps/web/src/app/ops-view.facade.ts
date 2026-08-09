@@ -233,6 +233,8 @@ export class OpsViewFacade {
   adminAccessWindowValidFromDraft = "";
   adminAccessWindowValidToDraft = "";
   adminAccessWindowValidForMinutesDraft = "";
+  adminCustomTextsTargetUserId = "";
+  adminCustomTextsUpdateDraft = "{}";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -500,28 +502,56 @@ export class OpsViewFacade {
   }
 
   get adminCreateCustomTextCount(): number {
-    const customTexts = parseJsonDocument<Record<string, unknown>>(
-      this.ops.adminCreateCustomTextsJson
-    );
-    return customTexts && !Array.isArray(customTexts)
-      ? Object.keys(customTexts).length
-      : 0;
+    return Object.keys(
+      this.normalizeAdminCustomTextsDraft(
+        this.ops.adminCreateCustomTextsJson
+      ) ?? {}
+    ).length;
   }
 
   get isAdminCreateCustomTextsValid(): boolean {
-    const customTexts = parseJsonDocument<Record<string, unknown>>(
-      this.ops.adminCreateCustomTextsJson
+    return (
+      this.normalizeAdminCustomTextsDraft(
+        this.ops.adminCreateCustomTextsJson
+      ) !== null
     );
-    return Boolean(
-      customTexts &&
-        !Array.isArray(customTexts) &&
-        Object.entries(customTexts).every(
-          ([key, value]) =>
-            /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) &&
-            key.length <= 120 &&
-            typeof value === "string"
-        )
-    );
+  }
+
+  private normalizeAdminCustomTextsDraft(
+    draft: string
+  ): Record<string, string> | null {
+    const parsed = parseJsonDocument<Record<string, unknown>>(draft);
+    if (!parsed || Array.isArray(parsed)) {
+      return null;
+    }
+    const entries = Object.entries(parsed);
+    if (entries.length > 250) {
+      return null;
+    }
+    const encoder = new TextEncoder();
+    const normalized: Record<string, string> = {};
+    let totalBytes = 0;
+    for (const [rawKey, rawValue] of entries) {
+      const key = rawKey.trim();
+      if (
+        !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) ||
+        key.length > 120 ||
+        typeof rawValue !== "string"
+      ) {
+        return null;
+      }
+      const text = rawValue.trim();
+      if (!text) {
+        continue;
+      }
+      const valueBytes = encoder.encode(text).byteLength;
+      totalBytes += encoder.encode(key).byteLength + valueBytes;
+      if (valueBytes > 10_000 || totalBytes > 250_000) {
+        return null;
+      }
+      normalized[key] = text;
+    }
+    return normalized;
   }
 
   get isAssigningMonitorRole(): boolean {
@@ -750,6 +780,25 @@ export class OpsViewFacade {
       this.canUseAdminSession &&
       this.adminAccessWindowTargetUserId.trim() !== "" &&
       this.isAdminAccessWindowUpdateValid
+    );
+  }
+
+  get normalizedAdminCustomTextsUpdate(): Record<string, string> | null {
+    return this.normalizeAdminCustomTextsDraft(
+      this.adminCustomTextsUpdateDraft
+    );
+  }
+
+  get adminCustomTextsUpdateCount(): number {
+    return Object.keys(this.normalizedAdminCustomTextsUpdate ?? {}).length;
+  }
+
+  get canUpdateAdminUserCustomTexts(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminCustomTextsTargetUserId.trim() !== "" &&
+      this.normalizedAdminCustomTextsUpdate !== null
     );
   }
 
@@ -1013,6 +1062,8 @@ export class OpsViewFacade {
     this.adminAccessWindowValidFromDraft = "";
     this.adminAccessWindowValidToDraft = "";
     this.adminAccessWindowValidForMinutesDraft = "";
+    this.adminCustomTextsTargetUserId = "";
+    this.adminCustomTextsUpdateDraft = "{}";
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -1226,6 +1277,24 @@ export class OpsViewFacade {
         validTo,
         validForMinutes
       )
+    );
+  }
+
+  confirmUpdateAdminUserCustomTexts(): void {
+    const adminUserId = this.adminCustomTextsTargetUserId.trim();
+    const customTexts = this.normalizedAdminCustomTextsUpdate;
+    if (!this.canUpdateAdminUserCustomTexts || !adminUserId || !customTexts) {
+      return;
+    }
+    const entryCount = Object.keys(customTexts).length;
+    const confirmed = globalThis.window?.confirm(
+      `Replace admin user '${adminUserId}' login-specific custom texts with ${entryCount} entr${entryCount === 1 ? "y" : "ies"}?`
+    );
+    if (!confirmed) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.opsService.updateAdminUserCustomTexts(adminUserId, customTexts)
     );
   }
 
@@ -1545,6 +1614,9 @@ export class OpsViewFacade {
       item.actionPayload?.adminUserValidTo ?? "";
     this.adminAccessWindowValidForMinutesDraft =
       item.actionPayload?.adminUserValidForMinutes ?? "";
+    this.adminCustomTextsTargetUserId = adminUserId;
+    this.adminCustomTextsUpdateDraft =
+      item.actionPayload?.adminUserCustomTexts ?? "{}";
     this.ops.adminRevokeRoleAssignmentId =
       item.actionPayload?.roleAssignmentId ??
       this.ops.adminRevokeRoleAssignmentId;
@@ -2108,6 +2180,10 @@ export class OpsViewFacade {
               : "not yet"
           },
           {
+            label: "Login Custom Texts",
+            value: `${Object.keys(item.adminUser.customTexts).length} configured`
+          },
+          {
             label: "Role Scopes",
             value: item.roleAssignments
               .map(roleAssignment =>
@@ -2128,7 +2204,8 @@ export class OpsViewFacade {
           item.adminUser.adminUserId === this.ops.adminRevokeTargetUserId ||
           item.adminUser.adminUserId === this.ops.adminStatusTargetUserId ||
           item.adminUser.adminUserId === this.adminDisplayNameTargetUserId ||
-          item.adminUser.adminUserId === this.adminAccessWindowTargetUserId,
+          item.adminUser.adminUserId === this.adminAccessWindowTargetUserId ||
+          item.adminUser.adminUserId === this.adminCustomTextsTargetUserId,
         actionLabel: "Use For Admin Actions",
         actionPayload: {
           adminUserId: item.adminUser.adminUserId,
@@ -2138,7 +2215,12 @@ export class OpsViewFacade {
           adminUserValidFrom: item.adminUser.validFrom ?? "",
           adminUserValidTo: item.adminUser.validTo ?? "",
           adminUserValidForMinutes:
-            item.adminUser.validForMinutes?.toString() ?? ""
+            item.adminUser.validForMinutes?.toString() ?? "",
+          adminUserCustomTexts: JSON.stringify(
+            item.adminUser.customTexts,
+            null,
+            2
+          )
         },
         actions:
           item.adminUser.adminUserId === this.currentAdminUserId

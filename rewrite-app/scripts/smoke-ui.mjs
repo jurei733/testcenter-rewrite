@@ -2321,6 +2321,8 @@ try {
   await fillAndCommit("#adminAccessWindowValidFrom", "");
   await fillAndCommit("#adminAccessWindowValidTo", "");
   await fillAndCommit("#adminAccessWindowValidForMinutes", "");
+  await fillAndCommit("#adminCustomTextsTargetUserId", "");
+  await fillAndCommit("#adminCustomTextsUpdateDraft", "{}");
   assert.equal(
     await page.locator("#adminCreatePassword").getAttribute("minlength"),
     "8"
@@ -3267,6 +3269,109 @@ try {
       )
   );
   stopAfter("admin-user-access-window");
+
+  await expectInputValue(
+    "#adminCustomTextsTargetUserId",
+    delegatedDisplayNameTargetUserId
+  );
+  await expectInputValue("#adminCustomTextsUpdateDraft", "{}");
+  await fillAndCommit("#adminCustomTextsUpdateDraft", "not-json");
+  await expectButtonSelectorDisabled("#adminUpdateCustomTextsButton");
+  const delegatedAdminCustomTexts = {
+    gm_headline: "UI custom workspace headline",
+    gm_control_pause: "UI hold workspace tests"
+  };
+  await fillAndCommit(
+    "#adminCustomTextsUpdateDraft",
+    JSON.stringify(delegatedAdminCustomTexts, null, 2)
+  );
+  await expectButtonSelectorEnabled("#adminUpdateCustomTextsButton");
+  logStep("admin-user-custom-texts");
+  const updateAdminCustomTextsDialog = acceptNextDialog(
+    new RegExp(
+      `Replace admin user '${delegatedDisplayNameTargetUserId}' login-specific custom texts with 2 entries\\?`
+    )
+  );
+  const updateAdminCustomTextsResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "PATCH" &&
+      /\/api\/v1\/admin\/users\/[^/]+$/.test(new URL(response.url()).pathname)
+  );
+  await page.locator("#adminUpdateCustomTextsButton").click();
+  await updateAdminCustomTextsDialog;
+  assert.equal((await updateAdminCustomTextsResponsePromise).status(), 200);
+  await waitForNotBusy("admin-user-custom-texts");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedWorkspaceAdminUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedWorkspaceAdminUsername &&
+          item?.adminUser?.customTexts?.gm_headline ===
+            delegatedAdminCustomTexts.gm_headline &&
+          item?.adminUser?.customTexts?.gm_control_pause ===
+            delegatedAdminCustomTexts.gm_control_pause &&
+          Object.keys(item?.adminUser?.customTexts ?? {}).length === 2
+      )
+  );
+  const adminCustomTextsAuditPayload = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=admin_user_updated&subjectAdminUserId=${delegatedDisplayNameTargetUserId}&limit=10`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.details?.previousCustomTextCount === 0 &&
+          item?.details?.nextCustomTextCount === 2 &&
+          Array.isArray(item?.details?.changedCustomTextKeys) &&
+          item.details.changedCustomTextKeys.includes("gm_headline") &&
+          item.details.changedCustomTextKeys.includes("gm_control_pause")
+      )
+  );
+  assert.equal(
+    JSON.stringify(adminCustomTextsAuditPayload).includes(
+      delegatedAdminCustomTexts.gm_headline
+    ),
+    false
+  );
+  assert.equal(
+    JSON.stringify(adminCustomTextsAuditPayload).includes(
+      delegatedAdminCustomTexts.gm_control_pause
+    ),
+    false
+  );
+  const customTextSignInResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: delegatedWorkspaceAdminUsername,
+        password: delegatedWorkspaceAdminPassword
+      })
+    }
+  );
+  assert.equal(customTextSignInResponse.status, 200);
+  const customTextSignInPayload = await customTextSignInResponse.json();
+  assert.deepEqual(
+    customTextSignInPayload.adminUser?.customTexts,
+    delegatedAdminCustomTexts
+  );
+  const customTextSignOutResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-out`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${customTextSignInPayload.sessionToken}`
+      }
+    }
+  );
+  assert.equal(customTextSignOutResponse.status, 200);
+  stopAfter("admin-user-custom-texts");
 
   await clickAction("Sign Out");
   await fillAndCommitUntilValue(

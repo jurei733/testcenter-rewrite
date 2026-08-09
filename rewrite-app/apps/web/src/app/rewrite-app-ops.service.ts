@@ -736,6 +736,30 @@ export class RewriteAppOpsService {
     await this.refreshAdminUsers();
   }
 
+  async updateAdminUserCustomTexts(
+    adminUserId: string,
+    customTexts: Record<string, string>
+  ): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
+    const payload = await this.requestState.request<UpdateAdminUserResponse>(
+      "Update Admin User Custom Texts",
+      "PATCH",
+      resolveRoutePath(productionApiRoutes.admin.updateUser, {
+        adminUserId: adminUserId.trim()
+      }),
+      { customTexts } satisfies UpdateAdminUserRequest,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.feedback.rememberActivity(
+      "Admin Custom Texts Updated",
+      `${payload.adminUser.username} now has ${Object.keys(payload.adminUser.customTexts).length} login-specific custom text(s).`
+    );
+    await this.refreshAdminUsers();
+  }
+
   async updateAdminUsersStatus(
     adminUserIds: string[],
     status: AdminUserStatus

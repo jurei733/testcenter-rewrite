@@ -418,6 +418,16 @@ effective end without extending sessions when a boundary is relaxed. API and
 protected production Chromium/SQLite gates prove invalid-order rejection,
 scheduled-login denial, active-session invalidation, and boundary clearing.
 
+Login-specific administrator and monitor custom texts now have the same
+post-creation lifecycle. A scoped administrator can hydrate the current map
+from the directory, validate it against the server's key, entry, and byte
+limits, and replace or clear it atomically from a transient JSON editor. The
+update preserves every unrelated account attribute and active session; its
+audit event retains only previous/next counts and changed keys, never the
+authored values. API and protected production Chromium/SQLite gates prove
+invalid-key rejection, normalization, refreshed sign-in copy, and audit
+redaction.
+
 All administrator password mutation paths now enforce the shared 8–60
 character policy. The 60-character ceiling preserves the original
 Testcenter's protection against excessively expensive password hashing while

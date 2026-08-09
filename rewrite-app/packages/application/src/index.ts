@@ -946,6 +946,7 @@ export type AdminDirectoryPort = {
     adminUserId: string;
     displayName?: string;
     status?: AdminUserStatus;
+    customTexts?: Record<string, string>;
     validFrom?: string | null;
     validTo?: string | null;
     validForMinutes?: number | null;
@@ -21825,8 +21826,21 @@ export const createFirstSliceServices = (
               ? adminUser.displayName
               : normalizeAdminDisplayName(input.displayName, adminUser.username),
           status: nextStatus,
+          customTexts:
+            input.customTexts === undefined
+              ? adminUser.customTexts
+              : normalizeAdminCustomTexts(input.customTexts),
           ...nextAccessWindow
         };
+        const changedCustomTextKeys = [
+          ...new Set([
+            ...Object.keys(adminUser.customTexts),
+            ...Object.keys(updatedAdminUser.customTexts)
+          ])
+        ].filter(
+          key =>
+            adminUser.customTexts[key] !== updatedAdminUser.customTexts[key]
+        );
         await repository.saveAdminUser(updatedAdminUser);
 
         const revokedSessionIds: string[] = [];
@@ -21893,6 +21907,10 @@ export const createFirstSliceServices = (
             nextDisplayName: updatedAdminUser.displayName,
             previousStatus: adminUser.status,
             nextStatus: updatedAdminUser.status,
+            previousCustomTextCount: Object.keys(adminUser.customTexts).length,
+            nextCustomTextCount: Object.keys(updatedAdminUser.customTexts)
+              .length,
+            changedCustomTextKeys,
             previousValidFrom: adminUser.validFrom,
             nextValidFrom: updatedAdminUser.validFrom,
             previousValidTo: adminUser.validTo,

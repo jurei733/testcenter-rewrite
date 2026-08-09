@@ -511,6 +511,22 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="adminUpdateAccessWindowButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserAccessWindow" (click)="view.confirmUpdateAdminUserAccessWindow()">Update Access Window</button>
         </div>
+
+        <div class="form-grid">
+          <label>
+            Custom Text Target Admin User ID
+            <input id="adminCustomTextsTargetUserId" name="adminCustomTextsTargetUserId" placeholder="Select an admin user below" [(ngModel)]="view.adminCustomTextsTargetUserId" />
+          </label>
+          <label>
+            Login-Specific Custom Texts (JSON)
+            <textarea id="adminCustomTextsUpdateDraft" name="adminCustomTextsUpdateDraft" rows="8" spellcheck="false" [(ngModel)]="view.adminCustomTextsUpdateDraft"></textarea>
+          </label>
+        </div>
+        <p id="adminCustomTextsValidationError" *ngIf="view.normalizedAdminCustomTextsUpdate === null" role="alert">Use a JSON object with at most 250 valid keys and string values within the supported size limits.</p>
+        <p>{{ view.adminCustomTextsUpdateCount }} non-empty login-specific custom text(s) will replace the complete current map. Values are trimmed; empty values remove their key.</p>
+        <div class="actions">
+          <button id="adminUpdateCustomTextsButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserCustomTexts" (click)="view.confirmUpdateAdminUserCustomTexts()">Update Custom Texts</button>
+        </div>
       </article>
 
       <ng-container *ngIf="view.isCreatingMonitorAccount || view.isAssigningMonitorRole">

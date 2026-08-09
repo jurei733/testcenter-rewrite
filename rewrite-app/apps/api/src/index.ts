@@ -4424,6 +4424,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           adminUserId,
           displayName: body.displayName,
           status: body.status,
+          customTexts: body.customTexts,
           validFrom: body.validFrom,
           validTo: body.validTo,
           validForMinutes: body.validForMinutes
