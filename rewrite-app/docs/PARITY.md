@@ -160,15 +160,20 @@ matching versions fail as ambiguous instead of being guessed. Further
 representative families remain P0 corpus work.
 
 Latest P0 coding-scheme closure: the corpus now pins the official
-`@iqb/responses` 3.6.0 `SOLVER/case1` and `UNIQUE_VALUES/case03` schemes,
-inputs, and expected outcomes byte-for-byte at their release commit. The
-compatibility gates import the deliberately versionless legacy schemes, retain
-all authored codings, feed the official raw responses through server-side
-coding, and route on base-variable aliases, derived code/score, chained and
-decimal solver values, boolean uniqueness, all supported uniqueness processing
-variants, and `DERIVE_ERROR`. Raw Player envelopes remain unchanged while the
-calculated Booklet states and visible Unit routes persist through the normal
-runtime path.
+`@iqb/responses` 3.6.0 `SOLVER/case1`, `UNIQUE_VALUES/case03`,
+`CONCAT_CODE/01`, `COPY_VALUE/03`, `SUM_CODE/02`, and `SUM_SCORE/02`
+schemes, inputs, and expected outcomes byte-for-byte at their release commit.
+The compatibility gates import all six deliberately versionless legacy
+schemes, retain every authored coding, feed the official raw responses through
+server-side coding, and route on base-variable aliases, derived code/score,
+chained and decimal solver values, boolean uniqueness, every uniqueness
+processing variant, sorted and chained code concatenation, copied values,
+code/score sums, explicit numeric zeroes, missing-input `UNSET`,
+`DERIVE_ERROR`, and partial-input `INVALID`. The four remaining core
+families execute together in one real multi-Unit ZIP and Participant run across
+memory, file, and SQLite. Raw Player envelopes remain unchanged while all
+calculated Booklet states and the final visible Unit route persist through the
+normal runtime path.
 
 ## Capability matrix
 

@@ -22552,6 +22552,537 @@ test("original Testcenter compatibility corpus executes official IQB unique-valu
   );
 });
 
+test("original Testcenter compatibility corpus executes the remaining official IQB derive core", async () => {
+  type CodingSchemePackage = {
+    family: string;
+    schemeFixture: string;
+    inputFixture: string;
+    outcomeFixture: string;
+    expectedStates: Record<string, string>;
+  };
+  type LoadedCodingFamily = CodingSchemePackage & {
+    unitKey: string;
+    unitId: string;
+    schemeFileName: string;
+    schemeDocument: string;
+    inputResponses: Array<{ id: string; status: string; value: unknown }>;
+    officialOutcome: Array<{
+      id: string;
+      status: string;
+      value: unknown;
+      code?: number;
+      score?: number;
+    }>;
+    variableCodings: Array<{
+      id: string;
+      alias?: string;
+      sourceType: string;
+    }>;
+  };
+  const corpus = JSON.parse(
+    readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
+  ) as { codingSchemePackages: CodingSchemePackage[] };
+  const familyDefinitions = [
+    {
+      family: "concat-code-chain",
+      unitKey: "concat-unit",
+      unitId: "UNIT.IQB.CONCAT-CODE",
+      schemeFileName: "concat-code.json"
+    },
+    {
+      family: "copy-value-unset",
+      unitKey: "copy-unit",
+      unitId: "UNIT.IQB.COPY-VALUE",
+      schemeFileName: "copy-value.json"
+    },
+    {
+      family: "sum-code-derived-coding",
+      unitKey: "sum-code-unit",
+      unitId: "UNIT.IQB.SUM-CODE",
+      schemeFileName: "sum-code.json"
+    },
+    {
+      family: "sum-score-partial",
+      unitKey: "sum-score-unit",
+      unitId: "UNIT.IQB.SUM-SCORE",
+      schemeFileName: "sum-score.json"
+    }
+  ] as const;
+  const families: LoadedCodingFamily[] = familyDefinitions.map(definition => {
+    const codingPackage = corpus.codingSchemePackages.find(
+      candidate => candidate.family === definition.family
+    );
+    assert.ok(codingPackage);
+    const schemeDocument = readFileSync(
+      resolve(originalTestcenterCorpusRoot, codingPackage.schemeFixture),
+      "utf8"
+    );
+    const parsedScheme = JSON.parse(schemeDocument) as {
+      version?: string;
+      variableCodings: LoadedCodingFamily["variableCodings"];
+    };
+    assert.equal(parsedScheme.version, undefined);
+    return {
+      ...codingPackage,
+      ...definition,
+      schemeDocument,
+      inputResponses: JSON.parse(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, codingPackage.inputFixture),
+          "utf8"
+        )
+      ) as LoadedCodingFamily["inputResponses"],
+      officialOutcome: JSON.parse(
+        readFileSync(
+          resolve(originalTestcenterCorpusRoot, codingPackage.outcomeFixture),
+          "utf8"
+        )
+      ) as LoadedCodingFamily["officialOutcome"],
+      variableCodings: parsedScheme.variableCodings
+    };
+  });
+  for (const family of families) {
+    assert.deepEqual(
+      family.officialOutcome.map(variable => variable.id).sort(),
+      family.variableCodings
+        .map(variable => variable.alias ?? variable.id)
+        .sort(),
+      family.family
+    );
+  }
+  assert.deepEqual(
+    families.map(family => [
+      family.family,
+      family.variableCodings
+        .filter(variable => variable.sourceType !== "BASE")
+        .map(variable => variable.sourceType)
+    ]),
+    [
+      [
+        "concat-code-chain",
+        [
+          "CONCAT_CODE",
+          "CONCAT_CODE",
+          "CONCAT_CODE",
+          "CONCAT_CODE",
+          "CONCAT_CODE"
+        ]
+      ],
+      ["copy-value-unset", ["COPY_VALUE", "SUM_SCORE", "COPY_VALUE"]],
+      ["sum-code-derived-coding", ["SUM_CODE"]],
+      ["sum-score-partial", ["SUM_SCORE", "SUM_SCORE"]]
+    ]
+  );
+
+  const stateDefinitions: Array<{
+    key: string;
+    option: string;
+    source?: string;
+    variable?: string;
+    unitKey?: string;
+    comparison?: string;
+    conditionXml?: string;
+  }> = [
+    {
+      key: "concat-dependency",
+      option: "derive-error",
+      source: "Status",
+      variable: "d1",
+      unitKey: "concat-unit",
+      comparison: 'equal="DERIVE_ERROR"'
+    },
+    {
+      key: "concat-chained",
+      option: "concatenated",
+      source: "Value",
+      variable: "d2",
+      unitKey: "concat-unit",
+      comparison: 'equal="1_1"'
+    },
+    {
+      key: "concat-code",
+      option: "coded",
+      source: "Code",
+      variable: "d3",
+      unitKey: "concat-unit",
+      comparison: 'equal="1"'
+    },
+    {
+      key: "concat-score",
+      option: "scored",
+      source: "Score",
+      variable: "d3",
+      unitKey: "concat-unit",
+      comparison: 'greaterThan="6"'
+    },
+    {
+      key: "concat-sort",
+      option: "sorted",
+      source: "Value",
+      variable: "d4",
+      unitKey: "concat-unit",
+      comparison: 'equal="1_1_2"'
+    },
+    {
+      key: "concat-zero-code",
+      option: "retained",
+      conditionXml: `
+        <If><Code of="b4" from="concat-unit"/><Is equal="0"/></If>
+        <If><Status of="b4" from="concat-unit"/><Is equal="CODING_COMPLETE"/></If>
+      `
+    },
+    {
+      key: "copy-dependency",
+      option: "derive-error",
+      source: "Status",
+      variable: "d1",
+      unitKey: "copy-unit",
+      comparison: 'equal="DERIVE_ERROR"'
+    },
+    {
+      key: "copy-score-sum",
+      option: "calculated",
+      source: "Value",
+      variable: "d2",
+      unitKey: "copy-unit",
+      comparison: 'equal="3"'
+    },
+    {
+      key: "copy-unset",
+      option: "preserved",
+      source: "Status",
+      variable: "d3",
+      unitKey: "copy-unit",
+      comparison: 'equal="UNSET"'
+    },
+    {
+      key: "sum-code-value",
+      option: "calculated",
+      source: "Value",
+      variable: "d1",
+      unitKey: "sum-code-unit",
+      comparison: 'equal="2"'
+    },
+    {
+      key: "sum-code-status",
+      option: "complete",
+      source: "Status",
+      variable: "d1",
+      unitKey: "sum-code-unit",
+      comparison: 'equal="CODING_COMPLETE"'
+    },
+    {
+      key: "sum-code-code",
+      option: "coded",
+      source: "Code",
+      variable: "d1",
+      unitKey: "sum-code-unit",
+      comparison: 'equal="2"'
+    },
+    {
+      key: "sum-code-score",
+      option: "defaulted",
+      conditionXml: `
+        <If><Score of="d1" from="sum-code-unit"/><Is equal="0"/></If>
+        <If><Status of="d1" from="sum-code-unit"/><Is equal="CODING_COMPLETE"/></If>
+      `
+    },
+    {
+      key: "sum-score-invalid",
+      option: "invalid",
+      source: "Status",
+      variable: "d1",
+      unitKey: "sum-score-unit",
+      comparison: 'equal="INVALID"'
+    },
+    {
+      key: "sum-score-value",
+      option: "calculated",
+      source: "Value",
+      variable: "d2",
+      unitKey: "sum-score-unit",
+      comparison: 'equal="3"'
+    }
+  ] as const;
+  assert.deepEqual(
+    Object.assign({}, ...families.map(family => family.expectedStates)),
+    Object.fromEntries(
+      stateDefinitions.map(state => [state.key, state.option])
+    )
+  );
+  const statesDocument = stateDefinitions
+    .map(
+      state => `
+        <State id="${state.key}" label="${state.key}">
+          <Option id="${state.option}" label="${state.option}">
+            ${state.conditionXml ??
+            `<If><${state.source} of="${state.variable}" from="${state.unitKey}"/><Is ${state.comparison}/></If>`}
+          </Option>
+          <Option id="pending" label="Pending"/>
+        </State>
+      `
+    )
+    .join("");
+  const unitDocuments = families.map(family => {
+    const baseVariables = family.variableCodings
+      .filter(variable => variable.sourceType === "BASE")
+      .map(
+        variable =>
+          `<Variable id="${variable.alias ?? variable.id}" type="string"/>`
+      )
+      .join("");
+    const derivedVariables = family.variableCodings
+      .filter(variable => variable.sourceType !== "BASE")
+      .map(variable => `<Variable id="${variable.id}" type="string"/>`)
+      .join("");
+    return {
+      fileName: `export/units/${family.unitKey}.xml`,
+      content: `
+        <Unit>
+          <Metadata><Id>${family.unitId}</Id><Label>${family.family}</Label></Metadata>
+          <Definition player="verona-player-simple@6.0"><![CDATA[<p>${family.family}</p>]]></Definition>
+          <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/${family.schemeFileName}</CodingSchemeRef>
+          <BaseVariables>${baseVariables}</BaseVariables>
+          <DerivedVariables>${derivedVariables}</DerivedVariables>
+        </Unit>
+      `
+    };
+  });
+  const bookletKey = "BOOKLET.IQB.DERIVE-CORE";
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet-derive-core.xml"/>
+            ${families
+              .map(
+                family =>
+                  `<resource identifier="${family.unitId}" href="units/${family.unitKey}.xml"/>`
+              )
+              .join("")}
+            ${families
+              .map(
+                family =>
+                  `<resource identifier="${family.schemeFileName}" href="schemes/${family.schemeFileName}"/>`
+              )
+              .join("")}
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet-derive-core.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Official IQB Derive Core</Label></Metadata>
+          <States>${statesDocument}</States>
+          <Units>
+            ${families
+              .map(
+                family =>
+                  `<Unit id="${family.unitId}" alias="${family.unitKey}" label="${family.family}"/>`
+              )
+              .join("")}
+            <Testlet id="calculated-block">
+              <Restrictions><Show if="sum-score-value" is="calculated"/></Restrictions>
+              <Unit id="UNIT.IQB.DERIVE-PASSED" alias="passed-unit" label="Derived route"/>
+            </Testlet>
+            <Testlet id="pending-block">
+              <Restrictions><Show if="sum-score-value" is="pending"/></Restrictions>
+              <Unit id="UNIT.IQB.DERIVE-PENDING" alias="pending-unit" label="Pending route"/>
+            </Testlet>
+          </Units>
+        </Booklet>
+      `
+    },
+    ...unitDocuments,
+    ...families.map(family => ({
+      fileName: `export/schemes/${family.schemeFileName}`,
+      content: family.schemeDocument
+    }))
+  ]);
+  const tenantKey = "integration-tenant-official-derive-core";
+  const workspaceKey = "integration-workspace-official-derive-core";
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "official-iqb-derive-core.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.equal(
+    importResult.body.importJob.status,
+    "completed",
+    JSON.stringify(importResult.body.importJob.diagnostics)
+  );
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  const contentReleaseId = importResult.body.stagedContentRelease?.contentReleaseId;
+  assert.ok(contentReleaseId);
+
+  const releaseDetail = await requestJson<{
+    contentReleaseDetail: {
+      contentRelease: {
+        runtimeSnapshot: {
+          bookletEntries: Array<{
+            unitEntries: Array<{
+              unitKey: string;
+              codingScheme?: {
+                version?: string;
+                variableCodings: Array<{ sourceType?: string }>;
+              };
+            }>;
+          }>;
+        };
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}`);
+  const importedUnits =
+    releaseDetail.body.contentReleaseDetail.contentRelease.runtimeSnapshot
+      .bookletEntries[0]?.unitEntries ?? [];
+  for (const family of families) {
+    const importedUnit = importedUnits.find(
+      unit => unit.unitKey === family.unitKey
+    );
+    assert.equal(importedUnit?.codingScheme?.version, undefined);
+    assert.deepEqual(
+      importedUnit?.codingScheme?.variableCodings.map(
+        variable => variable.sourceType
+      ),
+      family.variableCodings.map(variable => variable.sourceType)
+    );
+  }
+
+  const activate = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
+    { method: "POST", body: {} }
+  );
+  assert.equal(activate.status, 200);
+  const signIn = await requestJson<{
+    participantSession: { participantSessionId: string };
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: {
+      tenantKey,
+      workspaceKey,
+      loginKey: "official-derive-core-participant"
+    }
+  });
+  assert.equal(signIn.status, 200);
+  const participantSessionId = signIn.body.participantSession.participantSessionId;
+  const resume = await requestJson<{
+    testRun: {
+      testRunId: string;
+      bookletStates: Record<string, string>;
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/resume`, {
+    method: "POST",
+    body: { bookletKey }
+  });
+  assert.deepEqual(
+    resume.body.testRun.bookletStates,
+    Object.fromEntries(
+      stateDefinitions.map(state => [
+        state.key,
+        state.key === "copy-unset" ? "preserved" : "pending"
+      ])
+    )
+  );
+
+  const retainedResponses: Record<string, string> = {};
+  for (const [index, family] of families.entries()) {
+    const rawPlayerResponse = JSON.stringify({
+      kind: "verona_unit_state",
+      version: 1,
+      unitState: {
+        unitStateDataType: "iqb-standard@1.0",
+        presentationProgress: "complete",
+        responseProgress: "complete",
+        dataParts: { responses: JSON.stringify(family.inputResponses) }
+      }
+    });
+    retainedResponses[family.unitKey] = rawPlayerResponse;
+    const nextFamily = families[index + 1];
+    const saveResult = await requestJson<{
+      testRun: {
+        bookletStates: Record<string, string>;
+        unitResponses: Record<string, string>;
+      };
+    }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+      method: "POST",
+      body: {
+        currentUnitKey: nextFamily?.unitKey ?? family.unitKey,
+        responseUnitKey: family.unitKey,
+        status: "running",
+        unitResponse: rawPlayerResponse
+      }
+    });
+    assert.equal(saveResult.status, 200, family.family);
+    assert.equal(
+      saveResult.body.testRun.unitResponses[family.unitKey],
+      rawPlayerResponse
+    );
+    if (!nextFamily) {
+      assert.deepEqual(
+        saveResult.body.testRun.bookletStates,
+        Object.assign({}, ...families.map(item => item.expectedStates))
+      );
+      assert.deepEqual(saveResult.body.testRun.unitResponses, retainedResponses);
+    }
+  }
+
+  const currentState = await requestJson<{
+    currentRunState: {
+      bookletUnits: Array<{ unitKey: string }>;
+      adaptiveStates: Array<{ stateKey: string; optionKey: string }>;
+      navigation: { nextUnitKey: string | null };
+    };
+  }>(`/api/v1/participant/sessions/${participantSessionId}/current-state`);
+  assert.deepEqual(
+    currentState.body.currentRunState.bookletUnits.map(unit => unit.unitKey),
+    [
+      "concat-unit",
+      "copy-unit",
+      "sum-code-unit",
+      "sum-score-unit",
+      "passed-unit"
+    ]
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      currentState.body.currentRunState.adaptiveStates.map(state => [
+        state.stateKey,
+        state.optionKey
+      ])
+    ),
+    Object.assign({}, ...families.map(family => family.expectedStates))
+  );
+  assert.equal(
+    currentState.body.currentRunState.navigation.nextUnitKey,
+    "passed-unit"
+  );
+});
+
 test("coding scheme references block incomplete or incompatible ZIP imports", async () => {
   const tenantKey = "integration-tenant-coding-import-errors";
   const workspaceKey = "integration-workspace-coding-import-errors";

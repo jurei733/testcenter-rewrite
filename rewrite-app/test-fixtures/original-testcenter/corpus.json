@@ -419,6 +419,93 @@
         "numeric-processing": "duplicate",
         "combined-processing": "unique"
       }
+    },
+    {
+      "family": "concat-code-chain",
+      "schemeFixture": "schemes/responses-3.6.0-concat-code.json",
+      "inputFixture": "schemes/responses-3.6.0-concat-code-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-concat-code-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/CONCAT_CODE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/CONCAT_CODE/01_input.json",
+      "outcomeSourcePath": "test/coding/derive/CONCAT_CODE/01_outcome.json",
+      "schemeSha256": "f690c81ce5015235c3eeb0a26a4e97884f13d50e53eb232388cb1095dd31cc5c",
+      "inputSha256": "bce0f579c5fee9b53dc220d6e7d3d929a4ea8a0faa6938bef882a45cd1ffa28f",
+      "outcomeSha256": "05d5e8255750ad2644381ad30a7346d48468083ccbbbd109806b9b274028fee2",
+      "license": "MIT",
+      "expectedStates": {
+        "concat-dependency": "derive-error",
+        "concat-chained": "concatenated",
+        "concat-code": "coded",
+        "concat-score": "scored",
+        "concat-sort": "sorted",
+        "concat-zero-code": "retained"
+      }
+    },
+    {
+      "family": "copy-value-unset",
+      "schemeFixture": "schemes/responses-3.6.0-copy-value.json",
+      "inputFixture": "schemes/responses-3.6.0-copy-value-case3-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-copy-value-case3-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/COPY_VALUE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/COPY_VALUE/03_input.json",
+      "outcomeSourcePath": "test/coding/derive/COPY_VALUE/03_outcome.json",
+      "schemeSha256": "492057f87792526748801b115e222edfb5f606769f93e07c63bc410a1c973168",
+      "inputSha256": "d9981dd3f692d8a9ffa8ed9977465c114c84c05b9103fb1d7fb7369237b0cb4a",
+      "outcomeSha256": "9cc3c3817dee8182c736d80a67d1976fe6a354019f6f16b50b18ca9aa5464d83",
+      "license": "MIT",
+      "expectedStates": {
+        "copy-dependency": "derive-error",
+        "copy-score-sum": "calculated",
+        "copy-unset": "preserved"
+      }
+    },
+    {
+      "family": "sum-code-derived-coding",
+      "schemeFixture": "schemes/responses-3.6.0-sum-code.json",
+      "inputFixture": "schemes/responses-3.6.0-sum-code-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-sum-code-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SUM_CODE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SUM_CODE/02_input.json",
+      "outcomeSourcePath": "test/coding/derive/SUM_CODE/02_outcome.json",
+      "schemeSha256": "d8ebb9a2250d5e0888450f8dac60afa0e7a4b985954e2a06d68a8ced0338ae0a",
+      "inputSha256": "74e3abe850a08d85ab01b9dfa98be286b337fa07d01e65c5eb9eb11411a3b687",
+      "outcomeSha256": "47e6f1c61653e953a2a7cbaa65db84ef0165ff46306993a175bcf45408af11a7",
+      "license": "MIT",
+      "expectedStates": {
+        "sum-code-value": "calculated",
+        "sum-code-status": "complete",
+        "sum-code-code": "coded",
+        "sum-code-score": "defaulted"
+      }
+    },
+    {
+      "family": "sum-score-partial",
+      "schemeFixture": "schemes/responses-3.6.0-sum-score.json",
+      "inputFixture": "schemes/responses-3.6.0-sum-score-case2-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-sum-score-case2-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/derive/SUM_SCORE/coding-scheme.json",
+      "inputSourcePath": "test/coding/derive/SUM_SCORE/02_input.json",
+      "outcomeSourcePath": "test/coding/derive/SUM_SCORE/02_outcome.json",
+      "schemeSha256": "b57af7607dd3d06086eb0ea1513a15b352ddb920d58299804b277e3134b951b3",
+      "inputSha256": "503104f07cd56b6f30a718b9d29bf57ac88768d313292abcb599696722e2517e",
+      "outcomeSha256": "7a9049fdd1c5604176d85b409e65c8844dc36a7978ff4895d1b55095d665725b",
+      "license": "MIT",
+      "expectedStates": {
+        "sum-score-invalid": "invalid",
+        "sum-score-value": "calculated"
+      }
     }
   ],
   "bookletConfigPackages": [

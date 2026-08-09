@@ -776,7 +776,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 2);
+  assert.equal(corpus.codingSchemePackages.length, 6);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -932,6 +932,112 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       ["d7", true, "NO_CODING", null, null]
     ]
   );
+
+  const remainingDerivedFamilies = [
+    {
+      family: "concat-code-chain",
+      sourceDirectory: "CONCAT_CODE",
+      inputCase: "01",
+      sourceTypes: [
+        "CONCAT_CODE",
+        "CONCAT_CODE",
+        "CONCAT_CODE",
+        "CONCAT_CODE",
+        "CONCAT_CODE"
+      ],
+      derivedOffset: 4,
+      expectedOutcome: [
+        ["d1", null, "DERIVE_ERROR", null, null],
+        ["d2", "1_1", "NO_CODING", null, null],
+        ["d3", "1_2_1", "CODING_COMPLETE", 1, 7],
+        ["d4", "1_1_2", "NO_CODING", null, null],
+        ["d5", "0_1", "NO_CODING", null, null]
+      ]
+    },
+    {
+      family: "copy-value-unset",
+      sourceDirectory: "COPY_VALUE",
+      inputCase: "03",
+      sourceTypes: ["COPY_VALUE", "SUM_SCORE", "COPY_VALUE"],
+      derivedOffset: 3,
+      expectedOutcome: [
+        ["d1", null, "DERIVE_ERROR", null, null],
+        ["d2", 3, "NO_CODING", null, null],
+        ["d3", null, "UNSET", null, null]
+      ]
+    },
+    {
+      family: "sum-code-derived-coding",
+      sourceDirectory: "SUM_CODE",
+      inputCase: "02",
+      sourceTypes: ["SUM_CODE"],
+      derivedOffset: 3,
+      expectedOutcome: [
+        ["d1", 2, "CODING_COMPLETE", 2, 0]
+      ]
+    },
+    {
+      family: "sum-score-partial",
+      sourceDirectory: "SUM_SCORE",
+      inputCase: "02",
+      sourceTypes: ["SUM_SCORE", "SUM_SCORE"],
+      derivedOffset: 3,
+      expectedOutcome: [
+        ["d1", null, "INVALID", null, null],
+        ["d2", 3, "NO_CODING", null, null]
+      ]
+    }
+  ] as const;
+  for (const expectedFamily of remainingDerivedFamilies) {
+    const codingPackage = corpus.codingSchemePackages.find(
+      candidate => candidate.family === expectedFamily.family
+    );
+    assert.ok(codingPackage);
+    assert.deepEqual(
+      [
+        codingPackage.schemeSourcePath,
+        codingPackage.inputSourcePath,
+        codingPackage.outcomeSourcePath
+      ],
+      [
+        `test/coding/derive/${expectedFamily.sourceDirectory}/coding-scheme.json`,
+        `test/coding/derive/${expectedFamily.sourceDirectory}/${expectedFamily.inputCase}_input.json`,
+        `test/coding/derive/${expectedFamily.sourceDirectory}/${expectedFamily.inputCase}_outcome.json`
+      ]
+    );
+    const derivedScheme = JSON.parse(
+      readFileSync(resolve(corpusRoot, codingPackage.schemeFixture), "utf8")
+    ) as {
+      version?: string;
+      variableCodings: Array<{ id: string; sourceType: string }>;
+    };
+    assert.equal(derivedScheme.version, undefined);
+    assert.deepEqual(
+      derivedScheme.variableCodings
+        .slice(expectedFamily.derivedOffset)
+        .map(variable => variable.sourceType),
+      expectedFamily.sourceTypes
+    );
+    const derivedOutcome = JSON.parse(
+      readFileSync(resolve(corpusRoot, codingPackage.outcomeFixture), "utf8")
+    ) as Array<{
+      id: string;
+      status: string;
+      value: unknown;
+      code?: number;
+      score?: number;
+    }>;
+    assert.deepEqual(
+      derivedOutcome.slice(expectedFamily.derivedOffset).map(variable => [
+        variable.id,
+        variable.value,
+        variable.status,
+        variable.code ?? null,
+        variable.score ?? null
+      ]),
+      expectedFamily.expectedOutcome
+    );
+  }
 });
 
 test("original Testcenter compatibility corpus pins official group monitoring semantics", () => {

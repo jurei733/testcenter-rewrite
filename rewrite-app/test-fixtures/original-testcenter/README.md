@@ -14,8 +14,12 @@ The same pinned release contributes the byte-exact `UNIQUE_VALUES` scheme plus
 case-03 input and outcome. That second family covers dependent derivation,
 derived code/score, boolean results, and the `REMOVE_ALL_SPACES`,
 `REMOVE_DISPENSABLE_SPACES`, `TO_NUMBER`, and combined lower-case/space
-processing paths. Every source path and hash is recorded separately in
-`corpus.json`.
+processing paths. Four further byte-exact families complete the release's
+derived-value core: `CONCAT_CODE/01`, `COPY_VALUE/03`, `SUM_CODE/02`, and
+`SUM_SCORE/02`. They retain alias-aware concatenation, sorted and chained
+codes, explicit code/score zeroes, missing-input `UNSET`, dependency
+`DERIVE_ERROR`, partial-input `INVALID`, and derived recoding. Every source
+path and hash is recorded separately in `corpus.json`.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "b1alias",
+    "status": "VALUE_CHANGED",
+    "value": "111"
+  },
+  {
+    "id": "b2",
+    "status": "VALUE_CHANGED",
+    "value": "444"
+  },
+  {
+    "id": "b3",
+    "status": "VALUE_CHANGED",
+    "value": "555"
+  },
+  {
+    "id": "b4",
+    "status": "VALUE_CHANGED",
+    "value": "333"
+  }
+]
