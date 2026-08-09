@@ -7146,6 +7146,25 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
     assert.equal(nonTimedTarget.status, 400);
     assert.equal(nonTimedTarget.body.error, "monitor_time_target_not_timed");
 
+    const nonTimedGotoRestoration = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      commandPath,
+      {
+        method: "POST",
+        headers: { authorization },
+        body: {
+          commandType: "goto",
+          targetUnitKey: "unit-finish",
+          remainingSeconds: 60
+        }
+      }
+    );
+    assert.equal(nonTimedGotoRestoration.status, 400);
+    assert.equal(
+      nonTimedGotoRestoration.body.error,
+      "monitor_goto_time_target_not_timed"
+    );
+
     const missingGotoTarget = await requestJsonAt<{ error: string }>(
       isolated.baseUrl,
       commandPath,
@@ -14163,7 +14182,9 @@ test("original Testcenter compatibility corpus executes the official group monit
           "CY-Unit.Sample-101",
           "CY-Unit.Sample-102",
           "CY-Unit.Sample-103"
-        ]
+        ],
+        timeMaxMinutes: null,
+        timer: null
       }
     ]);
 
@@ -18907,6 +18928,16 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       currentUnitLabel: string | null;
       currentBlockKey: string | null;
       currentBlockLabel: string | null;
+      blockNavigationTargets: Array<{
+        blockKey: string;
+        targetUnitKey: string;
+        timeMaxMinutes: number | null;
+        timer: {
+          testletKey: string;
+          status: string;
+          remainingSeconds: number;
+        } | null;
+      }>;
       activeTestletTimer: {
         testletKey: string;
         displayLabel: string;
@@ -18945,6 +18976,29 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   );
   const monitorTimer = openRunsWithTimer.body.items[0]?.activeTestletTimer;
   assert.ok(monitorTimer);
+  const timedNavigationTarget =
+    openRunsWithTimer.body.items[0]?.blockNavigationTargets.find(
+      target => target.targetUnitKey === "UNIT.TIMED"
+    );
+  assert.deepEqual(
+    timedNavigationTarget
+      ? {
+          blockKey: timedNavigationTarget.blockKey,
+          timeMaxMinutes: timedNavigationTarget.timeMaxMinutes,
+          timerTestletKey: timedNavigationTarget.timer?.testletKey,
+          timerStatus: timedNavigationTarget.timer?.status,
+          timerRemainingSeconds:
+            timedNavigationTarget.timer?.remainingSeconds
+        }
+      : null,
+    {
+      blockKey: testletKey,
+      timeMaxMinutes: authoredTimerDurationSeconds / 60,
+      timerTestletKey: testletKey,
+      timerStatus: "paused",
+      timerRemainingSeconds: pausedRemainingSeconds
+    }
+  );
   assert.deepEqual(
     {
       ...monitorTimer,
@@ -19239,6 +19293,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       body: {
         commandType: "goto",
         targetUnitKey: "UNIT.TIMED",
+        remainingSeconds: 1,
         actorId: "timer-monitor"
       }
     }
@@ -19257,17 +19312,62 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.durationSeconds,
-    authoredTimerDurationSeconds
+    1
   );
   assert.equal(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.remainingSeconds,
-    authoredTimerDurationSeconds
+    1
   );
   assert.match(
     monitorReopenedTimer.body.command.testRun.testletTimers?.[testletKey]
       ?.expiresAt ?? "",
     ISO_DATE_REGEX
+  );
+
+  const batchReopenedTimer = await requestJson<{
+    succeededCount: number;
+    failedCount: number;
+    commands: Array<{
+      testRun: {
+        currentUnitKey: string | null;
+        testletTimers?: Record<
+          string,
+          { status: string; durationSeconds: number; remainingSeconds: number }
+        >;
+      };
+    }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/commands`,
+    {
+      method: "POST",
+      body: {
+        commandType: "goto",
+        testRunIds: [testRunId],
+        targetUnitKey: "UNIT.TIMED",
+        remainingSeconds: 2,
+        actorId: "timer-monitor-batch"
+      }
+    }
+  );
+  assert.equal(batchReopenedTimer.status, 200);
+  assert.equal(batchReopenedTimer.body.succeededCount, 1);
+  assert.equal(batchReopenedTimer.body.failedCount, 0);
+  assert.equal(
+    batchReopenedTimer.body.commands[0]?.testRun.currentUnitKey,
+    "UNIT.TIMED"
+  );
+  const batchTimer =
+    batchReopenedTimer.body.commands[0]?.testRun.testletTimers?.[testletKey];
+  assert.deepEqual(
+    batchTimer
+      ? {
+          status: batchTimer.status,
+          durationSeconds: batchTimer.durationSeconds,
+          remainingSeconds: batchTimer.remainingSeconds
+        }
+      : null,
+    { status: "running", durationSeconds: 2, remainingSeconds: 2 }
   );
 
   const monitorActivity = await requestJson<{
@@ -19289,6 +19389,20 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   );
   const setTimeActivity = monitorActivity.body.items.find(
     item => item.activityEvent.details.commandType === "set_testlet_time"
+  );
+  const gotoRestorationActivity = monitorActivity.body.items.find(
+    item =>
+      item.activityEvent.details.commandType === "goto" &&
+      item.activityEvent.details.remainingSeconds === 1
+  );
+  assert.ok(gotoRestorationActivity);
+  assert.equal(
+    gotoRestorationActivity.activityEvent.details.targetTestletKey,
+    testletKey
+  );
+  assert.equal(
+    gotoRestorationActivity.activityEvent.details.previousTimerStatus,
+    "expired"
   );
   assert.ok(setTimeActivity);
   assert.deepEqual(

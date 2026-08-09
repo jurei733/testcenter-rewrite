@@ -62,8 +62,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <span class="eyebrow">{{ view.monitorText("gm_controls") }}</span>
             <h2 id="monitorCustomHeadline">{{ view.monitorText("gm_headline") }}</h2>
           </div>
-          <span class="status-pill">Server-enforced scope</span>
+          <div class="actions">
+            <button id="monitorScrollDownButton" class="ghost" type="button" [attr.title]="view.monitorText('gm_scroll_down')" (click)="view.scrollMonitorRunsIntoView()">{{ view.monitorText("gm_scroll_down") }}</button>
+            <button id="monitorToggleControlsButton" class="ghost" type="button" [attr.aria-expanded]="view.monitorControlsVisible" [attr.title]="view.monitorControlsVisible ? view.monitorText('gm_hide_controls_tooltip') : view.monitorText('gm_controls')" (click)="view.toggleMonitorControls()">{{ view.monitorControlsVisible ? view.monitorText("gm_hide_controls_tooltip") : view.monitorText("gm_controls") }}</button>
+          </div>
         </div>
+        <ng-container *ngIf="view.monitorControlsVisible">
         <p>Choose the assigned study scope, refresh its live runs, then select a run below before issuing a command. Group monitors see only their assigned groups even if a broader filter is entered.</p>
         <div class="form-grid">
           <label>
@@ -96,7 +100,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <select id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()">
               <option value="">Choose a block</option>
               <option *ngFor="let target of view.monitorBlockNavigationTargets" [value]="target.targetUnitKey">
-                {{ target.blockLabel }} ({{ target.blockKey }})
+                {{ target.blockLabel }} ({{ target.blockKey }}){{ view.monitorTargetTimerText(target) ? " · " + view.monitorTargetTimerText(target) : "" }}
               </option>
             </select>
           </label>
@@ -113,6 +117,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
         <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
         <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
+        <p id="monitorColumnPresentation">{{ view.monitorColumnPresentation }}</p>
+        <p id="monitorTargetTimerStatus" *ngIf="view.monitorSelectedTargetTimerText">{{ view.monitorSelectedTargetTimerText }}</p>
         <div class="actions">
           <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
@@ -126,13 +132,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
           <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">{{ view.monitorText("gm_control_finish_everything") }}</button>
         </div>
+        </ng-container>
       </article>
 
       <article id="monitorOverviewCard" class="card" *ngIf="view.isMonitorOnlySession">
         <div class="section-heading">
           <div>
             <span class="eyebrow">Scoped live dashboard</span>
-            <h2>Test Overview</h2>
+            <h2>{{ view.monitorText("gm_show_monitor") }}</h2>
           </div>
           <span class="status-pill">Profile-aware</span>
         </div>
@@ -150,7 +157,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         *ngIf="view.isMonitorOnlySession"
-        title="Groups In Scope"
+        [title]="view.monitorText('gm_show_monitor')"
         subtitle="Visible live runs grouped after server authorization, request filters, and the active monitor profile."
         [items]="view.monitorGroupOverviewItems"
         (itemAction)="view.filterMonitorOverviewGroup($event)"
@@ -808,11 +815,12 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div id="monitorBatchSelectionStatus" class="record-collection-summary" role="status" aria-live="polite">
           {{ view.monitorBatchSelectionText }}
         </div>
+        <p id="monitorBatchBookletWarning" class="warning" *ngIf="view.monitorBatchBookletWarning">{{ view.monitorBatchBookletWarning }}</p>
         <ul *ngIf="view.monitorBatchRunIds.length > 0">
           <li *ngFor="let testRunId of view.monitorBatchRunIds"><code>{{ testRunId }}</code></li>
         </ul>
         <div class="actions">
-          <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.selectAllVisibleMonitorRuns()">Select All Visible</button>
+          <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.selectAllVisibleMonitorRuns()">{{ view.isMonitorOnlySession ? view.monitorText("gm_auto_checkall") : "Select All Visible" }}</button>
           <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
           <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
           <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>
@@ -827,7 +835,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       </article>
 
       <app-record-collection
-        title="Open Monitor Runs"
+        id="openMonitorRunsCollection"
+        [title]="view.isMonitorOnlySession ? view.monitorText('gm_show_test') : 'Open Monitor Runs'"
         subtitle="Runs that currently keep the activation guard active."
         [items]="view.openRunItems"
         [density]="view.monitorProfileDensity"

@@ -8552,6 +8552,18 @@ try {
       "    <CustomText key=\"gm_selection_info_none\">UI No Runs Selected</CustomText>",
       "    <CustomText key=\"gm_control_goto_tooltip\">UI Pick a Section</CustomText>",
       "    <CustomText key=\"gm_control_unlock_tooltip\">UI Authorize Test</CustomText>",
+      "    <CustomText key=\"gm_show_monitor\">UI Groups In Scope</CustomText>",
+      "    <CustomText key=\"gm_show_test\">UI Open Monitor Tests</CustomText>",
+      "    <CustomText key=\"gm_menu_cols\">UI Columns</CustomText>",
+      "    <CustomText key=\"gm_menu_cols_states\">UI States</CustomText>",
+      "    <CustomText key=\"gm_scroll_down\">UI Bottom</CustomText>",
+      "    <CustomText key=\"gm_hide_controls_tooltip\">UI Hide Controls</CustomText>",
+      "    <CustomText key=\"gm_auto_checkall\">UI Control All</CustomText>",
+      "    <CustomText key=\"gm_timeleft_tooltip\">UI %s/%s minutes left</CustomText>",
+      "    <CustomText key=\"gm_timeup_tooltip\">UI Timer Closed</CustomText>",
+      "    <CustomText key=\"gm_timemax_tooltip\">UI Timer %s minutes</CustomText>",
+      "    <CustomText key=\"gm_control_goto_unlock_blocks_confirm_headline\">UI Reopen Timed Section</CustomText>",
+      "    <CustomText key=\"gm_control_goto_unlock_blocks_confirm_text\">UI Restore time before jumping.</CustomText>",
       "  </CustomTexts>",
       "  <Profiles><GroupMonitor>",
       "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"yes\">",
@@ -8602,7 +8614,7 @@ try {
     "All sessions (all)",
     "all: small view; block hide",
     "all: Current participant not substring student-ui",
-    "22 imported override(s)"
+    "34 imported override(s)"
   ]) {
     assert.ok(
       operationalLoginCandidateText.includes(expectedText),
@@ -8633,7 +8645,7 @@ try {
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
   await page.getByText("1 imported monitor profile(s)").waitFor();
-  await page.getByText("22 login-specific custom text(s)").waitFor();
+  await page.getByText("34 login-specific custom text(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -9771,7 +9783,10 @@ try {
     .filter({ hasText: "Timer Remaining" })
     .filter({ hasText: "Timer Expires" })
     .waitFor();
-  assert.match(await openRunStudentCard.innerText(), /Timer Remaining\s+\d+:\d{2}/i);
+  assert.match(
+    await openRunStudentCard.innerText(),
+    /Timer Remaining\s+Verbleibende Zeit: \d+(?:[.,]\d+)? von \d+ Minute\(n\)/i
+  );
   logStep("monitor-bulk-pause-resume");
   await openRunStudentCard
     .getByRole("button", { name: "Add to Batch" })
@@ -9968,6 +9983,17 @@ try {
   await page.locator("#monitorConsoleGotoButton", { hasText: "UI Jump" }).waitFor();
   await page.locator("#monitorConsoleUnlockTestButton", { hasText: "UI Release" }).waitFor();
   await page.locator("#monitorConsoleCompleteButton", { hasText: "UI Finish All" }).waitFor();
+  await page.locator("#monitorScrollDownButton", { hasText: "UI Bottom" }).waitFor();
+  await page.locator("#monitorToggleControlsButton", { hasText: "UI Hide Controls" }).waitFor();
+  await page
+    .locator("#monitorColumnPresentation")
+    .filter({ hasText: "UI Columns" })
+    .filter({ hasText: "UI States" })
+    .waitFor();
+  await page.locator("#monitorToggleControlsButton").click();
+  await page.locator("#monitorTenantKey").waitFor({ state: "hidden" });
+  await page.locator("#monitorToggleControlsButton", { hasText: "UI Test Controls" }).click();
+  await page.locator("#monitorTenantKey").waitFor({ state: "visible" });
   await selectAndCommit("#monitorTargetUnitKey", "");
   assert.equal(
     await page.locator("#monitorConsoleGotoButton").getAttribute("title"),
@@ -10013,7 +10039,7 @@ try {
   await page.locator("#monitorApplyScopeButton").click();
   const scopedOpenRuns = page
     .locator("app-record-collection")
-    .filter({ has: page.getByRole("heading", { name: "Open Monitor Runs" }) });
+    .filter({ has: page.getByRole("heading", { name: "UI Open Monitor Tests" }) });
   await scopedOpenRuns
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
@@ -10066,7 +10092,7 @@ try {
     .waitFor();
   const scopedGroups = page
     .locator("app-record-collection")
-    .filter({ has: page.getByRole("heading", { name: "Groups In Scope" }) });
+    .filter({ has: page.getByRole("heading", { name: "UI Groups In Scope" }) });
   await scopedGroups
     .filter({ hasText: participantGroupKey })
     .filter({ hasText: "1 participant · 1 visible run" })
@@ -10103,6 +10129,7 @@ try {
     .click();
   await expectInputValue("#monitorSelectedTestRunId", pausedTestRunId);
   await page.locator("#monitorConsolePauseButton").click();
+  await waitForNotBusy("group-monitor-pause");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "paused"
@@ -10113,6 +10140,7 @@ try {
     .getByRole("heading", { name: "1", exact: true })
     .waitFor();
   await page.locator("#monitorConsoleResumeButton").click();
+  await waitForNotBusy("group-monitor-resume");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload => payload?.currentRunState?.testRun?.status === "running"
@@ -10138,13 +10166,24 @@ try {
   );
   await page.locator("#monitorConsoleGotoButton").click();
   assert.equal((await firstBlockGotoResponsePromise).status(), 200);
+  await waitForNotBusy("group-monitor-first-goto");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
     payload =>
       payload?.currentRunState?.testRun?.currentUnitKey ===
       "unit-participant-route"
   );
+  await clickAction("Load Monitor Scope");
+  await expectInputValue("#openRunUnitFilter", "");
   await expectInputValue("#monitorTargetUnitKey", "unit-paused");
+  await page
+    .locator("#monitorTargetTimerStatus")
+    .filter({ hasText: "UI Timer Closed" })
+    .waitFor();
+  await fillAndCommit("#monitorConsoleTimeSeconds", "120");
+  const acceptTimedGotoRestoration = acceptNextDialog(
+    /UI Reopen Timed Section[\s\S]*UI Restore time before jumping\.[\s\S]*UI Timer 2 minutes/
+  );
   const nextBlockGotoResponsePromise = page.waitForResponse(
     response =>
       response.request().method() === "POST" &&
@@ -10153,10 +10192,30 @@ try {
       )
   );
   await page.locator("#monitorConsoleGotoButton").click();
-  assert.equal((await nextBlockGotoResponsePromise).status(), 200);
+  await acceptTimedGotoRestoration;
+  const nextBlockGotoResponse = await nextBlockGotoResponsePromise;
+  await waitForNotBusy("group-monitor-timed-goto");
+  assert.equal(nextBlockGotoResponse.status(), 200);
+  assert.equal(
+    nextBlockGotoResponse.request().postDataJSON().remainingSeconds,
+    120,
+    "The confirmed monitor jump must restore the closed timer atomically."
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${participantSessionId}/current-state`,
-    payload => payload?.currentRunState?.testRun?.currentUnitKey === "unit-paused"
+    payload => {
+      const timer =
+        payload?.currentRunState?.testRun?.testletTimers?.[
+          "testlet:timed-paused"
+        ];
+      return (
+        payload?.currentRunState?.testRun?.currentUnitKey === "unit-paused" &&
+        timer?.status === "running" &&
+        timer?.durationSeconds === 120 &&
+        timer?.remainingSeconds <= 120 &&
+        timer?.remainingSeconds > 0
+      );
+    }
   );
   await expectInputValue("#monitorTargetUnitKey", "");
   await monitorOverview

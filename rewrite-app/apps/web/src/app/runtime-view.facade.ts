@@ -80,6 +80,10 @@ type RuntimeEntryLink = {
   url: string;
 };
 
+type MonitorBlockNavigationTarget = NonNullable<
+  OpenMonitorRun["blockNavigationTargets"]
+>[number];
+
 const monitorFilterTargetTextKeys: Readonly<
   Record<string, MonitorCustomTextKey>
 > = {
@@ -125,6 +129,7 @@ export class RuntimeViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly monitorBatchSelection = new Set<string>();
+  monitorControlsVisible = true;
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
   > = [];
@@ -253,6 +258,73 @@ export class RuntimeViewFacade {
       this.selectedOpenMonitorRun?.blockNavigationTargets ??
       this.selectedMonitorBlockNavigationTargets
     );
+  }
+
+  get selectedMonitorTarget(): MonitorBlockNavigationTarget | null {
+    return this.findMonitorTarget(this.selectedOpenMonitorRun);
+  }
+
+  get monitorSelectedTargetTimerText(): string {
+    const target = this.selectedMonitorTarget;
+    return target ? this.monitorTargetTimerText(target) : "";
+  }
+
+  monitorTargetTimerText(target: MonitorBlockNavigationTarget): string {
+    if (target.timeMaxMinutes == null) {
+      return "";
+    }
+    const timer = target.timer;
+    if (!timer) {
+      return this.monitorFormattedText("gm_timemax_tooltip", [
+        this.formatMonitorMinutes(target.timeMaxMinutes)
+      ]);
+    }
+    if (
+      timer.status === "expired" ||
+      timer.status === "cancelled" ||
+      timer.remainingSeconds <= 0
+    ) {
+      return this.monitorText("gm_timeup_tooltip");
+    }
+    return this.monitorFormattedText("gm_timeleft_tooltip", [
+      this.formatMonitorMinutes(timer.remainingSeconds / 60),
+      this.formatMonitorMinutes(timer.durationSeconds / 60)
+    ]);
+  }
+
+  get monitorColumnPresentation(): string {
+    const profile = this.activeMonitorProfile;
+    if (!profile) {
+      return `${this.monitorText("gm_menu_cols")}: ${this.monitorText("gm_col_bookletLabel")}, ${this.monitorText("gm_col_unitLabel")}. ${this.monitorText("gm_menu_cols_states")}: ${this.monitorText("gm_col_state")}.`;
+    }
+    const visibleColumns = [
+      profile.settings.groupColumn === "show"
+        ? this.monitorText("gm_col_groupName")
+        : "",
+      profile.settings.bookletColumn === "show"
+        ? this.monitorText("gm_col_bookletLabel")
+        : "",
+      profile.settings.blockColumn === "show"
+        ? this.monitorText("gm_col_blockLabel")
+        : "",
+      profile.settings.unitColumn === "show"
+        ? this.monitorText("gm_col_unitLabel")
+        : ""
+    ].filter(Boolean);
+    const stateColumns = profile.settings.bookletStatesColumns
+      .split(/[\W,]+/)
+      .filter(Boolean);
+    return `${this.monitorText("gm_menu_cols")}: ${visibleColumns.join(", ") || "—"}. ${this.monitorText("gm_menu_cols_states")}: ${stateColumns.join(", ") || "—"}.`;
+  }
+
+  toggleMonitorControls(): void {
+    this.monitorControlsVisible = !this.monitorControlsVisible;
+  }
+
+  scrollMonitorRunsIntoView(): void {
+    globalThis.document
+      ?.getElementById("openMonitorRunsCollection")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   private get selectedOpenMonitorRun(): OpenMonitorRun | null {
@@ -2044,6 +2116,12 @@ export class RuntimeViewFacade {
               activeTimer.remainingSeconds % 60
             ).padStart(2, "0")}`
           : null;
+        const activeTimerText = activeTimer
+          ? this.monitorFormattedText("gm_timeleft_tooltip", [
+              this.formatMonitorMinutes(activeTimer.remainingSeconds / 60),
+              this.formatMonitorMinutes(activeTimer.durationSeconds / 60)
+            ])
+          : null;
         const batchSelected = this.monitorBatchSelection.has(
           openRun.testRunId
         );
@@ -2061,7 +2139,7 @@ export class RuntimeViewFacade {
             openRun.executionMode,
             openRun.bookletAssignmentKey,
             ...(activeTimer
-              ? [`timer ${activeTimer.status} · ${activeTimerRemaining}`]
+              ? [activeTimerText ?? `timer ${activeTimer.status}`]
               : []),
             bookletStates.length > 0
               ? `${bookletStates.length} booklet state${bookletStates.length === 1 ? "" : "s"}`
@@ -2128,8 +2206,14 @@ export class RuntimeViewFacade {
               ? []
               : [
                   { label: "Execution Mode", value: openRun.executionMode },
-                  { label: "Active Timer", value: activeTimer?.displayLabel ?? "none" },
-                  { label: "Timer Remaining", value: activeTimerRemaining ?? "none" },
+                  {
+                    label: "Active Timer",
+                    value: activeTimer?.displayLabel ?? "none"
+                  },
+                  {
+                    label: "Timer Remaining",
+                    value: activeTimerText ?? activeTimerRemaining ?? "none"
+                  },
                   {
                     label: "Timer Expires",
                     value: activeTimer?.expiresAt
@@ -2334,6 +2418,20 @@ export class RuntimeViewFacade {
     ]);
   }
 
+  get monitorBatchBookletWarning(): string {
+    if (!this.isMonitorOnlySession || this.monitorBatchCount < 2) {
+      return "";
+    }
+    const bookletSpecies = new Set(
+      this.visibleOpenMonitorRuns
+        .filter(openRun => this.monitorBatchSelection.has(openRun.testRunId))
+        .map(openRun => openRun.bookletSpecies ?? openRun.bookletKey)
+    );
+    return bookletSpecies.size > 1
+      ? this.monitorText("gm_multiple_booklet_species_warning")
+      : "";
+  }
+
   get canIssueMonitorBatch(): boolean {
     return (
       this.canIssueMonitorCommands &&
@@ -2343,19 +2441,19 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorBatchGoto(): boolean {
+    const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
+      this.monitorBatchSelection.has(openRun.testRunId)
+    );
+    const restoration = this.monitorGotoRestoration(selectedRuns);
     return (
       this.canIssueMonitorBatch &&
-      Boolean(this.runtime.monitorTargetUnitKey.trim())
+      Boolean(this.runtime.monitorTargetUnitKey.trim()) &&
+      (!restoration || this.hasValidMonitorTimeSeconds)
     );
   }
 
   get canIssueMonitorBatchTime(): boolean {
-    const seconds = Number(this.runtime.monitorTimeSeconds);
-    return (
-      this.canIssueMonitorBatchGoto &&
-      Number.isInteger(seconds) &&
-      seconds > 0
-    );
+    return this.canIssueMonitorBatchGoto && this.hasValidMonitorTimeSeconds;
   }
 
   get monitorCommandHistoryItems(): RecordCollectionItem[] {
@@ -2923,20 +3021,18 @@ export class RuntimeViewFacade {
   }
 
   get canIssueMonitorGoto(): boolean {
+    const restoration = this.monitorGotoRestoration(
+      this.selectedOpenMonitorRun ? [this.selectedOpenMonitorRun] : []
+    );
     return (
       this.canUseMonitorRunActions &&
-      this.runtime.monitorTargetUnitKey.trim().length > 0
+      this.runtime.monitorTargetUnitKey.trim().length > 0 &&
+      (!restoration || this.hasValidMonitorTimeSeconds)
     );
   }
 
   get canSetMonitorTestletTime(): boolean {
-    const remainingSeconds = Number(this.runtime.monitorTimeSeconds);
-    return (
-      this.canIssueMonitorGoto &&
-      Number.isInteger(remainingSeconds) &&
-      remainingSeconds >= 1 &&
-      remainingSeconds <= 86_400
-    );
+    return this.canIssueMonitorGoto && this.hasValidMonitorTimeSeconds;
   }
 
   get canCreateReviewAction(): boolean {
@@ -3339,8 +3435,23 @@ export class RuntimeViewFacade {
       return;
     }
     const navigationTargets = this.monitorBlockNavigationTargets;
+    const restoration = this.monitorGotoRestoration(
+      this.selectedOpenMonitorRun ? [this.selectedOpenMonitorRun] : []
+    );
+    if (
+      restoration &&
+      !globalThis.confirm(this.monitorGotoRestorationConfirmation(restoration))
+    ) {
+      return;
+    }
+    this.clearMonitorUnitFilterBeforeGoto();
     this.viewState.onActionAsync(async () => {
-      const result = await this.runtimeService.issueMonitorRunCommand("goto");
+      const result = await this.runtimeService.issueMonitorRunCommand(
+        "goto",
+        restoration
+          ? { remainingSeconds: restoration.remainingSeconds }
+          : undefined
+      );
       this.selectNextMonitorBlockAfterGoto(
         result.command.testRun.testRunId,
         result.command.testRun.currentUnitKey,
@@ -3428,6 +3539,13 @@ export class RuntimeViewFacade {
     const openRuns =
       parseJsonDocument<MonitorOpenRunsResponse>(this.runtime.openRunsView)
         ?.items ?? [];
+    const selectedRuns = openRuns.filter(openRun =>
+      testRunIds.includes(openRun.testRunId)
+    );
+    const restoration =
+      commandType === "goto"
+        ? this.monitorGotoRestoration(selectedRuns)
+        : null;
     const navigationTargetsByRun = new Map(
       openRuns.map(openRun => [
         openRun.testRunId,
@@ -3449,18 +3567,24 @@ export class RuntimeViewFacade {
         : commandType === "set_testlet_time"
           ? ` for unit ${this.runtime.monitorTargetUnitKey.trim()} with ${this.runtime.monitorTimeSeconds} seconds`
           : "";
-    if (
-      !globalThis.confirm(
-        `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`
-      )
-    ) {
+    const commandConfirmation = `Issue '${commandType}'${targetDescription} for ${testRunIds.length} selected run(s)?`;
+    const confirmation = restoration
+      ? `${this.monitorGotoRestorationConfirmation(restoration)}\n\n${commandConfirmation}`
+      : commandConfirmation;
+    if (!globalThis.confirm(confirmation)) {
       return;
+    }
+    if (commandType === "goto") {
+      this.clearMonitorUnitFilterBeforeGoto();
     }
 
     this.viewState.onActionAsync(async () => {
       const result = await this.runtimeService.issueMonitorRunCommands(
         testRunIds,
-        commandType
+        commandType,
+        restoration
+          ? { remainingSeconds: restoration.remainingSeconds }
+          : undefined
       );
       for (const command of result.commands) {
         this.monitorBatchSelection.delete(command.testRun.testRunId);
@@ -4227,7 +4351,7 @@ export class RuntimeViewFacade {
       );
       return [
         {
-          label: "Persisted BOOKLET_STATES",
+          label: this.monitorText("gm_menu_cols_states"),
           value: states.length > 0 ? states.join(" | ") : "none"
         }
       ];
@@ -4244,10 +4368,82 @@ export class RuntimeViewFacade {
     });
     return [
       {
-        label: "Profile BOOKLET_STATES",
+        label: this.monitorText("gm_menu_cols_states"),
         value: states.length > 0 ? states.join(" | ") : "none"
       }
     ];
+  }
+
+  private get hasValidMonitorTimeSeconds(): boolean {
+    const seconds = Number(this.runtime.monitorTimeSeconds);
+    return (
+      Number.isInteger(seconds) &&
+      seconds >= 1 &&
+      seconds <= 86_400
+    );
+  }
+
+  private findMonitorTarget(
+    openRun: OpenMonitorRun | null
+  ): MonitorBlockNavigationTarget | null {
+    const targetUnitKey = this.runtime.monitorTargetUnitKey.trim();
+    if (!openRun || !targetUnitKey) {
+      return null;
+    }
+    return (
+      openRun.blockNavigationTargets?.find(
+        target =>
+          target.targetUnitKey === targetUnitKey ||
+          target.unitKeys.includes(targetUnitKey)
+      ) ?? null
+    );
+  }
+
+  private monitorGotoRestoration(
+    openRuns: readonly OpenMonitorRun[]
+  ): { affectedCount: number; remainingSeconds: number } | null {
+    const affectedCount = openRuns.filter(openRun => {
+      const timer = this.findMonitorTarget(openRun)?.timer;
+      return Boolean(
+        timer &&
+          (timer.status === "expired" ||
+            timer.status === "cancelled" ||
+            timer.remainingSeconds <= 0)
+      );
+    }).length;
+    if (affectedCount === 0) {
+      return null;
+    }
+    return {
+      affectedCount,
+      remainingSeconds: Number(this.runtime.monitorTimeSeconds)
+    };
+  }
+
+  private monitorGotoRestorationConfirmation(restoration: {
+    affectedCount: number;
+    remainingSeconds: number;
+  }): string {
+    const restoredMinutes = this.formatMonitorMinutes(
+      restoration.remainingSeconds / 60
+    );
+    return `${this.monitorText("gm_control_goto_unlock_blocks_confirm_headline")}\n\n${this.monitorText("gm_control_goto_unlock_blocks_confirm_text")}\n\n${this.monitorFormattedText("gm_timemax_tooltip", [restoredMinutes])} · ${restoration.affectedCount} run${restoration.affectedCount === 1 ? "" : "s"}`;
+  }
+
+  private clearMonitorUnitFilterBeforeGoto(): void {
+    if (!this.isMonitorOnlySession || !this.runtime.openRunUnitFilter.trim()) {
+      return;
+    }
+    this.runtime.openRunUnitFilter = "";
+    this.persistState();
+  }
+
+  private formatMonitorMinutes(value: number): string {
+    if (!Number.isFinite(value)) {
+      return "0";
+    }
+    const rounded = Math.round(value * 100) / 100;
+    return String(rounded);
   }
 
   private formatResponsePreview(value: string): string {

@@ -261,7 +261,8 @@ export async function issueMonitorRunCommandAction(
     | "unlock_test"
     | "unlock_navigation"
     | "lock_navigation"
-    | "set_testlet_time"
+    | "set_testlet_time",
+  options?: { remainingSeconds?: number }
 ): Promise<IssueMonitorRunCommandResponse> {
   const requestLabel = {
     pause: "Monitor Pause Run",
@@ -282,7 +283,12 @@ export async function issueMonitorRunCommandAction(
       commandType,
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
-        ? { targetUnitKey: host.getMonitorTargetUnitKey().trim() }
+        ? {
+            targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+            ...(options?.remainingSeconds != null
+              ? { remainingSeconds: options.remainingSeconds }
+              : {})
+          }
         : commandType === "set_testlet_time"
           ? {
               targetUnitKey: host.getMonitorTargetUnitKey().trim(),
@@ -341,7 +347,8 @@ export async function issueMonitorRunCommandsAction(
     | "unlock_test"
     | "unlock_navigation"
     | "lock_navigation"
-    | "set_testlet_time"
+    | "set_testlet_time",
+  options?: { remainingSeconds?: number }
 ): Promise<IssueMonitorRunCommandsResponse> {
   const payload = await host.request<IssueMonitorRunCommandsResponse>(
     `Monitor ${commandType} ${testRunIds.length} Runs`,
@@ -352,7 +359,12 @@ export async function issueMonitorRunCommandsAction(
       commandType,
       actorId: host.getReviewerId().trim() || undefined,
       ...(commandType === "goto"
-        ? { targetUnitKey: host.getMonitorTargetUnitKey().trim() }
+        ? {
+            targetUnitKey: host.getMonitorTargetUnitKey().trim(),
+            ...(options?.remainingSeconds != null
+              ? { remainingSeconds: options.remainingSeconds }
+              : {})
+          }
         : commandType === "set_testlet_time"
           ? {
               targetUnitKey: host.getMonitorTargetUnitKey().trim(),

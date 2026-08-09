@@ -1041,6 +1041,10 @@ export type OpenMonitorRun = {
     blockLabel: string;
     targetUnitKey: string;
     unitKeys: string[];
+    /** Authored limit for the timed testlet reached by this block target. */
+    timeMaxMinutes?: number | null;
+    /** Persisted timer state, including expired/cancelled targets, when started before. */
+    timer?: MonitorTestletTimer | null;
   }>;
   activeTestletTimer: MonitorTestletTimer | null;
   updatedAt: string;

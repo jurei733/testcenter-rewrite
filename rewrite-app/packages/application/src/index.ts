@@ -4300,14 +4300,15 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
     )
     .map(testRun => {
       const normalizedTestRun = normalizeTestRun(testRun);
-      const location = resolveOpenMonitorRunLocation(
-        input.activeContentRelease,
-        normalizedTestRun
-      );
       const testletTimers = buildMonitorTestletTimers(
         input.activeContentRelease,
         normalizedTestRun,
         input.timestamp
+      );
+      const location = resolveOpenMonitorRunLocation(
+        input.activeContentRelease,
+        normalizedTestRun,
+        testletTimers
       );
       const participantSession =
         participantSessions.find(
@@ -4355,7 +4356,8 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
 
 const resolveOpenMonitorRunLocation = (
   contentRelease: ContentRelease | null,
-  testRun: TestRun
+  testRun: TestRun,
+  testletTimers: readonly MonitorTestletTimer[]
 ): Pick<
   OpenMonitorRun,
   | "bookletLabel"
@@ -4398,11 +4400,22 @@ const resolveOpenMonitorRunLocation = (
       existingTarget.unitKeys.push(visibleUnit.unitKey);
       continue;
     }
+    const timedTestlet = resolveTimedTestletForUnit(
+      booklet,
+      visibleUnit.unitKey
+    );
     const target = {
       blockKey,
       blockLabel: testletsByKey.get(blockKey)?.displayLabel ?? blockKey,
       targetUnitKey: visibleUnit.unitKey,
-      unitKeys: [visibleUnit.unitKey]
+      unitKeys: [visibleUnit.unitKey],
+      timeMaxMinutes:
+        timedTestlet?.restrictions?.timeMax?.minutes ?? null,
+      timer: timedTestlet
+        ? testletTimers.find(
+            candidate => candidate.testletKey === timedTestlet.testletKey
+          ) ?? null
+        : null
     };
     blockNavigationTargets.push(target);
     navigationTargetsByBlock.set(blockKey, target);
@@ -16138,8 +16151,13 @@ const applyMonitorGoto = (input: {
   contentRelease: ContentRelease;
   testRun: TestRun;
   targetUnitKey: string;
+  remainingSeconds?: number | null;
   timestamp: string;
-}): TestRun => {
+}): {
+  testRun: TestRun;
+  restoredTestletKey: string | null;
+  previousTimer: NonNullable<TestRun["testletTimers"]>[string] | null;
+} => {
   const booklet = input.contentRelease.runtimeSnapshot.bookletEntries.find(
     candidate => candidate.bookletKey === input.testRun.bookletKey
   );
@@ -16178,6 +16196,16 @@ const applyMonitorGoto = (input: {
     booklet,
     input.targetUnitKey
   );
+  if (input.remainingSeconds != null && !targetTimedTestlet) {
+    throw new FirstSliceError(
+      400,
+      "monitor_goto_time_target_not_timed",
+      `Unit '${input.targetUnitKey}' does not belong to a timed testlet.`
+    );
+  }
+  const previousTargetTimer = targetTimedTestlet
+    ? nextRun.testletTimers?.[targetTimedTestlet.testletKey] ?? null
+    : null;
   if (
     currentTimedTestlet &&
     currentTimedTestlet.testletKey !== targetTimedTestlet?.testletKey
@@ -16193,30 +16221,67 @@ const applyMonitorGoto = (input: {
     targetTimedTestlet.testletKey !== currentTimedTestlet?.testletKey
   ) {
     const testletTimers = { ...(nextRun.testletTimers ?? {}) };
-    delete testletTimers[targetTimedTestlet.testletKey];
+    if (input.remainingSeconds != null) {
+      testletTimers[targetTimedTestlet.testletKey] = {
+        testletKey: targetTimedTestlet.testletKey,
+        status: "paused",
+        durationSeconds: input.remainingSeconds,
+        remainingSeconds: input.remainingSeconds,
+        startedAt: previousTargetTimer?.startedAt ?? input.timestamp,
+        expiresAt: null,
+        updatedAt: input.timestamp,
+        endedAt: null
+      };
+    } else {
+      delete testletTimers[targetTimedTestlet.testletKey];
+    }
     nextRun = normalizeTestRun({
       ...nextRun,
       testletTimers,
       updatedAt: input.timestamp
     });
+  } else if (targetTimedTestlet && input.remainingSeconds != null) {
+    nextRun = normalizeTestRun({
+      ...nextRun,
+      testletTimers: {
+        ...(nextRun.testletTimers ?? {}),
+        [targetTimedTestlet.testletKey]: {
+          testletKey: targetTimedTestlet.testletKey,
+          status: "paused",
+          durationSeconds: input.remainingSeconds,
+          remainingSeconds: input.remainingSeconds,
+          startedAt: previousTargetTimer?.startedAt ?? input.timestamp,
+          expiresAt: null,
+          updatedAt: input.timestamp,
+          endedAt: null
+        }
+      },
+      updatedAt: input.timestamp
+    });
   }
 
   const targetTestletKeys = targetUnit.testletPath ?? [];
-  return normalizeTestRun({
-    ...nextRun,
-    status: "running",
-    currentUnitKey: input.targetUnitKey,
-    unlockedTestletKeys: Array.from(
-      new Set([...(nextRun.unlockedTestletKeys ?? []), ...targetTestletKeys])
-    ),
-    lockedTestletKeys: (nextRun.lockedTestletKeys ?? []).filter(
-      testletKey => !targetTestletKeys.includes(testletKey)
-    ),
-    lockedUnitKeys: (nextRun.lockedUnitKeys ?? []).filter(
-      unitKey => unitKey !== input.targetUnitKey
-    ),
-    updatedAt: input.timestamp
-  });
+  return {
+    testRun: normalizeTestRun({
+      ...nextRun,
+      status: "running",
+      currentUnitKey: input.targetUnitKey,
+      unlockedTestletKeys: Array.from(
+        new Set([...(nextRun.unlockedTestletKeys ?? []), ...targetTestletKeys])
+      ),
+      lockedTestletKeys: (nextRun.lockedTestletKeys ?? []).filter(
+        testletKey => !targetTestletKeys.includes(testletKey)
+      ),
+      lockedUnitKeys: (nextRun.lockedUnitKeys ?? []).filter(
+        unitKey => unitKey !== input.targetUnitKey
+      ),
+      updatedAt: input.timestamp
+    }),
+    restoredTestletKey:
+      input.remainingSeconds != null ? targetTimedTestlet?.testletKey ?? null : null,
+    previousTimer:
+      input.remainingSeconds != null ? previousTargetTimer : null
+  };
 };
 
 const applyMonitorNavigationUnlock = (input: {
@@ -26061,7 +26126,8 @@ export const createFirstSliceServices = (
               ) ?? null;
             const location = resolveOpenMonitorRunLocation(
               contentRelease,
-              testRun
+              testRun,
+              testletTimers
             );
 
             return {
@@ -26127,7 +26193,8 @@ export const createFirstSliceServices = (
               ? normalizeMonitorTimeTargetUnitKey(input.targetUnitKey)
               : null;
         const remainingSeconds =
-          commandType === "set_testlet_time"
+          commandType === "set_testlet_time" ||
+          (commandType === "goto" && input.remainingSeconds != null)
             ? normalizeMonitorTimeRemainingSeconds(input.remainingSeconds)
             : null;
         const actorId =
@@ -26230,12 +26297,18 @@ export const createFirstSliceServices = (
                     updatedAt: issuedAt
                   })
                 : commandType === "goto" && targetUnitKey
-                  ? applyMonitorGoto({
-                      contentRelease,
-                      testRun,
-                      targetUnitKey,
-                      timestamp: issuedAt
-                    })
+                  ? (() => {
+                      const adjusted = applyMonitorGoto({
+                        contentRelease,
+                        testRun,
+                        targetUnitKey,
+                        remainingSeconds,
+                        timestamp: issuedAt
+                      });
+                      adjustedTestletKey = adjusted.restoredTestletKey;
+                      previousTimer = adjusted.previousTimer;
+                      return adjusted.testRun;
+                    })()
                   : commandType === "unlock_navigation"
                     ? applyMonitorNavigationUnlock({
                         contentRelease,
@@ -26316,6 +26389,34 @@ export const createFirstSliceServices = (
                 testRun: nextTestRun,
                 timestamp: issuedAt
               });
+        if (
+          commandType === "goto" &&
+          adjustedTestletKey &&
+          remainingSeconds != null &&
+          previousTimer &&
+          (previousTimer.status === "expired" ||
+            previousTimer.status === "cancelled" ||
+            getTestletTimerRemainingSeconds(previousTimer, issuedAt) <= 0)
+        ) {
+          const restoredTimer =
+            effectiveNextTestRun.testletTimers?.[adjustedTestletKey];
+          await recordWorkspaceActivity({
+            tenantId: effectiveNextTestRun.tenantId,
+            workspaceId: effectiveNextTestRun.workspaceId,
+            eventType: "testlet_timer_started",
+            actorId,
+            subjectType: "test_run",
+            subjectId: effectiveNextTestRun.testRunId,
+            summary: `Timed block '${adjustedTestletKey}' reopened by monitor for run '${effectiveNextTestRun.testRunId}'.`,
+            details: {
+              testletKey: adjustedTestletKey,
+              durationSeconds: restoredTimer?.durationSeconds ?? remainingSeconds,
+              expiresAt: restoredTimer?.expiresAt ?? null,
+              currentUnitKey: effectiveNextTestRun.currentUnitKey,
+              restoredByMonitor: true
+            }
+          });
+        }
         const nextParticipantSession =
           commandType === "complete"
             ? {

@@ -63,6 +63,7 @@ export class RewriteAppRuntimeService {
   private readonly requestState = inject(RewriteAppShellRequestService);
 
   private readonly runtimeState = this.uiState.runtime;
+  private monitorRefreshTail: Promise<void> = Promise.resolve();
 
   async participantSignIn(): Promise<void> {
     await participantSignInAction(
@@ -123,13 +124,15 @@ export class RewriteAppRuntimeService {
       | "unlock_test"
       | "unlock_navigation"
       | "lock_navigation"
-      | "set_testlet_time"
+      | "set_testlet_time",
+    options?: { remainingSeconds?: number }
   ): Promise<IssueMonitorRunCommandResponse> {
     const result = await issueMonitorRunCommandAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       ),
-      commandType
+      commandType,
+      options
     );
     const activityTitle = {
       pause: "Monitor Pause Issued",
@@ -160,14 +163,16 @@ export class RewriteAppRuntimeService {
       | "unlock_test"
       | "unlock_navigation"
       | "lock_navigation"
-      | "set_testlet_time"
+      | "set_testlet_time",
+    options?: { remainingSeconds?: number }
   ): Promise<IssueMonitorRunCommandsResponse> {
     const result = await issueMonitorRunCommandsAction(
       this.hosts.createRuntimeActionsHost(() =>
         this.refreshCrossViewStateAfterRuntimeChange()
       ),
       testRunIds,
-      commandType
+      commandType,
+      options
     );
     this.feedback.rememberActivity(
       "Monitor Batch Command Issued",
@@ -180,12 +185,21 @@ export class RewriteAppRuntimeService {
     if (!this.hasWorkspaceScope()) {
       return;
     }
-    await refreshRuntimeReadsAction(
-      this.hosts.createRuntimeReadsHost(),
-      this.getParticipantSessionId(),
-      quiet,
-      { monitorOnly: this.operatorAccess.isMonitorOnly }
-    );
+    const refresh = () =>
+      refreshRuntimeReadsAction(
+        this.hosts.createRuntimeReadsHost(),
+        this.getParticipantSessionId(),
+        quiet,
+        { monitorOnly: this.operatorAccess.isMonitorOnly }
+      );
+    if (!this.operatorAccess.isMonitorOnly) {
+      await refresh();
+      return;
+    }
+
+    const scheduledRefresh = this.monitorRefreshTail.then(refresh, refresh);
+    this.monitorRefreshTail = scheduledRefresh.catch(() => undefined);
+    await scheduledRefresh;
   }
 
   async loadParticipantSessions(quiet = false): Promise<void> {
