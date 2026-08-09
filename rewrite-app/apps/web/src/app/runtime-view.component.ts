@@ -118,6 +118,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
         <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
         <p id="monitorColumnPresentation">{{ view.monitorColumnPresentation }}</p>
+        <label>
+          Search participants
+          <input id="monitorQuickFilter" name="monitorQuickFilter" type="search" [ngModel]="view.monitorQuickFilter" (ngModelChange)="view.setMonitorQuickFilter($event)" />
+        </label>
+        <button id="monitorClearQuickFilterButton" class="ghost" type="button" [disabled]="!view.monitorQuickFilter" (click)="view.clearMonitorQuickFilter()">Clear participant search</button>
         <section id="monitorDisplayOptions" aria-labelledby="monitorDisplayOptionsHeading">
           <strong id="monitorDisplayOptionsHeading">{{ view.monitorText("gm_menu_cols") }}</strong>
           <div class="actions">

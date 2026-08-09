@@ -11998,6 +11998,18 @@ try {
     "small",
     "Imported small monitor profile must apply the compact card layout."
   );
+  await page.locator("#monitorQuickFilter").fill("not-this-participant");
+  await scopedOpenRuns.getByText("No open runs are currently loaded.").waitFor();
+  assert.equal(
+    await page.locator("#monitorClearQuickFilterButton").isEnabled(),
+    true,
+    "The Original-style quick filter must expose an explicit clear action."
+  );
+  await page.locator("#monitorClearQuickFilterButton").click();
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  await page.locator("#monitorQuickFilter").fill("STUDENT-UI");
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  await page.locator("#monitorClearQuickFilterButton").click();
   assert.equal(
     await page.locator("#monitorToggleGroupColumnButton").getAttribute("aria-pressed"),
     "true"

@@ -153,6 +153,7 @@ export class RuntimeViewFacade {
   private readonly monitorBatchSelection = new Set<string>();
   monitorControlsVisible = true;
   monitorBookletListExpanded = true;
+  monitorQuickFilter = "";
   private monitorDisplayOverride: {
     profileId: string;
     settings: MonitorDisplaySettings;
@@ -383,6 +384,16 @@ export class RuntimeViewFacade {
     this.uiState.renderVersion.update(version => version + 1);
   }
 
+  setMonitorQuickFilter(value: string): void {
+    this.monitorQuickFilter = value;
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  clearMonitorQuickFilter(): void {
+    this.setMonitorQuickFilter("");
+  }
+
   toggleMonitorControls(): void {
     this.monitorControlsVisible = !this.monitorControlsVisible;
   }
@@ -416,9 +427,18 @@ export class RuntimeViewFacade {
     const payload = parseJsonDocument<MonitorOpenRunsResponse>(
       this.runtime.openRunsView
     );
-    return filterOpenMonitorRunsByProfile(
+    const profileRuns = filterOpenMonitorRunsByProfile(
       payload?.items ?? [],
       this.activeMonitorProfile
+    );
+    const quickFilter = this.monitorQuickFilter.trim().toLocaleLowerCase();
+    if (!quickFilter) {
+      return profileRuns;
+    }
+    return profileRuns.filter(openRun =>
+      (openRun.participantRosterEntry?.displayName ?? openRun.loginKey)
+        .toLocaleLowerCase()
+        .includes(quickFilter)
     );
   }
 
@@ -428,6 +448,7 @@ export class RuntimeViewFacade {
     }
     this.runtime.monitorProfileId = profileId;
     this.monitorDisplayOverride = null;
+    this.monitorQuickFilter = "";
     this.monitorBatchSelection.clear();
     this.persistState();
     this.uiState.renderVersion.update(version => version + 1);
