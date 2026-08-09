@@ -33346,10 +33346,14 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
   const sourceDocument = readFileSync(
     resolve(originalTestcenterCorpusRoot, "system-checks/SysCheck.xml"),
     "utf8"
-  ).replace(
-    '    <Q id="1"',
-    '    <CustomText key="syscheck_intro">Project-specific readiness introduction</CustomText>\n\n    <Q id="1"'
-  );
+  )
+    .replace(
+      '    <Q id="1"',
+      '    <CustomText key="syscheck_intro">Project-specific readiness introduction</CustomText>\n\n    <Q id="1"'
+    )
+    .replace('skipnetwork="false"', 'skipnetwork="0"')
+    .replace('required="true"', 'required="1"')
+    .replace('<Q id="3"', '<Q id="3" required="0"');
   const systemCheckUnitDocument = readFileSync(
     resolve(originalTestcenterCorpusRoot, "units/Unit2.xml"),
     "utf8"
@@ -33427,7 +33431,9 @@ test("original Testcenter compatibility corpus executes both official SysCheck c
       "system-checks/CY_SysCheck_2.xml"
     ),
     "utf8"
-  );
+  )
+    .replace('skipnetwork="true"', 'skipnetwork="1"')
+    .replace('required="true"', 'required="1"');
   const secondSystemCheckSource = await requestJson<{
     sourcePackage: { sourcePackageId: string };
   }>(

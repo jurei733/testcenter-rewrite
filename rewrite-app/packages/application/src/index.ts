@@ -12166,7 +12166,9 @@ const parseSystemCheckSourceDocument = (
           id,
           type: type as SourcePackageSystemCheckEntry["questions"][number]["type"],
           prompt: readAttribute(question, "prompt"),
-          required: readAttribute(question, "required").toLowerCase() === "true",
+          required:
+            parseTestcenterXmlBoolean(readAttribute(question, "required")) ===
+            true,
           options: xmlElementText(question)
             .split("#")
             .map(value => value.trim())
@@ -12195,7 +12197,8 @@ const parseSystemCheckSourceDocument = (
       : {}),
     ...(unitKey ? { unitKey } : {}),
     ...(saveKey ? { saveKey } : {}),
-    skipNetwork: readAttribute(config, "skipnetwork").toLowerCase() === "true",
+    skipNetwork:
+      parseTestcenterXmlBoolean(readAttribute(config, "skipnetwork")) === true,
     uploadSpeed: readSpeed("UploadSpeed"),
     downloadSpeed: readSpeed("DownloadSpeed"),
     customTexts,
