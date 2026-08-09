@@ -138,6 +138,8 @@ import {
   type RevokeAdminSessionResponse,
   type SaveTestRunProgressRequest,
   type SaveTestRunProgressResponse,
+  type SaveParticipantTestLogsRequest,
+  type SaveParticipantTestLogsResponse,
   type SelectParticipantAdaptiveStateRequest,
   type SelectParticipantAdaptiveStateResponse,
   type UnlockParticipantTestletRequest,
@@ -1920,6 +1922,9 @@ const participantResourcePattern =
 const saveProgressPattern = createRoutePattern(
   productionApiRoutes.participant.saveProgress
 );
+const saveTestLogsPattern = createRoutePattern(
+  productionApiRoutes.participant.saveTestLogs
+);
 const selectAdaptiveStatePattern = createRoutePattern(
   productionApiRoutes.participant.selectAdaptiveState
 );
@@ -2993,6 +2998,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
+    ["POST", saveTestLogsPattern, productionApiRoutes.participant.saveTestLogs],
     [
       "POST",
       selectAdaptiveStatePattern,
@@ -7362,6 +7368,24 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           logs: body.logs
         });
         sendJson<SaveTestRunProgressResponse>(response, 200, { testRun });
+        return;
+      }
+
+      const saveTestLogsMatch = saveTestLogsPattern.exec(pathname);
+      if (request.method === "POST" && saveTestLogsMatch?.groups) {
+        const testRunId = decodeRouteGroup(saveTestLogsMatch.groups.testRunId);
+        if (!testRunId) {
+          sendError(response, 400, "invalid_test_run_id", "testRunId is required.");
+          return;
+        }
+
+        const body = await readRequestJsonBody<SaveParticipantTestLogsRequest>();
+        const savedCount = await services.participantRuntime.saveTestLogs({
+          testRunId,
+          deliveryId: body.deliveryId,
+          logs: body.logs
+        });
+        sendJson<SaveParticipantTestLogsResponse>(response, 200, { savedCount });
         return;
       }
 

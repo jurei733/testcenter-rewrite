@@ -5847,6 +5847,78 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       "My first demo response"
     );
 
+    const runBeforeLogOnlySave = await requestJsonAt<{
+      currentRunState: {
+        testRun: {
+          status: string;
+          currentUnitKey: string | null;
+          unitResponses: Record<string, string>;
+          updatedAt: string;
+        };
+      };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+    assert.equal(runBeforeLogOnlySave.status, 200);
+
+    const savedLoadCompleteLog = await requestJsonAt<{ savedCount: number }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/test-logs`,
+      {
+        method: "POST",
+        body: {
+          deliveryId: "integration-demo-load-complete",
+          logs: [{
+            unitKey: null,
+            originalUnitId: null,
+            entries: [{
+              key: "LOADCOMPLETE",
+              timeStamp: 1_700_000_000_001,
+              content: JSON.stringify({ browserName: "Chrome", loadTime: 42 })
+            }]
+          }]
+        }
+      }
+    );
+    assert.equal(savedLoadCompleteLog.status, 200);
+    assert.equal(savedLoadCompleteLog.body.savedCount, 1);
+
+    const replayedLoadCompleteLog = await requestJsonAt<{ savedCount: number }>(
+      isolated.baseUrl,
+      `/api/v1/participant/test-runs/${resumed.body.testRun.testRunId}/test-logs`,
+      {
+        method: "POST",
+        body: {
+          deliveryId: "integration-demo-load-complete",
+          logs: [{
+            unitKey: null,
+            originalUnitId: null,
+            entries: [{
+              key: "LOADCOMPLETE",
+              timeStamp: 1_700_000_000_001,
+              content: JSON.stringify({ browserName: "Chrome", loadTime: 42 })
+            }]
+          }]
+        }
+      }
+    );
+    assert.equal(replayedLoadCompleteLog.status, 200);
+    assert.equal(replayedLoadCompleteLog.body.savedCount, 1);
+
+    const runAfterLogOnlySave = await requestJsonAt<{
+      currentRunState: typeof runBeforeLogOnlySave.body.currentRunState;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+    assert.equal(runAfterLogOnlySave.status, 200);
+    assert.deepEqual(
+      runAfterLogOnlySave.body.currentRunState.testRun,
+      runBeforeLogOnlySave.body.currentRunState.testRun,
+      "Saving test-wide logs must not mutate progress, responses, status, or timestamps."
+    );
+
     const statusOnlySave = await requestJsonAt<{
       testRun: {
         currentUnitKey: string | null;
@@ -7341,6 +7413,15 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       ).length,
       1,
       "Replaying one delivery must not duplicate participant Player logs."
+    );
+    assert.equal(
+      participantTestLogs.body.items.filter(item =>
+        item.testLog.logKey === "LOADCOMPLETE" &&
+        item.testLog.unitKey === null &&
+        item.testLog.originalUnitId === null
+      ).length,
+      1,
+      "Replaying one delivery must not duplicate test-wide load logs."
     );
     assert.ok(
       participantTestLogs.body.items.some(item =>

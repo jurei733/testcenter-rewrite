@@ -6174,6 +6174,9 @@ try {
     )
   ).json();
   assert.equal(guardedPlayerEndState.currentRunState.testRun.status, "running");
+  const veronaTestRunId =
+    guardedPlayerEndState.currentRunState.testRun.testRunId;
+  assert.ok(veronaTestRunId);
   await veronaFrame.locator("#playerAnswer").fill("Saved through Verona");
   await page.waitForFunction(
     () =>
@@ -6297,6 +6300,28 @@ try {
     ),
     new Set(["none", "complete"])
   );
+  const veronaLoadCompleteLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&testRunId=${encodeURIComponent(veronaTestRunId)}&logKey=LOADCOMPLETE`,
+    payload => Array.isArray(payload?.items) && payload.items.length === 1
+  );
+  assert.equal(veronaLoadCompleteLogs.items[0]?.testLog?.unitKey, null);
+  assert.equal(veronaLoadCompleteLogs.items[0]?.testLog?.originalUnitId, null);
+  const veronaLoadEnvironment = JSON.parse(
+    veronaLoadCompleteLogs.items[0].testLog.logContent
+  );
+  assert.equal(veronaLoadEnvironment.browserName, "Chrome");
+  assert.match(veronaLoadEnvironment.browserVersion, /^\d+(?:\.\d+)+$/);
+  assert.match(
+    veronaLoadEnvironment.osName,
+    /^(?:Android|Chrome OS|Chromium OS|iOS|Linux|Mac OS|Windows)(?:\s.+)?$/
+  );
+  assert.equal(veronaLoadEnvironment.device, "");
+  assert.ok(veronaLoadEnvironment.screenSizeWidth > 0);
+  assert.ok(veronaLoadEnvironment.screenSizeHeight > 0);
+  assert.ok(Number.isSafeInteger(veronaLoadEnvironment.loadTime));
+  assert.ok(veronaLoadEnvironment.loadTime >= 0);
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey
@@ -6338,10 +6363,10 @@ try {
     .waitFor();
   logStep("participant-verona-offline-outbox");
   const veronaOfflineResponse = "Recovered after offline reload";
-  const veronaTestRunId = (
-    await page.locator("#participantRouteRunId").textContent()
-  )?.trim();
-  assert.ok(veronaTestRunId);
+  assert.equal(
+    (await page.locator("#participantRouteRunId").textContent())?.trim(),
+    veronaTestRunId
+  );
   const veronaSaveProgressUrl =
     `**/api/v1/participant/test-runs/${veronaTestRunId}/save-progress`;
   const rejectVeronaSave = route => route.abort("internetdisconnected");

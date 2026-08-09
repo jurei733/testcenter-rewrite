@@ -691,6 +691,15 @@ export type ParticipantRuntimePort = {
       entries: ParticipantTestLogEntryInput[];
     }>;
   }): Promise<TestRun>;
+  saveTestLogs(input: {
+    testRunId: string;
+    deliveryId?: string;
+    logs: Array<{
+      unitKey?: string | null;
+      originalUnitId?: string | null;
+      entries: ParticipantTestLogEntryInput[];
+    }>;
+  }): Promise<number>;
   selectAdaptiveState(input: {
     testRunId: string;
     stateKey: string;
@@ -26485,6 +26494,63 @@ export const createFirstSliceServices = (
           });
         }
         return effectiveRun;
+      },
+      async saveTestLogs(input) {
+        const testRunId = normalizeTestRunId(input.testRunId);
+        const deliveryId = normalizeOptionalParticipantDeliveryId(
+          input.deliveryId
+        );
+        const storedTestRun = await repository.getTestRunById(testRunId);
+        if (!storedTestRun) {
+          throw new FirstSliceError(
+            404,
+            "test_run_not_found",
+            `Test run '${testRunId}' was not found.`
+          );
+        }
+
+        await requireAccessibleParticipantSession(
+          storedTestRun.participantSessionId
+        );
+        const contentRelease = await requireContentRelease(
+          repository,
+          storedTestRun.contentReleaseId
+        );
+        if (!Array.isArray(input.logs)) {
+          throw new FirstSliceError(
+            400,
+            "participant_test_logs_invalid",
+            "Participant test logs must be an array."
+          );
+        }
+        for (const batch of input.logs) {
+          const unitKey =
+            batch?.unitKey == null ? null : String(batch.unitKey).trim() || null;
+          if (unitKey) {
+            requireRuntimeUnitForBooklet(
+              contentRelease,
+              storedTestRun.bookletKey,
+              unitKey
+            );
+          }
+        }
+
+        const testRun = normalizeTestRun(storedTestRun);
+        const executionMode = resolveParticipantExecutionMode(
+          testRun.executionMode
+        );
+        if (!executionMode.saveResponses) {
+          return 0;
+        }
+        const participantTestLogs = buildParticipantTestLogs({
+          testRun,
+          deliveryId,
+          batches: input.logs
+        });
+        if (participantTestLogs.length > 0) {
+          await repository.saveParticipantTestLogs(participantTestLogs);
+        }
+        return participantTestLogs.length;
       },
       async unlockTestlet(input) {
         const testRunId = normalizeTestRunId(input.testRunId);

@@ -2016,6 +2016,7 @@ export const productionApiRoutes = {
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",
+    saveTestLogs: "/api/v1/participant/test-runs/:testRunId/test-logs",
     selectAdaptiveState:
       "/api/v1/participant/test-runs/:testRunId/adaptive-states/:stateKey",
     listReviews: "/api/v1/participant/test-runs/:testRunId/reviews",
@@ -2509,6 +2510,15 @@ export type SaveTestRunProgressRequest = {
   }>;
 };
 
+export type SaveParticipantTestLogsRequest = {
+  deliveryId?: string;
+  logs: Array<{
+    unitKey?: string | null;
+    originalUnitId?: string | null;
+    entries: ParticipantTestLogEntryInput[];
+  }>;
+};
+
 export type SelectParticipantAdaptiveStateRequest = {
   optionKey: string;
 };
@@ -2962,6 +2972,10 @@ export type ParticipantCurrentRunStateResponse = {
 
 export type SaveTestRunProgressResponse = {
   testRun: TestRun;
+};
+
+export type SaveParticipantTestLogsResponse = {
+  savedCount: number;
 };
 
 export type SelectParticipantAdaptiveStateResponse = {

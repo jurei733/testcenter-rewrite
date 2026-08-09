@@ -18,6 +18,8 @@ import type {
   ResumeTestRunResponse,
   SaveTestRunProgressRequest,
   SaveTestRunProgressResponse,
+  SaveParticipantTestLogsRequest,
+  SaveParticipantTestLogsResponse,
   SelectParticipantAdaptiveStateRequest,
   SelectParticipantAdaptiveStateResponse,
   UnlockParticipantTestletRequest,
@@ -28,6 +30,7 @@ import {
   type ParticipantCustomTextKey,
   mergeParticipantCustomTextScopes,
   parseVeronaUnitResponse,
+  projectTestcenterLoadEnvironment,
   productionApiRoutes,
   resolveAndFormatParticipantCustomText,
   resolveParticipantCustomText,
@@ -315,6 +318,9 @@ export class ParticipantViewFacade {
     string,
     Promise<ParticipantCurrentRunStateResponse>
   >();
+  private readonly bookletAssetLoadStartedAtMs = new Map<string, number>();
+  private readonly loadCompleteRunIds = new Set<string>();
+  private readonly loadCompleteDeliveryIds = new Map<string, string>();
   private pendingVeronaSave: ParticipantSaveOutboxEntry | null = null;
   private optimisticVeronaResponse: {
     testRunId: string;
@@ -2864,6 +2870,7 @@ export class ParticipantViewFacade {
       return;
     }
 
+    const loadStartedAtMs = Date.now();
     try {
       let payload =
         await this.requestState.request<ParticipantCurrentRunStateResponse>(
@@ -2876,6 +2883,9 @@ export class ParticipantViewFacade {
           { quiet }
         );
       const testRunId = payload.currentRunState.testRun.testRunId;
+      if (!this.bookletAssetLoadStartedAtMs.has(testRunId)) {
+        this.bookletAssetLoadStartedAtMs.set(testRunId, loadStartedAtMs);
+      }
       if (
         payload.currentRunState.booklet.policy.player.loadingMode === "eager" &&
         this.loadedBookletAssets()?.testRunId !== testRunId
@@ -2900,6 +2910,7 @@ export class ParticipantViewFacade {
       this.syncCurrentUnitResponse(payload.currentRunState);
       this.reconcileOptimisticVeronaResponse(payload.currentRunState);
       this.restorePersistentVeronaSave(payload.currentRunState);
+      this.persistLoadCompleteLog(payload, testRunId);
       if (payload.currentRunState.booklet.policy.player.loadingMode !== "eager") {
         this.loadBookletAssetsInBackground(payload);
       }
@@ -2962,6 +2973,7 @@ export class ParticipantViewFacade {
       .then(loadedPayload => {
         if (this.currentRunState?.testRun.testRunId === testRunId) {
           this.recordLoadedBookletAssets(loadedPayload, testRunId);
+          this.persistLoadCompleteLog(loadedPayload, testRunId);
         }
       })
       .catch(() => {
@@ -2979,6 +2991,63 @@ export class ParticipantViewFacade {
     this.loadedBookletAssets.set({
       testRunId: expectedTestRunId,
       assets: payload.currentRunState.bookletAssets ?? null
+    });
+  }
+
+  private persistLoadCompleteLog(
+    payload: ParticipantCurrentRunStateResponse,
+    expectedTestRunId: string
+  ): void {
+    const currentState = payload.currentRunState;
+    if (
+      currentState.testRun.testRunId !== expectedTestRunId ||
+      this.currentRunState?.testRun.testRunId !== expectedTestRunId ||
+      this.loadedBookletAssets()?.testRunId !== expectedTestRunId ||
+      this.loadCompleteRunIds.has(expectedTestRunId) ||
+      !currentState.availableActions.includes("save_progress")
+    ) {
+      return;
+    }
+    const completedAtMs = Date.now();
+    const environment = projectTestcenterLoadEnvironment({
+      userAgent: globalThis.navigator?.userAgent ?? "",
+      screenSizeWidth: globalThis.screen?.width ?? 0,
+      screenSizeHeight: globalThis.screen?.height ?? 0,
+      loadTime:
+        completedAtMs -
+        (this.bookletAssetLoadStartedAtMs.get(expectedTestRunId) ??
+          completedAtMs)
+    });
+    const deliveryId =
+      this.loadCompleteDeliveryIds.get(expectedTestRunId) ??
+      (globalThis.crypto?.randomUUID?.() ??
+        `loadcomplete-${completedAtMs}-${Math.random().toString(36).slice(2)}`);
+    this.loadCompleteDeliveryIds.set(expectedTestRunId, deliveryId);
+    this.loadCompleteRunIds.add(expectedTestRunId);
+    void this.requestState.request<SaveParticipantTestLogsResponse>(
+      "Participant Load Complete Log",
+      "POST",
+      resolveRoutePath(productionApiRoutes.participant.saveTestLogs, {
+        testRunId: expectedTestRunId
+      }),
+      {
+        deliveryId,
+        logs: [{
+          unitKey: null,
+          originalUnitId: null,
+          entries: [{
+            key: "LOADCOMPLETE",
+            timeStamp: completedAtMs,
+            content: JSON.stringify(environment)
+          }]
+        }]
+      } satisfies SaveParticipantTestLogsRequest,
+      { quiet: true }
+    ).then(() => {
+      this.bookletAssetLoadStartedAtMs.delete(expectedTestRunId);
+      this.loadCompleteDeliveryIds.delete(expectedTestRunId);
+    }).catch(() => {
+      this.loadCompleteRunIds.delete(expectedTestRunId);
     });
   }
 
