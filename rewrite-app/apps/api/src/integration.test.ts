@@ -5944,6 +5944,39 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
       "My first demo response"
     );
 
+    const sessionResumedRun = await requestJsonAt<{
+      testRun: { status: string; currentUnitKey: string | null };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSignIn.body.participantSession.participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(sessionResumedRun.status, 200);
+    assert.equal(sessionResumedRun.body.testRun.status, "running");
+    assert.equal(sessionResumedRun.body.testRun.currentUnitKey, "unit-intro");
+
+    const controllerLogsAfterSessionResume = await requestJsonAt<{
+      items: Array<{ testLog: { logKey: string; logContent: string } }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/test-logs?testRunId=${resumed.body.testRun.testRunId}&logKey=CONTROLLER&limit=20`,
+      { headers: { authorization: `Bearer ${signIn.body.sessionToken}` } }
+    );
+    assert.equal(controllerLogsAfterSessionResume.status, 200);
+    assert.equal(
+      controllerLogsAfterSessionResume.body.items.filter(
+        item => item.testLog.logContent === "RUNNING"
+      ).length,
+      2,
+      "Initial launch and session resume must both persist CONTROLLER=RUNNING."
+    );
+    assert.equal(
+      controllerLogsAfterSessionResume.body.items.filter(
+        item => item.testLog.logContent === "PAUSED"
+      ).length,
+      1
+    );
+
     const movedToPractice = await requestJsonAt<{
       testRun: {
         currentUnitKey: string | null;
@@ -30953,6 +30986,47 @@ test("participant session launch can target a specific booklet", async () => {
   assert.equal(betaRun.body.testRun.status, "running");
   assert.equal(betaRun.body.testRun.bookletKey, "booklet:beta");
   assert.equal(betaRun.body.testRun.currentUnitKey, "unit-beta-1");
+
+  const pausedBetaRun = await requestJson<{
+    testRun: { status: string };
+  }>(`/api/v1/participant/test-runs/${betaRun.body.testRun.testRunId}/save-progress`, {
+    method: "POST",
+    body: { status: "paused" }
+  });
+  assert.equal(pausedBetaRun.status, 200);
+  assert.equal(pausedBetaRun.body.testRun.status, "paused");
+
+  const resumedBetaRun = await requestJson<{
+    testRun: { status: string; bookletKey: string };
+  }>(
+    `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,
+    {
+      method: "POST",
+      body: { bookletKey: "booklet:beta" }
+    }
+  );
+  assert.equal(resumedBetaRun.status, 200);
+  assert.equal(resumedBetaRun.body.testRun.status, "running");
+  assert.equal(resumedBetaRun.body.testRun.bookletKey, "booklet:beta");
+
+  const betaControllerLogs = await requestJson<{
+    items: Array<{ testLog: { logContent: string } }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${betaRun.body.testRun.testRunId}&logKey=CONTROLLER&limit=20`
+  );
+  assert.equal(betaControllerLogs.status, 200);
+  assert.equal(
+    betaControllerLogs.body.items.filter(
+      item => item.testLog.logContent === "RUNNING"
+    ).length,
+    2
+  );
+  assert.equal(
+    betaControllerLogs.body.items.filter(
+      item => item.testLog.logContent === "PAUSED"
+    ).length,
+    1
+  );
 
   const conflictingBookletRun = await requestJson<{ error: string }>(
     `/api/v1/participant/sessions/${firstSignIn.body.participantSession.participantSessionId}/resume`,

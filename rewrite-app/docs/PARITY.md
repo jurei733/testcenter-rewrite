@@ -179,7 +179,12 @@ with browser, operating-system, device, screen-size, and elapsed-load fields;
 repeated current-state refreshes do not duplicate it within one frontend load.
 The same idempotent test-wide delivery records `CONNECTION=POLLING`, the
 original protocol's closest state for the Participant host's HTTP/SSE transport,
-and completes the original Test Controller test-state key catalog.
+and completes the original Test Controller test-state key catalog. The
+server-side session-resume path also mirrors the original controller state
+subscription: every paused-to-running transition persists
+`CONTROLLER=RUNNING`, including untimed runs where no timer entry changes.
+Memory, file, and SQLite integration gates distinguish that resume entry from
+the initial launch and preceding `PAUSED` state.
 
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,

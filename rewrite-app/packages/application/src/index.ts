@@ -26314,16 +26314,23 @@ export const createFirstSliceServices = (
             await repository.saveTestRun(resumedRun);
             if (
               resolveParticipantExecutionMode(resumedRun.executionMode)
-                .saveResponses &&
-              testletTimerStateChanged(normalizedExistingRun, resumedRun)
+                .saveResponses
             ) {
+              const resumedStateEntries: ParticipantTestLogEntryInput[] = [{
+                key: "CONTROLLER",
+                timeStamp: Date.parse(timestamp),
+                content: "RUNNING"
+              }];
+              if (testletTimerStateChanged(normalizedExistingRun, resumedRun)) {
+                resumedStateEntries.unshift(
+                  buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
+                );
+              }
               await repository.saveParticipantTestLogs(
                 buildParticipantTestLogs({
                   testRun: resumedRun,
                   batches: [{
-                    entries: [
-                      buildTestletTimeLeftTestStateEntry(resumedRun, timestamp)
-                    ]
+                    entries: resumedStateEntries
                   }]
                 })
               );
