@@ -1,4 +1,8 @@
 import type { AppView, PersistedShellState } from "./rewrite-app-shell.types";
+import {
+  parseOriginalTestcenterOperationalLogins,
+  parseParticipantRosterText
+} from "@testcenter-rewrite-app/contracts";
 import type {
   AdminRole,
   AdminRoleAccessMode,
@@ -74,6 +78,7 @@ export type ShellPersistenceTarget = {
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
+  operationalLoginCandidatesView: string;
   participantRosterExportView: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
@@ -142,7 +147,7 @@ export const createPersistedShellState = (
   workspaceKey: target.workspaceKey,
   sourceFileName: target.sourceFileName,
   sourceMediaType: target.sourceMediaType,
-  sourceDocument: target.sourceDocument,
+  sourceDocument: redactSensitiveRosterSource(target.sourceDocument),
   sourcePackageId: target.sourcePackageId,
   importJobId: target.importJobId,
   contentReleaseId: target.contentReleaseId,
@@ -203,9 +208,10 @@ export const createPersistedShellState = (
   monitorProfileId: target.monitorProfileId,
   monitorCommandHistoryRunFilter: target.monitorCommandHistoryRunFilter,
   monitorCommandHistoryLimit: target.monitorCommandHistoryLimit,
-  entryRosterText: target.entryRosterText,
+  entryRosterText: redactSensitiveRosterSource(target.entryRosterText),
   entryLinksView: target.entryLinksView,
   participantRosterView: target.participantRosterView,
+  operationalLoginCandidatesView: target.operationalLoginCandidatesView,
   participantRosterExportView: target.participantRosterExportView,
   autoRefreshEnabled: target.autoRefreshEnabled,
   autoRefreshSeconds: target.autoRefreshSeconds,
@@ -277,6 +283,35 @@ const hydrateString = (value: unknown, fallback: string): string => {
   }
 
   return fallback;
+};
+
+const redactSensitiveRosterSource = (source: string): string => {
+  if (!source.trim()) {
+    return source;
+  }
+
+  const mayContainRosterPassword =
+    /\b(?:pw|password)\s*=|["'](?:password|pw|passwort|kennwort|secret|accesscode|accesskey)["']\s*:|(?:^|[\t,;])(?:password|pw|passwort|kennwort|secret|accesscode|accesskey)(?:[\t,;]|$)/im.test(
+      source
+    );
+  if (!mayContainRosterPassword) {
+    return source;
+  }
+
+  try {
+    const containsParticipantPassword = parseParticipantRosterText(source).some(
+      entry => Boolean(entry.password)
+    );
+    const containsOperationalPassword =
+      parseOriginalTestcenterOperationalLogins(source).some(
+        candidate => candidate.passwordRequired
+      );
+    return containsParticipantPassword || containsOperationalPassword
+      ? ""
+      : source;
+  } catch {
+    return source;
+  }
 };
 
 export const applyHydratedShellState = (
@@ -532,6 +567,10 @@ export const applyHydratedShellState = (
   target.participantRosterView = hydrateString(
     snapshot.participantRosterView,
     target.participantRosterView
+  );
+  target.operationalLoginCandidatesView = hydrateString(
+    snapshot.operationalLoginCandidatesView,
+    target.operationalLoginCandidatesView
   );
   target.participantRosterExportView = hydrateString(
     snapshot.participantRosterExportView,

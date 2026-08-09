@@ -498,6 +498,12 @@ export function createShellPersistenceStateHost(args: {
     set participantRosterView(nextValue) {
       args.runtimeState.participantRosterView = nextValue;
     },
+    get operationalLoginCandidatesView() {
+      return args.runtimeState.operationalLoginCandidatesView;
+    },
+    set operationalLoginCandidatesView(nextValue) {
+      args.runtimeState.operationalLoginCandidatesView = nextValue;
+    },
     get participantRosterExportView() {
       return args.runtimeState.participantRosterExportView;
     },

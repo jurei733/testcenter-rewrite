@@ -3347,6 +3347,7 @@ export class RuntimeViewFacade {
     }
     this.viewState.onActionAsync(async () => {
       await this.runtimeService.importParticipantRoster();
+      this.persistState();
       this.generateEntryLinksFromSavedRoster();
     });
   }

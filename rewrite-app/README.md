@@ -68,7 +68,10 @@ and flags missing profile definitions. Mixed rosters import their participant
 rows and show the candidates in a dedicated Runtime card. Operational-only
 rosters are accepted as an explicit account-migration input: they make zero
 participant changes, retain only password-redacted candidates, and record the
-classification in workspace activity. Administrators can create
+classification in workspace activity. The Angular shell retains those
+redacted candidates across a same-browser reload, while raw roster drafts that
+contain participant or operational passwords are excluded from Local Storage.
+Administrators can create
 non-escalating `group_monitor`, `study_monitor`, and `system_check` accounts with
 the resolved monitor profiles attached to their scoped role. Monitor sign-in
 restores those profiles, offers the original alternatives for selection, applies

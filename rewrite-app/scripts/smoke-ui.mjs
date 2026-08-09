@@ -4039,6 +4039,25 @@ try {
   await operationalOnlyCandidateCard
     .getByRole("button", { name: "Prepare Monitor Account" })
     .waitFor();
+  const persistedOperationalCandidateState = await page.evaluate(() =>
+    window.localStorage.getItem("testcenter-rewrite-app-shell")
+  );
+  assert.ok(persistedOperationalCandidateState);
+  assert.equal(
+    persistedOperationalCandidateState.includes("operational-source-secret"),
+    false
+  );
+  assert.equal(
+    persistedOperationalCandidateState.includes(
+      operationalOnlyStudyUsername
+    ),
+    true
+  );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await operationalOnlyCandidateCard.waitFor();
+  await operationalOnlyCandidateCard
+    .getByRole("button", { name: "Prepare Monitor Account" })
+    .waitFor();
   stopAfter("operational-only-login-migration-candidates");
 
   logStep("participant-entry-ambiguous-workspace-guidance");

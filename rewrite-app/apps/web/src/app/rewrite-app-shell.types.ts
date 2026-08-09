@@ -92,6 +92,7 @@ export type PersistedShellState = {
   entryRosterText: string;
   entryLinksView: string;
   participantRosterView: string;
+  operationalLoginCandidatesView: string;
   participantRosterExportView: string;
   autoRefreshEnabled: boolean;
   autoRefreshSeconds: number;
