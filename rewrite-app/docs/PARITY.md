@@ -225,6 +225,18 @@ recalculation of a supplied derived response. All 38 official raw inputs
 retain their envelopes and select exactly one
 persisted route across memory, file, and SQLite.
 
+Latest P0 root-coding closure: the remaining official `alias` and `subforms`
+schemes, inputs, and outcomes are now byte-exact corpus fixtures. This closes
+the complete `@iqb/responses` 3.6.0 `test/coding` tree at 34 scheme variants
+and 70 input/outcome cases. The combined import/Participant gate addresses a
+Base variable through its external alias and proves that repeated IDs from
+three ordered subforms reach the IQB coder with every `subform` marker intact;
+the authored `BASE_NO_VALUE` response is omitted from coding input as required.
+After coding, adaptive Testcenter conditions intentionally retain their
+original ID-only last-write view, while the full raw multi-subform Player
+envelope remains byte-for-byte restorable. Alias and final subform
+status/value/code/score routes persist across memory, file, and SQLite.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

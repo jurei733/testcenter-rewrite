@@ -15589,7 +15589,7 @@ const resolveAdaptiveVariables = (
       )
     ])
   );
-  const suppliedVariableKeysByUnitKey = new Map<string, Set<string>>();
+  const suppliedResponsesByUnitKey = new Map<string, IqbResponse[]>();
   for (const [unitKey, response] of Object.entries(testRun.unitResponses)) {
     const parsedResponse = parseVeronaUnitResponse(response);
     if (
@@ -15600,8 +15600,7 @@ const resolveAdaptiveVariables = (
       continue;
     }
     const variables = variablesByUnitKey.get(unitKey) ?? new Map();
-    const suppliedVariableKeys =
-      suppliedVariableKeysByUnitKey.get(unitKey) ?? new Set<string>();
+    const suppliedResponses = suppliedResponsesByUnitKey.get(unitKey) ?? [];
     for (const dataPart of Object.values(
       parsedResponse.unitState.dataParts ?? {}
     )) {
@@ -15623,14 +15622,28 @@ const resolveAdaptiveVariables = (
           // Original Testcenter tracks adaptive responses by variable ID, not by
           // subform. Preserve its data-part order: a later repeated ID replaces
           // the earlier subform value before server-side coding and routing.
-          variables.set(value.id, {
+          const suppliedResponse = {
             id: value.id,
-            status: value.status,
-            value: value.value,
+            status: value.status as IqbResponse["status"],
+            value: value.value as IqbResponse["value"],
+            ...(typeof value.subform === "string"
+              ? { subform: value.subform }
+              : {}),
             ...(typeof value.code === "number" ? { code: value.code } : {}),
             ...(typeof value.score === "number" ? { score: value.score } : {})
+          } satisfies IqbResponse;
+          suppliedResponses.push(suppliedResponse);
+          variables.set(value.id, {
+            id: suppliedResponse.id,
+            status: suppliedResponse.status,
+            value: suppliedResponse.value,
+            ...(suppliedResponse.code === undefined
+              ? {}
+              : { code: suppliedResponse.code }),
+            ...(suppliedResponse.score === undefined
+              ? {}
+              : { score: suppliedResponse.score })
           });
-          suppliedVariableKeys.add(value.id);
         }
       } catch {
         // Invalid data parts remain persisted for player restoration, but cannot
@@ -15638,7 +15651,7 @@ const resolveAdaptiveVariables = (
       }
     }
     variablesByUnitKey.set(unitKey, variables);
-    suppliedVariableKeysByUnitKey.set(unitKey, suppliedVariableKeys);
+    suppliedResponsesByUnitKey.set(unitKey, suppliedResponses);
   }
 
   for (const unitEntry of booklet.unitEntries) {
@@ -15652,23 +15665,31 @@ const resolveAdaptiveVariables = (
       const baseVariableKeys = codingScheme.getBaseVarsList([
         ...trackedVariableKeys
       ]);
-      const baseResponses = baseVariableKeys.map(variableKey => {
-        const variable = variables.get(variableKey);
-        return variable
-          ? ({
-              id: variable.id,
-              status: variable.status as IqbResponse["status"],
-              value: variable.value as IqbResponse["value"],
-              ...(variable.code === undefined ? {} : { code: variable.code }),
-              ...(variable.score === undefined ? {} : { score: variable.score })
-            } satisfies IqbResponse)
-          : ({
-              id: variableKey,
-              status: "UNSET",
-              value: null
-            } satisfies IqbResponse);
-      });
       const baseVariableKeySet = new Set(baseVariableKeys);
+      const suppliedResponses =
+        suppliedResponsesByUnitKey.get(unitEntry.unitKey) ?? [];
+      const suppliedBaseResponses = suppliedResponses.filter(response =>
+        baseVariableKeySet.has(response.id)
+      );
+      const suppliedBaseVariableKeys = new Set(
+        suppliedBaseResponses.map(response => response.id)
+      );
+      // Keep every ordered subform response for the IQB coding engine. The
+      // adaptive read model remains ID-only and is populated from the coded
+      // output below in its original last-write-wins order.
+      const baseResponses = [
+        ...suppliedBaseResponses,
+        ...baseVariableKeys
+          .filter(variableKey => !suppliedBaseVariableKeys.has(variableKey))
+          .map(
+            variableKey =>
+              ({
+                id: variableKey,
+                status: "UNSET",
+                value: null
+              }) satisfies IqbResponse
+          )
+      ];
       const injectableVariableKeys = new Set(
         codingScheme.variableCodings
           .filter(
@@ -15685,26 +15706,11 @@ const resolveAdaptiveVariables = (
       // externally injected derived response. Keep only values that were
       // actually supplied by the Player and belong to this coding scheme;
       // launch-time UNSET placeholders must not suppress normal derivation.
-      const injectedResponses = [
-        ...(suppliedVariableKeysByUnitKey.get(unitEntry.unitKey) ?? [])
-      ].flatMap(variableKey => {
-        const variable = variables.get(variableKey);
-        return variable &&
-          !baseVariableKeySet.has(variableKey) &&
-          injectableVariableKeys.has(variableKey)
-          ? [
-              {
-                id: variable.id,
-                status: variable.status as IqbResponse["status"],
-                value: variable.value as IqbResponse["value"],
-                ...(variable.code === undefined ? {} : { code: variable.code }),
-                ...(variable.score === undefined
-                  ? {}
-                  : { score: variable.score })
-              } satisfies IqbResponse
-            ]
-          : [];
-      });
+      const injectedResponses = suppliedResponses.filter(
+        response =>
+          !baseVariableKeySet.has(response.id) &&
+          injectableVariableKeys.has(response.id)
+      );
       for (const codedVariable of codingScheme.code([
         ...baseResponses,
         ...injectedResponses

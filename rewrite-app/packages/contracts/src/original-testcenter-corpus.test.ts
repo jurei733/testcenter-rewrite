@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 32);
+  assert.equal(corpus.codingSchemePackages.length, 34);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -815,6 +815,16 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       );
     }
   }
+  const officialCodingInputSourcePaths = corpus.codingSchemePackages.flatMap(
+    codingPackage => [
+      codingPackage.inputSourcePath,
+      ...(codingPackage.additionalCases ?? []).map(
+        additionalCase => additionalCase.inputSourcePath
+      )
+    ]
+  );
+  assert.equal(officialCodingInputSourcePaths.length, 70);
+  assert.equal(new Set(officialCodingInputSourcePaths).size, 70);
 
   const solver = corpus.codingSchemePackages.find(
     codingPackage => codingPackage.family === "solver-alias-chain"
@@ -1112,6 +1122,64 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
       expectedSourceTypes
     );
   }
+
+  const rootCodingFamilies = [
+    ["base-aliases", "alias"],
+    ["subform-responses", "subforms"]
+  ] as const;
+  for (const [family, sourceDirectory] of rootCodingFamilies) {
+    const codingPackage = corpus.codingSchemePackages.find(
+      candidate => candidate.family === family
+    );
+    assert.ok(codingPackage);
+    assert.deepEqual(
+      [
+        codingPackage.schemeSourcePath,
+        codingPackage.inputSourcePath,
+        codingPackage.outcomeSourcePath
+      ],
+      [
+        `test/coding/${sourceDirectory}/coding-scheme.json`,
+        `test/coding/${sourceDirectory}/01_input.json`,
+        `test/coding/${sourceDirectory}/01_outcome.json`
+      ]
+    );
+  }
+  const subformPackage = corpus.codingSchemePackages.find(
+    candidate => candidate.family === "subform-responses"
+  );
+  assert.ok(subformPackage);
+  const subformOutcome = JSON.parse(
+    readFileSync(resolve(corpusRoot, subformPackage.outcomeFixture), "utf8")
+  ) as Array<{
+    id: string;
+    subform?: string;
+    status: string;
+    code?: number;
+    score?: number;
+  }>;
+  assert.deepEqual(
+    subformOutcome.map(response => [
+      response.id,
+      response.subform ?? null,
+      response.status,
+      response.code ?? null,
+      response.score ?? null
+    ]),
+    [
+      ["value", "0", "CODING_COMPLETE", null, null],
+      ["time", "0", "CODING_COMPLETE", 0, 0],
+      ["total_correct", null, "NO_CODING", null, null],
+      ["total_wrong", null, "NO_CODING", null, null],
+      ["a1", "0", "CODING_COMPLETE", 1, 1],
+      ["value", "1", "CODING_COMPLETE", null, null],
+      ["time", "1", "CODING_COMPLETE", 0, 0],
+      ["a1", "1", "CODING_COMPLETE", 1, 1],
+      ["value", "2", "CODING_COMPLETE", null, null],
+      ["time", "2", "CODING_COMPLETE", 0, 0],
+      ["a1", "2", "CODING_COMPLETE", 1, 1]
+    ]
+  );
 
   const arrayLength = corpus.codingSchemePackages.find(
     codingPackage => codingPackage.family === "array-length-rulesets"

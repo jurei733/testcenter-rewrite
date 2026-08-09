@@ -8,6 +8,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 
 import { PDFDocument } from "pdf-lib";
+import { CodingScheme } from "@iqb/responses";
+import type { Response as IqbResponse } from "@iqb/responses";
 
 import { createProductionApiServer } from "./index.js";
 
@@ -24306,7 +24308,7 @@ test("original Testcenter compatibility corpus executes official IQB regex fragm
   );
 });
 
-test("original Testcenter compatibility corpus executes official IQB rule and derive methods with status propagation", async () => {
+test("original Testcenter compatibility corpus executes official IQB rule, derive, alias, and subform methods", async () => {
   type CodingCase = {
     inputFixture: string;
     outcomeFixture: string;
@@ -24373,7 +24375,9 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
     ["manual-derive-case2", "derive-manual-case2", 1],
     ["solver-case2", "derive-solver-case2", 1],
     ["solver-case3", "derive-solver-case3", 1],
-    ["solver-same-id-alias", "derive-solver-same-id-alias", 3]
+    ["solver-same-id-alias", "derive-solver-same-id-alias", 3],
+    ["base-aliases", "root-alias", 1],
+    ["subform-responses", "root-subforms", 1]
   ] as const;
   const families = familyDefinitions.map(([family, slug, caseCount]) => {
     const codingPackage = corpus.codingSchemePackages.find(
@@ -24413,14 +24417,26 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
           "utf8"
         )
       ) as CodingResponse[];
-      assert.deepEqual(
-        officialOutcome.map(variable => variable.id).sort(),
-        scheme.variableCodings
-          .filter(variable => variable.sourceType !== "BASE_NO_VALUE")
-          .map(variable => variable.alias ?? variable.id)
-          .sort(),
-        `${family} case ${testCase.caseId}`
-      );
+      const officialVariableIds = officialOutcome
+        .map(variable => variable.id)
+        .sort();
+      const schemeVariableIds = scheme.variableCodings
+        .filter(variable => variable.sourceType !== "BASE_NO_VALUE")
+        .map(variable => variable.alias ?? variable.id)
+        .sort();
+      if (family === "subform-responses") {
+        assert.deepEqual(
+          [...new Set(officialVariableIds)],
+          [...new Set(schemeVariableIds)],
+          `${family} case ${testCase.caseId}`
+        );
+      } else {
+        assert.deepEqual(
+          officialVariableIds,
+          schemeVariableIds,
+          `${family} case ${testCase.caseId}`
+        );
+      }
       return {
         ...testCase,
         caseKey: `case${testCase.caseId}`,
@@ -24428,7 +24444,11 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
           [stateKey]: `case${testCase.caseId}`
         },
         inputResponses,
-        officialOutcome
+        officialOutcome,
+        routingOutcome:
+          family === "subform-responses"
+            ? [...new Map(officialOutcome.map(response => [response.id, response])).values()]
+            : officialOutcome
       };
     });
     assert.equal(cases.length, caseCount);
@@ -24446,7 +24466,7 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
   });
   assert.equal(
     families.reduce((total, family) => total + family.cases.length, 0),
-    61
+    63
   );
 
   const escapeXmlAttribute = (value: string): string =>
@@ -24481,7 +24501,9 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
     outcome
       .map(variable => {
         const valueCondition =
-          family.cases.length > 1 || family.slug.startsWith("derive-")
+          family.cases.length > 1 ||
+          family.slug.startsWith("derive-") ||
+          family.slug.startsWith("root-")
             ? condition(
                 "Value",
                 variable.id,
@@ -24557,7 +24579,7 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
                       testCase =>
                         `<Option id="${testCase.caseKey}" label="${testCase.caseKey}">${optionConditions(
                           family,
-                          testCase.officialOutcome
+                          testCase.routingOutcome
                         )}</Option>`
                     )
                     .join("")}
@@ -24592,7 +24614,14 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
               <Definition player="verona-player-simple@6.0"><![CDATA[<p>${family.slug} coding</p>]]></Definition>
               <CodingSchemeRef schemer="iqb-schemer@2.1" schemeType="iqb@2.0">../schemes/${family.slug}.json</CodingSchemeRef>
               <BaseVariables>
-                ${baseVariables
+                ${[
+                  ...new Map(
+                    baseVariables.map(variable => [
+                      variable.alias ?? variable.id,
+                      variable
+                    ])
+                  ).values()
+                ]
                   .map(
                     variable =>
                       `<Variable id="${variable.alias ?? variable.id}" type="string"/>`
@@ -24739,19 +24768,43 @@ test("original Testcenter compatibility corpus executes official IQB rule and de
           dataParts: { responses: JSON.stringify(testCase.inputResponses) }
         }
       });
-      const saveResult = await requestJson<{
-        testRun: {
-          bookletStates: Record<string, string>;
-          unitResponses: Record<string, string>;
+      const saveProgress = () =>
+        requestJson<{
+          testRun: {
+            bookletStates: Record<string, string>;
+            unitResponses: Record<string, string>;
+          };
+        }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
+          method: "POST",
+          body: {
+            currentUnitKey: family.unitKey,
+            status: "running",
+            unitResponse: rawPlayerResponse
+          }
+        });
+      const originalCoding = CodingScheme.prototype.code;
+      let capturedCodingInput: IqbResponse[] | null = null;
+      if (family.family === "subform-responses") {
+        CodingScheme.prototype.code = function (responses): IqbResponse[] {
+          capturedCodingInput = structuredClone(responses);
+          return originalCoding.call(this, responses);
         };
-      }>(`/api/v1/participant/test-runs/${resume.body.testRun.testRunId}/save-progress`, {
-        method: "POST",
-        body: {
-          currentUnitKey: family.unitKey,
-          status: "running",
-          unitResponse: rawPlayerResponse
-        }
-      });
+      }
+      let saveResult: Awaited<ReturnType<typeof saveProgress>>;
+      try {
+        saveResult = await saveProgress();
+      } finally {
+        CodingScheme.prototype.code = originalCoding;
+      }
+      if (family.family === "subform-responses") {
+        assert.deepEqual(
+          capturedCodingInput,
+          testCase.inputResponses.filter(
+            response => response.id !== "activeQuestionIndex"
+          ),
+          "ordered subform responses must reach the IQB coder before adaptive last-write selection"
+        );
+      }
       assert.equal(saveResult.status, 200);
       assert.deepEqual(
         saveResult.body.testRun.bookletStates,
