@@ -222,6 +222,13 @@ type ParticipantTestLogBatch = {
   entries: ParticipantTestLogEntryInput[];
 };
 
+type SettledVeronaResponse = Pick<
+  ParticipantSaveOutboxEntry,
+  "testRunId" | "unitKey" | "response"
+>;
+
+const VERONA_FOREGROUND_STATE_GRACE_MS = 200;
+
 @Injectable({ providedIn: "root" })
 export class ParticipantViewFacade {
   private readonly requestState = inject(RewriteAppShellRequestService);
@@ -2419,7 +2426,8 @@ export class ParticipantViewFacade {
   private async goToPlayerUnitInternal(
     target: "previous" | "next" | "first" | "last" | string
   ): Promise<void> {
-    await this.settleVeronaAutoSaveBeforeForegroundAction();
+    const settledVeronaResponse =
+      await this.settleVeronaAutoSaveBeforeForegroundAction();
     this.veronaForegroundSaveSettlement = true;
     try {
       const player = this.player;
@@ -2493,7 +2501,10 @@ export class ParticipantViewFacade {
         return;
       }
       const currentUnitKey = this.runtime.currentUnitKey.trim();
-      if (currentUnitKey) {
+      const currentResponseAlreadySettled =
+        settledVeronaResponse?.testRunId === this.runtime.testRunId.trim() &&
+        settledVeronaResponse.unitKey === currentUnitKey;
+      if (currentUnitKey && !currentResponseAlreadySettled) {
         await this.saveProgressInternal(
           "running",
           currentUnitKey,
@@ -2566,14 +2577,15 @@ export class ParticipantViewFacade {
     confirmTestletTimeLeave = false,
     confirmTestletLeaveLock = false
   ): Promise<void> {
-    await this.settleVeronaAutoSaveBeforeForegroundAction();
+    const settledVeronaResponse =
+      await this.settleVeronaAutoSaveBeforeForegroundAction();
     const activeTimerBeforeComplete =
       this.readCurrentRunState()?.activeTestletTimer ??
       Object.values(
         this.readCurrentRunState()?.testRun.testletTimers ?? {}
       ).find(timer => timer.status === "running" || timer.status === "paused") ??
       null;
-    await this.saveCurrentDraftBeforeCompleteInternal();
+    await this.saveCurrentDraftBeforeCompleteInternal(settledVeronaResponse);
 
     const payload = await this.requestState.request<CompleteTestRunResponse>(
       "Participant Complete Run",
@@ -2604,13 +2616,22 @@ export class ParticipantViewFacade {
     }
   }
 
-  private async saveCurrentDraftBeforeCompleteInternal(): Promise<void> {
+  private async saveCurrentDraftBeforeCompleteInternal(
+    settledVeronaResponse: SettledVeronaResponse | null
+  ): Promise<void> {
     const player = this.player;
     const currentUnitKey = this.runtime.currentUnitKey.trim();
     if (
       !player.canSaveProgress ||
       !this.runtime.testRunId.trim() ||
       !currentUnitKey
+    ) {
+      return;
+    }
+
+    if (
+      settledVeronaResponse?.testRunId === this.runtime.testRunId.trim() &&
+      settledVeronaResponse.unitKey === currentUnitKey
     ) {
       return;
     }
@@ -2622,31 +2643,42 @@ export class ParticipantViewFacade {
     );
   }
 
-  private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<void> {
-    this.veronaForegroundSaveSettlement = true;
-    try {
-      this.clearVeronaSaveBuffer();
-      const activeSave = this.veronaSaveDrainPromise;
-      if (activeSave) {
-        await activeSave;
-      }
-      // A failed or superseded background save is covered by the foreground
-      // action's latest response. Preserve only its logs for that request.
-      const pendingSave = this.pendingVeronaSave;
-      if (pendingSave) {
-        for (const batch of pendingSave.logs) {
-          this.queuedVeronaLogs.push({
-            testRunId: pendingSave.testRunId,
-            unitKey: batch.unitKey,
-            originalUnitId: batch.originalUnitId,
-            entries: batch.entries
-          });
-        }
-      }
-      this.pendingVeronaSave = null;
-    } finally {
-      this.veronaForegroundSaveSettlement = false;
+  private async settleVeronaAutoSaveBeforeForegroundAction(): Promise<
+    SettledVeronaResponse | null
+  > {
+    if (this.veronaPlayer) {
+      // Players may debounce stateChanged after an input event. Keep the frame
+      // alive briefly so an immediate host navigation cannot retire it before
+      // its latest answer reaches the outbox.
+      await new Promise<void>(resolve => {
+        globalThis.setTimeout(resolve, VERONA_FOREGROUND_STATE_GRACE_MS);
+      });
     }
+    const unsettledResponse = this.pendingVeronaSave
+      ? {
+          testRunId: this.pendingVeronaSave.testRunId,
+          unitKey: this.pendingVeronaSave.unitKey,
+          response: this.pendingVeronaSave.response
+        }
+      : this.optimisticVeronaResponse;
+    this.clearVeronaSaveBuffer();
+    const activeSave = this.veronaSaveDrainPromise;
+    if (activeSave) {
+      await activeSave;
+    }
+    if (this.pendingVeronaSave) {
+      this.scheduleVeronaSaveDrain(0);
+      const forcedSave = this.veronaSaveDrainPromise;
+      if (forcedSave) {
+        await forcedSave;
+      }
+    }
+    if (this.pendingVeronaSave) {
+      throw new Error(
+        "The pending Verona response could not be saved before the participant action."
+      );
+    }
+    return unsettledResponse;
   }
 
   private compactParticipantTestLogBatches(

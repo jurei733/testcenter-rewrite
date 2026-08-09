@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  formatMonitorCustomText,
   mergeMonitorCustomTextScopes,
   originalMonitorCustomTextKeys,
   resolveMonitorCustomText
@@ -23,4 +24,19 @@ test("monitor custom-text catalog retains the original settings keys", () => {
   assert.ok(originalMonitorCustomTextKeys.includes("gm_headline"));
   assert.ok(originalMonitorCustomTextKeys.includes("gm_control_finish_everything"));
   assert.ok(originalMonitorCustomTextKeys.includes("gm_selection_text_scheduled"));
+});
+
+test("monitor selection text substitutes original placeholders in order", () => {
+  assert.equal(
+    formatMonitorCustomText(
+      { gm_selection_info: "%s%s run%s across %s booklet%s" },
+      "gm_selection_info",
+      ["All ", 2, "s", 1, ""]
+    ),
+    "All 2 runs across 1 booklet"
+  );
+  assert.equal(
+    formatMonitorCustomText({}, "gm_timeleft_tooltip", [3, 10]),
+    "Verbleibende Zeit: 3 von 10 Minute(n)"
+  );
 });

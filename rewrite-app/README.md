@@ -49,7 +49,10 @@ the system-check surface. The complete original 58-key `gm_*` catalog is also a
 versioned contract. Imported Testtakers monitor text is preserved on the migrated
 operator account and overrides global settings after monitor sign-in; the focused
 monitor console applies it to its headline, controls, core columns, and summary
-labels. Logo type, bytes, safe SVG content, the original 20 MiB
+labels, plus localized profile view/filter descriptions, batch-selection counts,
+and command tooltips. Thirty-four of the 58 keys now have active monitor UI
+surfaces; unresolved keys are limited to timed/booklet error and confirmation
+copy plus scroll/hide controls. Logo type, bytes, safe SVG content, the original 20 MiB
 ceiling, theme names, custom-text keys, and bounded text payloads are validated;
 updates are audited without copying text values into the audit trail and stored
 by the memory, JSON-file, SQLite, and Postgres adapters.

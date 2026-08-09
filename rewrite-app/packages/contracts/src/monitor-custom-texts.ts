@@ -1,3 +1,5 @@
+import { formatOriginalCustomText } from "./participant-custom-texts.js";
+
 export const originalMonitorCustomTextDefaults = {
   gm_headline: "Gruppenüberwachung",
   gm_show_monitor: "Testgruppen-Überwachung",
@@ -81,3 +83,14 @@ export const resolveMonitorCustomText = (
   key: MonitorCustomTextKey,
   fallback: string = originalMonitorCustomTextDefaults[key]
 ): string => customTexts?.[key]?.trim() || fallback;
+
+export const formatMonitorCustomText = (
+  customTexts: Readonly<Record<string, string>> | null | undefined,
+  key: MonitorCustomTextKey,
+  replacements: ReadonlyArray<string | number>,
+  fallback: string = originalMonitorCustomTextDefaults[key]
+): string =>
+  formatOriginalCustomText(
+    resolveMonitorCustomText(customTexts, key, fallback),
+    replacements
+  );

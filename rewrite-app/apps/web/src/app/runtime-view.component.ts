@@ -59,8 +59,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <article id="monitorOperatorConsole" class="card" *ngIf="view.isMonitorOnlySession">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">{{ view.monitorText("gm_controls", "Scoped operator console") }}</span>
-            <h2 id="monitorCustomHeadline">{{ view.monitorText("gm_headline", view.operatorAccessLabel) }}</h2>
+            <span class="eyebrow">{{ view.monitorText("gm_controls") }}</span>
+            <h2 id="monitorCustomHeadline">{{ view.monitorText("gm_headline") }}</h2>
           </div>
           <span class="status-pill">Server-enforced scope</span>
         </div>
@@ -75,7 +75,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="monitorWorkspaceKey" name="monitorWorkspaceKey" [(ngModel)]="view.workspace.workspaceKey" />
           </label>
           <label *ngIf="view.monitorProfiles.length > 0">
-            Monitor Profile
+            {{ view.monitorText("gm_settings_tooltip") }}
             <select
               id="monitorProfile"
               name="monitorProfile"
@@ -92,7 +92,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="monitorSelectedTestRunId" name="monitorSelectedTestRunId" readonly [value]="view.runtime.testRunId || 'Select an open run below'" />
           </label>
           <label *ngIf="view.monitorBlockNavigationTargets.length > 0; else monitorTargetUnitInput">
-            {{ view.monitorText("gm_col_blockLabel", "Target Block") }}
+            {{ view.monitorText("gm_col_blockLabel") }}
             <select id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()">
               <option value="">Choose a block</option>
               <option *ngFor="let target of view.monitorBlockNavigationTargets" [value]="target.targetUnitKey">
@@ -102,7 +102,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <ng-template #monitorTargetUnitInput>
             <label>
-              Target Unit
+              {{ view.monitorText("gm_filter_target_unitId") }}
               <input id="monitorTargetUnitKey" name="monitorTargetUnitKey" [(ngModel)]="view.runtime.monitorTargetUnitKey" (change)="view.persistState()" />
             </label>
           </ng-template>
@@ -112,18 +112,19 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
         </div>
         <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
+        <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
         <div class="actions">
           <button id="monitorApplyScopeButton" class="primary" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.applyMonitorScope()">Load Monitor Scope</button>
           <button id="monitorConsoleExportButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.exportOpenRunsCsv()">Export Open Runs</button>
-          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">{{ view.monitorText("gm_control_pause", "Pause") }}</button>
-          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">{{ view.monitorText("gm_control_resume", "Resume") }}</button>
-          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" (click)="view.issueMonitorGoto()">{{ view.monitorText("gm_control_goto", "Go To Block") }}</button>
+          <button id="monitorConsolePauseButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorPause()">{{ view.monitorText("gm_control_pause") }}</button>
+          <button id="monitorConsoleResumeButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorResume()">{{ view.monitorText("gm_control_resume") }}</button>
+          <button id="monitorConsoleGotoButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorGoto" [attr.title]="!view.canIssueMonitorGoto ? view.monitorText('gm_control_goto_tooltip') : null" (click)="view.issueMonitorGoto()">{{ view.monitorText("gm_control_goto") }}</button>
           <button id="monitorConsoleUnlockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockNavigation()">Unlock Navigation</button>
           <button id="monitorConsoleLockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockTest()">Lock Test</button>
-          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorUnlockTest()">{{ view.monitorText("gm_control_unlock", "Unlock Test") }}</button>
+          <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" [attr.title]="view.monitorText('gm_control_unlock_tooltip')" (click)="view.issueMonitorUnlockTest()">{{ view.monitorText("gm_control_unlock") }}</button>
           <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
-          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">{{ view.monitorText("gm_control_finish_everything", "Complete") }}</button>
+          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">{{ view.monitorText("gm_control_finish_everything") }}</button>
         </div>
       </article>
 
@@ -162,7 +163,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <h2>Participant Runtime</h2>
         <div class="form-grid">
           <label>
-            Login Key
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_col_personLabel") : "Login Key" }}
             <input id="loginKey" name="loginKey" [(ngModel)]="view.runtime.loginKey" (change)="view.persistState()" />
           </label>
           <label>
@@ -751,7 +752,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       </ng-container>
 
       <article class="card">
-        <h2>Open Run Filters</h2>
+        <h2 id="openRunFiltersHeadline">{{ view.isMonitorOnlySession ? view.monitorText("gm_menu_filter") : "Open Run Filters" }}</h2>
         <p>Filter open runs and CSV by status and booklet species.</p>
         <div class="form-grid">
           <label>
@@ -759,15 +760,15 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="openRunLoginFilter" name="openRunLoginFilter" [(ngModel)]="view.runtime.openRunLoginFilter" (change)="view.persistState()" placeholder="Optional login key" />
           </label>
           <label>
-            Group Key
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_filter_target_groupName") : "Group Key" }}
             <input id="openRunGroupFilter" name="openRunGroupFilter" [(ngModel)]="view.runtime.openRunGroupFilter" (change)="view.persistState()" placeholder="Optional group key" />
           </label>
           <label>
-            Booklet Key
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_filter_target_bookletId") : "Booklet Key" }}
             <input id="openRunBookletFilter" name="openRunBookletFilter" [(ngModel)]="view.runtime.openRunBookletFilter" (change)="view.persistState()" placeholder="Optional booklet key" />
           </label>
           <label>
-            Booklet Species
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_filter_target_bookletSpecies") : "Booklet Species" }}
             <input id="openRunSpeciesFilter" name="openRunSpeciesFilter" [(ngModel)]="view.runtime.openRunSpeciesFilter" (change)="view.persistState()" placeholder="species: 2" />
           </label>
           <label>
@@ -779,11 +780,11 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <input id="openRunRunFilter" name="openRunRunFilter" [(ngModel)]="view.runtime.openRunRunFilter" (change)="view.persistState()" placeholder="Optional run id" />
           </label>
           <label>
-            Unit Key
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_filter_target_unitId") : "Unit Key" }}
             <input id="openRunUnitFilter" name="openRunUnitFilter" [(ngModel)]="view.runtime.openRunUnitFilter" (change)="view.persistState()" placeholder="Optional current unit" />
           </label>
           <label>
-            Status
+            {{ view.isMonitorOnlySession ? view.monitorText("gm_filter_target_testState") : "Status" }}
             <select id="openRunStatusFilter" name="openRunStatusFilter" [(ngModel)]="view.runtime.openRunStatusFilter" (change)="view.persistState()">
               <option value="">All statuses</option>
               <option *ngFor="let status of view.testRunStatusOptions" [value]="status">{{ status }}</option>
@@ -804,8 +805,8 @@ import { SummaryCardsComponent } from "./summary-cards.component";
       <article class="card">
         <h2>Monitor Batch Command Preview</h2>
         <p>Select visible open runs, review the exact run ids, then confirm one command for the batch. Per-run failures remain selected for correction or retry.</p>
-        <div class="record-collection-summary" role="status" aria-live="polite">
-          {{ view.monitorBatchCount }} selected run{{ view.monitorBatchCount === 1 ? "" : "s" }}
+        <div id="monitorBatchSelectionStatus" class="record-collection-summary" role="status" aria-live="polite">
+          {{ view.monitorBatchSelectionText }}
         </div>
         <ul *ngIf="view.monitorBatchRunIds.length > 0">
           <li *ngFor="let testRunId of view.monitorBatchRunIds"><code>{{ testRunId }}</code></li>

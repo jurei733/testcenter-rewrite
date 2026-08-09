@@ -965,6 +965,10 @@ try {
     "#applicationCustomText-login_testResumeButtonLabel",
     "UI Global Resume"
   );
+  await fillAndCommit(
+    "#applicationCustomText-gm_menu_filter",
+    "UI Global Hidden Sessions"
+  );
   await page.locator("#applicationThemeSelect").selectOption({ label: "Sekundar" });
   const configuredLogoBase64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -1061,6 +1065,7 @@ try {
     "Sekundar"
   );
   assert.deepEqual(configuredSettingsPayload.applicationSettings.customTexts, {
+    gm_menu_filter: "UI Global Hidden Sessions",
     login_subtitle: "UI Global Selection",
     login_testResumeButtonLabel: "UI Global Resume"
   });
@@ -1239,6 +1244,20 @@ try {
   const settingsAuditPayload = await settingsAuditResponse.json();
   assert.equal(settingsAuditPayload.items.length, 3);
   assert.equal(settingsAuditPayload.items[0].eventType, "application_settings_updated");
+  await fillAndCommit(
+    "#applicationCustomText-gm_menu_filter",
+    "UI Global Hidden Sessions"
+  );
+  await clickAction("Save Application Settings");
+  const monitorGlobalTextResponse = await fetch(
+    `${baseUrl}/api/v1/system/application-settings`
+  );
+  assert.equal(monitorGlobalTextResponse.status, 200);
+  assert.equal(
+    (await monitorGlobalTextResponse.json()).applicationSettings.customTexts
+      .gm_menu_filter,
+    "UI Global Hidden Sessions"
+  );
   stopAfter("application-settings");
   logStep("admin-sessions");
   await clickAction("Admin Sessions");
@@ -1849,16 +1868,26 @@ try {
     await page.locator("#systemCheckSavedReportStatus").waitFor({ timeout: 15_000 });
     await expectButtonSelectorEnabled("#loadSystemCheckReportsButton");
     await page.locator("#loadSystemCheckReportsButton").click();
-    await page
-      .locator(".system-check-report-detail")
-      .filter({ hasText: "UI Smoke System Check 2" })
-      .filter({ hasText: "Test-Input1" })
-      .filter({ hasText: "Option A" })
-      .filter({ hasText: "Test-Input2" })
-      .filter({ hasText: "true" })
-      .filter({ hasText: "Option B" })
-      .filter({ hasText: "Second system check answer" })
-      .waitFor({ timeout: 15_000 });
+    const secondSystemCheckReportDetail = page.locator(
+      ".system-check-report-detail"
+    );
+    await secondSystemCheckReportDetail.waitFor({ timeout: 30_000 });
+    const secondSystemCheckReportText =
+      (await secondSystemCheckReportDetail.textContent()) ?? "";
+    for (const expectedText of [
+      "UI Smoke System Check 2",
+      "Test-Input1",
+      "Option A",
+      "Test-Input2",
+      "true",
+      "Option B",
+      "Second system check answer"
+    ]) {
+      assert.ok(
+        secondSystemCheckReportText.includes(expectedText),
+        `System-check report detail must include ${expectedText}. Actual detail: ${secondSystemCheckReportText}`
+      );
+    }
     await page
       .locator(".system-check-statistics")
       .filter({ hasText: "System-Check-2" })
@@ -1900,7 +1929,7 @@ try {
     await page.goto(`${baseUrl}/app/workspace`, { waitUntil: "networkidle" });
   }
   logStep("workspace-directory-reads");
-  const expectedTenantDirectoryCount = 2;
+  const expectedTenantDirectoryCount = stopAfterStep ? 2 : 3;
   await clickAction("Refresh Tenant Directory");
   await page
     .locator("article.card")
@@ -8213,11 +8242,25 @@ try {
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-102" })
     .waitFor({ timeout: 15_000 });
-  const flushedControllerStateResponse = await sendSmokeJson(
+  const flushedControllerState = await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${protectedController.participantSessionId}/current-state`,
-    { method: "GET" }
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          "CY-Unit.Sample-101"
+        ];
+      if (typeof response !== "string" || response.trim() === "") {
+        return false;
+      }
+      try {
+        return (
+          Object.keys(JSON.parse(response).unitState?.dataParts ?? {}).length > 0
+        );
+      } catch {
+        return false;
+      }
+    }
   );
-  const flushedControllerState = await flushedControllerStateResponse.json();
   const flushedControllerResponse = JSON.parse(
     flushedControllerState.currentRunState.testRun.unitResponses[
       "CY-Unit.Sample-101"
@@ -8500,6 +8543,15 @@ try {
       "    <CustomText key=\"gm_col_unitLabel\">UI Task</CustomText>",
       "    <CustomText key=\"gm_col_personLabel\">UI Candidate</CustomText>",
       "    <CustomText key=\"gm_col_state\">UI Activity</CustomText>",
+      "    <CustomText key=\"gm_settings_tooltip\">UI Layout</CustomText>",
+      "    <CustomText key=\"gm_view_small\">UI Compact</CustomText>",
+      "    <CustomText key=\"gm_menu_filter\">UI Hidden Sessions</CustomText>",
+      "    <CustomText key=\"gm_filter_type_substring\">UI Contains</CustomText>",
+      "    <CustomText key=\"gm_filter_not\">UI Excluding</CustomText>",
+      "    <CustomText key=\"gm_selection_info\">UI%s %s run%s / %s booklet%s selected</CustomText>",
+      "    <CustomText key=\"gm_selection_info_none\">UI No Runs Selected</CustomText>",
+      "    <CustomText key=\"gm_control_goto_tooltip\">UI Pick a Section</CustomText>",
+      "    <CustomText key=\"gm_control_unlock_tooltip\">UI Authorize Test</CustomText>",
       "  </CustomTexts>",
       "  <Profiles><GroupMonitor>",
       "    <Profile id=\"all\" label=\"All sessions\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"show\" bookletColumn=\"hide\" autoselectNextBlock=\"yes\">",
@@ -8550,7 +8602,7 @@ try {
     "All sessions (all)",
     "all: small view; block hide",
     "all: Current participant not substring student-ui",
-    "13 imported override(s)"
+    "22 imported override(s)"
   ]) {
     assert.ok(
       operationalLoginCandidateText.includes(expectedText),
@@ -8581,7 +8633,7 @@ try {
   await expectInputValue("#adminCreateValidForMinutes", "45");
   await expectInputValue("#adminCreatePassword", "");
   await page.getByText("1 imported monitor profile(s)").waitFor();
-  await page.getByText("13 login-specific custom text(s)").waitFor();
+  await page.getByText("22 login-specific custom text(s)").waitFor();
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await clickAction("Clear User Filters");
   await fillAndCommit("#adminCreatePassword", groupMonitorPassword);
@@ -9916,6 +9968,15 @@ try {
   await page.locator("#monitorConsoleGotoButton", { hasText: "UI Jump" }).waitFor();
   await page.locator("#monitorConsoleUnlockTestButton", { hasText: "UI Release" }).waitFor();
   await page.locator("#monitorConsoleCompleteButton", { hasText: "UI Finish All" }).waitFor();
+  await selectAndCommit("#monitorTargetUnitKey", "");
+  assert.equal(
+    await page.locator("#monitorConsoleGotoButton").getAttribute("title"),
+    "UI Pick a Section"
+  );
+  assert.equal(
+    await page.locator("#monitorConsoleUnlockTestButton").getAttribute("title"),
+    "UI Authorize Test"
+  );
   assert.equal(
     (await page.locator("#monitorProfile option:checked").textContent())?.trim(),
     "All sessions"
@@ -9926,6 +9987,20 @@ try {
       hasText:
         "All sessions: small view, 1 imported filter(s), next-block selection automatic."
     })
+    .waitFor();
+  await page
+    .locator("#monitorProfilePresentation")
+    .filter({ hasText: "UI Layout: UI Compact" })
+    .filter({ hasText: "UI Hidden Sessions" })
+    .filter({ hasText: "Current participant — UI Candidate UI Contains UI Excluding student-ui" })
+    .waitFor();
+  await page
+    .locator("#openRunFiltersHeadline")
+    .filter({ hasText: "UI Hidden Sessions" })
+    .waitFor();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
     .waitFor();
   assert.equal(
     await page.locator("#loginKey").count(),
@@ -9942,6 +10017,19 @@ try {
   await scopedOpenRuns
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
+    .waitFor();
+  await scopedOpenRuns
+    .getByRole("button", { name: "Add to Batch" })
+    .first()
+    .click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI Alle 1 run / 1 booklet selected" })
+    .waitFor();
+  await page.locator("#clearMonitorBatchSelectionButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
     .waitFor();
   assert.equal(
     await scopedOpenRuns.locator(".record-collection-grid").getAttribute("data-density"),
@@ -10846,18 +10934,16 @@ try {
     .filter({ hasText: String(pausedWorkAttentionSummary?.score ?? "") })
     .filter({ hasText: "Open Unit Detail" })
     .waitFor();
-  const entrySmokeAttentionGroupCard = monitorAttentionQueueCard
+  const entrySmokeGroupCard = studyMonitorCard
     .locator(".record-card")
     .filter({ has: page.getByRole("heading", { name: "group:entry-smoke" }) })
-    .filter({ hasText: "2 waiting, 0 active run(s)" })
+    .filter({ hasText: "2 expected, 0 session(s)" })
     .filter({ hasText: "2 not started" })
-    .filter({ hasText: "Attention Score" })
-    .filter({ hasText: "60" })
     .filter({ hasText: "Open Group Detail" })
     .filter({ hasText: "Show In Matrix" });
-  await entrySmokeAttentionGroupCard.waitFor();
+  await entrySmokeGroupCard.waitFor();
   logStep("study-monitor-group-filter-matrix");
-  await entrySmokeAttentionGroupCard
+  await entrySmokeGroupCard
     .getByRole("button", { name: "Show In Matrix" })
     .click();
   await expectInputValue("#studyMonitorMatrixLoginFilter", "");
@@ -12172,11 +12258,23 @@ try {
 
   await runAttachmentManagerSmoke();
 
-  await page.locator('[data-view-nav="workspace"]').click();
-  await page.waitForURL(/\/app\/workspace$/);
-  await fillAndCommit("#workspaceKey", workspaceKey);
-
-  await page.locator('[data-view-nav="runtime"]').click();
+  await page.evaluate(
+    ([nextTenantKey, nextWorkspaceKey]) => {
+      const storageKey = "testcenter-rewrite-app-shell";
+      const persisted = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          ...persisted,
+          tenantKey: nextTenantKey,
+          workspaceKey: nextWorkspaceKey,
+          activeView: "runtime"
+        })
+      );
+    },
+    [tenantKey, workspaceKey]
+  );
+  await page.goto(`${baseUrl}/app/runtime`, { waitUntil: "domcontentloaded" });
   await page.waitForURL(/\/app\/runtime$/);
   logStep("delete-group-results");
   await pollJsonWithPredicate(

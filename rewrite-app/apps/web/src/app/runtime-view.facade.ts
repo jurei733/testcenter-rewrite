@@ -2,6 +2,7 @@ import { ApplicationRef, Injectable, inject } from "@angular/core";
 import { Router } from "@angular/router";
 
 import {
+  formatMonitorCustomText,
   mergeMonitorCustomTextScopes,
   mapOriginalTestcenterOperationalLoginToAdminRole,
   filterOpenMonitorRunsByProfile,
@@ -79,6 +80,40 @@ type RuntimeEntryLink = {
   url: string;
 };
 
+const monitorFilterTargetTextKeys: Readonly<
+  Record<string, MonitorCustomTextKey>
+> = {
+  personLabel: "gm_col_personLabel",
+  state: "gm_col_state",
+  groupName: "gm_filter_target_groupName",
+  bookletLabel: "gm_col_bookletLabel",
+  bookletId: "gm_filter_target_bookletId",
+  bookletSpecies: "gm_filter_target_bookletSpecies",
+  blockLabel: "gm_col_blockLabel",
+  blockId: "gm_filter_target_blockId",
+  unitLabel: "gm_col_unitLabel",
+  unitId: "gm_filter_target_unitId",
+  mode: "gm_filter_target_mode",
+  testState: "gm_filter_target_testState",
+  bookletStates: "gm_filter_target_bookletStates"
+};
+
+const monitorFilterTypeTextKeys: Readonly<
+  Record<string, MonitorCustomTextKey>
+> = {
+  equal: "gm_filter_type_equal",
+  substring: "gm_filter_type_substring",
+  regex: "gm_filter_type_regex"
+};
+
+const monitorViewTextKeys: Readonly<Record<string, MonitorCustomTextKey>> = {
+  full: "gm_view_full",
+  large: "gm_view_full",
+  medium: "gm_view_medium",
+  middle: "gm_view_medium",
+  small: "gm_view_small"
+};
+
 @Injectable({ providedIn: "root" })
 export class RuntimeViewFacade {
   private readonly applicationRef = inject(ApplicationRef);
@@ -113,15 +148,64 @@ export class RuntimeViewFacade {
     return this.operatorAccess.monitorProfiles;
   }
 
-  monitorText(key: MonitorCustomTextKey, fallback: string): string {
+  private get effectiveMonitorCustomTexts(): Record<string, string> {
+    return mergeMonitorCustomTextScopes(
+      this.applicationSettings.settings().customTexts,
+      this.operatorAccess.customTexts
+    );
+  }
+
+  monitorText(key: MonitorCustomTextKey, fallback?: string): string {
     return resolveMonitorCustomText(
-      mergeMonitorCustomTextScopes(
-        this.applicationSettings.settings().customTexts,
-        this.operatorAccess.customTexts
-      ),
+      this.effectiveMonitorCustomTexts,
       key,
       fallback
     );
+  }
+
+  monitorFormattedText(
+    key: MonitorCustomTextKey,
+    replacements: ReadonlyArray<string | number>,
+    fallback?: string
+  ): string {
+    return formatMonitorCustomText(
+      this.effectiveMonitorCustomTexts,
+      key,
+      replacements,
+      fallback
+    );
+  }
+
+  get monitorProfilePresentation(): string {
+    const profile = this.activeMonitorProfile;
+    if (!profile) {
+      return `${this.monitorText("gm_settings_tooltip")}: ${this.monitorText("gm_view_full")}. ${this.monitorText("gm_menu_filter")}: ${this.monitorText("gm_selection_info_none")}`;
+    }
+    const viewKey = monitorViewTextKeys[profile.settings.view];
+    const viewLabel = viewKey
+      ? this.monitorText(viewKey)
+      : profile.settings.view;
+    const filters = profile.filters.map(filter => {
+      const targetKey = monitorFilterTargetTextKeys[filter.target];
+      const typeKey = monitorFilterTypeTextKeys[filter.type];
+      const generatedLabel = [
+        targetKey ? this.monitorText(targetKey) : filter.target,
+        typeKey ? this.monitorText(typeKey) : filter.type,
+        filter.not ? this.monitorText("gm_filter_not") : "",
+        filter.value,
+        filter.subValue ?? ""
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const authoredLabel = filter.label.trim();
+      const resolvedAuthoredLabel = authoredLabel
+        ? this.effectiveMonitorCustomTexts[authoredLabel]?.trim() || authoredLabel
+        : "";
+      return resolvedAuthoredLabel && resolvedAuthoredLabel !== generatedLabel
+        ? `${resolvedAuthoredLabel} — ${generatedLabel}`
+        : generatedLabel;
+    });
+    return `${this.monitorText("gm_settings_tooltip")}: ${viewLabel}. ${this.monitorText("gm_menu_filter")}: ${filters.join(" | ") || this.monitorText("gm_selection_info_none")}`;
   }
 
   get activeMonitorProfile(): MonitorViewProfile | null {
@@ -1998,7 +2082,7 @@ export class RuntimeViewFacade {
               bookletKey: openRun.bookletKey
             }),
             ...(profile?.settings.groupColumn === "show"
-              ? [{ label: this.monitorText("gm_col_groupName", "Group"), value: openRun.groupKey }]
+              ? [{ label: this.monitorText("gm_col_groupName"), value: openRun.groupKey }]
               : []),
             ...(profile?.settings.view === "small"
               ? []
@@ -2007,7 +2091,7 @@ export class RuntimeViewFacade {
               ? []
               : [
                   {
-                    label: this.monitorText("gm_col_bookletLabel", "Booklet"),
+                    label: this.monitorText("gm_col_bookletLabel"),
                     value: openRun.bookletLabel ?? openRun.bookletKey
                   },
                   {
@@ -2023,7 +2107,7 @@ export class RuntimeViewFacade {
             ...(profile?.settings.blockColumn === "show"
               ? [
                   {
-                    label: this.monitorText("gm_col_blockLabel", "Current Block"),
+                    label: this.monitorText("gm_col_blockLabel"),
                     value:
                       openRun.currentBlockLabel ??
                       openRun.currentBlockKey ??
@@ -2035,7 +2119,7 @@ export class RuntimeViewFacade {
               ? []
               : [
                   {
-                    label: this.monitorText("gm_col_unitLabel", "Current Unit"),
+                    label: this.monitorText("gm_col_unitLabel"),
                     value:
                       openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "none"
                   }
@@ -2106,7 +2190,7 @@ export class RuntimeViewFacade {
           : "No imported profile filter applied."
       },
       {
-        label: this.monitorText("gm_col_personLabel", "Participants"),
+        label: this.monitorText("gm_col_personLabel"),
         headline: String(participantCount),
         detail: "Unique visible participant logins."
       },
@@ -2126,7 +2210,7 @@ export class RuntimeViewFacade {
         detail: "Whole-test locks in the visible scope."
       },
       {
-        label: this.monitorText("gm_col_groupName", "Groups"),
+        label: this.monitorText("gm_col_groupName"),
         headline: String(groupCount),
         detail: "Server-authorized groups represented below."
       }
@@ -2194,15 +2278,15 @@ export class RuntimeViewFacade {
           ],
           rows: [
             {
-              label: this.monitorText("gm_col_bookletLabel", "Booklets"),
+              label: this.monitorText("gm_col_bookletLabel"),
               value: booklets.join(" | ") || "none"
             },
             {
-              label: this.monitorText("gm_col_blockLabel", "Current Blocks"),
+              label: this.monitorText("gm_col_blockLabel"),
               value: blocks.join(" | ") || "none"
             },
             {
-              label: this.monitorText("gm_col_state", "Latest Activity"),
+              label: this.monitorText("gm_col_state"),
               value: latestActivityAt
                 ? this.formatDateTime(latestActivityAt)
                 : "none"
@@ -2223,6 +2307,31 @@ export class RuntimeViewFacade {
 
   get monitorBatchCount(): number {
     return this.monitorBatchSelection.size;
+  }
+
+  get monitorBatchSelectionText(): string {
+    if (!this.isMonitorOnlySession) {
+      return `${this.monitorBatchCount} selected run${this.monitorBatchCount === 1 ? "" : "s"}`;
+    }
+    if (this.monitorBatchCount === 0) {
+      return this.monitorText("gm_selection_info_none");
+    }
+    const selectedRuns = this.visibleOpenMonitorRuns.filter(openRun =>
+      this.monitorBatchSelection.has(openRun.testRunId)
+    );
+    const bookletCount = new Set(
+      selectedRuns.map(openRun => openRun.bookletAssignmentKey)
+    ).size;
+    const allVisibleSelected =
+      selectedRuns.length > 0 &&
+      selectedRuns.length === this.visibleOpenMonitorRuns.length;
+    return this.monitorFormattedText("gm_selection_info", [
+      allVisibleSelected ? " Alle" : "",
+      selectedRuns.length,
+      selectedRuns.length === 1 ? "" : "s",
+      bookletCount,
+      bookletCount === 1 ? "" : "en"
+    ]);
   }
 
   get canIssueMonitorBatch(): boolean {
