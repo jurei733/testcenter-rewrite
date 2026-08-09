@@ -12053,6 +12053,27 @@ try {
   await page.locator("#monitorQuickFilter").fill("STUDENT-UI");
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   await page.locator("#monitorClearQuickFilterButton").click();
+  await expectInputValue("#monitorSortKey", "participant");
+  assert.equal(
+    await page.locator("#monitorSortDirectionButton").getAttribute("data-direction"),
+    "asc",
+    "The monitor list must start with the Original participant-ascending sort."
+  );
+  await page.locator("#monitorSortDirectionButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#monitorSortDirectionButton")
+        ?.getAttribute("data-direction") === "desc"
+  );
+  await page.locator("#monitorResetSortButton").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#monitorSortKey")?.value === "participant" &&
+      document
+        .querySelector("#monitorSortDirectionButton")
+        ?.getAttribute("data-direction") === "asc"
+  );
   assert.equal(
     await page.locator("#monitorToggleGroupColumnButton").getAttribute("aria-pressed"),
     "true"

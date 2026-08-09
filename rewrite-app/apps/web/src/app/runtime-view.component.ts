@@ -132,6 +132,19 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <input id="monitorQuickFilter" name="monitorQuickFilter" type="search" [ngModel]="view.monitorQuickFilter" (ngModelChange)="view.setMonitorQuickFilter($event)" />
         </label>
         <button id="monitorClearQuickFilterButton" class="ghost" type="button" [disabled]="!view.monitorQuickFilter" (click)="view.clearMonitorQuickFilter()">Clear participant search</button>
+        <section id="monitorSortControls" aria-labelledby="monitorSortControlsHeading">
+          <strong id="monitorSortControlsHeading">Sort open runs</strong>
+          <div class="actions">
+            <label>
+              Sort field
+              <select id="monitorSortKey" name="monitorSortKey" [ngModel]="view.monitorSortKey" (ngModelChange)="view.selectMonitorSortKey($event)">
+                <option *ngFor="let option of view.monitorSortOptions" [value]="option.key">{{ option.label }}</option>
+              </select>
+            </label>
+            <button id="monitorSortDirectionButton" class="ghost" type="button" [attr.aria-label]="view.monitorSortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'" [attr.data-direction]="view.monitorSortDirection" (click)="view.toggleMonitorSortDirection()">{{ view.monitorSortDirection === 'asc' ? 'Ascending' : 'Descending' }}</button>
+            <button id="monitorResetSortButton" class="ghost" type="button" (click)="view.resetMonitorSort()">Reset sort</button>
+          </div>
+        </section>
         <section id="monitorDisplayOptions" aria-labelledby="monitorDisplayOptionsHeading">
           <strong id="monitorDisplayOptionsHeading">{{ view.monitorText("gm_menu_cols") }}</strong>
           <div class="actions">

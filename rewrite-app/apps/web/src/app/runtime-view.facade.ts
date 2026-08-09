@@ -99,6 +99,18 @@ type MonitorDisplaySettings = Record<MonitorDisplayColumn, "show" | "hide"> & {
 
 type MonitorStatusFilter = "pending" | "locked";
 
+type MonitorSortDirection = "asc" | "desc";
+
+type MonitorSortKey =
+  | "state"
+  | "group"
+  | "participant"
+  | "booklet"
+  | "block"
+  | "activity"
+  | "unit"
+  | `bookletState:${string}`;
+
 type MonitorFilterOverride = {
   profileId: string;
   enabledProfileFilterIndexes: Set<number>;
@@ -140,6 +152,20 @@ const monitorViewTextKeys: Readonly<Record<string, MonitorCustomTextKey>> = {
   small: "gm_view_small"
 };
 
+const monitorSuperStateSortOrder = [
+  "pending",
+  "locked",
+  "error",
+  "controller_terminated",
+  "connection_lost",
+  "paused",
+  "focus_lost",
+  "idle",
+  "connection_websocket",
+  "connection_polling",
+  "ok"
+] as const;
+
 const monitorBookletErrorTextKeys: Readonly<
   Record<NonNullable<OpenMonitorRun["bookletError"]>, MonitorCustomTextKey>
 > = {
@@ -163,6 +189,8 @@ export class RuntimeViewFacade {
   monitorControlsVisible = true;
   monitorBookletListExpanded = true;
   monitorQuickFilter = "";
+  monitorSortKey: MonitorSortKey = "participant";
+  monitorSortDirection: MonitorSortDirection = "asc";
   private monitorDisplayOverride: {
     profileId: string;
     settings: MonitorDisplaySettings;
@@ -440,6 +468,52 @@ export class RuntimeViewFacade {
     this.setMonitorQuickFilter("");
   }
 
+  get monitorSortOptions(): Array<{ key: MonitorSortKey; label: string }> {
+    const settings = this.monitorDisplaySettings;
+    return [
+      { key: "state", label: "Status" },
+      ...(settings.groupColumn === "show"
+        ? [{ key: "group" as const, label: this.monitorText("gm_col_groupName") }]
+        : []),
+      { key: "participant", label: this.monitorText("gm_col_personLabel") },
+      ...(settings.bookletColumn === "show"
+        ? [{ key: "booklet" as const, label: this.monitorText("gm_col_bookletLabel") }]
+        : []),
+      ...(settings.blockColumn === "show"
+        ? [{ key: "block" as const, label: this.monitorText("gm_col_blockLabel") }]
+        : []),
+      { key: "activity", label: this.monitorText("gm_col_state") },
+      ...(settings.unitColumn === "show"
+        ? [{ key: "unit" as const, label: this.monitorText("gm_col_unitLabel") }]
+        : []),
+      ...settings.bookletStatesColumns.map(stateKey => ({
+        key: `bookletState:${stateKey}` as const,
+        label: `${this.monitorText("gm_menu_cols_states")} ${stateKey}`
+      }))
+    ];
+  }
+
+  selectMonitorSortKey(value: string): void {
+    const option = this.monitorSortOptions.find(candidate => candidate.key === value);
+    if (!option) {
+      return;
+    }
+    this.monitorSortKey = option.key;
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  toggleMonitorSortDirection(): void {
+    this.monitorSortDirection =
+      this.monitorSortDirection === "asc" ? "desc" : "asc";
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  resetMonitorSort(): void {
+    this.monitorSortKey = "participant";
+    this.monitorSortDirection = "asc";
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
   toggleMonitorControls(): void {
     this.monitorControlsVisible = !this.monitorControlsVisible;
   }
@@ -478,14 +552,14 @@ export class RuntimeViewFacade {
       this.effectiveMonitorProfile
     );
     const quickFilter = this.monitorQuickFilter.trim().toLocaleLowerCase();
-    if (!quickFilter) {
-      return profileRuns;
-    }
-    return profileRuns.filter(openRun =>
-      (openRun.participantRosterEntry?.displayName ?? openRun.loginKey)
-        .toLocaleLowerCase()
-        .includes(quickFilter)
-    );
+    const filteredRuns = quickFilter
+      ? profileRuns.filter(openRun =>
+          (openRun.participantRosterEntry?.displayName ?? openRun.loginKey)
+            .toLocaleLowerCase()
+            .includes(quickFilter)
+        )
+      : profileRuns;
+    return this.sortMonitorRuns(filteredRuns);
   }
 
   selectMonitorProfile(profileId: string): void {
@@ -4729,6 +4803,48 @@ export class RuntimeViewFacade {
         ? profileSettings.bookletStatesColumns.split(/[\W,]+/).filter(Boolean)
         : this.monitorAvailableBookletStateColumns
     };
+  }
+
+  private sortMonitorRuns(openRuns: OpenMonitorRun[]): OpenMonitorRun[] {
+    const direction = this.monitorSortDirection === "asc" ? 1 : -1;
+    const valueFor = (openRun: OpenMonitorRun): string | number => {
+      switch (this.monitorSortKey) {
+        case "state":
+          return monitorSuperStateSortOrder.indexOf(
+            resolveOpenMonitorRunSuperState(openRun)
+          );
+        case "group":
+          return openRun.groupKey;
+        case "participant":
+          return openRun.participantRosterEntry?.displayName ?? openRun.loginKey;
+        case "booklet":
+          return openRun.bookletLabel ?? openRun.bookletKey;
+        case "block":
+          return openRun.currentBlockLabel ?? openRun.currentBlockKey ?? "zzzzzzzzzz";
+        case "activity":
+          return openRun.updatedAt;
+        case "unit":
+          return openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "zzzzzzzzzz";
+        default:
+          return openRun.bookletStates[
+            this.monitorSortKey.slice("bookletState:".length)
+          ] ?? "zzzzzzzzzz";
+      }
+    };
+    return openRuns
+      .map((openRun, index) => ({ openRun, index }))
+      .sort((left, right) => {
+        const leftValue = valueFor(left.openRun);
+        const rightValue = valueFor(right.openRun);
+        const comparison =
+          typeof leftValue === "number" && typeof rightValue === "number"
+            ? leftValue - rightValue
+            : String(leftValue).localeCompare(String(rightValue));
+        return comparison === 0
+          ? left.index - right.index
+          : comparison * direction;
+      })
+      .map(({ openRun }) => openRun);
   }
 
   private monitorProfileFilterLabel(
