@@ -3012,6 +3012,8 @@ try {
   logStep("delegated-workspace-operator-management");
   const delegatedWorkspaceAdminUsername = `ui-delegated-admin-${Date.now()}`;
   const delegatedWorkspaceAdminPassword = "ui-delegated-admin-secret";
+  const delegatedWorkspaceAdminFinalPassword =
+    "ui-delegated-admin-final-secret";
   await fillAndCommit("#adminCreateUsername", delegatedWorkspaceAdminUsername);
   await fillAndCommit("#adminCreateDisplayName", "UI Delegated Workspace Admin");
   await fillAndCommit("#adminCreatePassword", delegatedWorkspaceAdminPassword);
@@ -3046,6 +3048,37 @@ try {
   await fillAndCommitUntilValue(
     "#adminPassword",
     delegatedWorkspaceAdminPassword
+  );
+  await clickAction("Sign In");
+  await waitForInputMinLength("#adminSessionToken", 20);
+  await page.locator("#requiredAdminPasswordChangeDialog").waitFor();
+  await fillAndCommit(
+    "#requiredAdminPassword",
+    delegatedWorkspaceAdminFinalPassword
+  );
+  await fillAndCommit(
+    "#requiredAdminPasswordConfirmation",
+    delegatedWorkspaceAdminFinalPassword
+  );
+  await expectButtonSelectorEnabled("#requiredAdminPasswordSubmitButton");
+  const delegatedPasswordChangeResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/admin/auth/password")
+  );
+  await page.locator("#requiredAdminPasswordSubmitButton").click();
+  assert.equal((await delegatedPasswordChangeResponsePromise).status(), 200);
+  await page
+    .locator("#requiredAdminPasswordChangeDialog")
+    .waitFor({ state: "detached" });
+  await expectInputValue("#adminSessionToken", "");
+  await fillAndCommitUntilValue(
+    "#adminUsername",
+    delegatedWorkspaceAdminUsername
+  );
+  await fillAndCommitUntilValue(
+    "#adminPassword",
+    delegatedWorkspaceAdminFinalPassword
   );
   await clickAction("Sign In");
   await waitForInputMinLength("#adminSessionToken", 20);
@@ -3109,11 +3142,11 @@ try {
   };
   const workspaceAdminBatchSession = await createBatchAdminSession(
     workspaceAdminUsername,
-    workspaceAdminResetPassword
+    workspaceAdminFinalPassword
   );
   const delegatedAdminBatchSession = await createBatchAdminSession(
     delegatedWorkspaceAdminUsername,
-    delegatedWorkspaceAdminPassword
+    delegatedWorkspaceAdminFinalPassword
   );
 
   await page
