@@ -585,6 +585,18 @@ retaining the rewrite's stronger eight-character minimum; API boundary tests
 prove that 60 characters are accepted and 61 are rejected, and the Angular
 create, reset, and required-change controls expose the same bounds.
 
+Latest file-store deployability closure: the local durable adapter no longer
+rewrites all production-sized original package data for every participant,
+monitor, audit, or session mutation. Its small atomic core file now commits an
+authoritative manifest while each source package and content release occupies
+an independently replaced sidecar. Existing monolithic JSON state migrates on
+the next write or through `db:migrate:file`; readiness rejects a missing
+manifest member, guarded deletion removes stale sidecars, and backups are
+documented as the core file plus its `.objects` directory. The complete
+119-test File integration matrix that previously exceeded twelve minutes and
+5.1 GB peak memory now passes in 54 seconds with an approximately 2.2 MB core
+file, including all production-sized original Aspect and Verona resources.
+
 ## Exit criteria for “presentable with high parity”
 
 The application may be presented as high-parity only when:

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -7,13 +7,260 @@ import { describe, it } from "node:test";
 import type {
   AdminLoginAttempt,
   AdminUser,
+  ContentRelease,
   OperationalLoginMigrationCandidate,
+  SourcePackage,
   Workspace
 } from "@testcenter-rewrite-app/domain";
 
-import { createFileFirstSliceRepository } from "./index.js";
+import {
+  checkFileFirstSliceReadiness,
+  createFileFirstSliceRepository,
+  migrateFileFirstSliceStorage
+} from "./index.js";
+
+const largeEntityFilePath = (
+  filePath: string,
+  collectionName: "source-packages" | "content-releases",
+  entityId: string
+): string =>
+  join(
+    `${filePath}.objects`,
+    collectionName,
+    `${encodeURIComponent(entityId)}.json`
+  );
+
+const createLargeEntityFixture = () => {
+  const largePayload = "large-original-payload:".repeat(100_000);
+  const sourcePackage: SourcePackage = {
+    sourcePackageId: "source-package-large",
+    tenantId: "tenant-large",
+    workspaceId: "workspace-large",
+    fileName: "original-package.zip",
+    mediaType: "application/zip",
+    contentStructure: null,
+    sourceDocument: largePayload,
+    status: "accepted",
+    uploadedAt: "2026-08-10T00:00:00.000Z"
+  };
+  const contentRelease: ContentRelease = {
+    contentReleaseId: "content-release-large",
+    tenantId: sourcePackage.tenantId,
+    workspaceId: sourcePackage.workspaceId,
+    importJobId: "import-job-large",
+    releaseLabel: "Original package import",
+    runtimeSnapshot: {
+      bookletEntries: [],
+      playerEntries: [
+        {
+          playerKey: "player:large",
+          html: largePayload
+        }
+      ]
+    },
+    status: "staged",
+    createdAt: "2026-08-10T00:01:00.000Z",
+    activatedAt: null
+  };
+  return { contentRelease, sourcePackage };
+};
 
 describe("createFileFirstSliceRepository", () => {
+  it("externalizes large immutable package data without rewriting it for core mutations", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-large-"));
+    const filePath = join(tempDirectory, "state.json");
+    const { contentRelease, sourcePackage } = createLargeEntityFixture();
+    const sourcePackagePath = largeEntityFilePath(
+      filePath,
+      "source-packages",
+      sourcePackage.sourcePackageId
+    );
+    const contentReleasePath = largeEntityFilePath(
+      filePath,
+      "content-releases",
+      contentRelease.contentReleaseId
+    );
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveSourcePackage(sourcePackage);
+      await repository.saveContentRelease(contentRelease);
+
+      const coreDocument = JSON.parse(await readFile(filePath, "utf8")) as {
+        sourcePackages: Record<string, unknown>;
+        contentReleases: Record<string, unknown>;
+        externalizedCollections: {
+          version: number;
+          sourcePackageIds: string[];
+          contentReleaseIds: string[];
+        };
+      };
+      assert.deepEqual(coreDocument.sourcePackages, {});
+      assert.deepEqual(coreDocument.contentReleases, {});
+      assert.deepEqual(coreDocument.externalizedCollections, {
+        version: 1,
+        sourcePackageIds: [sourcePackage.sourcePackageId],
+        contentReleaseIds: [contentRelease.contentReleaseId]
+      });
+      assert.equal((await stat(filePath)).size < 100_000, true);
+
+      const sourceSidecar = await readFile(sourcePackagePath, "utf8");
+      const releaseSidecar = await readFile(contentReleasePath, "utf8");
+      await writeFile(sourcePackagePath, `${sourceSidecar}\n`, "utf8");
+      await writeFile(contentReleasePath, `${releaseSidecar}\n`, "utf8");
+      await repository.saveApplicationSettings({
+        appTitle: "Large package portal",
+        mainLogo: "app-icon.svg",
+        themeName: "Primar",
+        introHtml: "",
+        legalNoticeHtml: "",
+        customTexts: {},
+        globalWarningText: null,
+        globalWarningExpiresAt: null,
+        updatedAt: "2026-08-10T00:02:00.000Z",
+        updatedByAdminUserId: null
+      });
+      assert.equal((await readFile(sourcePackagePath, "utf8")).endsWith("\n"), true);
+      assert.equal((await readFile(contentReleasePath, "utf8")).endsWith("\n"), true);
+
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.deepEqual(
+        await restarted.getSourcePackageById(sourcePackage.sourcePackageId),
+        sourcePackage
+      );
+      assert.deepEqual(
+        await restarted.getContentReleaseById(contentRelease.contentReleaseId),
+        contentRelease
+      );
+      await checkFileFirstSliceReadiness(filePath);
+      await rm(contentReleasePath);
+      await assert.rejects(() => checkFileFirstSliceReadiness(filePath), {
+        code: "ENOENT"
+      });
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates legacy inline package data to external collections explicitly", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-legacy-large-"));
+    const filePath = join(tempDirectory, "state.json");
+    const { contentRelease, sourcePackage } = createLargeEntityFixture();
+
+    try {
+      await writeFile(
+        filePath,
+        JSON.stringify({
+          sourcePackages: {
+            [sourcePackage.sourcePackageId]: sourcePackage
+          },
+          contentReleases: {
+            [contentRelease.contentReleaseId]: contentRelease
+          }
+        }),
+        "utf8"
+      );
+      const repository = createFileFirstSliceRepository(filePath);
+      assert.deepEqual(
+        await repository.getSourcePackageById(sourcePackage.sourcePackageId),
+        sourcePackage
+      );
+      assert.deepEqual(
+        await repository.getContentReleaseById(contentRelease.contentReleaseId),
+        contentRelease
+      );
+
+      assert.deepEqual(await migrateFileFirstSliceStorage(filePath), {
+        migrated: true,
+        formatVersion: 1,
+        sourcePackageCount: 1,
+        contentReleaseCount: 1
+      });
+      const migratedCore = JSON.parse(await readFile(filePath, "utf8")) as {
+        sourcePackages: Record<string, unknown>;
+        contentReleases: Record<string, unknown>;
+        externalizedCollections?: { version: number };
+      };
+      assert.deepEqual(migratedCore.sourcePackages, {});
+      assert.deepEqual(migratedCore.contentReleases, {});
+      assert.equal(migratedCore.externalizedCollections?.version, 1);
+
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.deepEqual(
+        await restarted.getSourcePackageById(sourcePackage.sourcePackageId),
+        sourcePackage
+      );
+      assert.deepEqual(
+        await restarted.getContentReleaseById(contentRelease.contentReleaseId),
+        contentRelease
+      );
+      assert.deepEqual(await migrateFileFirstSliceStorage(filePath), {
+        migrated: false,
+        formatVersion: 1,
+        sourcePackageCount: 1,
+        contentReleaseCount: 1
+      });
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("removes externalized package aggregates after a guarded deletion", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-delete-large-"));
+    const filePath = join(tempDirectory, "state.json");
+    const { contentRelease, sourcePackage } = createLargeEntityFixture();
+    const sourcePackagePath = largeEntityFilePath(
+      filePath,
+      "source-packages",
+      sourcePackage.sourcePackageId
+    );
+    const contentReleasePath = largeEntityFilePath(
+      filePath,
+      "content-releases",
+      contentRelease.contentReleaseId
+    );
+
+    try {
+      const repository = createFileFirstSliceRepository(filePath);
+      await repository.saveSourcePackage(sourcePackage);
+      await repository.saveImportJob({
+        importJobId: contentRelease.importJobId,
+        tenantId: sourcePackage.tenantId,
+        workspaceId: sourcePackage.workspaceId,
+        sourcePackageId: sourcePackage.sourcePackageId,
+        status: "completed",
+        createdAt: "2026-08-10T00:00:30.000Z",
+        finishedAt: "2026-08-10T00:01:00.000Z",
+        diagnostics: []
+      });
+      await repository.saveContentRelease(contentRelease);
+      assert.equal(
+        await repository.deleteSourcePackageAggregate({
+          tenantId: sourcePackage.tenantId,
+          workspaceId: sourcePackage.workspaceId,
+          sourcePackageId: sourcePackage.sourcePackageId,
+          expectedImportJobIds: [contentRelease.importJobId],
+          expectedContentReleaseIds: [contentRelease.contentReleaseId]
+        }),
+        true
+      );
+      await assert.rejects(() => stat(sourcePackagePath), { code: "ENOENT" });
+      await assert.rejects(() => stat(contentReleasePath), { code: "ENOENT" });
+
+      const restarted = createFileFirstSliceRepository(filePath);
+      assert.equal(
+        await restarted.getSourcePackageById(sourcePackage.sourcePackageId),
+        null
+      );
+      assert.equal(
+        await restarted.getContentReleaseById(contentRelease.contentReleaseId),
+        null
+      );
+    } finally {
+      await rm(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
   it("persists a renamed workspace without changing its stable identity", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-workspace-"));
     const filePath = join(tempDirectory, "state.json");

@@ -266,6 +266,15 @@ For durable local storage, run the API with:
 FIRST_SLICE_STORE=file FIRST_SLICE_FILE=./.data/first-slice.json npm run start:api
 ```
 
+The JSON adapter keeps frequently changing metadata and an authoritative
+manifest in `first-slice.json`. Large immutable source packages and content
+releases live in `first-slice.json.objects/`, so participant and monitor writes
+do not repeatedly serialize every imported Player, definition, and resource.
+Include both paths in backups or moves. `db:migrate:file` externalizes legacy
+single-file state explicitly; the first normal write performs the same migration
+automatically. Core and entity files are replaced atomically, and readiness
+fails when a manifest-referenced sidecar is missing.
+
 For relational local persistence, run:
 
 ```bash
@@ -573,7 +582,7 @@ The added read side now makes the first slice inspectable:
 
 - [packages/application/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/application/src/index.ts) now owns use-case logic and repository ports
 - [packages/memory-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/memory-store/src/index.ts) provides the current runnable in-memory adapter
-- [packages/file-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/file-store/src/index.ts) provides a durable JSON-file adapter for local development
+- [packages/file-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/file-store/src/index.ts) provides a durable JSON-file adapter for local development; its atomic manifest plus per-package/per-release sidecars keep production-sized original resources out of frequent runtime rewrites while retaining automatic legacy-file migration
 - [packages/sqlite-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/sqlite-store/src/index.ts) provides the first relational adapter on top of `node:sqlite`, including tracked schema migrations and content-release runtime snapshots
 - [packages/postgres-store/src/index.ts](/Users/julian/code/testcenter-rewrite/rewrite-app/packages/postgres-store/src/index.ts) provides a networked Postgres adapter with its own schema migration bootstrap and the same repository contract as the local stores
 - the SQLite adapter now also persists raw source-package content used for import-time structure derivation
