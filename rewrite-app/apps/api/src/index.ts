@@ -7893,53 +7893,87 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
         }
 
         const body = await readRequestJsonBody<IssueMonitorRunCommandsRequest>();
-        if (!Array.isArray(body.testRunIds)) {
-          sendError(
-            response,
-            400,
-            "monitor_bulk_test_run_ids_invalid",
-            "testRunIds must be an array containing 1 to 100 run ids."
-          );
-          return;
-        }
-        const normalizedTestRunIds = [
-          ...new Set(
-            body.testRunIds.map(testRunId =>
-              typeof testRunId === "string" ? testRunId.trim() : ""
-            )
-          )
-        ];
-        if (
-          normalizedTestRunIds.length === 0 ||
-          normalizedTestRunIds.length > 100 ||
-          normalizedTestRunIds.some(testRunId => !testRunId)
-        ) {
-          sendError(
-            response,
-            400,
-            "monitor_bulk_test_run_ids_invalid",
-            "testRunIds must contain 1 to 100 non-empty run ids."
-          );
-          return;
-        }
-
         const groupKeys = getMonitorGroupKeys(request);
-        if (
-          !(await canAccessMonitorRuns({
-            repository: runtime.repository,
+        let normalizedTestRunIds: string[];
+        if (body.scope === "all_unlocked_open_runs") {
+          if (
+            body.commandType !== "complete_and_lock" ||
+            body.testRunIds !== undefined
+          ) {
+            sendError(
+              response,
+              400,
+              "monitor_bulk_scope_invalid",
+              "all_unlocked_open_runs only supports complete_and_lock without testRunIds."
+            );
+            return;
+          }
+          const openRuns = await services.monitorRead.listOpenRuns({
             tenantKey,
             workspaceKey,
-            testRunIds: normalizedTestRunIds,
-            groupKeys
-          }))
-        ) {
-          sendError(
-            response,
-            403,
-            "monitor_group_access_required",
-            "The monitor session does not have access to every requested run."
-          );
-          return;
+            groupKeys,
+            limit: null
+          });
+          normalizedTestRunIds = openRuns
+            .filter(openRun => openRun.locked !== true)
+            .map(openRun => openRun.testRunId);
+        } else {
+          if (body.scope !== undefined) {
+            sendError(
+              response,
+              400,
+              "monitor_bulk_scope_invalid",
+              "The requested monitor bulk scope is not supported."
+            );
+            return;
+          }
+          if (!Array.isArray(body.testRunIds)) {
+            sendError(
+              response,
+              400,
+              "monitor_bulk_test_run_ids_invalid",
+              "testRunIds must be an array containing 1 to 100 run ids."
+            );
+            return;
+          }
+          normalizedTestRunIds = [
+            ...new Set(
+              body.testRunIds.map(testRunId =>
+                typeof testRunId === "string" ? testRunId.trim() : ""
+              )
+            )
+          ];
+          if (
+            normalizedTestRunIds.length === 0 ||
+            normalizedTestRunIds.length > 100 ||
+            normalizedTestRunIds.some(testRunId => !testRunId)
+          ) {
+            sendError(
+              response,
+              400,
+              "monitor_bulk_test_run_ids_invalid",
+              "testRunIds must contain 1 to 100 non-empty run ids."
+            );
+            return;
+          }
+
+          if (
+            !(await canAccessMonitorRuns({
+              repository: runtime.repository,
+              tenantKey,
+              workspaceKey,
+              testRunIds: normalizedTestRunIds,
+              groupKeys
+            }))
+          ) {
+            sendError(
+              response,
+              403,
+              "monitor_group_access_required",
+              "The monitor session does not have access to every requested run."
+            );
+            return;
+          }
         }
 
         const { commands, failures } =

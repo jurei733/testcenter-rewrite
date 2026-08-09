@@ -387,3 +387,22 @@ export async function issueMonitorRunCommandsAction(
   await host.refreshCrossViewStateAfterRuntimeChange();
   return payload;
 }
+
+export async function finishAllMonitorRunsAction(
+  host: ShellRuntimeActionsHost,
+  onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
+): Promise<IssueMonitorRunCommandsResponse> {
+  const payload = await host.request<IssueMonitorRunCommandsResponse>(
+    "Finish All Monitor Runs",
+    "POST",
+    host.getMonitorRunCommandsPath(),
+    {
+      scope: "all_unlocked_open_runs",
+      commandType: "complete_and_lock",
+      actorId: host.getReviewerId().trim() || undefined
+    } satisfies IssueMonitorRunCommandsRequest,
+    onAccepted
+  );
+  await host.refreshCrossViewStateAfterRuntimeChange();
+  return payload;
+}

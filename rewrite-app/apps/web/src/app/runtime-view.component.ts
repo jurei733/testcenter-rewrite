@@ -226,7 +226,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <button id="monitorConsoleUnlockTestButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" [attr.title]="view.monitorText('gm_control_unlock_tooltip')" (click)="view.issueMonitorUnlockTest()">{{ view.monitorText("gm_control_unlock") }}</button>
           <button id="monitorConsoleLockButton" class="ghost" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorLockNavigation()">Lock Navigation</button>
           <button id="monitorConsoleSetTimeButton" class="ghost" type="button" [disabled]="!view.canSetMonitorTestletTime" (click)="view.issueMonitorSetTestletTime()">Set Testlet Time</button>
-          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canUseMonitorRunActions" (click)="view.issueMonitorComplete()">{{ view.monitorText("gm_control_finish_everything") }}</button>
+          <button id="monitorConsoleCompleteButton" class="danger" type="button" [disabled]="!view.canFinishAllMonitorRuns" (click)="view.finishAllMonitorRuns()">{{ view.monitorText("gm_control_finish_everything") }}</button>
         </div>
         </ng-container>
       </article>

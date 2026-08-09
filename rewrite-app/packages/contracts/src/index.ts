@@ -3145,9 +3145,17 @@ export type IssueMonitorRunCommandResponse = {
   command: MonitorRunCommandResult;
 };
 
-export type IssueMonitorRunCommandsRequest = IssueMonitorRunCommandRequest & {
-  testRunIds: string[];
-};
+export type IssueMonitorRunCommandsRequest = IssueMonitorRunCommandRequest &
+  (
+    | {
+        testRunIds: string[];
+        scope?: never;
+      }
+    | {
+        testRunIds?: never;
+        scope: "all_unlocked_open_runs";
+      }
+  );
 
 export type MonitorRunCommandFailure = {
   testRunId: string;

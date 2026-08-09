@@ -20,6 +20,7 @@ import {
   createReviewAction,
   deleteGroupResultsAction,
   deleteReviewAction,
+  finishAllMonitorRunsAction,
   importParticipantRosterAction,
   issueMonitorRunCommandAction,
   issueMonitorRunCommandsAction,
@@ -184,6 +185,22 @@ export class RewriteAppRuntimeService {
     this.feedback.rememberActivity(
       "Monitor Batch Command Issued",
       `${commandType}: ${result.succeededCount} succeeded, ${result.failedCount} failed.`
+    );
+    return result;
+  }
+
+  async finishAllMonitorRuns(
+    onAccepted?: (result: IssueMonitorRunCommandsResponse) => void
+  ): Promise<IssueMonitorRunCommandsResponse> {
+    const result = await finishAllMonitorRunsAction(
+      this.hosts.createRuntimeActionsHost(() =>
+        this.refreshCrossViewStateAfterRuntimeChange()
+      ),
+      onAccepted
+    );
+    this.feedback.rememberActivity(
+      "Monitor Session Finished",
+      `${result.succeededCount} run(s) completed and locked, ${result.failedCount} failed.`
     );
     return result;
   }

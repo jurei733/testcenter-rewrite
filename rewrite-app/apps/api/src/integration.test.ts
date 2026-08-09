@@ -16747,6 +16747,49 @@ test("original Testcenter compatibility corpus executes the official group monit
       hotReturnSignIn.body.participantSession.participantSessionId,
       participantSessionId
     );
+
+    const finishAll = await requestJsonAt<{
+      requestedCount: number;
+      succeededCount: number;
+      failedCount: number;
+      commands: Array<{
+        testRun: { testRunId: string; status: string; locked?: boolean };
+      }>;
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/commands`,
+      {
+        method: "POST",
+        headers: monitorHeaders,
+        body: {
+          commandType: "complete_and_lock",
+          actorId: "GM-1",
+          scope: "all_unlocked_open_runs"
+        }
+      }
+    );
+    assert.equal(finishAll.status, 200);
+    assert.equal(finishAll.body.requestedCount, 1);
+    assert.equal(finishAll.body.succeededCount, 1);
+    assert.equal(finishAll.body.failedCount, 0);
+    assert.equal(finishAll.body.commands[0]?.testRun.testRunId, testRunId);
+    assert.equal(finishAll.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finishAll.body.commands[0]?.testRun.locked, true);
+
+    const outsiderAfterFinish = await requestJsonAt<{
+      currentRunState: { testRun: { testRunId: string; status: string } | null };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${outsiderSignIn.body.participantSession.participantSessionId}/current-state`
+    );
+    assert.equal(
+      outsiderAfterFinish.body.currentRunState.testRun?.testRunId,
+      outsiderRun.body.testRun.testRunId
+    );
+    assert.equal(
+      outsiderAfterFinish.body.currentRunState.testRun?.status,
+      "running"
+    );
   } finally {
     await closeServer(isolated.server);
   }
@@ -34835,6 +34878,85 @@ test("monitor bulk commands report per-run successes and failures", async () => 
         .sort(),
       [...runIds, ...runIds].sort()
     );
+
+    const lockBeforeFinish = await requestJsonAt<{
+      commands: Array<{ testRun: { locked: boolean } }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "lock_test",
+          testRunIds: [runIds[0]]
+        }
+      }
+    );
+    assert.equal(lockBeforeFinish.status, 200);
+    assert.equal(lockBeforeFinish.body.commands[0]?.testRun.locked, true);
+
+    const invalidFinishScope = await requestJsonAt<{ error: string }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "pause",
+          scope: "all_unlocked_open_runs"
+        }
+      }
+    );
+    assert.equal(invalidFinishScope.status, 400);
+    assert.equal(invalidFinishScope.body.error, "monitor_bulk_scope_invalid");
+
+    const finished = await requestJsonAt<{
+      requestedCount: number;
+      succeededCount: number;
+      failedCount: number;
+      commands: Array<{
+        commandType: string;
+        testRun: { testRunId: string; status: string; locked: boolean };
+      }>;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "complete_and_lock",
+          actorId: "finish-all-operator",
+          scope: "all_unlocked_open_runs"
+        }
+      }
+    );
+    assert.equal(finished.status, 200);
+    assert.equal(finished.body.requestedCount, 1);
+    assert.equal(finished.body.succeededCount, 1);
+    assert.equal(finished.body.failedCount, 0);
+    assert.equal(finished.body.commands[0]?.commandType, "complete_and_lock");
+    assert.equal(finished.body.commands[0]?.testRun.testRunId, runIds[1]);
+    assert.equal(finished.body.commands[0]?.testRun.status, "completed");
+    assert.equal(finished.body.commands[0]?.testRun.locked, true);
+
+    const finishedAgain = await requestJsonAt<{
+      requestedCount: number;
+      succeededCount: number;
+      failedCount: number;
+    }>(
+      isolated.baseUrl,
+      "/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/commands",
+      {
+        method: "POST",
+        body: {
+          commandType: "complete_and_lock",
+          scope: "all_unlocked_open_runs"
+        }
+      }
+    );
+    assert.equal(finishedAgain.status, 200);
+    assert.equal(finishedAgain.body.requestedCount, 0);
+    assert.equal(finishedAgain.body.succeededCount, 0);
+    assert.equal(finishedAgain.body.failedCount, 0);
   } finally {
     await closeServer(isolated.server);
   }

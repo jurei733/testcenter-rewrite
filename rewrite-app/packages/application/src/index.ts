@@ -762,7 +762,7 @@ export type MonitorReadPort = {
     testRunId?: string;
     unitKey?: string;
     status?: TestRun["status"];
-    limit?: number;
+    limit?: number | null;
   }): Promise<OpenMonitorRun[]>;
   exportOpenRunsCsv(input: {
     tenantKey: string;
@@ -5187,7 +5187,7 @@ type OpenMonitorRunFilters = {
   testRunId?: string;
   unitKey?: string;
   status?: TestRun["status"];
-  limit?: number;
+  limit?: number | null;
 };
 
 const normalizeExactFilter = (value: string | undefined): string | undefined => {
@@ -5218,7 +5218,7 @@ const filterOpenMonitorRuns = (
     status: input.status
   };
 
-  return items
+  const filteredItems = items
     .filter(
       item =>
         (!filters.loginKey || item.loginKey === filters.loginKey) &&
@@ -5235,8 +5235,10 @@ const filterOpenMonitorRuns = (
         (!filters.testRunId || item.testRunId === filters.testRunId) &&
         (!filters.unitKey || item.currentUnitKey === filters.unitKey) &&
         (!filters.status || item.status === filters.status)
-    )
-    .slice(0, resolveOperatorReadLimit(input.limit));
+    );
+  return input.limit === null
+    ? filteredItems
+    : filteredItems.slice(0, resolveOperatorReadLimit(input.limit));
 };
 
 const listDetailedResponsesForWorkspace = (input: {

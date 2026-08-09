@@ -12243,6 +12243,61 @@ try {
   assert.equal(await page.locator(".monitor-custom-filter").count(), 0);
   await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
   stopAfter("group-monitor-custom-filters");
+
+  logStep("group-monitor-finish-all");
+  await fillAndCommit("#openRunLoginFilter", "hidden-by-finish-all-smoke");
+  await page.locator("#monitorApplyScopeButton").click();
+  await waitForNotBusy("group-monitor-finish-all-filter");
+  const finishAllCommandRoute = new RegExp(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs/commands$`
+  );
+  let finishAllRequestBody;
+  await page.route(finishAllCommandRoute, async route => {
+    finishAllRequestBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        requestedCount: 0,
+        succeededCount: 0,
+        failedCount: 0,
+        commands: [],
+        failures: []
+      })
+    });
+  });
+  page.once("dialog", async dialog => {
+    assert.match(dialog.message(), /Testdurchführung Beenden/);
+    assert.match(dialog.message(), /sämtliche Tests dieser Sitzung/);
+    await dialog.accept();
+  });
+  await page.locator("#monitorConsoleCompleteButton").click();
+  await waitForNotBusy("group-monitor-finish-all-command");
+  assert.deepEqual(finishAllRequestBody, {
+    scope: "all_unlocked_open_runs",
+    commandType: "complete_and_lock",
+    actorId: "operator-ui"
+  });
+  await expectInputValue("#openRunLoginFilter", "");
+  assert.equal(
+    await importedMonitorFilterButton.getAttribute("aria-pressed"),
+    "false",
+    "Finishing the monitor session must clear imported runtime filters like the Original monitor."
+  );
+  await page
+    .locator("#monitorCommandNotice")
+    .filter({ hasText: "0 Tests beendet und gesperrt." })
+    .waitFor();
+  await page.unroute(finishAllCommandRoute);
+  stopAfter("group-monitor-finish-all");
+  await page.locator("#monitorResetRuntimeFiltersButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.monitor-profile-filter[data-filter-index="0"]')
+        ?.getAttribute("aria-pressed") === "true"
+  );
+
   await page.locator("#monitorToggleBookletListButton").click();
   await page
     .locator("app-record-collection")
@@ -12690,7 +12745,7 @@ try {
     .click();
   await waitForNotBusy("group-monitor-booklet-error-copy-select");
   await expectButtonSelectorDisabled("#monitorConsolePauseButton");
-  await expectButtonSelectorDisabled("#monitorConsoleCompleteButton");
+  await expectButtonSelectorEnabled("#monitorConsoleCompleteButton");
   while (monitorBookletErrorRouteOperations.size > 0) {
     await Promise.all([...monitorBookletErrorRouteOperations]);
   }

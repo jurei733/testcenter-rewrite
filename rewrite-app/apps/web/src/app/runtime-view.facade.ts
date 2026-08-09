@@ -3620,6 +3620,10 @@ export class RuntimeViewFacade {
     );
   }
 
+  get canFinishAllMonitorRuns(): boolean {
+    return this.canIssueMonitorCommands && this.canUseWorkspaceScope;
+  }
+
   get canSaveProgressActions(): boolean {
     return this.canUseRunActions && this.runtime.currentUnitKey.trim().length > 0;
   }
@@ -4033,6 +4037,31 @@ export class RuntimeViewFacade {
     }
     this.viewState.onActionAsync(() =>
       this.runtimeService.issueMonitorRunCommand("complete_and_lock")
+    );
+  }
+
+  finishAllMonitorRuns(): void {
+    if (!this.canFinishAllMonitorRuns) {
+      return;
+    }
+    if (
+      !globalThis.confirm(
+        "Testdurchführung Beenden\n\nAchtung! Diese Aktion sperrt und beendet sämtliche Tests dieser Sitzung."
+      )
+    ) {
+      return;
+    }
+    this.clearAllMonitorFiltersForFinish();
+    this.runtime.monitorCommandNotice = "";
+    this.viewState.onActionAsync(() =>
+      this.runtimeService.finishAllMonitorRuns(result => {
+        this.runtime.monitorCommandNoticeKind =
+          result.failedCount > 0 ? "warning" : "info";
+        this.runtime.monitorCommandNotice =
+          result.failedCount > 0
+            ? `${result.succeededCount} Tests beendet und gesperrt; ${result.failedCount} fehlgeschlagen.`
+            : `${result.succeededCount} Tests beendet und gesperrt.`;
+      })
     );
   }
 
@@ -5319,6 +5348,32 @@ export class RuntimeViewFacade {
     }
     this.runtime.openRunUnitFilter = "";
     this.persistState();
+  }
+
+  private clearAllMonitorFiltersForFinish(): void {
+    this.runtime.openRunLoginFilter = "";
+    this.runtime.openRunGroupFilter = "";
+    this.runtime.openRunBookletFilter = "";
+    this.runtime.openRunSpeciesFilter = "";
+    this.runtime.openRunSessionFilter = "";
+    this.runtime.openRunRunFilter = "";
+    this.runtime.openRunUnitFilter = "";
+    this.runtime.openRunStatusFilter = "";
+    this.runtime.openRunLimit = "100";
+    this.monitorFilterOverride = {
+      profileId: this.activeMonitorProfileId || "__default__",
+      enabledProfileFilterIndexes: new Set<number>(),
+      pending: false,
+      locked: false
+    };
+    for (const customFilter of this.currentMonitorCustomFilters) {
+      customFilter.active = false;
+    }
+    this.monitorQuickFilter = "";
+    this.monitorAutoSelectAll = false;
+    this.monitorBatchSelection.clear();
+    this.persistState();
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   private formatMonitorMinutes(value: number): string {
