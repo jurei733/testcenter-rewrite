@@ -73,11 +73,13 @@ definition from the official Verona Player Testbed at a fixed commit. Its
 production Chromium gate persists and restores a positioned multiline-text and
 multiple-choice response through DAN's JSON-string `all` data part. The corpus
 also retains the Testbed's historical metadata-free `IQBVisualUnitPlayerV2.99.2`
-artifact and original `G231mm.xml`; an import gate resolves their unmodified
-`DefinitionRef player="IQBVisualUnitPlayerV2"` graph and deliberately retains
-the legacy metadata warning. The host records each legacy data part's original
-value kind so API-2/3 object-valued and string-valued Players both receive the
-representation they emitted.
+artifact and original `G231mm.xml`; import and production browser gates resolve
+and execute their unmodified
+`DefinitionRef player="IQBVisualUnitPlayerV2"` graph while deliberately
+retaining the legacy metadata warning. The browser gate persists and restores
+the real multiline and choice response after reload. The host records each
+legacy data part's original value kind so API-2/3 object-valued and string-valued
+Players both receive the representation they emitted.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
 It also contains the byte-exact

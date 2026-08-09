@@ -7252,6 +7252,243 @@ try {
       .isChecked(),
     true
   );
+
+  logStep("participant-historical-dan-testbed-player");
+  const historicalDanPackage = danPlayerPackage.legacyTestbedPackage;
+  assert.ok(
+    historicalDanPackage,
+    "The historical DAN Testbed package should be pinned."
+  );
+  const historicalDanTenantKey = `${tenantKey}-historical-dan`;
+  const historicalDanWorkspaceKey = `${workspaceKey}-historical-dan`;
+  const historicalDanBookletKey = "BOOKLET.OFFICIAL.DAN-TESTBED";
+  const historicalDanUnitKey = "G231mm";
+  const historicalDanLoginKey = "student-historical-dan";
+  const historicalDanResponse =
+    "Historischer Testbed-Player stellt diese Antwort wieder her.";
+  const [
+    historicalDanPlayerDocument,
+    historicalDanUnitDocument,
+    historicalDanDefinitionDocument
+  ] = await Promise.all([
+    readBrotliBase64Text(
+      resolve(
+        "test-fixtures/original-testcenter",
+        historicalDanPackage.playerFixture
+      )
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        historicalDanPackage.unitFixture
+      ),
+      "utf8"
+    ),
+    readFile(
+      resolve(
+        "test-fixtures/original-testcenter",
+        danPlayerPackage.definitionFixture
+      ),
+      "utf8"
+    ).then(encoded => Buffer.from(encoded.trim(), "base64").toString("utf8"))
+  ]);
+  const historicalDanZip = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="${historicalDanBookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${historicalDanUnitKey}" href="units/G231mm.xml" />
+            <resource identifier="${historicalDanPackage.playerKey}" href="players/IQBVisualUnitPlayerV2.99.2.html" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata>
+            <Id>${historicalDanBookletKey}</Id>
+            <Label>Historical DAN Testbed</Label>
+          </Metadata>
+          <Units>
+            <Unit id="${historicalDanUnitKey}" label="Sprachliche Mittel MM" />
+          </Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/G231mm.xml",
+      content: historicalDanUnitDocument
+    },
+    {
+      fileName: "export/units/G231mm.voud",
+      content: historicalDanDefinitionDocument
+    },
+    {
+      fileName: "export/players/IQBVisualUnitPlayerV2.99.2.html",
+      content: historicalDanPlayerDocument
+    }
+  ]);
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: historicalDanTenantKey,
+      displayName: "Historical DAN Testbed"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${historicalDanTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: historicalDanWorkspaceKey,
+        displayName: "Historical DAN Testbed"
+      }
+    }
+  );
+  const historicalDanWorkspaceApiUrl =
+    `${baseUrl}/api/v1/tenants/${historicalDanTenantKey}` +
+    `/workspaces/${historicalDanWorkspaceKey}`;
+  const historicalDanSourceResponse = await sendSmokeJson(
+    `${historicalDanWorkspaceApiUrl}/source-packages`,
+    {
+      body: {
+        fileName: "historical-dan-testbed-browser-smoke.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${historicalDanZip.toString("base64")}`
+      }
+    }
+  );
+  const historicalDanSourcePayload = await historicalDanSourceResponse.json();
+  const historicalDanImportResponse = await sendSmokeJson(
+    `${historicalDanWorkspaceApiUrl}/import-jobs`,
+    {
+      body: {
+        sourcePackageId:
+          historicalDanSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const historicalDanImportPayload = await historicalDanImportResponse.json();
+  assert.equal(
+    historicalDanImportPayload.importJob.status,
+    "completed",
+    JSON.stringify(historicalDanImportPayload.importJob.diagnostics)
+  );
+  assert.equal(
+    historicalDanImportPayload.importJob.diagnostics.some(
+      diagnostic =>
+        diagnostic.code === "source_document_player_metadata_missing" &&
+        diagnostic.severity === "warning"
+    ),
+    true,
+    JSON.stringify(historicalDanImportPayload.importJob.diagnostics)
+  );
+  const historicalDanReleaseId =
+    historicalDanImportPayload.stagedContentRelease?.contentReleaseId;
+  assert.ok(
+    historicalDanReleaseId,
+    "Historical DAN import should stage a release."
+  );
+  await sendSmokeJson(
+    `${historicalDanWorkspaceApiUrl}/content-releases/${historicalDanReleaseId}/activate`,
+    { body: {} }
+  );
+  await sendSmokeJson(`${historicalDanWorkspaceApiUrl}/participant-roster`, {
+    body: {
+      rosterText: [
+        {
+          loginKey: historicalDanLoginKey,
+          groupKey: "group:historical-dan",
+          bookletKey: historicalDanBookletKey,
+          displayName: "Historical DAN Participant",
+          executionMode: "run-hot-return"
+        }
+      ]
+    }
+  });
+  await page.goto(
+    `${baseUrl}/participant?${new URLSearchParams({
+      tenantKey: historicalDanTenantKey,
+      workspaceKey: historicalDanWorkspaceKey,
+      loginKey: historicalDanLoginKey,
+      bookletKey: historicalDanBookletKey
+    }).toString()}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${historicalDanPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const historicalDanFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await historicalDanFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  await historicalDanFrame
+    .locator("#canvasElement4_textbox")
+    .pressSequentially(historicalDanResponse);
+  await historicalDanFrame.locator("#canvasElement14_multipleChoice").click();
+  const historicalDanParticipantSessionId = await page
+    .locator("#participantRouteSessionId")
+    .inputValue();
+  assert.ok(historicalDanParticipantSessionId);
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${historicalDanParticipantSessionId}/current-state`,
+    payload => {
+      const response =
+        payload?.currentRunState?.testRun?.unitResponses?.[
+          historicalDanUnitKey
+        ];
+      if (typeof response !== "string") return false;
+      try {
+        const all = JSON.parse(response).unitState?.dataParts?.all;
+        if (typeof all !== "string") return false;
+        const unitStatus = JSON.parse(all);
+        return (
+          unitStatus?.canvasElement4 === historicalDanResponse &&
+          unitStatus?.canvasElement14 === "true"
+        );
+      } catch {
+        return false;
+      }
+    },
+    30_000
+  );
+  await page.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(
+      historicalDanParticipantSessionId
+    )}`,
+    { waitUntil: "networkidle" }
+  );
+  await page
+    .locator("#participantVeronaPlayerVersion")
+    .filter({ hasText: `API ${historicalDanPackage.playerApiVersion}` })
+    .waitFor({ timeout: 30_000 });
+  const restoredHistoricalDanFrame = page.frameLocator(
+    "#participantVeronaPlayerFrame"
+  );
+  await restoredHistoricalDanFrame
+    .getByText("Verbinde die vier folgenden Sätze zu einem Satz.", {
+      exact: false
+    })
+    .waitFor({ timeout: 30_000 });
+  assert.equal(
+    await restoredHistoricalDanFrame
+      .locator("#canvasElement4_textbox")
+      .inputValue(),
+    historicalDanResponse
+  );
+  assert.equal(
+    await restoredHistoricalDanFrame
+      .locator("#canvasElement14_multipleChoice")
+      .isChecked(),
+    true
+  );
   stopAfter("participant-verona-player-families");
 
   logStep("participant-original-aspect-player");
