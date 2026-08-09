@@ -2278,6 +2278,55 @@ export type OperatorAccessMode =
 const isEnabledMonitorProfileFlag = (value: string): boolean =>
   ["1", "true", "on", "yes"].includes(value.trim().toLowerCase());
 
+export type OpenMonitorRunSuperState =
+  | "pending"
+  | "locked"
+  | "error"
+  | "controller_terminated"
+  | "connection_lost"
+  | "paused"
+  | "focus_lost"
+  | "connection_websocket"
+  | "connection_polling"
+  | "ok";
+
+export const resolveOpenMonitorRunSuperState = (
+  openRun: OpenMonitorRun
+): OpenMonitorRunSuperState => {
+  const testState = openRun.testState;
+  if (testState.status === "pending" || openRun.status === "created") {
+    return "pending";
+  }
+  if (testState.status === "locked" || openRun.locked) {
+    return "locked";
+  }
+  if (testState.CONTROLLER === "ERROR") {
+    return "error";
+  }
+  if (
+    testState.CONTROLLER === "TERMINATED" ||
+    testState.CONTROLLER === "TERMINATED_PAUSED"
+  ) {
+    return "controller_terminated";
+  }
+  if (testState.CONNECTION === "LOST") {
+    return "connection_lost";
+  }
+  if (testState.CONTROLLER === "PAUSED" || openRun.status === "paused") {
+    return "paused";
+  }
+  if (testState.FOCUS === "HAS_NOT") {
+    return "focus_lost";
+  }
+  if (testState.CONNECTION === "WEBSOCKET") {
+    return "connection_websocket";
+  }
+  if (testState.CONNECTION === "POLLING") {
+    return "connection_polling";
+  }
+  return "ok";
+};
+
 const monitorProfileFilterExcludesRun = (
   openRun: OpenMonitorRun,
   filter: MonitorViewProfileFilter
@@ -2316,13 +2365,10 @@ const monitorProfileFilterExcludesRun = (
       subject = openRun.currentBlockLabel ?? openRun.currentBlockKey ?? "";
       break;
     case "state":
-      subject = openRun.status;
+      subject = resolveOpenMonitorRunSuperState(openRun);
       break;
     case "testState":
-      if (filter.value !== "status") {
-        return false;
-      }
-      subject = openRun.status;
+      subject = openRun.testState[filter.value] ?? "";
       break;
     case "bookletStates":
       subject = openRun.bookletStates[filter.value] ?? "";
@@ -2356,13 +2402,13 @@ export const filterOpenMonitorRunsByProfile = (
   return openRuns.filter(openRun => {
     if (
       isEnabledMonitorProfileFlag(profile.filtersEnabled.pending) &&
-      openRun.status === "created"
+      resolveOpenMonitorRunSuperState(openRun) === "pending"
     ) {
       return false;
     }
     if (
       isEnabledMonitorProfileFlag(profile.filtersEnabled.locked) &&
-      openRun.locked
+      resolveOpenMonitorRunSuperState(openRun) === "locked"
     ) {
       return false;
     }

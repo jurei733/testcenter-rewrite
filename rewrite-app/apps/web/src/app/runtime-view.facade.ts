@@ -8,6 +8,7 @@ import {
   filterOpenMonitorRunsByProfile,
   parseOriginalTestcenterOperationalLogins,
   parseParticipantRosterText,
+  resolveOpenMonitorRunSuperState,
   resolveMonitorCustomText,
   type MonitorCustomTextKey
 } from "@testcenter-rewrite-app/contracts";
@@ -2182,12 +2183,16 @@ export class RuntimeViewFacade {
         const bookletErrorText = openRun.bookletError
           ? this.monitorText(monitorBookletErrorTextKeys[openRun.bookletError])
           : null;
+        const monitorState = resolveOpenMonitorRunSuperState(openRun);
+        const controllerState = openRun.testState.CONTROLLER ?? "PENDING";
 
         return {
           headline: displayName ?? openRun.loginKey,
           subline: displayName ? openRun.loginKey : openRun.testRunId,
           badges: [
             openRun.status,
+            `state ${monitorState}`,
+            `controller ${controllerState.toLowerCase()}`,
             openRun.locked ? "test locked" : "test unlocked",
             openRun.groupKey,
             openRun.executionMode,
@@ -2206,6 +2211,10 @@ export class RuntimeViewFacade {
           ],
           rows: [
             { label: "Whole-test lock", value: openRun.locked ? "locked" : "unlocked" },
+            {
+              label: this.monitorText("gm_col_state"),
+              value: `${monitorState} · CONTROLLER=${controllerState}`
+            },
             ...(profile?.settings.view === "small"
               ? []
               : [{ label: "Session", value: openRun.participantSessionId }]),
@@ -2334,6 +2343,9 @@ export class RuntimeViewFacade {
       openRun => openRun.status === "paused"
     ).length;
     const lockedCount = openRuns.filter(openRun => openRun.locked).length;
+    const controllerErrorCount = openRuns.filter(
+      openRun => resolveOpenMonitorRunSuperState(openRun) === "error"
+    ).length;
     const profile = this.activeMonitorProfile;
 
     return [
@@ -2358,6 +2370,11 @@ export class RuntimeViewFacade {
         label: "Paused",
         headline: String(pausedCount),
         detail: "Runs waiting for continuation."
+      },
+      {
+        label: "Controller Errors",
+        headline: String(controllerErrorCount),
+        detail: "Participant Players currently reporting a controller failure."
       },
       {
         label: "Locked",
@@ -2398,6 +2415,9 @@ export class RuntimeViewFacade {
           openRun => openRun.status === "paused"
         ).length;
         const lockedCount = openRuns.filter(openRun => openRun.locked).length;
+        const controllerErrorCount = openRuns.filter(
+          openRun => resolveOpenMonitorRunSuperState(openRun) === "error"
+        ).length;
         const timedCount = openRuns.filter(
           openRun => openRun.activeTestletTimer
         ).length;
@@ -2428,6 +2448,7 @@ export class RuntimeViewFacade {
           badges: [
             `${runningCount} running`,
             `${pausedCount} paused`,
+            `${controllerErrorCount} controller errors`,
             `${lockedCount} locked`,
             `${timedCount} timed`
           ],

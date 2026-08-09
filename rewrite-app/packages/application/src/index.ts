@@ -1301,6 +1301,11 @@ export type FirstSliceRepository = {
     tenantId: string,
     workspaceId: string
   ): Promise<ParticipantTestLog[]>;
+  listLatestParticipantTestStateLogsByWorkspace(
+    tenantId: string,
+    workspaceId: string,
+    logKeys: string[]
+  ): Promise<ParticipantTestLog[]>;
   saveParticipantTestLogs(testLogs: ParticipantTestLog[]): Promise<void>;
   deleteParticipantTestLogsByTestRunIds(testRunIds: string[]): Promise<number>;
   getWorkspaceReviewById(reviewId: string): Promise<WorkspaceReview | null>;
@@ -4451,16 +4456,26 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
   activeContentRelease: ContentRelease;
   timestamp: string;
 }): Promise<OpenMonitorRun[]> => {
-  const participantSessions =
-    await input.repository.listParticipantSessionsByWorkspace(
+  const [
+    participantSessions,
+    participantRosterEntries,
+    participantTestLogs
+  ] = await Promise.all([
+    input.repository.listParticipantSessionsByWorkspace(
       input.tenantId,
       input.workspaceId
-    );
-  const participantRosterEntries =
-    await input.repository.listParticipantRosterEntriesByWorkspace(
+    ),
+    input.repository.listParticipantRosterEntriesByWorkspace(
       input.tenantId,
       input.workspaceId
-    );
+    ),
+    input.repository.listLatestParticipantTestStateLogsByWorkspace(
+      input.tenantId,
+      input.workspaceId,
+      [...originalMonitorTestStateKeys]
+    )
+  ]);
+  const latestTestStates = buildLatestMonitorTestStates(participantTestLogs);
   const activeSessionIds = new Set(
     participantSessions
       .filter(
@@ -4528,6 +4543,10 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
         bookletAssignmentKey:
           testRun.bookletAssignmentKey ?? testRun.bookletKey,
         bookletStates: normalizedTestRun.bookletStates ?? {},
+        testState: buildOpenMonitorRunTestState(
+          normalizedTestRun,
+          latestTestStates
+        ),
         status: normalizedTestRun.status,
         locked: normalizedTestRun.locked === true,
         currentUnitKey: normalizedTestRun.currentUnitKey,
@@ -4545,6 +4564,72 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
       };
     });
 };
+
+const originalMonitorTestStateKeys = [
+  "CURRENT_UNIT_ID",
+  "TESTLETS_TIMELEFT",
+  "TESTLETS_CLEARED_CODE",
+  "TESTLETS_LOCKED_AFTER_LEAVE",
+  "BOOKLET_STATES",
+  "UNITS_LOCKED_AFTER_LEAVE",
+  "FOCUS",
+  "CONTROLLER",
+  "CONNECTION"
+] as const;
+const originalMonitorTestStateKeySet = new Set<string>(
+  originalMonitorTestStateKeys
+);
+
+const isLaterParticipantTestLog = (
+  candidate: ParticipantTestLog,
+  current: ParticipantTestLog
+): boolean =>
+  candidate.timestamp > current.timestamp ||
+  (candidate.timestamp === current.timestamp &&
+    (candidate.recordedAt > current.recordedAt ||
+      (candidate.recordedAt === current.recordedAt &&
+        candidate.participantTestLogId > current.participantTestLogId)));
+
+const buildLatestMonitorTestStates = (
+  testLogs: ParticipantTestLog[]
+): Map<string, Record<string, string>> => {
+  const latestLogs = new Map<string, Map<string, ParticipantTestLog>>();
+  for (const testLog of testLogs) {
+    if (
+      testLog.unitKey !== null ||
+      !originalMonitorTestStateKeySet.has(testLog.logKey)
+    ) {
+      continue;
+    }
+    const runLogs = latestLogs.get(testLog.testRunId) ?? new Map();
+    const current = runLogs.get(testLog.logKey);
+    if (!current || isLaterParticipantTestLog(testLog, current)) {
+      runLogs.set(testLog.logKey, testLog);
+    }
+    latestLogs.set(testLog.testRunId, runLogs);
+  }
+
+  return new Map(
+    [...latestLogs].map(([testRunId, logs]) => [
+      testRunId,
+      Object.fromEntries(
+        [...logs].map(([logKey, testLog]) => [logKey, testLog.logContent])
+      )
+    ])
+  );
+};
+
+const buildOpenMonitorRunTestState = (
+  testRun: TestRun,
+  latestTestStates: Map<string, Record<string, string>>
+): Record<string, string> => ({
+  ...(latestTestStates.get(testRun.testRunId) ?? {}),
+  ...(testRun.locked
+    ? { status: "locked" }
+    : testRun.status === "created"
+      ? { status: "pending" }
+      : {})
+});
 
 type OpenMonitorBookletResolution = {
   booklet: ContentReleaseBookletEntry | undefined;
@@ -6071,6 +6156,7 @@ const formatOpenMonitorRunsCsv = (input: {
     "bookletError",
     "bookletAssignmentKey",
     "bookletStates",
+    "testState",
     "status",
     "locked",
     "currentUnitKey",
@@ -6100,6 +6186,7 @@ const formatOpenMonitorRunsCsv = (input: {
         item.bookletError ?? "",
         item.bookletAssignmentKey,
         JSON.stringify(item.bookletStates),
+        JSON.stringify(item.testState),
         item.status,
         item.locked ? "true" : "false",
         item.currentUnitKey ?? "",
@@ -27176,16 +27263,28 @@ export const createFirstSliceServices = (
               : normalizeTestRun(storedTestRun)
           );
         }
-        const participantSessions =
-          await repository.listParticipantSessionsByWorkspace(
+        const [
+          participantSessions,
+          participantRosterEntries,
+          participantTestLogs
+        ] = await Promise.all([
+          repository.listParticipantSessionsByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
-          );
-        const participantRosterEntries =
-          await repository.listParticipantRosterEntriesByWorkspace(
+          ),
+          repository.listParticipantRosterEntriesByWorkspace(
             workspace.tenantId,
             workspace.workspaceId
-          );
+          ),
+          repository.listLatestParticipantTestStateLogsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId,
+            [...originalMonitorTestStateKeys]
+          )
+        ]);
+        const latestTestStates = buildLatestMonitorTestStates(
+          participantTestLogs
+        );
 
         const items = testRuns
           .filter(testRun => testRun.status !== "completed")
@@ -27241,6 +27340,10 @@ export const createFirstSliceServices = (
               bookletAssignmentKey:
                 testRun.bookletAssignmentKey ?? testRun.bookletKey,
               bookletStates: normalizeTestRun(testRun).bookletStates ?? {},
+              testState: buildOpenMonitorRunTestState(
+                testRun,
+                latestTestStates
+              ),
               status: testRun.status,
               locked: testRun.locked === true,
               currentUnitKey: testRun.currentUnitKey,

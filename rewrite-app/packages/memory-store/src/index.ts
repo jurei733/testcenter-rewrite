@@ -1,4 +1,5 @@
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
+import { selectLatestParticipantTestStateLogs } from "@testcenter-rewrite-app/domain";
 import type {
   AdminLoginAttempt,
   AdminAuditEvent,
@@ -540,6 +541,19 @@ export const createInMemoryFirstSliceRepository = (): FirstSliceRepository => {
       return Array.from(state.participantTestLogs.values()).filter(
         testLog =>
           testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+      );
+    },
+    async listLatestParticipantTestStateLogsByWorkspace(
+      tenantId,
+      workspaceId,
+      logKeys
+    ) {
+      return selectLatestParticipantTestStateLogs(
+        Array.from(state.participantTestLogs.values()).filter(
+          testLog =>
+            testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+        ),
+        logKeys
       );
     },
     async saveParticipantTestLogs(testLogs) {

@@ -1199,6 +1199,35 @@ const migrations: PostgresMigration[] = [
       ALTER TABLE admin_users
         ADD COLUMN IF NOT EXISTS password_change_required BOOLEAN NOT NULL DEFAULT FALSE;
     `
+  },
+  {
+    version: 41,
+    name: "index_participant_test_state_monitor_reads",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_test_logs (
+        participant_test_log_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        test_run_id TEXT NOT NULL,
+        unit_key TEXT,
+        original_unit_id TEXT,
+        log_key TEXT NOT NULL,
+        log_content TEXT NOT NULL,
+        timestamp BIGINT NOT NULL,
+        recorded_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_participant_test_logs_monitor_state
+        ON participant_test_logs (
+          tenant_id,
+          workspace_id,
+          log_key,
+          test_run_id,
+          timestamp DESC,
+          recorded_at DESC
+        )
+        WHERE unit_key IS NULL;
+    `
   }
 ];
 
@@ -2390,6 +2419,27 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
          WHERE tenant_id = $1 AND workspace_id = $2
          ORDER BY timestamp DESC, recorded_at DESC`,
         [tenantId, workspaceId],
+        mapParticipantTestLog
+      );
+    },
+    async listLatestParticipantTestStateLogsByWorkspace(
+      tenantId,
+      workspaceId,
+      logKeys
+    ) {
+      if (logKeys.length === 0) {
+        return [];
+      }
+      return many(
+        `SELECT DISTINCT ON (test_run_id, log_key)
+                participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+         FROM participant_test_logs
+         WHERE tenant_id = $1
+           AND workspace_id = $2
+           AND unit_key IS NULL
+           AND log_key = ANY($3::text[])
+         ORDER BY test_run_id, log_key, timestamp DESC, recorded_at DESC, participant_test_log_id DESC`,
+        [tenantId, workspaceId, logKeys],
         mapParticipantTestLog
       );
     },

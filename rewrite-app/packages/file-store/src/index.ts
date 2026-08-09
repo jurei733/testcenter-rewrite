@@ -2,7 +2,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { FirstSliceRepository } from "@testcenter-rewrite-app/application";
-import { defaultApplicationSettings } from "@testcenter-rewrite-app/domain";
+import {
+  defaultApplicationSettings,
+  selectLatestParticipantTestStateLogs
+} from "@testcenter-rewrite-app/domain";
 import type {
   AdminLoginAttempt,
   AdminAuditEvent,
@@ -788,6 +791,20 @@ export const createFileFirstSliceRepository = (
       return Object.values(state.participantTestLogs).filter(
         testLog =>
           testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+      );
+    },
+    async listLatestParticipantTestStateLogsByWorkspace(
+      tenantId,
+      workspaceId,
+      logKeys
+    ) {
+      const state = await getState();
+      return selectLatestParticipantTestStateLogs(
+        Object.values(state.participantTestLogs).filter(
+          testLog =>
+            testLog.tenantId === tenantId && testLog.workspaceId === workspaceId
+        ),
+        logKeys
       );
     },
     async saveParticipantTestLogs(testLogs) {

@@ -1024,6 +1024,32 @@ export type ParticipantTestLog = {
   recordedAt: string;
 };
 
+export const selectLatestParticipantTestStateLogs = (
+  testLogs: ParticipantTestLog[],
+  logKeys: readonly string[]
+): ParticipantTestLog[] => {
+  const allowedLogKeys = new Set(logKeys);
+  const latestLogs = new Map<string, ParticipantTestLog>();
+  for (const testLog of testLogs) {
+    if (testLog.unitKey !== null || !allowedLogKeys.has(testLog.logKey)) {
+      continue;
+    }
+    const stateKey = `${testLog.testRunId}\u0000${testLog.logKey}`;
+    const current = latestLogs.get(stateKey);
+    if (
+      !current ||
+      testLog.timestamp > current.timestamp ||
+      (testLog.timestamp === current.timestamp &&
+        (testLog.recordedAt > current.recordedAt ||
+          (testLog.recordedAt === current.recordedAt &&
+            testLog.participantTestLogId > current.participantTestLogId)))
+    ) {
+      latestLogs.set(stateKey, testLog);
+    }
+  }
+  return [...latestLogs.values()];
+};
+
 export type ParticipantTestLogEntryInput = {
   key: string;
   content?: string;
@@ -1098,6 +1124,8 @@ export type OpenMonitorRun = {
   bookletError: MonitorBookletError | null;
   bookletAssignmentKey: string;
   bookletStates: Record<string, string>;
+  /** Latest original-compatible, test-wide state values for monitor presentation. */
+  testState: Record<string, string>;
   status: TestRunStatus;
   locked?: boolean;
   currentUnitKey: string | null;

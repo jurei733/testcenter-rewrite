@@ -24,6 +24,7 @@ const createOpenRun = (
   bookletError: null,
   bookletAssignmentKey: "booklet:starter",
   bookletStates,
+  testState: {},
   status,
   currentUnitKey: "unit:one",
   activeTestletTimer: null,
@@ -154,5 +155,59 @@ test("monitor profiles filter runs by original booklet species", () => {
       run => run.loginKey
     ),
     ["matching-ui"]
+  );
+});
+
+test("monitor profiles filter the projected original test-state map", () => {
+  const error = createOpenRun("error-ui", "running");
+  error.testState = { CONTROLLER: "ERROR", CONNECTION: "LOST" };
+  const running = createOpenRun("running-ui", "running");
+  running.testState = { CONTROLLER: "RUNNING" };
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "testState",
+        value: "CONTROLLER",
+        subValue: "ERROR",
+        label: "Hide controller errors",
+        type: "equal",
+        not: false
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([error, running], profile).map(
+      run => run.loginKey
+    ),
+    ["running-ui"]
+  );
+});
+
+test("monitor profiles use the original derived super-state", () => {
+  const error = createOpenRun("error-ui", "running");
+  error.testState = { CONTROLLER: "ERROR" };
+  const running = createOpenRun("running-ui", "running");
+  running.testState = { CONTROLLER: "RUNNING" };
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "state",
+        value: "error",
+        subValue: null,
+        label: "Hide inactive state",
+        type: "equal",
+        not: false
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile([error, running], profile).map(
+      run => run.loginKey
+    ),
+    ["running-ui"]
   );
 });

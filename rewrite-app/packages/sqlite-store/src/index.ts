@@ -1273,6 +1273,35 @@ const sqliteMigrations: SqliteMigration[] = [
       ALTER TABLE admin_users
         ADD COLUMN password_change_required INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    version: 47,
+    name: "index_participant_test_state_monitor_reads",
+    sql: `
+      CREATE TABLE IF NOT EXISTS participant_test_logs (
+        participant_test_log_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        participant_session_id TEXT NOT NULL,
+        test_run_id TEXT NOT NULL,
+        unit_key TEXT,
+        original_unit_id TEXT,
+        log_key TEXT NOT NULL,
+        log_content TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        recorded_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_participant_test_logs_monitor_state
+        ON participant_test_logs (
+          tenant_id,
+          workspace_id,
+          log_key,
+          test_run_id,
+          timestamp DESC,
+          recorded_at DESC
+        )
+        WHERE unit_key IS NULL;
+    `
   }
 ];
 
@@ -2582,6 +2611,37 @@ export const createSqliteFirstSliceRepository = (
            ORDER BY timestamp DESC, recorded_at DESC`
         )
         .all(tenantId, workspaceId) as Record<string, unknown>[];
+      return rows
+        .map(row => mapParticipantTestLog(row))
+        .filter(Boolean) as ParticipantTestLog[];
+    },
+    async listLatestParticipantTestStateLogsByWorkspace(
+      tenantId,
+      workspaceId,
+      logKeys
+    ) {
+      if (logKeys.length === 0) {
+        return [];
+      }
+      const placeholders = logKeys.map(() => "?").join(", ");
+      const rows = database
+        .prepare(
+          `SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at
+           FROM (
+             SELECT participant_test_log_id, tenant_id, workspace_id, participant_session_id, test_run_id, unit_key, original_unit_id, log_key, log_content, timestamp, recorded_at,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY test_run_id, log_key
+                      ORDER BY timestamp DESC, recorded_at DESC, participant_test_log_id DESC
+                    ) AS state_rank
+             FROM participant_test_logs
+             WHERE tenant_id = ?
+               AND workspace_id = ?
+               AND unit_key IS NULL
+               AND log_key IN (${placeholders})
+           ) AS latest_test_state
+           WHERE state_rank = 1`
+        )
+        .all(tenantId, workspaceId, ...logKeys) as Record<string, unknown>[];
       return rows
         .map(row => mapParticipantTestLog(row))
         .filter(Boolean) as ParticipantTestLog[];

@@ -85,6 +85,43 @@ const sendJson = async (baseUrl, path, body) => {
   return payload;
 };
 
+const getJson = async (baseUrl, path) => {
+  const response = await fetch(`${baseUrl}${path}`);
+  const payload = await response.json();
+  assert.equal(
+    response.ok,
+    true,
+    `${path} returned HTTP ${response.status}: ${JSON.stringify(payload)}`
+  );
+  return payload;
+};
+
+const waitForControllerBadge = async (page, testRunId, controllerState) => {
+  try {
+    await page.waitForFunction(
+      ({ runId, expectedBadge }) =>
+        [...document.querySelectorAll("#openMonitorRunsCollection .record-card")]
+          .some(card => {
+            const text = card.textContent?.toLowerCase() ?? "";
+            return text.includes(runId.toLowerCase()) && text.includes(expectedBadge);
+          }),
+      {
+        runId: testRunId,
+        expectedBadge: `controller ${controllerState.toLowerCase()}`
+      },
+      { timeout: 15_000 }
+    );
+  } catch (error) {
+    const cardTexts = await page
+      .locator("#openMonitorRunsCollection .record-card")
+      .allTextContents();
+    throw new Error(
+      `Monitor card did not render CONTROLLER=${controllerState}: ${JSON.stringify(cardTexts)}`,
+      { cause: error }
+    );
+  }
+};
+
 await mkdir(dirname(sqliteFile), { recursive: true });
 await removeSqliteFiles();
 const port = await allocatePort();
@@ -186,6 +223,47 @@ try {
     .locator("#openMonitorRunsCollection .record-card")
     .filter({ hasText: testRunId });
   await openRunCard.waitFor({ timeout: 15_000 });
+  const controllerErrorAt = Date.now() + 1_000;
+  await sendJson(
+    baseUrl,
+    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
+    {
+      deliveryId: `monitor-controller-error:${testRunId}`,
+      logs: [{
+        entries: [{
+          key: "CONTROLLER",
+          content: "ERROR",
+          timeStamp: controllerErrorAt
+        }]
+      }]
+    }
+  );
+  const errorOpenRuns = await getJson(
+    baseUrl,
+    `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?testRunId=${encodeURIComponent(testRunId)}`
+  );
+  assert.equal(errorOpenRuns.items?.[0]?.testState?.CONTROLLER, "ERROR");
+  await waitForControllerBadge(operatorPage, testRunId, "ERROR");
+  await sendJson(
+    baseUrl,
+    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
+    {
+      deliveryId: `monitor-controller-recovery:${testRunId}`,
+      logs: [{
+        entries: [{
+          key: "CONTROLLER",
+          content: "RUNNING",
+          timeStamp: controllerErrorAt + 1
+        }]
+      }]
+    }
+  );
+  const recoveredOpenRuns = await getJson(
+    baseUrl,
+    `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?testRunId=${encodeURIComponent(testRunId)}`
+  );
+  assert.equal(recoveredOpenRuns.items?.[0]?.testState?.CONTROLLER, "RUNNING");
+  await waitForControllerBadge(operatorPage, testRunId, "RUNNING");
   await openRunCard.getByRole("button", { name: "Add to Batch" }).click();
   const completeButton = operatorPage.locator("#monitorBatchCompleteButton");
   await operatorPage.waitForFunction(
@@ -214,7 +292,7 @@ try {
     .waitFor({ timeout: 15_000 });
 
   process.stdout.write(
-    `Participant monitor live pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
+    `Participant monitor live controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
   );
 } catch (error) {
   if (serverOutput) {

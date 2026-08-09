@@ -2156,11 +2156,26 @@ test("platform admin role changes require acting-password confirmation", async (
 });
 
 test("admin sign-in uses the original persistent login sink", async () => {
-  const isolated = await createIsolatedServer({
-    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_ADMIN_LOGIN_MAX_FAILURES: "2",
     FIRST_SLICE_ADMIN_LOGIN_FAILURE_WINDOW_MS: "500"
-  });
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.admin-login-sink`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.admin-login-sink.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
 
   try {
     const config = await requestJsonAt<{
@@ -6772,11 +6787,11 @@ test("local demo bootstrap seeds a directly usable app state", async () => {
     assert.equal(openRunsCsv.contentType, "text/csv; charset=utf-8");
     assert.match(
       openRunsCsv.body,
-      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+      /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
     );
     assert.match(
       openRunsCsv.body,
-      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","","booklet:demo","\{\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
+      /"demo-tenant","demo-workspace","[^"]+","[^"]+","student-demo","group:student-demo","run-hot-return","booklet:demo","Demo Booklet","species: 0","","booklet:demo","\{\}","\{""CONTROLLER"":""RUNNING"",""CURRENT_UNIT_ID"":""unit-practice""\}","running","false","unit-practice","Practice","","","","[^"]+","booklet:demo","Demo Student"/
     );
     assert.equal(openRunsCsv.body.trim().split("\n").length, 2);
     assert.match(
@@ -21171,6 +21186,55 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   );
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.expiresAt, null);
 
+  const controllerErrorAt = Date.now() + 1_000;
+  const savedMonitorTestState = await requestJson<{ savedCount: number }>(
+    `/api/v1/participant/test-runs/${testRunId}/test-logs`,
+    {
+      method: "POST",
+      body: {
+        deliveryId: `monitor-test-state-error:${testRunId}`,
+        logs: [
+          {
+            entries: [
+              {
+                key: "CONTROLLER",
+                content: "ERROR",
+                timeStamp: controllerErrorAt
+              },
+              {
+                key: "CONTROLLER",
+                content: "RUNNING",
+                timeStamp: controllerErrorAt - 1
+              },
+              {
+                key: "CONNECTION",
+                content: "LOST",
+                timeStamp: controllerErrorAt
+              },
+              {
+                key: "UNBOUNDED_CLIENT_KEY",
+                content: "must-not-project",
+                timeStamp: controllerErrorAt
+              }
+            ]
+          },
+          {
+            unitKey: "UNIT.TIMED",
+            entries: [
+              {
+                key: "CONTROLLER",
+                content: "RUNNING",
+                timeStamp: controllerErrorAt + 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(savedMonitorTestState.status, 200);
+  assert.equal(savedMonitorTestState.body.savedCount, 5);
+
   const openRunsWithTimer = await requestJson<{
     items: Array<{
       testRunId: string;
@@ -21180,6 +21244,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       currentUnitLabel: string | null;
       currentBlockKey: string | null;
       currentBlockLabel: string | null;
+      testState: Record<string, string>;
       blockNavigationTargets: Array<{
         blockKey: string;
         targetUnitKey: string;
@@ -21208,6 +21273,17 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${testRunId}`
   );
   assert.equal(openRunsWithTimer.status, 200);
+  assert.equal(
+    openRunsWithTimer.body.items[0]?.testState.CONTROLLER,
+    "ERROR",
+    "The newest test-wide controller state must win over older and unit-scoped values."
+  );
+  assert.equal(openRunsWithTimer.body.items[0]?.testState.CONNECTION, "LOST");
+  assert.equal(
+    openRunsWithTimer.body.items[0]?.testState.UNBOUNDED_CLIENT_KEY,
+    undefined,
+    "Arbitrary client log keys must not inflate the live monitor read model."
+  );
   assert.deepEqual(
     {
       bookletLabel: openRunsWithTimer.body.items[0]?.bookletLabel,
@@ -21272,6 +21348,34 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   );
   assert.match(monitorTimer.updatedAt, ISO_DATE_REGEX);
 
+  const savedControllerRecovery = await requestJson<{ savedCount: number }>(
+    `/api/v1/participant/test-runs/${testRunId}/test-logs`,
+    {
+      method: "POST",
+      body: {
+        deliveryId: `monitor-test-state-recovery:${testRunId}`,
+        logs: [{
+          entries: [{
+            key: "CONTROLLER",
+            content: "RUNNING",
+            timeStamp: controllerErrorAt + 1
+          }]
+        }]
+      }
+    }
+  );
+  assert.equal(savedControllerRecovery.status, 200);
+  assert.equal(savedControllerRecovery.body.savedCount, 1);
+  const openRunsAfterControllerRecovery = await requestJson<{
+    items: Array<{ testState: Record<string, string> }>;
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/monitor/open-runs?testRunId=${testRunId}`
+  );
+  assert.equal(
+    openRunsAfterControllerRecovery.body.items[0]?.testState.CONTROLLER,
+    "RUNNING"
+  );
+
   const studyMonitorRunWithTimer = await requestJson<{
     studyMonitorRun: {
       testletTimers: Array<typeof monitorTimer>;
@@ -21291,9 +21395,10 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(openRunsTimerCsv.status, 200);
   assert.match(
     openRunsTimerCsv.body,
-    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
+    /^tenantKey,workspaceKey,participantSessionId,testRunId,loginKey,groupKey,executionMode,bookletKey,bookletLabel,bookletSpecies,bookletError,bookletAssignmentKey,bookletStates,testState,status,locked,currentUnitKey,currentUnitLabel,currentBlockKey,currentBlockLabel,activeTestletTimer,updatedAt,rosterBookletKey,rosterDisplayName\n/
   );
   assert.match(openRunsTimerCsv.body, /Timed Block/);
+  assert.match(openRunsTimerCsv.body, /CONTROLLER.*RUNNING/);
 
   const studyMonitorTimerCsv = await requestText(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/exports/study-monitor-runs/${testRunId}.csv`
@@ -32663,13 +32768,28 @@ test("participant access windows enforce Original Testcenter timing semantics", 
 });
 
 test("password-protected participant logins use a shared persistent login sink", async () => {
-  const isolated = await createIsolatedServer({
-    FIRST_SLICE_STORE: process.env.FIRST_SLICE_STORE ?? "memory",
+  const requestedStore = process.env.FIRST_SLICE_STORE;
+  const isolatedStore = requestedStore === "file" || requestedStore === "sqlite"
+    ? requestedStore
+    : "memory";
+  const isolatedEnvironment: Record<string, string> = {
+    FIRST_SLICE_STORE: isolatedStore,
     FIRST_SLICE_BOOTSTRAP_DEMO: "true",
     FIRST_SLICE_OPERATOR_AUTH_REQUIRED: "false",
     FIRST_SLICE_PARTICIPANT_LOGIN_MAX_FAILURES: "2",
     FIRST_SLICE_PARTICIPANT_LOGIN_FAILURE_WINDOW_MS: "500"
-  });
+  };
+  if (isolatedStore === "file") {
+    isolatedEnvironment.FIRST_SLICE_FILE = `${
+      process.env.FIRST_SLICE_FILE ?? ".data/first-slice.json"
+    }.${process.pid}.participant-login-sink`;
+  }
+  if (isolatedStore === "sqlite") {
+    isolatedEnvironment.FIRST_SLICE_SQLITE_FILE = `${
+      process.env.FIRST_SLICE_SQLITE_FILE ?? ".data/first-slice.sqlite"
+    }.${process.pid}.participant-login-sink.sqlite`;
+  }
+  const isolated = await createIsolatedServer(isolatedEnvironment);
 
   try {
     const config = await requestJsonAt<{
