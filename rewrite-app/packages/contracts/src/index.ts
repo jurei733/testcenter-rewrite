@@ -2524,6 +2524,9 @@ export type CreateAdminUserRequest = {
 export type UpdateAdminUserRequest = {
   displayName?: string;
   status?: AdminUserStatus;
+  validFrom?: string | null;
+  validTo?: string | null;
+  validForMinutes?: number | null;
 };
 
 export type ResetAdminUserPasswordRequest = {

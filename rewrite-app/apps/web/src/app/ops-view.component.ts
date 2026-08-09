@@ -487,6 +487,30 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <div class="actions">
           <button id="adminUpdateDisplayNameButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserDisplayName" (click)="view.confirmUpdateAdminUserDisplayName()">Update Display Name</button>
         </div>
+
+        <div class="form-grid">
+          <label>
+            Access Window Target Admin User ID
+            <input id="adminAccessWindowTargetUserId" name="adminAccessWindowTargetUserId" placeholder="Select an admin user below" [(ngModel)]="view.adminAccessWindowTargetUserId" />
+          </label>
+          <label>
+            Access Starts
+            <input id="adminAccessWindowValidFrom" name="adminAccessWindowValidFrom" placeholder="2026-08-01T08:00:00Z" [(ngModel)]="view.adminAccessWindowValidFromDraft" />
+          </label>
+          <label>
+            Access Ends
+            <input id="adminAccessWindowValidTo" name="adminAccessWindowValidTo" placeholder="2026-08-31T18:00:00Z" [(ngModel)]="view.adminAccessWindowValidToDraft" />
+          </label>
+          <label>
+            Valid For Minutes After First Sign-In
+            <input id="adminAccessWindowValidForMinutes" name="adminAccessWindowValidForMinutes" type="number" min="1" max="5256000" step="1" [(ngModel)]="view.adminAccessWindowValidForMinutesDraft" />
+          </label>
+        </div>
+        <p id="adminAccessWindowValidationError" *ngIf="!view.isAdminAccessWindowUpdateValid" role="alert">Use valid timestamps, keep the start before the end, and enter 1–5256000 whole minutes or leave a field empty.</p>
+        <p>Empty fields clear their boundary. Active sessions are ended or shortened when they fall outside the confirmed window.</p>
+        <div class="actions">
+          <button id="adminUpdateAccessWindowButton" class="ghost" type="button" [disabled]="!view.canUpdateAdminUserAccessWindow" (click)="view.confirmUpdateAdminUserAccessWindow()">Update Access Window</button>
+        </div>
       </article>
 
       <ng-container *ngIf="view.isCreatingMonitorAccount || view.isAssigningMonitorRole">

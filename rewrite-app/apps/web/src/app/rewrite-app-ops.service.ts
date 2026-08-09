@@ -487,8 +487,12 @@ export class RewriteAppOpsService {
           ) ?? {},
         validFrom: this.opsState.adminCreateValidFrom.trim() || undefined,
         validTo: this.opsState.adminCreateValidTo.trim() || undefined,
-        validForMinutes: this.opsState.adminCreateValidForMinutes.trim()
-          ? Number(this.opsState.adminCreateValidForMinutes.trim())
+        validForMinutes: String(
+          this.opsState.adminCreateValidForMinutes ?? ""
+        ).trim()
+          ? Number(
+              String(this.opsState.adminCreateValidForMinutes ?? "").trim()
+            )
           : undefined,
         roleAssignments: [
           this.createRoleAssignmentRequest(
@@ -693,6 +697,41 @@ export class RewriteAppOpsService {
     this.feedback.rememberActivity(
       "Admin Display Name Updated",
       `${payload.adminUser.username} is now shown as ${payload.adminUser.displayName}.`
+    );
+    await this.refreshAdminUsers();
+  }
+
+  async updateAdminUserAccessWindow(
+    adminUserId: string,
+    validFrom: string,
+    validTo: string,
+    validForMinutes: string
+  ): Promise<void> {
+    if (!this.hasAdminSession()) {
+      return;
+    }
+    const normalizedValidFrom = validFrom.trim();
+    const normalizedValidTo = validTo.trim();
+    const normalizedValidForMinutes = validForMinutes.trim();
+    const payload = await this.requestState.request<UpdateAdminUserResponse>(
+      "Update Admin User Access Window",
+      "PATCH",
+      resolveRoutePath(productionApiRoutes.admin.updateUser, {
+        adminUserId: adminUserId.trim()
+      }),
+      {
+        validFrom: normalizedValidFrom || null,
+        validTo: normalizedValidTo || null,
+        validForMinutes: normalizedValidForMinutes
+          ? Number(normalizedValidForMinutes)
+          : null
+      } satisfies UpdateAdminUserRequest,
+      { headers: this.createAdminHeaders() }
+    );
+
+    this.feedback.rememberActivity(
+      "Admin Access Window Updated",
+      `${payload.adminUser.username} now uses the confirmed access boundaries.`
     );
     await this.refreshAdminUsers();
   }

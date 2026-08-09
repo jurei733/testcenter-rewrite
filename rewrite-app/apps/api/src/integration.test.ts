@@ -1064,6 +1064,25 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "admin_access_window_invalid"
   );
 
+  const invalidAdminAccessWindowUpdate = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`,
+    {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        validFrom: "2999-01-02T00:00:00.000Z",
+        validTo: "2999-01-01T00:00:00.000Z"
+      }
+    }
+  );
+  assert.equal(invalidAdminAccessWindowUpdate.status, 400);
+  assert.equal(
+    invalidAdminAccessWindowUpdate.body.error,
+    "admin_access_window_invalid"
+  );
+
   const futureAccessAdmin = await requestJson<{
     adminUser: { validFrom: string | null; firstSignedInAt: string | null };
   }>("/api/v1/admin/users", {
@@ -1548,6 +1567,75 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(changedPasswordSignIn.status, 200);
   assert.equal(changedPasswordSignIn.body.adminUser.passwordChangeRequired, false);
 
+  const scheduledAdminUser = await requestJson<{
+    adminUser: {
+      validFrom: string | null;
+      validTo: string | null;
+      validForMinutes: number | null;
+    };
+  }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`, {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      validFrom: "2999-01-01T00:00:00.000Z",
+      validForMinutes: 45
+    }
+  });
+  assert.equal(scheduledAdminUser.status, 200);
+  assert.equal(
+    scheduledAdminUser.body.adminUser.validFrom,
+    "2999-01-01T00:00:00.000Z"
+  );
+  assert.equal(scheduledAdminUser.body.adminUser.validTo, null);
+  assert.equal(scheduledAdminUser.body.adminUser.validForMinutes, 45);
+
+  const scheduledAdminCurrentSession = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/current-session",
+    {
+      headers: {
+        authorization: `Bearer ${changedPasswordSignIn.body.sessionToken}`
+      }
+    }
+  );
+  assert.equal(scheduledAdminCurrentSession.status, 401);
+  assert.equal(scheduledAdminCurrentSession.body.error, "admin_session_invalid");
+
+  const restoredAdminAccessWindow = await requestJson<{
+    adminUser: {
+      validFrom: string | null;
+      validTo: string | null;
+      validForMinutes: number | null;
+    };
+  }>(`/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}`, {
+    method: "PATCH",
+    headers: {
+      authorization: `Bearer ${signIn.body.sessionToken}`
+    },
+    body: {
+      validFrom: null,
+      validTo: null,
+      validForMinutes: null
+    }
+  });
+  assert.equal(restoredAdminAccessWindow.status, 200);
+  assert.equal(restoredAdminAccessWindow.body.adminUser.validFrom, null);
+  assert.equal(restoredAdminAccessWindow.body.adminUser.validTo, null);
+  assert.equal(restoredAdminAccessWindow.body.adminUser.validForMinutes, null);
+
+  const accessWindowRestoredSignIn = await requestJson<{
+    sessionToken: string;
+    adminSession: { adminSessionId: string };
+  }>("/api/v1/admin/auth/sign-in", {
+    method: "POST",
+    body: {
+      username: "workspace.admin",
+      password: "workspace-secret-final"
+    }
+  });
+  assert.equal(accessWindowRestoredSignIn.status, 200);
+
   const selfDisable = await requestJson<{ error: string }>(
     `/api/v1/admin/users/${bootstrap.body.adminUser.adminUserId}`,
     {
@@ -1586,7 +1674,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "/api/v1/admin/auth/current-session",
     {
       headers: {
-        authorization: `Bearer ${changedPasswordSignIn.body.sessionToken}`
+        authorization: `Bearer ${accessWindowRestoredSignIn.body.sessionToken}`
       }
     }
   );
@@ -1607,7 +1695,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     disabledAdminRevokedSessions.body.items.some(
       item =>
         item.adminSession.adminSessionId ===
-          changedPasswordSignIn.body.adminSession.adminSessionId &&
+          accessWindowRestoredSignIn.body.adminSession.adminSessionId &&
         item.status === "revoked"
     ),
     true
@@ -1780,6 +1868,22 @@ test("admin bootstrap and bearer session lifecycle", async () => {
         item.eventType === "admin_user_updated" &&
         item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
         item.summary.includes("workspace.admin") &&
+        item.details["revokedSessionCount"] === 1 &&
+        Array.isArray(item.details["revokedSessionIds"]) &&
+        item.details["revokedSessionIds"].includes(
+          accessWindowRestoredSignIn.body.adminSession.adminSessionId
+        )
+    ),
+    true
+  );
+  assert.equal(
+    adminAuditEvents.body.items.some(
+      item =>
+        item.eventType === "admin_user_updated" &&
+        item.subjectAdminUserId === createdAdminUser.body.adminUser.adminUserId &&
+        item.details["previousValidFrom"] === null &&
+        item.details["nextValidFrom"] === "2999-01-01T00:00:00.000Z" &&
+        item.details["nextValidForMinutes"] === 45 &&
         item.details["revokedSessionCount"] === 1 &&
         Array.isArray(item.details["revokedSessionIds"]) &&
         item.details["revokedSessionIds"].includes(

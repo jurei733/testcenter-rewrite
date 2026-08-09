@@ -408,6 +408,16 @@ mutation preserves username, status, roles, and sessions, refreshes the
 directory, and records the previous and next values in the admin audit trail.
 A protected production Chromium/SQLite gate proves the complete handoff.
 
+Administrative access windows now have the same post-creation lifecycle as
+the other account attributes. A scoped administrator can hydrate, validate,
+replace, or explicitly clear absolute start/end boundaries and the relative
+first-sign-in duration from the Angular directory. The server preserves omitted
+fields, audits every previous/next boundary, revokes active sessions when the
+new window is already unavailable, and shortens sessions that extend past a new
+effective end without extending sessions when a boundary is relaxed. API and
+protected production Chromium/SQLite gates prove invalid-order rejection,
+scheduled-login denial, active-session invalidation, and boundary clearing.
+
 All administrator password mutation paths now enforce the shared 8–60
 character policy. The 60-character ceiling preserves the original
 Testcenter's protection against excessively expensive password hashing while

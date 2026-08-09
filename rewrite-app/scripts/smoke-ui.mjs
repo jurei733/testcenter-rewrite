@@ -2317,6 +2317,10 @@ try {
   await fillAndCommit("#adminStatusTargetUserId", "");
   await fillAndCommit("#adminDisplayNameTargetUserId", "");
   await fillAndCommit("#adminDisplayNameUpdateDraft", "");
+  await fillAndCommit("#adminAccessWindowTargetUserId", "");
+  await fillAndCommit("#adminAccessWindowValidFrom", "");
+  await fillAndCommit("#adminAccessWindowValidTo", "");
+  await fillAndCommit("#adminAccessWindowValidForMinutes", "");
   assert.equal(
     await page.locator("#adminCreatePassword").getAttribute("minlength"),
     "8"
@@ -3148,6 +3152,121 @@ try {
     .filter({ hasText: delegatedWorkspaceAdminRenamedDisplayName })
     .waitFor();
   stopAfter("admin-user-display-name");
+
+  await expectInputValue(
+    "#adminAccessWindowTargetUserId",
+    delegatedDisplayNameTargetUserId
+  );
+  await expectInputValue("#adminAccessWindowValidFrom", "");
+  await expectInputValue("#adminAccessWindowValidTo", "");
+  await expectInputValue("#adminAccessWindowValidForMinutes", "");
+  await fillAndCommit(
+    "#adminAccessWindowValidFrom",
+    "2999-01-02T00:00:00.000Z"
+  );
+  await fillAndCommit(
+    "#adminAccessWindowValidTo",
+    "2999-01-01T00:00:00.000Z"
+  );
+  await expectButtonSelectorDisabled("#adminUpdateAccessWindowButton");
+  await fillAndCommit(
+    "#adminAccessWindowValidFrom",
+    "2999-01-01T00:00:00.000Z"
+  );
+  await fillAndCommit("#adminAccessWindowValidTo", "");
+  await fillAndCommit("#adminAccessWindowValidForMinutes", "45");
+  await expectButtonSelectorEnabled("#adminUpdateAccessWindowButton");
+  logStep("admin-user-access-window");
+  const scheduleAdminAccessDialog = acceptNextDialog(
+    new RegExp(
+      `Update admin user '${delegatedDisplayNameTargetUserId}' access window\\? Active sessions outside the new boundary will be ended\\.`
+    )
+  );
+  const scheduleAdminAccessResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "PATCH" &&
+      /\/api\/v1\/admin\/users\/[^/]+$/.test(new URL(response.url()).pathname)
+  );
+  await page.locator("#adminUpdateAccessWindowButton").click();
+  await scheduleAdminAccessDialog;
+  assert.equal((await scheduleAdminAccessResponsePromise).status(), 200);
+  await waitForNotBusy("admin-user-access-window-schedule");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedWorkspaceAdminUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedWorkspaceAdminUsername &&
+          item?.adminUser?.validFrom === "2999-01-01T00:00:00.000Z" &&
+          item?.adminUser?.validTo === null &&
+          item?.adminUser?.validForMinutes === 45
+      )
+  );
+  const scheduledAdminSignInResponse = await fetch(
+    `${baseUrl}/api/v1/admin/auth/sign-in`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        username: delegatedWorkspaceAdminUsername,
+        password: delegatedWorkspaceAdminPassword
+      })
+    }
+  );
+  assert.equal(scheduledAdminSignInResponse.status, 403);
+  assert.equal(
+    (await scheduledAdminSignInResponse.json()).error,
+    "admin_access_not_started"
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/audit-events?eventType=admin_user_updated&subjectAdminUserId=${delegatedDisplayNameTargetUserId}&limit=10`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.details?.previousValidFrom === null &&
+          item?.details?.nextValidFrom === "2999-01-01T00:00:00.000Z" &&
+          item?.details?.nextValidForMinutes === 45
+      )
+  );
+  await fillAndCommit("#adminAccessWindowValidFrom", "");
+  await fillAndCommit("#adminAccessWindowValidTo", "");
+  await fillAndCommit("#adminAccessWindowValidForMinutes", "");
+  await expectButtonSelectorEnabled("#adminUpdateAccessWindowButton");
+  const clearAdminAccessDialog = acceptNextDialog(
+    new RegExp(
+      `Update admin user '${delegatedDisplayNameTargetUserId}' access window\\? Active sessions outside the new boundary will be ended\\.`
+    )
+  );
+  const clearAdminAccessResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === "PATCH" &&
+      /\/api\/v1\/admin\/users\/[^/]+$/.test(new URL(response.url()).pathname)
+  );
+  await page.locator("#adminUpdateAccessWindowButton").click();
+  await clearAdminAccessDialog;
+  assert.equal((await clearAdminAccessResponsePromise).status(), 200);
+  await waitForNotBusy("admin-user-access-window-clear");
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/admin/users?username=${delegatedWorkspaceAdminUsername}`,
+    payload =>
+      typeof payload === "object" &&
+      payload != null &&
+      Array.isArray(payload.items) &&
+      payload.items.some(
+        item =>
+          item?.adminUser?.username === delegatedWorkspaceAdminUsername &&
+          item?.adminUser?.validFrom === null &&
+          item?.adminUser?.validTo === null &&
+          item?.adminUser?.validForMinutes === null
+      )
+  );
+  stopAfter("admin-user-access-window");
 
   await clickAction("Sign Out");
   await fillAndCommitUntilValue(

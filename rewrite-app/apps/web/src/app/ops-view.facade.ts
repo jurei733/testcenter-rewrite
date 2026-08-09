@@ -229,6 +229,10 @@ export class OpsViewFacade {
   adminResetPasswordConfirmation = "";
   adminDisplayNameTargetUserId = "";
   adminDisplayNameUpdateDraft = "";
+  adminAccessWindowTargetUserId = "";
+  adminAccessWindowValidFromDraft = "";
+  adminAccessWindowValidToDraft = "";
+  adminAccessWindowValidForMinutesDraft = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -442,9 +446,21 @@ export class OpsViewFacade {
   }
 
   get isAdminCreateAccessWindowValid(): boolean {
-    const validFrom = this.ops.adminCreateValidFrom.trim();
-    const validTo = this.ops.adminCreateValidTo.trim();
-    const validForMinutes = this.ops.adminCreateValidForMinutes.trim();
+    return this.isAdminAccessWindowValid(
+      this.ops.adminCreateValidFrom,
+      this.ops.adminCreateValidTo,
+      this.ops.adminCreateValidForMinutes
+    );
+  }
+
+  private isAdminAccessWindowValid(
+    validFromInput: unknown,
+    validToInput: unknown,
+    validForMinutesInput: unknown
+  ): boolean {
+    const validFrom = String(validFromInput ?? "").trim();
+    const validTo = String(validToInput ?? "").trim();
+    const validForMinutes = String(validForMinutesInput ?? "").trim();
     const parsedValidFrom = validFrom === "" ? null : Date.parse(validFrom);
     const parsedValidTo = validTo === "" ? null : Date.parse(validTo);
 
@@ -720,6 +736,23 @@ export class OpsViewFacade {
     );
   }
 
+  get isAdminAccessWindowUpdateValid(): boolean {
+    return this.isAdminAccessWindowValid(
+      this.adminAccessWindowValidFromDraft,
+      this.adminAccessWindowValidToDraft,
+      this.adminAccessWindowValidForMinutesDraft
+    );
+  }
+
+  get canUpdateAdminUserAccessWindow(): boolean {
+    return (
+      this.canUseAdminManagement &&
+      this.canUseAdminSession &&
+      this.adminAccessWindowTargetUserId.trim() !== "" &&
+      this.isAdminAccessWindowUpdateValid
+    );
+  }
+
   private isAdminPasswordValid(password: string): boolean {
     return (
       password.length >= adminPasswordPolicy.minimumLength &&
@@ -976,6 +1009,10 @@ export class OpsViewFacade {
     this.adminResetPasswordConfirmation = "";
     this.adminDisplayNameTargetUserId = "";
     this.adminDisplayNameUpdateDraft = "";
+    this.adminAccessWindowTargetUserId = "";
+    this.adminAccessWindowValidFromDraft = "";
+    this.adminAccessWindowValidToDraft = "";
+    this.adminAccessWindowValidForMinutesDraft = "";
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -1162,6 +1199,34 @@ export class OpsViewFacade {
       await this.opsService.updateAdminUserDisplayName(adminUserId, displayName);
       this.adminDisplayNameUpdateDraft = displayName;
     });
+  }
+
+  confirmUpdateAdminUserAccessWindow(): void {
+    const adminUserId = this.adminAccessWindowTargetUserId.trim();
+    if (!this.canUpdateAdminUserAccessWindow || !adminUserId) {
+      return;
+    }
+    const validFrom = String(
+      this.adminAccessWindowValidFromDraft ?? ""
+    ).trim();
+    const validTo = String(this.adminAccessWindowValidToDraft ?? "").trim();
+    const validForMinutes = String(
+      this.adminAccessWindowValidForMinutesDraft ?? ""
+    ).trim();
+    const confirmed = globalThis.window?.confirm(
+      `Update admin user '${adminUserId}' access window? Active sessions outside the new boundary will be ended.`
+    );
+    if (!confirmed) {
+      return;
+    }
+    this.viewState.onActionAsync(() =>
+      this.opsService.updateAdminUserAccessWindow(
+        adminUserId,
+        validFrom,
+        validTo,
+        validForMinutes
+      )
+    );
   }
 
   confirmUpdateAdminUserBatchStatus(): void {
@@ -1473,6 +1538,13 @@ export class OpsViewFacade {
     this.adminDisplayNameTargetUserId = adminUserId;
     this.adminDisplayNameUpdateDraft =
       item.actionPayload?.adminUserDisplayName ?? "";
+    this.adminAccessWindowTargetUserId = adminUserId;
+    this.adminAccessWindowValidFromDraft =
+      item.actionPayload?.adminUserValidFrom ?? "";
+    this.adminAccessWindowValidToDraft =
+      item.actionPayload?.adminUserValidTo ?? "";
+    this.adminAccessWindowValidForMinutesDraft =
+      item.actionPayload?.adminUserValidForMinutes ?? "";
     this.ops.adminRevokeRoleAssignmentId =
       item.actionPayload?.roleAssignmentId ??
       this.ops.adminRevokeRoleAssignmentId;
@@ -2055,13 +2127,18 @@ export class OpsViewFacade {
           item.adminUser.adminUserId === this.ops.adminRoleTargetUserId ||
           item.adminUser.adminUserId === this.ops.adminRevokeTargetUserId ||
           item.adminUser.adminUserId === this.ops.adminStatusTargetUserId ||
-          item.adminUser.adminUserId === this.adminDisplayNameTargetUserId,
+          item.adminUser.adminUserId === this.adminDisplayNameTargetUserId ||
+          item.adminUser.adminUserId === this.adminAccessWindowTargetUserId,
         actionLabel: "Use For Admin Actions",
         actionPayload: {
           adminUserId: item.adminUser.adminUserId,
           roleAssignmentId: item.roleAssignments[0]?.roleAssignmentId ?? "",
           adminUserStatus: item.adminUser.status,
-          adminUserDisplayName: item.adminUser.displayName
+          adminUserDisplayName: item.adminUser.displayName,
+          adminUserValidFrom: item.adminUser.validFrom ?? "",
+          adminUserValidTo: item.adminUser.validTo ?? "",
+          adminUserValidForMinutes:
+            item.adminUser.validForMinutes?.toString() ?? ""
         },
         actions:
           item.adminUser.adminUserId === this.currentAdminUserId

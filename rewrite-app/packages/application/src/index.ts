@@ -946,6 +946,9 @@ export type AdminDirectoryPort = {
     adminUserId: string;
     displayName?: string;
     status?: AdminUserStatus;
+    validFrom?: string | null;
+    validTo?: string | null;
+    validForMinutes?: number | null;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   deleteAdminUser(input: {
     sessionToken: string;
@@ -21782,6 +21785,28 @@ export const createFirstSliceServices = (
           input.status === undefined
             ? adminUser.status
             : normalizeAdminUserStatus(input.status);
+        const accessWindowUpdateRequested =
+          input.validFrom !== undefined ||
+          input.validTo !== undefined ||
+          input.validForMinutes !== undefined;
+        const nextAccessWindow = accessWindowUpdateRequested
+          ? normalizeAdminAccessWindow({
+              validFrom:
+                input.validFrom === undefined
+                  ? adminUser.validFrom
+                  : input.validFrom,
+              validTo:
+                input.validTo === undefined ? adminUser.validTo : input.validTo,
+              validForMinutes:
+                input.validForMinutes === undefined
+                  ? adminUser.validForMinutes
+                  : input.validForMinutes
+            })
+          : {
+              validFrom: adminUser.validFrom,
+              validTo: adminUser.validTo,
+              validForMinutes: adminUser.validForMinutes
+            };
         if (
           nextStatus === "disabled" &&
           adminUser.adminUserId === currentSession.adminUser.adminUserId
@@ -21799,23 +21824,55 @@ export const createFirstSliceServices = (
             input.displayName === undefined
               ? adminUser.displayName
               : normalizeAdminDisplayName(input.displayName, adminUser.username),
-          status: nextStatus
+          status: nextStatus,
+          ...nextAccessWindow
         };
         await repository.saveAdminUser(updatedAdminUser);
 
         const revokedSessionIds: string[] = [];
-        if (nextStatus === "disabled") {
-          const revokedAt = now();
+        const shortenedSessionIds: string[] = [];
+        const accessWindowChanged =
+          adminUser.validFrom !== updatedAdminUser.validFrom ||
+          adminUser.validTo !== updatedAdminUser.validTo ||
+          adminUser.validForMinutes !== updatedAdminUser.validForMinutes;
+        if (nextStatus === "disabled" || accessWindowChanged) {
+          const sessionBoundaryTimestamp = now();
+          const accessFailureReason = accessWindowChanged
+            ? resolveAdminAccessFailureReason(
+                updatedAdminUser,
+                sessionBoundaryTimestamp
+              )
+            : null;
+          const accessValidUntil = accessWindowChanged
+            ? resolveAdminAccessValidUntil(updatedAdminUser)
+            : null;
           for (const adminSession of await repository.listAdminSessions()) {
             if (
               adminSession.adminUserId !== updatedAdminUser.adminUserId ||
-              resolveAdminSessionStatus(adminSession, revokedAt) !== "active"
+              resolveAdminSessionStatus(
+                adminSession,
+                sessionBoundaryTimestamp
+              ) !== "active"
             ) {
+              continue;
+            }
+            if (nextStatus !== "disabled" && !accessFailureReason) {
+              if (
+                !accessValidUntil ||
+                Date.parse(accessValidUntil) >= Date.parse(adminSession.expiresAt)
+              ) {
+                continue;
+              }
+              await repository.saveAdminSession({
+                ...adminSession,
+                expiresAt: accessValidUntil
+              });
+              shortenedSessionIds.push(adminSession.adminSessionId);
               continue;
             }
             await repository.saveAdminSession({
               ...adminSession,
-              revokedAt
+              revokedAt: sessionBoundaryTimestamp
             });
             revokedSessionIds.push(adminSession.adminSessionId);
           }
@@ -21836,8 +21893,16 @@ export const createFirstSliceServices = (
             nextDisplayName: updatedAdminUser.displayName,
             previousStatus: adminUser.status,
             nextStatus: updatedAdminUser.status,
+            previousValidFrom: adminUser.validFrom,
+            nextValidFrom: updatedAdminUser.validFrom,
+            previousValidTo: adminUser.validTo,
+            nextValidTo: updatedAdminUser.validTo,
+            previousValidForMinutes: adminUser.validForMinutes,
+            nextValidForMinutes: updatedAdminUser.validForMinutes,
             revokedSessionCount: revokedSessionIds.length,
-            revokedSessionIds
+            revokedSessionIds,
+            shortenedSessionCount: shortenedSessionIds.length,
+            shortenedSessionIds
           }
         });
 

@@ -4423,7 +4423,10 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           sessionToken,
           adminUserId,
           displayName: body.displayName,
-          status: body.status
+          status: body.status,
+          validFrom: body.validFrom,
+          validTo: body.validTo,
+          validForMinutes: body.validForMinutes
         });
         sendJson<UpdateAdminUserResponse>(
           response,
