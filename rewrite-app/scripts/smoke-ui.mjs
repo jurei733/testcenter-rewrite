@@ -12021,6 +12021,16 @@ try {
     .locator("#monitorBatchSelectionStatus")
     .filter({ hasText: "UI Alle 1 run / 1 booklet selected" })
     .waitFor();
+  await page.locator("#invertVisibleMonitorRunSelectionButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI No Runs Selected" })
+    .waitFor();
+  await page.locator("#invertVisibleMonitorRunSelectionButton").click();
+  await page
+    .locator("#monitorBatchSelectionStatus")
+    .filter({ hasText: "UI Alle 1 run / 1 booklet selected" })
+    .waitFor();
   await page.locator("#clearMonitorBatchSelectionButton").click();
   await page
     .locator("#monitorBatchSelectionStatus")

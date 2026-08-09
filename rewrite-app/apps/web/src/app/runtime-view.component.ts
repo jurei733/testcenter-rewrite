@@ -872,6 +872,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </ul>
         <div class="actions">
           <button id="selectAllVisibleMonitorRunsButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.selectAllVisibleMonitorRuns()">{{ view.isMonitorOnlySession ? view.monitorText("gm_auto_checkall") : "Select All Visible" }}</button>
+          <button id="invertVisibleMonitorRunSelectionButton" class="ghost" type="button" [disabled]="!view.canUseWorkspaceScope" (click)="view.invertVisibleMonitorRunSelection()">Invert Visible Selection</button>
           <button id="clearMonitorBatchSelectionButton" class="ghost" type="button" [disabled]="view.monitorBatchCount === 0" (click)="view.clearMonitorBatchSelection()">Clear Selection</button>
           <button id="monitorBatchPauseButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('pause')">Pause Selected</button>
           <button id="monitorBatchResumeButton" class="ghost" type="button" [disabled]="!view.canIssueMonitorBatch" (click)="view.issueMonitorBatchCommand('resume')">Resume Selected</button>

@@ -3905,6 +3905,18 @@ export class RuntimeViewFacade {
     this.uiState.renderVersion.update(version => version + 1);
   }
 
+  invertVisibleMonitorRunSelection(): void {
+    const nextSelection = this.visibleOpenMonitorRuns
+      .filter(openRun => !openRun.bookletError)
+      .filter(openRun => !this.monitorBatchSelection.has(openRun.testRunId))
+      .map(openRun => openRun.testRunId);
+    this.monitorBatchSelection.clear();
+    for (const testRunId of nextSelection) {
+      this.monitorBatchSelection.add(testRunId);
+    }
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
   clearMonitorBatchSelection(): void {
     this.monitorBatchSelection.clear();
     this.uiState.renderVersion.update(version => version + 1);
