@@ -445,7 +445,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             New Admin Password
             <input id="adminResetPassword" name="adminResetPassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.ops.adminResetPassword" />
           </label>
+          <label>
+            Confirm New Admin Password
+            <input id="adminResetPasswordConfirmation" name="adminResetPasswordConfirmation" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.adminResetPasswordConfirmation" />
+          </label>
         </div>
+        <p id="adminResetPasswordMismatch" *ngIf="view.hasAdminResetPasswordMismatch" role="alert">
+          The password confirmation does not match.
+        </p>
         <div class="actions">
           <button id="adminResetPasswordButton" class="ghost" type="button" [disabled]="!view.canResetAdminUserPassword" (click)="view.confirmResetAdminUserPassword()">Reset Password</button>
         </div>

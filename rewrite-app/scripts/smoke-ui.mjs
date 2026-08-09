@@ -2312,6 +2312,7 @@ try {
   await fillAndCommit("#adminRevokeRoleAssignmentId", "");
   await fillAndCommit("#adminResetTargetUserId", "");
   await fillAndCommit("#adminResetPassword", "");
+  await fillAndCommit("#adminResetPasswordConfirmation", "");
   await fillAndCommit("#adminStatusTargetUserId", "");
   assert.equal(
     await page.locator("#adminCreatePassword").getAttribute("minlength"),
@@ -2327,6 +2328,18 @@ try {
   );
   assert.equal(
     await page.locator("#adminResetPassword").getAttribute("maxlength"),
+    "60"
+  );
+  assert.equal(
+    await page
+      .locator("#adminResetPasswordConfirmation")
+      .getAttribute("minlength"),
+    "8"
+  );
+  assert.equal(
+    await page
+      .locator("#adminResetPasswordConfirmation")
+      .getAttribute("maxlength"),
     "60"
   );
   await expectButtonSelectorDisabled("#adminCreateUserButton");
@@ -2745,6 +2758,26 @@ try {
 
   await fillAndCommit("#adminResetTargetUserId", workspaceAdminUserId);
   await fillAndCommit("#adminResetPassword", workspaceAdminResetPassword);
+  await expectButtonSelectorDisabled("#adminResetPasswordButton");
+  await fillAndCommit(
+    "#adminResetPasswordConfirmation",
+    `${workspaceAdminResetPassword}-mismatch`
+  );
+  await page.locator("#adminResetPasswordMismatch").waitFor();
+  await expectButtonSelectorDisabled("#adminResetPasswordButton");
+  const resetPasswordStorageSnapshot = JSON.stringify(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("testcenter-rewrite-app-shell") ?? "{}")
+    )
+  );
+  assert.equal(
+    resetPasswordStorageSnapshot.includes(workspaceAdminResetPassword),
+    false
+  );
+  await fillAndCommit(
+    "#adminResetPasswordConfirmation",
+    workspaceAdminResetPassword
+  );
   await expectButtonSelectorEnabled("#adminResetPasswordButton");
   logStep("reset-workspace-admin-password");
   const resetAdminPasswordDialog = acceptNextDialog(
@@ -2752,6 +2785,8 @@ try {
   );
   await clickAction("Reset Password");
   await resetAdminPasswordDialog;
+  await expectInputValue("#adminResetPassword", "");
+  await expectInputValue("#adminResetPasswordConfirmation", "");
   const oldWorkspaceAdminPasswordSignIn = await fetch(
     `${baseUrl}/api/v1/admin/auth/sign-in`,
     {
@@ -2801,6 +2836,8 @@ try {
     (await blockedResetPasswordSession.json()).error,
     "admin_password_change_required"
   );
+  logStep("admin-password-reset-confirmation");
+  stopAfter("admin-password-reset-confirmation");
 
   logStep("read-only-workspace-admin");
   await clickAction("Sign Out");

@@ -212,6 +212,7 @@ export class OpsViewFacade {
   adminUserPasswordBatchResult: AdminUserPasswordBatchResult | null = null;
   adminUserDeletionBatchResult: AdminUserDeletionBatchResult | null = null;
   platformRoleConfirmationPassword = "";
+  adminResetPasswordConfirmation = "";
   private readonly adminSessionBatchSelection = new Set<string>();
   adminSessionBatchResult: RevokeAdminSessionsResponse | null = null;
   applicationTitleDraft = "IQB-Testcenter";
@@ -658,7 +659,15 @@ export class OpsViewFacade {
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminResetTargetUserId.trim() !== "" &&
-      this.isAdminPasswordValid(this.ops.adminResetPassword)
+      this.isAdminPasswordValid(this.ops.adminResetPassword) &&
+      this.ops.adminResetPassword === this.adminResetPasswordConfirmation
+    );
+  }
+
+  get hasAdminResetPasswordMismatch(): boolean {
+    return (
+      this.adminResetPasswordConfirmation !== "" &&
+      this.ops.adminResetPassword !== this.adminResetPasswordConfirmation
     );
   }
 
@@ -932,6 +941,7 @@ export class OpsViewFacade {
     }
     this.clearAdminBatches();
     this.platformRoleConfirmationPassword = "";
+    this.adminResetPasswordConfirmation = "";
     this.viewState.onActionAsync(() => this.opsService.signOutAdmin());
   }
 
@@ -1283,7 +1293,10 @@ export class OpsViewFacade {
     if (!this.canResetAdminUserPassword) {
       return;
     }
-    this.viewState.onActionAsync(() => this.opsService.resetAdminUserPassword());
+    this.viewState.onActionAsync(async () => {
+      await this.opsService.resetAdminUserPassword();
+      this.adminResetPasswordConfirmation = "";
+    });
   }
 
   applyAdminUserFilters(): void {
