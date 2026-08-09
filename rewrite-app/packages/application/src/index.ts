@@ -7963,6 +7963,39 @@ const xmlUnsupportedTestcenterRootAttributeNames = (
   return unsupportedAttributeNames;
 };
 
+const xmlFirstUnsupportedTestcenterElementNamespace = (
+  root: XmlElement,
+  canonicalRootName: string
+): XmlElement | undefined => {
+  const findUnsupportedElement = (
+    element: XmlElement,
+    insideUntypedUnitPayload: boolean
+  ): XmlElement | undefined => {
+    for (const child of xmlChildElements(element)) {
+      if (child.namespaceURI && !insideUntypedUnitPayload) {
+        return child;
+      }
+      const childName = xmlElementLocalName(child);
+      const parentName = xmlElementLocalName(element);
+      const childStartsUntypedUnitPayload =
+        canonicalRootName === "Unit" &&
+        !child.namespaceURI &&
+        ((parentName === "Value" && ["label", "value"].includes(childName)) ||
+          (parentName === "ValuePositionLabels" &&
+            childName === "ValuePositionLabel"));
+      const unsupportedDescendant = findUnsupportedElement(
+        child,
+        insideUntypedUnitPayload || childStartsUntypedUnitPayload
+      );
+      if (unsupportedDescendant) {
+        return unsupportedDescendant;
+      }
+    }
+    return undefined;
+  };
+  return findUnsupportedElement(root, false);
+};
+
 const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] => {
   const matches: XmlElement[] = [];
   const descendants = element.getElementsByTagName("*");
@@ -8372,6 +8405,17 @@ const validateTestcenterXmlSourceDocument = (
       createImportDiagnostic(
         "testcenter_xml_root_namespace_invalid",
         `Original Testcenter XML '${sourceFileName}' must use root element '${canonicalRootName}' without a namespace, but found '${root.namespaceURI}'.`
+      )
+    );
+  }
+  const namespacedSchemaElement = root.namespaceURI
+    ? undefined
+    : xmlFirstUnsupportedTestcenterElementNamespace(root, canonicalRootName);
+  if (namespacedSchemaElement) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_element_namespace_invalid",
+        `Original Testcenter ${canonicalRootName} '${sourceFileName}' contains schema element '${namespacedSchemaElement.nodeName}' in unsupported namespace '${namespacedSchemaElement.namespaceURI}'.`
       )
     );
   }

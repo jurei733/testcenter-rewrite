@@ -11562,7 +11562,49 @@ test("original Testcenter compatibility corpus imports representative booklets",
     fileName: string;
     sourceDocument: string;
     diagnosticCode: string;
+    forbiddenDiagnosticCode?: string;
   }> = [
+    {
+      fileName: "booklet-namespaced-metadata.xml",
+      sourceDocument: validBookletXml
+        .replace(
+          "<Metadata>",
+          '<tc:Metadata xmlns:tc="urn:testcenter:unexpected">'
+        )
+        .replace("</Metadata>", "</tc:Metadata>"),
+      diagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
+    {
+      fileName: "unit-namespaced-metadata.xml",
+      sourceDocument: validUnitXml
+        .replace(
+          "<Metadata>",
+          '<tc:Metadata xmlns:tc="urn:testcenter:unexpected">'
+        )
+        .replace("</Metadata>", "</tc:Metadata>"),
+      diagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
+    {
+      fileName: "syscheck-namespaced-metadata.xml",
+      sourceDocument: validSystemCheckXml
+        .replace(
+          "<Metadata>",
+          '<tc:Metadata xmlns:tc="urn:testcenter:unexpected">'
+        )
+        .replace("</Metadata>", "</tc:Metadata>"),
+      diagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
+    {
+      fileName: "unit-untyped-value-payload-namespace.xml",
+      sourceDocument: validUnitXml
+        .replace("<Unit ", '<Unit ignored="true" ')
+        .replace(
+          '<Variable id="var1" type="string" />',
+          '<Variable id="var1" type="string"><Values><Value><label><payload:text xmlns:payload="urn:testcenter:payload">Label</payload:text></label><value>value</value></Value></Values></Variable>'
+        ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
     {
       fileName: "booklet-namespaced-root.xml",
       sourceDocument: validBookletXml
@@ -12334,6 +12376,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       ),
       facetCase.fileName
     );
+    if (facetCase.forbiddenDiagnosticCode) {
+      assert.ok(
+        importResult.body.importJob.diagnostics.every(
+          diagnostic => diagnostic.code !== facetCase.forbiddenDiagnosticCode
+        ),
+        facetCase.fileName
+      );
+    }
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
@@ -12626,6 +12676,17 @@ test("original Testcenter compatibility corpus imports representative booklets",
         )
         .replace("</Booklet>", "</tc:Booklet>"),
       diagnosticCode: "testcenter_xml_root_namespace_invalid"
+    },
+    {
+      fileName: "invalid-element-namespace-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml
+        .replace(
+          "<Metadata>",
+          '<tc:Metadata xmlns:tc="urn:testcenter:unexpected">'
+        )
+        .replace("</Metadata>", "</tc:Metadata>"),
+      diagnosticCode: "testcenter_xml_element_namespace_invalid"
     }
   ]) {
     const zipPayload = createZipBase64([
@@ -12697,6 +12758,16 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "utf8"
   );
   const invalidRosterFacetCases = [
+    {
+      label: "namespaced Testtakers metadata",
+      rosterText: validRosterXml
+        .replace(
+          "<Metadata>",
+          '<tc:Metadata xmlns:tc="urn:testcenter:unexpected">'
+        )
+        .replace("</Metadata>", "</tc:Metadata>"),
+      diagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
     {
       label: "namespaced Testtakers root",
       rosterText: validRosterXml
