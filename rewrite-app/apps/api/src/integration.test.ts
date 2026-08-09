@@ -70,7 +70,10 @@ const zipFixtureCrc32 = (content: Buffer): number => {
 
 const createZipBase64 = (
   entries: ZipFixtureEntry[],
-  options: { compressionMethod?: ZipCompressionMethod } = {}
+  options: {
+    compressionMethod?: ZipCompressionMethod;
+    archiveComment?: Buffer;
+  } = {}
 ): string => {
   const localFileHeaders: Buffer[] = [];
   const centralDirectoryHeaders: Buffer[] = [];
@@ -168,12 +171,19 @@ const createZipBase64 = (
 
   const centralDirectoryOffset = offset;
   const centralDirectory = Buffer.concat(centralDirectoryHeaders);
-  const endOfCentralDirectory = Buffer.alloc(22);
+  const archiveComment = options.archiveComment ?? Buffer.alloc(0);
+  assert.ok(
+    archiveComment.length <= 0xffff,
+    "ZIP fixture comments must fit the EOCD field."
+  );
+  const endOfCentralDirectory = Buffer.alloc(22 + archiveComment.length);
   endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
   endOfCentralDirectory.writeUInt16LE(entries.length, 8);
   endOfCentralDirectory.writeUInt16LE(entries.length, 10);
   endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
   endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+  endOfCentralDirectory.writeUInt16LE(archiveComment.length, 20);
+  archiveComment.copy(endOfCentralDirectory, 22);
 
   return Buffer.concat([
     ...localFileHeaders,
@@ -28785,6 +28795,74 @@ test("source document import reports invalid ZIP source documents", async () => 
   assert.equal(importResult.body.stagedContentRelease, null);
 });
 
+test("source document import rejects inconsistent ZIP directory metadata", async () => {
+  const tenantKey = "integration-tenant-invalid-zip-directory";
+  const workspaceKey = "integration-workspace-invalid-zip-directory";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const validZip = Buffer.from(
+    createZipBase64([
+      {
+        fileName: "imsmanifest.xml",
+        content:
+          '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources /></manifest>'
+      }
+    ]),
+    "base64"
+  );
+  const endOfCentralDirectoryOffset = validZip.length - 22;
+  const multiDiskZip = Buffer.from(validZip);
+  multiDiskZip.writeUInt16LE(1, endOfCentralDirectoryOffset + 4);
+  const inconsistentCentralSizeZip = Buffer.from(validZip);
+  inconsistentCentralSizeZip.writeUInt32LE(
+    inconsistentCentralSizeZip.readUInt32LE(endOfCentralDirectoryOffset + 12) +
+      1,
+    endOfCentralDirectoryOffset + 12
+  );
+
+  for (const [fileName, zipPayload] of [
+    ["multi-disk.zip", multiDiskZip],
+    ["inconsistent-central-size.zip", inconsistentCentralSizeZip]
+  ] as const) {
+    const sourcePackage = await requestJson<{
+      sourcePackage: { sourcePackageId: string };
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+      method: "POST",
+      body: {
+        fileName,
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${zipPayload.toString("base64")}`
+      }
+    });
+
+    const importResult = await requestJson<{
+      importJob: { status: string; diagnostics: Array<{ code: string }> };
+      stagedContentRelease: null;
+    }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+      method: "POST",
+      body: {
+        sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+      }
+    });
+
+    assert.equal(importResult.status, 201);
+    assert.equal(importResult.body.importJob.status, "failed");
+    assert.equal(
+      importResult.body.importJob.diagnostics[0]?.code,
+      "source_document_zip_invalid"
+    );
+    assert.equal(importResult.body.stagedContentRelease, null);
+  }
+});
+
 test("source document import reports unreadable deflated ZIP manifest entries", async () => {
   const tenantKey = "integration-tenant-unreadable-zip-manifest";
   const workspaceKey = "integration-workspace-unreadable-zip-manifest";
@@ -28893,6 +28971,86 @@ test("source document import accepts ZIP data descriptor entries", async () => {
     method: "POST",
     body: {
       fileName: "data-descriptor-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+});
+
+test("source document import accepts ZIP comments containing EOCD signatures", async () => {
+  const tenantKey = "integration-tenant-zip-eocd-comment";
+  const workspaceKey = "integration-workspace-zip-eocd-comment";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64(
+    [
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="comment-booklet" href="booklets/Booklet.xml" />
+              <resource identifier="comment-unit" href="units/Unit.xml" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>comment-booklet</Id><Label>Comment Booklet</Label></Metadata>
+            <Units><Unit id="comment-unit" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>comment-unit</Id><Label>Comment Unit</Label></Metadata>
+          </Unit>
+        `
+      }
+    ],
+    {
+      archiveComment: Buffer.concat([
+        Buffer.from("release-comment-", "ascii"),
+        Buffer.from([0x50, 0x4b, 0x05, 0x06]),
+        Buffer.alloc(24, 0x41)
+      ])
+    }
+  );
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "commented-export.zip",
       mediaType: "application/zip",
       sourceDocument: `data:application/zip;base64,${zipPayload}`
     }

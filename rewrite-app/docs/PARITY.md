@@ -389,6 +389,15 @@ binding falls back to CP437 instead of redirecting dependency resolution. A
 second gate resolves the non-CP437 path `units/測定.xml` through that field and
 retains its Unit content in the staged release.
 
+EOCD discovery now accepts only a candidate whose declared ZIP-comment length
+reaches the physical archive end, so an embedded `PK\x05\x06` sequence inside a
+valid comment cannot shadow the real directory record. Imports also require a
+single-disk entry count and an exact Central Directory extent; entry headers
+and an optional Central Directory digital-signature record must stay inside
+that extent. API gates accept a commented package containing the false
+signature and reject both multi-disk metadata and a forged directory size with
+`source_document_zip_invalid`.
+
 Nested `.itcr.zip` resource packages now apply the same safe relative-path
 contract as the outer upload before resource projection. Traversal segments,
 absolute and drive-qualified paths, backslashes, control characters, and

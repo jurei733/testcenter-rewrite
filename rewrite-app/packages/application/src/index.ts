@@ -12315,7 +12315,10 @@ const MAX_EXTRACTED_RESOURCE_TOTAL_BYTES = 50 * 1024 * 1024;
 const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
   const minimumOffset = Math.max(0, zipBuffer.length - 65557);
   for (let offset = zipBuffer.length - 22; offset >= minimumOffset; offset -= 1) {
-    if (zipBuffer.readUInt32LE(offset) === 0x06054b50) {
+    if (
+      zipBuffer.readUInt32LE(offset) === 0x06054b50 &&
+      offset + 22 + zipBuffer.readUInt16LE(offset + 20) === zipBuffer.length
+    ) {
       return offset;
     }
   }
@@ -12391,23 +12394,46 @@ const decodeZipFileName = (
   return fileName;
 };
 
-const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
+const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
   const endOfCentralDirectoryOffset =
     findZipEndOfCentralDirectoryOffset(zipBuffer);
   if (endOfCentralDirectoryOffset < 0) {
-    return [];
+    return null;
   }
 
+  const diskNumber = zipBuffer.readUInt16LE(endOfCentralDirectoryOffset + 4);
+  const centralDirectoryDisk = zipBuffer.readUInt16LE(
+    endOfCentralDirectoryOffset + 6
+  );
+  const diskEntryCount = zipBuffer.readUInt16LE(
+    endOfCentralDirectoryOffset + 8
+  );
   const entryCount = zipBuffer.readUInt16LE(endOfCentralDirectoryOffset + 10);
+  const centralDirectorySize = zipBuffer.readUInt32LE(
+    endOfCentralDirectoryOffset + 12
+  );
   const centralDirectoryOffset = zipBuffer.readUInt32LE(
     endOfCentralDirectoryOffset + 16
   );
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+  if (
+    diskNumber !== 0 ||
+    centralDirectoryDisk !== 0 ||
+    diskEntryCount !== entryCount ||
+    centralDirectoryEnd !== endOfCentralDirectoryOffset
+  ) {
+    return null;
+  }
+
   const entries: ZipEntry[] = [];
   let offset = centralDirectoryOffset;
 
   for (let index = 0; index < entryCount; index += 1) {
-    if (offset + 46 > zipBuffer.length || zipBuffer.readUInt32LE(offset) !== 0x02014b50) {
-      return [];
+    if (
+      offset + 46 > centralDirectoryEnd ||
+      zipBuffer.readUInt32LE(offset) !== 0x02014b50
+    ) {
+      return null;
     }
 
     const generalPurposeBitFlag = zipBuffer.readUInt16LE(offset + 8);
@@ -12424,8 +12450,8 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
     const extraEnd = fileNameEnd + extraLength;
     const commentEnd = extraEnd + commentLength;
 
-    if (commentEnd > zipBuffer.length) {
-      return [];
+    if (commentEnd > centralDirectoryEnd) {
+      return null;
     }
 
     const rawFileName = Buffer.from(
@@ -12447,6 +12473,16 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] => {
       localHeaderOffset
     });
     offset = commentEnd;
+  }
+
+  if (offset !== centralDirectoryEnd) {
+    if (
+      offset + 6 > centralDirectoryEnd ||
+      zipBuffer.readUInt32LE(offset) !== 0x05054b50 ||
+      offset + 6 + zipBuffer.readUInt16LE(offset + 4) !== centralDirectoryEnd
+    ) {
+      return null;
+    }
   }
 
   return entries;
@@ -14727,7 +14763,11 @@ const extractXmlManifestFromZipSourceDocument = (
     return { status: "invalid_zip" };
   }
 
-  const entries = readZipEntries(zipBuffer).filter(
+  const zipEntries = readZipEntries(zipBuffer);
+  if (!zipEntries) {
+    return { status: "invalid_zip" };
+  }
+  const entries = zipEntries.filter(
     entry => !entry.fileName.endsWith("/")
   );
   const candidates = [
@@ -15678,7 +15718,17 @@ const extractNestedResourcePackages = (
     const normalizedPackagePath = normalizeZipEntryPath(packageEntry.fileName);
     const packageFileName = normalizedPackagePath.split("/").at(-1) ?? "";
     const packageKey = packageFileName.slice(0, -".itcr.zip".length);
-    const nestedEntries = readZipEntries(packageBuffer).filter(
+    const nestedZipEntries = readZipEntries(packageBuffer);
+    if (!nestedZipEntries) {
+      diagnostics.push(
+        createImportDiagnostic(
+          "source_document_resource_package_invalid",
+          `Resource package ZIP entry '${packageEntry.fileName}' contains an invalid central directory.`
+        )
+      );
+      continue;
+    }
+    const nestedEntries = nestedZipEntries.filter(
       entry => !entry.fileName.endsWith("/")
     );
     for (const nestedEntry of nestedEntries) {
