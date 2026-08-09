@@ -171,6 +171,9 @@ from a retiring Player frame. Once the complete Booklet asset set has loaded,
 the Participant host also emits the original test-wide `LOADCOMPLETE` record
 with browser, operating-system, device, screen-size, and elapsed-load fields;
 repeated current-state refreshes do not duplicate it within one frontend load.
+The same idempotent test-wide delivery records `CONNECTION=POLLING`, reflecting
+the Participant host's current HTTP request transport and completing the
+original Test Controller test-state key catalog.
 
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,

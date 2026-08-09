@@ -6322,6 +6322,15 @@ try {
   assert.ok(veronaLoadEnvironment.screenSizeHeight > 0);
   assert.ok(Number.isSafeInteger(veronaLoadEnvironment.loadTime));
   assert.ok(veronaLoadEnvironment.loadTime >= 0);
+  const veronaConnectionLogs = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
+      veronaLoginKey
+    )}&testRunId=${encodeURIComponent(veronaTestRunId)}&logKey=CONNECTION`,
+    payload => Array.isArray(payload?.items) && payload.items.length === 1
+  );
+  assert.equal(veronaConnectionLogs.items[0]?.testLog?.unitKey, null);
+  assert.equal(veronaConnectionLogs.items[0]?.testLog?.originalUnitId, null);
+  assert.equal(veronaConnectionLogs.items[0]?.testLog?.logContent, "POLLING");
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?loginKey=${encodeURIComponent(
       veronaLoginKey

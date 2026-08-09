@@ -3035,11 +3035,18 @@ export class ParticipantViewFacade {
         logs: [{
           unitKey: null,
           originalUnitId: null,
-          entries: [{
-            key: "LOADCOMPLETE",
-            timeStamp: completedAtMs,
-            content: JSON.stringify(environment)
-          }]
+          entries: [
+            {
+              key: "LOADCOMPLETE",
+              timeStamp: completedAtMs,
+              content: JSON.stringify(environment)
+            },
+            {
+              key: "CONNECTION",
+              timeStamp: completedAtMs,
+              content: "POLLING"
+            }
+          ]
         }]
       } satisfies SaveParticipantTestLogsRequest,
       { quiet: true }
