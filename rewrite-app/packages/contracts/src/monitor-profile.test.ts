@@ -6,7 +6,10 @@ import type {
   OpenMonitorRun
 } from "@testcenter-rewrite-app/domain";
 
-import { filterOpenMonitorRunsByProfile } from "./index.js";
+import {
+  filterOpenMonitorRunsByProfile,
+  resolveOpenMonitorRunSuperState
+} from "./index.js";
 
 const createOpenRun = (
   loginKey: string,
@@ -209,5 +212,57 @@ test("monitor profiles use the original derived super-state", () => {
       run => run.loginKey
     ),
     ["running-ui"]
+  );
+});
+
+test("monitor super-state derives the original five-minute idle fallback", () => {
+  const polling = createOpenRun("polling-ui", "running");
+  polling.testState = { CONTROLLER: "RUNNING", CONNECTION: "POLLING" };
+  const exactlyFiveMinutes = Date.parse("2026-08-01T00:05:00.000Z");
+
+  assert.equal(
+    resolveOpenMonitorRunSuperState(polling, exactlyFiveMinutes),
+    "connection_polling"
+  );
+  assert.equal(
+    resolveOpenMonitorRunSuperState(polling, exactlyFiveMinutes + 1),
+    "idle"
+  );
+
+  polling.testState.CONTROLLER = "ERROR";
+  assert.equal(
+    resolveOpenMonitorRunSuperState(polling, exactlyFiveMinutes + 1),
+    "error",
+    "Higher-priority controller failures must remain visible for idle runs."
+  );
+});
+
+test("monitor profiles can filter the original idle super-state", () => {
+  const idle = createOpenRun("idle-ui", "running");
+  idle.testState = { CONTROLLER: "RUNNING", CONNECTION: "POLLING" };
+  const active = createOpenRun("active-ui", "running");
+  active.updatedAt = "2026-08-01T00:00:00.001Z";
+  active.testState = { CONTROLLER: "RUNNING", CONNECTION: "POLLING" };
+  const profile: MonitorViewProfile = {
+    ...baseProfile,
+    filters: [
+      {
+        target: "state",
+        value: "idle",
+        subValue: null,
+        label: "Hide idle runs",
+        type: "equal",
+        not: false
+      }
+    ]
+  };
+
+  assert.deepEqual(
+    filterOpenMonitorRunsByProfile(
+      [idle, active],
+      profile,
+      Date.parse("2026-08-01T00:05:00.001Z")
+    ).map(run => run.loginKey),
+    ["active-ui"]
   );
 });

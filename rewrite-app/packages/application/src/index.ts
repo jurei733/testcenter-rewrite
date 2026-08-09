@@ -4560,7 +4560,10 @@ const listOpenMonitorRunsForActiveRelease = async (input: {
               timer.current &&
               (timer.status === "running" || timer.status === "paused")
           ) ?? null,
-        updatedAt: normalizedTestRun.updatedAt
+        updatedAt: resolveOpenMonitorRunUpdatedAt(
+          normalizedTestRun,
+          latestTestStates
+        )
       };
     });
 };
@@ -4590,9 +4593,14 @@ const isLaterParticipantTestLog = (
       (candidate.recordedAt === current.recordedAt &&
         candidate.participantTestLogId > current.participantTestLogId)));
 
+type LatestMonitorTestState = {
+  values: Record<string, string>;
+  latestRecordedAt: string | null;
+};
+
 const buildLatestMonitorTestStates = (
   testLogs: ParticipantTestLog[]
-): Map<string, Record<string, string>> => {
+): Map<string, LatestMonitorTestState> => {
   const latestLogs = new Map<string, Map<string, ParticipantTestLog>>();
   for (const testLog of testLogs) {
     if (
@@ -4612,24 +4620,43 @@ const buildLatestMonitorTestStates = (
   return new Map(
     [...latestLogs].map(([testRunId, logs]) => [
       testRunId,
-      Object.fromEntries(
-        [...logs].map(([logKey, testLog]) => [logKey, testLog.logContent])
-      )
+      {
+        values: Object.fromEntries(
+          [...logs].map(([logKey, testLog]) => [logKey, testLog.logContent])
+        ),
+        latestRecordedAt:
+          [...logs.values()]
+            .map(testLog => testLog.recordedAt)
+            .sort()
+            .at(-1) ?? null
+      }
     ])
   );
 };
 
 const buildOpenMonitorRunTestState = (
   testRun: TestRun,
-  latestTestStates: Map<string, Record<string, string>>
+  latestTestStates: Map<string, LatestMonitorTestState>
 ): Record<string, string> => ({
-  ...(latestTestStates.get(testRun.testRunId) ?? {}),
+  ...(latestTestStates.get(testRun.testRunId)?.values ?? {}),
   ...(testRun.locked
     ? { status: "locked" }
     : testRun.status === "created"
       ? { status: "pending" }
       : {})
 });
+
+const resolveOpenMonitorRunUpdatedAt = (
+  testRun: TestRun,
+  latestTestStates: Map<string, LatestMonitorTestState>
+): string => {
+  const latestRecordedAt = latestTestStates.get(
+    testRun.testRunId
+  )?.latestRecordedAt;
+  return latestRecordedAt && latestRecordedAt > testRun.updatedAt
+    ? latestRecordedAt
+    : testRun.updatedAt;
+};
 
 type OpenMonitorBookletResolution = {
   booklet: ContentReleaseBookletEntry | undefined;
@@ -27357,7 +27384,10 @@ export const createFirstSliceServices = (
                     timer.current &&
                     (timer.status === "running" || timer.status === "paused")
                 ) ?? null,
-              updatedAt: testRun.updatedAt
+              updatedAt: resolveOpenMonitorRunUpdatedAt(
+                testRun,
+                latestTestStates
+              )
             };
           });
 

@@ -2286,12 +2286,14 @@ export type OpenMonitorRunSuperState =
   | "connection_lost"
   | "paused"
   | "focus_lost"
+  | "idle"
   | "connection_websocket"
   | "connection_polling"
   | "ok";
 
 export const resolveOpenMonitorRunSuperState = (
-  openRun: OpenMonitorRun
+  openRun: OpenMonitorRun,
+  currentTimestamp = Date.now()
 ): OpenMonitorRunSuperState => {
   const testState = openRun.testState;
   if (testState.status === "pending" || openRun.status === "created") {
@@ -2318,6 +2320,13 @@ export const resolveOpenMonitorRunSuperState = (
   if (testState.FOCUS === "HAS_NOT") {
     return "focus_lost";
   }
+  const lastActivityTimestamp = Date.parse(openRun.updatedAt);
+  if (
+    Number.isFinite(lastActivityTimestamp) &&
+    currentTimestamp - lastActivityTimestamp > 5 * 60 * 1_000
+  ) {
+    return "idle";
+  }
   if (testState.CONNECTION === "WEBSOCKET") {
     return "connection_websocket";
   }
@@ -2329,7 +2338,8 @@ export const resolveOpenMonitorRunSuperState = (
 
 const monitorProfileFilterExcludesRun = (
   openRun: OpenMonitorRun,
-  filter: MonitorViewProfileFilter
+  filter: MonitorViewProfileFilter,
+  currentTimestamp: number
 ): boolean => {
   const expected = filter.subValue || filter.value;
   let subject: string;
@@ -2365,7 +2375,7 @@ const monitorProfileFilterExcludesRun = (
       subject = openRun.currentBlockLabel ?? openRun.currentBlockKey ?? "";
       break;
     case "state":
-      subject = resolveOpenMonitorRunSuperState(openRun);
+      subject = resolveOpenMonitorRunSuperState(openRun, currentTimestamp);
       break;
     case "testState":
       subject = openRun.testState[filter.value] ?? "";
@@ -2394,26 +2404,31 @@ const monitorProfileFilterExcludesRun = (
 
 export const filterOpenMonitorRunsByProfile = (
   openRuns: OpenMonitorRun[],
-  profile: MonitorViewProfile | null
+  profile: MonitorViewProfile | null,
+  currentTimestamp = Date.now()
 ): OpenMonitorRun[] => {
   if (!profile) {
     return openRuns;
   }
   return openRuns.filter(openRun => {
+    const superState = resolveOpenMonitorRunSuperState(
+      openRun,
+      currentTimestamp
+    );
     if (
       isEnabledMonitorProfileFlag(profile.filtersEnabled.pending) &&
-      resolveOpenMonitorRunSuperState(openRun) === "pending"
+      superState === "pending"
     ) {
       return false;
     }
     if (
       isEnabledMonitorProfileFlag(profile.filtersEnabled.locked) &&
-      resolveOpenMonitorRunSuperState(openRun) === "locked"
+      superState === "locked"
     ) {
       return false;
     }
     return !profile.filters.some(filter =>
-      monitorProfileFilterExcludesRun(openRun, filter)
+      monitorProfileFilterExcludesRun(openRun, filter, currentTimestamp)
     );
   });
 };

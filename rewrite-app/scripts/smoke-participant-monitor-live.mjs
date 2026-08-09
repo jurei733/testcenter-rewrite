@@ -122,6 +122,32 @@ const waitForControllerBadge = async (page, testRunId, controllerState) => {
   }
 };
 
+const waitForStateBadge = async (page, testRunId, state) => {
+  try {
+    await page.waitForFunction(
+      ({ runId, expectedBadge }) =>
+        [...document.querySelectorAll("#openMonitorRunsCollection .record-card")]
+          .some(card => {
+            const text = card.textContent?.toLowerCase() ?? "";
+            return text.includes(runId.toLowerCase()) && text.includes(expectedBadge);
+          }),
+      {
+        runId: testRunId,
+        expectedBadge: `state ${state.toLowerCase()}`
+      },
+      { timeout: 15_000 }
+    );
+  } catch (error) {
+    const cardTexts = await page
+      .locator("#openMonitorRunsCollection .record-card")
+      .allTextContents();
+    throw new Error(
+      `Monitor card did not render state=${state}: ${JSON.stringify(cardTexts)}`,
+      { cause: error }
+    );
+  }
+};
+
 await mkdir(dirname(sqliteFile), { recursive: true });
 await removeSqliteFiles();
 const port = await allocatePort();
@@ -223,6 +249,37 @@ try {
     .locator("#openMonitorRunsCollection .record-card")
     .filter({ hasText: testRunId });
   await openRunCard.waitFor({ timeout: 15_000 });
+  const idleClock = Date.now() + 6 * 60 * 1_000;
+  await operatorPage.evaluate(timestamp => {
+    globalThis.__monitorRealDateNow = Date.now;
+    Date.now = () => timestamp;
+  }, idleClock);
+  const pollingActivityStartedAt = Date.now();
+  await sendJson(
+    baseUrl,
+    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
+    {
+      deliveryId: `monitor-connection-polling:${testRunId}`,
+      logs: [{
+        entries: [{
+          key: "CONNECTION",
+          content: "POLLING",
+          timeStamp: pollingActivityStartedAt
+        }]
+      }]
+    }
+  );
+  const pollingOpenRuns = await getJson(
+    baseUrl,
+    `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs?testRunId=${encodeURIComponent(testRunId)}`
+  );
+  assert.equal(pollingOpenRuns.items?.[0]?.testState?.CONNECTION, "POLLING");
+  assert.ok(
+    Date.parse(pollingOpenRuns.items?.[0]?.updatedAt ?? "") >=
+      pollingActivityStartedAt,
+    "Open-run activity must include the server-recorded test-state update."
+  );
+  await waitForStateBadge(operatorPage, testRunId, "IDLE");
   const controllerErrorAt = Date.now() + 1_000;
   await sendJson(
     baseUrl,
@@ -244,6 +301,7 @@ try {
   );
   assert.equal(errorOpenRuns.items?.[0]?.testState?.CONTROLLER, "ERROR");
   await waitForControllerBadge(operatorPage, testRunId, "ERROR");
+  await waitForStateBadge(operatorPage, testRunId, "ERROR");
   await sendJson(
     baseUrl,
     `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
@@ -264,6 +322,26 @@ try {
   );
   assert.equal(recoveredOpenRuns.items?.[0]?.testState?.CONTROLLER, "RUNNING");
   await waitForControllerBadge(operatorPage, testRunId, "RUNNING");
+  await waitForStateBadge(operatorPage, testRunId, "IDLE");
+  await operatorPage.evaluate(() => {
+    Date.now = globalThis.__monitorRealDateNow;
+    delete globalThis.__monitorRealDateNow;
+  });
+  await sendJson(
+    baseUrl,
+    `/api/v1/participant/test-runs/${encodeURIComponent(testRunId)}/test-logs`,
+    {
+      deliveryId: `monitor-connection-websocket:${testRunId}`,
+      logs: [{
+        entries: [{
+          key: "CONNECTION",
+          content: "WEBSOCKET",
+          timeStamp: Date.now()
+        }]
+      }]
+    }
+  );
+  await waitForStateBadge(operatorPage, testRunId, "CONNECTION_WEBSOCKET");
   await openRunCard.getByRole("button", { name: "Add to Batch" }).click();
   const completeButton = operatorPage.locator("#monitorBatchCompleteButton");
   await operatorPage.waitForFunction(
@@ -292,7 +370,7 @@ try {
     .waitFor({ timeout: 15_000 });
 
   process.stdout.write(
-    `Participant monitor live controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
+    `Participant monitor live idle/controller-error/recovery/pause/resume/complete-and-lock smoke passed for run=${testRunId} at ${baseUrl}/app\n`
   );
 } catch (error) {
   if (serverOutput) {

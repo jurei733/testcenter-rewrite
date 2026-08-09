@@ -2300,7 +2300,10 @@ export class RuntimeViewFacade {
                         ? "paused"
                         : "none"
                   },
-                  { label: "Updated", value: this.formatDateTime(openRun.updatedAt) }
+                  {
+                    label: "Last Activity",
+                    value: this.formatDateTime(openRun.updatedAt)
+                  }
                 ])
           ],
           selected: this.runtime.testRunId.trim() === openRun.testRunId,
@@ -2346,6 +2349,9 @@ export class RuntimeViewFacade {
     const controllerErrorCount = openRuns.filter(
       openRun => resolveOpenMonitorRunSuperState(openRun) === "error"
     ).length;
+    const idleCount = openRuns.filter(
+      openRun => resolveOpenMonitorRunSuperState(openRun) === "idle"
+    ).length;
     const profile = this.activeMonitorProfile;
 
     return [
@@ -2375,6 +2381,11 @@ export class RuntimeViewFacade {
         label: "Controller Errors",
         headline: String(controllerErrorCount),
         detail: "Participant Players currently reporting a controller failure."
+      },
+      {
+        label: "Idle",
+        headline: String(idleCount),
+        detail: "Runs without server-side activity for more than five minutes."
       },
       {
         label: "Locked",
@@ -2418,6 +2429,9 @@ export class RuntimeViewFacade {
         const controllerErrorCount = openRuns.filter(
           openRun => resolveOpenMonitorRunSuperState(openRun) === "error"
         ).length;
+        const idleCount = openRuns.filter(
+          openRun => resolveOpenMonitorRunSuperState(openRun) === "idle"
+        ).length;
         const timedCount = openRuns.filter(
           openRun => openRun.activeTestletTimer
         ).length;
@@ -2449,6 +2463,7 @@ export class RuntimeViewFacade {
             `${runningCount} running`,
             `${pausedCount} paused`,
             `${controllerErrorCount} controller errors`,
+            `${idleCount} idle`,
             `${lockedCount} locked`,
             `${timedCount} timed`
           ],

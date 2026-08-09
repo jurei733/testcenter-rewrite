@@ -21187,6 +21187,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
   assert.equal(paused.body.testRun.testletTimers?.[testletKey]?.expiresAt, null);
 
   const controllerErrorAt = Date.now() + 1_000;
+  const monitorStateRequestStartedAt = Date.now();
   const savedMonitorTestState = await requestJson<{ savedCount: number }>(
     `/api/v1/participant/test-runs/${testRunId}/test-logs`,
     {
@@ -21245,6 +21246,7 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
       currentBlockKey: string | null;
       currentBlockLabel: string | null;
       testState: Record<string, string>;
+      updatedAt: string;
       blockNavigationTargets: Array<{
         blockKey: string;
         targetUnitKey: string;
@@ -21279,6 +21281,11 @@ test("original Testcenter timed testlets pause durably and close after expiry", 
     "The newest test-wide controller state must win over older and unit-scoped values."
   );
   assert.equal(openRunsWithTimer.body.items[0]?.testState.CONNECTION, "LOST");
+  assert.ok(
+    Date.parse(openRunsWithTimer.body.items[0]?.updatedAt ?? "") >=
+      monitorStateRequestStartedAt,
+    "Monitor activity must advance when a test-wide state update is recorded."
+  );
   assert.equal(
     openRunsWithTimer.body.items[0]?.testState.UNBOUNDED_CLIENT_KEY,
     undefined,
