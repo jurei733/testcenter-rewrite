@@ -1,0 +1,153 @@
+{
+  "variableCodings": [
+    {
+      "id": "b1",
+      "sourceType": "BASE",
+      "processing": ["SORT_ARRAY"],
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "valueArrayPos": 1,
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["2"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "valueArrayPos": 1,
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["3"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 1,
+          "ruleSets": [
+            {
+              "valueArrayPos": 1,
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "2"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "valueArrayPos": 1,
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": [
+                    "3"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 7,
+          "ruleSets": [
+            {
+              "valueArrayPos": "SUM",
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["10"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "valueArrayPos": "SUM",
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["20"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "sourceType": "BASE",
+      "codes": [
+        {
+          "id": 1,
+          "score": 2,
+          "ruleSets": [
+            {
+              "valueArrayPos": "ANY_OTHER",
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["10"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "score": 2,
+          "ruleSets": [
+            {
+              "valueArrayPos": "ANY",
+              "rules": [
+                {
+                  "method": "MATCH",
+                  "parameters": ["20"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

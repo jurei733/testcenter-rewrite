@@ -553,6 +553,79 @@
           }
         }
       ]
+    },
+    {
+      "family": "array-selection-modes",
+      "schemeFixture": "schemes/responses-3.6.0-arrays.json",
+      "inputFixture": "schemes/responses-3.6.0-arrays-case1-input.json",
+      "outcomeFixture": "schemes/responses-3.6.0-arrays-case1-outcome.json",
+      "sourceRepository": "https://github.com/iqb-berlin/responses",
+      "sourceTag": "3.6.0",
+      "sourceCommit": "e04e585e6514e5257ac42f48b629628326471f90",
+      "schemeSourcePath": "test/coding/arrays/coding-scheme.json",
+      "inputSourcePath": "test/coding/arrays/01_input.json",
+      "outcomeSourcePath": "test/coding/arrays/01_outcome.json",
+      "schemeSha256": "bbbbc288884db97bac6b0840d3ed520d63ff822eb770799475b44fb6c1e4df4d",
+      "inputSha256": "f8e8f8c29542484cb5f6d87ced84a63c7e69b5d6b0684539f42eac0d709b7e99",
+      "outcomeSha256": "e15498dd49ad4f849f8c98209e6abc35793c329f56499a3780568fa32b96a8a7",
+      "license": "MIT",
+      "expectedStates": {
+        "arrays-route": "aggregate",
+        "arrays-sort-code": "coded",
+        "arrays-index-code": "coded",
+        "arrays-sum-score": "seven",
+        "arrays-b4-value": "unset"
+      },
+      "additionalCases": [
+        {
+          "caseId": "02",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case2-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case2-outcome.json",
+          "inputSourcePath": "test/coding/arrays/02_input.json",
+          "outcomeSourcePath": "test/coding/arrays/02_outcome.json",
+          "inputSha256": "507f75d499d8d229835f3742f04838154d85eea2d3fa80da4edde5287e89bc93",
+          "outcomeSha256": "9037a25f2d330fafc2d8d6aa72b507a33f0fd1282b5a6daa9b18ea6f8bcb33ca",
+          "expectedStates": {
+            "arrays-route": "any-other",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "ten-nine"
+          }
+        },
+        {
+          "caseId": "03",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case3-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case3-outcome.json",
+          "inputSourcePath": "test/coding/arrays/03_input.json",
+          "outcomeSourcePath": "test/coding/arrays/03_outcome.json",
+          "inputSha256": "5e0b0a1cfd40317403f2bb1ecd097e5cc6b246ff802afb47f72fa5bcbc03cd2a",
+          "outcomeSha256": "63d46e1ec2df04ea3c9644648a67040344e537984938cd9a629b2d6ba671970c",
+          "expectedStates": {
+            "arrays-route": "incomplete",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "twenty-nine"
+          }
+        },
+        {
+          "caseId": "04",
+          "inputFixture": "schemes/responses-3.6.0-arrays-case4-input.json",
+          "outcomeFixture": "schemes/responses-3.6.0-arrays-case4-outcome.json",
+          "inputSourcePath": "test/coding/arrays/04_input.json",
+          "outcomeSourcePath": "test/coding/arrays/04_outcome.json",
+          "inputSha256": "4e5f1210ef276c1352fc6d96c9efddcee024f6ca6856ef1e80d38c6d5154054d",
+          "outcomeSha256": "2007f9d96ad8195b1987db049fc873a5ccd2d7f5fb17099a9c096cd0f08493d5",
+          "expectedStates": {
+            "arrays-route": "any",
+            "arrays-sort-code": "unset",
+            "arrays-index-code": "unset",
+            "arrays-sum-score": "unset",
+            "arrays-b4-value": "twenty"
+          }
+        }
+      ]
     }
   ],
   "bookletConfigPackages": [

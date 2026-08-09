@@ -22,7 +22,10 @@ codes, explicit code/score zeroes, missing-input `UNSET`, dependency
 path and hash is recorded separately in `corpus.json`. The versioned 3.0
 `array-length-check` family adds both official cases for AND-connected rule
 sets, `ANY_OPEN`, `LENGTH`, automatic residual zeroes, derived `SUM_SCORE`,
-and sorted adaptive-array comparison.
+and sorted adaptive-array comparison. The deliberately versionless `arrays`
+family adds all four official cases for `SORT_ARRAY`, numeric array positions,
+`SUM`, `ANY_OTHER`, `ANY`, untouched raw array values, and the ambiguous
+multi-value result `CODING_INCOMPLETE`.
 
 The corpus deliberately contains current 17.6 examples, including the original
 `Booklet.xml`/`Booklet3.xml` pair with equal top-level-testlet species, a 17.4 booklet,

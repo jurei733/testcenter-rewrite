@@ -184,6 +184,14 @@ residual routes, including original-compatible sorted-array equality, eight
 persisted Booklet states, raw response retention, and mutually exclusive
 visible Units across memory, file, and SQLite.
 
+The closure now also includes the release's complete deliberately versionless
+`arrays` family: its scheme and all four official input/outcome pairs are
+byte-exact. Four independent Participant runs execute `SORT_ARRAY`, a numeric
+array position, `SUM`, `ANY_OTHER`, and `ANY`, retain each authored raw array,
+and distinguish `UNSET`, `CODING_COMPLETE`, and the intentionally ambiguous
+`CODING_INCOMPLETE` result. Five persisted Booklet states select exactly one
+aggregate, any-other, incomplete, or any route across memory, file, and SQLite.
+
 ## Capability matrix
 
 ### Participant access and session lifecycle

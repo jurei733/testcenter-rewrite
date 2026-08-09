@@ -786,7 +786,7 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
   const corpus = JSON.parse(
     readFileSync(resolve(corpusRoot, "corpus.json"), "utf8")
   ) as OriginalTestcenterCorpus;
-  assert.equal(corpus.codingSchemePackages.length, 7);
+  assert.equal(corpus.codingSchemePackages.length, 8);
   for (const codingPackage of corpus.codingSchemePackages) {
     assert.equal(
       codingPackage.sourceRepository,
@@ -1146,6 +1146,120 @@ test("original Testcenter compatibility corpus pins official IQB coding fixtures
         ["b2", ["01_2"], "CODING_COMPLETE", 0, 0],
         ["b3", ["01_3", "01_1"], "CODING_COMPLETE", 0, 0],
         ["d1", 1, "CODING_COMPLETE", 0, 0]
+      ]
+    ]
+  );
+
+  const arrays = corpus.codingSchemePackages.find(
+    codingPackage => codingPackage.family === "array-selection-modes"
+  );
+  assert.ok(arrays);
+  assert.deepEqual(
+    [
+      arrays.schemeSourcePath,
+      arrays.inputSourcePath,
+      arrays.outcomeSourcePath,
+      ...(arrays.additionalCases ?? []).flatMap(additionalCase => [
+        additionalCase.inputSourcePath,
+        additionalCase.outcomeSourcePath
+      ])
+    ],
+    [
+      "test/coding/arrays/coding-scheme.json",
+      "test/coding/arrays/01_input.json",
+      "test/coding/arrays/01_outcome.json",
+      "test/coding/arrays/02_input.json",
+      "test/coding/arrays/02_outcome.json",
+      "test/coding/arrays/03_input.json",
+      "test/coding/arrays/03_outcome.json",
+      "test/coding/arrays/04_input.json",
+      "test/coding/arrays/04_outcome.json"
+    ]
+  );
+  const arraysScheme = JSON.parse(
+    readFileSync(resolve(corpusRoot, arrays.schemeFixture), "utf8")
+  ) as {
+    version?: string;
+    variableCodings: Array<{
+      id: string;
+      sourceType: string;
+      processing?: string[];
+      codes: Array<{
+        id: number;
+        ruleSets: Array<{ valueArrayPos?: string | number }>;
+      }>;
+    }>;
+  };
+  assert.equal(arraysScheme.version, undefined);
+  assert.deepEqual(
+    arraysScheme.variableCodings.map(variable => variable.sourceType),
+    ["BASE", "BASE", "BASE", "BASE"]
+  );
+  assert.deepEqual(arraysScheme.variableCodings[0]?.processing, ["SORT_ARRAY"]);
+  assert.equal(
+    arraysScheme.variableCodings[0]?.codes[0]?.ruleSets[0]?.valueArrayPos,
+    1
+  );
+  assert.equal(
+    arraysScheme.variableCodings[2]?.codes[0]?.ruleSets[0]?.valueArrayPos,
+    "SUM"
+  );
+  assert.deepEqual(
+    arraysScheme.variableCodings[3]?.codes.map(
+      code => code.ruleSets[0]?.valueArrayPos
+    ),
+    ["ANY_OTHER", "ANY"]
+  );
+  const arraysOutcomes = [
+    arrays.outcomeFixture,
+    ...(arrays.additionalCases ?? []).map(
+      additionalCase => additionalCase.outcomeFixture
+    )
+  ].map(fixture =>
+    JSON.parse(readFileSync(resolve(corpusRoot, fixture), "utf8"))
+  ) as Array<
+    Array<{
+      id: string;
+      status: string;
+      value: unknown;
+      code?: number;
+      score?: number;
+    }>
+  >;
+  assert.deepEqual(
+    arraysOutcomes.map(outcome =>
+      outcome.map(variable => [
+        variable.id,
+        variable.value,
+        variable.status,
+        variable.code ?? null,
+        variable.score ?? null
+      ])
+    ),
+    [
+      [
+        ["b1", ["3", "9", "1", "2"], "CODING_COMPLETE", 1, 1],
+        ["b2", ["3", "2", "10", "22"], "CODING_COMPLETE", 1, 1],
+        ["b3", ["3", "2", "5", ""], "CODING_COMPLETE", 1, 7],
+        ["b4", null, "UNSET", null, null]
+      ],
+      [
+        ["b4", ["10", "9"], "CODING_COMPLETE", 1, 2],
+        ["b1", null, "UNSET", null, null],
+        ["b2", null, "UNSET", null, null],
+        ["b3", null, "UNSET", null, null]
+      ],
+      [
+        ["b4", ["20", "9"], "CODING_INCOMPLETE", null, null],
+        ["b1", null, "UNSET", null, null],
+        ["b2", null, "UNSET", null, null],
+        ["b3", null, "UNSET", null, null]
+      ],
+      [
+        ["b4", ["20"], "CODING_COMPLETE", 2, 2],
+        ["b1", null, "UNSET", null, null],
+        ["b2", null, "UNSET", null, null],
+        ["b3", null, "UNSET", null, null]
       ]
     ]
   );
