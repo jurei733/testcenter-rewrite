@@ -2410,6 +2410,11 @@ export type AdminSignInRequest = {
   password: string;
 };
 
+export const adminPasswordPolicy = {
+  minimumLength: 8,
+  maximumLength: 60
+} as const;
+
 export type ChangeAdminPasswordRequest = {
   password: string;
 };

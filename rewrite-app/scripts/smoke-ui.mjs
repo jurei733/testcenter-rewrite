@@ -2313,6 +2313,22 @@ try {
   await fillAndCommit("#adminResetTargetUserId", "");
   await fillAndCommit("#adminResetPassword", "");
   await fillAndCommit("#adminStatusTargetUserId", "");
+  assert.equal(
+    await page.locator("#adminCreatePassword").getAttribute("minlength"),
+    "8"
+  );
+  assert.equal(
+    await page.locator("#adminCreatePassword").getAttribute("maxlength"),
+    "60"
+  );
+  assert.equal(
+    await page.locator("#adminResetPassword").getAttribute("minlength"),
+    "8"
+  );
+  assert.equal(
+    await page.locator("#adminResetPassword").getAttribute("maxlength"),
+    "60"
+  );
   await expectButtonSelectorDisabled("#adminCreateUserButton");
   await expectButtonSelectorDisabled("#adminAssignRoleButton");
   await expectButtonSelectorDisabled("#adminRevokeRoleButton");
@@ -2659,6 +2675,20 @@ try {
   assert.equal(readOnlyAdminSignInResponse.status(), 200);
   await page.locator("#requiredAdminPasswordChangeDialog").waitFor();
   await waitForInputMinLength("#adminSessionToken", 20);
+  assert.equal(
+    await page.locator("#requiredAdminPassword").getAttribute("minlength"),
+    "8"
+  );
+  assert.equal(
+    await page.locator("#requiredAdminPassword").getAttribute("maxlength"),
+    "60"
+  );
+  assert.equal(
+    await page
+      .locator("#requiredAdminPasswordConfirmation")
+      .getAttribute("maxlength"),
+    "60"
+  );
   await fillAndCommit("#requiredAdminPassword", "short");
   await fillAndCommit("#requiredAdminPasswordConfirmation", "different");
   await expectButtonSelectorDisabled("#requiredAdminPasswordSubmitButton");

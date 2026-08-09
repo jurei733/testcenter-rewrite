@@ -3,6 +3,8 @@ import { ChangeDetectorRef, Component, inject } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
+import { adminPasswordPolicy } from "@testcenter-rewrite-app/contracts";
+
 import { ActivityFeedComponent } from "./activity-feed.component";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { AppShellFacade } from "./app-shell.facade";
@@ -43,6 +45,8 @@ export class AppComponent implements OnInit, OnDestroy {
   requiredAdminPassword = "";
   requiredAdminPasswordConfirmation = "";
   requiredAdminPasswordError = "";
+  readonly adminPasswordMinimumLength = adminPasswordPolicy.minimumLength;
+  readonly adminPasswordMaximumLength = adminPasswordPolicy.maximumLength;
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly onlineListener = (): void => {
@@ -90,7 +94,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   get canSubmitRequiredAdminPassword(): boolean {
     return (
-      this.requiredAdminPassword.length >= 8 &&
+      this.requiredAdminPassword.length >= adminPasswordPolicy.minimumLength &&
+      this.requiredAdminPassword.length <= adminPasswordPolicy.maximumLength &&
       this.requiredAdminPassword === this.requiredAdminPasswordConfirmation &&
       this.app.activeRequestLabel() === null
     );
@@ -99,9 +104,11 @@ export class AppComponent implements OnInit, OnDestroy {
   async submitRequiredAdminPassword(): Promise<void> {
     if (!this.canSubmitRequiredAdminPassword) {
       this.requiredAdminPasswordError =
-        this.requiredAdminPassword.length < 8
-          ? "The new password must contain at least 8 characters."
-          : "The password confirmation does not match.";
+        this.requiredAdminPassword.length < adminPasswordPolicy.minimumLength
+          ? `The new password must contain at least ${adminPasswordPolicy.minimumLength} characters.`
+          : this.requiredAdminPassword.length > adminPasswordPolicy.maximumLength
+            ? `The new password must contain no more than ${adminPasswordPolicy.maximumLength} characters.`
+            : "The password confirmation does not match.";
       return;
     }
     this.requiredAdminPasswordError = "";

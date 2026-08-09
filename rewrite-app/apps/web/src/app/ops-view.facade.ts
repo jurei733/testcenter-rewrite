@@ -13,6 +13,7 @@ import type {
   GetRuntimeDiagnosticsResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
+  adminPasswordPolicy,
   originalMonitorCustomTextDefaults,
   originalMonitorCustomTextKeys,
   originalParticipantCustomTextDefaults,
@@ -408,7 +409,7 @@ export class OpsViewFacade {
       this.canUseAdminSession &&
       this.adminRoleOptions.includes(this.ops.adminCreateRole) &&
       this.ops.adminCreateUsername.trim() !== "" &&
-      this.ops.adminCreatePassword !== "" &&
+      this.isAdminPasswordValid(this.ops.adminCreatePassword) &&
       this.isAdminCreateCustomTextsValid &&
       this.isAdminCreateAccessWindowValid &&
       this.isScopedAdminRoleInputComplete(
@@ -621,8 +622,16 @@ export class OpsViewFacade {
       this.canUseAdminManagement &&
       this.canUseAdminSession &&
       this.ops.adminResetTargetUserId.trim() !== "" &&
-      this.ops.adminResetPassword !== ""
+      this.isAdminPasswordValid(this.ops.adminResetPassword)
     );
+  }
+
+  get adminPasswordMinimumLength(): number {
+    return adminPasswordPolicy.minimumLength;
+  }
+
+  get adminPasswordMaximumLength(): number {
+    return adminPasswordPolicy.maximumLength;
   }
 
   get canUpdateAdminUserStatus(): boolean {
@@ -631,6 +640,13 @@ export class OpsViewFacade {
       this.canUseAdminSession &&
       this.ops.adminStatusTargetUserId.trim() !== "" &&
       this.adminStatusOptions.includes(this.ops.adminStatusValue)
+    );
+  }
+
+  private isAdminPasswordValid(password: string): boolean {
+    return (
+      password.length >= adminPasswordPolicy.minimumLength &&
+      password.length <= adminPasswordPolicy.maximumLength
     );
   }
 

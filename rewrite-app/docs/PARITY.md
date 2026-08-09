@@ -370,6 +370,13 @@ and signs the browser out. The scoped Admin Users directory exposes each
 pending handoff as both a badge and an explicit status row. API and protected
 Chromium/SQLite gates cover the complete flow.
 
+All administrator password mutation paths now enforce the shared 8–60
+character policy. The 60-character ceiling preserves the original
+Testcenter's protection against excessively expensive password hashing while
+retaining the rewrite's stronger eight-character minimum; API boundary tests
+prove that 60 characters are accepted and 61 are rejected, and the Angular
+create, reset, and required-change controls expose the same bounds.
+
 ## Exit criteria for “presentable with high parity”
 
 The application may be presented as high-parity only when:

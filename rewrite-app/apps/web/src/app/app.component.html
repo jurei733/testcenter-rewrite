@@ -62,7 +62,8 @@
           name="requiredAdminPassword"
           type="password"
           autocomplete="new-password"
-          minlength="8"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
           required
           [value]="requiredAdminPassword"
           (input)="updateRequiredAdminPassword($event)"
@@ -75,7 +76,8 @@
           name="requiredAdminPasswordConfirmation"
           type="password"
           autocomplete="new-password"
-          minlength="8"
+          [attr.minlength]="adminPasswordMinimumLength"
+          [attr.maxlength]="adminPasswordMaximumLength"
           required
           [value]="requiredAdminPasswordConfirmation"
           (input)="updateRequiredAdminPasswordConfirmation($event)"

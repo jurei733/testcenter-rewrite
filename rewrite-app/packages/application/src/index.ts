@@ -16,6 +16,7 @@ import { CodingScheme } from "@iqb/responses";
 import type { Response as IqbResponse } from "@iqb/responses";
 
 import {
+  adminPasswordPolicy,
   bookletNavigationDeniedReasons,
   compileBookletRuntimePolicy,
   isSupportedVeronaPlayerApiVersion,
@@ -1526,11 +1527,15 @@ const normalizeAdminUsername = (value: unknown): string => {
 };
 
 const requireAdminPassword = (value: unknown): string => {
-  if (typeof value !== "string" || value.length < 8) {
+  if (
+    typeof value !== "string" ||
+    value.length < adminPasswordPolicy.minimumLength ||
+    value.length > adminPasswordPolicy.maximumLength
+  ) {
     throw new FirstSliceError(
       400,
       "admin_password_policy_violation",
-      "Admin password must be at least 8 characters long."
+      `Admin password must contain ${adminPasswordPolicy.minimumLength} through ${adminPasswordPolicy.maximumLength} characters.`
     );
   }
 

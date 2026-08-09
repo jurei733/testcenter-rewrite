@@ -321,7 +321,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             New Password
-            <input id="adminCreatePassword" name="adminCreatePassword" type="password" autocomplete="new-password" [(ngModel)]="view.ops.adminCreatePassword" />
+            <input id="adminCreatePassword" name="adminCreatePassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.ops.adminCreatePassword" />
           </label>
           <label>
             Initial Role
@@ -434,7 +434,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           </label>
           <label>
             New Admin Password
-            <input id="adminResetPassword" name="adminResetPassword" type="password" autocomplete="new-password" [(ngModel)]="view.ops.adminResetPassword" />
+            <input id="adminResetPassword" name="adminResetPassword" type="password" autocomplete="new-password" [attr.minlength]="view.adminPasswordMinimumLength" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.ops.adminResetPassword" />
           </label>
         </div>
         <div class="actions">

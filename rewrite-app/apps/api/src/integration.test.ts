@@ -10,6 +10,7 @@ import { brotliDecompressSync, deflateRawSync } from "node:zlib";
 import { PDFDocument } from "pdf-lib";
 import { CodingScheme } from "@iqb/responses";
 import type { Response as IqbResponse } from "@iqb/responses";
+import { adminPasswordPolicy } from "@testcenter-rewrite-app/contracts";
 
 import { createProductionApiServer } from "./index.js";
 
@@ -417,6 +418,28 @@ test("system-check speed-test endpoints transfer exact package sizes", async () 
 });
 
 test("admin bootstrap and bearer session lifecycle", async () => {
+  const maximumLengthAdminPassword = "r".repeat(
+    adminPasswordPolicy.maximumLength
+  );
+  const overlongAdminPassword = "p".repeat(
+    adminPasswordPolicy.maximumLength + 1
+  );
+  const rejectedOverlongBootstrap = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/bootstrap",
+    {
+      method: "POST",
+      body: {
+        username: "Overlong.Bootstrap",
+        password: overlongAdminPassword
+      }
+    }
+  );
+  assert.equal(rejectedOverlongBootstrap.status, 400);
+  assert.equal(
+    rejectedOverlongBootstrap.body.error,
+    "admin_password_policy_violation"
+  );
+
   const bootstrap = await requestJson<{
     adminUser: {
       adminUserId: string;
@@ -938,6 +961,32 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "Admin Directory Workspace"
   );
 
+  const rejectedOverlongAdminUser = await requestJson<{ error: string }>(
+    "/api/v1/admin/users",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: {
+        username: "overlong.workspace.admin",
+        password: overlongAdminPassword,
+        roleAssignments: [
+          {
+            role: "workspace_admin",
+            tenantKey: adminTenantKey,
+            workspaceKey: adminWorkspaceKey
+          }
+        ]
+      }
+    }
+  );
+  assert.equal(rejectedOverlongAdminUser.status, 400);
+  assert.equal(
+    rejectedOverlongAdminUser.body.error,
+    "admin_password_policy_violation"
+  );
+
   const createdAdminUser = await requestJson<{
     adminUser: {
       adminUserId: string;
@@ -1352,6 +1401,22 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     "admin_role_assignment_not_found"
   );
 
+  const rejectedOverlongReset = await requestJson<{ error: string }>(
+    `/api/v1/admin/users/${createdAdminUser.body.adminUser.adminUserId}/password`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${signIn.body.sessionToken}`
+      },
+      body: { password: overlongAdminPassword }
+    }
+  );
+  assert.equal(rejectedOverlongReset.status, 400);
+  assert.equal(
+    rejectedOverlongReset.body.error,
+    "admin_password_policy_violation"
+  );
+
   const resetPassword = await requestJson<{
     adminUser: {
       adminUserId: string;
@@ -1364,7 +1429,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
     headers: {
       authorization: `Bearer ${signIn.body.sessionToken}`
     },
-    body: { password: "workspace-secret-reset" }
+    body: { password: maximumLengthAdminPassword }
   });
 
   assert.equal(resetPassword.status, 200);
@@ -1399,7 +1464,7 @@ test("admin bootstrap and bearer session lifecycle", async () => {
       method: "POST",
       body: {
         username: "workspace.admin",
-        password: "workspace-secret-reset"
+        password: maximumLengthAdminPassword
       }
     }
   );
@@ -1418,6 +1483,35 @@ test("admin bootstrap and bearer session lifecycle", async () => {
   assert.equal(blockedPasswordChangeRequiredDirectory.status, 403);
   assert.equal(
     blockedPasswordChangeRequiredDirectory.body.error,
+    "admin_password_change_required"
+  );
+
+  const rejectedOverlongOwnPassword = await requestJson<{ error: string }>(
+    "/api/v1/admin/auth/password",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+      },
+      body: { password: overlongAdminPassword }
+    }
+  );
+  assert.equal(rejectedOverlongOwnPassword.status, 400);
+  assert.equal(
+    rejectedOverlongOwnPassword.body.error,
+    "admin_password_policy_violation"
+  );
+
+  const stillBlockedAfterRejectedPassword = await requestJson<{
+    error: string;
+  }>("/api/v1/admin/users", {
+    headers: {
+      authorization: `Bearer ${resetPasswordSignIn.body.sessionToken}`
+    }
+  });
+  assert.equal(stillBlockedAfterRejectedPassword.status, 403);
+  assert.equal(
+    stillBlockedAfterRejectedPassword.body.error,
     "admin_password_change_required"
   );
 
