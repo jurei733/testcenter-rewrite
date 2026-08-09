@@ -244,7 +244,7 @@ describe("parseParticipantRosterText", () => {
         "  <CustomTexts><CustomText key=\"gm_headline\">Custom monitor</CustomText></CustomTexts>",
         "  <Profiles><GroupMonitor>",
         "    <Profile id=\"all\" label=\"All sessions\" view=\"full\" blockColumn=\"show\" unitColumn=\"show\" groupColumn=\"show\" bookletColumn=\"show\" bookletStatesColumns=\"level bonus\" autoselectNextBlock=\"no\" />",
-        "    <Profile id=\"small\" label=\"Reduced\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"hide\" bookletColumn=\"hide\" filterLocked=\"yes\" filterPending=\"yes\"><Filter label=\"Reduced Booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Reduced Booklet\" not=\"true\" /></Profile>",
+        "    <Profile id=\"small\" label=\"Reduced\" view=\"small\" blockColumn=\"hide\" unitColumn=\"hide\" groupColumn=\"hide\" bookletColumn=\"hide\" filterLocked=\"yes\" filterPending=\"yes\"><Filter label=\"Reduced Booklet\" type=\"equal\" field=\"bookletLabel\" value=\"Reduced Booklet\" not=\"1\" /><Filter label=\"Operator group\" type=\"equal\" field=\"groupName\" value=\"operators\" not=\"0\" /></Profile>",
         "  </GroupMonitor></Profiles>",
         "  <Group id=\"scheduled-operators\" validFrom=\"1/6/2023 10:00\" validFor=\"45\">",
         "    <Login mode=\"monitor-group\" name=\"group-monitor\" pw=\"secret\">",
@@ -303,6 +303,14 @@ describe("parseParticipantRosterText", () => {
                 label: "Reduced Booklet",
                 type: "equal",
                 not: true
+              },
+              {
+                target: "groupName",
+                value: "operators",
+                subValue: null,
+                label: "Operator group",
+                type: "equal",
+                not: false
               }
             ],
             filtersEnabled: { pending: "yes", locked: "yes" }

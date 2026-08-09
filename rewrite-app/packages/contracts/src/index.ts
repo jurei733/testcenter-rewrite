@@ -419,6 +419,13 @@ const readXmlAttribute = (
   return undefined;
 };
 
+const parseOriginalTestcenterXmlBoolean = (
+  value: string | undefined
+): boolean => {
+  const normalizedValue = value?.trim().toLowerCase();
+  return normalizedValue === "true" || normalizedValue === "1";
+};
+
 const readXmlChildText = (
   content: string,
   ...candidateTagNames: string[]
@@ -1655,9 +1662,9 @@ const parseOriginalTestcenterMonitorProfiles = (
             readXmlAttribute(filterAttributes, "subValue")?.trim() || null,
           label: readXmlAttribute(filterAttributes, "label")?.trim() || "",
           type: readXmlAttribute(filterAttributes, "type")?.trim() || "equal",
-          not:
-            readXmlAttribute(filterAttributes, "not")?.trim().toLowerCase() ===
-            "true"
+          not: parseOriginalTestcenterXmlBoolean(
+            readXmlAttribute(filterAttributes, "not")
+          )
         };
       }
     );

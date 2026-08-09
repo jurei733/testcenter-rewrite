@@ -13149,6 +13149,31 @@ test("original Testcenter compatibility corpus imports representative booklets",
     resolve(originalTestcenterCorpusRoot, corpus.roster.fixture),
     "utf8"
   );
+  const numericBooleanRoster = await requestJson<{
+    operationalLoginCandidates: Array<{
+      loginKey: string;
+      monitorProfiles: Array<{
+        profileId: string;
+        filters: Array<{ not: boolean }>;
+      }>;
+    }>;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`, {
+    method: "POST",
+    body: {
+      rosterText: validRosterXml.replace(
+        'field="bookletLabel"',
+        'field="bookletLabel" not="1"'
+      )
+    }
+  });
+  assert.equal(numericBooleanRoster.status, 201);
+  assert.equal(
+    numericBooleanRoster.body.operationalLoginCandidates
+      .find(candidate => candidate.loginKey === "test-group-monitor-2")
+      ?.monitorProfiles.find(profile => profile.profileId === "small")
+      ?.filters[0]?.not,
+    true
+  );
   const invalidRosterFacetCases = [
     {
       label: "legacy Testtakers schema file name",
