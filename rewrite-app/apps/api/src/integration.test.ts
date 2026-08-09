@@ -11564,6 +11564,30 @@ test("original Testcenter compatibility corpus imports representative booklets",
     diagnosticCode: string;
   }> = [
     {
+      fileName: "booklet-unsupported-root-attribute.xml",
+      sourceDocument: validBookletXml.replace(
+        "<Booklet ",
+        '<Booklet ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      fileName: "unit-unsupported-root-attribute.xml",
+      sourceDocument: validUnitXml.replace(
+        "<Unit ",
+        '<Unit ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      fileName: "syscheck-unsupported-root-attribute.xml",
+      sourceDocument: validSystemCheckXml.replace(
+        "<SysCheck ",
+        '<SysCheck ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
       fileName: "booklet-invalid-metadata-id.xml",
       sourceDocument: validBookletXml.replace(
         "<Id>BOOKLET.SAMPLE-1</Id>",
@@ -12552,6 +12576,18 @@ test("original Testcenter compatibility corpus imports representative booklets",
       entryFileName: "export/items/malformed.xml",
       entryDocument: "<item><prompt>Malformed dependency</item>",
       diagnosticCode: "source_document_xml_malformed"
+    },
+    {
+      fileName: "invalid-root-attribute-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml
+        .replace("xmlns:xsi=", "xmlns:schema=")
+        .replace(
+          "xsi:noNamespaceSchemaLocation=",
+          "schema:noNamespaceSchemaLocation="
+        )
+        .replace("<Booklet ", '<Booklet ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
     }
   ]) {
     const zipPayload = createZipBase64([
@@ -12623,6 +12659,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "utf8"
   );
   const invalidRosterFacetCases = [
+    {
+      label: "unsupported Testtakers root attribute",
+      rosterText: validRosterXml.replace(
+        "<Testtakers ",
+        '<Testtakers ignored="true" '
+      ),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
     {
       label: "monitor profiles before schema 15.3",
       rosterText: validRosterXml.replace(

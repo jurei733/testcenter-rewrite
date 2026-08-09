@@ -7942,6 +7942,27 @@ const xmlUnsupportedAttributeNames = (
   return unsupportedAttributeNames;
 };
 
+const xmlUnsupportedTestcenterRootAttributeNames = (
+  element: XmlElement
+): string[] => {
+  const unsupportedAttributeNames: string[] = [];
+  for (let index = 0; index < element.attributes.length; index += 1) {
+    const attribute = element.attributes.item(index);
+    if (
+      !attribute ||
+      attribute.name === "xmlns" ||
+      attribute.name.startsWith("xmlns:") ||
+      (attribute.namespaceURI ===
+        "http://www.w3.org/2001/XMLSchema-instance" &&
+        attribute.localName === "noNamespaceSchemaLocation")
+    ) {
+      continue;
+    }
+    unsupportedAttributeNames.push(attribute.name);
+  }
+  return unsupportedAttributeNames;
+};
+
 const xmlDescendantsNamed = (element: XmlElement, name: string): XmlElement[] => {
   const matches: XmlElement[] = [];
   const descendants = element.getElementsByTagName("*");
@@ -8356,6 +8377,15 @@ const validateTestcenterXmlSourceDocument = (
       createImportDiagnostic(
         "testcenter_xml_schema_reference_invalid",
         `Original Testcenter XML '${sourceFileName}' references schema '${schemaLocation}', which does not match '${canonicalRootName}'.`
+      )
+    );
+  }
+
+  for (const attributeName of xmlUnsupportedTestcenterRootAttributeNames(root)) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_root_attribute_invalid",
+        `Original Testcenter ${canonicalRootName} '${sourceFileName}' contains unsupported root attribute '${attributeName}'.`
       )
     );
   }
