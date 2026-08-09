@@ -28909,6 +28909,86 @@ test("source document import rejects ZIP XML integrity failures", async () => {
   assert.equal(importResult.body.stagedContentRelease, null);
 });
 
+test("source document import rejects unsafe nested resource paths", async () => {
+  const tenantKey = "integration-tenant-unsafe-nested-resource";
+  const workspaceKey = "integration-workspace-unsafe-nested-resource";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const unsafeEntryNames = [
+    "../escape.bin",
+    "/absolute.bin",
+    "C:/drive.bin",
+    "folder\\backslash.bin",
+    "folder/../normalized.bin"
+  ];
+  const nestedPackage = Buffer.from(
+    createZipBase64([
+      { fileName: "safe.bin", content: "safe" },
+      ...unsafeEntryNames.map(fileName => ({ fileName, content: "unsafe" }))
+    ]),
+    "base64"
+  );
+  const zipPayload = createZipBase64([
+    {
+      fileName: "imsmanifest.xml",
+      content:
+        '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources /></manifest>'
+    },
+    {
+      fileName: "resources/runtime-assets.itcr.zip",
+      content: "",
+      compressedContent: nestedPackage,
+      uncompressedSize: nestedPackage.length,
+      checksum: zipFixtureCrc32(nestedPackage)
+    }
+  ]);
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "unsafe-nested-resource.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  const importResult = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "failed");
+  assert.deepEqual(
+    importResult.body.importJob.diagnostics.map(diagnostic => diagnostic.code),
+    unsafeEntryNames.map(() => "source_document_resource_path_invalid")
+  );
+  assert.deepEqual(
+    importResult.body.importJob.diagnostics.map(
+      diagnostic => diagnostic.message.match(/entry '([^']+)'/)?.[1]
+    ),
+    unsafeEntryNames
+  );
+  assert.equal(importResult.body.stagedContentRelease, null);
+});
+
 test("source document import resolves IMS resource dependencies", async () => {
   const tenantKey = "integration-tenant-ims-dependencies";
   const workspaceKey = "integration-workspace-ims-dependencies";

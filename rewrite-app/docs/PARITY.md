@@ -358,6 +358,12 @@ requires both entries to fail staging with the stable
 `source_document_zip_xml_unreadable` diagnostic instead of entering the
 dependency graph as apparently valid content.
 
+Nested `.itcr.zip` resource packages now apply the same safe relative-path
+contract as the outer upload before resource projection. Traversal segments,
+absolute and drive-qualified paths, backslashes, control characters, and
+overlong names fail with `source_document_resource_path_invalid`; valid sibling
+resources remain bounded and CRC-checked.
+
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |
 | JSON/XML/ZIP package intake | `WorkspaceController`, file parsers | partial | P0 | staged immutable releases, retry diagnostics, IMS/Testcenter aliases, referenced ZIP content, manifest-resource-ID resolution for original unit references, ZIP-relative IQB coding-scheme dependencies, nested original `.itcr.zip` extraction/delivery, and a pinned 14.3/15.1/17.4/17.6 corpus whose real adaptive, Session-Management, SysCheck, and complete three-unit Aspect samples bundle complete dependency sets. Source-package create/replace/retry routes use a separate bounded 72 MiB JSON-body limit, so the enforced 50 MiB extracted-package ceiling remains reachable for base64 uploads without weakening ordinary API commands. ZIP manifest reads remain capped at 5 MiB, while referenced resources use the intended 20 MiB per-entry ceiling: the original 16.17 MB Aspect definition imports byte-exactly and a declared resource above 20 MiB is rejected with a stable diagnostic. XSD-declared Units block staging when `DefinitionRef`, player, or player-targeted file dependencies are absent, while relative, manifest-backed, and unambiguous original workspace-style names resolve. Angular and API accept a loose multi-file upload; importing a Booklet or SysCheck automatically follows uniquely matching Unit/player/definition/variables/coding/resource references, stores the closure as a CRC-valid immutable ZIP with member lineage, and imports it immediately. Explicit reviewed assembly remains for ambiguous names and preserves or synthesizes compatible resource aliases, including modern `id@version-major.minor` and original `id-version-major.minor` player references, but not `id@specVersion`; production package variants remain |

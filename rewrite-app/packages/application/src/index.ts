@@ -15579,6 +15579,15 @@ const extractNestedResourcePackages = (
       entry => !entry.fileName.endsWith("/")
     );
     for (const nestedEntry of nestedEntries) {
+      if (!isSafeRelativeArchivePath(nestedEntry.fileName, false)) {
+        diagnostics.push(
+          createImportDiagnostic(
+            "source_document_resource_path_invalid",
+            `Resource package '${packageEntry.fileName}' contains an unsafe or duplicate entry '${nestedEntry.fileName}'.`
+          )
+        );
+        continue;
+      }
       const nestedPath = normalizeZipEntryPath(nestedEntry.fileName);
       const resourcePath = normalizeZipEntryPath(`${packageKey}/${nestedPath}`);
       const normalizedLookupPath = resourcePath.toLowerCase();
