@@ -13,6 +13,10 @@ import type {
   GetRuntimeDiagnosticsResponse
 } from "@testcenter-rewrite-app/contracts";
 import {
+  originalParticipantCustomTextDefaults,
+  originalParticipantCustomTextKeys
+} from "@testcenter-rewrite-app/contracts";
+import {
   adminAuditEventTypes,
   applicationThemeNames,
   defaultApplicationSettings,
@@ -212,6 +216,9 @@ export class OpsViewFacade {
   applicationThemeDraft: ApplicationSettings["themeName"] =
     defaultApplicationSettings.themeName;
   readonly applicationThemeOptions = applicationThemeNames;
+  applicationCustomTextDrafts: Record<string, string> = {};
+  applicationCustomTextNewKey = "";
+  applicationCustomTextNewValue = "";
   applicationWarningTextDraft = "";
   applicationWarningExpiresAtDraft = "";
 
@@ -257,8 +264,52 @@ export class OpsViewFacade {
       this.applicationTitleDraft.trim().length <= 120 &&
       this.applicationLogoDraft.length <= 28_000_000 &&
       !this.applicationLogoDraftError &&
+      this.applicationCustomTextsValid &&
       this.applicationWarningTextDraft.trim().length <= 4_000 &&
       this.isApplicationWarningExpirationValid
+    );
+  }
+
+  get applicationCustomTextKeys(): string[] {
+    return [...new Set([
+      ...originalParticipantCustomTextKeys,
+      ...Object.keys(this.applicationCustomTextDrafts)
+    ])].sort((left, right) => left.localeCompare(right));
+  }
+
+  applicationCustomTextDefault(key: string): string {
+    return originalParticipantCustomTextDefaults[
+      key as keyof typeof originalParticipantCustomTextDefaults
+    ] ?? "";
+  }
+
+  get applicationCustomTextsValid(): boolean {
+    const entries = Object.entries(this.normalizedApplicationCustomTexts());
+    if (entries.length > 250) {
+      return false;
+    }
+    let totalBytes = 0;
+    for (const [key, value] of entries) {
+      const valueBytes = new TextEncoder().encode(value).length;
+      totalBytes += new TextEncoder().encode(key).length + valueBytes;
+      if (
+        !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) ||
+        key.length > 120 ||
+        valueBytes > 10_000 ||
+        totalBytes > 250_000
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  get canAddApplicationCustomText(): boolean {
+    const key = this.applicationCustomTextNewKey.trim();
+    return (
+      /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) &&
+      key.length <= 120 &&
+      Boolean(this.applicationCustomTextNewValue.trim())
     );
   }
 
@@ -619,6 +670,7 @@ export class OpsViewFacade {
           appTitle: this.applicationTitleDraft,
           mainLogo: this.applicationLogoDraft,
           themeName: this.applicationThemeDraft,
+          customTexts: this.normalizedApplicationCustomTexts(),
           globalWarningText: this.applicationWarningTextDraft,
           globalWarningExpiresAt: expirationInput
             ? new Date(expirationInput).toISOString()
@@ -632,6 +684,41 @@ export class OpsViewFacade {
   clearApplicationWarning(): void {
     this.applicationWarningTextDraft = "";
     this.applicationWarningExpiresAtDraft = "";
+  }
+
+  addApplicationCustomText(): void {
+    if (!this.canAddApplicationCustomText) {
+      return;
+    }
+    this.applicationCustomTextDrafts = {
+      ...this.applicationCustomTextDrafts,
+      [this.applicationCustomTextNewKey.trim()]:
+        this.applicationCustomTextNewValue.trim()
+    };
+    this.applicationCustomTextNewKey = "";
+    this.applicationCustomTextNewValue = "";
+  }
+
+  removeApplicationCustomText(key: string): void {
+    const { [key]: _removed, ...remaining } = this.applicationCustomTextDrafts;
+    this.applicationCustomTextDrafts = remaining;
+  }
+
+  resetApplicationCustomTexts(): void {
+    this.applicationCustomTextDrafts = {};
+    this.applicationCustomTextNewKey = "";
+    this.applicationCustomTextNewValue = "";
+  }
+
+  setApplicationCustomTextToDefault(key: string): void {
+    const defaultValue = this.applicationCustomTextDefault(key);
+    if (!defaultValue) {
+      return;
+    }
+    this.applicationCustomTextDrafts = {
+      ...this.applicationCustomTextDrafts,
+      [key]: defaultValue
+    };
   }
 
   selectApplicationLogo(event: Event): void {
@@ -2914,10 +3001,25 @@ export class OpsViewFacade {
     this.applicationLogoDraft = settings.mainLogo;
     this.applicationLogoDraftError = "";
     this.applicationThemeDraft = settings.themeName;
+    this.applicationCustomTextDrafts = { ...settings.customTexts };
+    this.applicationCustomTextNewKey = "";
+    this.applicationCustomTextNewValue = "";
     this.applicationWarningTextDraft = settings.globalWarningText ?? "";
     this.applicationWarningExpiresAtDraft = settings.globalWarningExpiresAt
       ? this.toLocalDateTimeInput(settings.globalWarningExpiresAt)
       : "";
+  }
+
+  private normalizedApplicationCustomTexts(): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(this.applicationCustomTextDrafts).flatMap(([key, value]) => {
+        const normalizedKey = key.trim();
+        const normalizedValue = value.trim();
+        return normalizedKey && normalizedValue
+          ? [[normalizedKey, normalizedValue] as const]
+          : [];
+      })
+    );
   }
 
   private toLocalDateTimeInput(timestamp: string): string {

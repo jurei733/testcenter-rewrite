@@ -29,6 +29,7 @@ import type {
 } from "@testcenter-rewrite-app/domain";
 
 import { downloadBlobFile, downloadTextFile } from "./download-text-file";
+import { ApplicationSettingsService } from "./application-settings.service";
 import { RewriteAppApiService } from "./rewrite-app-api.service";
 import { RewriteAppOperatorAccessService } from "./rewrite-app-operator-access.service";
 import { RewriteAppOpsService } from "./rewrite-app-ops.service";
@@ -378,6 +379,7 @@ export class SystemCheckViewComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly api = inject(RewriteAppApiService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly opsService = inject(RewriteAppOpsService);
   private readonly uiState = inject(RewriteAppUiStateService);
@@ -865,7 +867,11 @@ export class SystemCheckViewComponent implements OnInit {
   }
 
   customText(key: string, fallback: string): string {
-    return this.systemCheck?.customTexts[key]?.trim() || fallback;
+    return (
+      this.systemCheck?.customTexts[key]?.trim() ||
+      this.applicationSettings.settings().customTexts[key]?.trim() ||
+      fallback
+    );
   }
 
   onUnitResponse(response: string): void {

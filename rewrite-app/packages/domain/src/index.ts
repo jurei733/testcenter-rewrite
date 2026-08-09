@@ -408,6 +408,7 @@ export type ApplicationSettings = {
   appTitle: string;
   mainLogo: string;
   themeName: ApplicationThemeName;
+  customTexts: Record<string, string>;
   globalWarningText: string | null;
   globalWarningExpiresAt: string | null;
   updatedAt: string | null;
@@ -418,6 +419,7 @@ export const defaultApplicationSettings: ApplicationSettings = {
   appTitle: "IQB-Testcenter",
   mainLogo: "app-icon.svg",
   themeName: "Primar",
+  customTexts: {},
   globalWarningText: null,
   globalWarningExpiresAt: null,
   updatedAt: null,
@@ -550,6 +552,7 @@ export type SourcePackagePlayerEntry = {
 export type SourcePackageBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  customTexts?: Record<string, string>;
   config?: Record<string, string>;
   rootRestrictions?: BookletRootRestrictions;
   stateEntries?: SourcePackageBookletStateEntry[];
@@ -777,6 +780,7 @@ export type ContentReleaseResourceEntry = {
 export type ContentReleaseBookletEntry = {
   bookletKey: string;
   displayLabel: string;
+  customTexts?: Record<string, string>;
   policy?: BookletRuntimePolicy;
   rootRestrictions?: BookletRootRestrictions;
   stateEntries?: SourcePackageBookletStateEntry[];
@@ -1080,6 +1084,7 @@ export type ParticipantRuntimeBooklet = {
   sourceBookletKey: string;
   statePreset: Record<string, string>;
   displayLabel: string;
+  customTexts?: Record<string, string>;
   status: "available" | "in_progress" | "locked" | "completed";
 };
 

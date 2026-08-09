@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from "@angular/core";
+import { Injectable, effect, inject, signal } from "@angular/core";
 
 import type {
   CompleteTestRunRequest,
@@ -26,6 +26,7 @@ import type {
 } from "@testcenter-rewrite-app/contracts";
 import {
   type ParticipantCustomTextKey,
+  mergeParticipantCustomTextScopes,
   parseVeronaUnitResponse,
   productionApiRoutes,
   resolveAndFormatParticipantCustomText,
@@ -50,6 +51,7 @@ import {
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
+import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
@@ -226,11 +228,18 @@ export class ParticipantViewFacade {
   private readonly uiState = inject(RewriteAppUiStateService);
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly browserCompatibility = inject(BrowserCompatibilityService);
+  private readonly applicationSettings = inject(ApplicationSettingsService);
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
   assignedBooklets: ParticipantRuntimeBooklet[] = [];
+  private participantRosterCustomTexts: Record<string, string> = {};
+  private participantBookletCustomTexts: Record<string, string> = {};
   private participantCustomTexts: Record<string, string> = {};
+  private readonly applicationCustomTextEffect = effect(() => {
+    this.applicationSettings.settings().customTexts;
+    this.syncParticipantCustomTexts();
+  });
   participantCodeRequired = false;
   veronaSaveStatus:
     | "not_saved"
@@ -1430,10 +1439,26 @@ export class ParticipantViewFacade {
     this.presentedActiveTimers.clear();
   }
 
-  private setParticipantCustomTexts(
+  private setParticipantRosterCustomTexts(
     customTexts: Readonly<Record<string, string>>
   ): void {
-    this.participantCustomTexts = { ...customTexts };
+    this.participantRosterCustomTexts = { ...customTexts };
+    this.syncParticipantCustomTexts();
+  }
+
+  private setParticipantBookletCustomTexts(
+    customTexts: Readonly<Record<string, string>>
+  ): void {
+    this.participantBookletCustomTexts = { ...customTexts };
+    this.syncParticipantCustomTexts();
+  }
+
+  private syncParticipantCustomTexts(): void {
+    this.participantCustomTexts = mergeParticipantCustomTextScopes(
+      this.applicationSettings.settings().customTexts,
+      this.participantRosterCustomTexts,
+      this.participantBookletCustomTexts
+    );
     this.browserCompatibility.setCustomTexts(this.participantCustomTexts);
   }
 
@@ -2032,6 +2057,7 @@ export class ParticipantViewFacade {
     this.syncParticipantRosterEntry(payload.participantRosterEntry);
     this.syncRuntimeBooklets(payload.booklets);
     this.runtime.testRunId = "";
+    this.syncActiveBookletCustomTexts();
     this.runtime.currentUnitKey = "";
     this.runtime.currentUnitResponse = "";
     this.currentRunState = null;
@@ -2076,7 +2102,8 @@ export class ParticipantViewFacade {
     this.queuedVeronaLogs = [];
     this.veronaSaveStatus = "not_saved";
     this.participantCodeRequired = false;
-    this.setParticipantCustomTexts({});
+    this.setParticipantRosterCustomTexts({});
+    this.setParticipantBookletCustomTexts({});
     this.runtime.participantCode = "";
     if (
       !this.runtime.participantSessionId.trim() &&
@@ -2119,7 +2146,7 @@ export class ParticipantViewFacade {
     if (details && typeof details === "object" && "customTexts" in details) {
       const customTexts = (details as { customTexts?: unknown }).customTexts;
       if (customTexts && typeof customTexts === "object" && !Array.isArray(customTexts)) {
-        this.setParticipantCustomTexts(Object.fromEntries(
+        this.setParticipantRosterCustomTexts(Object.fromEntries(
           Object.entries(customTexts).filter(
             (entry): entry is [string, string] => typeof entry[1] === "string"
           )
@@ -2948,6 +2975,7 @@ export class ParticipantViewFacade {
     if (testRun.currentUnitKey != null) {
       this.runtime.currentUnitKey = testRun.currentUnitKey;
     }
+    this.syncActiveBookletCustomTexts();
   }
 
   private syncParticipantSessionFields(participantSession: {
@@ -2987,7 +3015,7 @@ export class ParticipantViewFacade {
   ): void {
     this.runtime.participantDisplayName =
       participantRosterEntry?.displayName?.trim() ?? "";
-    this.setParticipantCustomTexts(participantRosterEntry?.customTexts ?? {});
+    this.setParticipantRosterCustomTexts(participantRosterEntry?.customTexts ?? {});
   }
 
   private syncRuntimeBooklets(booklets: ParticipantRuntimeBooklet[]): void {
@@ -2996,6 +3024,7 @@ export class ParticipantViewFacade {
       booklet => booklet.bookletKey === this.runtime.bookletKey.trim()
     );
     if (selectedBooklet && selectedBooklet.status !== "completed") {
+      this.syncActiveBookletCustomTexts();
       return;
     }
 
@@ -3008,6 +3037,18 @@ export class ParticipantViewFacade {
     if (nextBooklet) {
       this.runtime.bookletKey = nextBooklet.bookletKey;
     }
+    this.syncActiveBookletCustomTexts();
+  }
+
+  private syncActiveBookletCustomTexts(): void {
+    if (!this.runtime.testRunId.trim()) {
+      this.setParticipantBookletCustomTexts({});
+      return;
+    }
+    const activeBooklet = this.assignedBooklets.find(
+      booklet => booklet.bookletKey === this.runtime.bookletKey.trim()
+    );
+    this.setParticipantBookletCustomTexts(activeBooklet?.customTexts ?? {});
   }
 
   formatBookletVariant(booklet: ParticipantRuntimeBooklet): string {

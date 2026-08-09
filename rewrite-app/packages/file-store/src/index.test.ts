@@ -64,6 +64,7 @@ describe("createFileFirstSliceRepository", () => {
         appTitle: "Assessment Portal",
         mainLogo: "data:image/png;base64,iVBORw0KGgo=",
         themeName: "Sekundar",
+        customTexts: { login_subtitle: "Global start" },
         globalWarningText: "Maintenance tonight",
         globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
         updatedAt: "2026-08-08T20:00:00.000Z",
@@ -76,6 +77,7 @@ describe("createFileFirstSliceRepository", () => {
           appTitle: "Assessment Portal",
           mainLogo: "data:image/png;base64,iVBORw0KGgo=",
           themeName: "Sekundar",
+          customTexts: { login_subtitle: "Global start" },
           globalWarningText: "Maintenance tonight",
           globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
           updatedAt: "2026-08-08T20:00:00.000Z",
@@ -87,7 +89,7 @@ describe("createFileFirstSliceRepository", () => {
     }
   });
 
-  it("normalizes legacy application settings with branding defaults", async () => {
+  it("normalizes legacy application settings with current defaults", async () => {
     const tempDirectory = await mkdtemp(join(tmpdir(), "file-store-branding-"));
     const filePath = join(tempDirectory, "state.json");
 
@@ -110,6 +112,7 @@ describe("createFileFirstSliceRepository", () => {
       assert.equal(settings?.appTitle, "Legacy Portal");
       assert.equal(settings?.mainLogo, "app-icon.svg");
       assert.equal(settings?.themeName, "Primar");
+      assert.deepEqual(settings?.customTexts, {});
     } finally {
       await rm(tempDirectory, { recursive: true, force: true });
     }

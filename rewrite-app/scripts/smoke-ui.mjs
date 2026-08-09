@@ -956,6 +956,15 @@ try {
   logStep("application-settings");
   await page.locator("#applicationSettingsCard").waitFor();
   await expectInputValue("#applicationTitleInput", "IQB-Testcenter");
+  await page.locator("#applicationCustomTextsEditor summary").click();
+  await fillAndCommit(
+    "#applicationCustomText-login_subtitle",
+    "UI Global Selection"
+  );
+  await fillAndCommit(
+    "#applicationCustomText-login_testResumeButtonLabel",
+    "UI Global Resume"
+  );
   await page.locator("#applicationThemeSelect").selectOption({ label: "Sekundar" });
   const configuredLogoBase64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -1051,6 +1060,10 @@ try {
     configuredSettingsPayload.applicationSettings.themeName,
     "Sekundar"
   );
+  assert.deepEqual(configuredSettingsPayload.applicationSettings.customTexts, {
+    login_subtitle: "UI Global Selection",
+    login_testResumeButtonLabel: "UI Global Resume"
+  });
   assert.equal(
     configuredSettingsPayload.applicationSettings.globalWarningText,
     "UI smoke planned maintenance warning"
@@ -1058,6 +1071,77 @@ try {
   assert.match(
     configuredSettingsPayload.applicationSettings.globalWarningExpiresAt,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/
+  );
+
+  const customTextTenantKey = "ui-custom-text-tenant";
+  const customTextWorkspaceKey = "ui-custom-text-workspace";
+  const customTextBookletKey = "BOOKLET.UI-CUSTOM-TEXT";
+  const customTextUnitKey = "UNIT.UI-CUSTOM-TEXT";
+  await sendSmokeJson(`${baseUrl}/api/v1/platform/tenants`, {
+    body: {
+      tenantKey: customTextTenantKey,
+      displayName: "UI Custom Text Tenant"
+    }
+  });
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces`,
+    {
+      body: {
+        workspaceKey: customTextWorkspaceKey,
+        displayName: "UI Custom Text Workspace"
+      }
+    }
+  );
+  const customTextArchive = createStoredZipBuffer([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `<manifest><resources><resource identifier="${customTextBookletKey}" href="booklets/Booklet.xml" /><resource identifier="${customTextUnitKey}" href="units/Unit.xml" /></resources></manifest>`
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `<Booklet><Metadata><Id>${customTextBookletKey}</Id><Label>UI Custom Text Booklet</Label></Metadata><CustomTexts><CustomText key="login_testResumeButtonLabel">UI Booklet Resume</CustomText></CustomTexts><Units><Unit id="${customTextUnitKey}" alias="ui-custom-text-unit" label="UI Custom Text Unit" /></Units></Booklet>`
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `<Unit><Metadata><Id>${customTextUnitKey}</Id><Label>UI Custom Text Unit</Label></Metadata></Unit>`
+    }
+  ]);
+  const customTextSourceResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/source-packages`,
+    {
+      body: {
+        fileName: "ui-custom-text-export.zip",
+        mediaType: "application/zip",
+        sourceDocument: `data:application/zip;base64,${customTextArchive.toString("base64")}`
+      }
+    }
+  );
+  const customTextSourcePayload = await customTextSourceResponse.json();
+  const customTextImportResponse = await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/import-jobs`,
+    {
+      body: {
+        sourcePackageId: customTextSourcePayload.sourcePackage.sourcePackageId
+      }
+    }
+  );
+  const customTextImportPayload = await customTextImportResponse.json();
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/content-releases/${customTextImportPayload.stagedContentRelease.contentReleaseId}/activate`,
+    { body: { activatedByActorId: "ui-custom-text-smoke" } }
+  );
+  await sendSmokeJson(
+    `${baseUrl}/api/v1/tenants/${customTextTenantKey}/workspaces/${customTextWorkspaceKey}/participant-roster`,
+    {
+      body: {
+        rosterText: [
+          "<Testtakers>",
+          "  <CustomTexts><CustomText key=\"login_subtitle\">UI Workspace Selection</CustomText><CustomText key=\"login_testResumeButtonLabel\">UI Workspace Resume</CustomText></CustomTexts>",
+          `  <Group id="ui-custom-text-group"><Login mode="run-hot-return" name="ui-custom-text-login"><Booklet>${customTextBookletKey}</Booklet></Login></Group>`,
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
   );
 
   const brandedParticipantPage = await context.newPage();
@@ -1079,6 +1163,43 @@ try {
     },
     configuredLogo
   );
+  await brandedParticipantPage
+    .locator("#participantCustomLoginSubtitle")
+    .filter({ hasText: "UI Global Selection" })
+    .waitFor();
+  await brandedParticipantPage
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "UI Global Resume" })
+    .waitFor();
+  await brandedParticipantPage
+    .locator("#participantTenantKey")
+    .fill(customTextTenantKey);
+  await brandedParticipantPage
+    .locator("#participantWorkspaceKey")
+    .fill(customTextWorkspaceKey);
+  await brandedParticipantPage
+    .locator("#participantLoginKey")
+    .fill("ui-custom-text-login");
+  await brandedParticipantPage.locator("#participantRouteSignInButton").click();
+  await brandedParticipantPage.waitForFunction(() => {
+    const sessionId = document.querySelector("#participantRouteSessionId");
+    return sessionId instanceof HTMLInputElement && sessionId.value.length > 0;
+  });
+  await brandedParticipantPage
+    .locator("#participantCustomLoginSubtitle")
+    .filter({ hasText: "UI Workspace Selection" })
+    .waitFor();
+  await brandedParticipantPage
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "UI Workspace Resume" })
+    .waitFor();
+  await brandedParticipantPage
+    .locator("#participantRouteStartOrResumeButton")
+    .click();
+  await brandedParticipantPage
+    .locator("#participantRouteStartOrResumeButton")
+    .filter({ hasText: "UI Booklet Resume" })
+    .waitFor();
   await brandedParticipantPage.close();
 
   await fillAndCommit(
@@ -1091,6 +1212,7 @@ try {
   await fillAndCommit("#applicationTitleInput", "IQB-Testcenter");
   await page.locator("#applicationThemeSelect").selectOption({ label: "Primar" });
   await page.locator("#resetApplicationLogoButton").click();
+  await page.locator("#resetApplicationCustomTextsButton").click();
   await fillAndCommit("#applicationWarningTextInput", "");
   await fillAndCommit("#applicationWarningExpiresAtInput", "");
   await clickAction("Save Application Settings");

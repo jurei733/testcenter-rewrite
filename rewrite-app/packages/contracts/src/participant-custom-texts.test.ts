@@ -3,11 +3,32 @@ import test from "node:test";
 
 import {
   formatOriginalCustomText,
+  mergeParticipantCustomTextScopes,
   originalParticipantCustomTextDefaults,
   originalParticipantCustomTextKeys,
   resolveAndFormatParticipantCustomText,
   resolveParticipantCustomText
 } from "./participant-custom-texts.js";
+
+test("participant custom-text scopes follow original global-login-booklet precedence", () => {
+  assert.deepEqual(
+    mergeParticipantCustomTextScopes(
+      {
+        login_subtitle: "Global selection",
+        booklet_loading: "Global loading"
+      },
+      {
+        login_subtitle: "Workspace selection",
+        booklet_loading: "Workspace loading"
+      },
+      { booklet_loading: "Booklet loading" }
+    ),
+    {
+      login_subtitle: "Workspace selection",
+      booklet_loading: "Booklet loading"
+    }
+  );
+});
 
 test("participant custom-text catalog preserves the complete original key set", () => {
   assert.equal(originalParticipantCustomTextKeys.length, 42);

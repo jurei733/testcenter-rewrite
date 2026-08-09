@@ -1678,6 +1678,7 @@ test("platform application settings are public, durable, validated, and audited"
       appTitle: string;
       mainLogo: string;
       themeName: string;
+      customTexts: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -1689,6 +1690,7 @@ test("platform application settings are public, durable, validated, and audited"
     appTitle: "IQB-Testcenter",
     mainLogo: "app-icon.svg",
     themeName: "Primar",
+    customTexts: {},
     globalWarningText: null,
     globalWarningExpiresAt: null,
     updatedAt: null,
@@ -1823,6 +1825,23 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(invalidTheme.status, 400);
   assert.equal(invalidTheme.body.error, "application_theme_invalid");
 
+  const invalidCustomTexts = await requestJson<{ error: string }>(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "Configured Testcenter",
+        customTexts: { "invalid key": "No" }
+      }
+    }
+  );
+  assert.equal(invalidCustomTexts.status, 400);
+  assert.equal(
+    invalidCustomTexts.body.error,
+    "application_custom_texts_invalid"
+  );
+
   const invalidLogo = await requestJson<{ error: string }>(
     "/api/v1/admin/application-settings",
     {
@@ -1845,6 +1864,7 @@ test("platform application settings are public, durable, validated, and audited"
       appTitle: string;
       mainLogo: string;
       themeName: string;
+      customTexts: Record<string, string>;
       globalWarningText: string | null;
       globalWarningExpiresAt: string | null;
       updatedAt: string | null;
@@ -1857,6 +1877,10 @@ test("platform application settings are public, durable, validated, and audited"
       appTitle: "  Configured Testcenter  ",
       mainLogo: configuredLogo,
       themeName: "Sekundar",
+      customTexts: {
+        login_subtitle: "  Global test selection  ",
+        login_testResumeButtonLabel: "Begin"
+      },
       globalWarningText: "  Planned maintenance from 18:00.  ",
       globalWarningExpiresAt: "2050-12-12T19:00:00+01:00"
     }
@@ -1868,6 +1892,10 @@ test("platform application settings are public, durable, validated, and audited"
   );
   assert.equal(updatedSettings.body.applicationSettings.mainLogo, configuredLogo);
   assert.equal(updatedSettings.body.applicationSettings.themeName, "Sekundar");
+  assert.deepEqual(updatedSettings.body.applicationSettings.customTexts, {
+    login_subtitle: "Global test selection",
+    login_testResumeButtonLabel: "Begin"
+  });
   assert.equal(
     updatedSettings.body.applicationSettings.globalWarningText,
     "Planned maintenance from 18:00."
@@ -1918,6 +1946,11 @@ test("platform application settings are public, durable, validated, and audited"
     "Sekundar"
   );
   assert.equal(settingsAudit.body.items[0]?.details["nextCustomLogo"], true);
+  assert.equal(settingsAudit.body.items[0]?.details["nextCustomTextCount"], 2);
+  assert.deepEqual(
+    settingsAudit.body.items[0]?.details["changedCustomTextKeys"],
+    ["login_subtitle", "login_testResumeButtonLabel"]
+  );
 
   const resetSettings = await requestJson<typeof updatedSettings.body>(
     "/api/v1/admin/application-settings",
@@ -1928,6 +1961,7 @@ test("platform application settings are public, durable, validated, and audited"
         appTitle: "",
         mainLogo: "",
         themeName: "Primar",
+        customTexts: {},
         globalWarningText: "",
         globalWarningExpiresAt: null
       }
@@ -1937,8 +1971,221 @@ test("platform application settings are public, durable, validated, and audited"
   assert.equal(resetSettings.body.applicationSettings.appTitle, "IQB-Testcenter");
   assert.equal(resetSettings.body.applicationSettings.mainLogo, "app-icon.svg");
   assert.equal(resetSettings.body.applicationSettings.themeName, "Primar");
+  assert.deepEqual(resetSettings.body.applicationSettings.customTexts, {});
   assert.equal(resetSettings.body.applicationSettings.globalWarningText, null);
   assert.equal(resetSettings.body.applicationSettings.globalWarningExpiresAt, null);
+});
+
+test("participant custom texts retain global-login-booklet precedence inputs", async () => {
+  const tenantKey = "custom-text-tenant";
+  const workspaceKey = "custom-text-workspace";
+  const bookletKey = "BOOKLET.CUSTOM-TEXTS";
+  const unitKey = "UNIT.CUSTOM-TEXTS";
+  let signIn = await requestJson<{ sessionToken: string }>(
+    "/api/v1/admin/auth/sign-in",
+    {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        password: "integration-secret"
+      }
+    }
+  );
+  if (signIn.status === 401) {
+    const bootstrap = await requestJson("/api/v1/admin/auth/bootstrap", {
+      method: "POST",
+      body: {
+        username: "integration.admin",
+        displayName: "Integration Admin",
+        password: "integration-secret"
+      }
+    });
+    assert.equal(bootstrap.status, 201);
+    signIn = await requestJson<{ sessionToken: string }>(
+      "/api/v1/admin/auth/sign-in",
+      {
+        method: "POST",
+        body: {
+          username: "integration.admin",
+          password: "integration-secret"
+        }
+      }
+    );
+  }
+  assert.equal(signIn.status, 200);
+  const authorization = `Bearer ${signIn.body.sessionToken}`;
+
+  const globalSettings = await requestJson<{
+    applicationSettings: { customTexts: Record<string, string> };
+  }>("/api/v1/admin/application-settings", {
+    method: "PATCH",
+    headers: { authorization },
+    body: {
+      appTitle: "IQB-Testcenter",
+      customTexts: {
+        login_subtitle: "Global selection",
+        booklet_loading: "Global loading"
+      },
+      globalWarningText: null,
+      globalWarningExpiresAt: null
+    }
+  });
+  assert.equal(globalSettings.status, 200);
+  assert.deepEqual(globalSettings.body.applicationSettings.customTexts, {
+    login_subtitle: "Global selection",
+    booklet_loading: "Global loading"
+  });
+
+  assert.equal(
+    (
+      await requestJson("/api/v1/platform/tenants", {
+        method: "POST",
+        headers: { authorization },
+        body: { tenantKey, displayName: "Custom Text Tenant" }
+      })
+    ).status,
+    201
+  );
+  assert.equal(
+    (
+      await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+        method: "POST",
+        headers: { authorization },
+        body: { workspaceKey, displayName: "Custom Text Workspace" }
+      })
+    ).status,
+    201
+  );
+
+  const zipPayload = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest>
+          <resources>
+            <resource identifier="${bookletKey}" href="booklets/Booklet.xml" />
+            <resource identifier="${unitKey}" href="units/Unit.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/booklets/Booklet.xml",
+      content: `
+        <Booklet>
+          <Metadata><Id>${bookletKey}</Id><Label>Custom Text Booklet</Label></Metadata>
+          <CustomTexts>
+            <CustomText key="booklet_loading">Booklet loading</CustomText>
+            <CustomText key="login_testResumeButtonLabel">Open custom booklet</CustomText>
+          </CustomTexts>
+          <Units><Unit id="${unitKey}" alias="custom-unit" label="Custom Unit" /></Units>
+        </Booklet>
+      `
+    },
+    {
+      fileName: "export/units/Unit.xml",
+      content: `
+        <Unit>
+          <Metadata><Id>${unitKey}</Id><Label>Custom Unit</Label></Metadata>
+        </Unit>
+      `
+    }
+  ]);
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    headers: { authorization },
+    body: {
+      fileName: "custom-text-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+  assert.equal(sourcePackage.status, 201);
+  const importResult = await requestJson<{
+    stagedContentRelease: {
+      contentReleaseId: string;
+      runtimeSnapshot: {
+        bookletEntries: Array<{ customTexts?: Record<string, string> }>;
+      };
+    };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    headers: { authorization },
+    body: { sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId }
+  });
+  assert.equal(importResult.status, 201);
+  assert.deepEqual(
+    importResult.body.stagedContentRelease.runtimeSnapshot.bookletEntries[0]
+      ?.customTexts,
+    {
+      booklet_loading: "Booklet loading",
+      login_testResumeButtonLabel: "Open custom booklet"
+    }
+  );
+  assert.equal(
+    (
+      await requestJson(
+        `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${importResult.body.stagedContentRelease.contentReleaseId}/activate`,
+        {
+          method: "POST",
+          headers: { authorization },
+          body: { activatedByActorId: "custom-text-integration" }
+        }
+      )
+    ).status,
+    200
+  );
+
+  const roster = await requestJson(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/participant-roster`,
+    {
+      method: "POST",
+      headers: { authorization },
+      body: {
+        rosterText: [
+          "<Testtakers>",
+          "  <CustomTexts><CustomText key=\"login_subtitle\">Workspace selection</CustomText><CustomText key=\"booklet_loading\">Workspace loading</CustomText></CustomTexts>",
+          `  <Group id="custom-group"><Login mode="run-hot-return" name="custom-login"><Booklet>${bookletKey}</Booklet></Login></Group>`,
+          "</Testtakers>"
+        ].join("\n")
+      }
+    }
+  );
+  assert.equal(roster.status, 201);
+
+  const participantSignIn = await requestJson<{
+    participantRosterEntry: { customTexts?: Record<string, string> } | null;
+    booklets: Array<{ customTexts?: Record<string, string> }>;
+  }>("/api/v1/participant/auth/sign-in", {
+    method: "POST",
+    body: { tenantKey, workspaceKey, loginKey: "custom-login" }
+  });
+  assert.equal(participantSignIn.status, 200);
+  assert.deepEqual(participantSignIn.body.participantRosterEntry?.customTexts, {
+    login_subtitle: "Workspace selection",
+    booklet_loading: "Workspace loading"
+  });
+  assert.deepEqual(participantSignIn.body.booklets[0]?.customTexts, {
+    booklet_loading: "Booklet loading",
+    login_testResumeButtonLabel: "Open custom booklet"
+  });
+
+  const resetSettings = await requestJson(
+    "/api/v1/admin/application-settings",
+    {
+      method: "PATCH",
+      headers: { authorization },
+      body: {
+        appTitle: "IQB-Testcenter",
+        customTexts: {},
+        globalWarningText: null,
+        globalWarningExpiresAt: null
+      }
+    }
+  );
+  assert.equal(resetSettings.status, 200);
 });
 
 test("attachment manager imports capture requests and enforces monitor scope", async () => {

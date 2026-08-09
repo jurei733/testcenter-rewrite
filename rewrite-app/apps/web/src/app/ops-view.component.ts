@@ -129,6 +129,41 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             />
             <button id="resetApplicationLogoButton" class="ghost" type="button" (click)="view.resetApplicationLogo()">Use Default Logo</button>
           </div>
+          <details id="applicationCustomTextsEditor" class="span-all application-custom-texts-editor">
+            <summary>Custom text overrides ({{ view.applicationCustomTextKeys.length }})</summary>
+            <p>Original precedence is global, then workspace Testtakers login, then active Booklet. Empty global values inherit the built-in default.</p>
+            <div class="application-custom-text-add">
+              <label>
+                Additional key
+                <input id="applicationCustomTextNewKey" name="applicationCustomTextNewKey" maxlength="120" [(ngModel)]="view.applicationCustomTextNewKey" placeholder="syscheck_intro" />
+              </label>
+              <label>
+                Override
+                <textarea id="applicationCustomTextNewValue" name="applicationCustomTextNewValue" rows="2" [(ngModel)]="view.applicationCustomTextNewValue"></textarea>
+              </label>
+              <button id="addApplicationCustomTextButton" class="secondary" type="button" [disabled]="!view.canAddApplicationCustomText" (click)="view.addApplicationCustomText()">Add override</button>
+            </div>
+            <div class="application-custom-text-list">
+              <div class="application-custom-text-row" *ngFor="let key of view.applicationCustomTextKeys">
+                <label>
+                  <span>{{ key }}</span>
+                  <textarea
+                    [id]="'applicationCustomText-' + key"
+                    [name]="'applicationCustomText-' + key"
+                    rows="2"
+                    [(ngModel)]="view.applicationCustomTextDrafts[key]"
+                    [placeholder]="view.applicationCustomTextDefault(key) || 'No global override'"
+                  ></textarea>
+                </label>
+                <div class="actions compact-actions">
+                  <button class="ghost" type="button" *ngIf="view.applicationCustomTextDefault(key)" (click)="view.setApplicationCustomTextToDefault(key)">Use default</button>
+                  <button class="ghost" type="button" [disabled]="!view.applicationCustomTextDrafts[key]" (click)="view.removeApplicationCustomText(key)">Inherit</button>
+                </div>
+              </div>
+            </div>
+            <p *ngIf="!view.applicationCustomTextsValid">Custom texts exceed the supported key or size limits.</p>
+            <button id="resetApplicationCustomTextsButton" class="ghost" type="button" (click)="view.resetApplicationCustomTexts()">Clear all global overrides</button>
+          </details>
           <label>
             Warning Expires
             <input

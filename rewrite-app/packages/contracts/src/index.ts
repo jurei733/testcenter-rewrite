@@ -2417,6 +2417,7 @@ export type UpdateApplicationSettingsRequest = {
   appTitle: string;
   mainLogo?: string;
   themeName?: ApplicationSettings["themeName"];
+  customTexts?: Record<string, string>;
   globalWarningText?: string | null;
   globalWarningExpiresAt?: string | null;
 };

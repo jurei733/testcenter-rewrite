@@ -953,6 +953,7 @@ export type ApplicationSettingsPort = {
     appTitle: string;
     mainLogo?: string;
     themeName?: ApplicationSettings["themeName"];
+    customTexts?: Record<string, string>;
     globalWarningText?: string | null;
     globalWarningExpiresAt?: string | null;
   }): Promise<ApplicationSettings>;
@@ -3335,6 +3336,64 @@ const normalizeApplicationTheme = (
   );
 };
 
+const MAX_APPLICATION_CUSTOM_TEXT_COUNT = 250;
+const MAX_APPLICATION_CUSTOM_TEXT_BYTES = 250_000;
+const MAX_APPLICATION_CUSTOM_TEXT_VALUE_BYTES = 10_000;
+
+const normalizeApplicationCustomTexts = (
+  value: unknown
+): Record<string, string> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new FirstSliceError(
+      400,
+      "application_custom_texts_invalid",
+      "Application custom texts must be a key-value object."
+    );
+  }
+  const entries = Object.entries(value);
+  if (entries.length > MAX_APPLICATION_CUSTOM_TEXT_COUNT) {
+    throw new FirstSliceError(
+      400,
+      "application_custom_texts_too_large",
+      `Application custom texts must not contain more than ${MAX_APPLICATION_CUSTOM_TEXT_COUNT} keys.`
+    );
+  }
+  const customTexts: Record<string, string> = {};
+  let totalBytes = 0;
+  for (const [rawKey, rawValue] of entries) {
+    const key = rawKey.trim();
+    if (
+      !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(key) ||
+      key.length > 120 ||
+      typeof rawValue !== "string"
+    ) {
+      throw new FirstSliceError(
+        400,
+        "application_custom_texts_invalid",
+        `Application custom text key '${rawKey || "missing"}' or its value is invalid.`
+      );
+    }
+    const text = rawValue.trim();
+    if (!text) {
+      continue;
+    }
+    const valueBytes = Buffer.byteLength(text, "utf8");
+    totalBytes += Buffer.byteLength(key, "utf8") + valueBytes;
+    if (
+      valueBytes > MAX_APPLICATION_CUSTOM_TEXT_VALUE_BYTES ||
+      totalBytes > MAX_APPLICATION_CUSTOM_TEXT_BYTES
+    ) {
+      throw new FirstSliceError(
+        400,
+        "application_custom_texts_too_large",
+        "Application custom texts exceed the supported size limit."
+      );
+    }
+    customTexts[key] = text;
+  }
+  return customTexts;
+};
+
 const normalizeGlobalWarningText = (value: unknown): string | null => {
   const text = String(value ?? "").trim();
   if (!text) {
@@ -3751,6 +3810,7 @@ const buildParticipantRuntimeBooklets = (input: {
         sourceBookletKey: booklet.bookletKey,
         statePreset: assignment.statePreset,
         displayLabel: booklet.displayLabel,
+        customTexts: { ...(booklet.customTexts ?? {}) },
         status: hasLockedRun
           ? ("locked" as const)
           : hasOpenRun
@@ -6110,6 +6170,17 @@ const normalizeContentStructure = (
         ),
         unitEntries: []
       };
+    const customTexts = Object.fromEntries(
+      Object.entries(bookletEntry.customTexts ?? {})
+        .map(([key, value]) => [key.trim(), String(value).trim()] as const)
+        .filter(([key, value]) => Boolean(key && value))
+    );
+    if (Object.keys(customTexts).length > 0) {
+      normalizedBooklet.customTexts = {
+        ...(normalizedBooklet.customTexts ?? {}),
+        ...customTexts
+      };
+    }
     if (bookletEntry.config && Object.keys(bookletEntry.config).length > 0) {
       normalizedBooklet.policy = compileBookletRuntimePolicy(bookletEntry.config);
     }
@@ -6683,6 +6754,19 @@ const normalizeParsedJsonContentStructure = (
 
     return "";
   };
+  const readStringRecord = (value: unknown): Record<string, string> => {
+    const record = asObject(value);
+    if (!record) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(record).flatMap(([key, entryValue]) =>
+        typeof entryValue === "string" && key.trim()
+          ? [[key.trim(), entryValue.trim()] as const]
+          : []
+      )
+    );
+  };
   type JsonManifestResource = {
     key: string;
     displayLabel: string;
@@ -7222,6 +7306,9 @@ const normalizeParsedJsonContentStructure = (
               booklet.displayName ??
               ""
           ).trim(),
+          customTexts: readStringRecord(
+            booklet.customTexts ?? booklet.CustomTexts
+          ),
           config: readBookletConfigValues(
             booklet.bookletConfig ??
               booklet.BookletConfig ??
@@ -10718,6 +10805,7 @@ const readXmlUnitEntryIdentity = (
   ).trim();
 
 type XmlBookletHierarchy = {
+  customTexts: Record<string, string>;
   rootRestrictions?: BookletRootRestrictions;
   stateEntries: SourcePackageBookletStateEntry[];
   testletEntries: SourcePackageTestletEntry[];
@@ -10757,6 +10845,16 @@ const collectXmlBookletHierarchies = (
     if (!bookletKey || !units) {
       continue;
     }
+    const customTextContainer = xmlChildrenNamed(booklet, "CustomTexts")[0];
+    const customTexts = Object.fromEntries(
+      (customTextContainer
+        ? xmlChildrenNamed(customTextContainer, "CustomText")
+        : []
+      ).flatMap(customText => {
+        const key = customText.getAttribute("key")?.trim() ?? "";
+        return key ? [[key, xmlElementText(customText).trim()] as const] : [];
+      })
+    );
     const testletEntries: SourcePackageTestletEntry[] = [];
     const unitTestletPaths = new Map<string, string[]>();
     const normalizeLeaveRestriction = (
@@ -11046,6 +11144,7 @@ const collectXmlBookletHierarchies = (
 
     visitContainer(units, []);
     hierarchies.set(bookletKey, {
+      customTexts,
       ...(Object.keys(rootRestrictions).length > 0 ? { rootRestrictions } : {}),
       stateEntries,
       testletEntries,
@@ -11238,6 +11337,9 @@ const collectXmlBookletEntries = (
           ) ??
           ""
       ).trim(),
+      ...(hierarchy && Object.keys(hierarchy.customTexts).length > 0
+        ? { customTexts: hierarchy.customTexts }
+        : {}),
       config: readBookletConfig(bookletMatch[3] ?? ""),
       ...(hierarchy?.rootRestrictions
         ? { rootRestrictions: hierarchy.rootRestrictions }
@@ -19810,6 +19912,10 @@ export const createFirstSliceServices = (
             input.themeName === undefined
               ? previousSettings.themeName
               : normalizeApplicationTheme(input.themeName),
+          customTexts:
+            input.customTexts === undefined
+              ? previousSettings.customTexts
+              : normalizeApplicationCustomTexts(input.customTexts),
           globalWarningText: normalizeGlobalWarningText(
             input.globalWarningText
           ),
@@ -19820,6 +19926,15 @@ export const createFirstSliceServices = (
           updatedByAdminUserId: currentSession.adminUser.adminUserId
         };
         await repository.saveApplicationSettings(updatedSettings);
+        const changedCustomTextKeys = [
+          ...new Set([
+            ...Object.keys(previousSettings.customTexts),
+            ...Object.keys(updatedSettings.customTexts)
+          ])
+        ].filter(
+          key =>
+            previousSettings.customTexts[key] !== updatedSettings.customTexts[key]
+        );
         await recordAdminAuditEvent({
           eventType: "application_settings_updated",
           actorAdminUserId: currentSession.adminUser.adminUserId,
@@ -19833,6 +19948,9 @@ export const createFirstSliceServices = (
               previousSettings.mainLogo !== defaultApplicationSettings.mainLogo,
             nextCustomLogo:
               updatedSettings.mainLogo !== defaultApplicationSettings.mainLogo,
+            previousCustomTextCount: Object.keys(previousSettings.customTexts).length,
+            nextCustomTextCount: Object.keys(updatedSettings.customTexts).length,
+            changedCustomTextKeys,
             previousGlobalWarningText: previousSettings.globalWarningText,
             nextGlobalWarningText: updatedSettings.globalWarningText,
             previousGlobalWarningExpiresAt:

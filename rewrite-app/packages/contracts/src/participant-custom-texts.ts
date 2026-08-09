@@ -68,6 +68,16 @@ export const originalParticipantCustomTextKeys = Object.freeze(
   Object.keys(originalParticipantCustomTextDefaults) as ParticipantCustomTextKey[]
 );
 
+export const mergeParticipantCustomTextScopes = (
+  globalCustomTexts: Readonly<Record<string, string>> | null | undefined,
+  loginCustomTexts: Readonly<Record<string, string>> | null | undefined,
+  bookletCustomTexts: Readonly<Record<string, string>> | null | undefined
+): Record<string, string> => ({
+  ...(globalCustomTexts ?? {}),
+  ...(loginCustomTexts ?? {}),
+  ...(bookletCustomTexts ?? {})
+});
+
 export const resolveParticipantCustomText = (
   customTexts: Readonly<Record<string, string>> | null | undefined,
   key: ParticipantCustomTextKey,

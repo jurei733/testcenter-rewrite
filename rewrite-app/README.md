@@ -39,12 +39,16 @@ HTML and Unit definition already arrive in the participant current-state payload
 
 Platform administrators can configure the original-style instance application
 title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded
-global warning from the Angular Ops view. The public settings endpoint applies
-the branding to participant and operator shells, shows the warning across all
-routes, and removes it automatically when its persisted expiration passes. Logo
-type, bytes, safe SVG content, the original 20 MiB ceiling, and theme names are
-validated; updates are audited and stored by the memory, JSON-file, SQLite, and
-Postgres adapters.
+global warning plus global custom-text overrides from the Angular Ops view. The
+public settings endpoint applies the branding to participant and operator shells,
+shows the warning across all routes, and removes it automatically when its
+persisted expiration passes. Participant copy follows the original precedence:
+global settings are overridden by the signed-in Testtakers/Login scope and then
+by the active Booklet scope. System-check-specific text overrides global copy on
+the system-check surface. Logo type, bytes, safe SVG content, the original 20 MiB
+ceiling, theme names, custom-text keys, and bounded text payloads are validated;
+updates are audited without copying text values into the audit trail and stored
+by the memory, JSON-file, SQLite, and Postgres adapters.
 
 The same import classifies original `monitor-group`, `monitor-study`, and
 `sys-check-login` entries as explicit operational-login migration candidates.

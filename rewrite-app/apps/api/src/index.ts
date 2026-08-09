@@ -3855,6 +3855,7 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
             appTitle: body.appTitle,
             mainLogo: body.mainLogo,
             themeName: body.themeName,
+            customTexts: body.customTexts,
             globalWarningText: body.globalWarningText,
             globalWarningExpiresAt: body.globalWarningExpiresAt
           });

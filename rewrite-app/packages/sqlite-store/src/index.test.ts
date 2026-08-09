@@ -86,6 +86,7 @@ test("SQLite preserves global application settings", async () => {
     appTitle: "Assessment Portal",
     mainLogo: "data:image/png;base64,iVBORw0KGgo=",
     themeName: "Erwachsene",
+    customTexts: { login_subtitle: "Global start" },
     globalWarningText: "Maintenance tonight",
     globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
     updatedAt: "2026-08-08T20:00:00.000Z",
@@ -96,6 +97,7 @@ test("SQLite preserves global application settings", async () => {
     appTitle: "Assessment Portal",
     mainLogo: "data:image/png;base64,iVBORw0KGgo=",
     themeName: "Erwachsene",
+    customTexts: { login_subtitle: "Global start" },
     globalWarningText: "Maintenance tonight",
     globalWarningExpiresAt: "2050-12-12T18:00:00.000Z",
     updatedAt: "2026-08-08T20:00:00.000Z",
@@ -103,7 +105,7 @@ test("SQLite preserves global application settings", async () => {
   });
 });
 
-test("SQLite adds branding defaults to legacy application settings", async () => {
+test("SQLite adds current defaults to legacy application settings", async () => {
   const tempDirectory = await mkdtemp(join(tmpdir(), "sqlite-branding-"));
   const databasePath = join(tempDirectory, "legacy.sqlite");
   const database = new DatabaseSync(databasePath);
@@ -143,6 +145,7 @@ test("SQLite adds branding defaults to legacy application settings", async () =>
     assert.equal(settings?.appTitle, "Legacy Portal");
     assert.equal(settings?.mainLogo, "app-icon.svg");
     assert.equal(settings?.themeName, "Primar");
+    assert.deepEqual(settings?.customTexts, {});
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });
   }

@@ -314,10 +314,61 @@ h1 {
   object-fit: contain;
 }
 
+.application-custom-texts-editor {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 0.55);
+}
+
+.application-custom-texts-editor > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.application-custom-text-add,
+.application-custom-text-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(260px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.application-custom-text-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  max-height: 720px;
+  overflow: auto;
+}
+
+.application-custom-text-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.application-custom-text-row label > span {
+  overflow-wrap: anywhere;
+}
+
+.compact-actions {
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .application-logo-editor {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .application-custom-text-add,
+  .application-custom-text-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 }
 
