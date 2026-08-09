@@ -413,7 +413,10 @@ login candidates remain password-redacted, repeated imports update rather than
 duplicate participants, and the API plus Angular activity feedback report the
 source files and import counts. Multiple Testtakers files share one candidate
 replacement operation, so later files cannot erase candidates from earlier
-files. Arbitrary XML archives still fail with
+files. The same password-redacted summary is joined back into Import Job Detail
+from its durable activity record, so it remains inspectable after a reload
+without adding secret-bearing fields to the import entity. Arbitrary XML
+archives still fail with
 `source_document_zip_manifest_missing`, and an
 explicitly named but unreadable manifest remains a hard integrity failure.
 

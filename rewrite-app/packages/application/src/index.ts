@@ -78,6 +78,7 @@ import type {
   ParticipantLoginAttempt,
   ParticipantTestLog,
   ParticipantTestLogEntryInput,
+  ParticipantRosterImportSummary,
   ParticipantRosterEntry,
   ParticipantRuntimeBooklet,
   ParticipantSession,
@@ -1138,13 +1139,6 @@ export type CreateImportJobResult = {
   importJob: ImportJob;
   stagedContentRelease: ContentRelease | null;
   participantRosterImport?: ParticipantRosterImportSummary;
-};
-
-export type ParticipantRosterImportSummary = {
-  sourceFileNames: string[];
-  importedCount: number;
-  updatedCount: number;
-  operationalLoginCandidateCount: number;
 };
 
 export type ContentReleaseActivationSummary = {
@@ -20249,6 +20243,7 @@ export const createFirstSliceServices = (
     workspaceKey: string;
     rosterDocuments: ParticipantRosterDocument[];
     sourcePackageId?: string;
+    importJobId?: string;
   }) => {
     const workspace = await requireWorkspace(
       repository,
@@ -20456,6 +20451,7 @@ export const createFirstSliceServices = (
         ...(input.sourcePackageId
           ? {
               sourcePackageId: input.sourcePackageId,
+              importJobId: input.importJobId ?? null,
               sourceFileNames: input.rosterDocuments.map(
                 rosterDocument => rosterDocument.sourceFileName
               )
@@ -20659,7 +20655,8 @@ export const createFirstSliceServices = (
             tenantKey: input.tenantKey,
             workspaceKey: input.workspaceKey,
             rosterDocuments,
-            sourcePackageId: sourcePackage.sourcePackageId
+            sourcePackageId: sourcePackage.sourcePackageId,
+            importJobId: importJob.importJobId
           });
         participantRosterImport = {
           sourceFileNames: rosterDocuments.map(
@@ -23907,18 +23904,53 @@ export const createFirstSliceServices = (
         const sourcePackage = await repository.getSourcePackageById(
           importJob.sourcePackageId
         );
+        const [contentReleases, activityEvents] = await Promise.all([
+          repository.listContentReleasesByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          ),
+          repository.listWorkspaceActivityEventsByWorkspace(
+            workspace.tenantId,
+            workspace.workspaceId
+          )
+        ]);
         const contentRelease =
-          (
-            await repository.listContentReleasesByWorkspace(
-              workspace.tenantId,
-              workspace.workspaceId
-            )
-          ).find(candidate => candidate.importJobId === importJob.importJobId) ?? null;
+          contentReleases.find(
+            candidate => candidate.importJobId === importJob.importJobId
+          ) ?? null;
+        const rosterImportDetails = activityEvents.find(
+          activityEvent =>
+            activityEvent.eventType === "participant_roster_imported" &&
+            activityEvent.details.importJobId === importJob.importJobId
+        )?.details;
+        const participantRosterImport =
+          rosterImportDetails &&
+          Array.isArray(rosterImportDetails.sourceFileNames) &&
+          rosterImportDetails.sourceFileNames.every(
+            fileName => typeof fileName === "string"
+          ) &&
+          typeof rosterImportDetails.importedCount === "number" &&
+          Number.isSafeInteger(rosterImportDetails.importedCount) &&
+          typeof rosterImportDetails.updatedCount === "number" &&
+          Number.isSafeInteger(rosterImportDetails.updatedCount) &&
+          typeof rosterImportDetails.operationalLoginCandidateCount === "number" &&
+          Number.isSafeInteger(
+            rosterImportDetails.operationalLoginCandidateCount
+          )
+            ? {
+                sourceFileNames: rosterImportDetails.sourceFileNames,
+                importedCount: rosterImportDetails.importedCount,
+                updatedCount: rosterImportDetails.updatedCount,
+                operationalLoginCandidateCount:
+                  rosterImportDetails.operationalLoginCandidateCount
+              }
+            : null;
 
         return {
           importJob,
           sourcePackage,
-          contentRelease
+          contentRelease,
+          participantRosterImport
         };
       },
       async listImportJobs(input) {

@@ -1661,10 +1661,18 @@ export type WorkspaceImportJobListItem = {
   sourcePackage: SourcePackage | null;
 };
 
+export type ParticipantRosterImportSummary = {
+  sourceFileNames: string[];
+  importedCount: number;
+  updatedCount: number;
+  operationalLoginCandidateCount: number;
+};
+
 export type WorkspaceImportJobDetail = {
   importJob: ImportJob;
   sourcePackage: SourcePackage | null;
   contentRelease: ContentRelease | null;
+  participantRosterImport: ParticipantRosterImportSummary | null;
 };
 
 export type WorkspaceParticipantSessionListItem = {

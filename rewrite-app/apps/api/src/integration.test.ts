@@ -20391,7 +20391,11 @@ test("source document import assembles original manifestless root ZIP archives",
     }
   });
   const importResult = await requestJson<{
-    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    importJob: {
+      importJobId: string;
+      status: string;
+      diagnostics: Array<{ code: string }>;
+    };
     stagedContentRelease: { contentReleaseId: string } | null;
     participantRosterImport?: {
       sourceFileNames: string[];
@@ -20550,12 +20554,27 @@ test("source document import assembles original manifestless root ZIP archives",
     migrationOnly: false,
     operationalLoginCandidateCount: 2,
     sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId,
+    importJobId: importResult.body.importJob.importJobId,
     sourceFileNames: [
       "nested/rosters/Participants-A.xml",
       "nested/rosters/Participants-B.xml"
     ]
   });
   assert.equal(JSON.stringify(rosterActivities.body).includes("monitor-secret"), false);
+
+  const importJobDetail = await requestJson<{
+    importJobDetail: {
+      participantRosterImport: typeof importResult.body.participantRosterImport;
+    };
+  }>(
+    `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs/${importResult.body.importJob.importJobId}`
+  );
+  assert.equal(importJobDetail.status, 200);
+  assert.deepEqual(
+    importJobDetail.body.importJobDetail.participantRosterImport,
+    importResult.body.participantRosterImport
+  );
+  assert.equal(JSON.stringify(importJobDetail.body).includes("participant-a-secret"), false);
 
   await requestJson(
     `/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/content-releases/${contentReleaseId}/activate`,
