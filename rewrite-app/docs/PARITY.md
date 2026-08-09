@@ -300,7 +300,7 @@ path. The complete graph and failure path run across memory, file, and SQLite.
 
 ### Import and content administration
 
-Import validation now rejects unsupported attributes on all four original XML root types and non-empty namespaces on their roots and schema-owned descendants, matching the schemas' missing `targetNamespace`, while allowing namespace declarations and `noNamespaceSchemaLocation` by namespace identity rather than by the conventional `xsi` prefix. The Unit schema's deliberately untyped `label`, `value`, and `ValuePositionLabel` payloads retain arbitrary embedded XML. Direct XML uploads and XML entries inside ZIP bundles share this boundary.
+Import validation now rejects unsupported attributes on all four original XML root types and non-empty namespaces on their roots and schema-owned descendants, matching the schemas' missing `targetNamespace`, while allowing namespace declarations and `noNamespaceSchemaLocation` by namespace identity rather than by the conventional `xsi` prefix. Schema references mirror the original backend's case-sensitive historical `v?o?_?Type.xsd` filename surface, so current `vo_Booklet.xsd` files and legacy forms such as `Booklet.xsd`, `v_Unit.xsd`, `o_SysCheck.xsd`, and `_Testtakers.xsd` remain importable without confusing differently cased types. The Unit schema's deliberately untyped `label`, `value`, and `ValuePositionLabel` payloads retain arbitrary embedded XML. Direct XML uploads and XML entries inside ZIP bundles share this boundary.
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |
 | --- | --- | --- | --- | --- |

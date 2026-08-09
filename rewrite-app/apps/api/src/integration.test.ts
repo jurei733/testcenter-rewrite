@@ -11565,6 +11565,38 @@ test("original Testcenter compatibility corpus imports representative booklets",
     forbiddenDiagnosticCode?: string;
   }> = [
     {
+      fileName: "booklet-legacy-schema-file-name.xml",
+      sourceDocument: validBookletXml
+        .replace("vo_Booklet.xsd", "Booklet.xsd")
+        .replace("<Booklet ", '<Booklet ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_schema_reference_invalid"
+    },
+    {
+      fileName: "unit-legacy-schema-file-name.xml",
+      sourceDocument: validUnitXml
+        .replace("vo_Unit.xsd", "v_Unit.xsd")
+        .replace("<Unit ", '<Unit ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_schema_reference_invalid"
+    },
+    {
+      fileName: "syscheck-legacy-schema-file-name.xml",
+      sourceDocument: validSystemCheckXml
+        .replace("vo_SysCheck.xsd", "o_SysCheck.xsd")
+        .replace("<SysCheck ", '<SysCheck ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_schema_reference_invalid"
+    },
+    {
+      fileName: "booklet-schema-file-name-case.xml",
+      sourceDocument: validBookletXml.replace(
+        "vo_Booklet.xsd",
+        "vo_booklet.xsd"
+      ),
+      diagnosticCode: "testcenter_xml_schema_reference_invalid"
+    },
+    {
       fileName: "booklet-namespaced-metadata.xml",
       sourceDocument: validBookletXml
         .replace(
@@ -12687,6 +12719,15 @@ test("original Testcenter compatibility corpus imports representative booklets",
         )
         .replace("</Metadata>", "</tc:Metadata>"),
       diagnosticCode: "testcenter_xml_element_namespace_invalid"
+    },
+    {
+      fileName: "legacy-schema-file-name-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml
+        .replace("vo_Booklet.xsd", "Booklet.xsd")
+        .replace("<Booklet ", '<Booklet ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_schema_reference_invalid"
     }
   ]) {
     const zipPayload = createZipBase64([
@@ -12730,6 +12771,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       ),
       nestedXmlCase.fileName
     );
+    if (nestedXmlCase.forbiddenDiagnosticCode) {
+      assert.ok(
+        importResult.body.importJob.diagnostics.every(
+          diagnostic => diagnostic.code !== nestedXmlCase.forbiddenDiagnosticCode
+        ),
+        nestedXmlCase.fileName
+      );
+    }
     assert.equal(importResult.body.stagedContentRelease, null);
   }
 
@@ -12758,6 +12807,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "utf8"
   );
   const invalidRosterFacetCases = [
+    {
+      label: "legacy Testtakers schema file name",
+      rosterText: validRosterXml
+        .replace("vo_Testtakers.xsd", "_Testtakers.xsd")
+        .replace("<Testtakers ", '<Testtakers ignored="true" '),
+      diagnosticCode: "testcenter_xml_root_attribute_invalid",
+      forbiddenDiagnosticCode: "testcenter_xml_schema_reference_invalid"
+    },
     {
       label: "namespaced Testtakers metadata",
       rosterText: validRosterXml
@@ -13016,6 +13073,14 @@ test("original Testcenter compatibility corpus imports representative booklets",
       ),
       rosterFacetCase.label
     );
+    if (rosterFacetCase.forbiddenDiagnosticCode) {
+      assert.ok(
+        invalidRoster.body.details.diagnostics.every(
+          diagnostic => diagnostic.code !== rosterFacetCase.forbiddenDiagnosticCode
+        ),
+        rosterFacetCase.label
+      );
+    }
   }
 
   const operationalOnlyRoster = await requestJson<{

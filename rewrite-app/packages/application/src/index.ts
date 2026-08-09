@@ -8421,8 +8421,7 @@ const validateTestcenterXmlSourceDocument = (
   }
   if (
     !new RegExp(
-      `(?:^|/)definitions/vo_${canonicalRootName}\\.xsd(?:[?#].*)?$`,
-      "i"
+      `(?:^|/)definitions/v?o?_?${canonicalRootName}\\.xsd(?:[?#].*)?$`
     ).test(schemaLocation)
   ) {
     diagnostics.push(
