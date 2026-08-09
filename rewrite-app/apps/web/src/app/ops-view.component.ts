@@ -651,7 +651,7 @@ import { SummaryCardsComponent } from "./summary-cards.component";
 
       <app-record-collection
         title="Admin Users"
-        subtitle="Scoped admin directory with public user fields and delegable role scopes."
+        subtitle="Scoped admin directory with password-handoff state, public user fields, and delegable role scopes."
         [items]="view.adminUserItems"
         (itemAction)="view.selectAdminUser($event)"
         emptyState="Sign in with an administrative delegation role, then refresh admin users."

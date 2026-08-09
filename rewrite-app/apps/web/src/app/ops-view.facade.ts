@@ -1811,6 +1811,9 @@ export class OpsViewFacade {
         subline: item.adminUser.displayName,
         badges: [
           item.adminUser.status,
+          ...(item.adminUser.passwordChangeRequired
+            ? ["password handoff pending"]
+            : []),
           ...item.roleAssignments.map(roleAssignment => roleAssignment.role),
           ...(item.adminUser.adminUserId === this.currentAdminUserId
             ? ["current session"]
@@ -1827,6 +1830,12 @@ export class OpsViewFacade {
           {
             label: "Created",
             value: this.formatDateTime(item.adminUser.createdAt)
+          },
+          {
+            label: "Password Handoff",
+            value: item.adminUser.passwordChangeRequired
+              ? "Required before administration"
+              : "Complete"
           },
           {
             label: "Access Starts",

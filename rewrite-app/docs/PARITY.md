@@ -366,8 +366,9 @@ inspect itself, sign out, or set a compliant replacement password; every other
 admin/business route returns a stable `403 admin_password_change_required`.
 The non-dismissible Angular handoff clears the flag through the self-service
 route, revokes every active account session, records a dedicated audit event,
-and signs the browser out. API and protected Chromium/SQLite gates cover the
-complete flow.
+and signs the browser out. The scoped Admin Users directory exposes each
+pending handoff as both a badge and an explicit status row. API and protected
+Chromium/SQLite gates cover the complete flow.
 
 ## Exit criteria for “presentable with high parity”
 

@@ -2370,6 +2370,8 @@ try {
       has: page.getByRole("heading", { name: "Admin Users", exact: true })
     })
     .filter({ hasText: workspaceAdminUsername })
+    .filter({ hasText: "password handoff pending" })
+    .filter({ hasText: "Required before administration" })
     .filter({ hasText: "workspace_admin" })
     .filter({ hasText: "read_only" })
     .waitFor();
