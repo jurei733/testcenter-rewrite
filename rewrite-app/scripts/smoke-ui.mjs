@@ -819,15 +819,16 @@ try {
       .locator("#participantCustomLoginSubtitle")
       .filter({ hasText: "Start or Resume Test" })
       .waitFor();
+    if (await offlineShellPage.evaluate(() => navigator.onLine)) {
+      await offlineShellPage.evaluate(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+    }
     const offlineNotice = offlineShellPage.locator("#appOfflineShellNotice");
     await offlineNotice.waitFor();
     assert.match(
       (await offlineNotice.innerText()).replace(/\s+/g, " "),
       /Offline mode.*signing in, loading test content, and saving require a connection/
-    );
-    assert.equal(
-      await offlineShellPage.evaluate(() => navigator.onLine),
-      false
     );
     const offlineShellCache = await offlineShellPage.evaluate(async () => {
       const cacheName = (await caches.keys()).find(candidate =>

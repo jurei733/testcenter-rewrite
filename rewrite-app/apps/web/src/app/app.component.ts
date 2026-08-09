@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { ChangeDetectorRef, Component, inject } from "@angular/core";
+import { ChangeDetectorRef, Component, inject, signal } from "@angular/core";
 import type { OnDestroy, OnInit } from "@angular/core";
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
@@ -41,7 +41,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly app = inject(AppShellFacade);
   readonly applicationSettings = inject(ApplicationSettingsService);
   readonly browserCompatibility = inject(BrowserCompatibilityService);
-  isOffline = !navigator.onLine;
+  readonly isOffline = signal(!navigator.onLine);
   requiredAdminPassword = "";
   requiredAdminPasswordConfirmation = "";
   requiredAdminPasswordError = "";
@@ -50,10 +50,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly onlineListener = (): void => {
-    this.isOffline = false;
+    this.isOffline.set(false);
   };
   private readonly offlineListener = (): void => {
-    this.isOffline = true;
+    this.isOffline.set(true);
   };
 
   get isParticipantView(): boolean {
