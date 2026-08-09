@@ -126,6 +126,51 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             <button *ngFor="let filter of view.monitorProfileFilterOptions" class="ghost monitor-profile-filter" type="button" [attr.data-filter-index]="filter.index" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorProfileFilter(filter.index)">{{ filter.label }}</button>
             <button id="monitorResetRuntimeFiltersButton" class="ghost" type="button" (click)="view.resetMonitorRuntimeFilters()">Reset to Profile</button>
           </div>
+          <details id="monitorCustomFilterEditor" open>
+            <summary>Eigenen Filter hinzufügen</summary>
+            <p>Passende Testsitzungen werden ausgeblendet, bis der Filter deaktiviert oder entfernt wird.</p>
+            <div class="form-grid">
+              <label>
+                Feld
+                <select id="monitorCustomFilterTarget" name="monitorCustomFilterTarget" [ngModel]="view.monitorCustomFilterTarget" (ngModelChange)="view.setMonitorCustomFilterTarget($event)">
+                  <option *ngFor="let option of view.monitorCustomFilterTargetOptions" [value]="option.value">{{ option.label }}</option>
+                </select>
+              </label>
+              <label>
+                Filtertyp
+                <select id="monitorCustomFilterType" name="monitorCustomFilterType" [(ngModel)]="view.monitorCustomFilterType" [disabled]="view.monitorCustomFilterTarget === 'state'">
+                  <option *ngFor="let option of view.monitorCustomFilterTypeOptions" [value]="option.value">{{ option.label }}</option>
+                </select>
+              </label>
+              <label>
+                Filter
+                <input id="monitorCustomFilterValue" name="monitorCustomFilterValue" [(ngModel)]="view.monitorCustomFilterValue" [placeholder]="view.monitorCustomFilterTarget === 'state' ? 'paused, idle' : 'Auszublendender Wert'" />
+              </label>
+              <label *ngIf="view.monitorCustomFilterRequiresSubValue">
+                Unterfilter
+                <input id="monitorCustomFilterSubValue" name="monitorCustomFilterSubValue" [(ngModel)]="view.monitorCustomFilterSubValue" placeholder="Erwarteter Zustandswert" />
+              </label>
+              <label>
+                Filtername
+                <input id="monitorCustomFilterLabel" name="monitorCustomFilterLabel" [(ngModel)]="view.monitorCustomFilterLabel" placeholder="Optionaler eigener Name" />
+              </label>
+              <label class="checkbox-label">
+                <input id="monitorCustomFilterNot" name="monitorCustomFilterNot" type="checkbox" [(ngModel)]="view.monitorCustomFilterNot" />
+                {{ view.monitorText("gm_filter_not") }}
+              </label>
+            </div>
+            <div class="actions">
+              <button id="monitorSaveCustomFilterButton" class="secondary" type="button" [disabled]="!view.canSaveMonitorCustomFilter" (click)="view.saveMonitorCustomFilter()">{{ view.monitorCustomFilterEditingId ? 'Filter aktualisieren' : 'Eigenen Filter hinzufügen' }}</button>
+              <button *ngIf="view.monitorCustomFilterEditingId" id="monitorCancelCustomFilterEditButton" class="ghost" type="button" (click)="view.cancelMonitorCustomFilterEdit()">Bearbeiten abbrechen</button>
+            </div>
+            <div id="monitorCustomFilterList" class="actions" *ngIf="view.monitorCustomFilterOptions.length > 0">
+              <ng-container *ngFor="let filter of view.monitorCustomFilterOptions">
+                <button class="ghost monitor-custom-filter" type="button" [attr.data-custom-filter-id]="filter.customFilterId" [attr.aria-pressed]="filter.active" (click)="view.toggleMonitorCustomFilter(filter.customFilterId)">{{ filter.label }}</button>
+                <button class="ghost monitor-custom-filter-edit" type="button" [attr.data-custom-filter-id]="filter.customFilterId" (click)="view.editMonitorCustomFilter(filter.customFilterId)">Bearbeiten</button>
+                <button class="ghost monitor-custom-filter-remove" type="button" [attr.data-custom-filter-id]="filter.customFilterId" (click)="view.removeMonitorCustomFilter(filter.customFilterId)">Entfernen</button>
+              </ng-container>
+            </div>
+          </details>
         </section>
         <label>
           Search participants

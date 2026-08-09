@@ -12197,6 +12197,52 @@ try {
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
     .waitFor();
+  logStep("group-monitor-custom-filters");
+  assert.equal(
+    await page.locator("#monitorSaveCustomFilterButton").isDisabled(),
+    true,
+    "A custom monitor filter must require a value before it can be saved."
+  );
+  await selectAndCommit("#monitorCustomFilterTarget", "groupName");
+  await selectAndCommit("#monitorCustomFilterType", "equal");
+  await page.locator("#monitorCustomFilterValue").fill(participantGroupKey);
+  await page.locator("#monitorCustomFilterLabel").fill("Hide selected cohort");
+  await page.locator("#monitorSaveCustomFilterButton").click();
+  await scopedOpenRuns.getByText("No open runs are currently loaded.").waitFor();
+  const customMonitorFilter = page.locator(".monitor-custom-filter").first();
+  await customMonitorFilter.filter({ hasText: "Hide selected cohort" }).waitFor();
+  assert.equal(
+    await customMonitorFilter.getAttribute("aria-pressed"),
+    "true",
+    "A newly authored Original-style filter must start enabled."
+  );
+  await customMonitorFilter.click();
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  assert.equal(await customMonitorFilter.getAttribute("aria-pressed"), "false");
+  await page.locator(".monitor-custom-filter-edit").first().click();
+  await expectInputValue("#monitorCustomFilterTarget", "groupName");
+  await expectInputValue("#monitorCustomFilterValue", participantGroupKey);
+  await page.locator("#monitorCustomFilterValue").fill("group:outside-scope");
+  await page
+    .locator("#monitorSaveCustomFilterButton", { hasText: "Filter aktualisieren" })
+    .click();
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector(".monitor-custom-filter")
+        ?.getAttribute("aria-pressed") === "true"
+  );
+  assert.equal(
+    await customMonitorFilter.getAttribute("aria-pressed"),
+    "true",
+    "Editing a custom filter must reactivate its updated predicate."
+  );
+  await page.locator(".monitor-custom-filter-remove").first().click();
+  await page.locator(".monitor-custom-filter").waitFor({ state: "detached" });
+  assert.equal(await page.locator(".monitor-custom-filter").count(), 0);
+  await scopedOpenRuns.filter({ hasText: participantLoginKey }).waitFor();
+  stopAfter("group-monitor-custom-filters");
   await page.locator("#monitorToggleBookletListButton").click();
   await page
     .locator("app-record-collection")

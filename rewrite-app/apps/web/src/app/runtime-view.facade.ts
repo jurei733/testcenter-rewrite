@@ -118,6 +118,13 @@ type MonitorFilterOverride = {
   locked: boolean;
 };
 
+type MonitorCustomFilter = {
+  customFilterId: string;
+  scopeId: string;
+  filter: MonitorViewProfile["filters"][number];
+  active: boolean;
+};
+
 const monitorFilterTargetTextKeys: Readonly<
   Record<string, MonitorCustomTextKey>
 > = {
@@ -186,12 +193,21 @@ export class RuntimeViewFacade {
   private readonly operatorAccess = inject(RewriteAppOperatorAccessService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly monitorBatchSelection = new Set<string>();
+  private readonly monitorCustomFilters: MonitorCustomFilter[] = [];
+  private monitorCustomFilterSequence = 0;
   monitorAutoSelectAll = false;
   monitorControlsVisible = true;
   monitorBookletListExpanded = true;
   monitorQuickFilter = "";
   monitorSortKey: MonitorSortKey = "participant";
   monitorSortDirection: MonitorSortDirection = "asc";
+  monitorCustomFilterTarget = "personLabel";
+  monitorCustomFilterType = "equal";
+  monitorCustomFilterValue = "";
+  monitorCustomFilterSubValue = "";
+  monitorCustomFilterLabel = "";
+  monitorCustomFilterNot = false;
+  monitorCustomFilterEditingId = "";
   private monitorDisplayOverride: {
     profileId: string;
     settings: MonitorDisplaySettings;
@@ -310,6 +326,194 @@ export class RuntimeViewFacade {
       label: this.monitorProfileFilterLabel(filter),
       active: this.monitorProfileFilterActive(index)
     }));
+  }
+
+  get monitorCustomFilterTargetOptions(): Array<{
+    value: string;
+    label: string;
+  }> {
+    return Object.keys(monitorFilterTargetTextKeys).map(value => ({
+      value,
+      label: this.monitorText(monitorFilterTargetTextKeys[value]!)
+    }));
+  }
+
+  get monitorCustomFilterTypeOptions(): Array<{
+    value: string;
+    label: string;
+  }> {
+    return Object.keys(monitorFilterTypeTextKeys).map(value => ({
+      value,
+      label: this.monitorText(monitorFilterTypeTextKeys[value]!)
+    }));
+  }
+
+  get monitorCustomFilterRequiresSubValue(): boolean {
+    return ["testState", "bookletStates"].includes(
+      this.monitorCustomFilterTarget
+    );
+  }
+
+  get monitorCustomFilterOptions(): Array<{
+    customFilterId: string;
+    label: string;
+    active: boolean;
+  }> {
+    return this.currentMonitorCustomFilters.map(customFilter => ({
+      customFilterId: customFilter.customFilterId,
+      label: this.monitorProfileFilterLabel(customFilter.filter),
+      active: customFilter.active
+    }));
+  }
+
+  get canSaveMonitorCustomFilter(): boolean {
+    if (
+      this.currentMonitorCustomFilters.length >= 50 &&
+      !this.monitorCustomFilterEditingId
+    ) {
+      return false;
+    }
+    const value = this.monitorCustomFilterValue.trim();
+    if (!value) {
+      return false;
+    }
+    if (this.monitorCustomFilterTarget === "state") {
+      const stateValues = value
+        .split(",")
+        .map(item => item.trim())
+        .filter(Boolean);
+      if (
+        stateValues.length === 0 ||
+        !stateValues.every(item =>
+          (monitorSuperStateSortOrder as readonly string[]).includes(item)
+        )
+      ) {
+        return false;
+      }
+    }
+    if (
+      this.monitorCustomFilterRequiresSubValue &&
+      !this.monitorCustomFilterSubValue.trim()
+    ) {
+      return false;
+    }
+    if (this.monitorCustomFilterType === "regex") {
+      try {
+        new RegExp(value);
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  setMonitorCustomFilterTarget(target: string): void {
+    if (!(target in monitorFilterTargetTextKeys)) {
+      return;
+    }
+    this.monitorCustomFilterTarget = target;
+    if (target === "state") {
+      this.monitorCustomFilterType = "equal";
+    }
+    if (!["testState", "bookletStates"].includes(target)) {
+      this.monitorCustomFilterSubValue = "";
+    }
+  }
+
+  saveMonitorCustomFilter(): void {
+    if (!this.canSaveMonitorCustomFilter) {
+      return;
+    }
+    const value = this.monitorCustomFilterValue.trim();
+    const filter: MonitorViewProfile["filters"][number] = {
+      target: this.monitorCustomFilterTarget,
+      value:
+        this.monitorCustomFilterTarget === "state"
+          ? value
+              .split(",")
+              .map(item => item.trim())
+              .filter(Boolean)
+          : value,
+      subValue: this.monitorCustomFilterRequiresSubValue
+        ? this.monitorCustomFilterSubValue.trim()
+        : null,
+      label: this.monitorCustomFilterLabel.trim(),
+      type:
+        this.monitorCustomFilterTarget === "state"
+          ? "equal"
+          : this.monitorCustomFilterType,
+      not: this.monitorCustomFilterNot
+    };
+    const editing = this.currentMonitorCustomFilters.find(
+      customFilter =>
+        customFilter.customFilterId === this.monitorCustomFilterEditingId
+    );
+    if (editing) {
+      editing.filter = filter;
+      editing.active = true;
+    } else {
+      this.monitorCustomFilters.push({
+        customFilterId:
+          `monitor-custom-filter-${++this.monitorCustomFilterSequence}`,
+        scopeId: this.monitorCustomFilterScopeId,
+        filter,
+        active: true
+      });
+    }
+    this.resetMonitorCustomFilterDraft();
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  editMonitorCustomFilter(customFilterId: string): void {
+    const customFilter = this.currentMonitorCustomFilters.find(
+      candidate => candidate.customFilterId === customFilterId
+    );
+    if (!customFilter) {
+      return;
+    }
+    this.monitorCustomFilterEditingId = customFilter.customFilterId;
+    this.monitorCustomFilterTarget = customFilter.filter.target;
+    this.monitorCustomFilterType = customFilter.filter.type;
+    this.monitorCustomFilterValue = Array.isArray(customFilter.filter.value)
+      ? customFilter.filter.value.join(", ")
+      : customFilter.filter.value;
+    this.monitorCustomFilterSubValue = customFilter.filter.subValue ?? "";
+    this.monitorCustomFilterLabel = customFilter.filter.label;
+    this.monitorCustomFilterNot = customFilter.filter.not;
+  }
+
+  cancelMonitorCustomFilterEdit(): void {
+    this.resetMonitorCustomFilterDraft();
+  }
+
+  toggleMonitorCustomFilter(customFilterId: string): void {
+    const customFilter = this.currentMonitorCustomFilters.find(
+      candidate => candidate.customFilterId === customFilterId
+    );
+    if (!customFilter) {
+      return;
+    }
+    customFilter.active = !customFilter.active;
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  removeMonitorCustomFilter(customFilterId: string): void {
+    const index = this.monitorCustomFilters.findIndex(
+      candidate =>
+        candidate.scopeId === this.monitorCustomFilterScopeId &&
+        candidate.customFilterId === customFilterId
+    );
+    if (index < 0) {
+      return;
+    }
+    this.monitorCustomFilters.splice(index, 1);
+    if (this.monitorCustomFilterEditingId === customFilterId) {
+      this.resetMonitorCustomFilterDraft();
+    }
+    this.monitorBatchSelection.clear();
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   monitorProfileFilterActive(index: number): boolean {
@@ -571,6 +775,7 @@ export class RuntimeViewFacade {
     this.monitorDisplayOverride = null;
     this.monitorFilterOverride = null;
     this.monitorQuickFilter = "";
+    this.resetMonitorCustomFilterDraft();
     this.monitorBatchSelection.clear();
     this.persistState();
     this.uiState.renderVersion.update(version => version + 1);
@@ -4936,6 +5141,38 @@ export class RuntimeViewFacade {
       : generatedLabel;
   }
 
+  private get currentMonitorCustomFilters(): MonitorCustomFilter[] {
+    return this.monitorCustomFilters.filter(
+      customFilter => customFilter.scopeId === this.monitorCustomFilterScopeId
+    );
+  }
+
+  private get monitorCustomFilterScopeId(): string {
+    const monitorAssignmentIds = this.operatorAccess.roleAssignments
+      .filter(
+        assignment =>
+          assignment.role === "study_monitor" ||
+          assignment.role === "group_monitor"
+      )
+      .map(assignment => assignment.roleAssignmentId)
+      .sort()
+      .join(",");
+    return [
+      monitorAssignmentIds,
+      this.activeMonitorProfileId || "__default__"
+    ].join("::");
+  }
+
+  private resetMonitorCustomFilterDraft(): void {
+    this.monitorCustomFilterTarget = "personLabel";
+    this.monitorCustomFilterType = "equal";
+    this.monitorCustomFilterValue = "";
+    this.monitorCustomFilterSubValue = "";
+    this.monitorCustomFilterLabel = "";
+    this.monitorCustomFilterNot = false;
+    this.monitorCustomFilterEditingId = "";
+  }
+
   private get currentMonitorFilterState(): MonitorFilterOverride {
     const profileId = this.activeMonitorProfileId || "__default__";
     if (this.monitorFilterOverride?.profileId === profileId) {
@@ -4969,7 +5206,15 @@ export class RuntimeViewFacade {
   private get effectiveMonitorProfile(): MonitorViewProfile | null {
     const profile = this.activeMonitorProfile;
     const state = this.currentMonitorFilterState;
-    if (!profile && !state.pending && !state.locked) {
+    const customFilters = this.currentMonitorCustomFilters
+      .filter(customFilter => customFilter.active)
+      .map(customFilter => customFilter.filter);
+    if (
+      !profile &&
+      !state.pending &&
+      !state.locked &&
+      customFilters.length === 0
+    ) {
       return null;
     }
     return {
@@ -4984,9 +5229,12 @@ export class RuntimeViewFacade {
         bookletStatesColumns: "",
         autoselectNextBlock: "no"
       },
-      filters: (profile?.filters ?? []).filter((_filter, index) =>
-        state.enabledProfileFilterIndexes.has(index)
-      ),
+      filters: [
+        ...(profile?.filters ?? []).filter((_filter, index) =>
+          state.enabledProfileFilterIndexes.has(index)
+        ),
+        ...customFilters
+      ],
       filtersEnabled: {
         pending: state.pending ? "yes" : "no",
         locked: state.locked ? "yes" : "no"
