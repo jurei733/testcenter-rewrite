@@ -2061,12 +2061,16 @@ export class ParticipantViewFacade {
   private async resumeEntrySessionInternal(
     normalized: NormalizedParticipantEntryParameters
   ): Promise<void> {
-    // A session-only re-entry URL is authoritative. Do not let a booklet from a
-    // previously persisted browser session constrain which assigned booklet the
-    // server resumes next.
+    // A session-only re-entry URL is authoritative. Load an existing run
+    // without changing its status so a reload cannot bypass a monitor pause.
+    // Do not let a booklet from a previously persisted browser session
+    // constrain which assigned booklet the server starts when no run exists.
     this.runtime.bookletKey = normalized.bookletKey;
     try {
-      await this.resumeSessionInternal({ quiet: true });
+      await this.refreshCurrentStateInternal(true);
+      if (!this.currentRunState) {
+        await this.resumeSessionInternal({ quiet: true });
+      }
       await this.applyEntryDraftAfterResume(normalized);
     } catch (error) {
       if (!this.isParticipantSessionNoLongerResumable(error)) {
@@ -3219,9 +3223,16 @@ export class ParticipantViewFacade {
     currentState: ParticipantCurrentRunStateResponse["currentRunState"]
   ): void {
     const unitKey = currentState.currentUnit.unitKey;
-    this.runtime.currentUnitResponse = unitKey
-      ? currentState.testRun.unitResponses[unitKey] ?? ""
-      : "";
+    const optimisticResponse =
+      unitKey &&
+      this.optimisticVeronaResponse?.testRunId ===
+        currentState.testRun.testRunId &&
+      this.optimisticVeronaResponse.unitKey === unitKey
+        ? this.optimisticVeronaResponse.response
+        : null;
+    this.runtime.currentUnitResponse =
+      optimisticResponse ??
+      (unitKey ? currentState.testRun.unitResponses[unitKey] ?? "" : "");
   }
 
   private restorePersistentVeronaSave(

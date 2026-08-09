@@ -10135,10 +10135,27 @@ try {
       exact: true
     })
     .waitFor({ timeout: 15_000 });
+  const aliasedStartPlayerFrame = await page
+    .locator("#participantVeronaPlayerFrame")
+    .elementHandle();
+  assert.ok(
+    aliasedStartPlayerFrame,
+    "The aliased Test Controller start unit should have a mounted player frame."
+  );
   await page.locator("#participantRouteNextUnitButton").click();
   await page
     .locator("#participantRouteUnitKey")
     .filter({ hasText: "CY-Unit.Sample-101" })
+    .waitFor({ timeout: 15_000 });
+  await page.waitForFunction(
+    frame => !frame.isConnected,
+    aliasedStartPlayerFrame,
+    { timeout: 15_000 }
+  );
+  await completionControllerFrame
+    .getByText("Testung Controller: Aufgabe1: Check response complete and presentation complete", {
+      exact: true
+    })
     .waitFor({ timeout: 15_000 });
   assert.equal(
     await page.locator("#participantRouteNextUnitButton").isDisabled(),
@@ -11960,7 +11977,7 @@ try {
   await page
     .locator("app-record-collection")
     .filter({ has: page.getByRole("heading", { name: "Active Test Booklets" }) })
-    .filter({ hasText: participantRouteBookletKey })
+    .filter({ hasText: participantBookletKey })
     .filter({ hasText: "1 active run" })
     .waitFor();
   await scopedOpenRuns
