@@ -7461,6 +7461,197 @@ try {
     await page.locator("#participantRouteAdaptiveState-bonus").inputValue(),
     "yes"
   );
+  logStep("participant-multi-unit-outbox-recovery");
+  const originalAdaptiveStateForOutbox = await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
+    payload =>
+      typeof payload?.currentRunState?.testRun?.unitResponses?.[
+        originalAdaptiveUnitKey
+      ] === "string"
+  );
+  const originalAdaptiveTestRunId =
+    originalAdaptiveStateForOutbox.currentRunState.testRun.testRunId;
+  const originalAdaptiveBaseResponse =
+    originalAdaptiveStateForOutbox.currentRunState.testRun.unitResponses[
+      originalAdaptiveUnitKey
+    ];
+  const originalAdaptiveBeginnerUnitKey = "beginner-unit";
+  const currentUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n`;
+  const otherUnitOutboxResponse = `${originalAdaptiveBaseResponse}\n `;
+  const multiUnitSaveOrder = [];
+  const recordMultiUnitSaveOrder = request => {
+    const requestBody = request.postDataJSON();
+    if (
+      request.method() === "POST" &&
+      request.url().endsWith(
+        `/participant/test-runs/${originalAdaptiveTestRunId}/save-progress`
+      ) &&
+      requestBody?.deliveryId?.startsWith("multi-unit-")
+    ) {
+      multiUnitSaveOrder.push(requestBody.responseUnitKey);
+    }
+  };
+  page.on("request", recordMultiUnitSaveOrder);
+  await page.evaluate(
+    ({
+      storageKey,
+      testRunId,
+      currentUnitKey,
+      currentResponse,
+      otherUnitKey,
+      otherResponse
+    }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: [
+            {
+              version: 1,
+              deliveryId: `multi-unit-other-${queuedAt}`,
+              testRunId,
+              unitKey: otherUnitKey,
+              response: otherResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt - 1_000).toISOString()
+            },
+            {
+              version: 1,
+              deliveryId: `multi-unit-current-${queuedAt}`,
+              testRunId,
+              unitKey: currentUnitKey,
+              response: currentResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt).toISOString()
+            }
+          ]
+        })
+      );
+      window.dispatchEvent(new Event("online"));
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: originalAdaptiveTestRunId,
+      currentUnitKey: originalAdaptiveUnitKey,
+      currentResponse: currentUnitOutboxResponse,
+      otherUnitKey: originalAdaptiveBeginnerUnitKey,
+      otherResponse: otherUnitOutboxResponse
+    }
+  );
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.unitResponses?.[
+        originalAdaptiveUnitKey
+      ] === currentUnitOutboxResponse &&
+      payload.currentRunState.testRun.unitResponses?.[
+        originalAdaptiveBeginnerUnitKey
+      ] === otherUnitOutboxResponse
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1"
+  );
+  page.off("request", recordMultiUnitSaveOrder);
+  assert.deepEqual(
+    multiUnitSaveOrder.slice(0, 2),
+    [originalAdaptiveUnitKey, originalAdaptiveBeginnerUnitKey],
+    "Recovery must restore the visible Unit first, then drain every remaining Unit."
+  );
+
+  logStep("participant-multi-unit-background-sync");
+  const backgroundCurrentResponse = `${originalAdaptiveBaseResponse}\n  `;
+  const backgroundOtherResponse = `${originalAdaptiveBaseResponse}\n   `;
+  await page.evaluate(
+    ({
+      storageKey,
+      testRunId,
+      currentUnitKey,
+      currentResponse,
+      otherUnitKey,
+      otherResponse
+    }) => {
+      const queuedAt = Date.now();
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          version: 1,
+          entries: [
+            {
+              version: 1,
+              deliveryId: `background-current-${queuedAt}`,
+              testRunId,
+              unitKey: currentUnitKey,
+              response: currentResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt).toISOString()
+            },
+            {
+              version: 1,
+              deliveryId: `background-other-${queuedAt}`,
+              testRunId,
+              unitKey: otherUnitKey,
+              response: otherResponse,
+              status: "running",
+              logs: [],
+              queuedAt: new Date(queuedAt + 1).toISOString()
+            }
+          ]
+        })
+      );
+    },
+    {
+      storageKey: "testcenter-rewrite:participant-save-outbox:v1",
+      testRunId: originalAdaptiveTestRunId,
+      currentUnitKey: originalAdaptiveUnitKey,
+      currentResponse: backgroundCurrentResponse,
+      otherUnitKey: originalAdaptiveBeginnerUnitKey,
+      otherResponse: backgroundOtherResponse
+    }
+  );
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await page.waitForFunction(
+    async testRunId => {
+      const database = await new Promise((resolvePromise, reject) => {
+        const request = indexedDB.open("testcenter-participant-save-outbox-v1", 1);
+        request.addEventListener("error", () => reject(request.error));
+        request.addEventListener("success", () => resolvePromise(request.result));
+      });
+      try {
+        const records = await new Promise((resolvePromise, reject) => {
+          const transaction = database.transaction("pending-saves", "readonly");
+          const request = transaction.objectStore("pending-saves").getAll();
+          request.addEventListener("error", () => reject(request.error));
+          request.addEventListener("success", () => resolvePromise(request.result));
+        });
+        return records.filter(record => record.entry?.testRunId === testRunId).length === 2;
+      } finally {
+        database.close();
+      }
+    },
+    originalAdaptiveTestRunId
+  );
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await pollJsonWithPredicate(
+    `${baseUrl}/api/v1/participant/sessions/${originalAdaptiveParticipantSessionId}/current-state`,
+    payload =>
+      payload?.currentRunState?.testRun?.unitResponses?.[
+        originalAdaptiveUnitKey
+      ] === backgroundCurrentResponse &&
+      payload.currentRunState.testRun.unitResponses?.[
+        originalAdaptiveBeginnerUnitKey
+      ] === backgroundOtherResponse
+  );
+  await page.waitForFunction(
+    storageKey => localStorage.getItem(storageKey) === null,
+    "testcenter-rewrite:participant-save-outbox:v1"
+  );
   stopAfter("participant-original-verona-player");
 
   logStep("participant-official-verona-3-player");

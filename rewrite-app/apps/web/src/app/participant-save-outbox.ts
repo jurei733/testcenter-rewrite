@@ -59,9 +59,26 @@ export function findParticipantSaveOutboxEntry(
   testRunId: string,
   storage = getBrowserStorage()
 ): ParticipantSaveOutboxEntry | null {
-  return readParticipantSaveOutbox(storage).find(
-    entry => entry.testRunId === testRunId
+  return listParticipantSaveOutboxEntriesForRun(testRunId, storage)[0] ?? null;
+}
+
+export function findParticipantSaveOutboxEntryForUnit(
+  testRunId: string,
+  unitKey: string,
+  storage = getBrowserStorage()
+): ParticipantSaveOutboxEntry | null {
+  return listParticipantSaveOutboxEntriesForRun(testRunId, storage).find(
+    entry => entry.unitKey === unitKey
   ) ?? null;
+}
+
+export function listParticipantSaveOutboxEntriesForRun(
+  testRunId: string,
+  storage = getBrowserStorage()
+): ParticipantSaveOutboxEntry[] {
+  return readParticipantSaveOutbox(storage).filter(
+    entry => entry.testRunId === testRunId
+  );
 }
 
 export function persistParticipantSaveOutboxEntry(
@@ -93,6 +110,17 @@ export function queueParticipantSaveOutboxEntryForBackgroundDelivery(
     queueParticipantSaveForBackgroundDelivery(entry);
   }
   return persisted;
+}
+
+export function queueParticipantSaveOutboxForRunForBackgroundDelivery(
+  testRunId: string,
+  storage = getBrowserStorage()
+): number {
+  const entries = listParticipantSaveOutboxEntriesForRun(testRunId, storage);
+  for (const entry of entries) {
+    queueParticipantSaveForBackgroundDelivery(entry);
+  }
+  return entries.length;
 }
 
 export function removeParticipantSaveOutboxEntry(

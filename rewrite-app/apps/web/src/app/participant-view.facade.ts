@@ -48,8 +48,10 @@ import {
   createParticipantSaveOutboxEntry,
   discardParticipantSaveOutboxForRun,
   findParticipantSaveOutboxEntry,
+  findParticipantSaveOutboxEntryForUnit,
   persistParticipantSaveOutboxEntry,
   queueParticipantSaveOutboxEntryForBackgroundDelivery,
+  queueParticipantSaveOutboxForRunForBackgroundDelivery,
   removeParticipantSaveOutboxEntry,
   type ParticipantSaveOutboxEntry
 } from "./participant-save-outbox";
@@ -2439,10 +2441,15 @@ export class ParticipantViewFacade {
           } satisfies SaveTestRunProgressRequest,
           { quiet: true }
         );
-        removeParticipantSaveOutboxEntry(
+        const removedFromOutbox = removeParticipantSaveOutboxEntry(
           save.testRunId,
           save.deliveryId
         );
+        if (removedFromOutbox && !this.pendingVeronaSave) {
+          this.pendingVeronaSave = this.nextPersistentVeronaSave(
+            save.testRunId
+          );
+        }
         this.syncRun(payload.testRun);
         this.runtime.runtimeMonitorView = prettyPrintJson(
           payload,
@@ -3243,9 +3250,12 @@ export class ParticipantViewFacade {
     if (!currentState || this.pendingVeronaSave) {
       return;
     }
-    const saved = findParticipantSaveOutboxEntry(
-      currentState.testRun.testRunId
-    );
+    const testRunId = currentState.testRun.testRunId;
+    const currentUnitKey = currentState.currentUnit.unitKey;
+    const saved =
+      (currentUnitKey
+        ? findParticipantSaveOutboxEntryForUnit(testRunId, currentUnitKey)
+        : null) ?? findParticipantSaveOutboxEntry(testRunId);
     if (!saved) {
       return;
     }
@@ -3297,7 +3307,7 @@ export class ParticipantViewFacade {
     if (!unitKey || unitResponse == null) {
       return;
     }
-    const saved = findParticipantSaveOutboxEntry(testRunId);
+    const saved = findParticipantSaveOutboxEntryForUnit(testRunId, unitKey);
     if (
       saved &&
       saved.unitKey === unitKey &&
@@ -3308,11 +3318,22 @@ export class ParticipantViewFacade {
   }
 
   private queuePendingVeronaSaveForBackgroundDelivery(): void {
-    if (this.pendingVeronaSave) {
-      queueParticipantSaveOutboxEntryForBackgroundDelivery(
-        this.pendingVeronaSave
-      );
+    const testRunId =
+      this.pendingVeronaSave?.testRunId ?? this.runtime.testRunId.trim();
+    if (testRunId) {
+      queueParticipantSaveOutboxForRunForBackgroundDelivery(testRunId);
     }
+  }
+
+  private nextPersistentVeronaSave(
+    testRunId: string
+  ): ParticipantSaveOutboxEntry | null {
+    const currentUnitKey = this.readCurrentRunState()?.currentUnit.unitKey;
+    return (
+      (currentUnitKey
+        ? findParticipantSaveOutboxEntryForUnit(testRunId, currentUnitKey)
+        : null) ?? findParticipantSaveOutboxEntry(testRunId)
+    );
   }
 
   private createParticipantSessionEntryLink(): string {
