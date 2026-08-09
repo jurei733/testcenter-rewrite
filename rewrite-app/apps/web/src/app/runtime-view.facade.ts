@@ -735,7 +735,7 @@ export class RuntimeViewFacade {
     const sessions = this.parseParticipantSessionListView();
     const items: RecordCollectionItem[] = [];
 
-    if (inputEntries.length > 0 && rosterEntries.length === 0) {
+    if (inputEntries.length > 0) {
       items.push({
         headline: "Import current roster input",
         subline: `${inputEntries.length} parsed input row${inputEntries.length === 1 ? "" : "s"}`,

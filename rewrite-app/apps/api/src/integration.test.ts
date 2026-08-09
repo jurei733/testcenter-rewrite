@@ -8572,6 +8572,152 @@ test("monitor command endpoint pauses and resumes an open run", async () => {
   }
 });
 
+test("participant event stream publishes session snapshots and monitor changes", async () => {
+  const isolated = await createIsolatedServer({
+    FIRST_SLICE_STORE: "memory",
+    FIRST_SLICE_BOOTSTRAP_DEMO: "true"
+  });
+  const abortController = new AbortController();
+
+  try {
+    const participantSignIn = await requestJsonAt<{
+      participantSession: { participantSessionId: string };
+    }>(isolated.baseUrl, "/api/v1/participant/auth/sign-in", {
+      method: "POST",
+      body: {
+        workspaceKey: "demo-workspace",
+        loginKey: "student-demo"
+      }
+    });
+    const participantSessionId =
+      participantSignIn.body.participantSession.participantSessionId;
+    const resumed = await requestJsonAt<{
+      testRun: { testRunId: string; status: string };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/participant/sessions/${participantSessionId}/resume`,
+      { method: "POST" }
+    );
+    assert.equal(resumed.body.testRun.status, "running");
+
+    const streamResponse = await fetch(
+      `${isolated.baseUrl}/api/v1/participant/sessions/${participantSessionId}/events`,
+      {
+        headers: { accept: "text/event-stream" },
+        signal: abortController.signal
+      }
+    );
+    assert.equal(streamResponse.status, 200);
+    assert.equal(
+      streamResponse.headers.get("content-type"),
+      "text/event-stream; charset=utf-8"
+    );
+    assert.equal(
+      streamResponse.headers.get("cache-control"),
+      "no-cache, no-transform"
+    );
+    assert.equal(streamResponse.headers.get("x-accel-buffering"), "no");
+    assertSecurityHeaders(streamResponse);
+    assert.ok(streamResponse.body);
+
+    const reader = streamResponse.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const readEvent = async (
+      expectedEventType: "snapshot" | "change"
+    ): Promise<{
+      eventType: string;
+      sequence: number;
+      participantSessionId: string;
+      testRunId: string;
+      revision: string;
+    }> => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        let boundary = buffer.indexOf("\n\n");
+        while (boundary >= 0) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const eventType = frame
+            .split("\n")
+            .find(line => line.startsWith("event: "))
+            ?.slice("event: ".length);
+          const data = frame
+            .split("\n")
+            .find(line => line.startsWith("data: "))
+            ?.slice("data: ".length);
+          if (eventType === expectedEventType && data) {
+            return JSON.parse(data) as {
+              eventType: string;
+              sequence: number;
+              participantSessionId: string;
+              testRunId: string;
+              revision: string;
+            };
+          }
+          boundary = buffer.indexOf("\n\n");
+        }
+
+        const remainingMs = deadline - Date.now();
+        const chunk = await new Promise<ReadableStreamReadResult<Uint8Array>>(
+          (resolve, reject) => {
+            const timeout = setTimeout(
+              () => reject(new Error(`Timed out waiting for ${expectedEventType}.`)),
+              remainingMs
+            );
+            void reader.read().then(
+              result => {
+                clearTimeout(timeout);
+                resolve(result);
+              },
+              error => {
+                clearTimeout(timeout);
+                reject(error);
+              }
+            );
+          }
+        );
+        if (chunk.done) {
+          throw new Error(
+            `Participant event stream closed before ${expectedEventType}.`
+          );
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+      }
+      throw new Error(`Timed out waiting for ${expectedEventType}.`);
+    };
+
+    const snapshot = await readEvent("snapshot");
+    assert.equal(snapshot.eventType, "snapshot");
+    assert.equal(snapshot.sequence, 1);
+    assert.equal(snapshot.participantSessionId, participantSessionId);
+    assert.equal(snapshot.testRunId, resumed.body.testRun.testRunId);
+    assert.match(snapshot.revision, /^[a-f0-9]{64}$/);
+
+    const pause = await requestJsonAt<{
+      command: { testRun: { status: string } };
+    }>(
+      isolated.baseUrl,
+      `/api/v1/tenants/demo-tenant/workspaces/demo-workspace/monitor/open-runs/${resumed.body.testRun.testRunId}/commands`,
+      {
+        method: "POST",
+        body: { commandType: "pause", actorId: "participant-stream-test" }
+      }
+    );
+    assert.equal(pause.body.command.testRun.status, "paused");
+
+    const change = await readEvent("change");
+    assert.equal(change.eventType, "change");
+    assert.equal(change.sequence, 2);
+    assert.equal(change.participantSessionId, participantSessionId);
+    assert.equal(change.testRunId, resumed.body.testRun.testRunId);
+    assert.notEqual(change.revision, snapshot.revision);
+  } finally {
+    abortController.abort();
+    await closeServer(isolated.server);
+  }
+});
+
 test("monitor event stream publishes authenticated snapshots and run changes", async () => {
   const isolated = await createIsolatedServer({
     FIRST_SLICE_STORE: "memory",

@@ -77,6 +77,7 @@ export * from "./verona-player.js";
 export * from "./booklet-policy.js";
 export * from "./browser-compatibility.js";
 export * from "./monitor-event-stream.js";
+export * from "./participant-event-stream.js";
 export * from "./monitor-custom-texts.js";
 export * from "./participant-custom-texts.js";
 
@@ -2013,6 +2014,8 @@ export const productionApiRoutes = {
     getRuntimeState: "/api/v1/participant/sessions/:participantSessionId/runtime-state",
     getCurrentRunState:
       "/api/v1/participant/sessions/:participantSessionId/current-state",
+    eventStream:
+      "/api/v1/participant/sessions/:participantSessionId/events",
     getResource:
       "/api/v1/participant/sessions/:participantSessionId/resources/:resourcePath",
     saveProgress: "/api/v1/participant/test-runs/:testRunId/save-progress",

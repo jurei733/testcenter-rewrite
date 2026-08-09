@@ -56,6 +56,7 @@ import {
 import { buildParticipantSessionEntryUrl } from "./participant-session-links";
 import { ApplicationSettingsService } from "./application-settings.service";
 import { BrowserCompatibilityService } from "./browser-compatibility.service";
+import { ParticipantEventStreamService } from "./participant-event-stream.service";
 import type { ApiErrorLike } from "./rewrite-app-api.service";
 import { parseJsonDocument, prettyPrintJson } from "./rewrite-app-shell.readers";
 import { RewriteAppShellRequestService } from "./rewrite-app-shell-request.service";
@@ -239,6 +240,7 @@ export class ParticipantViewFacade {
   private readonly viewState = inject(RewriteAppViewStateService);
   private readonly browserCompatibility = inject(BrowserCompatibilityService);
   private readonly applicationSettings = inject(ApplicationSettingsService);
+  private readonly participantEvents = inject(ParticipantEventStreamService);
 
   readonly workspace = this.uiState.workspace;
   readonly runtime = this.uiState.runtime;
@@ -351,6 +353,8 @@ export class ParticipantViewFacade {
   private readonly pageHideListener = (): void => {
     this.queuePendingVeronaSaveForBackgroundDelivery();
   };
+  private readonly refreshFromParticipantEvents = (): Promise<void> =>
+    this.refreshCurrentStateInternal(true);
 
   init(): void {
     this.viewState.setActiveView("participant");
@@ -392,6 +396,7 @@ export class ParticipantViewFacade {
   }
 
   destroy(): void {
+    this.participantEvents.stop();
     if (this.timerTickerHandle != null) {
       globalThis.window?.clearInterval(this.timerTickerHandle);
       this.timerTickerHandle = null;
@@ -2044,6 +2049,7 @@ export class ParticipantViewFacade {
   }
 
   private async signInInternal(): Promise<void> {
+    this.participantEvents.stop();
     let payload: ParticipantSignInResponse;
     try {
       payload = await this.requestState.request<ParticipantSignInResponse>(
@@ -2097,6 +2103,7 @@ export class ParticipantViewFacade {
   private clearStoredParticipantSession(
     message = 'Stored participant session is gone. Use "Start Or Resume".'
   ): void {
+    this.participantEvents.stop();
     const previousTestRunId = this.runtime.testRunId.trim();
     if (previousTestRunId) {
       discardParticipantSaveOutboxForRun(previousTestRunId);
@@ -2915,12 +2922,21 @@ export class ParticipantViewFacade {
         this.loadBookletAssetsInBackground(payload);
       }
       await this.refreshParticipantReviewsInternal(payload.currentRunState, true);
+      if (payload.currentRunState.testRun.status === "completed") {
+        this.participantEvents.stop();
+      } else {
+        this.participantEvents.start(
+          payload.currentRunState.participantSession.participantSessionId,
+          this.refreshFromParticipantEvents
+        );
+      }
       this.persistState();
     } catch (error) {
       if (
         this.requestState.isApiError(error) &&
         error.error === "participant_session_has_no_current_run"
       ) {
+        this.participantEvents.stop();
         this.currentRunState = null;
         this.runtime.currentRunStateView = prettyPrintJson(
           error,

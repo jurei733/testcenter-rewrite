@@ -4355,6 +4355,14 @@ try {
   await operationalOnlyCandidateCard
     .getByRole("button", { name: "Prepare Monitor Account" })
     .waitFor();
+  await page.waitForFunction(
+    expectedUsername =>
+      window.localStorage
+        .getItem("testcenter-rewrite-app-shell")
+        ?.includes(expectedUsername) === true,
+    operationalOnlyStudyUsername,
+    { timeout: 15_000 }
+  );
   const persistedOperationalCandidateState = await page.evaluate(() =>
     window.localStorage.getItem("testcenter-rewrite-app-shell")
   );
@@ -10929,6 +10937,15 @@ try {
       .filter({ hasText: "Filtered review smoke" })
       .waitFor();
   }
+  logStep("participant-monitor-live-sync");
+  const liveParticipantPage = await context.newPage();
+  await liveParticipantPage.goto(
+    `${baseUrl}/participant?participantSessionId=${encodeURIComponent(participantSessionId)}`,
+    { waitUntil: "domcontentloaded" }
+  );
+  await liveParticipantPage
+    .locator("#participantRouteStatus", { hasText: "paused" })
+    .waitFor({ timeout: 15_000 });
   logStep("monitor-resume-run-suggestion");
   await clickCardAction(
     "Runtime Action Queue",
@@ -10954,6 +10971,9 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await liveParticipantPage
+    .locator("#participantRouteStatus", { hasText: "running" })
+    .waitFor({ timeout: 15_000 });
   await clickAction("Refresh Runtime Reads");
   await expectMonitorCommandHistoryCard({
     commandType: "resume",
@@ -10991,6 +11011,11 @@ try {
     undefined,
     { timeout: 15_000 }
   );
+  await liveParticipantPage
+    .locator("#participantRouteStatus", { hasText: "paused" })
+    .waitFor({ timeout: 15_000 });
+  await liveParticipantPage.close();
+  stopAfter("participant-monitor-live-sync");
   await page.waitForFunction(
     previousEvent => {
       const detail = document

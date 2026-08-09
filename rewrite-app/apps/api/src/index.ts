@@ -112,6 +112,8 @@ import {
   type ListSystemCheckReportsResponse,
   MONITOR_EVENT_STREAM_SCHEMA_VERSION,
   type MonitorEventStreamEvent,
+  PARTICIPANT_EVENT_STREAM_SCHEMA_VERSION,
+  type ParticipantEventStreamEvent,
   type SystemCheckSpeedTestUploadResponse,
   type MonitorOpenRunsResponse,
   type MonitorOpenRunsQuery,
@@ -1917,6 +1919,9 @@ const runtimeStatePattern = createRoutePattern(
 const currentRunStatePattern = createRoutePattern(
   productionApiRoutes.participant.getCurrentRunState
 );
+const participantEventStreamPattern = createRoutePattern(
+  productionApiRoutes.participant.eventStream
+);
 const participantResourcePattern =
   /^\/api\/v1\/participant\/sessions\/(?<participantSessionId>[^/]+)\/resources\/(?<resourcePath>.+)$/;
 const saveProgressPattern = createRoutePattern(
@@ -2995,6 +3000,7 @@ const resolveMetricsRouteLabel = (method: string, pathname: string): string => {
     ],
     ["GET", runtimeStatePattern, productionApiRoutes.participant.getRuntimeState],
     ["GET", currentRunStatePattern, productionApiRoutes.participant.getCurrentRunState],
+    ["GET", participantEventStreamPattern, productionApiRoutes.participant.eventStream],
     ["GET", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["OPTIONS", participantResourcePattern, productionApiRoutes.participant.getResource],
     ["POST", saveProgressPattern, productionApiRoutes.participant.saveProgress],
@@ -3425,6 +3431,125 @@ const parseStudyMonitorParticipantMatrixQuery = (
     answerState: answerState as "answered" | "missing" | undefined,
     limit: limitResult.limit
   };
+};
+
+const PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS = 1_000;
+const PARTICIPANT_EVENT_STREAM_HEARTBEAT_INTERVAL_MS = 15_000;
+
+const participantCurrentStateRevision = (
+  currentRunState: ParticipantCurrentRunStateResponse["currentRunState"]
+): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify(currentRunState.testRun, (key, value) =>
+        key === "remainingSeconds" ? undefined : value
+      )
+    )
+    .digest("hex");
+
+const writeParticipantEvent = (
+  response: ServerResponse,
+  event: ParticipantEventStreamEvent
+): void => {
+  response.write(`id: ${event.sequence}\n`);
+  response.write(`event: ${event.eventType}\n`);
+  response.write(`data: ${JSON.stringify(event)}\n\n`);
+};
+
+const streamParticipantEvents = async (input: {
+  request: IncomingMessage;
+  response: ServerResponse;
+  participantRuntime: FirstSliceServices["participantRuntime"];
+  participantSessionId: string;
+}): Promise<void> => {
+  const initialState = await input.participantRuntime.getCurrentRunState({
+    participantSessionId: input.participantSessionId
+  });
+  let testRunId = initialState.testRun.testRunId;
+  let revision = participantCurrentStateRevision(initialState);
+  let sequence = 0;
+  let lastEventAt = Date.now();
+  let polling = false;
+  let closed = false;
+  let pollHandle: NodeJS.Timeout | null = null;
+
+  const stop = (): void => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (pollHandle) {
+      clearInterval(pollHandle);
+      pollHandle = null;
+    }
+  };
+  const publish = (
+    eventType: ParticipantEventStreamEvent["eventType"]
+  ): void => {
+    sequence += 1;
+    lastEventAt = Date.now();
+    writeParticipantEvent(input.response, {
+      schemaVersion: PARTICIPANT_EVENT_STREAM_SCHEMA_VERSION,
+      eventType,
+      sequence,
+      participantSessionId: input.participantSessionId,
+      testRunId,
+      emittedAt: new Date(lastEventAt).toISOString(),
+      revision
+    });
+  };
+
+  input.request.once("close", stop);
+  input.response.once("close", stop);
+  input.response.writeHead(200, {
+    ...securityHeaders,
+    "content-type": "text/event-stream; charset=utf-8",
+    "cache-control": "no-cache, no-transform",
+    connection: "keep-alive",
+    "x-accel-buffering": "no"
+  });
+  input.response.flushHeaders();
+  input.response.write("retry: 3000\n\n");
+  publish("snapshot");
+
+  pollHandle = setInterval(() => {
+    if (closed || polling) {
+      return;
+    }
+    polling = true;
+    void input.participantRuntime
+      .getCurrentRunState({
+        participantSessionId: input.participantSessionId
+      })
+      .then(currentState => {
+        if (closed) {
+          return;
+        }
+        const nextRevision = participantCurrentStateRevision(currentState);
+        if (nextRevision !== revision) {
+          testRunId = currentState.testRun.testRunId;
+          revision = nextRevision;
+          publish("change");
+          return;
+        }
+        if (
+          Date.now() - lastEventAt >=
+          PARTICIPANT_EVENT_STREAM_HEARTBEAT_INTERVAL_MS
+        ) {
+          publish("heartbeat");
+        }
+      })
+      .catch(() => {
+        stop();
+        if (!input.response.writableEnded) {
+          input.response.end();
+        }
+      })
+      .finally(() => {
+        polling = false;
+      });
+  }, PARTICIPANT_EVENT_STREAM_POLL_INTERVAL_MS);
+  pollHandle.unref();
 };
 
 const MONITOR_EVENT_STREAM_POLL_INTERVAL_MS = 1_000;
@@ -7148,6 +7273,31 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
       }
 
       const currentRunStateMatch = currentRunStatePattern.exec(pathname);
+      const participantEventStreamMatch =
+        participantEventStreamPattern.exec(pathname);
+      if (request.method === "GET" && participantEventStreamMatch?.groups) {
+        const participantSessionId = decodeRouteGroup(
+          participantEventStreamMatch.groups.participantSessionId
+        );
+        if (!participantSessionId) {
+          sendError(
+            response,
+            400,
+            "invalid_participant_session_id",
+            "participantSessionId is required."
+          );
+          return;
+        }
+
+        await streamParticipantEvents({
+          request,
+          response,
+          participantRuntime: services.participantRuntime,
+          participantSessionId
+        });
+        return;
+      }
+
       if (request.method === "GET" && currentRunStateMatch?.groups) {
         const participantSessionId = decodeRouteGroup(
           currentRunStateMatch.groups.participantSessionId
