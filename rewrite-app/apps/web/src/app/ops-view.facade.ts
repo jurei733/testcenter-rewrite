@@ -1677,6 +1677,11 @@ export class OpsViewFacade {
     this.ops.adminRoleGroupKey = item.actionPayload?.groupKey ?? "";
     this.ops.adminRoleMonitorProfilesJson =
       item.actionPayload?.monitorProfilesJson ?? "[]";
+    this.ops.adminRoleMonitorBookletVisibility =
+      item.actionPayload?.monitorBookletVisibility === "collapsed" ||
+      item.actionPayload?.monitorBookletVisibility === "hidden"
+        ? item.actionPayload.monitorBookletVisibility
+        : "visible";
     this.monitorProfileEditorTarget = "role";
     this.resetMonitorProfileDraft();
     const status = item.actionPayload?.adminUserStatus;
@@ -2475,7 +2480,9 @@ export class OpsViewFacade {
           adminRole: roleAssignment.role,
           adminRoleAccessMode: roleAssignment.accessMode,
           groupKey: roleAssignment.groupKey ?? "",
-          monitorProfilesJson: JSON.stringify(roleAssignment.monitorProfiles)
+          monitorProfilesJson: JSON.stringify(roleAssignment.monitorProfiles),
+          monitorBookletVisibility:
+            roleAssignment.monitorBookletVisibility ?? "visible"
         }
       }))
     );

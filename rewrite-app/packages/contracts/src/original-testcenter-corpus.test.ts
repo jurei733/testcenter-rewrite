@@ -1995,6 +1995,7 @@ test("original Testcenter compatibility corpus pins official group monitoring se
         filtersEnabled: { pending: "yes", locked: "yes" }
       }
     ],
+    monitorBookletVisibility: "visible",
     customTexts: {},
     unresolvedProfileIds: []
   });

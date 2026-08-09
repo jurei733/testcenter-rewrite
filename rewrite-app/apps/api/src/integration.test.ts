@@ -13835,6 +13835,7 @@ test("original Testcenter compatibility corpus imports representative booklets",
         passwordRequired: false,
         profileIds: [],
         monitorProfiles: [],
+        monitorBookletVisibility: "visible",
         customTexts: {},
         unresolvedProfileIds: []
       }
@@ -16085,6 +16086,7 @@ test("original Testcenter compatibility corpus executes the official group monit
     passwordRequired: boolean;
     profileIds: string[];
     monitorProfiles: MonitorProfile[];
+    monitorBookletVisibility: "visible" | "collapsed" | "hidden";
     unresolvedProfileIds: string[];
   };
 
@@ -16310,6 +16312,9 @@ test("original Testcenter compatibility corpus executes the official group monit
     const rosterXml = readFileSync(
       resolve(originalTestcenterCorpusRoot, expectation.roster.fixture),
       "utf8"
+    ).replace(
+      '      <Profile id="small" />\n    </Login>',
+      '      <Profile id="small" />\n      <ViewSettings monitorBookletVisibility="collapsed" />\n    </Login>'
     );
     const rosterImport = await requestJsonAt<{
       items: Array<{
@@ -16353,6 +16358,7 @@ test("original Testcenter compatibility corpus executes the official group monit
       ["Alles zeigen", "Superklein"]
     );
     assert.deepEqual(monitorCandidate.unresolvedProfileIds, []);
+    assert.equal(monitorCandidate.monitorBookletVisibility, "collapsed");
 
     const monitorAccount = await requestJsonAt<{
       adminUser: { username: string; passwordHash?: string };
@@ -16360,6 +16366,7 @@ test("original Testcenter compatibility corpus executes the official group monit
         role: string;
         groupKey: string | null;
         monitorProfiles: MonitorProfile[];
+        monitorBookletVisibility: "visible" | "collapsed" | "hidden";
       }>;
     }>(isolated.baseUrl, "/api/v1/admin/users", {
       method: "POST",
@@ -16374,7 +16381,9 @@ test("original Testcenter compatibility corpus executes the official group monit
             tenantKey,
             workspaceKey,
             groupKey: monitorCandidate.groupKey,
-            monitorProfiles: monitorCandidate.monitorProfiles
+            monitorProfiles: monitorCandidate.monitorProfiles,
+            monitorBookletVisibility:
+              monitorCandidate.monitorBookletVisibility
           }
         ]
       }
@@ -16387,6 +16396,10 @@ test("original Testcenter compatibility corpus executes the official group monit
       monitorAccount.body.roleAssignments[0]?.groupKey,
       "filter-profiles"
     );
+    assert.equal(
+      monitorAccount.body.roleAssignments[0]?.monitorBookletVisibility,
+      "collapsed"
+    );
 
     const monitorSignIn = await requestJsonAt<{
       sessionToken: string;
@@ -16394,6 +16407,7 @@ test("original Testcenter compatibility corpus executes the official group monit
         role: string;
         groupKey: string | null;
         monitorProfiles: MonitorProfile[];
+        monitorBookletVisibility: "visible" | "collapsed" | "hidden";
       }>;
     }>(isolated.baseUrl, "/api/v1/admin/auth/sign-in", {
       method: "POST",
@@ -16406,6 +16420,10 @@ test("original Testcenter compatibility corpus executes the official group monit
     assert.deepEqual(
       monitorSignIn.body.roleAssignments[0]?.monitorProfiles,
       monitorCandidate.monitorProfiles
+    );
+    assert.equal(
+      monitorSignIn.body.roleAssignments[0]?.monitorBookletVisibility,
+      "collapsed"
     );
     const monitorHeaders = {
       authorization: `Bearer ${monitorSignIn.body.sessionToken}`
@@ -31510,6 +31528,7 @@ test("workspace participant roster can be imported, updated, and listed", async 
       passwordRequired: true,
       profileIds: [],
       monitorProfiles: [],
+      monitorBookletVisibility: "visible",
       customTexts: {
         login_subtitle: "Project test selection",
         login_testEndButtonLabel: "Submit project test"

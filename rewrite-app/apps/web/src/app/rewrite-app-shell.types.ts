@@ -136,6 +136,7 @@ export type PersistedShellState = {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
@@ -147,6 +148,7 @@ export type PersistedShellState = {
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
   adminRoleMonitorProfilesJson: string;
+  adminRoleMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;

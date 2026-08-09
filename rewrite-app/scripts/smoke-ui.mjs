@@ -10442,6 +10442,7 @@ try {
       `    <Login mode="monitor-group" name="${groupMonitorUsername}" pw="operator-secret">`,
       "      <Profile id=\"all\" />",
       "      <Profile id=\"booklet-errors\" />",
+      "      <ViewSettings monitorBookletVisibility=\"collapsed\" />",
       "    </Login>",
       `    <Login mode="sys-check-login" name="${systemCheckUsername}" pw="system-check-secret" />`,
       "  </Group>",
@@ -10481,6 +10482,7 @@ try {
     "all: small view; block hide",
     "all: Current participant not substring student-ui",
     "Booklet diagnostics (booklet-errors)",
+    "collapsed",
     "43 imported override(s)"
   ]) {
     assert.ok(
@@ -10510,6 +10512,10 @@ try {
   await expectInputValue("#adminCreateValidFrom", "");
   await expectInputValue("#adminCreateValidTo", "");
   await expectInputValue("#adminCreateValidForMinutes", "45");
+  await expectInputValue(
+    "#adminCreateMonitorBookletVisibility",
+    "collapsed"
+  );
   await expectInputValue("#adminCreatePassword", "");
   await page.getByText("2 imported monitor profile(s)").waitFor();
   await page.getByText("43 login-specific custom text(s)").waitFor();
@@ -10551,6 +10557,10 @@ try {
       profile => profile.profileId
     ),
     ["all", "booklet-errors"]
+  );
+  assert.equal(
+    initialGroupMonitorSignIn.roleAssignments[0]?.monitorBookletVisibility,
+    "collapsed"
   );
   assert.equal(
     initialGroupMonitorSignIn.adminUser.firstSignedInAt,
@@ -11829,6 +11839,10 @@ try {
   assert.equal(groupMonitorSignIn.adminUser.customTexts.gm_headline, "UI Scoped Monitor");
   assert.equal(groupMonitorSignIn.adminUser.customTexts.gm_control_pause, "UI Hold");
   assert.equal(
+    groupMonitorSignIn.roleAssignments[0]?.monitorBookletVisibility,
+    "collapsed"
+  );
+  assert.equal(
     Date.parse(groupMonitorSignIn.adminSession.expiresAt),
     Date.parse(groupMonitorSignIn.adminUser.firstSignedInAt) + 45 * 60_000
   );
@@ -11869,6 +11883,15 @@ try {
   await page.locator("#monitorConsoleCompleteButton", { hasText: "UI Finish All" }).waitFor();
   await page.locator("#monitorScrollDownButton", { hasText: "UI Bottom" }).waitFor();
   await page.locator("#monitorToggleControlsButton", { hasText: "UI Hide Controls" }).waitFor();
+  assert.equal(
+    await page.locator("#monitorToggleBookletListButton").getAttribute("aria-expanded"),
+    "false"
+  );
+  assert.equal(
+    await page.getByRole("heading", { name: "Active Test Booklets" }).count(),
+    0,
+    "Collapsed monitor booklet visibility must keep the start-menu list closed."
+  );
   await page
     .locator("#monitorColumnPresentation")
     .filter({ hasText: "UI Columns" })
@@ -11932,6 +11955,13 @@ try {
   await scopedOpenRuns
     .filter({ hasText: participantLoginKey })
     .filter({ hasText: participantGroupKey })
+    .waitFor();
+  await page.locator("#monitorToggleBookletListButton").click();
+  await page
+    .locator("app-record-collection")
+    .filter({ has: page.getByRole("heading", { name: "Active Test Booklets" }) })
+    .filter({ hasText: participantRouteBookletKey })
+    .filter({ hasText: "1 active run" })
     .waitFor();
   await scopedOpenRuns
     .getByRole("button", { name: "Add to Batch" })

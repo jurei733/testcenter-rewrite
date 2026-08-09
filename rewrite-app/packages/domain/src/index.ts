@@ -488,6 +488,8 @@ export type MonitorViewProfile = {
   };
 };
 
+export type MonitorBookletVisibility = "visible" | "collapsed" | "hidden";
+
 export type OperationalLoginMigrationCandidate = {
   loginKey: string;
   loginMode: "monitor-group" | "monitor-study" | "sys-check-login";
@@ -495,6 +497,7 @@ export type OperationalLoginMigrationCandidate = {
   passwordRequired: boolean;
   profileIds: string[];
   monitorProfiles: MonitorViewProfile[];
+  monitorBookletVisibility: MonitorBookletVisibility;
   customTexts: Record<string, string>;
   unresolvedProfileIds: string[];
   validFrom?: string | null;
@@ -511,6 +514,7 @@ export type AdminRoleAssignment = {
   workspaceId: string | null;
   groupKey: string | null;
   monitorProfiles: MonitorViewProfile[];
+  monitorBookletVisibility: MonitorBookletVisibility;
   createdAt: string;
 };
 

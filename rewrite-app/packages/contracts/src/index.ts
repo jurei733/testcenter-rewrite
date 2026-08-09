@@ -1793,6 +1793,19 @@ export const parseOriginalTestcenterOperationalLogins = (
         )
     ).filter((profileId): profileId is string => Boolean(profileId));
     const uniqueProfileIds = Array.from(new Set(profileIds));
+    const viewSettingsAttributes = content.match(
+      /<(?:[a-zA-Z_][\w.-]*:)?viewsettings\b([^>]*?)(?:\/?>)/i
+    )?.[1];
+    const importedVisibility = viewSettingsAttributes
+      ? readXmlAttribute(
+          parseXmlAttributes(viewSettingsAttributes),
+          "monitorBookletVisibility"
+        )?.trim()
+      : undefined;
+    const monitorBookletVisibility =
+      importedVisibility === "collapsed" || importedVisibility === "hidden"
+        ? importedVisibility
+        : "visible";
 
     candidates.push({
       loginKey,
@@ -1804,6 +1817,7 @@ export const parseOriginalTestcenterOperationalLogins = (
         const profile = monitorProfiles.get(profileId);
         return profile ? [profile] : [];
       }),
+      monitorBookletVisibility,
       customTexts: { ...customTexts },
       unresolvedProfileIds: uniqueProfileIds.filter(
         profileId => !monitorProfiles.has(profileId)
@@ -2511,6 +2525,7 @@ export type AdminRoleAssignmentRequest = {
   workspaceKey?: string | null;
   groupKey?: string | null;
   monitorProfiles?: MonitorViewProfile[];
+  monitorBookletVisibility?: AdminRoleAssignment["monitorBookletVisibility"];
 };
 
 export type CreateAdminUserRequest = {

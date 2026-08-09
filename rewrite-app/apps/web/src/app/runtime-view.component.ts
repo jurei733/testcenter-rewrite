@@ -841,6 +841,32 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         </div>
       </article>
 
+      <section *ngIf="view.isMonitorOnlySession && view.monitorBookletListVisible">
+        <article class="card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Test booklet access</span>
+              <h2>{{ view.monitorText('gm_show_test') }}</h2>
+            </div>
+            <button
+              id="monitorToggleBookletListButton"
+              class="ghost"
+              type="button"
+              [attr.aria-expanded]="view.monitorBookletListExpanded"
+              (click)="view.toggleMonitorBookletList()"
+            >{{ view.monitorBookletListExpanded ? 'Collapse' : 'Expand' }}</button>
+          </div>
+        </article>
+        <app-record-collection
+          *ngIf="view.monitorBookletListExpanded"
+          title="Active Test Booklets"
+          subtitle="Booklets currently visible through the authorized monitor scope."
+          [items]="view.monitorBookletItems"
+          [density]="view.monitorProfileDensity"
+          emptyState="No active test booklet is currently visible."
+        ></app-record-collection>
+      </section>
+
       <app-record-collection
         id="openMonitorRunsCollection"
         [title]="view.isMonitorOnlySession ? view.monitorText('gm_show_test') : 'Open Monitor Runs'"

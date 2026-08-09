@@ -347,6 +347,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
             Initial Group Key
             <input id="adminCreateGroupKey" name="adminCreateGroupKey" [(ngModel)]="view.ops.adminCreateGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminCreateRole !== 'group_monitor'" />
           </label>
+          <label *ngIf="view.isCreatingMonitorAccount">
+            Test Booklet List
+            <select id="adminCreateMonitorBookletVisibility" name="adminCreateMonitorBookletVisibility" [(ngModel)]="view.ops.adminCreateMonitorBookletVisibility" (change)="view.persistState()">
+              <option value="visible">Visible</option>
+              <option value="collapsed">Initially collapsed</option>
+              <option value="hidden">Hidden</option>
+            </select>
+          </label>
           <label *ngIf="view.requiresPlatformRoleConfirmation">
             Confirm Current Platform Admin Password
             <input id="adminPlatformRoleConfirmationPassword" name="adminPlatformRoleConfirmationPassword" type="password" autocomplete="current-password" [attr.maxlength]="view.adminPasswordMaximumLength" [(ngModel)]="view.platformRoleConfirmationPassword" />
@@ -416,6 +424,14 @@ import { SummaryCardsComponent } from "./summary-cards.component";
           <label>
             Role Group Key
             <input id="adminRoleGroupKey" name="adminRoleGroupKey" [(ngModel)]="view.ops.adminRoleGroupKey" (change)="view.persistState()" [disabled]="view.ops.adminRoleRole !== 'group_monitor'" />
+          </label>
+          <label *ngIf="view.isAssigningMonitorRole">
+            Test Booklet List
+            <select id="adminRoleMonitorBookletVisibility" name="adminRoleMonitorBookletVisibility" [(ngModel)]="view.ops.adminRoleMonitorBookletVisibility" (change)="view.persistState()">
+              <option value="visible">Visible</option>
+              <option value="collapsed">Initially collapsed</option>
+              <option value="hidden">Hidden</option>
+            </select>
           </label>
         </div>
         <div class="actions">

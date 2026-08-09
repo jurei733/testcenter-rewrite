@@ -122,6 +122,7 @@ export type ShellPersistenceTarget = {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
@@ -133,6 +134,7 @@ export type ShellPersistenceTarget = {
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
   adminRoleMonitorProfilesJson: string;
+  adminRoleMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -257,6 +259,8 @@ export const createPersistedShellState = (
   adminCreateWorkspaceKey: target.adminCreateWorkspaceKey,
   adminCreateGroupKey: target.adminCreateGroupKey,
   adminCreateMonitorProfilesJson: target.adminCreateMonitorProfilesJson,
+  adminCreateMonitorBookletVisibility:
+    target.adminCreateMonitorBookletVisibility,
   adminCreateCustomTextsJson: target.adminCreateCustomTextsJson,
   adminCreateValidFrom: target.adminCreateValidFrom,
   adminCreateValidTo: target.adminCreateValidTo,
@@ -268,6 +272,7 @@ export const createPersistedShellState = (
   adminRoleWorkspaceKey: target.adminRoleWorkspaceKey,
   adminRoleGroupKey: target.adminRoleGroupKey,
   adminRoleMonitorProfilesJson: target.adminRoleMonitorProfilesJson,
+  adminRoleMonitorBookletVisibility: target.adminRoleMonitorBookletVisibility,
   adminRevokeTargetUserId: target.adminRevokeTargetUserId,
   adminRevokeRoleAssignmentId: target.adminRevokeRoleAssignmentId,
   adminStatusTargetUserId: target.adminStatusTargetUserId,
@@ -729,6 +734,15 @@ export const applyHydratedShellState = (
     snapshot.adminCreateMonitorProfilesJson,
     target.adminCreateMonitorProfilesJson
   );
+  const adminCreateMonitorBookletVisibility = hydrateString(
+    snapshot.adminCreateMonitorBookletVisibility,
+    target.adminCreateMonitorBookletVisibility
+  );
+  target.adminCreateMonitorBookletVisibility =
+    adminCreateMonitorBookletVisibility === "collapsed" ||
+    adminCreateMonitorBookletVisibility === "hidden"
+      ? adminCreateMonitorBookletVisibility
+      : "visible";
   target.adminCreateCustomTextsJson = hydrateString(
     snapshot.adminCreateCustomTextsJson,
     target.adminCreateCustomTextsJson
@@ -763,6 +777,15 @@ export const applyHydratedShellState = (
     snapshot.adminRoleMonitorProfilesJson,
     target.adminRoleMonitorProfilesJson
   );
+  const adminRoleMonitorBookletVisibility = hydrateString(
+    snapshot.adminRoleMonitorBookletVisibility,
+    target.adminRoleMonitorBookletVisibility
+  );
+  target.adminRoleMonitorBookletVisibility =
+    adminRoleMonitorBookletVisibility === "collapsed" ||
+    adminRoleMonitorBookletVisibility === "hidden"
+      ? adminRoleMonitorBookletVisibility
+      : "visible";
   target.adminRevokeTargetUserId =
     hydrateString(
       snapshot.adminRevokeTargetUserId,

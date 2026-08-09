@@ -943,6 +943,7 @@ export type AdminDirectoryPort = {
       workspaceKey?: string | null;
       groupKey?: string | null;
       monitorProfiles?: MonitorViewProfile[];
+      monitorBookletVisibility?: AdminRoleAssignment["monitorBookletVisibility"];
     }>;
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   updateAdminUser(input: {
@@ -979,6 +980,7 @@ export type AdminDirectoryPort = {
     workspaceKey?: string | null;
     groupKey?: string | null;
     monitorProfiles?: MonitorViewProfile[];
+    monitorBookletVisibility?: AdminRoleAssignment["monitorBookletVisibility"];
   }): Promise<{ adminUser: AdminUser; roleAssignments: AdminRoleAssignment[] }>;
   revokeAdminRole(input: {
     sessionToken: string;
@@ -1529,6 +1531,7 @@ type AdminRoleAssignmentInput = {
   workspaceKey?: string | null;
   groupKey?: string | null;
   monitorProfiles?: MonitorViewProfile[];
+  monitorBookletVisibility?: AdminRoleAssignment["monitorBookletVisibility"];
 };
 
 type ResolvedAdminRoleScope = {
@@ -1538,6 +1541,7 @@ type ResolvedAdminRoleScope = {
   workspaceId: string | null;
   groupKey: string | null;
   monitorProfiles: MonitorViewProfile[];
+  monitorBookletVisibility: AdminRoleAssignment["monitorBookletVisibility"];
 };
 
 const normalizeAdminUsername = (value: unknown): string => {
@@ -3466,7 +3470,9 @@ const listAdminRoleAssignmentsForUser = async (
   (await repository.listAdminRoleAssignmentsByUserId(adminUserId))
     .map(roleAssignment => ({
       ...roleAssignment,
-      accessMode: roleAssignment.accessMode ?? "read_write"
+      accessMode: roleAssignment.accessMode ?? "read_write",
+      monitorBookletVisibility:
+        roleAssignment.monitorBookletVisibility ?? "visible"
     }))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 
@@ -4258,6 +4264,36 @@ const resolveAdminRoleScope = async (
   const workspaceKey = normalizeOptionalScopeKey(input.workspaceKey, "workspaceKey");
   const groupKey = normalizeOptionalScopeKey(input.groupKey, "groupKey");
   const monitorProfiles = normalizeMonitorViewProfiles(input.monitorProfiles);
+  const monitorBookletVisibility =
+    input.monitorBookletVisibility === "collapsed" ||
+    input.monitorBookletVisibility === "hidden"
+      ? input.monitorBookletVisibility
+      : "visible";
+
+  if (
+    input.monitorBookletVisibility !== undefined &&
+    input.monitorBookletVisibility !== "visible" &&
+    input.monitorBookletVisibility !== "collapsed" &&
+    input.monitorBookletVisibility !== "hidden"
+  ) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_booklet_visibility_invalid",
+      "Monitor booklet visibility must be 'visible', 'collapsed', or 'hidden'."
+    );
+  }
+
+  if (
+    input.monitorBookletVisibility !== undefined &&
+    role !== "group_monitor" &&
+    role !== "study_monitor"
+  ) {
+    throw new FirstSliceError(
+      400,
+      "admin_monitor_booklet_visibility_invalid",
+      "Monitor booklet visibility may only be assigned to group or study monitor roles."
+    );
+  }
 
   if (
     monitorProfiles.length > 0 &&
@@ -4286,7 +4322,8 @@ const resolveAdminRoleScope = async (
       tenantId: null,
       workspaceId: null,
       groupKey: null,
-      monitorProfiles
+      monitorProfiles,
+      monitorBookletVisibility
     };
   }
 
@@ -4314,7 +4351,8 @@ const resolveAdminRoleScope = async (
       tenantId: tenant.tenantId,
       workspaceId: null,
       groupKey: null,
-      monitorProfiles
+      monitorProfiles,
+      monitorBookletVisibility
     };
   }
 
@@ -4347,7 +4385,8 @@ const resolveAdminRoleScope = async (
     tenantId: workspace.tenantId,
     workspaceId: workspace.workspaceId,
     groupKey: role === "group_monitor" ? groupKey : null,
-    monitorProfiles
+    monitorProfiles,
+    monitorBookletVisibility
   };
 };
 
@@ -21710,6 +21749,7 @@ export const createFirstSliceServices = (
           workspaceId: null,
           groupKey: null,
           monitorProfiles: [],
+          monitorBookletVisibility: "visible",
           createdAt: timestamp
         };
 
@@ -22326,6 +22366,7 @@ export const createFirstSliceServices = (
             workspaceId: scope.workspaceId,
             groupKey: scope.groupKey,
             monitorProfiles: scope.monitorProfiles,
+            monitorBookletVisibility: scope.monitorBookletVisibility,
             createdAt: timestamp
           };
           await repository.saveAdminRoleAssignment(roleAssignment);
@@ -22644,6 +22685,7 @@ export const createFirstSliceServices = (
         if (
           existingRoleAssignment &&
           input.monitorProfiles === undefined &&
+          input.monitorBookletVisibility === undefined &&
           input.accessMode === undefined
         ) {
           return { adminUser, roleAssignments: existingRoleAssignments };
@@ -22656,7 +22698,11 @@ export const createFirstSliceServices = (
             monitorProfiles:
               input.monitorProfiles === undefined
                 ? existingRoleAssignment.monitorProfiles
-                : scope.monitorProfiles
+                : scope.monitorProfiles,
+            monitorBookletVisibility:
+              input.monitorBookletVisibility === undefined
+                ? existingRoleAssignment.monitorBookletVisibility
+                : scope.monitorBookletVisibility
           };
           await repository.saveAdminRoleAssignment(updatedRoleAssignment);
           const directoryItem = await createAdminUserDirectoryItem(repository, adminUser);
@@ -22684,6 +22730,7 @@ export const createFirstSliceServices = (
           workspaceId: scope.workspaceId,
           groupKey: scope.groupKey,
           monitorProfiles: scope.monitorProfiles,
+          monitorBookletVisibility: scope.monitorBookletVisibility,
           createdAt: now()
         };
         await repository.saveAdminRoleAssignment(roleAssignment);

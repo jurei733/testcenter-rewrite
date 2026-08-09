@@ -118,9 +118,14 @@ const mapAdminSession = (
 
 const mapAdminRoleAssignment = (
   row: Record<string, unknown> | undefined
-): AdminRoleAssignment | null =>
-  row
-    ? {
+): AdminRoleAssignment | null => {
+  if (!row) {
+    return null;
+  }
+  const monitorRoleSettings = parseMonitorRoleSettings(
+    row.monitor_profiles_json
+  );
+  return {
         roleAssignmentId: String(row.role_assignment_id),
         adminUserId: String(row.admin_user_id),
         role: row.role as AdminRoleAssignment["role"],
@@ -138,24 +143,42 @@ const mapAdminRoleAssignment = (
           row.group_key === null || row.group_key === undefined
             ? null
             : String(row.group_key),
-        monitorProfiles: parseMonitorProfiles(row.monitor_profiles_json),
+        monitorProfiles: monitorRoleSettings.monitorProfiles,
+        monitorBookletVisibility: monitorRoleSettings.monitorBookletVisibility,
         createdAt: String(row.created_at)
-      }
-    : null;
+      };
+};
 
-const parseMonitorProfiles = (
+const parseMonitorRoleSettings = (
   value: unknown
-): AdminRoleAssignment["monitorProfiles"] => {
+): Pick<AdminRoleAssignment, "monitorProfiles" | "monitorBookletVisibility"> => {
   if (typeof value !== "string" || !value) {
-    return [];
+    return { monitorProfiles: [], monitorBookletVisibility: "visible" };
   }
   try {
     const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed)
-      ? (parsed as AdminRoleAssignment["monitorProfiles"])
-      : [];
+    if (Array.isArray(parsed)) {
+      return {
+        monitorProfiles: parsed as AdminRoleAssignment["monitorProfiles"],
+        monitorBookletVisibility: "visible"
+      };
+    }
+    if (parsed && typeof parsed === "object") {
+      const settings = parsed as Record<string, unknown>;
+      return {
+        monitorProfiles: Array.isArray(settings.monitorProfiles)
+          ? (settings.monitorProfiles as AdminRoleAssignment["monitorProfiles"])
+          : [],
+        monitorBookletVisibility:
+          settings.monitorBookletVisibility === "collapsed" ||
+          settings.monitorBookletVisibility === "hidden"
+            ? settings.monitorBookletVisibility
+            : "visible"
+      };
+    }
+    return { monitorProfiles: [], monitorBookletVisibility: "visible" };
   } catch {
-    return [];
+    return { monitorProfiles: [], monitorBookletVisibility: "visible" };
   }
 };
 
@@ -1680,7 +1703,11 @@ export const createSqliteFirstSliceRepository = (
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
           roleAssignment.groupKey,
-          JSON.stringify(roleAssignment.monitorProfiles),
+          JSON.stringify({
+            monitorProfiles: roleAssignment.monitorProfiles,
+            monitorBookletVisibility:
+              roleAssignment.monitorBookletVisibility ?? "visible"
+          }),
           roleAssignment.createdAt
         );
     },

@@ -110,6 +110,18 @@ export class RewriteAppOperatorAccessService {
     return Array.from(profiles.values());
   }
 
+  get monitorBookletVisibility(): "visible" | "collapsed" | "hidden" {
+    const monitorAssignment = this.roleAssignments.find(
+      assignment =>
+        assignment.role === "study_monitor" ||
+        assignment.role === "group_monitor"
+    );
+    return monitorAssignment?.monitorBookletVisibility === "collapsed" ||
+      monitorAssignment?.monitorBookletVisibility === "hidden"
+      ? monitorAssignment.monitorBookletVisibility
+      : "visible";
+  }
+
   get label(): string {
     switch (this.mode) {
       case "study_monitor":

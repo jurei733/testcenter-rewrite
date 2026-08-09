@@ -141,6 +141,7 @@ export class RuntimeViewFacade {
   private readonly applicationSettings = inject(ApplicationSettingsService);
   private readonly monitorBatchSelection = new Set<string>();
   monitorControlsVisible = true;
+  monitorBookletListExpanded = true;
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
   > = [];
@@ -337,6 +338,14 @@ export class RuntimeViewFacade {
 
   toggleMonitorControls(): void {
     this.monitorControlsVisible = !this.monitorControlsVisible;
+  }
+
+  get monitorBookletListVisible(): boolean {
+    return this.operatorAccess.monitorBookletVisibility !== "hidden";
+  }
+
+  toggleMonitorBookletList(): void {
+    this.monitorBookletListExpanded = !this.monitorBookletListExpanded;
   }
 
   scrollMonitorRunsIntoView(): void {
@@ -1252,6 +1261,10 @@ export class RuntimeViewFacade {
                 value: `${Object.keys(candidate.customTexts).length} imported override(s)`
               },
               {
+                label: "Test Booklet List",
+                value: candidate.monitorBookletVisibility
+              },
+              {
                 label: "Migration Decision",
                 value: roleDraft
                   ? `Create a ${roleDraft.role} account with a newly assigned password; the source password remains unavailable.`
@@ -1270,6 +1283,8 @@ export class RuntimeViewFacade {
                     role: roleDraft.role,
                     groupKey: roleDraft.groupKey ?? "",
                     monitorProfilesJson: JSON.stringify(candidate.monitorProfiles),
+                    monitorBookletVisibility:
+                      candidate.monitorBookletVisibility,
                     customTextsJson: JSON.stringify(candidate.customTexts),
                     validFrom: candidate.validFrom ?? "",
                     validTo: candidate.validTo ?? "",
@@ -1314,6 +1329,13 @@ export class RuntimeViewFacade {
       role === "group_monitor" || role === "study_monitor"
         ? item.actionPayload.monitorProfilesJson ?? "[]"
         : "[]";
+    ops.adminCreateMonitorBookletVisibility =
+      role === "group_monitor" || role === "study_monitor"
+        ? item.actionPayload.monitorBookletVisibility === "collapsed" ||
+          item.actionPayload.monitorBookletVisibility === "hidden"
+          ? item.actionPayload.monitorBookletVisibility
+          : "visible"
+        : "visible";
     ops.adminCreateCustomTextsJson =
       item.actionPayload.customTextsJson ?? "{}";
     ops.adminCreateValidFrom = item.actionPayload.validFrom?.trim() ?? "";
@@ -2341,6 +2363,42 @@ export class RuntimeViewFacade {
     );
   }
 
+  get monitorBookletItems(): RecordCollectionItem[] {
+    const booklets = new Map<
+      string,
+      { label: string; groups: Set<string>; runCount: number }
+    >();
+    for (const openRun of this.visibleOpenMonitorRuns) {
+      const key = openRun.bookletAssignmentKey || openRun.bookletKey;
+      const current = booklets.get(key) ?? {
+        label: openRun.bookletLabel ?? openRun.bookletKey,
+        groups: new Set<string>(),
+        runCount: 0
+      };
+      current.groups.add(openRun.groupKey);
+      current.runCount += 1;
+      booklets.set(key, current);
+    }
+    return Array.from(booklets.entries())
+      .sort((left, right) => left[1].label.localeCompare(right[1].label))
+      .map(([bookletKey, booklet]) => ({
+        headline: booklet.label,
+        subline: bookletKey,
+        badges: [
+          `${booklet.runCount} active run${booklet.runCount === 1 ? "" : "s"}`,
+          `${booklet.groups.size} group${booklet.groups.size === 1 ? "" : "s"}`
+        ],
+        rows: [
+          { label: "Booklet", value: bookletKey },
+          {
+            label: "Groups",
+            value: Array.from(booklet.groups).sort().join(" | ")
+          },
+          { label: "Active Runs", value: String(booklet.runCount) }
+        ]
+      }));
+  }
+
   get monitorOverviewCards(): SummaryCard[] {
     const openRuns = this.visibleOpenMonitorRuns;
     const participantCount = new Set(openRuns.map(openRun => openRun.loginKey))
@@ -3037,6 +3095,8 @@ export class RuntimeViewFacade {
 
   init(): void {
     this.viewState.setActiveView("runtime");
+    this.monitorBookletListExpanded =
+      this.operatorAccess.monitorBookletVisibility !== "collapsed";
   }
 
   persistState(): void {

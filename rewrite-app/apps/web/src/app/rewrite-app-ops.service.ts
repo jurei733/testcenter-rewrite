@@ -501,7 +501,9 @@ export class RewriteAppOpsService {
             this.opsState.adminCreateTenantKey,
             this.opsState.adminCreateWorkspaceKey,
             this.opsState.adminCreateGroupKey,
-            this.opsState.adminCreateMonitorProfilesJson
+            this.opsState.adminCreateMonitorProfilesJson,
+            undefined,
+            this.opsState.adminCreateMonitorBookletVisibility
           )
         ]
       } satisfies CreateAdminUserRequest,
@@ -513,6 +515,7 @@ export class RewriteAppOpsService {
     this.opsState.adminCreateValidTo = "";
     this.opsState.adminCreateValidForMinutes = "";
     this.opsState.adminCreateMonitorProfilesJson = "[]";
+    this.opsState.adminCreateMonitorBookletVisibility = "visible";
     this.opsState.adminCreateCustomTextsJson = "{}";
     this.opsState.adminRoleTargetUserId = payload.adminUser.adminUserId;
     this.opsState.adminRevokeTargetUserId = payload.adminUser.adminUserId;
@@ -544,7 +547,8 @@ export class RewriteAppOpsService {
         this.opsState.adminRoleWorkspaceKey,
         this.opsState.adminRoleGroupKey,
         this.opsState.adminRoleMonitorProfilesJson,
-        confirmationPassword
+        confirmationPassword,
+        this.opsState.adminRoleMonitorBookletVisibility
       ) satisfies AssignAdminRoleRequest,
       { headers: this.createAdminHeaders() }
     );
@@ -584,7 +588,8 @@ export class RewriteAppOpsService {
       this.opsState.adminRoleWorkspaceKey,
       this.opsState.adminRoleGroupKey,
       this.opsState.adminRoleMonitorProfilesJson,
-      confirmationPassword
+      confirmationPassword,
+      this.opsState.adminRoleMonitorBookletVisibility
     );
     const succeededAdminUserIds: string[] = [];
     const failures: AdminUserRoleBatchResult["failures"] = [];
@@ -1085,7 +1090,8 @@ export class RewriteAppOpsService {
     workspaceKey: string,
     groupKey: string,
     monitorProfilesJson?: string,
-    confirmationPassword?: string
+    confirmationPassword?: string,
+    monitorBookletVisibility?: "visible" | "collapsed" | "hidden"
   ): AssignAdminRoleRequest {
     if (role === "platform_admin") {
       return { role, confirmationPassword };
@@ -1107,6 +1113,10 @@ export class RewriteAppOpsService {
       ...((role === "group_monitor" || role === "study_monitor") &&
       monitorProfilesJson !== undefined
         ? { monitorProfiles: this.parseMonitorProfiles(monitorProfilesJson) }
+        : {}),
+      ...((role === "group_monitor" || role === "study_monitor") &&
+      monitorBookletVisibility !== undefined
+        ? { monitorBookletVisibility }
         : {})
     };
   }

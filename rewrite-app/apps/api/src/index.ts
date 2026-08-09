@@ -4531,7 +4531,8 @@ const createRequestHandler = (runtime: Awaited<ReturnType<typeof createApiRuntim
           tenantKey: body.tenantKey,
           workspaceKey: body.workspaceKey,
           groupKey: body.groupKey,
-          monitorProfiles: body.monitorProfiles
+          monitorProfiles: body.monitorProfiles,
+          monitorBookletVisibility: body.monitorBookletVisibility
         });
         sendJson<AssignAdminRoleResponse>(
           response,

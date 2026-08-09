@@ -252,6 +252,7 @@ describe("parseParticipantRosterText", () => {
         "      <Profile id=\"small\" />",
         "      <Profile id=\"all\" />",
         "      <Profile id=\"missing\" />",
+        "      <ViewSettings monitorBookletVisibility=\"collapsed\" />",
         "    </Login>",
         "    <Login mode=\"sys-check-login\" name=\"sys-check\" />",
         "    <Login mode=\"run-hot-return\" name=\"participant\"><Booklet>BOOKLET.A</Booklet></Login>",
@@ -316,6 +317,7 @@ describe("parseParticipantRosterText", () => {
             filtersEnabled: { pending: "yes", locked: "yes" }
           }
         ],
+        monitorBookletVisibility: "collapsed",
         customTexts: { gm_headline: "Custom monitor" },
         unresolvedProfileIds: ["missing"],
         validFrom: "1/6/2023 10:00",
@@ -328,6 +330,7 @@ describe("parseParticipantRosterText", () => {
         passwordRequired: false,
         profileIds: [],
         monitorProfiles: [],
+        monitorBookletVisibility: "visible",
         customTexts: { gm_headline: "Custom monitor" },
         unresolvedProfileIds: [],
         validFrom: "1/6/2023 10:00",
@@ -355,6 +358,7 @@ describe("parseParticipantRosterText", () => {
         passwordRequired: true,
         profileIds: [],
         monitorProfiles: [],
+        monitorBookletVisibility: "visible",
         customTexts: {},
         unresolvedProfileIds: []
       }),

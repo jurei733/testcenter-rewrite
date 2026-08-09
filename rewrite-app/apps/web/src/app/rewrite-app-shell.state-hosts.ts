@@ -762,6 +762,12 @@ export function createShellPersistenceStateHost(args: {
     set adminCreateMonitorProfilesJson(nextValue) {
       args.opsState.adminCreateMonitorProfilesJson = nextValue;
     },
+    get adminCreateMonitorBookletVisibility() {
+      return args.opsState.adminCreateMonitorBookletVisibility;
+    },
+    set adminCreateMonitorBookletVisibility(nextValue) {
+      args.opsState.adminCreateMonitorBookletVisibility = nextValue;
+    },
     get adminCreateCustomTextsJson() {
       return args.opsState.adminCreateCustomTextsJson;
     },
@@ -827,6 +833,12 @@ export function createShellPersistenceStateHost(args: {
     },
     set adminRoleMonitorProfilesJson(nextValue) {
       args.opsState.adminRoleMonitorProfilesJson = nextValue;
+    },
+    get adminRoleMonitorBookletVisibility() {
+      return args.opsState.adminRoleMonitorBookletVisibility;
+    },
+    set adminRoleMonitorBookletVisibility(nextValue) {
+      args.opsState.adminRoleMonitorBookletVisibility = nextValue;
     },
     get adminRevokeTargetUserId() {
       return args.opsState.adminRevokeTargetUserId;

@@ -107,9 +107,16 @@ const mapAdminSession = (row: Row | undefined): AdminSession | null =>
       }
     : null;
 
-const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | null =>
-  row
-    ? {
+const mapAdminRoleAssignment = (
+  row: Row | undefined
+): AdminRoleAssignment | null => {
+  if (!row) {
+    return null;
+  }
+  const monitorRoleSettings = parseMonitorRoleSettings(
+    row.monitor_profiles_json
+  );
+  return {
         roleAssignmentId: String(row.role_assignment_id),
         adminUserId: String(row.admin_user_id),
         role: row.role as AdminRoleAssignment["role"],
@@ -127,27 +134,42 @@ const mapAdminRoleAssignment = (row: Row | undefined): AdminRoleAssignment | nul
           row.group_key === null || row.group_key === undefined
             ? null
             : String(row.group_key),
-        monitorProfiles: parseMonitorProfiles(row.monitor_profiles_json),
+        monitorProfiles: monitorRoleSettings.monitorProfiles,
+        monitorBookletVisibility: monitorRoleSettings.monitorBookletVisibility,
         createdAt: String(row.created_at)
-      }
-    : null;
+      };
+};
 
-const parseMonitorProfiles = (
+const parseMonitorRoleSettings = (
   value: unknown
-): AdminRoleAssignment["monitorProfiles"] => {
+): Pick<AdminRoleAssignment, "monitorProfiles" | "monitorBookletVisibility"> => {
   if (Array.isArray(value)) {
-    return value as AdminRoleAssignment["monitorProfiles"];
+    return {
+      monitorProfiles: value as AdminRoleAssignment["monitorProfiles"],
+      monitorBookletVisibility: "visible"
+    };
   }
   if (typeof value !== "string" || !value) {
-    return [];
+    if (value && typeof value === "object") {
+      const settings = value as Record<string, unknown>;
+      return {
+        monitorProfiles: Array.isArray(settings.monitorProfiles)
+          ? (settings.monitorProfiles as AdminRoleAssignment["monitorProfiles"])
+          : [],
+        monitorBookletVisibility:
+          settings.monitorBookletVisibility === "collapsed" ||
+          settings.monitorBookletVisibility === "hidden"
+            ? settings.monitorBookletVisibility
+            : "visible"
+      };
+    }
+    return { monitorProfiles: [], monitorBookletVisibility: "visible" };
   }
   try {
     const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed)
-      ? (parsed as AdminRoleAssignment["monitorProfiles"])
-      : [];
+    return parseMonitorRoleSettings(parsed);
   } catch {
-    return [];
+    return { monitorProfiles: [], monitorBookletVisibility: "visible" };
   }
 };
 
@@ -1595,7 +1617,11 @@ const createRepositoryFromPool = (pool: Pool): FirstSliceRepository => {
           roleAssignment.tenantId,
           roleAssignment.workspaceId,
           roleAssignment.groupKey,
-          JSON.stringify(roleAssignment.monitorProfiles),
+          JSON.stringify({
+            monitorProfiles: roleAssignment.monitorProfiles,
+            monitorBookletVisibility:
+              roleAssignment.monitorBookletVisibility ?? "visible"
+          }),
           roleAssignment.createdAt
         ]
       );

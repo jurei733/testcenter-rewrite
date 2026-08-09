@@ -111,6 +111,7 @@ test("SQLite persists and replaces operational login migration candidates", asyn
     passwordRequired: true,
     profileIds: [],
     monitorProfiles: [],
+    monitorBookletVisibility: "collapsed",
     customTexts: { gm_headline: "Imported monitor" },
     unresolvedProfileIds: [],
     validForMinutes: 45
@@ -201,6 +202,7 @@ test("SQLite preserves workspace-admin access modes", async () => {
     workspaceId: "workspace-read-only",
     groupKey: null,
     monitorProfiles: [],
+    monitorBookletVisibility: "visible",
     createdAt: "2026-08-03T00:00:00.000Z"
   };
 
@@ -210,6 +212,11 @@ test("SQLite preserves workspace-admin access modes", async () => {
     (await repository.listAdminRoleAssignmentsByUserId("admin-read-only"))[0]
       ?.accessMode,
     "read_only"
+  );
+  assert.equal(
+    (await repository.listAdminRoleAssignmentsByUserId("admin-read-only"))[0]
+      ?.monitorBookletVisibility,
+    "visible"
   );
 });
 

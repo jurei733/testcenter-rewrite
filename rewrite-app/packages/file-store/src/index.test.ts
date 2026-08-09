@@ -108,6 +108,7 @@ describe("createFileFirstSliceRepository", () => {
       passwordRequired: true,
       profileIds: [],
       monitorProfiles: [],
+      monitorBookletVisibility: "hidden",
       customTexts: { systemcheck_intro: "Imported check" },
       unresolvedProfileIds: [],
       validForMinutes: 30

@@ -57,6 +57,7 @@ export interface ShellOpsState {
   adminCreateWorkspaceKey: string;
   adminCreateGroupKey: string;
   adminCreateMonitorProfilesJson: string;
+  adminCreateMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminCreateCustomTextsJson: string;
   adminCreateValidFrom: string;
   adminCreateValidTo: string;
@@ -68,6 +69,7 @@ export interface ShellOpsState {
   adminRoleWorkspaceKey: string;
   adminRoleGroupKey: string;
   adminRoleMonitorProfilesJson: string;
+  adminRoleMonitorBookletVisibility: "visible" | "collapsed" | "hidden";
   adminRevokeTargetUserId: string;
   adminRevokeRoleAssignmentId: string;
   adminStatusTargetUserId: string;
@@ -293,6 +295,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminCreateWorkspaceKey: "demo-workspace",
     adminCreateGroupKey: "group:student-demo",
     adminCreateMonitorProfilesJson: "[]",
+    adminCreateMonitorBookletVisibility: "visible",
     adminCreateCustomTextsJson: "{}",
     adminCreateValidFrom: "",
     adminCreateValidTo: "",
@@ -304,6 +307,7 @@ export function createInitialShellOpsState(): ShellOpsState {
     adminRoleWorkspaceKey: "demo-workspace",
     adminRoleGroupKey: "group:student-demo",
     adminRoleMonitorProfilesJson: "[]",
+    adminRoleMonitorBookletVisibility: "visible",
     adminRevokeTargetUserId: "",
     adminRevokeRoleAssignmentId: "",
     adminStatusTargetUserId: "",
