@@ -16898,6 +16898,57 @@ const resolveVisibleBookletUnits = (
   );
 };
 
+const resetNonSavingTestRunForEntry = (input: {
+  booklet: ContentReleaseBookletEntry | undefined;
+  executionMode: ParticipantExecutionModeDefinition;
+  testRun: TestRun;
+  timestamp: string;
+}): TestRun => {
+  // The original keeps these values only in Unit/Test-state buffers when
+  // saveResponses is disabled. Returning to the starter therefore reopens the
+  // same database test with its launch-equivalent, response-free state.
+  const resetUnlockedTestletKeys = input.executionMode.presetCode
+    ? input.booklet?.testletEntries
+        ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
+        .map(testlet => testlet.testletKey) ?? []
+    : [];
+  const resetEvaluationRun = withEvaluatedBookletStates(input.booklet, {
+    ...input.testRun,
+    status: "running",
+    locked: false,
+    currentUnitKey: null,
+    unitResponses: {},
+    unlockedTestletKeys: resetUnlockedTestletKeys,
+    monitorNavigationUnlocked: false,
+    testletTimers: {},
+    lockedTestletKeys: [],
+    lockedUnitKeys: [],
+    updatedAt: input.timestamp,
+    completedAt: null
+  });
+  const firstVisibleUnit = resolveVisibleBookletUnits(
+    input.booklet,
+    resetEvaluationRun
+  )[0];
+  const firstUnitRequiresCode =
+    input.executionMode.forceNaviRestrictions &&
+    !input.executionMode.presetCode &&
+    (firstVisibleUnit?.testletPath ?? []).some(testletKey =>
+      Boolean(
+        input.booklet?.testletEntries?.find(
+          testlet => testlet.testletKey === testletKey
+        )?.restrictions?.codeToEnter?.code
+      )
+    );
+
+  return {
+    ...resetEvaluationRun,
+    currentUnitKey: firstUnitRequiresCode
+      ? null
+      : firstVisibleUnit?.unitKey ?? null
+  };
+};
+
 const isUnitLeaveLocked = (
   booklet: ContentReleaseBookletEntry | undefined,
   testRun: TestRun,
@@ -27309,56 +27360,28 @@ export const createFirstSliceServices = (
             const booklet = contentRelease.runtimeSnapshot.bookletEntries.find(
               candidate => candidate.bookletKey === normalizedExistingRun.bookletKey
             );
-            const resetUnlockedTestletKeys = executionMode.presetCode
-              ? booklet?.testletEntries
-                  ?.filter(testlet => Boolean(testlet.restrictions?.codeToEnter?.code))
-                  .map(testlet => testlet.testletKey) ?? []
-              : [];
-            const resetEvaluationRun = withEvaluatedBookletStates(booklet, {
-              ...normalizedExistingRun,
-              locked: false,
-              unitResponses: {},
-              unlockedTestletKeys: resetUnlockedTestletKeys,
-              monitorNavigationUnlocked: false,
-              testletTimers: {},
-              lockedTestletKeys: [],
-              lockedUnitKeys: []
-            });
-            const firstVisibleUnit = resolveVisibleBookletUnits(
+            const resetRun = resetNonSavingTestRunForEntry({
               booklet,
-              resetEvaluationRun
-            )[0];
-            const firstUnitRequiresCode =
-              executionMode.forceNaviRestrictions &&
-              !executionMode.presetCode &&
-              (firstVisibleUnit?.testletPath ?? []).some(testletKey =>
-                Boolean(
-                  booklet?.testletEntries?.find(
-                    testlet => testlet.testletKey === testletKey
-                  )?.restrictions?.codeToEnter?.code
-                )
-              );
-            const resetCurrentUnitKey = firstUnitRequiresCode
-              ? null
-              : firstVisibleUnit?.unitKey ?? null;
+              executionMode,
+              testRun: normalizedExistingRun,
+              timestamp: now()
+            });
             if (
-              normalizedExistingRun.currentUnitKey !== resetCurrentUnitKey ||
+              normalizedExistingRun.status !== resetRun.status ||
+              normalizedExistingRun.completedAt !== resetRun.completedAt ||
+              normalizedExistingRun.currentUnitKey !== resetRun.currentUnitKey ||
               Object.keys(normalizedExistingRun.unitResponses).length > 0 ||
               normalizedExistingRun.locked ||
               normalizedExistingRun.monitorNavigationUnlocked ||
               JSON.stringify(normalizedExistingRun.unlockedTestletKeys ?? []) !==
-                JSON.stringify(resetUnlockedTestletKeys) ||
+                JSON.stringify(resetRun.unlockedTestletKeys ?? []) ||
               Object.keys(normalizedExistingRun.testletTimers ?? {}).length > 0 ||
               (normalizedExistingRun.lockedTestletKeys ?? []).length > 0 ||
               (normalizedExistingRun.lockedUnitKeys ?? []).length > 0 ||
               JSON.stringify(normalizedExistingRun.bookletStates ?? {}) !==
-                JSON.stringify(resetEvaluationRun.bookletStates ?? {})
+                JSON.stringify(resetRun.bookletStates ?? {})
             ) {
-              normalizedExistingRun = {
-                ...resetEvaluationRun,
-                currentUnitKey: resetCurrentUnitKey,
-                updatedAt: now()
-              };
+              normalizedExistingRun = resetRun;
               await repository.saveTestRun(normalizedExistingRun);
             }
           }
@@ -28225,7 +28248,15 @@ export const createFirstSliceServices = (
             unitResponses: testRun.unitResponses
           }).bookletStates;
         }
-        await repository.saveTestRun(completedRun);
+        const persistedRun = executionMode.saveResponses
+          ? completedRun
+          : resetNonSavingTestRunForEntry({
+              booklet,
+              executionMode,
+              testRun: completedRun,
+              timestamp
+            });
+        await repository.saveTestRun(persistedRun);
         if (executionMode.saveResponses) {
           const completedStateEntries: ParticipantTestLogEntryInput[] = [];
           if (testletTimerStateChanged(testRun, completedRun)) {
@@ -28259,7 +28290,11 @@ export const createFirstSliceServices = (
         const participantSession = await repository.getParticipantSessionById(
           testRun.participantSessionId
         );
-        if (participantSession && !lockOnTermination) {
+        if (
+          participantSession &&
+          !lockOnTermination &&
+          executionMode.saveResponses
+        ) {
           const nextSessionStatus =
             await resolveParticipantSessionStatusAfterCompletion(
               repository,

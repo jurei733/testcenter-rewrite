@@ -30847,6 +30847,86 @@ test("original Testcenter execution modes govern sessions, persistence, restrict
     protectedTestletKey
   ]);
   assert.deepEqual(reopenedDemo.body.testRun.testletTimers, {});
+  const demoAtFinish = await requestJson<{
+    testRun: { currentUnitKey: string | null };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/save-progress`, {
+    method: "POST",
+    body: { currentUnitKey: "UNIT.FINISH", status: "running" }
+  });
+  assert.equal(demoAtFinish.status, 200);
+  assert.equal(demoAtFinish.body.testRun.currentUnitKey, "UNIT.FINISH");
+  const completedDemo = await requestJson<{
+    testRun: {
+      testRunId: string;
+      status: string;
+      currentUnitKey: string | null;
+      unitResponses: Record<string, string>;
+      completedAt: string | null;
+    };
+  }>(`/api/v1/participant/test-runs/${demo.testRunId}/complete`, {
+    method: "POST"
+  });
+  assert.equal(completedDemo.status, 200);
+  assert.equal(completedDemo.body.testRun.testRunId, demo.testRunId);
+  assert.equal(completedDemo.body.testRun.status, "completed");
+  assert.equal(completedDemo.body.testRun.currentUnitKey, null);
+  assert.deepEqual(completedDemo.body.testRun.unitResponses, {});
+  assert.ok(completedDemo.body.testRun.completedAt);
+  const demoAfterCompletion = await requestJson<{
+    currentRunState: {
+      participantSession: { status: string };
+      testRun: {
+        testRunId: string;
+        status: string;
+        currentUnitKey: string | null;
+        completedAt: string | null;
+        unitResponses: Record<string, string>;
+        unlockedTestletKeys?: string[];
+        testletTimers?: Record<string, unknown>;
+        lockedTestletKeys?: string[];
+        lockedUnitKeys?: string[];
+      };
+      booklets: Array<{ status: string }>;
+      availableActions: string[];
+    };
+  }>(`/api/v1/participant/sessions/${demo.participantSessionId}/current-state`);
+  assert.equal(demoAfterCompletion.status, 200);
+  assert.equal(demoAfterCompletion.body.currentRunState.participantSession.status, "launched");
+  assert.equal(demoAfterCompletion.body.currentRunState.testRun.testRunId, demo.testRunId);
+  assert.equal(demoAfterCompletion.body.currentRunState.testRun.status, "running");
+  assert.equal(
+    demoAfterCompletion.body.currentRunState.testRun.currentUnitKey,
+    "UNIT.INTRO"
+  );
+  assert.equal(demoAfterCompletion.body.currentRunState.testRun.completedAt, null);
+  assert.deepEqual(demoAfterCompletion.body.currentRunState.testRun.unitResponses, {});
+  assert.deepEqual(
+    demoAfterCompletion.body.currentRunState.testRun.unlockedTestletKeys,
+    [protectedTestletKey]
+  );
+  assert.deepEqual(demoAfterCompletion.body.currentRunState.testRun.testletTimers, {});
+  assert.deepEqual(
+    demoAfterCompletion.body.currentRunState.testRun.lockedTestletKeys,
+    []
+  );
+  assert.deepEqual(demoAfterCompletion.body.currentRunState.testRun.lockedUnitKeys, []);
+  assert.deepEqual(
+    demoAfterCompletion.body.currentRunState.booklets.map(booklet => booklet.status),
+    ["in_progress"]
+  );
+  assert.equal(
+    demoAfterCompletion.body.currentRunState.availableActions.includes("save_progress"),
+    true
+  );
+  const rerunDemo = await requestJson<{
+    testRun: { testRunId: string; status: string; currentUnitKey: string | null };
+  }>(`/api/v1/participant/sessions/${demo.participantSessionId}/resume`, {
+    method: "POST"
+  });
+  assert.equal(rerunDemo.status, 200);
+  assert.equal(rerunDemo.body.testRun.testRunId, demo.testRunId);
+  assert.equal(rerunDemo.body.testRun.status, "running");
+  assert.equal(rerunDemo.body.testRun.currentUnitKey, "UNIT.INTRO");
 
   const review = await start("mode-review");
   assert.equal(review.currentRunState.executionMode.saveResponses, false);

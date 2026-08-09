@@ -42,7 +42,9 @@ and authorize navigation or completion in the same request, but never enter the
 response store, Player-log store, save outbox, or Local Storage. Re-entry resets
 the automatic path, current Unit, code grants, timers, leave locks, and temporary
 monitor unlocks while retaining explicit adaptive choices and separately stored
-Review comments.
+Review comments. Completing one of these non-saving runs shows the terminal
+confirmation in the active browser, then keeps the same response-free run open
+for another attempt instead of consuming the booklet assignment.
 
 Platform administrators can configure the original-style instance application
 title, logo, `Primar`/`Sekundar`/`Erwachsene` audience theme, and a time-bounded

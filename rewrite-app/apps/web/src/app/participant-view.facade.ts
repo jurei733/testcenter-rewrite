@@ -2733,8 +2733,13 @@ export class ParticipantViewFacade {
       payload,
       this.runtime.runtimeMonitorView
     );
-    this.persistState();
-    await this.refreshCurrentStateInternal(true);
+    if (saveResponses) {
+      this.persistState();
+      await this.refreshCurrentStateInternal(true);
+    } else {
+      this.presentTransientCompletion(payload.testRun);
+      this.persistState();
+    }
     if (activeTimerBeforeComplete) {
       this.showTimerLifecycleEvent(
         payload.testRun.testRunId,
@@ -3216,6 +3221,55 @@ export class ParticipantViewFacade {
       this.runtime.currentUnitKey = testRun.currentUnitKey;
     }
     this.syncActiveBookletCustomTexts();
+  }
+
+  private presentTransientCompletion(
+    testRun: CompleteTestRunResponse["testRun"]
+  ): void {
+    if (!this.currentRunState) {
+      return;
+    }
+    const completedState: ParticipantCurrentRunStateResponse["currentRunState"] = {
+      ...this.currentRunState,
+      testRun: {
+        ...this.currentRunState.testRun,
+        ...testRun
+      },
+      currentUnit: {
+        unitKey: null,
+        displayLabel: null,
+        description: null,
+        content: null,
+        player: null,
+        unitDefinition: null,
+        unitDefinitionType: null,
+        testletPath: []
+      },
+      activeTestletTimer: null,
+      activeLeaveLock: null,
+      navigation: {
+        previousUnitKey: null,
+        nextUnitKey: null,
+        canGoPrevious: false,
+        canGoNext: false,
+        canComplete: false,
+        canPlayerEnd: false,
+        backwardDeniedReasons: [],
+        forwardDeniedReasons: [],
+        backwardAdvisoryReasons: [],
+        forwardAdvisoryReasons: [],
+        nextTestletGate: null
+      },
+      availableActions: this.currentRunState.executionMode.canReview
+        ? ["review"]
+        : []
+    };
+    this.currentRunState = completedState;
+    this.runtime.currentUnitKey = "";
+    this.runtime.currentRunStateView = prettyPrintJson(
+      { currentRunState: completedState },
+      this.runtime.currentRunStateView
+    );
   }
 
   private syncParticipantSessionFields(participantSession: {

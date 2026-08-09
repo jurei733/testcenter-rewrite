@@ -7269,7 +7269,25 @@ try {
       { method: "GET" }
     )
   ).json();
+  assert.equal(completedSimulationState.currentRunState?.testRun?.testRunId, simulationRunId);
+  assert.equal(completedSimulationState.currentRunState?.testRun?.status, "running");
+  assert.equal(completedSimulationState.currentRunState?.testRun?.currentUnitKey, null);
+  assert.equal(completedSimulationState.currentRunState?.testRun?.completedAt, null);
   assert.deepEqual(completedSimulationState.currentRunState?.testRun?.unitResponses, {});
+  assert.deepEqual(
+    completedSimulationState.currentRunState?.testRun?.unlockedTestletKeys,
+    []
+  );
+  assert.deepEqual(completedSimulationState.currentRunState?.testRun?.testletTimers, {});
+  assert.deepEqual(
+    completedSimulationState.currentRunState?.testRun?.lockedTestletKeys,
+    []
+  );
+  assert.deepEqual(completedSimulationState.currentRunState?.testRun?.lockedUnitKeys, []);
+  assert.deepEqual(
+    completedSimulationState.currentRunState?.booklets?.map(booklet => booklet.status),
+    ["in_progress"]
+  );
   const simulationLogs = await (
     await sendSmokeJson(
       `${baseUrl}/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/test-logs?testRunId=${encodeURIComponent(
@@ -7287,6 +7305,32 @@ try {
     false,
     "Simulation responses must not survive in local storage."
   );
+  await page.locator("#participantRouteStartOrResumeButton").click();
+  await page
+    .locator("#participantRouteStatus")
+    .filter({ hasText: "running" })
+    .waitFor({ timeout: 15_000 });
+  assert.equal(
+    (await page.locator("#participantRouteRunId").textContent())?.trim(),
+    simulationRunId,
+    "Completing a simulation must keep the same reusable run."
+  );
+  await page.locator("#participantRouteTestletUnlockCode").waitFor({
+    state: "visible",
+    timeout: 15_000
+  });
+  const rerunSimulationState = await (
+    await sendSmokeJson(
+      `${baseUrl}/api/v1/participant/sessions/${encodeURIComponent(
+        simulationSessionId
+      )}/current-state`,
+      { method: "GET" }
+    )
+  ).json();
+  assert.equal(rerunSimulationState.currentRunState?.testRun?.testRunId, simulationRunId);
+  assert.equal(rerunSimulationState.currentRunState?.testRun?.status, "running");
+  assert.equal(rerunSimulationState.currentRunState?.testRun?.currentUnitKey, null);
+  assert.deepEqual(rerunSimulationState.currentRunState?.testRun?.unitResponses, {});
   stopAfter("participant-test-mode-navigation-advisory");
 
   logStep("participant-original-verona-player");
