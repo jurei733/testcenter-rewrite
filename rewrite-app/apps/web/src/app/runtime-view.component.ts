@@ -118,6 +118,23 @@ import { SummaryCardsComponent } from "./summary-cards.component";
         <p id="monitorProfileDetail">{{ view.monitorProfileDetail }}</p>
         <p id="monitorProfilePresentation">{{ view.monitorProfilePresentation }}</p>
         <p id="monitorColumnPresentation">{{ view.monitorColumnPresentation }}</p>
+        <section id="monitorDisplayOptions" aria-labelledby="monitorDisplayOptionsHeading">
+          <strong id="monitorDisplayOptionsHeading">{{ view.monitorText("gm_menu_cols") }}</strong>
+          <div class="actions">
+            <button id="monitorToggleGroupColumnButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorDisplayColumnVisible('groupColumn')" (click)="view.toggleMonitorDisplayColumn('groupColumn')">{{ view.monitorText("gm_col_groupName") }}</button>
+            <button id="monitorToggleBookletColumnButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorDisplayColumnVisible('bookletColumn')" (click)="view.toggleMonitorDisplayColumn('bookletColumn')">{{ view.monitorText("gm_col_bookletLabel") }}</button>
+            <button id="monitorToggleBlockColumnButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorDisplayColumnVisible('blockColumn')" (click)="view.toggleMonitorDisplayColumn('blockColumn')">{{ view.monitorText("gm_col_blockLabel") }}</button>
+            <button id="monitorToggleUnitColumnButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorDisplayColumnVisible('unitColumn')" (click)="view.toggleMonitorDisplayColumn('unitColumn')">{{ view.monitorText("gm_col_unitLabel") }}</button>
+            <button *ngFor="let stateColumn of view.monitorAvailableBookletStateColumns" class="ghost monitor-booklet-state-column" type="button" [attr.data-state-column]="stateColumn" [attr.aria-pressed]="view.monitorBookletStateColumnVisible(stateColumn)" (click)="view.toggleMonitorBookletStateColumn(stateColumn)">{{ view.monitorText("gm_menu_cols_states") }} {{ stateColumn }}</button>
+          </div>
+          <strong>{{ view.monitorText("gm_col_state") }}</strong>
+          <div class="actions">
+            <button id="monitorDisplayFullButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorProfileDensity === 'full'" (click)="view.selectMonitorDisplayDensity('full')">{{ view.monitorText("gm_view_full") }}</button>
+            <button id="monitorDisplayMediumButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorProfileDensity === 'medium'" (click)="view.selectMonitorDisplayDensity('medium')">{{ view.monitorText("gm_view_medium") }}</button>
+            <button id="monitorDisplaySmallButton" class="ghost" type="button" [attr.aria-pressed]="view.monitorProfileDensity === 'small'" (click)="view.selectMonitorDisplayDensity('small')">{{ view.monitorText("gm_view_small") }}</button>
+            <button id="monitorResetDisplayOptionsButton" class="ghost" type="button" (click)="view.resetMonitorDisplayOptions()">Reset to Profile</button>
+          </div>
+        </section>
         <p id="monitorTargetTimerStatus" *ngIf="view.monitorSelectedTargetTimerText">{{ view.monitorSelectedTargetTimerText }}</p>
         <p
           id="monitorCommandNotice"

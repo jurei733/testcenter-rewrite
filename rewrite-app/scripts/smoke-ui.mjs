@@ -11998,6 +11998,84 @@ try {
     "small",
     "Imported small monitor profile must apply the compact card layout."
   );
+  assert.equal(
+    await page.locator("#monitorToggleGroupColumnButton").getAttribute("aria-pressed"),
+    "true"
+  );
+  assert.equal(
+    await page.locator("#monitorToggleBookletColumnButton").getAttribute("aria-pressed"),
+    "false"
+  );
+  await page.locator("#monitorToggleGroupColumnButton").click();
+  await page.locator("#monitorToggleBookletColumnButton").click();
+  await page.locator("#monitorToggleBlockColumnButton").click();
+  await page.locator("#monitorToggleUnitColumnButton").click();
+  await page.locator("#monitorDisplayFullButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#monitorDisplayFullButton")
+        ?.getAttribute("aria-pressed") === "true" &&
+      document
+        .querySelector("#openMonitorRunsCollection .record-collection-grid")
+        ?.getAttribute("data-density") === "full"
+  );
+  assert.equal(
+    await scopedOpenRuns.locator(".record-collection-grid").getAttribute("data-density"),
+    "full",
+    "The Original-style activity menu must override the imported profile density."
+  );
+  for (const visibleColumn of [
+    "Session",
+    "Run",
+    "UI Test Booklet",
+    "UI Section",
+    "UI Task"
+  ]) {
+    assert.equal(
+      await scopedOpenRuns.getByText(visibleColumn, { exact: true }).count(),
+      1,
+      `The runtime display controls must show the ${visibleColumn} column.`
+    );
+  }
+  assert.equal(
+    await scopedOpenRuns.getByText("UI Cohort", { exact: true }).count(),
+    0,
+    "The runtime display controls must hide the group column."
+  );
+  await page.locator("#monitorResetDisplayOptionsButton").click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector("#monitorDisplaySmallButton")
+        ?.getAttribute("aria-pressed") === "true" &&
+      document
+        .querySelector("#openMonitorRunsCollection .record-collection-grid")
+        ?.getAttribute("data-density") === "small"
+  );
+  assert.equal(
+    await scopedOpenRuns.locator(".record-collection-grid").getAttribute("data-density"),
+    "small",
+    "Reset must restore the imported profile density."
+  );
+  assert.equal(
+    await scopedOpenRuns.getByText("UI Cohort", { exact: true }).count(),
+    1,
+    "Reset must restore imported profile columns."
+  );
+  for (const hiddenColumn of [
+    "Session",
+    "Run",
+    "UI Test Booklet",
+    "UI Section",
+    "UI Task"
+  ]) {
+    assert.equal(
+      await scopedOpenRuns.getByText(hiddenColumn, { exact: true }).count(),
+      0,
+      `Reset must hide the profile-disabled ${hiddenColumn} column.`
+    );
+  }
   const monitorOverview = page.locator("#monitorOverviewCard");
   await monitorOverview
     .locator(".summary-card")

@@ -86,6 +86,17 @@ type MonitorBlockNavigationTarget = NonNullable<
   OpenMonitorRun["blockNavigationTargets"]
 >[number];
 
+type MonitorDisplayColumn =
+  | "groupColumn"
+  | "bookletColumn"
+  | "blockColumn"
+  | "unitColumn";
+
+type MonitorDisplaySettings = Record<MonitorDisplayColumn, "show" | "hide"> & {
+  view: RecordCollectionDensity;
+  bookletStatesColumns: string[];
+};
+
 const monitorFilterTargetTextKeys: Readonly<
   Record<string, MonitorCustomTextKey>
 > = {
@@ -142,6 +153,10 @@ export class RuntimeViewFacade {
   private readonly monitorBatchSelection = new Set<string>();
   monitorControlsVisible = true;
   monitorBookletListExpanded = true;
+  private monitorDisplayOverride: {
+    profileId: string;
+    settings: MonitorDisplaySettings;
+  } | null = null;
   private selectedMonitorBlockNavigationTargets: NonNullable<
     OpenMonitorRun["blockNavigationTargets"]
   > = [];
@@ -257,17 +272,7 @@ export class RuntimeViewFacade {
   }
 
   get monitorProfileDensity(): RecordCollectionDensity {
-    switch (this.activeMonitorProfile?.settings.view) {
-      case "small":
-        return "small";
-      case "medium":
-      case "middle":
-        return "medium";
-      case "full":
-      case "large":
-      default:
-        return "full";
-    }
+    return this.monitorDisplaySettings.view;
   }
 
   get monitorBlockNavigationTargets(): NonNullable<
@@ -312,28 +317,70 @@ export class RuntimeViewFacade {
   }
 
   get monitorColumnPresentation(): string {
-    const profile = this.activeMonitorProfile;
-    if (!profile) {
-      return `${this.monitorText("gm_menu_cols")}: ${this.monitorText("gm_col_bookletLabel")}, ${this.monitorText("gm_col_unitLabel")}. ${this.monitorText("gm_menu_cols_states")}: ${this.monitorText("gm_col_state")}.`;
-    }
+    const settings = this.monitorDisplaySettings;
     const visibleColumns = [
-      profile.settings.groupColumn === "show"
+      settings.groupColumn === "show"
         ? this.monitorText("gm_col_groupName")
         : "",
-      profile.settings.bookletColumn === "show"
+      settings.bookletColumn === "show"
         ? this.monitorText("gm_col_bookletLabel")
         : "",
-      profile.settings.blockColumn === "show"
+      settings.blockColumn === "show"
         ? this.monitorText("gm_col_blockLabel")
         : "",
-      profile.settings.unitColumn === "show"
+      settings.unitColumn === "show"
         ? this.monitorText("gm_col_unitLabel")
         : ""
     ].filter(Boolean);
-    const stateColumns = profile.settings.bookletStatesColumns
-      .split(/[\W,]+/)
-      .filter(Boolean);
+    const stateColumns = settings.bookletStatesColumns;
     return `${this.monitorText("gm_menu_cols")}: ${visibleColumns.join(", ") || "—"}. ${this.monitorText("gm_menu_cols_states")}: ${stateColumns.join(", ") || "—"}.`;
+  }
+
+  get monitorAvailableBookletStateColumns(): string[] {
+    return Array.from(
+      new Set(
+        this.visibleOpenMonitorRuns.flatMap(openRun =>
+          Object.keys(openRun.bookletStates)
+        )
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }
+
+  monitorDisplayColumnVisible(column: MonitorDisplayColumn): boolean {
+    return this.monitorDisplaySettings[column] === "show";
+  }
+
+  monitorBookletStateColumnVisible(column: string): boolean {
+    return this.monitorDisplaySettings.bookletStatesColumns.includes(column);
+  }
+
+  toggleMonitorDisplayColumn(column: MonitorDisplayColumn): void {
+    const settings = this.editableMonitorDisplaySettings();
+    settings[column] = settings[column] === "show" ? "hide" : "show";
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  toggleMonitorBookletStateColumn(column: string): void {
+    if (!this.monitorAvailableBookletStateColumns.includes(column)) {
+      return;
+    }
+    const settings = this.editableMonitorDisplaySettings();
+    settings.bookletStatesColumns = settings.bookletStatesColumns.includes(column)
+      ? settings.bookletStatesColumns.filter(candidate => candidate !== column)
+      : [...settings.bookletStatesColumns, column].sort((left, right) =>
+          left.localeCompare(right)
+        );
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  selectMonitorDisplayDensity(view: RecordCollectionDensity): void {
+    this.editableMonitorDisplaySettings().view = view;
+    this.uiState.renderVersion.update(version => version + 1);
+  }
+
+  resetMonitorDisplayOptions(): void {
+    this.monitorDisplayOverride = null;
+    this.uiState.renderVersion.update(version => version + 1);
   }
 
   toggleMonitorControls(): void {
@@ -380,6 +427,7 @@ export class RuntimeViewFacade {
       return;
     }
     this.runtime.monitorProfileId = profileId;
+    this.monitorDisplayOverride = null;
     this.monitorBatchSelection.clear();
     this.persistState();
     this.uiState.renderVersion.update(version => version + 1);
@@ -2187,7 +2235,7 @@ export class RuntimeViewFacade {
   }
 
   get openRunItems(): RecordCollectionItem[] {
-    const profile = this.activeMonitorProfile;
+    const displaySettings = this.monitorDisplaySettings;
     return (
       this.visibleOpenMonitorRuns.map(openRun => {
         const displayName = openRun.participantRosterEntry?.displayName;
@@ -2244,7 +2292,7 @@ export class RuntimeViewFacade {
               label: this.monitorText("gm_col_state"),
               value: `${monitorState} · CONTROLLER=${controllerState}`
             },
-            ...(profile?.settings.view === "small"
+            ...(displaySettings.view === "small"
               ? []
               : [{ label: "Session", value: openRun.participantSessionId }]),
             ...participantSessionLinkRows(openRun.participantSessionId, {
@@ -2254,13 +2302,13 @@ export class RuntimeViewFacade {
               groupKey: openRun.groupKey,
               bookletKey: openRun.bookletKey
             }),
-            ...(profile?.settings.groupColumn === "show"
+            ...(displaySettings.groupColumn === "show"
               ? [{ label: this.monitorText("gm_col_groupName"), value: openRun.groupKey }]
               : []),
-            ...(profile?.settings.view === "small"
+            ...(displaySettings.view === "small"
               ? []
               : [{ label: "Run", value: openRun.testRunId }]),
-            ...(profile?.settings.bookletColumn === "hide"
+            ...(displaySettings.bookletColumn === "hide"
               ? []
               : [
                   {
@@ -2279,7 +2327,7 @@ export class RuntimeViewFacade {
                     label: "Booklet Assignment",
                     value: openRun.bookletAssignmentKey
                   },
-                  ...(openRun.bookletError && profile?.settings.view !== "small"
+                  ...(openRun.bookletError && displaySettings.view !== "small"
                     ? [
                         {
                           label: "Booklet Reference",
@@ -2288,8 +2336,11 @@ export class RuntimeViewFacade {
                       ]
                     : [])
                 ]),
-            ...this.monitorBookletStateRows(openRun, profile),
-            ...(profile?.settings.blockColumn === "show"
+            ...this.monitorBookletStateRows(
+              openRun,
+              displaySettings.bookletStatesColumns
+            ),
+            ...(displaySettings.blockColumn === "show"
               ? [
                   {
                     label: this.monitorText("gm_col_blockLabel"),
@@ -2300,7 +2351,7 @@ export class RuntimeViewFacade {
                   }
                 ]
               : []),
-            ...(profile?.settings.unitColumn === "hide"
+            ...(displaySettings.unitColumn === "hide"
               ? []
               : [
                   {
@@ -2309,7 +2360,7 @@ export class RuntimeViewFacade {
                       openRun.currentUnitLabel ?? openRun.currentUnitKey ?? "none"
                   }
                 ]),
-            ...(profile?.settings.view === "small"
+            ...(displaySettings.view === "small"
               ? []
               : [
                   { label: "Execution Mode", value: openRun.executionMode },
@@ -4576,22 +4627,8 @@ export class RuntimeViewFacade {
 
   private monitorBookletStateRows(
     openRun: OpenMonitorRun,
-    profile: MonitorViewProfile | null
+    visibleStateKeys: string[]
   ): RecordCollectionRow[] {
-    if (!profile) {
-      const states = Object.entries(openRun.bookletStates).map(
-        ([stateKey, optionKey]) => `${stateKey}=${optionKey}`
-      );
-      return [
-        {
-          label: this.monitorText("gm_menu_cols_states"),
-          value: states.length > 0 ? states.join(" | ") : "none"
-        }
-      ];
-    }
-    const visibleStateKeys = profile.settings.bookletStatesColumns
-      .split(/[\W,]+/)
-      .filter(Boolean);
     if (visibleStateKeys.length === 0) {
       return [];
     }
@@ -4605,6 +4642,46 @@ export class RuntimeViewFacade {
         value: states.length > 0 ? states.join(" | ") : "none"
       }
     ];
+  }
+
+  private get monitorDisplaySettings(): MonitorDisplaySettings {
+    const profileId = this.activeMonitorProfileId || "__default__";
+    if (this.monitorDisplayOverride?.profileId === profileId) {
+      return this.monitorDisplayOverride.settings;
+    }
+    const profileSettings = this.activeMonitorProfile?.settings;
+    return {
+      groupColumn: profileSettings?.groupColumn === "show" ? "show" : "hide",
+      bookletColumn:
+        profileSettings?.bookletColumn === "hide" ? "hide" : "show",
+      blockColumn: profileSettings?.blockColumn === "show" ? "show" : "hide",
+      unitColumn: profileSettings?.unitColumn === "hide" ? "hide" : "show",
+      view:
+        profileSettings?.view === "small"
+          ? "small"
+          : profileSettings?.view === "medium" ||
+              profileSettings?.view === "middle"
+            ? "medium"
+            : "full",
+      bookletStatesColumns: profileSettings
+        ? profileSettings.bookletStatesColumns.split(/[\W,]+/).filter(Boolean)
+        : this.monitorAvailableBookletStateColumns
+    };
+  }
+
+  private editableMonitorDisplaySettings(): MonitorDisplaySettings {
+    const profileId = this.activeMonitorProfileId || "__default__";
+    if (this.monitorDisplayOverride?.profileId !== profileId) {
+      const settings = this.monitorDisplaySettings;
+      this.monitorDisplayOverride = {
+        profileId,
+        settings: {
+          ...settings,
+          bookletStatesColumns: [...settings.bookletStatesColumns]
+        }
+      };
+    }
+    return this.monitorDisplayOverride.settings;
   }
 
   private get hasValidMonitorTimeSeconds(): boolean {
