@@ -12366,6 +12366,133 @@ const findZipEndOfCentralDirectoryOffset = (zipBuffer: Buffer): number => {
   return -1;
 };
 
+const readZipSafeUInt64LE = (buffer: Buffer, offset: number): number | null => {
+  if (offset < 0 || offset + 8 > buffer.length) {
+    return null;
+  }
+  const value = buffer.readBigUInt64LE(offset);
+  return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+};
+
+const readZip64DirectoryMetadata = (
+  zipBuffer: Buffer,
+  endOfCentralDirectoryOffset: number
+): {
+  entryCount: number;
+  centralDirectorySize: number;
+  centralDirectoryOffset: number;
+  centralDirectoryEnd: number;
+} | null => {
+  const locatorOffset = endOfCentralDirectoryOffset - 20;
+  if (
+    locatorOffset < 0 ||
+    zipBuffer.readUInt32LE(locatorOffset) !== 0x07064b50 ||
+    zipBuffer.readUInt32LE(locatorOffset + 4) !== 0 ||
+    zipBuffer.readUInt32LE(locatorOffset + 16) !== 1
+  ) {
+    return null;
+  }
+  const recordOffset = readZipSafeUInt64LE(zipBuffer, locatorOffset + 8);
+  if (
+    recordOffset == null ||
+    recordOffset + 56 > locatorOffset ||
+    zipBuffer.readUInt32LE(recordOffset) !== 0x06064b50
+  ) {
+    return null;
+  }
+  const recordSize = readZipSafeUInt64LE(zipBuffer, recordOffset + 4);
+  if (
+    recordSize == null ||
+    recordSize < 44 ||
+    recordOffset + 12 + recordSize !== locatorOffset ||
+    zipBuffer.readUInt32LE(recordOffset + 16) !== 0 ||
+    zipBuffer.readUInt32LE(recordOffset + 20) !== 0
+  ) {
+    return null;
+  }
+  const diskEntryCount = readZipSafeUInt64LE(zipBuffer, recordOffset + 24);
+  const entryCount = readZipSafeUInt64LE(zipBuffer, recordOffset + 32);
+  const centralDirectorySize = readZipSafeUInt64LE(zipBuffer, recordOffset + 40);
+  const centralDirectoryOffset = readZipSafeUInt64LE(zipBuffer, recordOffset + 48);
+  if (
+    diskEntryCount == null ||
+    entryCount == null ||
+    centralDirectorySize == null ||
+    centralDirectoryOffset == null ||
+    diskEntryCount !== entryCount ||
+    entryCount > 0xffff ||
+    centralDirectoryOffset + centralDirectorySize !== recordOffset
+  ) {
+    return null;
+  }
+  return {
+    entryCount,
+    centralDirectorySize,
+    centralDirectoryOffset,
+    centralDirectoryEnd: recordOffset
+  };
+};
+
+const readZip64EntryValues = (
+  extraFields: Buffer,
+  fields: {
+    uncompressedSize: boolean;
+    compressedSize: boolean;
+    localHeaderOffset: boolean;
+    diskNumber: boolean;
+  }
+): {
+  uncompressedSize?: number;
+  compressedSize?: number;
+  localHeaderOffset?: number;
+  diskNumber?: number;
+} | null => {
+  let offset = 0;
+  while (offset + 4 <= extraFields.length) {
+    const headerId = extraFields.readUInt16LE(offset);
+    const dataSize = extraFields.readUInt16LE(offset + 2);
+    const dataStart = offset + 4;
+    const dataEnd = dataStart + dataSize;
+    if (dataEnd > extraFields.length) {
+      return null;
+    }
+    if (headerId !== 0x0001) {
+      offset = dataEnd;
+      continue;
+    }
+    let valueOffset = dataStart;
+    const values: {
+      uncompressedSize?: number;
+      compressedSize?: number;
+      localHeaderOffset?: number;
+      diskNumber?: number;
+    } = {};
+    for (const [fieldName, required, byteLength] of [
+      ["uncompressedSize", fields.uncompressedSize, 8],
+      ["compressedSize", fields.compressedSize, 8],
+      ["localHeaderOffset", fields.localHeaderOffset, 8],
+      ["diskNumber", fields.diskNumber, 4]
+    ] as const) {
+      if (!required) {
+        continue;
+      }
+      if (valueOffset + byteLength > dataEnd) {
+        return null;
+      }
+      const value = byteLength === 8
+        ? readZipSafeUInt64LE(extraFields, valueOffset)
+        : extraFields.readUInt32LE(valueOffset);
+      if (value == null) {
+        return null;
+      }
+      values[fieldName] = value;
+      valueOffset += byteLength;
+    }
+    return values;
+  }
+  return Object.values(fields).some(Boolean) ? null : {};
+};
+
 const ZIP_CP437_EXTENDED_CHARACTERS = [
   "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒ",
   "áíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐",
@@ -12456,20 +12583,48 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
   const centralDirectoryOffset = zipBuffer.readUInt32LE(
     endOfCentralDirectoryOffset + 16
   );
-  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+  const zip64LocatorPresent =
+    endOfCentralDirectoryOffset >= 20 &&
+    zipBuffer.readUInt32LE(endOfCentralDirectoryOffset - 20) === 0x07064b50;
+  const usesZip64 =
+    zip64LocatorPresent ||
+    diskEntryCount === 0xffff ||
+    entryCount === 0xffff ||
+    centralDirectorySize === 0xffffffff ||
+    centralDirectoryOffset === 0xffffffff;
+  const zip64Metadata = usesZip64
+    ? readZip64DirectoryMetadata(zipBuffer, endOfCentralDirectoryOffset)
+    : null;
+  const resolvedEntryCount = zip64Metadata?.entryCount ?? entryCount;
+  const resolvedCentralDirectorySize =
+    zip64Metadata?.centralDirectorySize ?? centralDirectorySize;
+  const resolvedCentralDirectoryOffset =
+    zip64Metadata?.centralDirectoryOffset ?? centralDirectoryOffset;
+  const centralDirectoryEnd =
+    zip64Metadata?.centralDirectoryEnd ??
+    resolvedCentralDirectoryOffset + resolvedCentralDirectorySize;
   if (
     diskNumber !== 0 ||
     centralDirectoryDisk !== 0 ||
-    diskEntryCount !== entryCount ||
-    centralDirectoryEnd !== endOfCentralDirectoryOffset
+    (usesZip64 && !zip64Metadata) ||
+    (!usesZip64 && diskEntryCount !== entryCount) ||
+    (zip64Metadata &&
+      ((diskEntryCount !== 0xffff && diskEntryCount !== resolvedEntryCount) ||
+        (entryCount !== 0xffff && entryCount !== resolvedEntryCount) ||
+        (centralDirectorySize !== 0xffffffff &&
+          centralDirectorySize !== resolvedCentralDirectorySize) ||
+        (centralDirectoryOffset !== 0xffffffff &&
+          centralDirectoryOffset !== resolvedCentralDirectoryOffset))) ||
+    centralDirectoryEnd > zipBuffer.length ||
+    (!zip64Metadata && centralDirectoryEnd !== endOfCentralDirectoryOffset)
   ) {
     return null;
   }
 
   const entries: ZipEntry[] = [];
-  let offset = centralDirectoryOffset;
+  let offset = resolvedCentralDirectoryOffset;
 
-  for (let index = 0; index < entryCount; index += 1) {
+  for (let index = 0; index < resolvedEntryCount; index += 1) {
     if (
       offset + 46 > centralDirectoryEnd ||
       zipBuffer.readUInt32LE(offset) !== 0x02014b50
@@ -12480,18 +12635,54 @@ const readZipEntries = (zipBuffer: Buffer): ZipEntry[] | null => {
     const generalPurposeBitFlag = zipBuffer.readUInt16LE(offset + 8);
     const compressionMethod = zipBuffer.readUInt16LE(offset + 10);
     const checksum = zipBuffer.readUInt32LE(offset + 16);
-    const compressedSize = zipBuffer.readUInt32LE(offset + 20);
-    const uncompressedSize = zipBuffer.readUInt32LE(offset + 24);
+    const compressedSize32 = zipBuffer.readUInt32LE(offset + 20);
+    const uncompressedSize32 = zipBuffer.readUInt32LE(offset + 24);
     const fileNameLength = zipBuffer.readUInt16LE(offset + 28);
     const extraLength = zipBuffer.readUInt16LE(offset + 30);
     const commentLength = zipBuffer.readUInt16LE(offset + 32);
-    const localHeaderOffset = zipBuffer.readUInt32LE(offset + 42);
+    const diskNumberStart = zipBuffer.readUInt16LE(offset + 34);
+    const localHeaderOffset32 = zipBuffer.readUInt32LE(offset + 42);
     const fileNameStart = offset + 46;
     const fileNameEnd = fileNameStart + fileNameLength;
     const extraEnd = fileNameEnd + extraLength;
     const commentEnd = extraEnd + commentLength;
 
     if (commentEnd > centralDirectoryEnd) {
+      return null;
+    }
+
+    const zip64Values = readZip64EntryValues(
+      zipBuffer.subarray(fileNameEnd, extraEnd),
+      {
+        uncompressedSize: uncompressedSize32 === 0xffffffff,
+        compressedSize: compressedSize32 === 0xffffffff,
+        localHeaderOffset: localHeaderOffset32 === 0xffffffff,
+        diskNumber: diskNumberStart === 0xffff
+      }
+    );
+    const compressedSize =
+      compressedSize32 === 0xffffffff
+        ? zip64Values?.compressedSize
+        : compressedSize32;
+    const uncompressedSize =
+      uncompressedSize32 === 0xffffffff
+        ? zip64Values?.uncompressedSize
+        : uncompressedSize32;
+    const localHeaderOffset =
+      localHeaderOffset32 === 0xffffffff
+        ? zip64Values?.localHeaderOffset
+        : localHeaderOffset32;
+    const resolvedDiskNumber =
+      diskNumberStart === 0xffff
+        ? zip64Values?.diskNumber
+        : diskNumberStart;
+    if (
+      zip64Values == null ||
+      compressedSize == null ||
+      uncompressedSize == null ||
+      localHeaderOffset == null ||
+      resolvedDiskNumber !== 0
+    ) {
       return null;
     }
 
@@ -12561,6 +12752,26 @@ const readZipEntryBuffer = (
   const fileNameStart = entry.localHeaderOffset + 30;
   const fileNameEnd = fileNameStart + fileNameLength;
   const extraEnd = fileNameEnd + extraLength;
+  if (extraEnd > zipBuffer.length) {
+    return null;
+  }
+  const localZip64Values = readZip64EntryValues(
+    zipBuffer.subarray(fileNameEnd, extraEnd),
+    {
+      uncompressedSize: localUncompressedSize === 0xffffffff,
+      compressedSize: localCompressedSize === 0xffffffff,
+      localHeaderOffset: false,
+      diskNumber: false
+    }
+  );
+  const resolvedLocalCompressedSize =
+    localCompressedSize === 0xffffffff
+      ? localZip64Values?.compressedSize
+      : localCompressedSize;
+  const resolvedLocalUncompressedSize =
+    localUncompressedSize === 0xffffffff
+      ? localZip64Values?.uncompressedSize
+      : localUncompressedSize;
   const localRawFileName = zipBuffer.subarray(fileNameStart, fileNameEnd);
   const localUnicodePath =
     (localGeneralPurposeBitFlag & 0x0800) === 0 && extraEnd <= zipBuffer.length
@@ -12575,9 +12786,9 @@ const readZipEntryBuffer = (
     localCompressionMethod !== entry.compressionMethod ||
     (!usesDataDescriptor &&
       (localChecksum !== entry.checksum ||
-        localCompressedSize !== entry.compressedSize ||
-        localUncompressedSize !== entry.uncompressedSize)) ||
-    extraEnd > zipBuffer.length ||
+        resolvedLocalCompressedSize !== entry.compressedSize ||
+        resolvedLocalUncompressedSize !== entry.uncompressedSize)) ||
+    localZip64Values == null ||
     !localRawFileName.equals(entry.rawFileName) ||
     (localUnicodePath != null && localUnicodePath !== entry.fileName)
   ) {

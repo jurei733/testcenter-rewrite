@@ -73,6 +73,7 @@ const createZipBase64 = (
   options: {
     compressionMethod?: ZipCompressionMethod;
     archiveComment?: Buffer;
+    zip64?: boolean;
   } = {}
 ): string => {
   const localFileHeaders: Buffer[] = [];
@@ -94,25 +95,50 @@ const createZipBase64 = (
     const unicodePath = entry.unicodePathExtra == null
       ? null
       : Buffer.from(entry.unicodePathExtra, "utf8");
-    const extraField = unicodePath == null
+    const unicodePathExtraField = unicodePath == null
       ? Buffer.alloc(0)
       : Buffer.alloc(9 + unicodePath.length);
-    if (unicodePath && extraField.length > 0) {
-      extraField.writeUInt16LE(0x7075, 0);
-      extraField.writeUInt16LE(5 + unicodePath.length, 2);
-      extraField.writeUInt8(1, 4);
-      extraField.writeUInt32LE(
+    if (unicodePath && unicodePathExtraField.length > 0) {
+      unicodePathExtraField.writeUInt16LE(0x7075, 0);
+      unicodePathExtraField.writeUInt16LE(5 + unicodePath.length, 2);
+      unicodePathExtraField.writeUInt8(1, 4);
+      unicodePathExtraField.writeUInt32LE(
         entry.unicodePathChecksum ?? zipFixtureCrc32(fileName),
         5
       );
-      unicodePath.copy(extraField, 9);
+      unicodePath.copy(unicodePathExtraField, 9);
     }
+    const localZip64ExtraField = options.zip64 ? Buffer.alloc(20) : Buffer.alloc(0);
+    if (options.zip64) {
+      localZip64ExtraField.writeUInt16LE(0x0001, 0);
+      localZip64ExtraField.writeUInt16LE(16, 2);
+      localZip64ExtraField.writeBigUInt64LE(BigInt(uncompressedSize), 4);
+      localZip64ExtraField.writeBigUInt64LE(BigInt(content.length), 12);
+    }
+    const centralZip64ExtraField = options.zip64 ? Buffer.alloc(28) : Buffer.alloc(0);
+    if (options.zip64) {
+      centralZip64ExtraField.writeUInt16LE(0x0001, 0);
+      centralZip64ExtraField.writeUInt16LE(24, 2);
+      centralZip64ExtraField.writeBigUInt64LE(BigInt(uncompressedSize), 4);
+      centralZip64ExtraField.writeBigUInt64LE(BigInt(content.length), 12);
+      centralZip64ExtraField.writeBigUInt64LE(BigInt(offset), 20);
+    }
+    const localExtraField = Buffer.concat([
+      localZip64ExtraField,
+      unicodePathExtraField
+    ]);
+    const centralExtraField = Buffer.concat([
+      centralZip64ExtraField,
+      unicodePathExtraField
+    ]);
     const generalPurposeBitFlag =
       (entry.usesUtf8FileName === false ? 0 : 0x0800) |
       (entry.usesDataDescriptor ? 0x0008 : 0);
-    const localHeader = Buffer.alloc(30 + fileName.length + extraField.length);
+    const localHeader = Buffer.alloc(
+      30 + fileName.length + localExtraField.length
+    );
     localHeader.writeUInt32LE(0x04034b50, 0);
-    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(options.zip64 ? 45 : 20, 4);
     localHeader.writeUInt16LE(generalPurposeBitFlag, 6);
     localHeader.writeUInt16LE(compressionMethod, 8);
     localHeader.writeUInt32LE(0, 10);
@@ -122,24 +148,39 @@ const createZipBase64 = (
     );
     localHeader.writeUInt32LE(
       entry.localCompressedSize ??
-        (entry.usesDataDescriptor ? 0 : content.length),
+        (entry.usesDataDescriptor
+          ? 0
+          : options.zip64
+            ? 0xffffffff
+            : content.length),
       18
     );
     localHeader.writeUInt32LE(
       entry.localUncompressedSize ??
-        (entry.usesDataDescriptor ? 0 : uncompressedSize),
+        (entry.usesDataDescriptor
+          ? 0
+          : options.zip64
+            ? 0xffffffff
+            : uncompressedSize),
       22
     );
     localHeader.writeUInt16LE(fileName.length, 26);
-    localHeader.writeUInt16LE(extraField.length, 28);
+    localHeader.writeUInt16LE(localExtraField.length, 28);
     fileName.copy(localHeader, 30);
-    extraField.copy(localHeader, 30 + fileName.length);
-    const dataDescriptor = entry.usesDataDescriptor ? Buffer.alloc(16) : null;
+    localExtraField.copy(localHeader, 30 + fileName.length);
+    const dataDescriptor = entry.usesDataDescriptor
+      ? Buffer.alloc(options.zip64 ? 24 : 16)
+      : null;
     if (dataDescriptor) {
       dataDescriptor.writeUInt32LE(0x08074b50, 0);
       dataDescriptor.writeUInt32LE(checksum, 4);
-      dataDescriptor.writeUInt32LE(content.length, 8);
-      dataDescriptor.writeUInt32LE(uncompressedSize, 12);
+      if (options.zip64) {
+        dataDescriptor.writeBigUInt64LE(BigInt(content.length), 8);
+        dataDescriptor.writeBigUInt64LE(BigInt(uncompressedSize), 16);
+      } else {
+        dataDescriptor.writeUInt32LE(content.length, 8);
+        dataDescriptor.writeUInt32LE(uncompressedSize, 12);
+      }
     }
     localFileHeaders.push(
       localHeader,
@@ -148,22 +189,31 @@ const createZipBase64 = (
     );
 
     const centralDirectoryHeader = Buffer.alloc(
-      46 + fileName.length + extraField.length
+      46 + fileName.length + centralExtraField.length
     );
     centralDirectoryHeader.writeUInt32LE(0x02014b50, 0);
     centralDirectoryHeader.writeUInt16LE(20, 4);
-    centralDirectoryHeader.writeUInt16LE(20, 6);
+    centralDirectoryHeader.writeUInt16LE(options.zip64 ? 45 : 20, 6);
     centralDirectoryHeader.writeUInt16LE(generalPurposeBitFlag, 8);
     centralDirectoryHeader.writeUInt16LE(compressionMethod, 10);
     centralDirectoryHeader.writeUInt32LE(0, 12);
     centralDirectoryHeader.writeUInt32LE(checksum, 16);
-    centralDirectoryHeader.writeUInt32LE(content.length, 20);
-    centralDirectoryHeader.writeUInt32LE(uncompressedSize, 24);
+    centralDirectoryHeader.writeUInt32LE(
+      options.zip64 ? 0xffffffff : content.length,
+      20
+    );
+    centralDirectoryHeader.writeUInt32LE(
+      options.zip64 ? 0xffffffff : uncompressedSize,
+      24
+    );
     centralDirectoryHeader.writeUInt16LE(fileName.length, 28);
-    centralDirectoryHeader.writeUInt16LE(extraField.length, 30);
-    centralDirectoryHeader.writeUInt32LE(offset, 42);
+    centralDirectoryHeader.writeUInt16LE(centralExtraField.length, 30);
+    centralDirectoryHeader.writeUInt32LE(
+      options.zip64 ? 0xffffffff : offset,
+      42
+    );
     fileName.copy(centralDirectoryHeader, 46);
-    extraField.copy(centralDirectoryHeader, 46 + fileName.length);
+    centralExtraField.copy(centralDirectoryHeader, 46 + fileName.length);
     centralDirectoryHeaders.push(centralDirectoryHeader);
 
     offset += localHeader.length + content.length + (dataDescriptor?.length ?? 0);
@@ -178,16 +228,47 @@ const createZipBase64 = (
   );
   const endOfCentralDirectory = Buffer.alloc(22 + archiveComment.length);
   endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
-  endOfCentralDirectory.writeUInt16LE(entries.length, 8);
-  endOfCentralDirectory.writeUInt16LE(entries.length, 10);
-  endOfCentralDirectory.writeUInt32LE(centralDirectory.length, 12);
-  endOfCentralDirectory.writeUInt32LE(centralDirectoryOffset, 16);
+  endOfCentralDirectory.writeUInt16LE(
+    options.zip64 ? 0xffff : entries.length,
+    8
+  );
+  endOfCentralDirectory.writeUInt16LE(
+    options.zip64 ? 0xffff : entries.length,
+    10
+  );
+  endOfCentralDirectory.writeUInt32LE(
+    options.zip64 ? 0xffffffff : centralDirectory.length,
+    12
+  );
+  endOfCentralDirectory.writeUInt32LE(
+    options.zip64 ? 0xffffffff : centralDirectoryOffset,
+    16
+  );
   endOfCentralDirectory.writeUInt16LE(archiveComment.length, 20);
   archiveComment.copy(endOfCentralDirectory, 22);
 
+  const zip64EndOfCentralDirectory = options.zip64 ? Buffer.alloc(56) : null;
+  const zip64Locator = options.zip64 ? Buffer.alloc(20) : null;
+  if (zip64EndOfCentralDirectory && zip64Locator) {
+    const zip64RecordOffset = centralDirectoryOffset + centralDirectory.length;
+    zip64EndOfCentralDirectory.writeUInt32LE(0x06064b50, 0);
+    zip64EndOfCentralDirectory.writeBigUInt64LE(44n, 4);
+    zip64EndOfCentralDirectory.writeUInt16LE(45, 12);
+    zip64EndOfCentralDirectory.writeUInt16LE(45, 14);
+    zip64EndOfCentralDirectory.writeBigUInt64LE(BigInt(entries.length), 24);
+    zip64EndOfCentralDirectory.writeBigUInt64LE(BigInt(entries.length), 32);
+    zip64EndOfCentralDirectory.writeBigUInt64LE(BigInt(centralDirectory.length), 40);
+    zip64EndOfCentralDirectory.writeBigUInt64LE(BigInt(centralDirectoryOffset), 48);
+    zip64Locator.writeUInt32LE(0x07064b50, 0);
+    zip64Locator.writeBigUInt64LE(BigInt(zip64RecordOffset), 8);
+    zip64Locator.writeUInt32LE(1, 16);
+  }
   return Buffer.concat([
     ...localFileHeaders,
     centralDirectory,
+    ...(zip64EndOfCentralDirectory && zip64Locator
+      ? [zip64EndOfCentralDirectory, zip64Locator]
+      : []),
     endOfCentralDirectory
   ]).toString("base64");
 };
@@ -29233,10 +29314,25 @@ test("source document import rejects inconsistent ZIP directory metadata", async
       1,
     endOfCentralDirectoryOffset + 12
   );
+  const inconsistentZip64 = Buffer.from(
+    createZipBase64(
+      [
+        {
+          fileName: "imsmanifest.xml",
+          content:
+            '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"><resources /></manifest>'
+        }
+      ],
+      { zip64: true }
+    ),
+    "base64"
+  );
+  inconsistentZip64.writeUInt32LE(2, inconsistentZip64.length - 22 - 20 + 16);
 
   for (const [fileName, zipPayload] of [
     ["multi-disk.zip", multiDiskZip],
-    ["inconsistent-central-size.zip", inconsistentCentralSizeZip]
+    ["inconsistent-central-size.zip", inconsistentCentralSizeZip],
+    ["inconsistent-zip64-locator.zip", inconsistentZip64]
   ] as const) {
     const sourcePackage = await requestJson<{
       sourcePackage: { sourcePackageId: string };
@@ -29377,6 +29473,80 @@ test("source document import accepts ZIP data descriptor entries", async () => {
     method: "POST",
     body: {
       fileName: "data-descriptor-export.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${zipPayload}`
+    }
+  });
+
+  const importResult = await requestJson<{
+    importJob: { status: string; diagnostics: Array<{ code: string }> };
+    stagedContentRelease: { contentReleaseId: string } | null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId: sourcePackage.body.sourcePackage.sourcePackageId
+    }
+  });
+
+  assert.equal(importResult.status, 201);
+  assert.equal(importResult.body.importJob.status, "completed");
+  assert.deepEqual(importResult.body.importJob.diagnostics, []);
+  assert.ok(importResult.body.stagedContentRelease?.contentReleaseId);
+});
+
+test("source document import accepts bounded single-disk ZIP64 packages", async () => {
+  const tenantKey = "integration-tenant-zip64";
+  const workspaceKey = "integration-workspace-zip64";
+
+  await requestJson("/api/v1/platform/tenants", {
+    method: "POST",
+    body: { tenantKey, displayName: tenantKey }
+  });
+  await requestJson(`/api/v1/tenants/${tenantKey}/workspaces`, {
+    method: "POST",
+    body: { workspaceKey, displayName: workspaceKey }
+  });
+
+  const zipPayload = createZipBase64(
+    [
+      {
+        fileName: "export/imsmanifest.xml",
+        content: `
+          <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+            <resources>
+              <resource identifier="zip64-booklet" href="booklets/Booklet.xml" />
+              <resource identifier="zip64-unit" href="units/Unit.xml" />
+            </resources>
+          </manifest>
+        `
+      },
+      {
+        fileName: "export/booklets/Booklet.xml",
+        content: `
+          <Booklet>
+            <Metadata><Id>zip64-booklet</Id><Label>ZIP64 Booklet</Label></Metadata>
+            <Units><Unit id="zip64-unit" /></Units>
+          </Booklet>
+        `
+      },
+      {
+        fileName: "export/units/Unit.xml",
+        content: `
+          <Unit>
+            <Metadata><Id>zip64-unit</Id><Label>ZIP64 Unit</Label></Metadata>
+          </Unit>
+        `
+      }
+    ],
+    { compressionMethod: 8, zip64: true }
+  );
+
+  const sourcePackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "single-disk-zip64-export.zip",
       mediaType: "application/zip",
       sourceDocument: `data:application/zip;base64,${zipPayload}`
     }
