@@ -10,6 +10,7 @@ import {
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
   readVeronaPlayerApiVersion,
+  resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse
 } from "./verona-player.js";
 
@@ -264,6 +265,56 @@ test("Verona notifications and supported API versions are validated", () => {
     parseVeronaIncomingNotification({
       type: "vopWindowFocusChangedNotification",
       hasFocus: "true"
+    }),
+    null
+  );
+});
+
+test("Verona navigation keeps absolute Unit ids separate from relative commands", () => {
+  assert.deepEqual(
+    resolveVeronaNavigationRequest({
+      type: "vopUnitNavigationRequestedNotification",
+      sessionId: "run:unit",
+      target: "CY-Unit.Sample-102",
+      targetRelative: "next"
+    }),
+    { kind: "absolute", unitKey: "CY-Unit.Sample-102" }
+  );
+  assert.deepEqual(
+    resolveVeronaNavigationRequest(
+      {
+        type: "vopUnitNavigationRequestedNotification",
+        sessionId: "run:unit",
+        target: "end"
+      },
+      ["end"]
+    ),
+    { kind: "absolute", unitKey: "end" }
+  );
+  assert.deepEqual(
+    resolveVeronaNavigationRequest(
+      {
+        type: "vopUnitNavigationRequestedNotification",
+        sessionId: "run:unit",
+        target: "last"
+      },
+      ["UNIT.1", "UNIT.2"]
+    ),
+    { kind: "relative", target: "last" }
+  );
+  assert.deepEqual(
+    resolveVeronaNavigationRequest({
+      type: "vopUnitNavigationRequestedNotification",
+      sessionId: "run:unit",
+      targetRelative: " #NEXT "
+    }),
+    { kind: "relative", target: "next" }
+  );
+  assert.equal(
+    resolveVeronaNavigationRequest({
+      type: "vopUnitNavigationRequestedNotification",
+      sessionId: "run:unit",
+      targetRelative: "sideways"
     }),
     null
   );

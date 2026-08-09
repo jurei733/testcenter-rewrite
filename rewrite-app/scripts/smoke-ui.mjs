@@ -6032,7 +6032,7 @@ try {
         document.querySelector("#playerEnd").addEventListener("click", () => parent.postMessage({
           type: "vopUnitNavigationRequestedNotification",
           sessionId,
-          target: "end"
+          targetRelative: "end"
         }, "*"));
         document.querySelector("#playerRuntimeError").addEventListener("click", () => parent.postMessage({
           type: "vopRuntimeErrorNotification",
@@ -9107,7 +9107,18 @@ try {
     '[data-unit-key="testcenter-sample2"]'
   );
   assert.equal(await aspectSecondUnitNavigationItem.isEnabled(), true);
-  await aspectSecondUnitNavigationItem.click();
+  await aspectFrame.locator("body").evaluate(
+    (_body, request) => parent.postMessage({
+      type: "vopUnitNavigationRequestedNotification",
+      sessionId: request.sessionId,
+      target: request.target
+    }, "*"),
+    {
+      sessionId:
+        `${savedAspectState.currentRunState.testRun.testRunId}:${aspectUnitKey}`,
+      target: "testcenter-sample2"
+    }
+  );
   await pollJsonWithPredicate(
     `${baseUrl}/api/v1/participant/sessions/${aspectParticipantSessionId}/current-state`,
     payload =>

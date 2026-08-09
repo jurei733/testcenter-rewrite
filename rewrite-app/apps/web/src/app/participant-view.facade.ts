@@ -180,6 +180,8 @@ export type ParticipantVeronaPlayerState = {
   canGoPrevious: boolean;
   canGoNext: boolean;
   canComplete: boolean;
+  canNavigateUnits: boolean;
+  navigationUnits: ReadonlyArray<{ unitKey: string; isLocked: boolean }>;
   backwardDeniedReasons: readonly string[];
   forwardDeniedReasons: readonly string[];
   logPolicy: "disabled" | "lean" | "rich" | "debug";
@@ -1156,6 +1158,13 @@ export class ParticipantViewFacade {
       canGoPrevious: this.player.canGoPreviousUnit,
       canGoNext: this.player.canGoNextUnit,
       canComplete: currentState.navigation.canPlayerEnd,
+      canNavigateUnits:
+        currentState.testRun.status === "running" &&
+        currentState.availableActions.includes("save_progress"),
+      navigationUnits: currentState.bookletUnits.map(unit => ({
+        unitKey: unit.unitKey,
+        isLocked: unit.isLocked
+      })),
       backwardDeniedReasons: currentState.navigation.backwardDeniedReasons,
       forwardDeniedReasons: currentState.navigation.forwardDeniedReasons,
       logPolicy: currentState.booklet.policy.player.logPolicy,
@@ -1818,6 +1827,26 @@ export class ParticipantViewFacade {
   }
 
   navigateFromVerona(target: string): void {
+    if (target.startsWith("#")) {
+      const unitKey = target.slice(1).trim();
+      const targetUnit = this.player.unitItems.find(
+        unit => unit.unitKey === unitKey
+      );
+      if (!targetUnit || targetUnit.isLocked || targetUnit.isCurrent) {
+        return;
+      }
+      const currentIndex = this.player.unitItems.findIndex(unit => unit.isCurrent);
+      const targetIndex = this.player.unitItems.findIndex(
+        unit => unit.unitKey === unitKey
+      );
+      this.presentNavigationAdvisory(
+        targetIndex >= 0 && targetIndex < currentIndex ? "backward" : "forward"
+      );
+      this.viewState.onActionAsync(() =>
+        this.goToPlayerUnitInternal(`#${unitKey}`)
+      );
+      return;
+    }
     switch (target) {
       case "previous":
         this.goToPreviousUnit();
@@ -2444,8 +2473,12 @@ export class ParticipantViewFacade {
     this.veronaForegroundSaveSettlement = true;
     try {
       const player = this.player;
+      const directUnitKey = target.startsWith("#")
+        ? target.slice(1).trim()
+        : null;
       const targetUnitKey =
-        target === "previous"
+        directUnitKey ||
+        (target === "previous"
           ? player.previousUnitKey
           : target === "next"
             ? player.nextUnitKey
@@ -2457,7 +2490,7 @@ export class ParticipantViewFacade {
                     .reverse()
                     .find(unit => !unit.isCurrent && !unit.isLocked)?.unitKey ??
                   null
-                : target.trim();
+                : target.trim());
       if (!targetUnitKey) {
         return;
       }
@@ -2467,7 +2500,7 @@ export class ParticipantViewFacade {
       );
       const usesUnitMenu = !["previous", "next", "first", "last"].includes(
         target
-      );
+      ) && directUnitKey == null;
       if (
         targetUnitKey === player.unitKey ||
         !targetUnit ||

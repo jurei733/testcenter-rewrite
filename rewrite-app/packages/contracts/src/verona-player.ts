@@ -175,6 +175,65 @@ export type VeronaNavigationRequestedNotification = {
   targetRelative?: string;
 };
 
+export type VeronaRelativeNavigationTarget =
+  | "previous"
+  | "next"
+  | "first"
+  | "last"
+  | "end";
+
+export type VeronaResolvedNavigationRequest =
+  | { kind: "absolute"; unitKey: string }
+  | { kind: "relative"; target: VeronaRelativeNavigationTarget };
+
+const VERONA_RELATIVE_NAVIGATION_TARGETS = new Set<string>([
+  "previous",
+  "next",
+  "first",
+  "last",
+  "end"
+]);
+
+/**
+ * The Testcenter host uses `target` for an exact Unit id and `targetRelative`
+ * for host navigation commands. Published Simple Player releases also sent
+ * relative tokens through `target`, so known Booklet ids disambiguate that
+ * legacy dialect. Keep absolute ids case-sensitive: XML ids and repeated-Unit
+ * aliases are not command tokens.
+ */
+export const resolveVeronaNavigationRequest = (
+  notification: VeronaNavigationRequestedNotification,
+  knownUnitKeys?: readonly string[]
+): VeronaResolvedNavigationRequest | null => {
+  const absoluteTarget = notification.target?.trim();
+  if (absoluteTarget) {
+    const unitKey = absoluteTarget.replace(/^#/, "").trim();
+    const legacyRelativeTarget = unitKey.toLowerCase();
+    if (
+      knownUnitKeys &&
+      !knownUnitKeys.includes(unitKey) &&
+      VERONA_RELATIVE_NAVIGATION_TARGETS.has(legacyRelativeTarget)
+    ) {
+      return {
+        kind: "relative",
+        target: legacyRelativeTarget as VeronaRelativeNavigationTarget
+      };
+    }
+    return unitKey ? { kind: "absolute", unitKey } : null;
+  }
+
+  const relativeTarget = notification.targetRelative
+    ?.trim()
+    .replace(/^#/, "")
+    .toLowerCase();
+  return relativeTarget && VERONA_RELATIVE_NAVIGATION_TARGETS.has(relativeTarget)
+    ? {
+        kind: "relative",
+        target: relativeTarget as VeronaRelativeNavigationTarget
+      }
+    : null;
+};
+
 export type VeronaRuntimeErrorNotification = {
   type: "vopRuntimeErrorNotification";
   sessionId?: string;

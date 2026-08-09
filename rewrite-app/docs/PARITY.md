@@ -186,6 +186,24 @@ subscription: every paused-to-running transition persists
 Memory, file, and SQLite integration gates distinguish that resume entry from
 the initial launch and preceding `PAUSED` state.
 
+Latest P0 Verona navigation closure: the Participant host now mirrors the
+original `vopUnitNavigationRequestedNotification` split. `target` resolves as
+a case-sensitive absolute Unit ID, while `targetRelative` resolves the
+`previous`/`next`/`first`/`last`/`end` commands. Published Simple Player 2–5
+releases that sent those five command tokens through `target` remain executable:
+the host treats such a token as relative only when it is not the exact ID of a
+Unit in the active Booklet. The API-2 `#next`/`#previous` spelling in
+`targetRelative` is normalized at the same boundary. Absolute Player
+requests can open visible unlocked Units even when the host's Unit-menu control
+is not the source of the request, but they still pass the same direction,
+completion, adaptive-route, testlet-code, timer, and leave-lock guards before
+the server changes the current Unit. Invalid, locked, or locally denied targets
+receive the Verona navigation-denied notification instead of being treated as a
+lower-cased relative command. Contract coverage pins command precedence and
+case preservation; the production Chromium/SQLite gate drives the original
+three-Unit Aspect booklet from Unit 1 to Unit 2 through an absolute Player
+notification and verifies the server-authoritative current Unit.
+
 Latest P0 player-family closure: the compatibility corpus now also pins the
 official MIT-licensed IQB ABI 3.3.0 scripted-survey, DAN 3.0.0 visual-assessment,
 and STARS 0.6.19 choice-interaction Players. ABI retains its release example

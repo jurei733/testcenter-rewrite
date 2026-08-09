@@ -358,6 +358,8 @@ import { VeronaPlayerHostComponent } from "./verona-player-host.component";
               [canGoPrevious]="verona.canGoPrevious"
               [canGoNext]="verona.canGoNext"
               [canComplete]="verona.canComplete"
+              [canNavigateUnits]="verona.canNavigateUnits"
+              [navigationUnits]="verona.navigationUnits"
               [backwardDeniedReasons]="verona.backwardDeniedReasons"
               [forwardDeniedReasons]="verona.forwardDeniedReasons"
               [logPolicy]="verona.logPolicy"

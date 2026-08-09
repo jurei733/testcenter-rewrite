@@ -25,6 +25,7 @@ import {
   projectVeronaPageState,
   projectVeronaUnitStateLogs,
   readVeronaPlayerApiVersion,
+  resolveVeronaNavigationRequest,
   serializeVeronaUnitResponse,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MAX,
   SUPPORTED_VERONA_PLAYER_API_MAJOR_MIN,
@@ -206,6 +207,11 @@ export class VeronaPlayerHostComponent
   @Input() canGoPrevious = false;
   @Input() canGoNext = false;
   @Input() canComplete = false;
+  @Input() canNavigateUnits = false;
+  @Input() navigationUnits: ReadonlyArray<{
+    unitKey: string;
+    isLocked: boolean;
+  }> = [];
   @Input() backwardDeniedReasons: readonly string[] = [];
   @Input() forwardDeniedReasons: readonly string[] = [];
   @Input() logPolicy: "disabled" | "lean" | "rich" | "debug" = "rich";
@@ -605,10 +611,43 @@ export class VeronaPlayerHostComponent
   private handleNavigationRequest(
     notification: VeronaNavigationRequestedNotification
   ): void {
-    const target = (notification.target ?? notification.targetRelative ?? "")
-      .replace(/^#/, "")
-      .trim()
-      .toLowerCase();
+    const request = resolveVeronaNavigationRequest(
+      notification,
+      this.navigationUnits.map(unit => unit.unitKey)
+    );
+    if (!request) {
+      this.sendNavigationDenied([]);
+      return;
+    }
+    if (request.kind === "absolute") {
+      const currentIndex = this.navigationUnits.findIndex(
+        unit => unit.unitKey === this.unitKey
+      );
+      const targetIndex = this.navigationUnits.findIndex(
+        unit => unit.unitKey === request.unitKey
+      );
+      const targetUnit = this.navigationUnits[targetIndex];
+      const reasons =
+        targetIndex >= 0 && targetIndex < currentIndex
+          ? this.backwardDeniedReasons
+          : this.forwardDeniedReasons;
+      if (
+        this.canNavigateUnits &&
+        currentIndex >= 0 &&
+        targetIndex >= 0 &&
+        targetIndex !== currentIndex &&
+        targetUnit &&
+        !targetUnit.isLocked &&
+        reasons.length === 0
+      ) {
+        this.navigationRequest.emit(`#${request.unitKey}`);
+        return;
+      }
+      this.sendNavigationDenied(reasons);
+      return;
+    }
+
+    const target = request.target;
     const targetEnabled =
       (target === "previous" && this.canGoPrevious) ||
       (target === "next" && this.canGoNext) ||
