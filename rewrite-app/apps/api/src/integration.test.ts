@@ -11564,6 +11564,33 @@ test("original Testcenter compatibility corpus imports representative booklets",
     diagnosticCode: string;
   }> = [
     {
+      fileName: "booklet-namespaced-root.xml",
+      sourceDocument: validBookletXml
+        .replace(
+          "<Booklet ",
+          '<tc:Booklet xmlns:tc="urn:testcenter:unexpected" '
+        )
+        .replace("</Booklet>", "</tc:Booklet>"),
+      diagnosticCode: "testcenter_xml_root_namespace_invalid"
+    },
+    {
+      fileName: "unit-namespaced-root.xml",
+      sourceDocument: validUnitXml
+        .replace("<Unit ", '<tc:Unit xmlns:tc="urn:testcenter:unexpected" ')
+        .replace("</Unit>", "</tc:Unit>"),
+      diagnosticCode: "testcenter_xml_root_namespace_invalid"
+    },
+    {
+      fileName: "syscheck-namespaced-root.xml",
+      sourceDocument: validSystemCheckXml
+        .replace(
+          "<SysCheck ",
+          '<tc:SysCheck xmlns:tc="urn:testcenter:unexpected" '
+        )
+        .replace("</SysCheck>", "</tc:SysCheck>"),
+      diagnosticCode: "testcenter_xml_root_namespace_invalid"
+    },
+    {
       fileName: "booklet-unsupported-root-attribute.xml",
       sourceDocument: validBookletXml.replace(
         "<Booklet ",
@@ -12588,6 +12615,17 @@ test("original Testcenter compatibility corpus imports representative booklets",
         )
         .replace("<Booklet ", '<Booklet ignored="true" '),
       diagnosticCode: "testcenter_xml_root_attribute_invalid"
+    },
+    {
+      fileName: "invalid-root-namespace-dependency.zip",
+      entryFileName: "export/booklets/Booklet_error.xml",
+      entryDocument: validBookletXml
+        .replace(
+          "<Booklet ",
+          '<tc:Booklet xmlns:tc="urn:testcenter:unexpected" '
+        )
+        .replace("</Booklet>", "</tc:Booklet>"),
+      diagnosticCode: "testcenter_xml_root_namespace_invalid"
     }
   ]) {
     const zipPayload = createZipBase64([
@@ -12659,6 +12697,16 @@ test("original Testcenter compatibility corpus imports representative booklets",
     "utf8"
   );
   const invalidRosterFacetCases = [
+    {
+      label: "namespaced Testtakers root",
+      rosterText: validRosterXml
+        .replace(
+          "<Testtakers ",
+          '<tc:Testtakers xmlns:tc="urn:testcenter:unexpected" '
+        )
+        .replace("</Testtakers>", "</tc:Testtakers>"),
+      diagnosticCode: "testcenter_xml_root_namespace_invalid"
+    },
     {
       label: "unsupported Testtakers root attribute",
       rosterText: validRosterXml.replace(

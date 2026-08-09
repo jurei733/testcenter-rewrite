@@ -8367,6 +8367,14 @@ const validateTestcenterXmlSourceDocument = (
       )
     );
   }
+  if (root.namespaceURI) {
+    diagnostics.push(
+      createImportDiagnostic(
+        "testcenter_xml_root_namespace_invalid",
+        `Original Testcenter XML '${sourceFileName}' must use root element '${canonicalRootName}' without a namespace, but found '${root.namespaceURI}'.`
+      )
+    );
+  }
   if (
     !new RegExp(
       `(?:^|/)definitions/vo_${canonicalRootName}\\.xsd(?:[?#].*)?$`,
