@@ -12353,10 +12353,27 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     sha256: string;
     diagnosticCode: string;
   };
+  type CrossFileRosterCollisions = {
+    sameWorkspaceLoginFixtures: Array<{
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+    }>;
+    crossWorkspaceFixture: {
+      fixture: string;
+      sourcePath: string;
+      sha256: string;
+    };
+    loginName: string;
+    groupId: string;
+    loginDiagnosticCode: string;
+    groupDiagnosticCode: string;
+  };
   const corpus = JSON.parse(
     readFileSync(resolve(originalTestcenterCorpusRoot, "corpus.json"), "utf8")
   ) as {
     bookletIdentityCollisions: BookletIdentityCollision[];
+    crossFileRosterCollisions: CrossFileRosterCollisions;
   };
   const expectation = corpus.bookletIdentityCollisions[0];
   assert.ok(expectation);
@@ -12730,6 +12747,124 @@ test("original Testcenter compatibility corpus rejects duplicate file identities
     /CY_Logins_SM\.xml.*renamed-session-logins\.xml.*group and login assignments/
   );
   assert.equal(packageImport.body.stagedContentRelease, null);
+
+  const crossFileRoster = corpus.crossFileRosterCollisions;
+  const sameWorkspaceRosterDocuments =
+    crossFileRoster.sameWorkspaceLoginFixtures.map(fixture => {
+      const content = readFileSync(
+        resolve(originalTestcenterCorpusRoot, fixture.fixture),
+        "utf8"
+      );
+      assert.equal(
+        createHash("sha256").update(content).digest("hex"),
+        fixture.sha256,
+        fixture.sourcePath
+      );
+      return { ...fixture, content };
+    });
+  const crossWorkspaceRosterDocument = readFileSync(
+    resolve(
+      originalTestcenterCorpusRoot,
+      crossFileRoster.crossWorkspaceFixture.fixture
+    ),
+    "utf8"
+  );
+  assert.equal(
+    createHash("sha256").update(crossWorkspaceRosterDocument).digest("hex"),
+    crossFileRoster.crossWorkspaceFixture.sha256,
+    crossFileRoster.crossWorkspaceFixture.sourcePath
+  );
+  const crossFileRosterZip = createZipBase64([
+    {
+      fileName: "export/imsmanifest.xml",
+      content: `
+        <manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1">
+          <resources>
+            <resource identifier="ROSTER-LOGIN-ONE" href="rosters/login-one.xml" />
+            <resource identifier="ROSTER-LOGIN-TWO" href="rosters/login-two.xml" />
+            <resource identifier="ROSTER-GROUP-ONE" href="rosters/group-one.xml" />
+            <resource identifier="ROSTER-GROUP-TWO" href="rosters/group-two.xml" />
+          </resources>
+        </manifest>
+      `
+    },
+    {
+      fileName: "export/rosters/login-one.xml",
+      content: sameWorkspaceRosterDocuments[0]!.content
+    },
+    {
+      fileName: "export/rosters/login-two.xml",
+      content: sameWorkspaceRosterDocuments[1]!.content.replace(
+        'name="double_login"',
+        'name="DOUBLE_LOGIN"'
+      )
+    },
+    {
+      fileName: "export/rosters/group-one.xml",
+      content: crossWorkspaceRosterDocument
+    },
+    {
+      fileName: "export/rosters/group-two.xml",
+      content: crossWorkspaceRosterDocument
+        .replace('id="another_group"', 'id="ANOTHER_GROUP"')
+        .replace('name="another_login"', 'name="another_login_variant"')
+    }
+  ]);
+  const crossFileRosterPackage = await requestJson<{
+    sourcePackage: { sourcePackageId: string };
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/source-packages`, {
+    method: "POST",
+    body: {
+      fileName: "cross-file-roster-identities.zip",
+      mediaType: "application/zip",
+      sourceDocument: `data:application/zip;base64,${crossFileRosterZip}`
+    }
+  });
+  assert.equal(crossFileRosterPackage.status, 201);
+  const crossFileRosterImport = await requestJson<{
+    importJob: {
+      status: string;
+      diagnostics: Array<{ code: string; message: string }>;
+    };
+    stagedContentRelease: null;
+  }>(`/api/v1/tenants/${tenantKey}/workspaces/${workspaceKey}/import-jobs`, {
+    method: "POST",
+    body: {
+      sourcePackageId:
+        crossFileRosterPackage.body.sourcePackage.sourcePackageId
+    }
+  });
+  assert.equal(crossFileRosterImport.status, 201);
+  assert.equal(crossFileRosterImport.body.importJob.status, "failed");
+  const crossFileDiagnostics =
+    crossFileRosterImport.body.importJob.diagnostics.filter(diagnostic =>
+      [
+        crossFileRoster.loginDiagnosticCode,
+        crossFileRoster.groupDiagnosticCode
+      ].includes(diagnostic.code)
+    );
+  assert.deepEqual(
+    crossFileDiagnostics.map(diagnostic => diagnostic.code),
+    [
+      crossFileRoster.loginDiagnosticCode,
+      crossFileRoster.groupDiagnosticCode
+    ]
+  );
+  assert.match(
+    crossFileDiagnostics[0]?.message ?? "",
+    new RegExp(
+      `login-one\\.xml.*login-two\\.xml.*${crossFileRoster.loginName}`,
+      "i"
+    )
+  );
+  assert.match(
+    crossFileDiagnostics[1]?.message ?? "",
+    new RegExp(
+      `group-one\\.xml.*group-two\\.xml.*${crossFileRoster.groupId}`,
+      "i"
+    )
+  );
+  assert.equal(crossFileRosterImport.body.stagedContentRelease, null);
 
   const duplicatePathZip = createZipBase64([
     {

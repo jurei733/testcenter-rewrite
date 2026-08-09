@@ -19,6 +19,14 @@ type PinnedOriginalFixture = {
 
 type OriginalTestcenterCorpus = {
   sourceCommit: string;
+  crossFileRosterCollisions: {
+    sameWorkspaceLoginFixtures: PinnedOriginalFixture[];
+    crossWorkspaceFixture: PinnedOriginalFixture;
+    loginName: string;
+    groupId: string;
+    loginDiagnosticCode: string;
+    groupDiagnosticCode: string;
+  };
   roster: {
     fixture: string;
     participantLoginKeys: string[];
@@ -251,6 +259,37 @@ test("original Testcenter compatibility corpus separates participant and operati
   assert.equal(
     corpus.sourceCommit,
     "284a4ffcd9452d56dddd51939707ac7f646c3da7"
+  );
+
+  const crossFileRosterFixtures = [
+    ...corpus.crossFileRosterCollisions.sameWorkspaceLoginFixtures,
+    corpus.crossFileRosterCollisions.crossWorkspaceFixture
+  ];
+  for (const fixture of crossFileRosterFixtures) {
+    const fixtureBuffer = readFileSync(resolve(corpusRoot, fixture.fixture));
+    assert.equal(
+      createHash("sha256").update(fixtureBuffer).digest("hex"),
+      fixture.sha256,
+      fixture.sourcePath
+    );
+  }
+  assert.ok(
+    corpus.crossFileRosterCollisions.sameWorkspaceLoginFixtures.every(
+      fixture =>
+        readFileSync(resolve(corpusRoot, fixture.fixture), "utf8").includes(
+          `name="${corpus.crossFileRosterCollisions.loginName}"`
+        )
+    )
+  );
+  assert.match(
+    readFileSync(
+      resolve(
+        corpusRoot,
+        corpus.crossFileRosterCollisions.crossWorkspaceFixture.fixture
+      ),
+      "utf8"
+    ),
+    new RegExp(`id="${corpus.crossFileRosterCollisions.groupId}"`)
   );
 
   const rosterXml = readFileSync(

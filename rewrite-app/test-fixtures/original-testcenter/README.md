@@ -82,6 +82,11 @@ legacy data part's original value kind so API-2/3 object-valued and string-value
 Players both receive the representation they emitted.
 Prebuilt ZIP validation also rejects case-insensitive duplicate archive paths
 before resolving manifests or dependencies, matching the reviewed assembly path.
+The original backend's in-memory Testtakers identity fixtures are reconstructed
+as standalone XML files as well. They gate the file-graph rule that distinct
+Testtakers files in one package may not reuse a login or group identity even
+when their complete assignments differ; `corpus.json` points back to the
+generating strings in `VfsForTest.class.php`.
 It also contains the byte-exact
 original sample `.itcr.zip` resource package as base64 so the binary fixture
 remains reviewable and portable. The real 3.2 MB IQB Aspect 2.12.3 player is stored as

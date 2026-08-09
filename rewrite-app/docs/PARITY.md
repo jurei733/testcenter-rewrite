@@ -187,6 +187,13 @@ representative families remain P0 corpus work.
 | Draft validation before activation | workspace admin | done | P1 | import jobs, persisted diagnostics, staged release readiness, roster warnings, activation guard |
 | File browser/upload/download/delete | workspace admin files module | partial | P1 | source-package cards expose content-derived original file type, stored byte size, import/release counts, and deletion safety; protected routes serve uploads byte-exactly, preview exact blockers, and require the file name before a store-rechecked aggregate deletion. File type is an exact API/CSV filter, and Angular presents grouped type cards with a persisted type filter. Selected package detail adds a relationship graph with direct/transitive counts, concrete directed edges, and related-file handoff. Replacement creates and imports a new immutable package while retaining the prior version and auditing lineage. The lazy Angular content route uploads and selects several original loose dependencies in one operation before assembly; API tests cover classification and every local store, while browser smoke covers type views/filtering, dependency rendering, multi-select, exact ZIP download, replacement, readiness, and cascade deletion. Original result data is database-backed rather than a workspace file type and is covered by the separate result-report archive workflow |
 
+The pinned import corpus now also reconstructs the original backend's
+cross-file Testtakers fixtures. ZIP validation rejects case-insensitive reuse of
+a login name or group ID across distinct Testtakers entries with separate stable
+diagnostics, even when the complete roster digests differ. The check applies to
+one immutable package graph, so historical loose uploads and replacement
+versions are not misclassified as concurrently active roster files.
+
 ### Monitoring and control
 
 | Capability | Original evidence | Rewrite status | Priority | Rewrite evidence / gap |

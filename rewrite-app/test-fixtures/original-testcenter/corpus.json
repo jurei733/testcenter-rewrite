@@ -930,6 +930,29 @@
       "diagnosticCode": "testcenter_xml_booklet_id_duplicate"
     }
   ],
+  "crossFileRosterCollisions": {
+    "sameWorkspaceLoginFixtures": [
+      {
+        "fixture": "invalid/testtakers-duplicate-login-name-cross-file-1.xml",
+        "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-file-1.xml",
+        "sha256": "e7fdc67fa538809b86da52efa5d62dba8694a8a9870699300039f67e06e8611a"
+      },
+      {
+        "fixture": "invalid/testtakers-duplicate-login-name-cross-file-2.xml",
+        "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-file-2.xml",
+        "sha256": "6d92351ef8e8b667ba2b45d0783012862e8d63a35b7a6cc8aefe845a07f1b2c8"
+      }
+    ],
+    "crossWorkspaceFixture": {
+      "fixture": "invalid/testtakers-duplicate-login-name-cross-workspace.xml",
+      "sourcePath": "backend/test/unit/VfsForTest.class.php#testtakers-duplicate-login-name-cross-ws.xml",
+      "sha256": "f68162c812a2ca76a92956abc0be5602b879c09f2db53148ac0887507121b46a"
+    },
+    "loginName": "double_login",
+    "groupId": "another_group",
+    "loginDiagnosticCode": "testcenter_xml_login_name_cross_file_duplicate",
+    "groupDiagnosticCode": "testcenter_xml_group_id_cross_file_duplicate"
+  },
   "invalidXml": [
     {
       "fixture": "invalid/Booklet_error.xml",

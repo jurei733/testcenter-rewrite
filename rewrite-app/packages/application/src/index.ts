@@ -2010,9 +2010,16 @@ type TestcenterXmlFileIdentity = {
   source: "metadata" | "roster";
 };
 
-const readTesttakersRosterIdentity = (
+type TesttakersRosterStructure = {
+  groups: Array<{
+    groupId: string;
+    loginNames: string[];
+  }>;
+};
+
+const readTesttakersRosterStructure = (
   sourceDocument: string
-): TestcenterXmlFileIdentity | null => {
+): TesttakersRosterStructure | null => {
   const parserErrors: string[] = [];
   let document: XmlDocument | null = null;
   try {
@@ -2035,24 +2042,37 @@ const readTesttakersRosterIdentity = (
     return null;
   }
 
-  const groupIdentities = xmlChildrenNamed(root, "Group").map(group => {
-    const groupId = group.getAttribute("id")?.trim().toLowerCase() ?? "";
+  const groups = xmlChildrenNamed(root, "Group").map(group => {
+    const groupId = group.getAttribute("id")?.trim() ?? "";
     const loginNames = xmlChildrenNamed(group, "Login")
-      .map(login => login.getAttribute("name")?.trim().toLowerCase() ?? "")
-      .sort();
+      .map(login => login.getAttribute("name")?.trim() ?? "");
     return { groupId, loginNames };
   });
   if (
-    groupIdentities.length === 0 ||
-    groupIdentities.some(
-      groupIdentity =>
-        !groupIdentity.groupId ||
-        groupIdentity.loginNames.length === 0 ||
-        groupIdentity.loginNames.some(loginName => !loginName)
+    groups.length === 0 ||
+    groups.some(
+      group =>
+        !group.groupId ||
+        group.loginNames.length === 0 ||
+        group.loginNames.some(loginName => !loginName)
     )
   ) {
     return null;
   }
+  return { groups };
+};
+
+const readTesttakersRosterIdentity = (
+  sourceDocument: string
+): TestcenterXmlFileIdentity | null => {
+  const rosterStructure = readTesttakersRosterStructure(sourceDocument);
+  if (!rosterStructure) {
+    return null;
+  }
+  const groupIdentities = rosterStructure.groups.map(group => ({
+    groupId: group.groupId.toLowerCase(),
+    loginNames: group.loginNames.map(loginName => loginName.toLowerCase()).sort()
+  }));
   groupIdentities.sort((left, right) =>
     left.groupId.localeCompare(right.groupId)
   );
@@ -14554,6 +14574,14 @@ const validateZipXmlEntries = (
   const diagnostics: ImportJobDiagnostic[] = [];
   const validatedPlayerKeys = new Set<string>();
   const xmlIdentitySourceFileByKey = new Map<string, string>();
+  const rosterGroupSourceByKey = new Map<
+    string,
+    { value: string; sourceFileName: string }
+  >();
+  const rosterLoginSourceByKey = new Map<
+    string,
+    { value: string; sourceFileName: string }
+  >();
   const zipEntrySourceFileByPath = new Map<string, string>();
   for (const entry of manifestExtraction.entries) {
     if (!isSafeRelativeArchivePath(entry.fileName, entry.fileName.endsWith("/"))) {
@@ -14706,12 +14734,14 @@ const validateZipXmlEntries = (
       ...validateTestcenterXmlSourceDocument(sourceDocument, entry.fileName)
     );
     const xmlFileIdentity = readTestcenterXmlFileIdentity(sourceDocument);
+    let hasDuplicateXmlIdentity = false;
     if (xmlFileIdentity) {
       const identityKey =
         `${xmlFileIdentity.fileType}:${xmlFileIdentity.id}`.toUpperCase();
       const existingIdentitySourceFile =
         xmlIdentitySourceFileByKey.get(identityKey);
       if (existingIdentitySourceFile) {
+        hasDuplicateXmlIdentity = true;
         const identityDescription =
           xmlFileIdentity.source === "roster"
             ? "the same case-insensitive group and login assignments"
@@ -14724,6 +14754,60 @@ const validateZipXmlEntries = (
         );
       } else {
         xmlIdentitySourceFileByKey.set(identityKey, entry.fileName);
+      }
+    }
+    if (
+      xmlFileIdentity?.fileType === "Testtakers" &&
+      !hasDuplicateXmlIdentity
+    ) {
+      const rosterStructure = readTesttakersRosterStructure(sourceDocument);
+      const registerRosterValues = (
+        values: string[],
+        valueLabel: "group id" | "login name",
+        diagnosticCode:
+          | "testcenter_xml_group_id_cross_file_duplicate"
+          | "testcenter_xml_login_name_cross_file_duplicate",
+        sourceByKey: Map<
+          string,
+          { value: string; sourceFileName: string }
+        >
+      ): void => {
+        const valuesInCurrentFile = new Set<string>();
+        for (const value of values) {
+          const identityKey = value.toLowerCase();
+          if (!identityKey || valuesInCurrentFile.has(identityKey)) {
+            continue;
+          }
+          valuesInCurrentFile.add(identityKey);
+          const existingSource = sourceByKey.get(identityKey);
+          if (existingSource) {
+            diagnostics.push(
+              createImportDiagnostic(
+                diagnosticCode,
+                `Original Testcenter ZIP entries '${existingSource.sourceFileName}' and '${entry.fileName}' reuse Testtakers ${valueLabel} '${value}' (first declared as '${existingSource.value}'), which must be unique case-insensitively across files.`
+              )
+            );
+          } else {
+            sourceByKey.set(identityKey, {
+              value,
+              sourceFileName: entry.fileName
+            });
+          }
+        }
+      };
+      if (rosterStructure) {
+        registerRosterValues(
+          rosterStructure.groups.map(group => group.groupId),
+          "group id",
+          "testcenter_xml_group_id_cross_file_duplicate",
+          rosterGroupSourceByKey
+        );
+        registerRosterValues(
+          rosterStructure.groups.flatMap(group => group.loginNames),
+          "login name",
+          "testcenter_xml_login_name_cross_file_duplicate",
+          rosterLoginSourceByKey
+        );
       }
     }
     for (const systemCheck of parseSystemCheckSourceDocument(sourceDocument)) {
